@@ -38,7 +38,7 @@ class RakResource extends Resource
                 TextInput::make('code')
                     ->required()
                     ->maxLength(255),
-                Select::make('warehouse')
+                Select::make('warehouse_id')
                     ->label('Warehouse')
                     ->searchable()
                     ->preload()
