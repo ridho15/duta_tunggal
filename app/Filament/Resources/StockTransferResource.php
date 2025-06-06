@@ -2,50 +2,52 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\WarehouseResource\Pages;
-use App\Models\Warehouse;
+use App\Filament\Resources\StockTransferResource\Pages;
+use App\Filament\Resources\StockTransferResource\RelationManagers;
+use App\Models\StockTransfer;
+use Filament\Forms;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class WarehouseResource extends Resource
+class StockTransferResource extends Resource
 {
-    protected static ?string $model = Warehouse::class;
+    protected static ?string $model = StockTransfer::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-home-modern';
+    protected static ?string $navigationIcon = 'heroicon-o-arrows-up-down';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Warehouse';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Fieldset::make('Form Warehouse')
+                Fieldset::make('Form Stock Transfer')
                     ->schema([
-                        TextInput::make('name')
+                        TextInput::make('transfer_number')
                             ->required()
                             ->maxLength(255),
-                        TextInput::make('location')
+                        TextInput::make('from_warehouse_id')
                             ->required()
-                            ->maxLength(255),
-                        Repeater::make('rak')
-                            ->relationship()
-                            ->schema([
-                                TextInput::make('name')
-                                    ->required()
-                                    ->maxLength(255),
-                                TextInput::make('code')
-                                    ->required()
-                                    ->maxLength(255),
-                            ])
+                            ->numeric(),
+                        TextInput::make('to_warehouse_id')
+                            ->required()
+                            ->numeric(),
+                        DateTimePicker::make('transfer_date')
+                            ->required(),
+                        TextInput::make('status')
+                            ->required(),
                     ])
             ]);
     }
@@ -54,14 +56,18 @@ class WarehouseResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('transfer_number')
                     ->searchable(),
-                TextColumn::make('location')
-                    ->searchable(),
-                TextColumn::make('rak.name')
-                    ->label('Rak')
-                    ->badge()
-                    ->searchable(),
+                TextColumn::make('from_warehouse_id')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('to_warehouse_id')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('transfer_date')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('status'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -99,9 +105,9 @@ class WarehouseResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListWarehouses::route('/'),
-            // 'create' => Pages\CreateWarehouse::route('/create'),
-            // 'edit' => Pages\EditWarehouse::route('/{record}/edit'),
+            'index' => Pages\ListStockTransfers::route('/'),
+            'create' => Pages\CreateStockTransfer::route('/create'),
+            'edit' => Pages\EditStockTransfer::route('/{record}/edit'),
         ];
     }
 }

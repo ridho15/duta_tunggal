@@ -17,7 +17,7 @@ class PurchaseReceiptResource extends Resource
 {
     protected static ?string $model = PurchaseReceipt::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
 
     protected static ?string $navigationGroup = 'Purchase Order';
 

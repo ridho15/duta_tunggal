@@ -3,10 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseOrderResource\Pages;
-use App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
-use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Repeater;
@@ -15,10 +13,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
-use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
@@ -26,14 +22,12 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PurchaseOrderResource extends Resource
 {
     protected static ?string $model = PurchaseOrder::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static ?string $navigationGroup = 'Purchase Order';
 
@@ -66,6 +60,7 @@ class PurchaseOrderResource extends Resource
                         Textarea::make('note')
                             ->columnSpanFull(),
                         Repeater::make('purchaseOrderItem')
+                            ->label('Order Item')
                             ->columnSpanFull()
                             ->relationship()
                             ->columns(5)
@@ -113,20 +108,22 @@ class PurchaseOrderResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('supplier_id')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('supplier.name')
+                    ->label('Supplier')
+                    ->searchable(),
                 TextColumn::make('po_number')
                     ->searchable(),
                 TextColumn::make('order_date')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('status'),
+                TextColumn::make('status')
+                    ->badge(),
                 TextColumn::make('expected_date')
                     ->dateTime()
                     ->sortable(),
                 TextColumn::make('total_amount')
-                    ->numeric()
+                    ->label('Total Amount')
+                    ->money('idr')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -147,25 +144,32 @@ class PurchaseOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('approved_by')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('close_requested_by')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('close_requested_at')
                     ->dateTime()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('closed_by')
                     ->numeric()
-                    ->sortable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('closed_at')
                     ->dateTime()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('completed_at')
                     ->dateTime()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('completed_by')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //

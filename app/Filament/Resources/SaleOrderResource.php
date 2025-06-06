@@ -2,10 +2,10 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\WarehouseResource\Pages;
-use App\Models\Warehouse;
+use App\Filament\Resources\SaleOrderResource\Pages;
+use App\Models\SaleOrder;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -16,36 +16,35 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class WarehouseResource extends Resource
+class SaleOrderResource extends Resource
 {
-    protected static ?string $model = Warehouse::class;
+    protected static ?string $model = SaleOrder::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-home-modern';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Sales Order';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Fieldset::make('Form Warehouse')
+                Fieldset::make('Form Sales')
                     ->schema([
-                        TextInput::make('name')
+                        TextInput::make('customer_id')
+                            ->required()
+                            ->numeric(),
+                        TextInput::make('so_number')
                             ->required()
                             ->maxLength(255),
-                        TextInput::make('location')
+                        DateTimePicker::make('order_date')
+                            ->required(),
+                        TextInput::make('status')
+                            ->required(),
+                        DateTimePicker::make('delivery_date'),
+                        TextInput::make('total_amount')
                             ->required()
-                            ->maxLength(255),
-                        Repeater::make('rak')
-                            ->relationship()
-                            ->schema([
-                                TextInput::make('name')
-                                    ->required()
-                                    ->maxLength(255),
-                                TextInput::make('code')
-                                    ->required()
-                                    ->maxLength(255),
-                            ])
+                            ->numeric()
+                            ->default(0),
                     ])
             ]);
     }
@@ -54,14 +53,21 @@ class WarehouseResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('customer_id')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('so_number')
                     ->searchable(),
-                TextColumn::make('location')
-                    ->searchable(),
-                TextColumn::make('rak.name')
-                    ->label('Rak')
-                    ->badge()
-                    ->searchable(),
+                TextColumn::make('order_date')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('status'),
+                TextColumn::make('delivery_date')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('total_amount')
+                    ->numeric()
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -99,9 +105,9 @@ class WarehouseResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListWarehouses::route('/'),
-            // 'create' => Pages\CreateWarehouse::route('/create'),
-            // 'edit' => Pages\EditWarehouse::route('/{record}/edit'),
+            'index' => Pages\ListSaleOrders::route('/'),
+            'create' => Pages\CreateSaleOrder::route('/create'),
+            'edit' => Pages\EditSaleOrder::route('/{record}/edit'),
         ];
     }
 }

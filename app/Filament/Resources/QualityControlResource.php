@@ -17,7 +17,7 @@ class QualityControlResource extends Resource
 {
     protected static ?string $model = QualityControl::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-archive-box-arrow-down';
 
     protected static ?string $navigationGroup = 'Purchase Order';
 
