@@ -13,7 +13,7 @@ class PurchaseOrderPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view-any purchase order');
     }
 
     /**
@@ -21,7 +21,7 @@ class PurchaseOrderPolicy
      */
     public function view(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('view purchase order');
     }
 
     /**
@@ -29,7 +29,7 @@ class PurchaseOrderPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create purchase order');
     }
 
     /**
@@ -37,7 +37,7 @@ class PurchaseOrderPolicy
      */
     public function update(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('update purchase order');
     }
 
     /**
@@ -45,7 +45,7 @@ class PurchaseOrderPolicy
      */
     public function delete(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete purchase order');
     }
 
     /**
@@ -53,7 +53,7 @@ class PurchaseOrderPolicy
      */
     public function restore(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore purchase order');
     }
 
     /**
@@ -61,11 +61,11 @@ class PurchaseOrderPolicy
      */
     public function forceDelete(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 
     public function approve(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('approve purchase order');
     }
 }

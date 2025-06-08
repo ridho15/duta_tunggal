@@ -13,7 +13,7 @@ class DeliveryOrderItemPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasRole('view-any delivery order item');
     }
 
     /**
@@ -21,7 +21,7 @@ class DeliveryOrderItemPolicy
      */
     public function view(User $user, DeliveryOrderItem $deliveryOrderItem): bool
     {
-        return true;
+        return $user->hasRole('view delivery order item');
     }
 
     /**
@@ -29,7 +29,7 @@ class DeliveryOrderItemPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasRole('create delivery order item');
     }
 
     /**
@@ -37,7 +37,7 @@ class DeliveryOrderItemPolicy
      */
     public function update(User $user, DeliveryOrderItem $deliveryOrderItem): bool
     {
-        return true;
+        return $user->hasRole('update delivery order item');
     }
 
     /**
@@ -45,7 +45,7 @@ class DeliveryOrderItemPolicy
      */
     public function delete(User $user, DeliveryOrderItem $deliveryOrderItem): bool
     {
-        return true;
+        return $user->hasRole('delete delivery order item');
     }
 
     /**
@@ -53,7 +53,7 @@ class DeliveryOrderItemPolicy
      */
     public function restore(User $user, DeliveryOrderItem $deliveryOrderItem): bool
     {
-        return true;
+        return $user->hasRole('restore delivery order item');
     }
 
     /**
@@ -61,6 +61,6 @@ class DeliveryOrderItemPolicy
      */
     public function forceDelete(User $user, DeliveryOrderItem $deliveryOrderItem): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

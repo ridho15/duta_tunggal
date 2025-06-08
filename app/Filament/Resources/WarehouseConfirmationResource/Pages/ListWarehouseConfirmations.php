@@ -1,17 +1,15 @@
 <?php
 
-namespace App\Filament\Resources\PurchaseOrderResource\Pages;
+namespace App\Filament\Resources\WarehouseConfirmationResource\Pages;
 
-use App\Filament\Resources\PurchaseOrderResource;
+use App\Filament\Resources\WarehouseConfirmationResource;
 use Filament\Actions;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
-class ListPurchaseOrders extends ListRecords
+class ListWarehouseConfirmations extends ListRecords
 {
-    protected static string $resource = PurchaseOrderResource::class;
-
-    protected static ?string $title = 'Purchase Order';
+    protected static string $resource = WarehouseConfirmationResource::class;
 
     protected function getHeaderActions(): array
     {

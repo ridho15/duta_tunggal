@@ -2,13 +2,12 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DeliveryOrderResource\Pages;
-use App\Models\DeliveryOrder;
+use App\Filament\Resources\WarehouseConfirmationResource\Pages;
+use App\Filament\Resources\WarehouseConfirmationResource\RelationManagers;
+use App\Models\WarehouseConfirmation;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -20,37 +19,35 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class DeliveryOrderResource extends Resource
+class WarehouseConfirmationResource extends Resource
 {
-    protected static ?string $model = DeliveryOrder::class;
+    protected static ?string $model = WarehouseConfirmation::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
+    protected static ?string $navigationIcon = 'heroicon-o-check-badge';
 
-    protected static ?string $navigationGroup = 'Delivery Order';
+    protected static ?string $navigationGroup = 'Warehouse';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Fieldset::make('Form Delivery Order')
+                Fieldset::make('Form Warehouse Confirmation')
                     ->schema([
-                        DateTimePicker::make('delivery_date')
+                        TextInput::make('manufacturing_order_id')
+                            ->required()
+                            ->numeric(),
+                        TextInput::make('status')
                             ->required(),
-                        Select::make('driver_id')
-                            ->label('Driver')
-                            ->searchable()
-                            ->preload()
-                            ->relationship('driver', 'name')
+                        Textarea::make('note')
+                            ->columnSpanFull(),
+                        TextInput::make('confirmed_by')
+                            ->required()
+                            ->numeric(),
+                        DateTimePicker::make('confirmed_at')
                             ->required(),
-                        Select::make('vehicle_id')
-                            ->label('Vehicle')
-                            ->preload()
-                            ->searchable()
-                            ->relationship('vehicle', 'plate')
-                            ->required(),
-                        Textarea::make('notes')
-                            ->label('Notes')
                     ])
             ]);
     }
@@ -59,18 +56,16 @@ class DeliveryOrderResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('delivery_date')
-                    ->date()
-                    ->sortable(),
-                TextColumn::make('driver.name')
+                TextColumn::make('manufacturing_order_id')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('vehicle')
-                    ->label('Vehicle')
-                    ->formatStateUsing(function ($state) {
-                        return $state->plat . ' - ' . $state->type;
-                    }),
                 TextColumn::make('status'),
+                TextColumn::make('confirmed_by')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('confirmed_at')
+                    ->dateTime()
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -108,9 +103,9 @@ class DeliveryOrderResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDeliveryOrders::route('/'),
-            'create' => Pages\CreateDeliveryOrder::route('/create'),
-            'edit' => Pages\EditDeliveryOrder::route('/{record}/edit'),
+            'index' => Pages\ListWarehouseConfirmations::route('/'),
+            // 'create' => Pages\CreateWarehouseConfirmation::route('/create'),
+            // 'edit' => Pages\EditWarehouseConfirmation::route('/{record}/edit'),
         ];
     }
 }

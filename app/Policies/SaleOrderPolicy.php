@@ -13,7 +13,7 @@ class SaleOrderPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->hasPermissionTo('view-any sales order');
     }
 
     /**
@@ -21,7 +21,7 @@ class SaleOrderPolicy
      */
     public function view(User $user, SaleOrder $saleOrder): bool
     {
-        return false;
+        return $user->hasPermissionTo('view sales order');
     }
 
     /**
@@ -29,7 +29,7 @@ class SaleOrderPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->hasPermissionTo('create sales order');
     }
 
     /**
@@ -37,7 +37,7 @@ class SaleOrderPolicy
      */
     public function update(User $user, SaleOrder $saleOrder): bool
     {
-        return false;
+        return $user->hasPermissionTo('update sales order');
     }
 
     /**
@@ -45,7 +45,7 @@ class SaleOrderPolicy
      */
     public function delete(User $user, SaleOrder $saleOrder): bool
     {
-        return false;
+        return $user->hasPermissionTo('delete sales order');
     }
 
     /**
@@ -53,7 +53,7 @@ class SaleOrderPolicy
      */
     public function restore(User $user, SaleOrder $saleOrder): bool
     {
-        return false;
+        return $user->hasPermissionTo('restore sales order');
     }
 
     /**
@@ -61,6 +61,6 @@ class SaleOrderPolicy
      */
     public function forceDelete(User $user, SaleOrder $saleOrder): bool
     {
-        return false;
+        return $user->hasRole('Super Admin');
     }
 }

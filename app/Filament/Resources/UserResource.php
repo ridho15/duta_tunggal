@@ -3,11 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
+use App\Forms\Components\SignaturePad;
 use App\Models\User;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ViewField;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -56,7 +58,19 @@ class UserResource extends Resource
                             ->preload()
                             ->searchable()
                             ->multiple()
-                            ->relationship('permissions', 'name')
+                            ->relationship('permissions', 'name'),
+                        Select::make('warehouse_id')
+                            ->label('Warehouse')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('warehouse', 'name')
+                            ->nullable(),
+                        ViewField::make('signature')
+                        ->reactive()
+                            ->afterStateUpdated(function ($state) {
+                                dd($state);
+                            })
+                            ->view('filament.components.signature-pad'),
                     ])
             ]);
     }
@@ -106,8 +120,8 @@ class UserResource extends Resource
     {
         return [
             'index' => Pages\ListUsers::route('/'),
-            // 'create' => Pages\CreateUser::route('/create'),
-            // 'edit' => Pages\EditUser::route('/{record}/edit'),
+            'create' => Pages\CreateUser::route('/create'),
+            'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
     }
 }

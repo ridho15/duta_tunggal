@@ -20,9 +20,11 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
+        'signature',
+        'warehouse_id'
     ];
 
-   
+
     protected $hidden = [
         'password',
         'remember_token',
@@ -40,7 +42,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return Str::of($this->name)
             ->explode(' ')
-            ->map(fn (string $name) => Str::of($name)->substr(0, 1))
+            ->map(fn(string $name) => Str::of($name)->substr(0, 1))
             ->implode('');
     }
 
@@ -49,4 +51,8 @@ class User extends Authenticatable implements FilamentUser
         return true;
     }
 
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
 }

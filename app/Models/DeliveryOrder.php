@@ -13,7 +13,7 @@ class DeliveryOrder extends Model
         'delivery_date',
         'driver_id',
         'vehicle_id',
-        'status',
+        'status', // draft, sent,received_by, supplier
         'notes'
     ];
 

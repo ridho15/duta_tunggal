@@ -150,6 +150,13 @@ class PermissionSeeder extends Seeder
 
         // customer
         Permission::updateOrCreate([
+            'name' => 'view-any customer'
+        ], [
+            'name' => 'view-any customer',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
             'name' => 'view customer'
         ], [
             'name' => 'view customer',
@@ -214,6 +221,12 @@ class PermissionSeeder extends Seeder
 
         // currency
         Permission::updateOrCreate([
+            'name' => 'view-any currency'
+        ], [
+            'name' => 'view-any currency',
+            'guard_name' => 'web'
+        ]);
+        Permission::updateOrCreate([
             'name' => 'view currency'
         ], [
             'name' => 'view currency',
@@ -238,6 +251,13 @@ class PermissionSeeder extends Seeder
             'name' => 'delete currency'
         ], [
             'name' => 'delete currency',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'restore currency'
+        ], [
+            'name' => 'restore currency',
             'guard_name' => 'web'
         ]);
 
@@ -382,6 +402,193 @@ class PermissionSeeder extends Seeder
             'name' => 'delete vehicle'
         ], [
             'name' => 'delete vehicle',
+            'guard_name' => 'web'
+        ]);
+
+        // Purchase Order
+        Permission::updateOrCreate([
+            'name' => 'view-any purchase order'
+        ], [
+            'name' => 'view-any purchase order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'view purchase order'
+        ], [
+            'name' => 'view purchase order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'create purchase order'
+        ], [
+            'name' => 'create purchase order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'update purchase order'
+        ], [
+            'name' => 'update purchase order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'delete purchase order'
+        ], [
+            'name' => 'delete purchase order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'approve purchase order'
+        ], [
+            'name' => 'approve purchase order',
+            'guard_name' => 'web'
+        ]);
+
+        // Purchase Order Item
+        Permission::updateOrCreate([
+            'name' => 'view-any purchase order item'
+        ], [
+            'name' => 'view-any purchase order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'view purchase order item'
+        ], [
+            'name' => 'view purchase order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'create purchase order item'
+        ], [
+            'name' => 'create purchase order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'update purchase order item'
+        ], [
+            'name' => 'update purchase order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'delete purchase order item'
+        ], [
+            'name' => 'delete purchase order item',
+            'guard_name' => 'web'
+        ]);
+
+        // Sales Order
+        Permission::updateOrCreate([
+            'name' => 'view-any sales order'
+        ], [
+            'name' => 'view-any sales order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'view sales order'
+        ], [
+            'name' => 'view sales order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'create sales order'
+        ], [
+            'name' => 'create sales order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'update sales order'
+        ], [
+            'name' => 'update sales order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'delete sales order'
+        ], [
+            'name' => 'delete sales order',
+            'guard_name' => 'web'
+        ]);
+
+        // Sales Order Item
+        Permission::updateOrCreate([
+            'name' => 'view-any sales order item'
+        ], [
+            'name' => 'view-any sales order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'view sales order item'
+        ], [
+            'name' => 'view sales order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'create sales order item'
+        ], [
+            'name' => 'create sales order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'update sales order item'
+        ], [
+            'name' => 'update sales order item',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'delete sales order item'
+        ], [
+            'name' => 'delete sales order item',
+            'guard_name' => 'web'
+        ]);
+
+        // Delivery Order
+        Permission::updateOrCreate([
+            'name' => 'view-any delivery order'
+        ], [
+            'name' => 'view-any delivery order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'view delivery order'
+        ], [
+            'name' => 'view delivery order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'create delivery order'
+        ], [
+            'name' => 'create delivery order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'update delivery order'
+        ], [
+            'name' => 'update delivery order',
+            'guard_name' => 'web'
+        ]);
+
+        Permission::updateOrCreate([
+            'name' => 'delete delivery order'
+        ], [
+            'name' => 'delete delivery order',
             'guard_name' => 'web'
         ]);
     }

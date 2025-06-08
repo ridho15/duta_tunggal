@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Currency;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class CurrencyPolicy
 {
@@ -13,7 +12,7 @@ class CurrencyPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view-any currency');
     }
 
     /**
@@ -21,7 +20,7 @@ class CurrencyPolicy
      */
     public function view(User $user, Currency $currency): bool
     {
-        return true;
+        return $user->hasPermissionTo('view currency');
     }
 
     /**
@@ -29,7 +28,7 @@ class CurrencyPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create currency');
     }
 
     /**
@@ -37,7 +36,7 @@ class CurrencyPolicy
      */
     public function update(User $user, Currency $currency): bool
     {
-        return true;
+        return $user->hasPermissionTo('update currency');
     }
 
     /**
@@ -45,7 +44,7 @@ class CurrencyPolicy
      */
     public function delete(User $user, Currency $currency): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete currency');
     }
 
     /**
@@ -53,7 +52,7 @@ class CurrencyPolicy
      */
     public function restore(User $user, Currency $currency): bool
     {
-        return true;
+        return $user->hasPermissionTo(['restore currency']);
     }
 
     /**
@@ -61,6 +60,6 @@ class CurrencyPolicy
      */
     public function forceDelete(User $user, Currency $currency): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

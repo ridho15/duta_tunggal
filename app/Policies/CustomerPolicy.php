@@ -13,7 +13,7 @@ class CustomerPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view-any customer');
     }
 
     /**
@@ -21,7 +21,7 @@ class CustomerPolicy
      */
     public function view(User $user, Customer $customer): bool
     {
-        return true;
+        return $user->hasPermissionTo('view customer');
     }
 
     /**
@@ -29,7 +29,7 @@ class CustomerPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create customer');
     }
 
     /**
@@ -37,7 +37,7 @@ class CustomerPolicy
      */
     public function update(User $user, Customer $customer): bool
     {
-        return true;
+        return $user->hasPermissionTo('update customer');
     }
 
     /**
@@ -45,7 +45,7 @@ class CustomerPolicy
      */
     public function delete(User $user, Customer $customer): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete customer');
     }
 
     /**
@@ -53,7 +53,7 @@ class CustomerPolicy
      */
     public function restore(User $user, Customer $customer): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore customer');
     }
 
     /**
@@ -61,6 +61,6 @@ class CustomerPolicy
      */
     public function forceDelete(User $user, Customer $customer): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }
