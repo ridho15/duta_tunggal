@@ -13,7 +13,7 @@ class ProductCategoryPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any product category');
     }
 
     /**
@@ -21,7 +21,7 @@ class ProductCategoryPolicy
      */
     public function view(User $user, ProductCategory $productCategory): bool
     {
-        return true;
+        return $user->hasPermissionTo('view product category');
     }
 
     /**
@@ -29,7 +29,7 @@ class ProductCategoryPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create product category');
     }
 
     /**
@@ -37,7 +37,7 @@ class ProductCategoryPolicy
      */
     public function update(User $user, ProductCategory $productCategory): bool
     {
-        return true;
+        return $user->hasPermissionTo('update product category');
     }
 
     /**
@@ -45,7 +45,7 @@ class ProductCategoryPolicy
      */
     public function delete(User $user, ProductCategory $productCategory): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete product category');
     }
 
     /**
@@ -53,7 +53,7 @@ class ProductCategoryPolicy
      */
     public function restore(User $user, ProductCategory $productCategory): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore product category');
     }
 
     /**
@@ -61,6 +61,6 @@ class ProductCategoryPolicy
      */
     public function forceDelete(User $user, ProductCategory $productCategory): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

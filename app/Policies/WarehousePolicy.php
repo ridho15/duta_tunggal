@@ -13,7 +13,7 @@ class WarehousePolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any warehouse');
     }
 
     /**
@@ -21,7 +21,7 @@ class WarehousePolicy
      */
     public function view(User $user, Warehouse $warehouse): bool
     {
-        return true;
+        return $user->hasPermissionTo('view warehouse');
     }
 
     /**
@@ -29,7 +29,7 @@ class WarehousePolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create warehouse');
     }
 
     /**
@@ -37,7 +37,7 @@ class WarehousePolicy
      */
     public function update(User $user, Warehouse $warehouse): bool
     {
-        return true;
+        return $user->hasPermissionTo('update warehouse');
     }
 
     /**
@@ -45,7 +45,7 @@ class WarehousePolicy
      */
     public function delete(User $user, Warehouse $warehouse): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete warehouse');
     }
 
     /**
@@ -53,7 +53,7 @@ class WarehousePolicy
      */
     public function restore(User $user, Warehouse $warehouse): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore warehouse');
     }
 
     /**
@@ -61,6 +61,6 @@ class WarehousePolicy
      */
     public function forceDelete(User $user, Warehouse $warehouse): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

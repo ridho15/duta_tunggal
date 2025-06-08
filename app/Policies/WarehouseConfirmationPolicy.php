@@ -13,7 +13,7 @@ class WarehouseConfirmationPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any warehouse confirmation');
     }
 
     /**
@@ -21,7 +21,7 @@ class WarehouseConfirmationPolicy
      */
     public function view(User $user, WarehouseConfirmation $warehouseConfirmation): bool
     {
-        return true;
+        return $user->hasPermissionTo('view warehouse confirmation');
     }
 
     /**
@@ -29,7 +29,7 @@ class WarehouseConfirmationPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create warehouse confirmation');
     }
 
     /**
@@ -37,7 +37,7 @@ class WarehouseConfirmationPolicy
      */
     public function update(User $user, WarehouseConfirmation $warehouseConfirmation): bool
     {
-        return true;
+        return $user->hasPermissionTo('update warehouse confirmation');
     }
 
     /**
@@ -45,7 +45,7 @@ class WarehouseConfirmationPolicy
      */
     public function delete(User $user, WarehouseConfirmation $warehouseConfirmation): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete warehouse confirmation');
     }
 
     /**
@@ -53,14 +53,13 @@ class WarehouseConfirmationPolicy
      */
     public function restore(User $user, WarehouseConfirmation $warehouseConfirmation): bool
     {
-        return false;
+        return $user->hasPermissionTo('restore warehouse confirmation');
     }
-
     /**
      * Determine whether the user can permanently delete the model.
      */
     public function forceDelete(User $user, WarehouseConfirmation $warehouseConfirmation): bool
     {
-        return false;
+        return $user->hasRole('Super Admin');
     }
 }

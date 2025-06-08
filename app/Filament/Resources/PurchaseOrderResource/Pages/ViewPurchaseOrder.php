@@ -4,24 +4,22 @@ namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Http\Controllers\HelperController;
-use App\Services\PurchaseOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Actions;
 use Filament\Actions\Action;
-use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
+use Filament\Actions\EditAction;
+use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
 
-class EditPurchaseOrder extends EditRecord
+class ViewPurchaseOrder extends ViewRecord
 {
     protected static string $resource = PurchaseOrderResource::class;
-
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make()
-                ->icon('heroicon-o-trash'),
+            EditAction::make()
+                ->icon('heroicon-o-pencil-square'),
             Action::make('konfirmasi')
                 ->label('Konfirmasi')
                 ->hidden(function ($record) {
@@ -80,19 +78,13 @@ class EditPurchaseOrder extends EditRecord
                 ->label('Cetak PDF')
                 ->icon('heroicon-o-document-check')
                 ->color('danger')
-                ->openUrlInNewTab()
                 ->hidden(function ($record) {
                     return in_array($record->status, ['draft', 'closed', 'request_close', 'request_approval']);
                 })
+                ->openUrlInNewTab()
                 ->url(function ($record) {
-                    return route('purchase-order.cetak', ['id' => $record]);
+                    return route('purchase-order.cetak', ['id' => $record->id]);
                 })
         ];
-    }
-
-    protected function afterSave()
-    {
-        $purchaseOrderService = new PurchaseOrderService;
-        $purchaseOrderService->setTotalAmount($this->getRecord());
     }
 }

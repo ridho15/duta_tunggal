@@ -2,6 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Http\Controllers\HelperController;
+use App\Models\Customer;
+use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -13,32 +16,34 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
-        Role::updateOrCreate([
+        $superAdmin = Role::updateOrCreate([
             'name' => 'Super Admin',
         ], [
             'name' => 'Super Admin',
             'guard_name' => 'web'
         ]);
 
-        Role::updateOrCreate([
+        $admin = Role::updateOrCreate([
             'name' => 'Admin',
         ], [
             'name' => 'Admin',
             'guard_name' => 'web'
         ]);
 
-        Role::updateOrCreate([
+        $gudang = Role::updateOrCreate([
             'name' => 'Gudang',
         ], [
             'name' => 'Gudang',
             'guard_name' => 'web'
         ]);
 
-        Role::updateOrCreate([
+        $owner = Role::updateOrCreate([
             'name' => 'Owner',
         ], [
             'name' => 'Owner',
             'guard_name' => 'web'
         ]);
+
+        $superAdmin->syncPermissions(Permission::all());
     }
 }

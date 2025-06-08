@@ -26,7 +26,8 @@ class PermissionResource extends Resource
             ->schema([
                 TextInput::make('name')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->disabled(),
                 Select::make('roles')
                     ->label('Roles')
                     ->preload()

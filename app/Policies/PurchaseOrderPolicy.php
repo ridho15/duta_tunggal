@@ -13,7 +13,7 @@ class PurchaseOrderPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view-any purchase order');
+        return $user->hasPermissionTo('view any purchase order');
     }
 
     /**

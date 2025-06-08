@@ -21,8 +21,10 @@ class EditUser extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        dd($data);
         $data['signature'] = HelperController::saveSignatureImage($data['signature']);
+        if ($data['signature'] == null) {
+            unset($data['signature']);
+        }
         return $data;
     }
 }

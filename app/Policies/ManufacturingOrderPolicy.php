@@ -13,7 +13,7 @@ class ManufacturingOrderPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any manufacturing order');
     }
 
     /**
@@ -21,7 +21,7 @@ class ManufacturingOrderPolicy
      */
     public function view(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('view manufacturing order');
     }
 
     /**
@@ -29,7 +29,7 @@ class ManufacturingOrderPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create manufacturing order');
     }
 
     /**
@@ -37,7 +37,7 @@ class ManufacturingOrderPolicy
      */
     public function update(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('update manufacturing order');
     }
 
     /**
@@ -45,7 +45,7 @@ class ManufacturingOrderPolicy
      */
     public function delete(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete manufacturing order');
     }
 
     /**
@@ -53,7 +53,7 @@ class ManufacturingOrderPolicy
      */
     public function restore(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore manufacturing order');
     }
 
     /**
@@ -61,6 +61,6 @@ class ManufacturingOrderPolicy
      */
     public function forceDelete(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

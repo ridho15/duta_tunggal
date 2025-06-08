@@ -13,7 +13,6 @@
     canvas.addEventListener('mouseup', () => {
         document.getElementById('signature-input').value = signaturePad.toDataURL();
         console.log('log');
-        
     });
 
     // Jika ada data sebelumnya, tampilkan

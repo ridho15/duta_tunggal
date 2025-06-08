@@ -13,7 +13,7 @@ class StockMovementPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any stock movement');
     }
 
     /**
@@ -21,7 +21,7 @@ class StockMovementPolicy
      */
     public function view(User $user, StockMovement $stockMovement): bool
     {
-        return true;
+        return $user->hasPermissionTo('view stock movement');
     }
 
     /**
@@ -29,7 +29,7 @@ class StockMovementPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create stock movement');
     }
 
     /**
@@ -37,7 +37,7 @@ class StockMovementPolicy
      */
     public function update(User $user, StockMovement $stockMovement): bool
     {
-        return true;
+        return $user->hasPermissionTo('update stock movement');
     }
 
     /**
@@ -45,7 +45,7 @@ class StockMovementPolicy
      */
     public function delete(User $user, StockMovement $stockMovement): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete stock movement');
     }
 
     /**
@@ -53,7 +53,7 @@ class StockMovementPolicy
      */
     public function restore(User $user, StockMovement $stockMovement): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore stock movement');
     }
 
     /**
@@ -61,6 +61,6 @@ class StockMovementPolicy
      */
     public function forceDelete(User $user, StockMovement $stockMovement): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

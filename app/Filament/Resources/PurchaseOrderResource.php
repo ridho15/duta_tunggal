@@ -3,9 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseOrderResource\Pages;
+use App\Filament\Resources\PurchaseOrderResource\Pages\ViewPurchaseOrder;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PurchaseOrderItemRelationManager;
+use App\Http\Controllers\HelperController;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use Carbon\Carbon;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Repeater;
@@ -18,6 +21,7 @@ use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
@@ -29,6 +33,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Filament\Tables\Enums\ActionsPosition;
 
 class PurchaseOrderResource extends Resource
 {
@@ -79,9 +84,11 @@ class PurchaseOrderResource extends Resource
                                     $total_amount += ($item['quantity'] * $item['unit_price']) - $item['discount'] + $item['tax'];
                                 }
 
-                                $purchaseOrder->update([
-                                    'total_amount' => $total_amount
-                                ]);
+                                if ($purchaseOrder) {
+                                    $purchaseOrder->update([
+                                        'total_amount' => $total_amount
+                                    ]);
+                                }
                             })
                             ->schema([
                                 Select::make('product_id')
@@ -210,13 +217,14 @@ class PurchaseOrderResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_asset')
+                    ->label('Asset?')
                     ->boolean(),
                 TextColumn::make('date_approved')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('approved_by')
-                    ->numeric()
-                    ->sortable()
+                TextColumn::make('approvedBy.name')
+                    ->label('Approved By')
+                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('close_requested_by')
                     ->numeric()
@@ -246,34 +254,85 @@ class PurchaseOrderResource extends Resource
                 //
             ])
             ->actions([
-                ViewAction::make(),
-                EditAction::make()
-                    ->hidden(function () {
-                        return Auth::user()->hasRole(['Owner']);
-                    }),
-                DeleteAction::make()
-                    ->hidden(function () {
-                        return Auth::user()->hasRole('Owner');
-                    }),
-                Action::make('konfirmasi')
-                    ->label('Konfirmasi')
-                    ->hidden(function () {
-                        return Auth::user()->hasRole('Admin');
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-check-badge')
-                    ->color('success')
-                    ->action(function ($record) {}),
-                Action::make('tolak')
-                    ->label('Tolak')
-                    ->hidden(function () {
-                        return Auth::user()->hasRole('Admin');
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->action(function ($record) {})
-            ])
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->hidden(function () {
+                            return Auth::user()->hasRole('Owner');
+                        })
+                        ->color('success'),
+                    DeleteAction::make()
+                        ->hidden(function () {
+                            return Auth::user()->hasRole('Owner');
+                        }),
+                    Action::make('konfirmasi')
+                        ->label('Konfirmasi')
+                        ->hidden(function ($record) {
+                            return Auth::user()->hasRole('Admin') || in_array($record->status, ['draft', 'closed', 'approved', 'completed']);
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-check-badge')
+                        ->color('success')
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => 'approved',
+                                'date_approved' => Carbon::now(),
+                                'approved_by' => Auth::user()->id,
+                            ]);
+                        }),
+                    Action::make('tolak')
+                        ->label('Tolak')
+                        ->hidden(function ($record) {
+                            return Auth::user()->hasRole('Admin') || in_array($record->status, ['draft', 'closed', 'approved', 'completed']);
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => 'draft'
+                            ]);
+                        }),
+                    Action::make('request_approval')
+                        ->label('Request Approval')
+                        ->hidden(function ($record) {
+                            return Auth::user()->hasRole('Owner') || in_array($record->status, ['request_approval', 'closed', 'completed', 'approved']);
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-clipboard-document-check')
+                        ->color('success')
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => 'request_approval'
+                            ]);
+                        }),
+                    Action::make('request_close')
+                        ->label('Request Close')
+                        ->hidden(function ($record) {
+                            return Auth::user()->hasRole('Owner') || in_array($record->status, ['request_close', 'closed', 'completed', 'approved']);
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => 'request_close'
+                            ]);
+                        }),
+                    Action::make('cetak_pdf')
+                        ->label('Cetak PDF')
+                        ->icon('heroicon-o-document-check')
+                        ->color('danger')
+                        ->hidden(function ($record) {
+                            return in_array($record->status, ['draft', 'closed', 'request_close', 'request_approval']);
+                        })
+                        ->openUrlInNewTab()
+                        ->url(function ($record) {
+                            return route('purchase-order.cetak', ['id' => $record->id]);
+                        })
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -302,6 +361,7 @@ class PurchaseOrderResource extends Resource
         return [
             'index' => Pages\ListPurchaseOrders::route('/'),
             'create' => Pages\CreatePurchaseOrder::route('/create'),
+            'view' => ViewPurchaseOrder::route('/{record}'),
             'edit' => Pages\EditPurchaseOrder::route('/{record}/edit'),
         ];
     }

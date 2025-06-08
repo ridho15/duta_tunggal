@@ -13,7 +13,7 @@ class SuratJalanPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any surat jalan');
     }
 
     /**
@@ -21,7 +21,7 @@ class SuratJalanPolicy
      */
     public function view(User $user, SuratJalan $suratJalan): bool
     {
-        return true;
+        return $user->hasPermissionTo('view surat jalan');
     }
 
     /**
@@ -29,7 +29,7 @@ class SuratJalanPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create surat jalan');
     }
 
     /**
@@ -37,7 +37,7 @@ class SuratJalanPolicy
      */
     public function update(User $user, SuratJalan $suratJalan): bool
     {
-        return true;
+        return $user->hasPermissionTo('update surat jalan');
     }
 
     /**
@@ -45,7 +45,7 @@ class SuratJalanPolicy
      */
     public function delete(User $user, SuratJalan $suratJalan): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete surat jalan');
     }
 
     /**
@@ -53,7 +53,7 @@ class SuratJalanPolicy
      */
     public function restore(User $user, SuratJalan $suratJalan): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore surat jalan');
     }
 
     /**
@@ -61,6 +61,6 @@ class SuratJalanPolicy
      */
     public function forceDelete(User $user, SuratJalan $suratJalan): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

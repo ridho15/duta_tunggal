@@ -12,7 +12,7 @@ class CurrencyPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view-any currency');
+        return $user->hasPermissionTo('view any currency');
     }
 
     /**

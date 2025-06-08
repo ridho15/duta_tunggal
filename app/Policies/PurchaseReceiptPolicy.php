@@ -13,7 +13,7 @@ class PurchaseReceiptPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any purchase receipt');
     }
 
     /**
@@ -21,7 +21,7 @@ class PurchaseReceiptPolicy
      */
     public function view(User $user, PurchaseReceipt $purchaseReceipt): bool
     {
-        return true;
+        return $user->hasPermissionTo('view purchase receipt');
     }
 
     /**
@@ -29,7 +29,7 @@ class PurchaseReceiptPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create purchase receipt');
     }
 
     /**
@@ -37,7 +37,7 @@ class PurchaseReceiptPolicy
      */
     public function update(User $user, PurchaseReceipt $purchaseReceipt): bool
     {
-        return true;
+        return $user->hasPermissionTo('update purchase receipt');
     }
 
     /**
@@ -45,7 +45,7 @@ class PurchaseReceiptPolicy
      */
     public function delete(User $user, PurchaseReceipt $purchaseReceipt): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete purchase receipt');
     }
 
     /**
@@ -53,7 +53,7 @@ class PurchaseReceiptPolicy
      */
     public function restore(User $user, PurchaseReceipt $purchaseReceipt): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore purchase receipt');
     }
 
     /**
@@ -61,6 +61,6 @@ class PurchaseReceiptPolicy
      */
     public function forceDelete(User $user, PurchaseReceipt $purchaseReceipt): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

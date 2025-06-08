@@ -16,9 +16,12 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
+use Saade\FilamentAutograph\Forms\Components\Enums\DownloadableFormat;
+use Saade\FilamentAutograph\Forms\Components\SignaturePad as ComponentsSignaturePad;
 
 class UserResource extends Resource
 {
@@ -40,6 +43,7 @@ class UserResource extends Resource
                         TextInput::make('email')
                             ->email()
                             ->required()
+                            ->unique(ignoreRecord: true)
                             ->maxLength(255),
                         DateTimePicker::make('email_verified_at'),
                         TextInput::make('password')
@@ -65,12 +69,14 @@ class UserResource extends Resource
                             ->searchable()
                             ->relationship('warehouse', 'name')
                             ->nullable(),
-                        ViewField::make('signature')
-                        ->reactive()
-                            ->afterStateUpdated(function ($state) {
-                                dd($state);
-                            })
-                            ->view('filament.components.signature-pad'),
+                        ComponentsSignaturePad::make('signature')
+                            ->label(__('Sign here'))
+                            ->dotSize(2.0)
+                            ->lineMinWidth(0.5)
+                            ->lineMaxWidth(2.5)
+                            ->throttle(16)
+                            ->minDistance(5)
+                            ->velocityFilterWeight(0.7)
                     ])
             ]);
     }
@@ -94,6 +100,8 @@ class UserResource extends Resource
                     ->label('Permissions')
                     ->badge()
                     ->searchable(),
+                ImageColumn::make('signature')
+                    ->size(75),
             ])
             ->filters([
                 //

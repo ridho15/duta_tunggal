@@ -13,7 +13,7 @@ class PurchaseReceiptItemNominalPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any purchase receipt item nominal');
     }
 
     /**
@@ -21,7 +21,7 @@ class PurchaseReceiptItemNominalPolicy
      */
     public function view(User $user, PurchaseReceiptItemNominal $purchaseReceiptItemNominal): bool
     {
-        return true;
+        return $user->hasPermissionTo('view purchase receipt item nominal');
     }
 
     /**
@@ -29,7 +29,7 @@ class PurchaseReceiptItemNominalPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create purchase receipt item nominal');
     }
 
     /**
@@ -37,7 +37,7 @@ class PurchaseReceiptItemNominalPolicy
      */
     public function update(User $user, PurchaseReceiptItemNominal $purchaseReceiptItemNominal): bool
     {
-        return true;
+        return $user->hasPermissionTo('update purchase receipt item nominal');
     }
 
     /**
@@ -45,7 +45,7 @@ class PurchaseReceiptItemNominalPolicy
      */
     public function delete(User $user, PurchaseReceiptItemNominal $purchaseReceiptItemNominal): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete purchase receipt item nominal');
     }
 
     /**
@@ -53,7 +53,7 @@ class PurchaseReceiptItemNominalPolicy
      */
     public function restore(User $user, PurchaseReceiptItemNominal $purchaseReceiptItemNominal): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore purchase receipt item nominal');
     }
 
     /**
@@ -61,6 +61,6 @@ class PurchaseReceiptItemNominalPolicy
      */
     public function forceDelete(User $user, PurchaseReceiptItemNominal $purchaseReceiptItemNominal): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

@@ -2,26 +2,26 @@
 
 namespace App\Policies;
 
-use App\Models\UnitOfMeasure;
+use App\Models\Rak;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
-class UnitOfMeasurePolicy
+class RakPolicy
 {
     /**
      * Determine whether the user can view any models.
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view any unit of measure');
+        return $user->hasPermissionTo('view any rak');
     }
 
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, UnitOfMeasure $unitOfMeasure): bool
+    public function view(User $user, Rak $rak): bool
     {
-        return $user->hasPermissionTo('view unit of measure');
+        return $user->hasPermissionTo('view rak');
     }
 
     /**
@@ -29,37 +29,37 @@ class UnitOfMeasurePolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('create unit of measure');
+        return $user->hasPermissionTo('create rak');
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, UnitOfMeasure $unitOfMeasure): bool
+    public function update(User $user, Rak $rak): bool
     {
-        return $user->hasPermissionTo('update unit of measure');
+        return $user->hasPermissionTo('update rak');
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, UnitOfMeasure $unitOfMeasure): bool
+    public function delete(User $user, Rak $rak): bool
     {
-        return $user->hasPermissionTo('delete unit of measure');
+        return $user->hasPermissionTo('delete rak');
     }
 
     /**
      * Determine whether the user can restore the model.
      */
-    public function restore(User $user, UnitOfMeasure $unitOfMeasure): bool
+    public function restore(User $user, Rak $rak): bool
     {
-        return $user->hasPermissionTo('restore unit of measure');
+        return $user->hasPermissionTo('restore rak');
     }
 
     /**
      * Determine whether the user can permanently delete the model.
      */
-    public function forceDelete(User $user, UnitOfMeasure $unitOfMeasure): bool
+    public function forceDelete(User $user, Rak $rak): bool
     {
         return $user->hasRole('Super Admin');
     }

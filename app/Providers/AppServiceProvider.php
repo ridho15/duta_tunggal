@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\PurchaseOrderService;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
@@ -15,6 +16,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $loader = AliasLoader::getInstance();
         $loader->alias('Debugbar', Debugbar::class);
+
+        $this->app->bind(PurchaseOrderService::class);
     }
 
     /**

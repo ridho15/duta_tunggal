@@ -6,6 +6,9 @@ use App\Filament\Resources\PurchaseReceiptResource\Pages;
 use App\Filament\Resources\PurchaseReceiptResource\RelationManagers;
 use App\Models\PurchaseReceipt;
 use Filament\Forms;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -25,15 +28,15 @@ class PurchaseReceiptResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('purchase_order_id')
+                TextInput::make('purchase_order_id')
                     ->required()
                     ->numeric(),
-                Forms\Components\DateTimePicker::make('receipt_date')
+                DateTimePicker::make('receipt_date')
                     ->required(),
-                Forms\Components\TextInput::make('received_by')
+                TextInput::make('received_by')
                     ->required()
                     ->numeric(),
-                Forms\Components\Textarea::make('notes')
+                Textarea::make('notes')
                     ->columnSpanFull(),
             ]);
     }

@@ -29,6 +29,7 @@ class PurchaseOrder extends Model
         'close_reason',
         'completed_by',
         'completed_at',
+        'created_by'
     ];
 
     public function supplier()
@@ -64,5 +65,10 @@ class PurchaseOrder extends Model
     public function completedBy()
     {
         return $this->belongsTo(User::class, 'completed_by')->withDefault();
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
 }

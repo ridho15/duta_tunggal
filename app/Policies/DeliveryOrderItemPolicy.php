@@ -13,7 +13,7 @@ class DeliveryOrderItemPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasRole('view-any delivery order item');
+        return $user->hasRole('view any delivery order item');
     }
 
     /**

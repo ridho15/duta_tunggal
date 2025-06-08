@@ -13,7 +13,7 @@ class QualityControlPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any quality control');
     }
 
     /**
@@ -21,7 +21,7 @@ class QualityControlPolicy
      */
     public function view(User $user, QualityControl $qualityControl): bool
     {
-        return true;
+        return $user->hasPermissionTo('view quality control');
     }
 
     /**
@@ -29,7 +29,7 @@ class QualityControlPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create quality control');
     }
 
     /**
@@ -37,7 +37,7 @@ class QualityControlPolicy
      */
     public function update(User $user, QualityControl $qualityControl): bool
     {
-        return true;
+        return $user->hasPermissionTo('update quality control');
     }
 
     /**
@@ -45,7 +45,7 @@ class QualityControlPolicy
      */
     public function delete(User $user, QualityControl $qualityControl): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete quality control');
     }
 
     /**
@@ -53,7 +53,7 @@ class QualityControlPolicy
      */
     public function restore(User $user, QualityControl $qualityControl): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore quality control');
     }
 
     /**
@@ -61,6 +61,6 @@ class QualityControlPolicy
      */
     public function forceDelete(User $user, QualityControl $qualityControl): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

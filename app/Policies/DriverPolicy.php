@@ -13,7 +13,7 @@ class DriverPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('view any driver');
     }
 
     /**
@@ -21,7 +21,7 @@ class DriverPolicy
      */
     public function view(User $user, Driver $driver): bool
     {
-        return true;
+        return $user->hasPermissionTo('view driver');
     }
 
     /**
@@ -29,7 +29,7 @@ class DriverPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermissionTo('create driver');
     }
 
     /**
@@ -37,7 +37,7 @@ class DriverPolicy
      */
     public function update(User $user, Driver $driver): bool
     {
-        return true;
+        return $user->hasPermissionTo('update driver');
     }
 
     /**
@@ -45,7 +45,7 @@ class DriverPolicy
      */
     public function delete(User $user, Driver $driver): bool
     {
-        return true;
+        return $user->hasPermissionTo('delete driver');
     }
 
     /**
@@ -53,7 +53,7 @@ class DriverPolicy
      */
     public function restore(User $user, Driver $driver): bool
     {
-        return true;
+        return $user->hasPermissionTo('restore driver');
     }
 
     /**
@@ -61,6 +61,6 @@ class DriverPolicy
      */
     public function forceDelete(User $user, Driver $driver): bool
     {
-        return true;
+        return $user->hasRole('Super Admin');
     }
 }

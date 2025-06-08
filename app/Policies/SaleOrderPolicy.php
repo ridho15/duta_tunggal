@@ -13,7 +13,7 @@ class SaleOrderPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view-any sales order');
+        return $user->hasPermissionTo('view any sales order');
     }
 
     /**
