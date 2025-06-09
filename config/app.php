@@ -52,9 +52,9 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'https://profigo.id'),
+    'url' => env('APP_URL', 'https://profigo.digi-biosportex.site'),
 
-    'asset_url' => env('ASSET_URL', 'https://profigo.id'),
+    'asset_url' => env('ASSET_URL', 'https://profigo.digi-biosportex.site'),
 
     /*
     |--------------------------------------------------------------------------

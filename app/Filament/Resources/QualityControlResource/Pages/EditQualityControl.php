@@ -3,11 +3,8 @@
 namespace App\Filament\Resources\QualityControlResource\Pages;
 
 use App\Filament\Resources\QualityControlResource;
-use Filament\Actions;
-use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
-use Illuminate\Support\Facades\Auth;
 
 class EditQualityControl extends EditRecord
 {
