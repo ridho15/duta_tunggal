@@ -3,18 +3,29 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseReceiptResource\Pages;
-use App\Filament\Resources\PurchaseReceiptResource\RelationManagers;
+use App\Filament\Resources\PurchaseReceiptResource\RelationManagers\PurchaseReceiptItemRelationManager;
+use App\Models\Currency;
 use App\Models\PurchaseReceipt;
-use Filament\Forms;
+use Filament\Forms\Components\Actions;
+use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\Actions\ActionContainer;
+use Filament\Forms\Components\Component;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PurchaseReceiptResource extends Resource
 {
@@ -28,16 +39,126 @@ class PurchaseReceiptResource extends Resource
     {
         return $form
             ->schema([
-                TextInput::make('purchase_order_id')
-                    ->required()
-                    ->numeric(),
-                DateTimePicker::make('receipt_date')
-                    ->required(),
-                TextInput::make('received_by')
-                    ->required()
-                    ->numeric(),
-                Textarea::make('notes')
-                    ->columnSpanFull(),
+                Fieldset::make('Form Purchase Receipt')
+                    ->schema([
+                        Select::make('purchase_order_id')
+                            ->label('Purchase Order')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('purchaseOrder', 'po_number')
+                            ->required(),
+                        DateTimePicker::make('receipt_date')
+                            ->required(),
+                        Select::make('received_by')
+                            ->label('Received By')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('receivedBy', 'name')
+                            ->required(),
+                        Textarea::make('notes')
+                            ->nullable(),
+                        Repeater::make('purchaseReceiptItem')
+                            ->relationship()
+                            ->nullable()
+                            ->columnSpanFull()
+                            ->addActionLabel('Tambah Purchase Receipt Item')
+                            ->columns(3)
+                            ->deletable(false)
+                            ->defaultItems(0)
+                            ->schema([
+                                Select::make('product_id')
+                                    ->preload()
+                                    ->searchable()
+                                    ->relationship('product', 'name', function ($get, Builder $query) {
+                                        $purchaseOrderId = $get('../../purchase_order_id');
+                                        return $query->whereHas('purchaseOrderItem', function (Builder $query) use ($purchaseOrderId) {
+                                            $query->where('purchase_order_id', $purchaseOrderId);
+                                        });
+                                    })
+                                    ->reactive()
+                                    ->getOptionLabelFromRecordUsing(function ($record) {
+                                        return "{$record->sku} - {$record->name}";
+                                    }),
+                                Select::make('warehouse_id')
+                                    ->label('Warehouse')
+                                    ->preload()
+                                    ->searchable()
+                                    ->relationship('warehouse', 'name'),
+                                TextInput::make('qty_received')
+                                    ->label('Quantity Received')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(0),
+                                TextInput::make('qty_accepted')
+                                    ->label('Quantity Accepted')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->required(),
+                                TextInput::make('qty_rejected')
+                                    ->label('Quantity Rejected')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->required(),
+                                Repeater::make('purchaseReceiptItemPhoto')
+                                    ->relationship()
+                                    ->addActionLabel('Tambah Photo')
+                                    ->schema([
+                                        FileUpload::make('photo_url')
+                                            ->label('Photo')
+                                            ->image()
+                                            ->maxSize(1024)
+                                            ->required(),
+                                    ]),
+                                Repeater::make('purchaseReceiptItemNominal')
+                                    ->relationship()
+                                    ->columnSpanFull()
+                                    ->addActionLabel("Tambah Currency")
+                                    ->defaultItems(0)
+                                    ->addAction(function (Action $action) {
+                                        return $action->disabled(function ($record) {
+                                            if ($record && $record->is_sent == 1) {
+                                                return true;
+                                            }
+
+                                            return false;
+                                        });
+                                    })
+                                    ->deleteAction(function (Action $action) {
+                                        return $action->requiresConfirmation()
+                                            ->disabled(function ($record) {
+                                                if ($record && $record->is_sent == 1) {
+                                                    return true;
+                                                }
+
+                                                return false;
+                                            });
+                                    })
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('currency_id')
+                                            ->label('Currency')
+                                            ->preload()
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($set, $state) {
+                                                $currency = Currency::find($state);
+                                                $set('symbol', $currency->symbol);
+                                            })
+                                            ->searchable()
+                                            ->required()
+                                            ->relationship('currency', 'name'),
+                                        TextInput::make('nominal')
+                                            ->label('Nominal')
+                                            ->numeric()
+                                            ->reactive()
+                                            ->prefix(function ($get) {
+                                                return $get('symbol');
+                                            })
+                                            ->default(0)
+                                    ]),
+
+                            ]),
+
+                    ])
             ]);
     }
 
@@ -45,24 +166,27 @@ class PurchaseReceiptResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('purchase_order_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('receipt_date')
+                TextColumn::make('purchaseOrder.po_number')
+                    ->label('PO Number')
+                    ->searchable(),
+                TextColumn::make('receipt_date')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('received_by')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('receivedBy.name')
+                    ->label('Received By')
+                    ->searchable(),
+                TextColumn::make('notes')
+                    ->label('Notes')
+                    ->searchable(),
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('deleted_at')
+                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -71,11 +195,12 @@ class PurchaseReceiptResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                EditAction::make(),
+                DeleteAction::make()
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -83,7 +208,7 @@ class PurchaseReceiptResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            PurchaseReceiptItemRelationManager::class,
         ];
     }
 

@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-use function Pest\Laravel\withDefer;
-
 class PurchaseReceiptItem extends Model
 {
     use SoftDeletes;
@@ -18,7 +16,6 @@ class PurchaseReceiptItem extends Model
         'qty_accepted',
         'qty_rejected',
         'reason_rejected',
-        'photo_url',
         'warehouse_id',
         'is_sent',
     ];

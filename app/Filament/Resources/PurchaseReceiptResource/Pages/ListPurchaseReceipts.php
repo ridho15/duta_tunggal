@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PurchaseReceiptResource\Pages;
 
 use App\Filament\Resources\PurchaseReceiptResource;
 use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPurchaseReceipts extends ListRecords
@@ -13,7 +14,8 @@ class ListPurchaseReceipts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            CreateAction::make()
+                ->icon('heroicon-o-plus-circle')
         ];
     }
 }

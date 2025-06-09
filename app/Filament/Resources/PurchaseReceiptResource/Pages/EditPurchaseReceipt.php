@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PurchaseReceiptResource\Pages;
 
 use App\Filament\Resources\PurchaseReceiptResource;
 use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditPurchaseReceipt extends EditRecord
@@ -13,7 +14,8 @@ class EditPurchaseReceipt extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make()
+                ->icon('heroicon-o-trash'),
         ];
     }
 }

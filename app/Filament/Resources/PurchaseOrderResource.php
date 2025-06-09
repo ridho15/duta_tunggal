@@ -176,9 +176,6 @@ class PurchaseOrderResource extends Resource
                             case 'draft':
                                 return 'gray';
                                 break;
-                            case 'draft':
-                                return 'gray';
-                                break;
                             case 'partially_received':
                                 return 'warning';
                                 break;
