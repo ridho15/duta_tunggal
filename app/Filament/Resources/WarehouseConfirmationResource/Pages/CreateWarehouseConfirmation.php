@@ -9,4 +9,10 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateWarehouseConfirmation extends CreateRecord
 {
     protected static string $resource = WarehouseConfirmationResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $data['status'] = 'request';
+        return $data;
+    }
 }

@@ -4,9 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ManufacturingOrderResource\Pages;
 use App\Models\ManufacturingOrder;
+use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -35,17 +39,55 @@ class ManufacturingOrderResource extends Resource
                         TextInput::make('mo_number')
                             ->required()
                             ->maxLength(255),
-                        TextInput::make('product_id')
+                        Select::make('product_id')
                             ->required()
-                            ->numeric(),
-                        TextInput::make('quantity')
-                            ->required()
-                            ->numeric()
-                            ->default(0),
-                        TextInput::make('status')
-                            ->required(),
-                        DateTimePicker::make('start_date'),
-                        DateTimePicker::make('end_date'),
+                            ->label('Product')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('product', 'name')
+                            ->getOptionLabelFromRecordUsing(function (Product $product) {
+                                return "({$product->sku}) {$product->name}";
+                            }),
+                        Grid::make(3)
+                            ->schema([
+                                TextInput::make('quantity')
+                                    ->required()
+                                    ->numeric()
+                                    ->default(0),
+                                DateTimePicker::make('start_date'),
+                                DateTimePicker::make('end_date')
+                            ]),
+                        Repeater::make('manufacturingOrderMaterial')
+                            ->relationship()
+                            ->columnSpanFull()
+                            ->columns(4)
+                            ->schema([
+                                Select::make('material_id')
+                                    ->label('Material')
+                                    ->preload()
+                                    ->searchable()
+                                    ->required()
+                                    ->relationship('material', 'sku')
+                                    ->getOptionLabelFromRecordUsing(function (Product $product) {
+                                        return "({$product->sku}) {$product->name}";
+                                    }),
+                                TextInput::make('qty_required')
+                                    ->label('Quantity Required')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(0),
+                                TextInput::make('qty_used')
+                                    ->label('Quantity Used')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(0),
+                                Select::make('warehouse_id')
+                                    ->label('Warehouse')
+                                    ->preload()
+                                    ->searchable()
+                                    ->required()
+                                    ->relationship('warehouse', 'name')
+                            ])
                     ])
             ]);
     }
@@ -56,9 +98,10 @@ class ManufacturingOrderResource extends Resource
             ->columns([
                 TextColumn::make('mo_number')
                     ->searchable(),
-                TextColumn::make('product_id')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('product.sku')
+                    ->searchable(),
+                TextColumn::make('product.name')
+                    ->searchable(),
                 TextColumn::make('quantity')
                     ->numeric()
                     ->sortable(),

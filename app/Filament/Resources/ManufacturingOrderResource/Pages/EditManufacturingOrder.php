@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ManufacturingOrderResource\Pages;
 
 use App\Filament\Resources\ManufacturingOrderResource;
 use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditManufacturingOrder extends EditRecord
@@ -13,7 +14,8 @@ class EditManufacturingOrder extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make()
+                ->icon('heroicon-o-trash'),
         ];
     }
 }

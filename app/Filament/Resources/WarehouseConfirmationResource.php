@@ -3,24 +3,18 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\WarehouseConfirmationResource\Pages;
-use App\Filament\Resources\WarehouseConfirmationResource\RelationManagers;
 use App\Models\WarehouseConfirmation;
-use Filament\Forms;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class WarehouseConfirmationResource extends Resource
 {
@@ -36,18 +30,19 @@ class WarehouseConfirmationResource extends Resource
             ->schema([
                 Fieldset::make('Form Warehouse Confirmation')
                     ->schema([
-                        TextInput::make('manufacturing_order_id')
-                            ->required()
-                            ->numeric(),
-                        TextInput::make('status')
+                        Select::make('manufacturing_order_id')
+                            ->label('Manufacturing Order')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('manufacturingOrder', 'mo_number')
                             ->required(),
-                        Textarea::make('note')
-                            ->columnSpanFull(),
-                        TextInput::make('confirmed_by')
-                            ->required()
-                            ->numeric(),
-                        DateTimePicker::make('confirmed_at')
+                        Select::make('confirmed_by')
+                            ->label('Confirmed By')
+                            ->preload()
+                            ->searchable()
+                            ->preload('confirmedBy', 'name')
                             ->required(),
+                        Textarea::make('note'),
                     ])
             ]);
     }
@@ -104,8 +99,8 @@ class WarehouseConfirmationResource extends Resource
     {
         return [
             'index' => Pages\ListWarehouseConfirmations::route('/'),
-            // 'create' => Pages\CreateWarehouseConfirmation::route('/create'),
-            // 'edit' => Pages\EditWarehouseConfirmation::route('/{record}/edit'),
+            'create' => Pages\CreateWarehouseConfirmation::route('/create'),
+            'edit' => Pages\EditWarehouseConfirmation::route('/{record}/edit'),
         ];
     }
 }

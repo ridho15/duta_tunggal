@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\ManufacturingService;
 use App\Services\PurchaseOrderService;
 use App\Services\QualityControlService;
 use Barryvdh\Debugbar\Facades\Debugbar;
@@ -18,7 +19,11 @@ class AppServiceProvider extends ServiceProvider
         $loader = AliasLoader::getInstance();
         $loader->alias('Debugbar', Debugbar::class);
 
-        $this->app->bind(PurchaseOrderService::class, QualityControlService::class);
+        $this->app->bind(
+            PurchaseOrderService::class,
+            QualityControlService::class,
+            ManufacturingService::class
+        );
     }
 
     /**

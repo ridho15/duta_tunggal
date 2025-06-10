@@ -14,7 +14,7 @@ class ManufacturingOrder extends Model
         'mo_number',
         'product_id',
         'quantity',
-        'status',
+        'status', // draft, in_progress, completed
         'start_date',
         'end_date'
     ];
@@ -22,5 +22,10 @@ class ManufacturingOrder extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
+    }
+
+    public function manufacturingOrderMaterial()
+    {
+        return $this->hasMany(manufacturingOrderMaterial::class, 'manufacturing_order_id');
     }
 }
