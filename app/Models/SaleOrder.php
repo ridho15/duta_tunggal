@@ -13,9 +13,18 @@ class SaleOrder extends Model
         'customer_id',
         'so_number',
         'order_date',
-        'status',
+        'status', // draft, request_approve, request_close, approved, closed, completed, confirmed, received, canceled
         'delivery_date',
-        'total_amount'
+        'total_amount',
+        'request_approve_by',
+        'request_approve_at',
+        'request_close_by',
+        'request_close_at',
+        'approve_by',
+        'approve_at',
+        'close_by',
+        'close_at',
+        'completed_at'
     ];
 
     public function customer()

@@ -303,4 +303,10 @@ class HelperController extends Controller
         ]);
         return $pdf->stream('PO-' . $purchaseOrder->po_number . '.pdf');
     }
+
+    public static function hitungSubtotal($quantity, $unit_price, $discount, $tax)
+    {
+        $subtotal = ((int) $quantity * (int) $unit_price) - (int) $discount + (int) $tax;
+        return $subtotal;
+    }
 }
