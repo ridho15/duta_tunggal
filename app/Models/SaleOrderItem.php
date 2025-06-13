@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SaleOrderItem extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory;
     protected $table = 'sale_order_items';
     protected $fillable = [
         'sale_order_id',

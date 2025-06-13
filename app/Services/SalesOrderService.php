@@ -13,7 +13,7 @@ class SalesOrderService
             $total_amount += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax);
         }
 
-        $salesOrder->update([
+        return $salesOrder->update([
             'total_amount' => $total_amount
         ]);
     }

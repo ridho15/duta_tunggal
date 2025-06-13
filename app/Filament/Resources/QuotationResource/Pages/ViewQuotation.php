@@ -20,8 +20,10 @@ class ViewQuotation extends ViewRecord
     {
         return [
             EditAction::make()
+                ->icon('heroicon-o-pencil-square')
                 ->color('primary'),
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->icon('heroicon-o-trash'),
             Action::make('download_file')
                 ->label('Download File')
                 ->color('success')

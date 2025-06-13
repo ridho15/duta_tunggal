@@ -10,6 +10,7 @@ use App\Http\Controllers\HelperController;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Services\QuotationService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
@@ -55,6 +56,9 @@ class QuotationResource extends Resource
                         Placeholder::make('status')
                             ->label('Status')
                             ->content(function ($record) {
+                                if(!$record){
+                                    return '-';
+                                }
                                 return match ($record->status) {
                                     'draft' => 'Draft',
                                     'request_approve' => 'Request Approve',
@@ -268,6 +272,22 @@ class QuotationResource extends Resource
                     EditAction::make()
                         ->color('primary'),
                     DeleteAction::make(),
+                    Action::make('pdf_quotation')
+                        ->label('PDF Quotation')
+                        ->color('danger')
+                        ->icon('heroicon-o-document')
+                        ->hidden(function ($record) {
+                            return $record->status != 'approve';
+                        })
+                        ->action(function ($record) {
+                            $pdf = Pdf::loadView('pdf.quotation', [
+                                'quotation' => $record
+                            ])->setPaper('A4', 'potrait');
+
+                            return response()->streamDownload(function () use ($pdf) {
+                                echo $pdf->stream();
+                            }, 'Quotation_' . $record->quotation_number . '.pdf');
+                        }),
                     Action::make('download_file')
                         ->label('Download File')
                         ->color('success')

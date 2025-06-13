@@ -77,6 +77,7 @@ class UserResource extends Resource
                             ->throttle(16)
                             ->minDistance(5)
                             ->velocityFilterWeight(0.7)
+                            ->maxWidth(100)
                     ])
             ]);
     }

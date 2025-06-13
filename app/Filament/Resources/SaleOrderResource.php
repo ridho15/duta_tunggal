@@ -3,23 +3,31 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SaleOrderResource\Pages;
+use App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder;
 use App\Filament\Resources\SaleOrderResource\RelationManagers\SaleOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
 use App\Models\Product;
 use App\Models\SaleOrder;
+use App\Services\SalesOrderService;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
 
 class SaleOrderResource extends Resource
 {
@@ -35,6 +43,11 @@ class SaleOrderResource extends Resource
             ->schema([
                 Fieldset::make('Form Sales')
                     ->schema([
+                        Placeholder::make('status')
+                            ->label('Status')
+                            ->content(function ($record) {
+                                return $record ? Str::upper($record->status) : '-';
+                            }),
                         Select::make('customer_id')
                             ->required()
                             ->label('Customer')
@@ -43,6 +56,7 @@ class SaleOrderResource extends Resource
                             ->relationship('customer', 'name'),
                         TextInput::make('so_number')
                             ->required()
+                            ->unique(ignoreRecord: true)
                             ->maxLength(255),
                         DateTimePicker::make('order_date')
                             ->required(),
@@ -114,7 +128,20 @@ class SaleOrderResource extends Resource
                                 TextInput::make('subtotal')
                                     ->label('Sub Total')
                                     ->reactive()
+                                    ->readOnly()
                                     ->default(0)
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $component->state(HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax));
+                                        }
+                                    })
+                                    ->afterStateUpdated(function ($component, $state, $livewire) {
+                                        $quantity = $livewire->data['quantity'] ?? 0;
+                                        $unit_price = $livewire->data['unit_price'] ?? 0;
+                                        $discount = $livewire->data['discount'] ?? 0;
+                                        $tax = $livewire->data['tax'] ?? 0;
+                                        $component->state(HelperController::hitungSubtotal($$quantity, $unit_price, $discount, $tax));
+                                    })
                                     ->prefix('Rp.')
                             ])
                     ])
@@ -126,20 +153,35 @@ class SaleOrderResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('customer_id')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('customer.name')
+                    ->label('Customer')
+                    ->searchable(),
                 TextColumn::make('so_number')
                     ->searchable(),
                 TextColumn::make('order_date')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('status'),
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->formatStateUsing(function ($state) {
+                        return Str::upper($state);
+                    })
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'draft' => 'gray',
+                            'process' => 'warning',
+                            'completed' => 'success',
+                            'canceled' => 'danger'
+                        };
+                    })
+                    ->badge(),
                 TextColumn::make('delivery_date')
                     ->dateTime()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
+                    ->money('idr')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -158,9 +200,23 @@ class SaleOrderResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make()
-            ])
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('primary'),
+                    DeleteAction::make(),
+                    Action::make('sync_total_amount')
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->label('Sync Total Amount')
+                        ->color('primary')
+                        ->action(function ($record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->updateTotalAmount($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil di update");
+                        })
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -180,6 +236,7 @@ class SaleOrderResource extends Resource
         return [
             'index' => Pages\ListSaleOrders::route('/'),
             'create' => Pages\CreateSaleOrder::route('/create'),
+            'view' => ViewSaleOrder::route('/{record}'),
             'edit' => Pages\EditSaleOrder::route('/{record}/edit'),
         ];
     }
