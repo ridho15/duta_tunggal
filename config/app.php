@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'PROFIGO'),
+    'name' => env('APP_NAME', 'DUTA TUNGGAL ERP'),
 
     /*
     |--------------------------------------------------------------------------
@@ -52,9 +52,9 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'https://profigo.digi-biosportex.site'),
+    'url' => env('APP_URL', 'https://dutatunggal.digi-biosportex.site'),
 
-    'asset_url' => env('ASSET_URL', 'https://profigo.digi-biosportex.site'),
+    'asset_url' => env('ASSET_URL', 'https://dutatunggal.digi-biosportex.site'),
 
     /*
     |--------------------------------------------------------------------------

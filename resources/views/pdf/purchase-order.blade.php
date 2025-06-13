@@ -71,11 +71,11 @@
     <table class="no-border">
         <tr class="no-border">
             <td class="no-border" style="width: 70%">
-                <strong>PT Profigo</strong><br>
+                <strong>PT Duta Tunggal</strong><br>
                 Jl. Contoh No. 123<br>
                 Jakarta, Indonesia<br>
                 Telp: (021) 12345678<br>
-                Email: admin@ptprofigo.co.id
+                Email: admin@dutatunggal.co.id
             </td>
             <td class="no-border right">
                 <img src="{{ public_path('images/logo.png') }}" class="logo">
