@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\ManufacturingService;
 use App\Services\PurchaseOrderService;
 use App\Services\QualityControlService;
+use App\Services\QuotationService;
 use App\Services\SalesOrderService;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Foundation\AliasLoader;
@@ -25,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
             QualityControlService::class,
             ManufacturingService::class,
             SalesOrderService::class,
+            QuotationService::class
         );
     }
 

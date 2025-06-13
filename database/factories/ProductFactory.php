@@ -22,10 +22,10 @@ class ProductFactory extends Factory
         return [
             'name' => $this->faker->word(),
             'sku' => $this->faker->unique()->word(),
-            'product_category_id' => ProductCategory::inRandomOrder()->first(),
+            'product_category_id' => ProductCategory::inRandomOrder()->first()->id,
             'cost_price' => $cost_price,
             'sell_price' => $cost_price + ($cost_price * 10 / 100),
-            'uom_id' => UnitOfMeasure::inRandomOrder()->first()
+            'uom_id' => UnitOfMeasure::inRandomOrder()->first()->id,
         ];
     }
 }

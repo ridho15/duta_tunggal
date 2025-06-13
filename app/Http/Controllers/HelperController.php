@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -274,6 +275,29 @@ class HelperController extends Controller
                 'restore',
                 'force-delete'
             ],
+            'quotation' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'request-approve',
+                'reject',
+                'approve'
+            ],
+            'quotation item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'request-approve',
+                'approve'
+            ],
         ];
 
         return $listPermissions;
@@ -309,4 +333,23 @@ class HelperController extends Controller
         $subtotal = ((int) $quantity * (int) $unit_price) - (int) $discount + (int) $tax;
         return $subtotal;
     }
+
+    public static function sendNotification($isSuccess = false, $title = "", $message = "")
+    {
+        if ($isSuccess) {
+            return Notification::make()
+                ->body($message)
+                ->title($title)
+                ->success()
+                ->send();
+        } else {
+            return Notification::make()
+                ->body($message)
+                ->title($title)
+                ->danger()
+                ->send();
+        }
+    }
+
+    public static function sendNotificationToUser() {}
 }

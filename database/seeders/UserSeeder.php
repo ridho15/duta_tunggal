@@ -23,6 +23,32 @@ class UserSeeder extends Seeder
             'password' => Hash::make('ridho123')
         ]);
 
+        $admin = User::updateOrCreate([
+            'email' => 'admin@gmail.com',
+        ], [
+            'email' => 'admin@gmail.com',
+            'name' => 'Admin',
+            'password' => Hash::make('ridho123')
+        ]);
+
+        $gudang = User::updateOrCreate([
+            'email' => 'gudang@gmail.com',
+        ], [
+            'email' => 'gudang@gmail.com',
+            'name' => "Gudang",
+            'password' => Hash::make('ridho123')
+        ]);
+
+        $owner = User::updateOrCreate([
+            'email' => 'owner@gmail.com',
+        ], [
+            'email' => 'owner@gmail.com',
+            'name' => "Owner",
+            'password' => Hash::make('ridho123')
+        ]);
+
         $user->syncRoles(Role::where('name', 'Super Admin')->first());
+        $gudang->assignRole('Gudang');
+        $owner->assignRole('Owner');
     }
 }
