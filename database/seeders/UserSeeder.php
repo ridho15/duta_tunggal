@@ -23,6 +23,14 @@ class UserSeeder extends Seeder
             'password' => Hash::make('ridho123')
         ]);
 
+        $superAdmin = User::updateOrCreate([
+            'email' => 'superadmin@gmail.com',
+        ], [
+            'email' => 'superadmin@gmail.com',
+            'name' => 'Super Admin',
+            'password' => Hash::make('superadmin')
+        ]);
+
         $admin = User::updateOrCreate([
             'email' => 'admin@gmail.com',
         ], [
