@@ -56,6 +56,7 @@ class UserSeeder extends Seeder
         ]);
 
         $user->syncRoles(Role::where('name', 'Super Admin')->first());
+        $superAdmin->syncRoles(Role::where('name', 'Super Admin')->first());
         $gudang->assignRole('Gudang');
         $owner->assignRole('Owner');
     }
