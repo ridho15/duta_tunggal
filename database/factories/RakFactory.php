@@ -24,7 +24,7 @@ class RakFactory extends Factory
         return [
             'name' => $name,
             'code' => $code,
-            'warehouse_id' => Warehouse::inRandomOrder()->first()
+            'warehouse_id' => Warehouse::inRandomOrder()->first()->id,
         ];
     }
 }
