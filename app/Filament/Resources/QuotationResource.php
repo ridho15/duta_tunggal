@@ -56,7 +56,7 @@ class QuotationResource extends Resource
                         Placeholder::make('status')
                             ->label('Status')
                             ->content(function ($record) {
-                                if(!$record){
+                                if (!$record) {
                                     return '-';
                                 }
                                 return match ($record->status) {
@@ -303,8 +303,8 @@ class QuotationResource extends Resource
                         ->label('Request Approve')
                         ->icon('heroicon-o-arrow-uturn-up')
                         ->color('success')
-                        ->hidden(function ($record) {
-                            return !Auth::user()->hasPermissionTo('request-approve quotation') || $record->status != 'draft';
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('request-approve quotation') && $record->status == 'draft';
                         })
                         ->requiresConfirmation()
                         ->action(function ($record) {
@@ -315,8 +315,8 @@ class QuotationResource extends Resource
                     Action::make('approve')
                         ->label('Approve')
                         ->icon('heroicon-o-check-badge')
-                        ->hidden(function ($record) {
-                            return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('approve quotation');
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'draft');
                         })
                         ->color('success')
                         ->requiresConfirmation()
@@ -329,8 +329,8 @@ class QuotationResource extends Resource
                     Action::make('reject')
                         ->label('Reject')
                         ->icon('heroicon-o-x-circle')
-                        ->hidden(function ($record) {
-                            return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('reject quotation');
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'draft');
                         })
                         ->color('danger')
                         ->requiresConfirmation()

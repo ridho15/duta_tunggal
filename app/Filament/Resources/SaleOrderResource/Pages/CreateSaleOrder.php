@@ -12,6 +12,8 @@ class CreateSaleOrder extends CreateRecord
 {
     protected static string $resource = SaleOrderResource::class;
 
+    protected static string $view = 'filament.components.sale-order.form';
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         return $data;

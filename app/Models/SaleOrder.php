@@ -14,7 +14,7 @@ class SaleOrder extends Model
         'customer_id',
         'so_number',
         'order_date',
-        'status', // draft, request_approve, request_close, approved, closed, completed, confirmed, received, canceled
+        'status', // draft, request_approve, request_close, approved, closed, completed, confirmed, received, canceled, 'reject
         'delivery_date',
         'total_amount',
         'request_approve_by',
@@ -25,7 +25,10 @@ class SaleOrder extends Model
         'approve_at',
         'close_by',
         'close_at',
-        'completed_at'
+        'completed_at',
+        'shipped_to',
+        'reject_by',
+        'reject_at',
     ];
 
     public function customer()
@@ -36,5 +39,30 @@ class SaleOrder extends Model
     public function saleOrderItem()
     {
         return $this->hasMany(SaleOrderItem::class, 'sale_order_id');
+    }
+
+    public function requestApproveBy()
+    {
+        return $this->belongsTo(User::class, 'request_approve_by')->withDefault();
+    }
+
+    public function requestCloseBy()
+    {
+        return $this->belongsTo(User::class, 'request_close_by')->withDefault();
+    }
+
+    public function approveBy()
+    {
+        return $this->belongsTo(User::class, 'approve_by')->withDefault();
+    }
+
+    public function closeBy()
+    {
+        return $this->belongsTo(User::class, 'close_by')->withDefault();
+    }
+
+    public function rejectBy()
+    {
+        return $this->belongsTo(User::class, 'reject_by')->withDefault();
     }
 }

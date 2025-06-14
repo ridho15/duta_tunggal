@@ -5,6 +5,7 @@ namespace App\Filament\Resources\QuotationResource\Pages;
 use App\Filament\Resources\QuotationResource;
 use App\Http\Controllers\HelperController;
 use App\Services\QuotationService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -24,6 +25,22 @@ class ViewQuotation extends ViewRecord
                 ->color('primary'),
             DeleteAction::make()
                 ->icon('heroicon-o-trash'),
+            Action::make('pdf_quotation')
+                ->label('PDF Quotation')
+                ->color('danger')
+                ->icon('heroicon-o-document')
+                ->hidden(function ($record) {
+                    return $record->status != 'approve';
+                })
+                ->action(function ($record) {
+                    $pdf = Pdf::loadView('pdf.quotation', [
+                        'quotation' => $record
+                    ])->setPaper('A4', 'potrait');
+
+                    return response()->streamDownload(function () use ($pdf) {
+                        echo $pdf->stream();
+                    }, 'Quotation_' . $record->quotation_number . '.pdf');
+                }),
             Action::make('download_file')
                 ->label('Download File')
                 ->color('success')
@@ -39,8 +56,8 @@ class ViewQuotation extends ViewRecord
                 ->label('Request Approve')
                 ->icon('heroicon-o-arrow-uturn-up')
                 ->color('success')
-                ->hidden(function ($record) {
-                    return !Auth::user()->hasPermissionTo('request-approve quotation') || $record->status != 'draft';
+                ->visible(function ($record) {
+                    return Auth::user()->hasPermissionTo('request-approve quotation') && $record->status == 'draft';
                 })
                 ->requiresConfirmation()
                 ->action(function ($record) {
@@ -51,8 +68,8 @@ class ViewQuotation extends ViewRecord
             Action::make('approve')
                 ->label('Approve')
                 ->icon('heroicon-o-check-badge')
-                ->hidden(function ($record) {
-                    return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('approve quotation');
+                ->visible(function ($record) {
+                    return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'draft');
                 })
                 ->color('success')
                 ->requiresConfirmation()
@@ -65,8 +82,8 @@ class ViewQuotation extends ViewRecord
             Action::make('reject')
                 ->label('Reject')
                 ->icon('heroicon-o-x-circle')
-                ->hidden(function ($record) {
-                    return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('reject quotation');
+                ->visible(function ($record) {
+                    return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'draft');
                 })
                 ->color('danger')
                 ->requiresConfirmation()

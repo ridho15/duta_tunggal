@@ -24,6 +24,7 @@ class SaleOrderFactory extends Factory
             'so_number' => $so_number,
             'order_date' => $this->faker->date(),
             'total_amount' => 0,
+            'shipped_to' => $this->faker->address()
         ];
     }
 }

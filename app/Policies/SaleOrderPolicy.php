@@ -61,6 +61,16 @@ class SaleOrderPolicy
      */
     public function forceDelete(User $user, SaleOrder $saleOrder): bool
     {
-        return $user->hasRole('Super Admin');
+        return $user->hasPermissionTo('force-delete sales order');
+    }
+
+    public function request(User $user, SaleOrder $saleOrder): bool
+    {
+        return $user->hasPermissionTo('request sales order');
+    }
+
+    public function response(User $user, SaleOrder $saleOrder): bool
+    {
+        return $user->hasPermissionTo('response sales order');
     }
 }

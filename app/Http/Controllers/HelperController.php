@@ -210,7 +210,9 @@ class HelperController extends Controller
                 'update',
                 'delete',
                 'restore',
-                'force-delete'
+                'force-delete',
+                'request',
+                'response',
             ],
             'sales order item' => [
                 'view any',

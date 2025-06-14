@@ -7,12 +7,17 @@ use App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder;
 use App\Filament\Resources\SaleOrderResource\RelationManagers\SaleOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
 use App\Models\Product;
+use App\Models\Quotation;
+use App\Models\QuotationItem;
 use App\Models\SaleOrder;
+use App\Models\SaleOrderItem;
 use App\Services\SalesOrderService;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -27,6 +32,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class SaleOrderResource extends Resource
@@ -48,29 +54,124 @@ class SaleOrderResource extends Resource
                             ->content(function ($record) {
                                 return $record ? Str::upper($record->status) : '-';
                             }),
+                        Select::make('options_form')
+                            ->label('Opions From')
+                            ->searchable()
+                            ->preload()
+                            ->reactive()
+                            ->loadingMessage("loading...")
+                            ->options(function () {
+                                return [
+                                    '0' => 'None',
+                                    '1' => 'Refer Penjualan',
+                                    '2' => 'Refer Quotation',
+                                ];
+                            })->default(0),
+                        Select::make('quotation_id')
+                            ->label('Quotation')
+                            ->searchable()
+                            ->preload()
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $items = [];
+                                $quotation = Quotation::find($state);
+                                foreach ($quotation->quotationItem as $item) {
+                                    array_push($items, [
+                                        'product_id' => $item->product_id,
+                                        'quantity' => $item->quantity,
+                                        'unit_price' => $item->unit_price,
+                                        'discount' => $item->discount,
+                                        'tax' => $item->tax,
+                                        'notes' => $item->notes
+                                    ]);
+                                }
+                                $set('total_amount', $quotation->total_amount);
+                                $set('customer_id', $quotation->customer_id);
+                                $set('saleOrderItem', $items);
+                            })
+                            ->visible(function ($get) {
+                                return $get('options_form') == 2;
+                            })
+                            ->options(Quotation::where('status', 'approve')->select(['id', 'customer_id', 'quotation_number'])->get()->pluck('quotation_number', 'id'))
+                            ->required(),
+                        Select::make('sale_order_id')
+                            ->label('Sales Order')
+                            ->preload()
+                            ->loadingMessage('Loading ...')
+                            ->reactive()
+                            ->searchable()
+                            ->visible(function ($get) {
+                                return $get('options_form') == 1;
+                            })
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $items = [];
+                                $saleOrder = SaleOrder::find($state);
+                                foreach ($saleOrder->saleOrderItem as $item) {
+                                    array_push($items, [
+                                        'product_id' => $item->product_id,
+                                        'unit_price' => $item->unit_price,
+                                        'quantity' => $item->quantity,
+                                        'discount' => $item->discount,
+                                        'tax' => $item->tax,
+                                        'notes' => $item->notes,
+                                    ]);
+                                }
+                                $set('total_amount', $saleOrder->total_amount);
+                                $set('customer_id', $saleOrder->customer_id);
+                                $set('saleOrderItem', $items);
+                            })
+                            ->options(SaleOrder::select(['id', 'so_number', 'customer_id'])->get()->pluck('so_number', 'id'))
+                            ->required(),
                         Select::make('customer_id')
                             ->required()
                             ->label('Customer')
                             ->preload()
                             ->searchable()
-                            ->relationship('customer', 'name'),
+                            ->reactive()
+                            ->relationship('customer', 'name')
+                            ->createOptionForm([
+                                Fieldset::make('Form Customer')
+                                    ->schema([
+                                        TextInput::make('name')
+                                            ->required()
+                                            ->maxLength(255),
+                                        TextInput::make('address')
+                                            ->required()
+                                            ->maxLength(255),
+                                        TextInput::make('phone')
+                                            ->tel()
+                                            ->maxLength(15)
+                                            ->rules(['regex:/^08[0-9]{8,12}$/'])
+                                            ->required()
+                                            ->maxLength(255),
+                                        TextInput::make('email')
+                                            ->email()
+                                            ->required()
+                                            ->maxLength(255)
+                                    ]),
+                            ]),
                         TextInput::make('so_number')
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
-                        DateTimePicker::make('order_date')
+                        DatePicker::make('order_date')
                             ->required(),
-                        DateTimePicker::make('delivery_date'),
+                        DatePicker::make('delivery_date'),
+                        TextInput::make('shipped_to')
+                            ->label('Shipped To')
+                            ->nullable(),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
                             ->prefix('Rp.')
                             ->required()
                             ->disabled()
+                            ->reactive()
                             ->default(0)
                             ->numeric(),
                         Repeater::make('saleOrderItem')
                             ->relationship()
                             ->columnSpanFull()
+                            ->reactive()
                             ->columns(3)
                             ->addActionLabel("Add Items")
                             ->schema([
@@ -175,6 +276,9 @@ class SaleOrderResource extends Resource
                         };
                     })
                     ->badge(),
+                TextColumn::make('shipped_to')
+                    ->label('Shipped To')
+                    ->searchable(),
                 TextColumn::make('delivery_date')
                     ->dateTime()
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -206,6 +310,58 @@ class SaleOrderResource extends Resource
                     EditAction::make()
                         ->color('primary'),
                     DeleteAction::make(),
+                    Action::make('request_approve')
+                        ->label('Request Approve')
+                        ->requiresConfirmation()
+                        ->color('success')
+                        ->icon('heroicon-o-arrow-uturn-up')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('request sales order') && $record->status == 'draft';
+                        })
+                        ->action(function ($record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->requestApprove($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request approve");
+                        }),
+                    Action::make('request_close')
+                        ->label('Request Close')
+                        ->requiresConfirmation()
+                        ->color('danger')
+                        ->icon('heroicon-o-x-circle')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('request sales order') && ($record->status != 'approved' || $record->status != 'confirmed' || $record->status != 'close' || $record->status != 'canceled' || $record->status == 'draft');
+                        })
+                        ->action(function ($record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->requestClose($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                        }),
+                    Action::make('approve')
+                        ->label('Approve')
+                        ->requiresConfirmation()
+                        ->color('success')
+                        ->icon('heroicon-o-check-badge')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
+                        })
+                        ->action(function ($record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->requestClose($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                        }),
+                    Action::make('approve')
+                        ->label('Approve')
+                        ->requiresConfirmation()
+                        ->color('success')
+                        ->icon('heroicon-o-check-badge')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
+                        })
+                        ->action(function ($record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->requestClose($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                        }),
                     Action::make('sync_total_amount')
                         ->icon('heroicon-o-arrow-path-rounded-square')
                         ->label('Sync Total Amount')
