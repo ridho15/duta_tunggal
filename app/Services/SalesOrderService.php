@@ -48,7 +48,7 @@ class SalesOrderService
     public function approve($saleOrder)
     {
         return $saleOrder->update([
-            'status' => 'approve',
+            'status' => 'approved',
             'approve_by' => Auth::user()->id,
             'approve_at' => Carbon::now()
         ]);
@@ -57,9 +57,26 @@ class SalesOrderService
     public function close($saleOrder)
     {
         return $saleOrder->update([
-            'status' => 'close',
+            'status' => 'closed',
             'close_by' => Auth::user()->id,
             'close_at' => Carbon::now()
+        ]);
+    }
+
+    public function reject($saleOrder)
+    {
+        return $saleOrder->update([
+            'status' => 'reject',
+            'reject_by' => Auth::user()->id,
+            'reject_at' => Carbon::now()
+        ]);
+    }
+
+    public function completed($saleOrder)
+    {
+        return $saleOrder->update([
+            'status' => 'completed',
+            'completed_at' => Carbon::now()
         ]);
     }
 }

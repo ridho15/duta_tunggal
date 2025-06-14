@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             WarehouseSeeder::class,
             RakSeeder::class,
-            DeliveryOrderSeeder::class
+            DeliveryOrderSeeder::class,
         ]);
     }
 }

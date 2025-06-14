@@ -354,4 +354,48 @@ class HelperController extends Controller
     }
 
     public static function sendNotificationToUser() {}
+
+    public static function terbilang($number)
+    {
+        $number = abs($number);
+        $words = [
+            "",
+            "satu",
+            "dua",
+            "tiga",
+            "empat",
+            "lima",
+            "enam",
+            "tujuh",
+            "delapan",
+            "sembilan",
+            "sepuluh",
+            "sebelas"
+        ];
+
+        $temp = "";
+        if ($number < 12) {
+            $temp = " " . $words[$number];
+        } else if ($number < 20) {
+            $temp = static::terbilang($number - 10) . " belas ";
+        } else if ($number < 100) {
+            $temp = static::terbilang($number / 10) . " puluh " . static::terbilang($number % 10);
+        } else if ($number < 200) {
+            $temp = " seratus " . static::terbilang($number - 100);
+        } else if ($number < 1000) {
+            $temp = static::terbilang($number / 100) . " ratus " . static::terbilang($number % 100);
+        } else if ($number < 2000) {
+            $temp = " seribu" . static::terbilang($number - 1000);
+        } else if ($number < 1000000) {
+            $temp = static::terbilang($number / 1000) . " ribu " . static::terbilang($number % 1000);
+        } else if ($number < 1000000000) {
+            $temp = static::terbilang($number / 1000000) . " juta " . static::terbilang($number % 1000000);
+        } else if ($number < 1000000000000) {
+            $temp = static::terbilang($number / 1000000000) . " milyar " . static::terbilang(fmod($number, 1000000000));
+        } else if ($number < 1000000000000000) {
+            $temp = static::terbilang($number / 1000000000000) . " triliun " . static::terbilang(fmod($number, 1000000000000));
+        }
+
+        return trim($temp);
+    }
 }

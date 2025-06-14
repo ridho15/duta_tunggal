@@ -8,6 +8,7 @@ use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -51,6 +52,9 @@ class DeliveryOrderResource extends Resource
                             ->required(),
                         Textarea::make('notes')
                             ->label('Notes')
+                            ->nullable(),
+                        Repeater::make('deliveryOrderItem')
+                            ->schema([])
                     ])
             ]);
     }

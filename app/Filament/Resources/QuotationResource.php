@@ -316,7 +316,7 @@ class QuotationResource extends Resource
                         ->label('Approve')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'draft');
+                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'request_approve');
                         })
                         ->color('success')
                         ->requiresConfirmation()
@@ -330,7 +330,7 @@ class QuotationResource extends Resource
                         ->label('Reject')
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'draft');
+                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'request_approve');
                         })
                         ->color('danger')
                         ->requiresConfirmation()

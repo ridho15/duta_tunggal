@@ -12,6 +12,7 @@ use App\Models\QuotationItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Services\SalesOrderService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
@@ -59,6 +60,7 @@ class SaleOrderResource extends Resource
                             ->searchable()
                             ->preload()
                             ->reactive()
+                            ->hiddenOn(['edit', 'view'])
                             ->loadingMessage("loading...")
                             ->options(function () {
                                 return [
@@ -272,7 +274,12 @@ class SaleOrderResource extends Resource
                             'draft' => 'gray',
                             'process' => 'warning',
                             'completed' => 'success',
-                            'canceled' => 'danger'
+                            'approved' => 'success',
+                            'canceled' => 'danger',
+                            'request_approve' => 'primary',
+                            'request_close' => 'warning',
+                            'closed' => 'danger',
+                            default => '-'
                         };
                     })
                     ->badge(),
@@ -287,6 +294,45 @@ class SaleOrderResource extends Resource
                     ->numeric()
                     ->money('idr')
                     ->sortable(),
+                TextColumn::make('titip_saldo')
+                    ->label('Titip Saldo')
+                    ->money('idr')
+                    ->sortable(),
+                TextColumn::make('requestApproveBy.name')
+                    ->label('Request Approve By')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('request_approve_at')
+                    ->dateTime()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Request Approve At'),
+                TextColumn::make('requestCloseBy.name')
+                    ->label('Request Approve By')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('request_close_at')
+                    ->dateTime()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Request Approve At'),
+                TextColumn::make('approveBy.name')
+                    ->label('Approve By')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('approve_at')
+                    ->dateTime()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Approve At'),
+                TextColumn::make('closeBy.name')
+                    ->label('Close By')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('close_at')
+                    ->dateTime()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Close At'),
+                TextColumn::make('rejectBy.name')
+                    ->label('Reject By')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('reject_at')
+                    ->dateTime()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Reject At'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -346,21 +392,81 @@ class SaleOrderResource extends Resource
                         })
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->requestClose($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                            $salesOrderService->approve($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve sale order");
                         }),
-                    Action::make('approve')
-                        ->label('Approve')
+                    Action::make('closed')
+                        ->label('Close')
                         ->requiresConfirmation()
-                        ->color('success')
-                        ->icon('heroicon-o-check-badge')
+                        ->color('warning')
+                        ->icon('heroicon-o-x-circle')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_close');
+                        })
+                        ->action(function ($record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->close($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Closed");
+                        }),
+                    Action::make('reject')
+                        ->label('Reject')
+                        ->requiresConfirmation()
+                        ->color('danger')
+                        ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
                         })
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->requestClose($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                            $salesOrderService->reject($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Sale");
+                        }),
+                    Action::make('pdf_sale_order')
+                        ->label('Download PDF')
+                        ->color('danger')
+                        ->visible(function ($record) {
+                            return $record->status == 'approved' || $record->status == 'completed' || $record->status == 'confirmed' || $record->status == 'received';
+                        })
+                        ->icon('heroicon-o-document')
+                        ->action(function ($record) {
+                            $pdf = Pdf::loadView('pdf.sales-order', [
+                                'saleOrder' => $record
+                            ])->setPaper('A4', 'potrait');
+
+                            return response()->streamDownload(function () use ($pdf) {
+                                echo $pdf->stream();
+                            }, 'Sale_Order_' . $record->so_number . '.pdf');
+                        }),
+
+                    Action::make('completed')
+                        ->label('Complete')
+                        ->icon('heroicon-o-check-badge')
+                        ->requiresConfirmation()
+                        ->visible(function () {
+                            return Auth::user()->hasRole(['Owner']);
+                        })
+                        ->color('success')
+                        ->action(function ($record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->completed($record);
+
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                        }),
+                    Action::make('btn_titip_saldo')
+                        ->label('Saldo Titip Customer')
+                        ->icon('heroicon-o-banknotes')
+                        ->color('warning')
+                        ->form([
+                            TextInput::make('titip_saldo')
+                                ->numeric()
+                                ->prefix('Rp.')
+                                ->required()
+                                ->default(0),
+                        ])
+                        ->action(function (array $data, $record) {
+                            $record->update([
+                                'titip_saldo' => $data['titip_saldo'],
+                            ]);
                         }),
                     Action::make('sync_total_amount')
                         ->icon('heroicon-o-arrow-path-rounded-square')

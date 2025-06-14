@@ -29,6 +29,7 @@ class SaleOrder extends Model
         'shipped_to',
         'reject_by',
         'reject_at',
+        'titip_saldo'
     ];
 
     public function customer()
