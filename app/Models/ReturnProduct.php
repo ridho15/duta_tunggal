@@ -27,4 +27,9 @@ class ReturnProduct extends Model
     {
         return $this->hasMany(ReturnProductItem::class, 'return_product_id');
     }
+
+    public function fromModel()
+    {
+        return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id');
+    }
 }
