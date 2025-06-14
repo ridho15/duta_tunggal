@@ -19,6 +19,7 @@ class DeliveryOrderFactory extends Factory
     public function definition(): array
     {
         return [
+            'do_number' => $this->faker->unique()->word(),
             'delivery_date' => $this->faker->date(),
             'driver_id' => Driver::inRandomOrder()->first()->id,
             'vehicle_id' => Vehicle::inRandomOrder()->first()->id,

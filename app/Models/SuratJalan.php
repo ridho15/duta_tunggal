@@ -10,20 +10,25 @@ class SuratJalan extends Model
     use SoftDeletes;
     protected $table = 'surat_jalans';
     protected $fillable = [
-        'delivery_order_id',
         'sj_number',
-        'issue_at',
+        'issued_at',
         'signed_by',
-        'status'
+        'status',
+        'created_by'
     ];
 
     public function deliveryOrder()
     {
-        return $this->belongsTo(DeliveryOrder::class, 'delivery_order_id')->withDefault();
+        return $this->belongsToMany(DeliveryOrder::class, 'surat_jalan_delivery_orders', 'surat_jalan_id', 'delivery_order_id');
     }
 
     public function signedBy()
     {
         return $this->belongsTo(User::class, 'signed_by')->withDefault();
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
 }

@@ -11,6 +11,14 @@ class Supplier extends Model
     use SoftDeletes, HasFactory;
     protected $table = 'suppliers';
     protected $fillable = [
-        'name', 'address', 'phone', 'email'
+        'name',
+        'address',
+        'phone',
+        'email'
     ];
+
+    public function purchaseOrder()
+    {
+        return $this->hasMany(PurchaseOrder::class, 'supplier_id');
+    }
 }

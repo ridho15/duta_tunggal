@@ -29,7 +29,8 @@ class SaleOrder extends Model
         'shipped_to',
         'reject_by',
         'reject_at',
-        'titip_saldo'
+        'titip_saldo',
+        'reason_close'
     ];
 
     public function customer()
@@ -65,5 +66,15 @@ class SaleOrder extends Model
     public function rejectBy()
     {
         return $this->belongsTo(User::class, 'reject_by')->withDefault();
+    }
+
+    public function deliveryOrder()
+    {
+        return $this->belongsToMany(DeliveryOrder::class, 'delivery_sales_orders', 'sales_order_id', 'delivery_order_id');
+    }
+
+    public function deliverySalesOrder()
+    {
+        return $this->hasMany(DeliverySalesOrder::class, 'sales_order_id');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\VehicleResource\RelationManagers\DeliveryOrderRelationManager;
 use App\Filament\Resources\VehicleResource\Pages;
 use App\Filament\Resources\VehicleResource\RelationManagers;
 use App\Models\Vehicle;
@@ -87,7 +88,7 @@ class VehicleResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            DeliveryOrderRelationManager::class
         ];
     }
 

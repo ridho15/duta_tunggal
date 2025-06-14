@@ -11,11 +11,12 @@ class DeliveryOrder extends Model
     use SoftDeletes, HasFactory;
     protected $table = 'delivery_orders';
     protected $fillable = [
+        'do_number',
         'delivery_date',
         'driver_id',
         'vehicle_id',
-        'status', // draft, sent,received_by, supplier
-        'notes'
+        'status', // 'draft', 'sent', 'received', 'supplier', 'completed', 'request_approve', 'approved', 'request_close', 'closed', 'reject'
+        'notes',
     ];
 
     public function driver()
@@ -30,7 +31,7 @@ class DeliveryOrder extends Model
 
     public function deliveryOrderItem()
     {
-        return $this->belongsTo(DeliveryOrderItem::class, 'delivery_order_id');
+        return $this->hasMany(DeliveryOrderItem::class, 'delivery_order_id');
     }
 
     public function salesOrders()
@@ -41,6 +42,11 @@ class DeliveryOrder extends Model
     public function suratJalan()
     {
         return $this->hasOne(SuratJalan::class, 'delivery_order_id')->withDefault();
+    }
+
+    public function deliverySalesOrder()
+    {
+        return $this->hasMany(DeliverySalesOrder::class, 'delivery_order_id');
     }
 
     public function log()

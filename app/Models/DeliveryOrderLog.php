@@ -12,7 +12,7 @@ class DeliveryOrderLog extends Model
     protected $fillable = [
         'delivery_order_id',
         'status',
-        'confirmed_by'
+        'confirmed_by',
     ];
 
     public function deliveryOrder()

@@ -156,7 +156,9 @@ class HelperController extends Controller
                 'update',
                 'delete',
                 'restore',
-                'force-delete'
+                'force-delete',
+                'request',
+                'response'
             ],
             'delivery order item' => [
                 'view any',
@@ -299,6 +301,17 @@ class HelperController extends Controller
                 'force-delete',
                 'request-approve',
                 'approve'
+            ],
+            'surat jalan' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'request',
+                'response'
             ],
         ];
 

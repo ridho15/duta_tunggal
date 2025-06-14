@@ -23,7 +23,8 @@ class ViewSaleOrder extends ViewRecord
         return [
             EditAction::make()
                 ->icon('heroicon-o-pencil-square'),
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->icon('heroicon-o-trash'),
             Action::make('request_approve')
                 ->label('Request Approve')
                 ->requiresConfirmation()
@@ -121,16 +122,20 @@ class ViewSaleOrder extends ViewRecord
                 }),
             Action::make('btn_titip_saldo')
                 ->label('Saldo Titip Customer')
-                ->icon('heroicon-o')
+                ->icon('heroicon-o-banknotes')
                 ->color('warning')
                 ->form([
-                    TextInput::make('titip_saldo_customer')
+                    TextInput::make('titip_saldo')
                         ->numeric()
                         ->prefix('Rp.')
                         ->required()
                         ->default(0),
                 ])
-                ->action(function ($record) {}),
+                ->action(function (array $data, $record) {
+                    $record->update([
+                        'titip_saldo' => $data['titip_saldo'],
+                    ]);
+                }),
             Action::make('sync_total_amount')
                 ->icon('heroicon-o-arrow-path-rounded-square')
                 ->label('Sync Total Amount')

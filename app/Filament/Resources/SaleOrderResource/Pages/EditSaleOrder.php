@@ -12,6 +12,8 @@ class EditSaleOrder extends EditRecord
 {
     protected static string $resource = SaleOrderResource::class;
 
+    protected static string $view = 'filament.components.sale-order.form';
+
     protected function getHeaderActions(): array
     {
         return [

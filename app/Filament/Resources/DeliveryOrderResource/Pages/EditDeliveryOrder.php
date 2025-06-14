@@ -17,4 +17,9 @@ class EditDeliveryOrder extends EditRecord
                 ->icon('heroicon-o-trash'),
         ];
     }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return $data;
+    }
 }

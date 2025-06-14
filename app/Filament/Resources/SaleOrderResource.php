@@ -6,6 +6,7 @@ use App\Filament\Resources\SaleOrderResource\Pages;
 use App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder;
 use App\Filament\Resources\SaleOrderResource\RelationManagers\SaleOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
@@ -20,6 +21,7 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -130,6 +132,10 @@ class SaleOrderResource extends Resource
                             ->preload()
                             ->searchable()
                             ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $customer = Customer::find($state);
+                                $set('shipped_to', $customer->address);
+                            })
                             ->relationship('customer', 'name')
                             ->createOptionForm([
                                 Fieldset::make('Form Customer')
@@ -375,9 +381,20 @@ class SaleOrderResource extends Resource
                         ->color('danger')
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request sales order') && ($record->status != 'approved' || $record->status != 'confirmed' || $record->status != 'close' || $record->status != 'canceled' || $record->status == 'draft');
+                            return Auth::user()->hasPermissionTo('request sales order') && ($record->status == 'approved' || $record->status == 'draft');
                         })
-                        ->action(function ($record) {
+                        ->form(
+                            function ($record) {
+                                return [
+                                    Textarea::make('reason_close')
+                                        ->label('Reason Close')
+                                        ->string()
+                                        ->required(),
+                                ];
+                            }
+                        )
+                        ->action(function (array $data, $record) {
+                            $record->update($data);
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->requestClose($record);
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
@@ -400,6 +417,17 @@ class SaleOrderResource extends Resource
                         ->requiresConfirmation()
                         ->color('warning')
                         ->icon('heroicon-o-x-circle')
+                        ->form(
+                            function ($record) {
+                                return [
+                                    Textarea::make('reason_close')
+                                        ->label('Reason Close')
+                                        ->string()
+                                        ->required()
+                                        ->default($record->reason_close),
+                                ];
+                            }
+                        )
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_close');
                         })

@@ -3,22 +3,21 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SupplierResource\Pages;
-use App\Filament\Resources\SupplierResource\RelationManagers;
+use App\Filament\Resources\SupplierResource\Pages\ViewSupplier;
+use App\Filament\Resources\SupplierResource\RelationManagers\PurchaseOrderRelationManager;
 use App\Models\Supplier;
-use Filament\Forms;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class SupplierResource extends Resource
 {
@@ -82,8 +81,13 @@ class SupplierResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make()
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                ])
             ])
             ->bulkActions([
                 BulkActionGroup::make([
@@ -95,7 +99,7 @@ class SupplierResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            PurchaseOrderRelationManager::class
         ];
     }
 
@@ -103,6 +107,7 @@ class SupplierResource extends Resource
     {
         return [
             'index' => Pages\ListSuppliers::route('/'),
+            'view' => ViewSupplier::route('/{record}')
             // 'create' => Pages\CreateSupplier::route('/create'),
             // 'edit' => Pages\EditSupplier::route('/{record}/edit'),
         ];

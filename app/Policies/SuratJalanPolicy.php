@@ -61,6 +61,16 @@ class SuratJalanPolicy
      */
     public function forceDelete(User $user, SuratJalan $suratJalan): bool
     {
-        return $user->hasRole('Super Admin');
+        return $user->hasPermissionTo('force-delete surat jalan');
+    }
+
+    public function request(User $user, SuratJalan $suratJalan): bool
+    {
+        return $user->hasPermissionTo('request surat jalan');
+    }
+
+    public function response(User $user, SuratJalan $suratJalan): bool
+    {
+        return $user->hasPermissionTo('response surat jalan');
     }
 }
