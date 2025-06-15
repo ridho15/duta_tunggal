@@ -108,6 +108,12 @@ class QualityControlResource extends Resource
                     ->formatStateUsing(function ($state) {
                         return "({$state->sku}) {$state->name}";
                     }),
+                TextColumn::make('warehouse.name')
+                    ->label('Warehouse')
+                    ->searchable(),
+                TextColumn::make('rak.name')
+                    ->label("Rak")
+                    ->searchable(),
                 TextColumn::make('notes')
                     ->label('Notes'),
                 TextColumn::make('created_at')

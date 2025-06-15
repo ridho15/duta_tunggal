@@ -51,7 +51,7 @@ class PurchaseOrder extends Model
 
     public function purchaseReceipt()
     {
-        return $this->hasOne(PurchaseReceipt::class, 'purchase_order_id');
+        return $this->hasMany(PurchaseReceipt::class, 'purchase_order_id');
     }
 
     public function closeRequestedBy()

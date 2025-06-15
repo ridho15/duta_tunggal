@@ -15,6 +15,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Actions\DeleteAction;
@@ -26,6 +27,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class PurchaseReceiptItemRelationManager extends RelationManager
 {
@@ -123,6 +125,9 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                 TextColumn::make('warehouse.name')
                     ->label('Warehouse')
                     ->searchable(),
+                TextColumn::make('rak.name')
+                    ->label('Rak')
+                    ->searchable(),
                 TextColumn::make('qty_received')
                     ->label('Quantity Received')
                     ->sortable(),
@@ -161,36 +166,39 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                     ->icon('heroicon-o-plus-circle'),
             ])
             ->actions([
-                EditAction::make()
-                    ->hidden(function ($record) {
-                        return $record->is_sent == 1;
-                    }),
-                DeleteAction::make()
-                    ->hidden(function ($record) {
-                        return $record->is_sent == 1;
-                    }),
-                Action::make('kirim_qc')
-                    ->label('Kirim QC')
-                    ->color('success')
-                    ->hidden(function ($record) {
-                        return $record->is_sent == 1;
-                    })
-                    ->icon('heroicon-o-paper-airplane')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $qualityControlService = app(QualityControlService::class);
-                        $record->update([
-                            'is_sent' => 1
-                        ]);
+                ActionGroup::make([
+                    EditAction::make()
+                        ->color('success')
+                        ->hidden(function ($record) {
+                            return $record->is_sent == 1;
+                        }),
+                    DeleteAction::make()
+                        ->hidden(function ($record) {
+                            return $record->is_sent == 1;
+                        }),
+                    Action::make('kirim_qc')
+                        ->label('Kirim QC')
+                        ->color('success')
+                        ->hidden(function ($record) {
+                            return $record->is_sent == 1;
+                        })
+                        ->icon('heroicon-o-paper-airplane')
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            $qualityControlService = app(QualityControlService::class);
+                            $record->update([
+                                'is_sent' => 1
+                            ]);
 
-                        $qualityControlService->createQCFromPurchaseReceiptItem($record);
-                        Notification::make()
-                            ->title("Success")
-                            ->color('success')
-                            ->body('Berhasil mengirimkan data ke quality control')
-                            ->send();
-                    }),
-            ])
+                            $qualityControlService->createQCFromPurchaseReceiptItem($record);
+                            Notification::make()
+                                ->title("Success")
+                                ->color('success')
+                                ->body('Berhasil mengirimkan data ke quality control')
+                                ->send();
+                        }),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

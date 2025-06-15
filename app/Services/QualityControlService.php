@@ -15,6 +15,7 @@ class QualityControlService
             'status' => 0,
             'warehouse_id' => $purchaseReceiptItem->warehouse_id,
             'product_id' => $purchaseReceiptItem->product_id,
+            'rak_id' => $purchaseReceiptItem->rak_id
         ]);
     }
 }

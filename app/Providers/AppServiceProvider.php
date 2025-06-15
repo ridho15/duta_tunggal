@@ -7,6 +7,7 @@ use App\Services\DeliveryOrderService;
 use App\Services\ManufacturingService;
 use App\Services\OrderRequestService;
 use App\Services\PurchaseOrderService;
+use App\Services\PurchaseReceiptService;
 use App\Services\QualityControlService;
 use App\Services\QuotationService;
 use App\Services\ReturnProductService;
@@ -25,17 +26,36 @@ class AppServiceProvider extends ServiceProvider
         $loader = AliasLoader::getInstance();
         $loader->alias('Debugbar', Debugbar::class);
 
-        $this->app->bind(
-            QualityControlService::class,
-            ManufacturingService::class,
-            SalesOrderService::class,
-            QuotationService::class,
-            DeliveryOrderService::class,
-            ReturnProductService::class,
-            DeliveryOrderItemService::class,
-            OrderRequestService::class,
-            PurchaseOrderService::class,
-        );
+        $this->app->bind(QualityControlService::class, function ($app) {
+            return new QualityControlService;
+        });
+        $this->app->bind(ManufacturingService::class, function ($app) {
+            return new ManufacturingService;
+        });
+        $this->app->bind(SalesOrderService::class, function ($app) {
+            return new SalesOrderService;
+        });
+        $this->app->bind(QuotationService::class, function ($app) {
+            return new QuotationService;
+        });
+        $this->app->bind(DeliveryOrderService::class, function ($app) {
+            return new DeliveryOrderService;
+        });
+        $this->app->bind(ReturnProductService::class, function ($app) {
+            return new ReturnProductService;
+        });
+        $this->app->bind(DeliveryOrderItemService::class, function ($app) {
+            return new DeliveryOrderItemService;
+        });
+        $this->app->bind(OrderRequestService::class, function ($app) {
+            return new OrderRequestService;
+        });
+        $this->app->bind(PurchaseOrderService::class, function ($app) {
+            return new PurchaseOrderService;
+        });
+        $this->app->bind(PurchaseReceiptService::class, function ($app) {
+            return new PurchaseReceiptService;
+        });
     }
 
     /**

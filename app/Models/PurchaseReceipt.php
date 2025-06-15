@@ -14,7 +14,10 @@ class PurchaseReceipt extends Model
         'purchase_order_id',
         'receipt_date',
         'received_by',
-        'notes'
+        'notes',
+        'currency_id',
+        'other_cost',
+        'status' // draft, partial, completed
     ];
 
     public function purchaseOrder()
@@ -35,5 +38,28 @@ class PurchaseReceipt extends Model
     public function purchaseReceiptPhoto()
     {
         return $this->hasMany(PurchaseReceiptPhoto::class, 'purchase_receipt_id');
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
+    }
+
+    protected static function booted()
+    {
+        static::deleting(function ($purchaseReceipt) {
+            if ($purchaseReceipt->isForceDeleting()) {
+                $purchaseReceipt->purchaseReceiptItem()->forceDelete();
+                $purchaseReceipt->purchaseReceiptPhoto()->forceDelete();
+            } else {
+                $purchaseReceipt->purchaseReceiptItem()->delete();
+                $purchaseReceipt->purchaseReceiptPhoto()->delete();
+            }
+        });
+
+        static::restoring(function ($purchaseReceipt) {
+            $purchaseReceipt->purchaseReceiptItem()->withTrashed()->restore();
+            $purchaseReceipt->purchaseReceiptPhoto()->withTrashed()->restore();
+        });
     }
 }

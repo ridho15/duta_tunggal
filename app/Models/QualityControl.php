@@ -20,7 +20,8 @@ class QualityControl extends Model
         'reason_reject',
         'product_id',
         'date_send_stock',
-        'date_create_delivery_order'
+        'date_create_delivery_order',
+        'rak_id'
     ];
 
     protected $appends = [
@@ -54,5 +55,10 @@ class QualityControl extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
+    }
+
+    public function rak()
+    {
+        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
     }
 }

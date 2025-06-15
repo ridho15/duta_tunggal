@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Symfony\Component\CssSelector\Node\FunctionNode;
 
 class PurchaseReceiptItem extends Model
 {
@@ -11,6 +12,7 @@ class PurchaseReceiptItem extends Model
     protected $table = 'purchase_receipt_items';
     protected $fillable = [
         'purchase_receipt_id',
+        'purchase_order_item_id',
         'product_id',
         'qty_received',
         'qty_accepted',
@@ -18,9 +20,18 @@ class PurchaseReceiptItem extends Model
         'reason_rejected',
         'warehouse_id',
         'is_sent',
-        'refer_item_model_id',
-        'refer_item_model_type',
+        'rak_id', // optional
     ];
+
+    public function purchaseOrderItem()
+    {
+        return $this->belongsTo(PurchaseOrderItem::class, 'purchase_order_item_id')->withDefault();
+    }
+
+    public function rak()
+    {
+        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+    }
 
     public function purchaseReceipt()
     {
@@ -45,10 +56,5 @@ class PurchaseReceiptItem extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
-    }
-
-    public function referItemModel()
-    {
-        return $this->morphTo(__FUNCTION__, 'refer_item_model_type', 'refer_item_model_id')->withDefault();
     }
 }
