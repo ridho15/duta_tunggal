@@ -4,8 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\OrderRequestResource\Pages;
 use App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest;
+use App\Http\Controllers\HelperController;
 use App\Models\OrderRequest;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
+use App\Services\OrderRequestService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Repeater;
@@ -14,6 +19,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
@@ -22,6 +29,8 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\Auth;
 
 class OrderRequestResource extends Resource
 {
@@ -39,16 +48,19 @@ class OrderRequestResource extends Resource
                     ->schema([
                         TextInput::make('request_number')
                             ->required()
+                            ->unique(ignoreRecord: true)
                             ->maxLength(255),
-                        TextInput::make('warehouse_id')
-                            ->required()
-                            ->numeric(),
+                        Select::make('warehouse_id')
+                            ->label('Warehouse')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('warehouse', 'name')
+                            ->required(),
                         DatePicker::make('request_date')
                             ->required(),
-                        TextInput::make('status')
-                            ->required(),
                         Textarea::make('note')
-                            ->columnSpanFull(),
+                            ->label('Note')
+                            ->nullable(),
                         Repeater::make('orderRequestItem')
                             ->relationship()
                             ->columnSpanFull()
@@ -108,6 +120,10 @@ class OrderRequestResource extends Resource
                     })
                     ->searchable()
                     ->badge(),
+                TextColumn::make('createdBy.name')
+                    ->label('Created By')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -125,12 +141,86 @@ class OrderRequestResource extends Resource
                 //
             ])
             ->actions([
-                ViewAction::make()
-                    ->color('primary'),
-                EditAction::make()
-                    ->color('success'),
-                DeleteAction::make()
-            ])
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                    Action::make('download_pdf')
+                        ->label('Download PDF')
+                        ->icon('heroicon-o-document')
+                        ->color('danger')
+                        ->visible(function($record){
+                            return $record->status == 'approved';
+                        })
+                        ->action(function ($record) {
+                            $pdf = Pdf::loadView('pdf.order-request', [
+                                'orderRequest' => $record
+                            ])->setPaper('A4', 'potrait');
+
+                            return response()->streamDownload(function () use ($pdf) {
+                                echo $pdf->stream();
+                            }, 'Order_Request_' . $record->request_number . '.pdf');
+                        }),
+                    Action::make('reject')
+                        ->label('Reject')
+                        ->color('danger')
+                        ->icon('heroicon-o-x-circle')
+                        ->requiresConfirmation()
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('approve order request') && $record->status == 'draft';
+                        })
+                        ->action(function ($record) {
+                            $orderRequestService = app(OrderRequestService::class);
+                            $orderRequestService->reject($record);
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order request rejected");
+                        }),
+                    Action::make('approve')
+                        ->label('Approve')
+                        ->color('success')
+                        ->icon('heroicon-o-check-badge')
+                        ->requiresConfirmation()
+                        ->form([
+                            Select::make('supplier_id')
+                                ->label('Supplier')
+                                ->preload()
+                                ->searchable()
+                                ->options(function () {
+                                    return Supplier::select(['id', 'name'])->get()->pluck('name', 'id');
+                                })->required(),
+                            TextInput::make('po_number')
+                                ->label('PO Number')
+                                ->string()
+                                ->maxLength(255)
+                                ->required(),
+                            DatePicker::make('order_date')
+                                ->label('Order Date')
+                                ->required(),
+                            DatePicker::make('expected_date')
+                                ->label('Expected Date')
+                                ->nullable(),
+                            Textarea::make('note')
+                                ->label('Note')
+                                ->nullable()
+                        ])
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('approve order request') && $record->status == 'draft';
+                        })
+                        ->action(function (array $data, $record) {
+                            $orderRequestService = app(OrderRequestService::class);
+                            // Check purchase order number
+                            $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
+                            if ($purchaseOrder) {
+                                HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
+                                return;
+                            }
+
+                            $orderRequestService->approve($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request Approved");
+                        })
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

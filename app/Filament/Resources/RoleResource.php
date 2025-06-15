@@ -28,17 +28,18 @@ class RoleResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->disabled(),
-                Select::make('permissions')
-                    ->label('Permissions')
-                    ->searchable()
-                    ->preload()
-                    ->relationship('permissions', 'name')
-                    ->multiple(),
                 Select::make('id_user')
                     ->label('User')
                     ->searchable()
                     ->preload()
                     ->relationship('users', 'name')
+                    ->multiple(),
+                Select::make('permissions')
+                    ->label('Permissions')
+                    ->searchable()
+                    ->preload()
+                    ->columnSpanFull()
+                    ->relationship('permissions', 'name')
                     ->multiple(),
             ]);
     }

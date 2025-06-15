@@ -78,6 +78,11 @@ class SaleOrder extends Model
         return $this->hasMany(DeliverySalesOrder::class, 'sales_order_id');
     }
 
+    public function purchaseOrder()
+    {
+        return $this->morphMany(PurchaseOrder::class, 'refer_model');
+    }
+
     protected static function booted()
     {
         static::deleting(function ($saleOrder) {

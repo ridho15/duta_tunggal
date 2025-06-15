@@ -16,6 +16,7 @@ class OrderRequest extends Model
         'request_date',
         'status', // draft, approved, rejected
         'note',
+        'created_by'
     ];
 
     public function warehouse()
@@ -26,6 +27,16 @@ class OrderRequest extends Model
     public function orderRequestItem()
     {
         return $this->hasMany(OrderRequestItem::class, 'order_request_id');
+    }
+
+    public function purchaseOrder()
+    {
+        return $this->morphOne(PurchaseOrder::class, 'refer_model')->withDefault();
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
 
     protected static function booted()

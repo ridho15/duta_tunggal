@@ -79,4 +79,28 @@ class SalesOrderService
             'completed_at' => Carbon::now()
         ]);
     }
+
+    public function createPurchaseOrder($saleOrder, $data)
+    {
+        // Create Purchase order
+        $saleOrder->purchaseOrder()->create([
+            'po_number' => $data['po_number'],
+            'supplier_id' => $data['supplier_id'],
+            'order_date' => $data['order_date'],
+            'note' => $data['note'],
+            'expected_date' => $data['expected_date']
+        ]);
+
+        foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
+            $saleOrderItem->purchaseOrderItem()->create([
+                'purchase_order_id' => $saleOrder->purchaseOrder->id,
+                'product_id' => $saleOrderItem->product_id,
+                'quantity' => $saleOrderItem->quantity,
+                'unit_price' => $saleOrderItem->product->sell_price,
+                'discount' => 0,
+                'tax' => 0,
+            ]);
+        }
+        return $saleOrder;
+    }
 }

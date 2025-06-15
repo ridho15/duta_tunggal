@@ -28,4 +28,9 @@ class SaleOrderItem extends Model
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
     }
+
+    public function purchaseOrderItem()
+    {
+        return $this->morphMany(PurchaseOrderItem::class, 'refer_item_model');
+    }
 }

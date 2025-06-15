@@ -4,7 +4,6 @@ namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Services\PurchaseOrderService;
-use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,6 +20,6 @@ class CreatePurchaseOrder extends CreateRecord
     protected function afterCreate()
     {
         $purchaseOrderService = app(PurchaseOrderService::class);
-        $purchaseOrderService->setTotalAmount($this->getRecord());
+        $purchaseOrderService->updateTotalAmount($this->getRecord());
     }
 }

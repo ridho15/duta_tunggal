@@ -4,6 +4,7 @@ namespace App\Filament\Resources\OrderRequestResource\Pages;
 
 use App\Filament\Resources\OrderRequestResource;
 use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListOrderRequests extends ListRecords
@@ -13,7 +14,8 @@ class ListOrderRequests extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            CreateAction::make()
+                ->icon('heroicon-o-plus-circle'),
         ];
     }
 }

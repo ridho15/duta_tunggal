@@ -16,7 +16,9 @@ class PurchaseOrderItem extends Model
         'unit_price',
         'discount',
         'tax',
-        'opsi_harga' // default, negotiated, promo
+        'opsi_harga', // default, negotiated, promo
+        'refer_item_model_id',
+        'refer_item_model_type'
     ];
 
     public function purchaseOrder()
@@ -27,5 +29,10 @@ class PurchaseOrderItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
+    }
+
+    public function referItemModel()
+    {
+        return $this->morphTo(__FUNCTION__, 'refer_item_model_type', 'refer_item_model_id');
     }
 }

@@ -71,7 +71,7 @@
     <table class="no-border">
         <tr class="no-border">
             <td class="no-border" style="width: 70%">
-                <strong>PT Duta Tunggal</strong><br>
+                <strong>PT DUTA TUNGGAL</strong><br>
                 Jl. Contoh No. 123<br>
                 Jakarta, Indonesia<br>
                 Telp: (021) 12345678<br>
@@ -139,13 +139,12 @@
     <div class="signature">
         <div class="box">
             <p>Disetujui Oleh,</p>
-            <img src="{{ public_path('storage' . $purchaseOrder->approvedBy->signature) }}" alt=""
-                style="height: 75px">
+            <img src="{{ asset('storage' . $purchaseOrder->approvedBy->signature) }}" alt="" style="height: 75px">
             <p><strong>{{ $purchaseOrder->approved_by->name ?? 'Owner' }}</strong></p>
         </div>
         <div class="box">
             <p>Dibuat Oleh,</p>
-            <img src="{{ public_path('storage' . $purchaseOrder->createdBy->signature) }}" alt="">
+            <img src="{{ asset('storage' . $purchaseOrder->createdBy->signature) }}" alt="">
             <p><strong>{{ $purchaseOrder->created_by->name ?? 'Staff Purchasing' }}</strong></p>
         </div>
     </div>

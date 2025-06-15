@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\DeliveryOrderItemService;
 use App\Services\DeliveryOrderService;
 use App\Services\ManufacturingService;
+use App\Services\OrderRequestService;
 use App\Services\PurchaseOrderService;
 use App\Services\QualityControlService;
 use App\Services\QuotationService;
@@ -25,14 +26,15 @@ class AppServiceProvider extends ServiceProvider
         $loader->alias('Debugbar', Debugbar::class);
 
         $this->app->bind(
-            PurchaseOrderService::class,
             QualityControlService::class,
             ManufacturingService::class,
             SalesOrderService::class,
             QuotationService::class,
             DeliveryOrderService::class,
             ReturnProductService::class,
-            DeliveryOrderItemService::class
+            DeliveryOrderItemService::class,
+            OrderRequestService::class,
+            PurchaseOrderService::class,
         );
     }
 

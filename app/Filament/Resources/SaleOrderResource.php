@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
+use App\Models\Supplier;
 use App\Services\SalesOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
@@ -491,6 +492,42 @@ class SaleOrderResource extends Resource
                             $record->update([
                                 'titip_saldo' => $data['titip_saldo'],
                             ]);
+                        }),
+                    Action::make('create_purchase_order')
+                        ->label('Create Purchase Order')
+                        ->color('success')
+                        ->icon('heroicon-o-document-duplicate')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('create purchase order');
+                        })
+                        ->form([
+                            Select::make('supplier_id')
+                                ->label('Supplier')
+                                ->preload()
+                                ->searchable()
+                                ->options(function () {
+                                    return Supplier::select(['id', 'name'])->get()->pluck('name', 'id');
+                                })->required(),
+                            TextInput::make('po_number')
+                                ->label('PO Number')
+                                ->string()
+                                ->maxLength(255)
+                                ->required(),
+                            DatePicker::make('order_date')
+                                ->label('Order Date')
+                                ->required(),
+                            DatePicker::make('expected_date')
+                                ->label('Expected Date')
+                                ->nullable(),
+                            Textarea::make('note')
+                                ->label('Note')
+                                ->nullable()
+                        ])
+                        ->requiresConfirmation()
+                        ->action(function (array $data, $record) {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->createPurchaseOrder($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order Created");
                         }),
                     Action::make('sync_total_amount')
                         ->icon('heroicon-o-arrow-path-rounded-square')

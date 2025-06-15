@@ -64,8 +64,13 @@ class PurchaseOrderPolicy
         return $user->hasRole('Super Admin');
     }
 
-    public function approve(User $user, PurchaseOrder $purchaseOrder): bool
+    public function response(User $user, PurchaseOrder $purchaseOrder): bool
     {
-        return $user->hasPermissionTo('approve purchase order');
+        return $user->hasPermissionTo('response purchase order');
+    }
+
+    public function request(User $user, PurchaseOrder $purchaseOrder): bool
+    {
+        return $user->hasPermissionTo('request purchase order');
     }
 }

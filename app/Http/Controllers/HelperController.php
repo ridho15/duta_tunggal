@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class HelperController extends Controller
@@ -66,7 +67,8 @@ class HelperController extends Controller
                 'delete',
                 'restore',
                 'force-delete',
-                'approve'
+                'response',
+                'request',
             ],
             'purchase order item' => [
                 'view any',
@@ -448,5 +450,13 @@ class HelperController extends Controller
         }
 
         return trim($temp);
+    }
+
+    public static function setLog($message, $model)
+    {
+        activity()
+            ->causedBy(Auth::user())
+            ->performedOn($model)
+            ->log($message);
     }
 }

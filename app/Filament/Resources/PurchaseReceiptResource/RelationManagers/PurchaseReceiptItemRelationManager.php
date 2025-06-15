@@ -178,7 +178,7 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                     ->icon('heroicon-o-paper-airplane')
                     ->requiresConfirmation()
                     ->action(function ($record) {
-                        $qualityControlService = new QualityControlService;
+                        $qualityControlService = app(QualityControlService::class);
                         $record->update([
                             'is_sent' => 1
                         ]);

@@ -5,12 +5,20 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\Pages\ViewPurchaseOrder;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PurchaseOrderItemRelationManager;
+use App\Http\Controllers\HelperController;
+use App\Models\OrderRequest;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\SaleOrder;
+use App\Services\PurchaseOrderService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -48,6 +56,67 @@ class PurchaseOrderResource extends Resource
             ->schema([
                 Fieldset::make('Form Purchase Order')
                     ->schema([
+                        Section::make('Reference')
+                            ->description("Referensi untuk membuat PO, boleh di abaikan")
+                            ->columns(2)
+                            ->schema([
+                                Radio::make('refer_model_type')
+                                    ->label('Refer From')
+                                    ->reactive()
+                                    ->inlineLabel()
+                                    ->options([
+                                        'App\Models\SaleOrder' => 'Sales Order',
+                                        'App\Models\OrderRequest' => 'Order Request'
+                                    ])
+                                    ->nullable(),
+                                Select::make('refer_model_id')
+                                    ->label('Refer From')
+                                    ->reactive()
+                                    ->preload()
+                                    ->searchable()
+                                    ->options(function ($set, $get, $state) {
+                                        if ($get('refer_model_type') == 'App\Models\SaleOrder') {
+                                            return SaleOrder::select(['id', 'so_number'])->get()->pluck('so_number', 'id');
+                                        } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
+                                            return OrderRequest::where('status', 'approved')->select(['id', 'request_number'])->get()->pluck('request_number', 'id');
+                                        }
+
+                                        return [];
+                                    })
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $items = [];
+                                        if ($get('refer_model_type') == 'App\Models\SaleOrder') {
+                                            $saleOrder = SaleOrder::find($state);
+                                            foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
+                                                $subtotal = ((int)$saleOrderItem->quantity * (int) $saleOrderItem->unit_price) - (int) $saleOrderItem->discount + (int) $saleOrderItem->tax;
+                                                array_push($items, [
+                                                    'product_id' => $saleOrderItem->product_id,
+                                                    'quantity' => $saleOrderItem->quantity,
+                                                    'unit_price' => $saleOrderItem->product->cost_price,
+                                                    'discount' => 0,
+                                                    'tax' => 0,
+                                                    'subtotal' => $subtotal
+                                                ]);
+                                            }
+                                        } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
+                                            $orderRequest = OrderRequest::find($state);
+                                            foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
+                                                $subtotal = ((int)$orderRequestItem->quantity * (int) $orderRequestItem->unit_price) - (int) $orderRequestItem->discount + (int) $orderRequestItem->tax;
+                                                array_push($items, [
+                                                    'product_id' => $orderRequestItem->product_id,
+                                                    'quantity' => $orderRequestItem->quantity,
+                                                    'unit_price' => $orderRequestItem->product->cost_price,
+                                                    'discount' => 0,
+                                                    'tax' => 0,
+                                                    'subtotal' => $subtotal
+                                                ]);
+                                            }
+                                        }
+
+                                        $set('purchaseOrderItem', $items);
+                                    })
+                                    ->nullable(),
+                            ]),
                         Select::make('supplier_id')
                             ->label('Supplier')
                             ->preload()
@@ -57,9 +126,9 @@ class PurchaseOrderResource extends Resource
                         TextInput::make('po_number')
                             ->required()
                             ->maxLength(255),
-                        DateTimePicker::make('order_date')
+                        DatePicker::make('order_date')
                             ->required(),
-                        DateTimePicker::make('expected_date'),
+                        DatePicker::make('expected_date'),
                         TextInput::make('total_amount')
                             ->required()
                             ->prefix('Rp.')
@@ -76,6 +145,7 @@ class PurchaseOrderResource extends Resource
                             ->columnSpanFull()
                             ->relationship()
                             ->columns(3)
+                            ->defaultItems(0)
                             ->afterStateUpdated(function (Get $get, $state, $livewire) {
                                 $purchaseOrder = $livewire->getRecord();
                                 $total_amount = 0;
@@ -147,7 +217,17 @@ class PurchaseOrderResource extends Resource
                                     ->label('Sub Total')
                                     ->reactive()
                                     ->prefix('Rp.')
-                                    ->readOnly()
+                                    ->readOnly(),
+                                Radio::make('opsi_harga')
+                                    ->label('Opsi Harga')
+                                    ->inline()
+                                    ->columnSpanFull()
+                                    ->options([
+                                        'default' => 'Default',
+                                        'negotiated' => 'Negotiated',
+                                        'promo' => 'Promo'
+                                    ])
+                                    ->default('default')
                             ])
                     ])
             ]);
@@ -163,7 +243,7 @@ class PurchaseOrderResource extends Resource
                 TextColumn::make('po_number')
                     ->searchable(),
                 TextColumn::make('order_date')
-                    ->dateTime()
+                    ->date()
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Status PO')
@@ -194,7 +274,7 @@ class PurchaseOrderResource extends Resource
                     })
                     ->badge(),
                 TextColumn::make('expected_date')
-                    ->dateTime()
+                    ->date()
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total Amount')
@@ -264,23 +344,31 @@ class PurchaseOrderResource extends Resource
                         }),
                     Action::make('konfirmasi')
                         ->label('Konfirmasi')
-                        ->hidden(function ($record) {
-                            return Auth::user()->hasRole('Admin') || in_array($record->status, ['draft', 'closed', 'approved', 'completed']);
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('response purchase order') && ($record->status == 'request_approval');
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-check-badge')
                         ->color('success')
                         ->action(function ($record) {
-                            $record->update([
-                                'status' => 'approved',
-                                'date_approved' => Carbon::now(),
-                                'approved_by' => Auth::user()->id,
-                            ]);
+                            if ($record->status == 'request_approval') {
+                                $record->update([
+                                    'status' => 'approved',
+                                    'date_approved' => Carbon::now(),
+                                    'approved_by' => Auth::user()->id,
+                                ]);
+                            } elseif ($record->status == 'request_close') {
+                                $record->update([
+                                    'status' => 'closed',
+                                    'closed_at' => Carbon::now(),
+                                    'closed_by' => Auth::user()->id,
+                                ]);
+                            }
                         }),
                     Action::make('tolak')
                         ->label('Tolak')
-                        ->hidden(function ($record) {
-                            return Auth::user()->hasRole('Admin') || in_array($record->status, ['draft', 'closed', 'approved', 'completed']);
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('response purchase order') && ($record->status == 'request_approval' || $record->status == 'request_close');
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-x-circle')
@@ -292,8 +380,8 @@ class PurchaseOrderResource extends Resource
                         }),
                     Action::make('request_approval')
                         ->label('Request Approval')
-                        ->hidden(function ($record) {
-                            return Auth::user()->hasRole('Owner') || in_array($record->status, ['request_approval', 'closed', 'completed', 'approved']);
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('request purchase order') && $record->status == 'draft';
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-clipboard-document-check')
@@ -305,8 +393,8 @@ class PurchaseOrderResource extends Resource
                         }),
                     Action::make('request_close')
                         ->label('Request Close')
-                        ->hidden(function ($record) {
-                            return Auth::user()->hasRole('Owner') || in_array($record->status, ['request_close', 'closed', 'completed', 'approved']);
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('request purchase order') && ($record->status == 'draft' || $record->status == 'request_approval');
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-x-circle')
@@ -320,12 +408,26 @@ class PurchaseOrderResource extends Resource
                         ->label('Cetak PDF')
                         ->icon('heroicon-o-document-check')
                         ->color('danger')
-                        ->hidden(function ($record) {
-                            return in_array($record->status, ['draft', 'closed', 'request_close', 'request_approval']);
+                        ->visible(function ($record) {
+                            return $record->status != 'draft' && $record->status != 'closed';
                         })
-                        ->openUrlInNewTab()
-                        ->url(function ($record) {
-                            return route('purchase-order.cetak', ['id' => $record->id]);
+                        ->action(function ($record) {
+                            $pdf = Pdf::loadView('pdf.purchase-order', [
+                                'purchaseOrder' => $record
+                            ])->setPaper('A4', 'potrait');
+
+                            return response()->streamDownload(function () use ($pdf) {
+                                echo $pdf->stream();
+                            }, 'Purchase_Order_' . $record->po_number . '.pdf');
+                        }),
+                    Action::make('update_total_amount')
+                        ->label('Sync Total Amount')
+                        ->color('primary')
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->action(function ($record) {
+                            $purchaseOrderService = app(PurchaseOrderService::class);
+                            $purchaseOrderService->updateTotalAmount($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total amount berhasil disinkronkan");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
@@ -345,11 +447,7 @@ class PurchaseOrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->when(Auth::user()->hasRole([
-            'Owner'
-        ]), function (Builder $query) {
-            return $query->whereIn('status', ['request_close', 'request_approval', 'approved', 'completed']);
-        });
+        return parent::getEloquentQuery();
     }
 
     public static function getPages(): array
