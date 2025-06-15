@@ -29,7 +29,9 @@ class PurchaseOrder extends Model
         'close_reason',
         'completed_by',
         'completed_at',
-        'created_by'
+        'created_by',
+        'refer_model_type',
+        'refer_model_id'
     ];
 
     public function supplier()
@@ -70,5 +72,25 @@ class PurchaseOrder extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
+    }
+
+    public function referModel()
+    {
+        return $this->morphTo(__FUNCTION__, 'refer_model_type', 'refer_model_id')->withDefault();
+    }
+
+    protected static function booted()
+    {
+        static::deleting(function ($purchaseOrder) {
+            if ($purchaseOrder->isForceDeleting()) {
+                $purchaseOrder->purchaseOrderItem()->forceDelete();
+            } else {
+                $purchaseOrder->purchaseOrderItem()->delete();
+            }
+        });
+
+        static::restoring(function ($purchaseOrder) {
+            $purchaseOrder->purchaseOrderItem()->withTrashed()->restore();
+        });
     }
 }

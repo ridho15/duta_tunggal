@@ -3,14 +3,16 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ReturnProductResource\Pages;
-use App\Filament\Resources\ReturnProductResource\RelationManagers;
+use App\Filament\Resources\ReturnProductResource\Pages\ViewReturnProduct;
+use App\Http\Controllers\HelperController;
+use App\Models\DeliveryOrder;
 use App\Models\Product;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 use App\Models\ReturnProduct;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
-use Filament\Forms;
+use App\Services\ReturnProductService;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -19,17 +21,17 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
-use Illuminate\Cache\Events\RetrievingKey;
+use Illuminate\Support\Facades\Auth;
 
 class ReturnProductResource extends Resource
 {
@@ -53,9 +55,10 @@ class ReturnProductResource extends Resource
                         Radio::make('from_model_type')
                             ->label('From Order')
                             ->inlineLabel()
+                            ->reactive()
                             ->options(function () {
                                 return [
-                                    'App\Models\SaleOrder' => 'Sales Order',
+                                    'App\Models\DeliveryOrder' => 'Delivery Order',
                                     'App\Models\PurchaseReceipt' => 'Purchase Receipt',
                                 ];
                             })
@@ -68,8 +71,8 @@ class ReturnProductResource extends Resource
                             ->searchable()
                             ->reactive()
                             ->options(function ($set, $get, $state) {
-                                if ($get('from_model_type') == 'App\Models\SaleOrder') {
-                                    return SaleOrder::select(['id', 'so_number'])->get()->pluck('so_number', 'id');
+                                if ($get('from_model_type') == 'App\Models\DeliveryOrder') {
+                                    return DeliveryOrder::select(['id', 'do_number'])->get()->pluck('do_number', 'id');
                                 } elseif ($get('from_model_type') == 'App\Models\PurchaseReceipt') {
                                     return PurchaseReceipt::with(['purchaseOrder' => function ($query) {
                                         $query->select(['id', 'po_number', 'order_date']);
@@ -90,6 +93,7 @@ class ReturnProductResource extends Resource
                             ->nullable(),
                         Repeater::make('returnProductItem')
                             ->columnSpanFull()
+                            ->defaultItems(0)
                             ->columns(2)
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
                                 return $data;
@@ -102,14 +106,14 @@ class ReturnProductResource extends Resource
                                 Radio::make('from_item_model_type')
                                     ->label('From Item Model')
                                     ->options([
-                                        'App\Models\SaleOrderItem' => 'Sale Order item',
+                                        'App\Models\DeliveryOrderItem' => 'Sale Order item',
                                         'App\Models\PurchaseReceiptItem' => 'Purchase Receipt Item'
                                     ])->reactive()
                                     ->inlineLabel()
                                     ->default(function ($set, $get) {
                                         $from_model_type = $get('../../from_model_type');
-                                        if ($from_model_type == 'App\Models\SaleOrder') {
-                                            return 'App\Models\SaleOrderItem';
+                                        if ($from_model_type == 'App\Models\DeliveryOrder') {
+                                            return 'App\Models\DeliveryOrderItem';
                                         } elseif ($from_model_type == 'App\Models\PurchaseReceipt') {
                                             return 'App\Models\PurchaseReceiptItem';
                                         }
@@ -124,7 +128,7 @@ class ReturnProductResource extends Resource
                                     ->required()
                                     ->reactive()
                                     ->options(function ($set, $get) {
-                                        if ($get('from_item_model_type') == 'App\Models\SaleOrderItem') {
+                                        if ($get('from_item_model_type') == 'App\Models\DeliveryOrderItem') {
                                             $saleOrderId = $get('../../from_model_id');
                                             $listSaleOrderItem = SaleOrderItem::with(['product'])->where('sale_order_id', $saleOrderId)->select(['id', 'product_id'])->get();
                                             $items = [];
@@ -138,24 +142,25 @@ class ReturnProductResource extends Resource
                                             $purchaseReceiptId = $get('../../from_model_id');
                                             $listPurchaseReceiptItem = PurchaseReceiptItem::with(['purchaseReceipt.purchaseOrder'])->where('purchase_receipt_id', $purchaseReceiptId)->get();
                                             foreach ($listPurchaseReceiptItem as $purchaseReceiptItem) {
-                                                $items[$purchaseReceiptItem->id] = $purchaseReceiptItem->purchaseReceipt->purchaseOrder->po_number;
+                                                $items[$purchaseReceiptItem->id] = "({$purchaseReceiptItem->product->sku}) {$purchaseReceiptItem->product->name}";
                                             }
-
                                             return $items;
                                         }
-
                                         return [];
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $from_item_model_type = $get('from_item_model_type');
-                                        if ($from_item_model_type == 'App\Models\SaleOrderItem') {
-                                            $saleOrderItem = SaleOrderItem::find($get('from_item_model_id'));
-                                            $set('product_id', $saleOrderItem->product_id);
-                                            $set('quantity', $saleOrderItem->quantity);
+                                        $fromModelItem = null;
+                                        if ($from_item_model_type == 'App\Models\DeliveryOrderItem') {
+                                            $fromModelItem = SaleOrderItem::find($get('from_item_model_id'));
                                         } elseif ($from_item_model_type == 'App\Models\PurchaseReceiptItem') {
-                                            $purchaseReceiptItem = PurchaseReceiptItem::find($get('from_item_model_id'));
-                                            $set('product_id', $purchaseReceiptItem->product_id);
-                                            $set('quantity', $purchaseReceiptItem->quantity);
+                                            $fromModelItem = PurchaseReceiptItem::find($get('from_item_model_id'));
+                                        }
+
+                                        if ($fromModelItem) {
+                                            $set('product_id', $fromModelItem->product_id);
+                                            $set('max_quantity', $fromModelItem->quantity);
+                                            $set('quantity', $fromModelItem->quantity);
                                         }
                                     }),
                                 Select::make('product_id')
@@ -163,6 +168,7 @@ class ReturnProductResource extends Resource
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
+                                    ->disabled()
                                     ->relationship('product', 'id')
                                     ->required()
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
@@ -172,6 +178,12 @@ class ReturnProductResource extends Resource
                                     ->label('Quantity')
                                     ->numeric()
                                     ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if ($state > $get('max_quantity')) {
+                                            $set('quantity', $get('max_quantity'));
+                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Quantity yang kamu masukkan lebih besar dari sumber order");
+                                        }
+                                    })
                                     ->default(0),
                                 Select::make('rak_id')
                                     ->label('Rak')
@@ -211,11 +223,13 @@ class ReturnProductResource extends Resource
                 TextColumn::make('from_model_id')
                     ->label('From Resource')
                     ->formatStateUsing(function ($record) {
-                        if ($record->from_model_type == 'App\Models\SaleOrder') {
-                            return $record->fromModel->so_number;
-                        } else {
-                            $record->fromModel->purchaseOrder->po_number;
+                        if ($record->from_model_type == 'App\Models\DeliveryOrder') {
+                            return $record->fromModel->do_number;
+                        } elseif ($record->from_model_type == 'App\Models\PurchaseReceipt') {
+                            $record->fromModel->receipt_number;
                         }
+
+                        return '-';
                     }),
                 TextColumn::make('warehouse.name')
                     ->label('Warehouse')
@@ -225,6 +239,19 @@ class ReturnProductResource extends Resource
                         return Str::upper($state);
                     })
                     ->label('Status')
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'draft' => 'gray',
+                            'approved' => 'success'
+                        };
+                    })
+                    ->badge(),
+                TextColumn::make('returnProductItem')
+                    ->label('Product')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->product->sku}) {$state->product->name}";
+                    })
+                    ->searchable()
                     ->badge(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -244,9 +271,27 @@ class ReturnProductResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make()
+                        ->visible(function ($record) {
+                            return $record->status == 'draft' || Auth::user()->hasRole('Super Admin');
+                        }),
+                    Action::make('approve')
+                        ->label('Approve')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('success')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('approve return product') && $record->status == 'draft';
+                        })
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            $returnProductService = app(ReturnProductService::class);
+                            $returnProductService->updateQuantityFromModel($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Berhasil mengubah status return product");
+                        }),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([]);
@@ -264,6 +309,7 @@ class ReturnProductResource extends Resource
         return [
             'index' => Pages\ListReturnProducts::route('/'),
             'create' => Pages\CreateReturnProduct::route('/create'),
+            'view' => ViewReturnProduct::route('/{record}'),
             'edit' => Pages\EditReturnProduct::route('/{record}/edit'),
         ];
     }

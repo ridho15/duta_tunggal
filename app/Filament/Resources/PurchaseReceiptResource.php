@@ -41,6 +41,11 @@ class PurchaseReceiptResource extends Resource
             ->schema([
                 Fieldset::make('Form Purchase Receipt')
                     ->schema([
+                        TextInput::make('receipt_number')
+                            ->label('Receipt Number')
+                            ->string()
+                            ->unique(ignoreRecord: true)
+                            ->required(),
                         Select::make('purchase_order_id')
                             ->label('Purchase Order')
                             ->preload()
@@ -166,6 +171,9 @@ class PurchaseReceiptResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('receipt_number')
+                    ->label('Receipt Number')
+                    ->searchable(),
                 TextColumn::make('purchaseOrder.po_number')
                     ->label('PO Number')
                     ->searchable(),

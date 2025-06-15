@@ -18,6 +18,8 @@ class PurchaseReceiptItem extends Model
         'reason_rejected',
         'warehouse_id',
         'is_sent',
+        'refer_item_model_id',
+        'refer_item_model_type',
     ];
 
     public function purchaseReceipt()
@@ -43,5 +45,10 @@ class PurchaseReceiptItem extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function referItemModel()
+    {
+        return $this->morphTo(__FUNCTION__, 'refer_item_model_type', 'refer_item_model_id')->withDefault();
     }
 }

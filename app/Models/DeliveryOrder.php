@@ -53,4 +53,19 @@ class DeliveryOrder extends Model
     {
         return $this->hasMany(DeliveryOrderLog::class, 'delivery_order_id');
     }
+
+    protected static function booted()
+    {
+        static::deleting(function ($deliveryOrder) {
+            if ($deliveryOrder->isForceDeleting()) {
+                $deliveryOrder->deliveryOrderItem()->forceDelete();
+            } else {
+                $deliveryOrder->deliveryOrderItem()->delete();
+            }
+        });
+
+        static::restoring(function ($deliveryOrder) {
+            $deliveryOrder->deliveryOrderItem()->withTrashed()->restore();
+        });
+    }
 }

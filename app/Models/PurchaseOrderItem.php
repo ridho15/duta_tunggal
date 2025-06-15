@@ -16,6 +16,7 @@ class PurchaseOrderItem extends Model
         'unit_price',
         'discount',
         'tax',
+        'opsi_harga' // default, negotiated, promo
     ];
 
     public function purchaseOrder()

@@ -77,4 +77,19 @@ class SaleOrder extends Model
     {
         return $this->hasMany(DeliverySalesOrder::class, 'sales_order_id');
     }
+
+    protected static function booted()
+    {
+        static::deleting(function ($saleOrder) {
+            if ($saleOrder->isForceDeleting()) {
+                $saleOrder->saleOrderItem()->forceDelete();
+            } else {
+                $saleOrder->saleOrderItem()->delete();
+            }
+        });
+
+        static::restoring(function ($saleOrder) {
+            $saleOrder->saleOrderItem()->withTrashed()->restore();
+        });
+    }
 }

@@ -63,4 +63,9 @@ class ReturnProductPolicy
     {
         return $user->hasPermissionTo('force-delete return product');
     }
+
+    public function approve(User $user, ReturnProduct $returnProduct): bool
+    {
+        return $user->hasPermissionTo('approve return product');
+    }
 }

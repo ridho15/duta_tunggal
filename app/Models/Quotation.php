@@ -58,4 +58,19 @@ class Quotation extends Model
     {
         return $this->belongsTo(User::class, 'approve_by')->withDefault();
     }
+
+    protected static function booted()
+    {
+        static::deleting(function ($quotation) {
+            if ($quotation->isForceDeleting()) {
+                $quotation->quotationItem()->forceDelete();
+            } else {
+                $quotation->quotationItem()->delete();
+            }
+        });
+
+        static::restoring(function ($quotation) {
+            $quotation->quotationItem()->withTrashed()->restore();
+        });
+    }
 }

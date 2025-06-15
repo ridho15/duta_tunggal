@@ -67,6 +67,10 @@ class SuratJalanResource extends Resource
                 TextColumn::make('sj_number')
                     ->label('Surat Jalan Number')
                     ->searchable(),
+                TextColumn::make('deliveryOrder.do_number')
+                    ->searchable()
+                    ->label('Delivery Order')
+                    ->badge(),
                 TextColumn::make('issued_at')
                     ->description('Tanggal Surat Jalan dibuat')
                     ->dateTime()

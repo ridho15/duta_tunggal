@@ -20,7 +20,7 @@ class CreatePurchaseOrder extends CreateRecord
 
     protected function afterCreate()
     {
-        $purchaseOrderService = new PurchaseOrderService;
+        $purchaseOrderService = app(PurchaseOrderService::class);
         $purchaseOrderService->setTotalAmount($this->getRecord());
     }
 }

@@ -4,7 +4,7 @@ namespace App\Services;
 
 class PurchaseOrderService
 {
-    public static function setTotalAmount($purchaseOrder)
+    public function setTotalAmount($purchaseOrder)
     {
         $total = 0;
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
@@ -17,4 +17,6 @@ class PurchaseOrderService
 
         return $purchaseOrder;
     }
+
+    public function createPoFromSo($saleOrder) {}
 }

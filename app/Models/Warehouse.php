@@ -15,12 +15,28 @@ class Warehouse extends Model
         'location'
     ];
 
-    public function rak(){
+    public function rak()
+    {
         return $this->hasMany(Rak::class, 'warehouse_id');
     }
 
     public function stockMovement()
     {
         return $this->hasMany(StockMovement::class, 'warehouse_id');
+    }
+
+    protected static function booted()
+    {
+        static::deleting(function ($warehouse) {
+            if ($warehouse->isForceDeleting()) {
+                $warehouse->rak()->forceDelete();
+            } else {
+                $warehouse->rak()->delete();
+            }
+        });
+
+        static::restoring(function ($warehouse) {
+            $warehouse->rak()->withTrashed()->restore();
+        });
     }
 }

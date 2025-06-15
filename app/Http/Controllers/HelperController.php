@@ -321,8 +321,28 @@ class HelperController extends Controller
                 'delete',
                 'restore',
                 'force-delete',
+                'approve',
             ],
             'return product item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'order request' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'approve'
+            ],
+            'order request item' => [
                 'view any',
                 'view',
                 'create',

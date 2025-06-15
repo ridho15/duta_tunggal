@@ -92,7 +92,7 @@ class EditPurchaseOrder extends EditRecord
 
     protected function afterSave()
     {
-        $purchaseOrderService = new PurchaseOrderService;
+        $purchaseOrderService = app(PurchaseOrderService::class);
         $purchaseOrderService->setTotalAmount($this->getRecord());
     }
 }

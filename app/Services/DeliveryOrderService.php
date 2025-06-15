@@ -24,4 +24,8 @@ class DeliveryOrderService
             'confirmed_by' => Auth::user()->id,
         ]);
     }
+
+    public function updateQuantity(){
+
+    }
 }

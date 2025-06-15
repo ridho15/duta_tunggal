@@ -10,6 +10,7 @@ class PurchaseReceipt extends Model
     use SoftDeletes;
     protected $table = 'purchase_receipts';
     protected $fillable = [
+        'receipt_number',
         'purchase_order_id',
         'receipt_date',
         'received_by',

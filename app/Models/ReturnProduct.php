@@ -2,19 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ReturnProduct extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory;
     protected $table = 'return_products';
     protected $fillable = [
         'return_number',
         'from_model_id',
         'from_model_type',
         'warehouse_id',
-        'status',
+        'status', // draft / approve
         'reason'
     ];
 
@@ -31,5 +32,20 @@ class ReturnProduct extends Model
     public function fromModel()
     {
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id');
+    }
+
+    protected static function booted()
+    {
+        static::deleting(function ($returnProduct) {
+            if ($returnProduct->isForceDeleting()) {
+                $returnProduct->returnProductItem()->forceDelete();
+            } else {
+                $returnProduct->returnProductItem()->delete();
+            }
+        });
+
+        static::restoring(function ($returnProduct) {
+            $returnProduct->returnProductItem()->withTrashed()->restore();
+        });
     }
 }
