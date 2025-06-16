@@ -334,13 +334,13 @@ class PurchaseOrderResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
-                        ->hidden(function () {
-                            return Auth::user()->hasRole('Owner');
+                        ->hidden(function ($record) {
+                            return $record->status == 'completed';
                         })
                         ->color('success'),
                     DeleteAction::make()
-                        ->hidden(function () {
-                            return Auth::user()->hasRole('Owner');
+                        ->hidden(function ($record) {
+                            return $record->status == 'completed';
                         }),
                     Action::make('konfirmasi')
                         ->label('Konfirmasi')
@@ -409,6 +409,9 @@ class PurchaseOrderResource extends Resource
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('request purchase order') && ($record->status != 'closed' || $record->status != 'completed');
                         })
+                        ->hidden(function ($record) {
+                            return $record->status == 'completed';
+                        })
                         ->requiresConfirmation()
                         ->form([
                             Textarea::make('close_reason')
@@ -443,6 +446,9 @@ class PurchaseOrderResource extends Resource
                     Action::make('update_total_amount')
                         ->label('Sync Total Amount')
                         ->color('primary')
+                        ->hidden(function ($record) {
+                            return $record->status == 'completed';
+                        })
                         ->icon('heroicon-o-arrow-path-rounded-square')
                         ->action(function ($record) {
                             $purchaseOrderService = app(PurchaseOrderService::class);
