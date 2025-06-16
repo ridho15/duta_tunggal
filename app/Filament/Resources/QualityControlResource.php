@@ -202,6 +202,7 @@ class QualityControlResource extends Resource
                             $qualityControlService = app(QualityControlService::class);
                             $qualityControlService->completeQualityControl($record, $data);
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Completed");
+                            $qualityControlService->checkPenerimaanBarang($record);
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
