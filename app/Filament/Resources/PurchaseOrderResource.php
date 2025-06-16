@@ -14,7 +14,7 @@ use App\Services\PurchaseOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
-    use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
@@ -393,7 +393,7 @@ class PurchaseOrderResource extends Resource
                     Action::make('request_close')
                         ->label('Request Close')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request purchase order') && ($record->status == 'draft' || $record->status == 'request_approval');
+                            return Auth::user()->hasPermissionTo('request purchase order') && ($record->status != 'closed' || $record->status != 'completed');
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-x-circle')

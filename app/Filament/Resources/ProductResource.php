@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
+use App\Filament\Resources\ProductResource\RelationManagers\InventoryStockRelationManager;
+use App\Filament\Resources\ProductResource\RelationManagers\StockMovementRelationManager;
 use App\Models\Product;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
@@ -170,7 +172,8 @@ class ProductResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            InventoryStockRelationManager::class,
+            StockMovementRelationManager::class,
         ];
     }
 

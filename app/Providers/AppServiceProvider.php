@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\StockMovement;
+use App\Observers\StockMovementObserver;
 use App\Services\DeliveryOrderItemService;
 use App\Services\DeliveryOrderService;
 use App\Services\ManufacturingService;
 use App\Services\OrderRequestService;
+use App\Services\ProductService;
 use App\Services\PurchaseOrderService;
 use App\Services\PurchaseReceiptService;
 use App\Services\QualityControlService;
@@ -25,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $loader = AliasLoader::getInstance();
         $loader->alias('Debugbar', Debugbar::class);
+
+        StockMovement::observe(StockMovementObserver::class);
 
         $this->app->bind(QualityControlService::class, function ($app) {
             return new QualityControlService;
@@ -55,6 +60,9 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->bind(PurchaseReceiptService::class, function ($app) {
             return new PurchaseReceiptService;
+        });
+        $this->app->bind(ProductService::class, function ($app) {
+            return new ProductService;
         });
     }
 

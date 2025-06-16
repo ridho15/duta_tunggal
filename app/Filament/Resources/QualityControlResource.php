@@ -3,28 +3,27 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\QualityControlResource\Pages;
-use App\Filament\Resources\QualityControlResource\RelationManagers;
-use App\Models\PurchaseReceiptItem;
+use App\Http\Controllers\HelperController;
 use App\Models\QualityControl;
-use Filament\Forms;
-use Filament\Forms\Components\DateTimePicker;
+use App\Models\Rak;
+use App\Models\Warehouse;
+use App\Services\QualityControlService;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class QualityControlResource extends Resource
 {
@@ -32,7 +31,7 @@ class QualityControlResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-arrow-down';
 
-    protected static ?string $navigationGroup = 'Purchase Order';
+    protected static ?string $navigationGroup = 'Warehouse';
 
     public static function form(Form $form): Form
     {
@@ -45,7 +44,17 @@ class QualityControlResource extends Resource
                             ->label('Warehouse')
                             ->searchable()
                             ->preload()
+                            ->reactive()
                             ->relationship('warehouse', 'name'),
+                        Select::make('rak_id')
+                            ->label('Rak')
+                            ->preload()
+                            ->reactive()
+                            ->searchable()
+                            ->relationship('rak', 'name', function ($get, Builder $query) {
+                                $query->where('warehouse_id', $get('warehouse_id'));
+                            })
+                            ->nullable(),
                         Select::make('product_id')
                             ->label('Product')
                             ->searchable()
@@ -85,6 +94,17 @@ class QualityControlResource extends Resource
                 TextColumn::make('purchaseReceiptItem.purchaseReceipt.purchaseOrder.po_number')
                     ->label('PO Number')
                     ->searchable(),
+                TextColumn::make('product')
+                    ->label('Product')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('product', function ($query) use ($search) {
+                            $query->where('sku', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->sku}) {$state->name}";
+                    }),
                 TextColumn::make('inspectedBy.name')
                     ->searchable()
                     ->label('Inspected By'),
@@ -102,12 +122,7 @@ class QualityControlResource extends Resource
                     ->formatStateUsing(function ($state) {
                         return $state == 1 ? 'Sudah Proses' : 'Belum Proses';
                     }),
-                TextColumn::make('product')
-                    ->label('Product')
-                    ->searchable()
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->sku}) {$state->name}";
-                    }),
+
                 TextColumn::make('warehouse.name')
                     ->label('Warehouse')
                     ->searchable(),
@@ -128,11 +143,7 @@ class QualityControlResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-
                 TextColumn::make('date_send_stock')
-                    ->dateTime()
-                    ->sortable(),
-                TextColumn::make('date_create_delivery_order')
                     ->dateTime()
                     ->sortable(),
             ])
@@ -140,9 +151,60 @@ class QualityControlResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make(),
-            ])
+                ActionGroup::make([
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                    Action::make('Complete')
+                        ->color('success')
+                        ->label('Complete')
+                        ->requiresConfirmation()
+                        ->hidden(function ($record) {
+                            return $record->status == 1;
+                        })
+                        ->icon('heroicon-o-check-badge')
+                        ->form(function ($record) {
+                            if ($record->rejected_quantity > 0) {
+                                return [
+                                    TextInput::make('return_number')
+                                        ->label('Return Number')
+                                        ->string()
+                                        ->required(),
+                                    Select::make('warehouse_id')
+                                        ->label('Warehouse')
+                                        ->preload()
+                                        ->reactive()
+                                        ->searchable()
+                                        ->options(function () {
+                                            return Warehouse::select(['id', 'name'])->get()->pluck('name', 'id');
+                                        })
+                                        ->required(),
+                                    Select::make('rak_id')
+                                        ->label('Rak')
+                                        ->preload()
+                                        ->reactive()
+                                        ->searchable()
+                                        ->options(function ($get) {
+                                            return Rak::where('warehouse_id', $get('warehouse_id'))->select(['id', 'name'])->get()->pluck('name', 'id');
+                                        })
+                                        ->nullable(),
+                                    Textarea::make('reason')
+                                        ->label('Reason')
+                                        ->nullable()
+                                        ->string()
+                                        ->default($record->reason_reject)
+                                ];
+                            }
+
+                            return null;
+                        })
+                        ->action(function (array $data, $record) {
+                            $qualityControlService = app(QualityControlService::class);
+                            $qualityControlService->completeQualityControl($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Completed");
+                        })
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -161,8 +223,8 @@ class QualityControlResource extends Resource
     {
         return [
             'index' => Pages\ListQualityControls::route('/'),
-            'create' => Pages\CreateQualityControl::route('/create'),
-            'edit' => Pages\EditQualityControl::route('/{record}/edit'),
+            // 'create' => Pages\CreateQualityControl::route('/create'),
+            // 'edit' => Pages\EditQualityControl::route('/{record}/edit'),
         ];
     }
 }

@@ -15,13 +15,12 @@ class QualityControl extends Model
         'passed_quantity',
         'rejected_quantity',
         'notes',
-        'status',  // send to stock / send to delivery order
+        'status',  // send to stock / send return product
         'warehouse_id',
         'reason_reject',
         'product_id',
         'date_send_stock',
-        'date_create_delivery_order',
-        'rak_id'
+        'rak_id',
     ];
 
     protected $appends = [
@@ -60,5 +59,15 @@ class QualityControl extends Model
     public function rak()
     {
         return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+    }
+
+    public function stockMovement()
+    {
+        return $this->morphOne(StockMovement::class, 'from_model')->withDefault();
+    }
+
+    public function returnProduct()
+    {
+        return $this->morphOne(ReturnProduct::class, 'from_model')->withDefault();
     }
 }

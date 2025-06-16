@@ -16,7 +16,7 @@ class ReturnProduct extends Model
         'from_model_type',
         'warehouse_id',
         'status', // draft / approve
-        'reason'
+        'reason',
     ];
 
     public function warehouse()

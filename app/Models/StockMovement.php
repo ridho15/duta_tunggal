@@ -17,7 +17,10 @@ class StockMovement extends Model
         'type', //purchase, sales, transfer_in, transfer_out, manufacture_in, manufacture_out, adjustment
         'reference_id',
         'date',
-        'notes'
+        'notes',
+        'rak_id',
+        'from_model_type',
+        'from_model_id' // nullable
     ];
 
     public function product()
@@ -27,5 +30,15 @@ class StockMovement extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function rak()
+    {
+        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+    }
+
+    public function fromModel()
+    {
+        return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
     }
 }

@@ -82,33 +82,6 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                             ->maxSize(1024)
                             ->required(),
                     ]),
-                Repeater::make('purchaseReceiptItemNominal')
-                    ->relationship()
-                    ->columnSpanFull()
-                    ->defaultItems(0)
-                    ->addActionLabel('Tambah Currency')
-                    ->columns(2)
-                    ->schema([
-                        Select::make('currency_id')
-                            ->label('Currency')
-                            ->preload()
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $state) {
-                                $currency = Currency::find($state);
-                                $set('symbol', $currency->symbol);
-                            })
-                            ->searchable()
-                            ->required()
-                            ->relationship('currency', 'name'),
-                        TextInput::make('nominal')
-                            ->label('Nominal')
-                            ->numeric()
-                            ->reactive()
-                            ->prefix(function ($get) {
-                                return $get('symbol');
-                            })
-                            ->default(0)
-                    ])
             ]);
     }
 
@@ -117,6 +90,23 @@ class PurchaseReceiptItemRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('id')
             ->columns([
+                TextColumn::make('is_sent')
+                    ->label('Terkirim?')
+                    ->badge()
+                    ->color(function ($state) {
+                        if ($state == 0) {
+                            return 'gray';
+                        } else {
+                            return 'success';
+                        }
+                    })
+                    ->formatStateUsing(function ($state) {
+                        if ($state == 1) {
+                            return "Terkirim QC";
+                        } else {
+                            return "Belum Terkirim QC";
+                        }
+                    }),
                 TextColumn::make('product')
                     ->label('Product')
                     ->formatStateUsing(function ($state) {
@@ -138,24 +128,10 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                     ->label('Quantity Rejected')
                     ->sortable(),
                 ImageColumn::make('purchaseReceiptItemPhoto.photo_url')
-                    ->label('Photo'),
-                TextColumn::make('is_sent')
-                    ->label('Terkirim?')
-                    ->badge()
-                    ->color(function ($state) {
-                        if ($state == 0) {
-                            return 'gray';
-                        } else {
-                            return 'success';
-                        }
-                    })
-                    ->formatStateUsing(function ($state) {
-                        if ($state == 1) {
-                            return "Terkirim QC";
-                        } else {
-                            return "Belum Terkirim QC";
-                        }
-                    })
+                    ->label('Photo')
+                    ->size(75)
+                    ->circular()
+                    ->stacked(),
             ])
             ->filters([
                 //

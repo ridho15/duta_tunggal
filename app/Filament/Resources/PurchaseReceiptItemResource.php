@@ -4,17 +4,26 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseReceiptItemResource\Pages;
 use App\Http\Controllers\HelperController;
+use App\Models\Product;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceiptItem;
+use App\Models\User;
 use App\Services\QualityControlService;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
 
 class PurchaseReceiptItemResource extends Resource
 {
@@ -30,12 +39,21 @@ class PurchaseReceiptItemResource extends Resource
             ->schema([
                 Fieldset::make()
                     ->schema([
-                        TextInput::make('purchase_receipt_id')
-                            ->required()
-                            ->numeric(),
-                        TextInput::make('product_id')
-                            ->required()
-                            ->numeric(),
+                        Select::make('purchase_receipt_id')
+                            ->label('Purchase Receipt')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('purchaseReceipt', 'receipt_number')
+                            ->required(),
+                        Select::make('product_id')
+                            ->label('Product')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('product', 'id')
+                            ->getOptionLabelFromRecordUsing(function (Product $product) {
+                                return "({$product->sku}) {$product->name}";
+                            })
+                            ->required(),
                         TextInput::make('qty_received')
                             ->required()
                             ->numeric()
@@ -48,17 +66,41 @@ class PurchaseReceiptItemResource extends Resource
                             ->required()
                             ->numeric()
                             ->default(0),
-                        Textarea::make('reason_rejected')
-                            ->columnSpanFull(),
-                        TextInput::make('warehouse_id')
-                            ->required()
-                            ->numeric(),
-                        TextInput::make('purchase_order_item_id')
-                            ->numeric()
-                            ->default(null),
-                        TextInput::make('rak_id')
-                            ->numeric()
-                            ->default(null),
+                        Textarea::make('reason_rejected'),
+                        Select::make('warehouse_id')
+                            ->label('Warehouse')
+                            ->preload()
+                            ->reactive()
+                            ->searchable()
+                            ->relationship('warehouse', 'name')
+                            ->required(),
+                        Select::make('purchase_order_item_id')
+                            ->label('Purchase Order')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('purchaseOrderItem', 'id')
+                            ->getOptionLabelFromRecordUsing(function (PurchaseOrderItem $purchaseOrderItem) {
+                                return "({$purchaseOrderItem->purchaseOrder->po_number}) - ({$purchaseOrderItem->product->sku}) {$purchaseOrderItem->product->sku}";
+                            })
+                            ->nullable(),
+                        Select::make('rak_id')
+                            ->label('Rak')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('rak', 'name', function ($get, Builder $query) {
+                                return $query->where('warehouse_id', $get('warehouse_id'));
+                            })
+                            ->nullable(),
+                        Repeater::make('purchaseReceiptItemPhoto')
+                            ->relationship()
+                            ->addActionLabel('Tambah Photo')
+                            ->schema([
+                                FileUpload::make('photo_url')
+                                    ->label('Photo')
+                                    ->image()
+                                    ->maxSize(1024)
+                                    ->required(),
+                            ]),
                     ])
             ]);
     }
@@ -67,27 +109,6 @@ class PurchaseReceiptItemResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('purchaseReceipt.receipt_number')
-                    ->label('Receipt Number')
-                    ->searchable(),
-                TextColumn::make('product.sku')
-                    ->label('SKU')
-                    ->searchable(),
-                TextColumn::make('product.name')
-                    ->label('Product Name')
-                    ->searchable(),
-                TextColumn::make('qty_received')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('qty_accepted')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('qty_rejected')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('warehouse.name')
-                    ->label('Warehouse')
-                    ->searchable(),
                 TextColumn::make('is_sent')
                     ->label('Terkirim?')
                     ->badge()
@@ -105,9 +126,42 @@ class PurchaseReceiptItemResource extends Resource
                             return "Belum Terkirim QC";
                         }
                     }),
+                TextColumn::make('purchaseReceipt.receipt_number')
+                    ->label('Receipt Number')
+                    ->searchable(),
+                TextColumn::make('product')
+                    ->label('Product')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('product', function (Builder $query) use ($search) {
+                            $query->where('sku', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->sku}) {$state->name}";
+                    }),
+                TextColumn::make('qty_received')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('qty_accepted')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('qty_rejected')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('warehouse.name')
+                    ->label('Warehouse')
+                    ->searchable(),
+                TextColumn::make('rak.name')
+                    ->label('Rak')
+                    ->searchable(),
                 TextColumn::make('rak.name')
                     ->searchable()
                     ->label('Rak'),
+                ImageColumn::make('purchaseReceiptItemPhoto.photo_url')
+                    ->label('Photo')
+                    ->circular()
+                    ->stacked()
+                    ->size(75),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -126,6 +180,11 @@ class PurchaseReceiptItemResource extends Resource
                 //
             ])
             ->actions([
+                EditAction::make()
+                    ->color('success')
+                    ->hidden(function ($record) {
+                        return $record->is_sent == 1;
+                    }),
                 Action::make('kirim_qc')
                     ->label('Kirim QC')
                     ->color('success')
@@ -134,13 +193,23 @@ class PurchaseReceiptItemResource extends Resource
                     })
                     ->icon('heroicon-o-paper-airplane')
                     ->requiresConfirmation()
-                    ->action(function ($record) {
+                    ->form([
+                        Select::make('inspected_by')
+                            ->label('Inspected By')
+                            ->preload()
+                            ->searchable()
+                            ->options(function () {
+                                return User::select(['name', 'id'])->get()->pluck('name', 'id');
+                            })
+                            ->required()
+                    ])
+                    ->action(function (array $data, $record) {
                         $qualityControlService = app(QualityControlService::class);
                         $record->update([
                             'is_sent' => 1
                         ]);
 
-                        $qualityControlService->createQCFromPurchaseReceiptItem($record);
+                        $qualityControlService->createQCFromPurchaseReceiptItem($record, $data);
                         HelperController::sendNotification(isSuccess: true, title: 'Information', message: 'Berhasil mengirimkan data ke quality control');
                     }),
             ], position: ActionsPosition::BeforeColumns)

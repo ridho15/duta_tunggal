@@ -353,6 +353,25 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'inventory stock' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'stock movement' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+
         ];
 
         return $listPermissions;

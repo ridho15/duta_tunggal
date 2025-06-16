@@ -14,7 +14,8 @@ class InventoryStock extends Model
         'product_id',
         'warehouse_id',
         'qty_available',
-        'qty_reserved'
+        'qty_reserved',
+        'rak_id', // nullable,
     ];
 
     public function product()
@@ -25,5 +26,10 @@ class InventoryStock extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function rak()
+    {
+        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
     }
 }
