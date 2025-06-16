@@ -70,4 +70,9 @@ class QualityControl extends Model
     {
         return $this->morphOne(ReturnProduct::class, 'from_model')->withDefault();
     }
+
+    public function returnProductItem()
+    {
+        return $this->morphMany(ReturnProductItem::class, 'from_item_model');
+    }
 }

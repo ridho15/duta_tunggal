@@ -15,9 +15,10 @@ class CreatePurchaseReceipt extends CreateRecord
     {
         $qualityControlService = app(QualityControlService::class);
         $purchaseReceipt = $this->getRecord();
+        $data['inspected_by'] = $purchaseReceipt->received_by;
         foreach ($purchaseReceipt->purchaseReceiptItem as $purchaseReceiptItem) {
             if ($purchaseReceiptItem->purchaseOrderItem && $purchaseReceiptItem->purchaseOrderItem->quantity == $purchaseReceiptItem->qty_accepted) {
-                $qualityControlService->createQCFromPurchaseReceiptItem($purchaseReceiptItem);
+                $qualityControlService->createQCFromPurchaseReceiptItem($purchaseReceiptItem, $data);
                 $purchaseReceiptItem->update([
                     'is_sent' => 1
                 ]);

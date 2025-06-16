@@ -35,4 +35,9 @@ class PurchaseOrderItem extends Model
     {
         return $this->morphTo(__FUNCTION__, 'refer_item_model_type', 'refer_item_model_id');
     }
+
+    public function purchaseReceiptItem()
+    {
+        return $this->hasMany(PurchaseReceiptItem::class, 'purchase_order_item_id');
+    }
 }

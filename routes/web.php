@@ -1,16 +1,39 @@
 <?php
 
-use App\Http\Controllers\PurchaseOrderController;
-use App\Models\DeliveryOrder;
-use App\Models\ReturnProduct;
-use App\Models\SaleOrderItem;
-use App\Models\UnitOfMeasure;
+use App\Models\PurchaseOrder;
+use App\Models\QualityControl;
 use Illuminate\Support\Facades\Route;
 
 Route::get('testing', function () {
-    $returnProduct = ReturnProduct::has('warehouse.rak')->inRandomOrder()->first();
-    $deliveryOrderItem = $returnProduct->fromModel->deliveryOrderItem()->inRandomOrder()->first();
-    $rakId = $returnProduct->warehouse->rak()->inRandomOrder()->get();
+    $qualityControl = QualityControl::find(6);
+    $purchaseOrder = PurchaseOrder::select(['id'])->with(['purchaseOrderItem' => function ($query) {
+        $query->select(['id', 'quantity', 'purchase_order_id'])->with(['purchaseReceiptItem' => function ($query) {
+            $query->select(['id', 'qty_accepted', 'purchase_order_item_id', 'purchase_receipt_id'])->with(['qualityControl' => function ($query) {
+                $query->select(['id', 'purchase_receipt_item_id', 'passed_quantity']);
+            }]);
+        }]);
+    }])->whereHas('purchaseOrderItem', function ($query) use ($qualityControl) {
+        $query->whereHas('purchaseReceiptItem', function ($query) use ($qualityControl) {
+            $query->whereHas('qualityControl', function ($query) use ($qualityControl) {
+                $query->where('status', 1)->where('id', $qualityControl->id);
+            });
+        });
+    })->first();
 
-    return $rakId;
+    $totalQuantityDibutuhkan = 0;
+    $totalQuantityYangDiterima = 0;
+    if ($purchaseOrder) {
+        foreach ($purchaseOrder->purchaseOrderItem as $purchaseOrderItem) {
+            $totalQuantityDibutuhkan += $purchaseOrderItem->quantity;
+            foreach ($purchaseOrderItem->purchaseReceiptItem as $purchaseReceiptItem) {
+                $totalQuantityYangDiterima += $purchaseReceiptItem->qualityControl->passed_quantity;
+            }
+        }
+    }
+
+    return [
+        $purchaseOrder,
+        $totalQuantityDibutuhkan,
+        $totalQuantityYangDiterima
+    ];
 });

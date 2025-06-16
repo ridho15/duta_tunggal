@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PurchaseOrder;
 use App\Models\QualityControl;
 use App\Models\ReturnProduct;
 use Carbon\Carbon;
@@ -30,10 +31,15 @@ class QualityControlService
         }
 
         if ($qualityControl->rejected_quantity > 0) {
-            $returnProdcut = $qualityControl->returnProduct()->create($data);
-            $returnProdcut->returnProductItem()->create([
+            $returnProduct = $qualityControl->returnProduct()->create($data);
+            $qualityControl->returnProductItem()->create([
+                'return_product_id' => $returnProduct->id,
                 'product_id' => $qualityControl->product_id,
                 'quantity' => $qualityControl->rejected_quantity,
+            ]);
+
+            $qualityControl->purchaseReceiptItem->update([
+                'qty_accepted' => $qualityControl->purchaseReceiptItem->qty_accepted - $qualityControl->rejected_quantity
             ]);
         }
 
@@ -41,5 +47,19 @@ class QualityControlService
             'status' => 1,
             'date_send_stock' => Carbon::now()
         ]);
+    }
+
+    public function checkPenerimaanBarang($qualityControl)
+    {
+        $purchaseOrder = PurchaseOrder::with(['purchaseOrderItem.purchaseReceiptItem.qualityControl'])->whereHas('purchaseOrderItem', function ($query) use ($qualityControl) {
+            $query->whereHas('purchaseReceiptItem', function ($query) use ($qualityControl) {
+                $query->whereHas('qualityControl', function ($query) use ($qualityControl) {
+                    $query->where('id', $qualityControl->id);
+                });
+            });
+        })->first();
+
+        if ($purchaseOrder) {
+        }
     }
 }

@@ -53,4 +53,28 @@ class Product extends Model
     {
         return $this->hasMany(PurchaseOrderItem::class, 'product_id');
     }
+
+    protected static function booted()
+    {
+        static::deleting(function ($product) {
+            if ($product->isForceDeleting()) {
+                $product->purchaseOrderItem()->forceDelete();
+                $product->purchaseReceiptItem()->forceDelete();
+                $product->inventoryStock()->forceDelete();
+                $product->stockMovement()->forceDelete();
+            } else {
+                $product->purchaseOrderItem()->delete();
+                $product->purchaseReceiptItem()->delete();
+                $product->inventoryStock()->delete();
+                $product->stockMovement()->delete();
+            }
+        });
+
+        static::restoring(function ($product) {
+            $product->purchaseOrderItem()->restore();
+            $product->purchaseReceiptItem()->restore();
+            $product->inventoryStock()->restore();
+            $product->stockMovement()->restore();
+        });
+    }
 }

@@ -296,6 +296,7 @@ class PurchaseOrderResource extends Resource
                     ->boolean(),
                 TextColumn::make('date_approved')
                     ->dateTime()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
                 TextColumn::make('approvedBy.name')
                     ->label('Approved By')
@@ -344,12 +345,24 @@ class PurchaseOrderResource extends Resource
                     Action::make('konfirmasi')
                         ->label('Konfirmasi')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response purchase order') && ($record->status == 'request_approval');
+                            return Auth::user()->hasPermissionTo('response purchase order') && ($record->status == 'request_approval' || $record->status == 'request_close');
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-check-badge')
                         ->color('success')
-                        ->action(function ($record) {
+                        ->form(function ($record) {
+                            if ($record->status == 'request_close') {
+                                return [
+                                    Textarea::make('close_reason')
+                                        ->label('Close Reason')
+                                        ->required()
+                                        ->string()
+                                ];
+                            }
+
+                            return null;
+                        })
+                        ->action(function (array $data, $record) {
                             if ($record->status == 'request_approval') {
                                 $record->update([
                                     'status' => 'approved',
@@ -358,6 +371,7 @@ class PurchaseOrderResource extends Resource
                                 ]);
                             } elseif ($record->status == 'request_close') {
                                 $record->update([
+                                    'close_reason' => $data['close_reason'],
                                     'status' => 'closed',
                                     'closed_at' => Carbon::now(),
                                     'closed_by' => Auth::user()->id,
@@ -396,11 +410,18 @@ class PurchaseOrderResource extends Resource
                             return Auth::user()->hasPermissionTo('request purchase order') && ($record->status != 'closed' || $record->status != 'completed');
                         })
                         ->requiresConfirmation()
+                        ->form([
+                            Textarea::make('close_reason')
+                                ->label('Close Reason')
+                                ->string()
+                                ->required(),
+                        ])
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
-                        ->action(function ($record) {
+                        ->action(function (array $data, $record) {
                             $record->update([
-                                'status' => 'request_close'
+                                'status' => 'request_close',
+                                'close_reason' => $data['close_reason']
                             ]);
                         }),
                     Action::make('cetak_pdf')

@@ -57,4 +57,9 @@ class PurchaseReceiptItem extends Model
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
     }
+
+    public function qualityControl()
+    {
+        return $this->hasOne(QualityControl::class, 'purchase_receipt_item_id')->withDefault();
+    }
 }

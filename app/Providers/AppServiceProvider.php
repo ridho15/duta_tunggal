@@ -29,8 +29,6 @@ class AppServiceProvider extends ServiceProvider
         $loader = AliasLoader::getInstance();
         $loader->alias('Debugbar', Debugbar::class);
 
-        StockMovement::observe(StockMovementObserver::class);
-
         $this->app->bind(QualityControlService::class, function ($app) {
             return new QualityControlService;
         });
@@ -71,6 +69,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        StockMovement::observe(StockMovementObserver::class);
     }
 }
