@@ -279,6 +279,10 @@ class PurchaseOrderResource extends Resource
                     ->label('Total Amount')
                     ->money('idr')
                     ->sortable(),
+                TextColumn::make('purchaseOrderItem.product.name')
+                    ->label('Product')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->badge(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
