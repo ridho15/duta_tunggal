@@ -123,15 +123,15 @@
                 <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
                 <td class="right">{{ $item->quantity }}</td>
                 <td>{{ $item->product->uom->name }}</td>
-                <td class="right">{{ number_format($item->unit_price, 0, ',', '.') }}</td>
-                <td class="right">{{ number_format($item->discount, 0, ',', '.') }}</td>
-                <td class="right">{{ number_format($item->tax, 0, ',', '.') }}</td>
-                <td class="right">{{ number_format($subtotal, 0, ',', '.') }}</td>
+                <td class="right">Rp.{{ number_format($item->unit_price, 0, ',', '.') }}</td>
+                <td class="right">Rp.{{ number_format($item->discount, 0, ',', '.') }}</td>
+                <td class="right">Rp.{{ number_format($item->tax, 0, ',', '.') }}</td>
+                <td class="right">Rp.{{ number_format($subtotal, 0, ',', '.') }}</td>
             </tr>
             @endforeach
             <tr>
                 <td colspan="7" class="right"><strong>Total</strong></td>
-                <td class="right"><strong>{{ number_format($total, 0, ',', '.') }}</strong></td>
+                <td class="right"><strong>Rp.{{ number_format($total, 0, ',', '.') }}</strong></td>
             </tr>
         </tbody>
     </table>
@@ -139,12 +139,20 @@
     <div class="signature">
         <div class="box">
             <p>Disetujui Oleh,</p>
-            <img src="{{ asset('storage' . $purchaseOrder->approvedBy->signature) }}" alt="" style="height: 75px">
+            @if ($purchaseOrder->approvedBy->signature)
+            <img src="{{ public_path('storage' . $purchaseOrder->approvedBy->signature) }}" alt="" style="height: 75px">
+            @else
+            <br><br><br>
+            @endif
             <p><strong>{{ $purchaseOrder->approved_by->name ?? 'Owner' }}</strong></p>
         </div>
         <div class="box">
             <p>Dibuat Oleh,</p>
-            <img src="{{ asset('storage' . $purchaseOrder->createdBy->signature) }}" alt="">
+            @if ($purchaseOrder->createdBy->signature)
+            <img src="{{ public_path('storage' . $purchaseOrder->createdBy->signature) }}" style="height: 75px" alt="">
+            @else
+            <br><br><br>
+            @endif
             <p><strong>{{ $purchaseOrder->created_by->name ?? 'Staff Purchasing' }}</strong></p>
         </div>
     </div>

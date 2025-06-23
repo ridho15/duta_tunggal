@@ -38,7 +38,7 @@ class OrderRequestResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-arrow-down';
 
-    protected static ?string $navigationGroup = 'Warehouse';
+    protected static ?string $navigationGroup = 'Gudang';
 
     public static function form(Form $form): Form
     {

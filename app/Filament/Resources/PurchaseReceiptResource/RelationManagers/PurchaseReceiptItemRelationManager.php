@@ -53,7 +53,7 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                         return "{$record->sku} - {$record->name}";
                     }),
                 Select::make('warehouse_id')
-                    ->label('Warehouse')
+                    ->label('Gudang')
                     ->preload()
                     ->searchable()
                     ->relationship('warehouse', 'name'),

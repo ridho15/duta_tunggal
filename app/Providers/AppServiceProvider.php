@@ -7,11 +7,13 @@ use App\Models\StockMovement;
 use App\Observers\StockMovementObserver;
 use App\Services\DeliveryOrderItemService;
 use App\Services\DeliveryOrderService;
+use App\Services\InvoiceService;
 use App\Services\ManufacturingService;
 use App\Services\OrderRequestService;
 use App\Services\ProductService;
 use App\Services\PurchaseOrderService;
 use App\Services\PurchaseReceiptService;
+use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
 use App\Services\QuotationService;
 use App\Services\ReturnProductService;
@@ -62,6 +64,12 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->bind(ProductService::class, function ($app) {
             return new ProductService;
+        });
+        $this->app->bind(PurchaseReturnService::class, function ($app) {
+            return new PurchaseReturnService;
+        });
+        $this->app->bind(InvoiceService::class, function ($app) {
+            return new InvoiceService;
         });
     }
 

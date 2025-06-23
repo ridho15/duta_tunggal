@@ -13,6 +13,7 @@ use App\Models\SaleOrder;
 use App\Services\PurchaseOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -79,7 +80,6 @@ class PurchaseOrderResource extends Resource
                                         } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
                                             return OrderRequest::where('status', 'approved')->select(['id', 'request_number'])->get()->pluck('request_number', 'id');
                                         }
-
                                         return [];
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
@@ -124,6 +124,16 @@ class PurchaseOrderResource extends Resource
                             ->required(),
                         TextInput::make('po_number')
                             ->required()
+                            ->reactive()
+                            ->suffixAction(
+                                ActionsAction::make('generatePoNumber')
+                                    ->icon('heroicon-m-arrow-path') // ikon reload
+                                    ->tooltip('Generate PO Number')
+                                    ->action(function ($set, $get, $state) {
+                                        $purchaseOrderService = app(PurchaseOrderService::class);
+                                        $set('po_number', $purchaseOrderService->generatePoNumber());
+                                    })
+                            )
                             ->maxLength(255),
                         DatePicker::make('order_date')
                             ->required(),
@@ -220,6 +230,7 @@ class PurchaseOrderResource extends Resource
                                 Radio::make('opsi_harga')
                                     ->label('Opsi Harga')
                                     ->inline()
+                                    ->required()
                                     ->columnSpanFull()
                                     ->options([
                                         'default' => 'Default',
@@ -235,6 +246,9 @@ class PurchaseOrderResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->orderByDesc('order_date');
+            })
             ->columns([
                 TextColumn::make('supplier.name')
                     ->label('Supplier')

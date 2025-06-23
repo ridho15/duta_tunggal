@@ -31,7 +31,7 @@ class QualityControlResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-arrow-down';
 
-    protected static ?string $navigationGroup = 'Warehouse';
+    protected static ?string $navigationGroup = 'Gudang';
 
     public static function form(Form $form): Form
     {
@@ -41,11 +41,14 @@ class QualityControlResource extends Resource
                     ->schema([
                         Select::make('warehouse_id')
                             ->required()
-                            ->label('Warehouse')
+                            ->label('Gudang')
                             ->searchable()
                             ->preload()
                             ->reactive()
-                            ->relationship('warehouse', 'name'),
+                            ->relationship('warehouse', 'name')
+                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                return "({$warehouse->kode} {$warehouse->name})";
+                            }),
                         Select::make('rak_id')
                             ->label('Rak')
                             ->preload()
@@ -88,9 +91,12 @@ class QualityControlResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('warehouse.kode')
+                    ->label('Kode Gudang')
+                    ->searchable(),
                 TextColumn::make('warehouse.name')
                     ->searchable()
-                    ->label('Warehouse'),
+                    ->label('Gudang'),
                 TextColumn::make('purchaseReceiptItem.purchaseReceipt.purchaseOrder.po_number')
                     ->label('PO Number')
                     ->searchable(),

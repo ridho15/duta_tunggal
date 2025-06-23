@@ -3,25 +3,26 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InvoiceResource\Pages;
-use App\Filament\Resources\InvoiceResource\RelationManagers;
 use App\Models\Invoice;
 use App\Models\Product;
-use Filament\Forms;
+use App\Services\InvoiceService;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class InvoiceResource extends Resource
 {
@@ -33,54 +34,65 @@ class InvoiceResource extends Resource
     {
         return $form
             ->schema([
-                TextInput::make('invoice_number')
-                    ->label('Invoice Number')
-                    ->required()
-                    ->unique(ignoreRecord: true)
-                    ->maxLength(255),
-                DatePicker::make('invoice_date')
-                    ->required(),
-                TextInput::make('subtotal')
-                    ->required()
-                    ->numeric()
-                    ->prefix('Rp.')
-                    ->default(0),
-                TextInput::make('tax')
-                    ->required()
-                    ->prefix('Rp.')
-                    ->numeric()
-                    ->default(0),
-                TextInput::make('other_fee')
-                    ->required()
-                    ->numeric()
-                    ->prefix('Rp.')
-                    ->default(0),
-                TextInput::make('total')
-                    ->required()
-                    ->numeric(),
-                Repeater::make('invoiceItem')
-                    ->columnSpanFull()
-                    ->relationship()
-                    ->columns(2)
+                Fieldset::make('Form Invoice')
                     ->schema([
-                        Select::make('product_id')
-                            ->label('Product')
-                            ->preload()
-                            ->searchable()
+                        TextInput::make('invoice_number')
+                            ->label('Invoice Number')
                             ->required()
-                            ->relationship('product', 'id')
-                            ->getOptionLabelFromRecordUsing(function (Product $product) {
-                                return "({$product->sku}) {$product->name}";
-                            }),
-                        TextInput::make('quantity')
-                            ->label('Quantity')
+                            ->reactive()
+                            ->suffixAction(Action::make('generateInvoiceNumber')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Invoice Number')
+                                ->action(function ($set, $get, $state) {
+                                    $invoiceService = app(InvoiceService::class);
+                                    $set('invoice_number', $invoiceService->generateInvoiceNumber());
+                                }))
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(255),
+                        DatePicker::make('invoice_date')
+                            ->required(),
+                        TextInput::make('subtotal')
+                            ->required()
                             ->numeric()
                             ->prefix('Rp.')
-                            ->default(0)
-                            ->required(),
-                        TextInput::make('price')
-                            ->label('Price')
+                            ->default(0),
+                        TextInput::make('tax')
+                            ->required()
+                            ->prefix('Rp.')
                             ->numeric()
+                            ->default(0),
+                        TextInput::make('other_fee')
+                            ->required()
+                            ->numeric()
+                            ->prefix('Rp.')
+                            ->default(0),
+                        TextInput::make('total')
+                            ->required()
+                            ->numeric(),
+                        Repeater::make('invoiceItem')
+                            ->columnSpanFull()
+                            ->relationship()
+                            ->columns(3)
+                            ->schema([
+                                Select::make('product_id')
+                                    ->label('Product')
+                                    ->preload()
+                                    ->searchable()
+                                    ->required()
+                                    ->relationship('product', 'id')
+                                    ->getOptionLabelFromRecordUsing(function (Product $product) {
+                                        return "({$product->sku}) {$product->name}";
+                                    }),
+                                TextInput::make('quantity')
+                                    ->label('Quantity')
+                                    ->numeric()
+                                    ->prefix('Rp.')
+                                    ->default(0)
+                                    ->required(),
+                                TextInput::make('price')
+                                    ->label('Price')
+                                    ->numeric()
+                            ])
                     ])
             ]);
     }
@@ -129,8 +141,13 @@ class InvoiceResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make()
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make()
+                ])
             ])
             ->bulkActions([
                 BulkActionGroup::make([

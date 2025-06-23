@@ -5,13 +5,11 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PurchaseReceiptResource\Pages;
 use App\Filament\Resources\PurchaseReceiptResource\Pages\ViewPurchaseReceipt;
 use App\Filament\Resources\PurchaseReceiptResource\RelationManagers\PurchaseReceiptItemRelationManager;
-use App\Models\Currency;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceipt;
-use Filament\Forms\Components\Actions;
+use App\Models\Warehouse;
+use App\Services\PurchaseReceiptService;
 use Filament\Forms\Components\Actions\Action;
-use Filament\Forms\Components\Actions\ActionContainer;
-use Filament\Forms\Components\Component;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\FileUpload;
@@ -50,6 +48,14 @@ class PurchaseReceiptResource extends Resource
                         TextInput::make('receipt_number')
                             ->label('Receipt Number')
                             ->string()
+                            ->reactive()
+                            ->suffixAction(Action::make('generateReceiptNumber')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Receipt Number')
+                                ->action(function ($set, $get, $state) {
+                                    $purchaseReceipService = app(PurchaseReceiptService::class);
+                                    $set('receipt_number', $purchaseReceipService->generateReceiptNumber());
+                                }))
                             ->unique(ignoreRecord: true)
                             ->required(),
                         Select::make('purchase_order_id')
@@ -136,12 +142,15 @@ class PurchaseReceiptResource extends Resource
                                         return "{$record->sku} - {$record->name}";
                                     }),
                                 Select::make('warehouse_id')
-                                    ->label('Warehouse')
+                                    ->label('Gudang')
                                     ->preload()
                                     ->reactive()
                                     ->required()
                                     ->searchable()
-                                    ->relationship('warehouse', 'name'),
+                                    ->relationship('warehouse', 'name')
+                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                        return "({$warehouse->kode}) {$warehouse->name}";
+                                    }),
                                 Select::make('rak_id')
                                     ->label('Rak (Optional)')
                                     ->preload()

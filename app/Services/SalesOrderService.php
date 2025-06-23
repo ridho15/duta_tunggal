@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\HelperController;
+use App\Models\SaleOrder;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -102,5 +103,25 @@ class SalesOrderService
             ]);
         }
         return $saleOrder;
+    }
+
+    public function generateSoNumber()
+    {
+        $date = now()->format('Ymd');
+
+        // Hitung berapa PO pada hari ini
+        $lastSaleOrder = SaleOrder::whereDate('created_at', now()->toDateString())
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $number = 1;
+
+        if ($lastSaleOrder) {
+            // Ambil nomor urut terakhir
+            $lastNumber = intval(substr($lastSaleOrder->so_number, -4));
+            $number = $lastNumber + 1;
+        }
+
+        return 'RN-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
 }

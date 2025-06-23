@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Filament\Resources\InvoiceResource\Pages;
+namespace App\Filament\Resources\PurchaseReturnResource\Pages;
 
-use App\Filament\Resources\InvoiceResource;
+use App\Filament\Resources\PurchaseReturnResource;
 use Filament\Actions;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
-class ListInvoices extends ListRecords
+class ListPurchaseReturns extends ListRecords
 {
-    protected static string $resource = InvoiceResource::class;
+    protected static string $resource = PurchaseReturnResource::class;
 
     protected function getHeaderActions(): array
     {

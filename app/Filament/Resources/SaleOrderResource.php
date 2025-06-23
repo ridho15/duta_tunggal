@@ -13,6 +13,8 @@ use App\Models\SaleOrder;
 use App\Models\Supplier;
 use App\Services\SalesOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Database\Seeders\SaleOrderSeeder;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Placeholder;
@@ -156,8 +158,17 @@ class SaleOrderResource extends Resource
                                     ]),
                             ]),
                         TextInput::make('so_number')
+                            ->label('SO Number')
                             ->required()
+                            ->reactive()
                             ->unique(ignoreRecord: true)
+                            ->suffixAction(ActionsAction::make('generateSoNumber')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate SO Number')
+                                ->action(function ($set, $get, $state) {
+                                    $salesOrderService = app(SalesOrderService::class);
+                                    $set('receipt_number', $salesOrderService->generateSoNumber());
+                                }))
                             ->maxLength(255),
                         DatePicker::make('order_date')
                             ->required(),

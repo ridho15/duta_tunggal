@@ -26,7 +26,7 @@ class InventoryStockResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
 
-    protected static ?string $navigationGroup = 'Warehouse';
+    protected static ?string $navigationGroup = 'Gudang';
 
     public static function form(Form $form): Form
     {

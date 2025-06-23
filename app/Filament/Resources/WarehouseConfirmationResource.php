@@ -22,7 +22,7 @@ class WarehouseConfirmationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-check-badge';
 
-    protected static ?string $navigationGroup = 'Warehouse';
+    protected static ?string $navigationGroup = 'Gudang';
 
     public static function form(Form $form): Form
     {

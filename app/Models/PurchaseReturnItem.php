@@ -11,8 +11,10 @@ class PurchaseReturnItem extends Model
     protected $table = 'purchase_return_items';
     protected $fillable = [
         'purchase_return_id',
+        'purchase_receipt_item_id',
         'product_id',
         'qty_returned',
+        'unit_price',
         'reason'
     ];
 
@@ -24,5 +26,10 @@ class PurchaseReturnItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
+    }
+
+    public function purchaseReceiptItem()
+    {
+        return $this->belongsTo(PurchaseReceiptItem::class, 'purchase_receipt_item_id')->withDefault();
     }
 }

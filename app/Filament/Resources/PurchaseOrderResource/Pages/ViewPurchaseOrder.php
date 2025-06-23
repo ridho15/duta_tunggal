@@ -78,13 +78,18 @@ class ViewPurchaseOrder extends ViewRecord
                 ->label('Cetak PDF')
                 ->icon('heroicon-o-document-check')
                 ->color('danger')
-                ->hidden(function ($record) {
-                    return in_array($record->status, ['draft', 'closed', 'request_close', 'request_approval']);
+                ->visible(function ($record) {
+                    return $record->status != 'draft' && $record->status != 'closed';
                 })
-                ->openUrlInNewTab()
-                ->url(function ($record) {
-                    return route('purchase-order.cetak', ['id' => $record->id]);
-                })
+                ->action(function ($record) {
+                    $pdf = Pdf::loadView('pdf.purchase-order', [
+                        'purchaseOrder' => $record
+                    ])->setPaper('A4', 'potrait');
+
+                    return response()->streamDownload(function () use ($pdf) {
+                        echo $pdf->stream();
+                    }, 'Purchase_Order_' . $record->po_number . '.pdf');
+                }),
         ];
     }
 }
