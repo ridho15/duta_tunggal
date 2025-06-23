@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,7 +18,10 @@ class ProductCategoryFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->word()
+            'kode' => 'CAT-' . $this->faker->unique()->numerify('###'),
+            'name' => 'Kategori ' . $this->faker->word,
+            'cabang_id' => Cabang::inRandomOrder()->first()?->id ?? Cabang::factory(),
+            'kenaikan_harga' => $this->faker->randomFloat(2, 0, 20), // 0% - 20%
         ];
     }
 }

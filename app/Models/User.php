@@ -17,11 +17,20 @@ class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, Notifiable, HasRoles, HasPermissions;
     protected $fillable = [
-        'name',
+        'name', // Gabungan dari first name dan last name
         'email',
+        'username',
+        'telepon',
         'password',
+        'manage_type',
+        'cabang_id', // nullable
+        'first_name',
+        'last_name',
+        'status',
+        'kode_user',
+        'posisi',
         'signature',
-        'warehouse_id'
+        'warehouse_id' // nullable
     ];
 
 
@@ -54,5 +63,10 @@ class User extends Authenticatable implements FilamentUser
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

@@ -3,25 +3,31 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
-use App\Forms\Components\SignaturePad;
+use App\Filament\Resources\UserResource\Pages\ViewUser;
+use App\Models\Cabang;
 use App\Models\User;
-use Filament\Forms\Components\DateTimePicker;
+use App\Models\Warehouse;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\ViewField;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
-use Saade\FilamentAutograph\Forms\Components\Enums\DownloadableFormat;
 use Saade\FilamentAutograph\Forms\Components\SignaturePad as ComponentsSignaturePad;
+use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class UserResource extends Resource
 {
@@ -37,22 +43,43 @@ class UserResource extends Resource
             ->schema([
                 Fieldset::make('Form User')
                     ->schema([
-                        TextInput::make('name')
+                        TextInput::make('username')
+                            ->label('Username')
                             ->required()
-                            ->maxLength(255),
+                            ->unique(ignoreRecord: true),
+                        TextInput::make('telepon')
+                            ->label('Telepon')
+                            ->tel(),
+                        TextInput::make('password')
+                            ->password()
+                            ->dehydrateStateUsing(fn($state) => Hash::make($state))
+                            ->dehydrated(fn($state) => filled($state))
+                            ->same('konfirmasi_password')
+                            ->reactive()
+                            ->validationMessages([
+                                'requried' => 'Password wajib diisi',
+                                'same' => 'Password tidak sama'
+                            ])
+                            ->revealable()
+                            ->required(fn(string $context): bool => $context === 'create'),
+                        TextInput::make('konfirmasi_password')
+                            ->password()
+                            ->dehydrateStateUsing(fn($state) => Hash::make($state))
+                            ->dehydrated(fn($state) => filled($state))
+                            ->revealable()
+                            ->same('password')
+                            ->validationMessages([
+                                'required' => 'Password tidak boleh kosong',
+                                'same' => 'Password tidak sama'
+                            ])
+                            ->required(fn(string $context): bool => $context === 'create'),
                         TextInput::make('email')
                             ->email()
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
-                        DateTimePicker::make('email_verified_at'),
-                        TextInput::make('password')
-                            ->password()
-                            ->dehydrateStateUsing(fn($state) => Hash::make($state))
-                            ->dehydrated(fn($state) => filled($state))
-                            ->required(fn(string $context): bool => $context === 'create'),
                         Select::make('roles')
-                            ->label('Roles')
+                            ->label('Level')
                             ->searchable()
                             ->preload()
                             ->multiple()
@@ -63,12 +90,80 @@ class UserResource extends Resource
                             ->searchable()
                             ->multiple()
                             ->relationship('permissions', 'name'),
-                        Select::make('warehouse_id')
-                            ->label('Warehouse')
+                        Select::make('manage_type')
+                            ->label('Kelola')
+                            ->options([
+                                'all' => 'Semua Cabang / Gudang',
+                                'cabang' => 'Cabang',
+                                'warehouse' => 'Gudang'
+                            ])
+                            ->multiple()
                             ->preload()
                             ->searchable()
-                            ->relationship('warehouse', 'name')
+                            ->required()
+                            ->reactive(),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->preload()
+                            ->searchable()
+                            ->helperText("Untuk mengaktifkan cabang silahkan pilih cabang pada kelola")
+                            ->reactive()
+                            ->disabled(function ($set, $get) {
+                                if (in_array('all', $get('manage_type'))) {
+                                    return true;
+                                } elseif (in_array('cabang', $get('manage_type'))) {
+                                    return false;
+                                }
+
+                                return true;
+                            })
+                            ->relationship('cabang', 'nama')
+                            ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
+                                return "({$cabang->kode}) {$cabang->nama}";
+                            })
                             ->nullable(),
+                        Select::make('warehouse_id')
+                            ->label('Gudang')
+                            ->preload()
+                            ->helperText("Untuk mengaktifkan gudang silahkan pilih gudang pada kelola")
+                            ->searchable()
+                            ->reactive()
+                            ->disabled(function ($set, $get) {
+                                if (in_array('all', $get('manage_type'))) {
+                                    return true;
+                                } elseif (in_array('warehouse', $get('manage_type'))) {
+                                    return false;
+                                }
+
+                                return true;
+                            })
+                            ->relationship('warehouse', 'name', function (Builder $query, $get) {
+                                $query->where('cabang_id', $get('cabang_id'));
+                            })
+                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                return "({$warehouse->kode}) {$warehouse->name}";
+                            })
+                            ->nullable(),
+                        TextInput::make('first_name')
+                            ->label('Nama Depan')
+                            ->string()
+                            ->maxLength(50)
+                            ->required(),
+                        TextInput::make('last_name')
+                            ->label('Nama Belakang')
+                            ->maxLength(50)
+                            ->string()
+                            ->nullable(),
+                        TextInput::make('kode_user')
+                            ->label('Kode User')
+                            ->maxLength(50)
+                            ->required()
+                            ->unique(ignoreRecord: true),
+                        TextInput::make('posisi')
+                            ->label('Posisi')
+                            ->string()
+                            ->maxLength(50)
+                            ->required(),
                         ComponentsSignaturePad::make('signature')
                             ->label(__('Sign here'))
                             ->dotSize(2.0)
@@ -77,7 +172,10 @@ class UserResource extends Resource
                             ->throttle(16)
                             ->minDistance(5)
                             ->velocityFilterWeight(0.7)
-                            ->maxWidth(100)
+                            ->maxWidth(100),
+                        Checkbox::make('status')
+                            ->label('Status User (Aktif / Tidak Aktif)')
+                            ->default(true)
                     ])
             ]);
     }
@@ -86,31 +184,42 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('username')->sortable()->searchable(),
+                TextColumn::make('first_name')
+                    ->label('Nama Depan')
+                    ->sortable()
                     ->searchable(),
-                TextColumn::make('email')
+                TextColumn::make('last_name')
+                    ->label('Nama Belakang')
+                    ->sortable()
                     ->searchable(),
-                TextColumn::make('email_verified_at')
-                    ->dateTime()
-                    ->sortable(),
                 TextColumn::make('roles.name')
-                    ->label('Roles')
+                    ->label('Level')
+                    ->sortable(),
+                TextColumn::make('manage_type')
                     ->badge()
-                    ->searchable(),
-                TextColumn::make('permissions.name')
-                    ->label('Permissions')
-                    ->badge()
-                    ->searchable(),
+                    ->formatStateUsing(function ($state) {
+                        return Str::upper($state);
+                    })
+                    ->label('Kelola'),
                 ImageColumn::make('signature')
-                    ->size(75),
+                    ->label('Tanda Tangan'),
+                IconColumn::make('status')
+                    ->boolean()
+                    ->label('Status'),
             ])
             ->filters([
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make()
-            ])
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make()
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -130,6 +239,7 @@ class UserResource extends Resource
         return [
             'index' => Pages\ListUsers::route('/'),
             'create' => Pages\CreateUser::route('/create'),
+            'view' => ViewUser::route('/{record}'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
     }

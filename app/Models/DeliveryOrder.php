@@ -54,6 +54,10 @@ class DeliveryOrder extends Model
         return $this->hasMany(DeliveryOrderLog::class, 'delivery_order_id');
     }
 
+    public function returnProduct(){
+        return $this->morphOne(ReturnProduct::class, 'from_model')->withDefault();
+    }
+
     protected static function booted()
     {
         static::deleting(function ($deliveryOrder) {

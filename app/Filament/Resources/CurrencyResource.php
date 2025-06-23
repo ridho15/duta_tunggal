@@ -28,6 +28,8 @@ class CurrencyResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
+    protected static ?string $modelLabel = 'Mata Uang';
+
     public static function form(Form $form): Form
     {
         return $form
@@ -35,15 +37,19 @@ class CurrencyResource extends Resource
                 Fieldset::make('Form Currency')
                     ->schema([
                         TextInput::make('name')
+                            ->label('Mata Uang')
                             ->required()
                             ->maxLength(255),
                         TextInput::make('symbol')
                             ->maxLength(255)
                             ->default(null),
                         TextInput::make('code')
+                            ->label('Kode')
                             ->maxLength(255),
                         TextInput::make('to_rupiah')
+                            ->label('Nilai')
                             ->required()
+                            ->prefix('Rp.')
                             ->numeric()
                             ->default(0),
                     ])
@@ -55,13 +61,16 @@ class CurrencyResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
+                    ->label('Mata Uang')
                     ->searchable(),
                 TextColumn::make('symbol')
                     ->searchable(),
                 TextColumn::make('code')
+                    ->label('Kode')
                     ->searchable(),
                 TextColumn::make('to_rupiah')
-                    ->numeric()
+                    ->label('Nilai')
+                    ->money('idr')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

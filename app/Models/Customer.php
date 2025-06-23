@@ -12,9 +12,20 @@ class Customer extends Model
     protected $table = 'customers';
     protected $fillable = [
         'name',
+        'code',
         'address',
+        'telephone',
         'phone',
-        'email'
+        'email',
+        'perusahaan',
+        'tipe', // PKP, PRI,
+        'fax',
+        'isSpecial', // ya / tidak
+        'tempo_kredit', // harim
+        'kredit_limit', // Rp
+        'tipe_pembayaran', // Bebas, Kredit, Cash,
+        'nik_npwp', // NIK / NPWP,
+        'keterangan',
     ];
 
     public function sales()

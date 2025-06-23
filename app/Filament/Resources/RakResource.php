@@ -28,13 +28,15 @@ class RakResource extends Resource
         return $form
             ->schema([
                 TextInput::make('name')
+                    ->label('Nama')
                     ->required()
                     ->maxLength(255),
                 TextInput::make('code')
                     ->required()
+                    ->label('Kode Rak')
                     ->maxLength(255),
                 Select::make('warehouse_id')
-                    ->label('Warehouse')
+                    ->label('Gudang')
                     ->searchable()
                     ->preload()
                     ->relationship('warehouse', 'name')
@@ -47,8 +49,10 @@ class RakResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
+                    ->label('Nama')
                     ->searchable(),
                 TextColumn::make('code')
+                    ->label('Kode Rak')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -63,7 +67,7 @@ class RakResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('warehouse.name')
-                    ->label('Warehouse')
+                    ->label('Gudang')
                     ->searchable(),
             ])
             ->filters([

@@ -1,0 +1,188 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\CabangResource\Pages;
+use App\Filament\Resources\CabangResource\Pages\ViewCabang;
+use App\Models\Cabang;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\ColorPicker;
+use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\ColorColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
+
+class CabangResource extends Resource
+{
+    protected static ?string $model = Cabang::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-building-office';
+
+    protected static ?string $navigationLabel = 'Cabang';
+
+    protected static ?string $pluralLabel = 'Cabang';
+
+    protected static ?string $modelLabel = 'Cabang';
+
+    protected static ?string $navigationGroup = 'Master Data';
+
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Fieldset::make('form Cabang')
+                    ->schema([
+                        TextInput::make('kode')
+                            ->label('Kode')
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(20)
+                            ->required(),
+                        TextInput::make('nama')
+                            ->label('Nama')
+                            ->maxLength(100)
+                            ->required(),
+                        Textarea::make('alamat')
+                            ->label('Alamat')
+                            ->required(),
+                        TextInput::make('telepon')
+                            ->label('Telepon')
+                            ->tel()
+                            ->maxLength(15)
+                            ->rules(['regex:/^08[0-9]{8,12}$/'])
+                            ->required(),
+                        TextInput::make('kenaikan_harga')
+                            ->label('Kenaikan Harga (%)')
+                            ->numeric()
+                            ->default(0),
+                        ColorPicker::make('warna_background')
+                            ->label('Warna Background'),
+                        Radio::make('tipe_penjualan')
+                            ->label('Tipe Penjualan')
+                            ->inlineLabel()
+                            ->options([
+                                'Semua' => 'Semua',
+                                'Pajak' => 'Pajak',
+                                'Non Pajak' => 'Non Pajak',
+                            ])
+                            ->default('Semua')
+                            ->required(),
+                        TextInput::make('kode_invoice_pajak')
+                            ->label('Kode Invoice Pajak')
+                            ->maxLength(50),
+                        TextInput::make('kode_invoice_non_pajak')
+                            ->label('Kode Invoice Non Pajak')
+                            ->maxLength(50),
+                        TextInput::make('kode_invoice_pajak_walkin')
+                            ->label('Kode Invoice Pajak (Customer Walk-in)')
+                            ->maxLength(50),
+                        TextInput::make('nama_kwitansi')
+                            ->label('Nama di Kwitansi')
+                            ->maxLength(100),
+                        TextInput::make('label_invoice_pajak')
+                            ->label('Label Invoice Pajak')
+                            ->maxLength(100),
+                        TextInput::make('label_invoice_non_pajak')
+                            ->label('Label Invoice Non Pajak')
+                            ->maxLength(100),
+                        FileUpload::make('logo_invoice_non_pajak')
+                            ->label('Logo Invoice Non Pajak')
+                            ->directory('logo-invoice-non-pajak'),
+                        Toggle::make('lihat_stok_cabang_lain')
+                            ->label('Bisa Lihat Stok Cabang Lain saat Penjualan'),
+                        Checkbox::make('status')
+                            ->label('Status (Aktif / Tidak Aktif)')
+                            ->default(false),
+                    ])
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                ColorColumn::make('warna_background')
+                    ->label('Background'),
+                TextColumn::make('kode')
+                    ->label('Kode')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('nama')
+                    ->label('Nama')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('alamat')
+                    ->label('Alamat')
+                    ->limit(30),
+                TextColumn::make('telepon')
+                    ->label('Telepon'),
+                TextColumn::make('kenaikan_harga')
+                    ->label('Kenaikan Harga (%)')
+                    ->formatStateUsing(fn($state) => $state . '%'),
+                TextColumn::make('tipe_penjualan')
+                    ->label('Tipe Penjualan')
+                    ->badge()
+                    ->colors([
+                        'success' => 'Semua',
+                        'warning' => 'Pajak',
+                        'danger' => 'Non Pajak',
+                    ]),
+                IconColumn::make('status')
+                    ->label('Status')
+                    ->boolean(),
+                TextColumn::make('warehouse.name')
+                    ->label('Gudang')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->searchable(),
+            ])
+            ->filters([
+                //
+            ])
+            ->actions([
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
+            ->bulkActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            //
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListCabangs::route('/'),
+            'create' => Pages\CreateCabang::route('/create'),
+            'view' => ViewCabang::route('/{record}'),
+            'edit' => Pages\EditCabang::route('/{record}/edit'),
+        ];
+    }
+}

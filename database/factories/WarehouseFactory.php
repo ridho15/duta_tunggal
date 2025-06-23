@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,8 +18,14 @@ class WarehouseFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->word(),
-            'location' => $this->faker->address()
+            'kode' => 'GDG-' . $this->faker->unique()->numerify('###'),
+            'name' => 'Gudang ' . $this->faker->word,
+            'cabang_id' => Cabang::inRandomOrder()->first()?->id ?? Cabang::factory(),
+            'tipe' => $this->faker->randomElement(['Kecil', 'Besar']),
+            'location' => $this->faker->address,
+            'telepon' => $this->faker->phoneNumber,
+            'status' => $this->faker->boolean,
+            'warna_background' => $this->faker->safeHexColor,
         ];
     }
 }

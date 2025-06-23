@@ -371,7 +371,24 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
-
+            'cabang' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'product unit conversion' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
         ];
 
         return $listPermissions;

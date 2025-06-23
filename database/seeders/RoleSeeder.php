@@ -16,6 +16,13 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
+        $owner = Role::updateOrCreate([
+            'name' => 'Owner',
+        ], [
+            'name' => 'Owner',
+            'guard_name' => 'web'
+        ]);
+
         $superAdmin = Role::updateOrCreate([
             'name' => 'Super Admin',
         ], [
@@ -30,20 +37,71 @@ class RoleSeeder extends Seeder
             'guard_name' => 'web'
         ]);
 
-        $gudang = Role::updateOrCreate([
-            'name' => 'Gudang',
+        $salesManager = Role::updateOrCreate([
+            'name' => 'Sales Manager',
         ], [
-            'name' => 'Gudang',
+            'name' => 'Sales Manager',
             'guard_name' => 'web'
         ]);
 
-        $owner = Role::updateOrCreate([
-            'name' => 'Owner',
+        $sales = Role::updateOrCreate([
+            'name' => 'Sales',
         ], [
-            'name' => 'Owner',
+            'name' => 'Sales',
             'guard_name' => 'web'
         ]);
 
+        $kasir = Role::updateOrCreate([
+            'name' => 'Kasir',
+        ], [
+            'name' => 'Kasir',
+            'guard_name' => 'web'
+        ]);
+
+        $inventoryManager = Role::updateOrCreate([
+            'name' => 'Inventory Manager',
+        ], [
+            'name' => 'Inventory Manager',
+            'guard_name' => 'web'
+        ]);
+
+        $adminInventory = Role::updateOrCreate([
+            'name' => 'Admin Inventory',
+        ], [
+            'name' => 'Admin Inventory',
+            'guard_name' => 'web'
+        ]);
+
+        $checker = Role::updateOrCreate([
+            'name' => 'Checker',
+        ], [
+            'name' => 'Checker',
+            'guard_name' => 'web'
+        ]);
+
+        $financeManager = Role::updateOrCreate([
+            'name' => 'Finance Manager',
+        ], [
+            'name' => 'Finance Manager',
+            'guard_name' => 'web'
+        ]);
+
+        $adminKeuangan = Role::updateOrCreate([
+            'name' => 'Admin Keuangan',
+        ], [
+            'name' => 'Admin Keuangan',
+            'guard_name' => 'web'
+        ]);
+
+        $accounting = Role::updateOrCreate([
+            'name' => 'Accounting',
+        ], [
+            'name' => 'Accounting',
+            'guard_name' => 'web'
+        ]);
+
+
+        $owner->syncPermissions(Permission::all());
         $superAdmin->syncPermissions(Permission::all());
     }
 }

@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductCategoryResource\Pages;
 use App\Models\ProductCategory;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -13,6 +14,7 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class ProductCategoryResource extends Resource
 {
@@ -27,8 +29,24 @@ class ProductCategoryResource extends Resource
         return $form
             ->schema([
                 TextInput::make('name')
-                    ->required()
-                    ->maxLength(255),
+                    ->label('Nama Kategori')
+                    ->maxLength(100)
+                    ->required(),
+                TextInput::make('kode')
+                    ->label('Kode Kategori')
+                    ->maxLength(50)
+                    ->unique(ignoreRecord: true)
+                    ->required(),
+                Select::make('cabang_id')
+                    ->label('Cabang')
+                    ->preload()
+                    ->searchable()
+                    ->relationship('cabang', 'nama')
+                    ->required(),
+                TextInput::make('kenaikan_harga')
+                    ->label('Kenaikan Harga (%)')
+                    ->numeric()
+                    ->default(0),
             ]);
     }
 
@@ -36,20 +54,21 @@ class ProductCategoryResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('kode')
+                    ->label('Kode Kategori')
+                    ->sortable()
                     ->searchable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
+                TextColumn::make('name')
+                    ->label('Nama Kategori')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->searchable(),
+                TextColumn::make('cabang.nama')
+                    ->label('Cabang')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->searchable(),
+                TextColumn::make('kenaikan_harga')
+                    ->label('Kenaikan Harga (%)')
+                    ->suffix('%'),
             ])
             ->filters([
                 //
@@ -57,7 +76,7 @@ class ProductCategoryResource extends Resource
             ->actions([
                 EditAction::make(),
                 DeleteAction::make()
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

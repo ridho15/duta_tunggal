@@ -3,18 +3,29 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\WarehouseResource\Pages;
+use App\Filament\Resources\WarehouseResource\Pages\ViewWarehouse;
 use App\Models\Warehouse;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\ColorColumn;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class WarehouseResource extends Resource
 {
@@ -24,28 +35,48 @@ class WarehouseResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
+    protected static ?string $modelLabel = 'Gudang';
+
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Fieldset::make('Form Warehouse')
+                Fieldset::make('Form Gudang')
                     ->schema([
+                        TextInput::make('kode')
+                            ->label('Kode')
+                            ->maxLength(20)
+                            ->unique(ignoreRecord: true)
+                            ->required(),
                         TextInput::make('name')
-                            ->required()
-                            ->maxLength(255),
-                        TextInput::make('location')
-                            ->required()
-                            ->maxLength(255),
-                        Repeater::make('rak')
-                            ->relationship()
-                            ->schema([
-                                TextInput::make('name')
-                                    ->required()
-                                    ->maxLength(255),
-                                TextInput::make('code')
-                                    ->required()
-                                    ->maxLength(255),
+                            ->label('Nama')
+                            ->maxLength(100)
+                            ->required(),
+                        Select::make('branch_id')
+                            ->label('Cabang')
+                            ->preload()
+                            ->searchable()
+                            ->relationship('cabang', 'nama')
+                            ->required(),
+                        Radio::make('tipe')
+                            ->label('Tipe')
+                            ->inlineLabel()
+                            ->options([
+                                'Kecil' => 'Kecil',
+                                'Besar' => 'Besar',
                             ])
+                            ->default('Kecil')
+                            ->required(),
+                        Textarea::make('location')
+                            ->label('Alamat'),
+                        TextInput::make('telepon')
+                            ->label('Telepon')
+                            ->maxLength(20),
+                        Checkbox::make('status')
+                            ->label('Status (Aktif / Tidak Aktif)')
+                            ->default(false),
+                        ColorPicker::make('warna_background')
+                            ->label('Warna Background'),
                     ])
             ]);
     }
@@ -54,34 +85,48 @@ class WarehouseResource extends Resource
     {
         return $table
             ->columns([
+                ColorColumn::make('warna_background')
+                    ->label('Background'),
+                TextColumn::make('kode')
+                    ->label('Kode')
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('name')
+                    ->label('Nama')
+                    ->sortable()
                     ->searchable(),
-                TextColumn::make('location')
+                TextColumn::make('cabang.nama')
+                    ->label('Cabang')
+                    ->sortable()
                     ->searchable(),
-                TextColumn::make('rak.name')
-                    ->label('Rak')
+                TextColumn::make('tipe')
+                    ->label('Tipe')
                     ->badge()
-                    ->searchable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->colors([
+                        'info' => 'Kecil',
+                        'success' => 'Besar',
+                    ]),
+                TextColumn::make('location')
+                    ->label('Alamat')
+                    ->limit(30),
+                TextColumn::make('telepon')
+                    ->label('Telepon'),
+                IconColumn::make('status')
+                    ->label('Status')
+                    ->boolean(),
             ])
             ->filters([
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make()
-            ])
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make()
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -100,8 +145,9 @@ class WarehouseResource extends Resource
     {
         return [
             'index' => Pages\ListWarehouses::route('/'),
-            // 'create' => Pages\CreateWarehouse::route('/create'),
-            // 'edit' => Pages\EditWarehouse::route('/{record}/edit'),
+            'create' => Pages\CreateWarehouse::route('/create'),
+            'view' => ViewWarehouse::route('/{record}'),
+            'edit' => Pages\EditWarehouse::route('/{record}/edit'),
         ];
     }
 }

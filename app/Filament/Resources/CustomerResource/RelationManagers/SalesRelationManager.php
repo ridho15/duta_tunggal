@@ -205,7 +205,7 @@ class SalesRelationManager extends RelationManager
             ->headerActions([])
             ->actions([
                 ViewAction::make()
-                ->color('primary')
+                    ->color('primary')
             ])
             ->bulkActions([]);
     }

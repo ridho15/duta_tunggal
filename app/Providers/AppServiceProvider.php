@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\ReturnProduct;
 use App\Models\StockMovement;
 use App\Observers\StockMovementObserver;
 use App\Services\DeliveryOrderItemService;

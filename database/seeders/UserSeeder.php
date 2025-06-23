@@ -17,8 +17,15 @@ class UserSeeder extends Seeder
         $user = User::updateOrCreate([
             'email' => 'ralamzah@gmail.com',
         ], [
+            'username' => 'ridho_al_amzah',
             'email' => 'ralamzah@gmail.com',
             'name' => 'Ridho Al Amzah',
+            'first_name' => 'Ridho',
+            'last_name' => 'Al Amzah',
+            'kode_user' => 'ridho',
+            'status' => true,
+            'posisi' => 'Pemilik',
+            'manage_type' => 'all',
             'password' => Hash::make('ridho123')
         ]);
 
@@ -26,38 +33,17 @@ class UserSeeder extends Seeder
             'email' => 'superadmin@gmail.com',
         ], [
             'email' => 'superadmin@gmail.com',
+            'username' => 'super_admin',
+            'manage_type' => 'all',
+            'first_name' => 'Super Admin',
+            'status' => true,
+            'kode_user' => 'super_admin',
+            'posisi' => 'Super Admin',
             'name' => 'Super Admin',
             'password' => Hash::make('superadmin')
         ]);
 
-        $admin = User::updateOrCreate([
-            'email' => 'admin@gmail.com',
-        ], [
-            'email' => 'admin@gmail.com',
-            'name' => 'Admin',
-            'password' => Hash::make('ridho123')
-        ]);
-
-        $gudang = User::updateOrCreate([
-            'email' => 'gudang@gmail.com',
-        ], [
-            'email' => 'gudang@gmail.com',
-            'name' => "Gudang",
-            'password' => Hash::make('ridho123')
-        ]);
-
-        $owner = User::updateOrCreate([
-            'email' => 'owner@gmail.com',
-        ], [
-            'email' => 'owner@gmail.com',
-            'name' => "Owner",
-            'password' => Hash::make('ridho123')
-        ]);
-
         $user->syncRoles(Role::where('name', 'Super Admin')->first());
         $superAdmin->syncRoles(Role::where('name', 'Super Admin')->first());
-        $gudang->assignRole('Gudang');
-        $owner->assignRole('Owner');
-        $admin->assignRole('Admin');
     }
 }

@@ -11,11 +11,19 @@ class ProductCategory extends Model
     use SoftDeletes, HasFactory;
     protected $table = 'product_categories';
     protected $fillable = [
-        'name'
+        'name',
+        'kode',
+        'cabang_id',
+        'kenaikan_harga',
     ];
 
     public function product()
     {
         return $this->hasMany(Product::class, 'product_category_id');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

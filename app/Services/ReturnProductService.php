@@ -18,4 +18,8 @@ class ReturnProductService
 
         return $returnProduct;
     }
+
+    public function createReturnProduct($fromModel, $data){
+        return $fromModel->returnProduct()->create($data);
+    }
 }

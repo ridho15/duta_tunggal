@@ -6,7 +6,10 @@ use App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\SalesRelationManager;
 use App\Models\Customer;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -16,6 +19,7 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
@@ -34,13 +38,35 @@ class CustomerResource extends Resource
             ->schema([
                 Fieldset::make('Form Customer')
                     ->schema([
+                        TextInput::make('code')
+                            ->label('Kode Customer')
+                            ->required()
+                            ->unique(ignoreRecord: true),
                         TextInput::make('name')
                             ->required()
+                            ->label('Nama Customer')
                             ->maxLength(255),
+                        TextInput::make('perusahaan')
+                            ->label('Perusahaan')
+                            ->required(),
+                        TextInput::make('nik_npwp')
+                            ->label('NIK / NPWP')
+                            ->required()
+                            ->numeric(),
                         TextInput::make('address')
+                            ->required()
+                            ->label('Alamat')
+                            ->maxLength(255),
+                        TextInput::make('telephone')
+                            ->label('Telepon')
+                            ->tel()
+                            ->placeholder('Contoh: 0211234567')
+                            ->regex('/^0[2-9][0-9]{1,3}[0-9]{5,8}$/')
+                            ->helperText('Hanya nomor telepon rumah/kantor, bukan nomor HP.')
                             ->required()
                             ->maxLength(255),
                         TextInput::make('phone')
+                            ->label('Handphone')
                             ->tel()
                             ->maxLength(15)
                             ->rules(['regex:/^08[0-9]{8,12}$/'])
@@ -50,6 +76,42 @@ class CustomerResource extends Resource
                             ->email()
                             ->required()
                             ->maxLength(255),
+                        TextInput::make('fax')
+                            ->label('Fax')
+                            ->required(),
+                        TextInput::make('tempo_kredit')
+                            ->numeric()
+                            ->label('Tempo Kredit (Hari)')
+                            ->helperText('Hari')
+                            ->required()
+                            ->default(0),
+                        TextInput::make('kredit_limit')
+                            ->label('Kredit Limit (Rp.)')
+                            ->default(0)
+                            ->required()
+                            ->numeric()
+                            ->prefix('Rp.'),
+                        Radio::make('tipe_pembayaran')
+                            ->label('Tipe Bayar Customer')
+                            ->inlineLabel()
+                            ->options([
+                                'Bebas' => 'Bebas',
+                                'COD (Bayar Lunas)' => 'COD (Bayar Lunas)',
+                                'Kredit' => 'Kredit (Bayar Kredit)'
+                            ])->required(),
+                        Radio::make('tipe')
+                            ->label('Tipe Customer')
+                            ->inlineLabel()
+                            ->options([
+                                'PKP' => 'PKP',
+                                'PRI' => 'PRI'
+                            ])
+                            ->required(),
+                        Checkbox::make('isSpecial')
+                            ->label('Spesial (Ya / Tidak)'),
+                        Textarea::make('keterangan')
+                            ->label('Keterangan')
+                            ->nullable(),
                     ])
             ]);
     }
@@ -58,14 +120,47 @@ class CustomerResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('code')
+                    ->searchable()
+                    ->label('Kode Customer')
+                    ->label('Code'),
                 TextColumn::make('name')
+                    ->label('Nama Customer')
+                    ->searchable(),
+                TextColumn::make('perusahaan')
+                    ->label('Nama Perusahaan')
+                    ->searchable(),
+                TextColumn::make('tipe')
+                    ->label('Tipe')
                     ->searchable(),
                 TextColumn::make('address')
+                    ->label('Alamat')
                     ->searchable(),
+                TextColumn::make('telephone')
+                    ->label('Telepon')
+                    ->searchable(),
+                IconColumn::make('isSpecial')
+                    ->label('Spesial')
+                    ->boolean(),
+                TextColumn::make('tempo_kredit')
+                    ->label('Tempo Kredit')
+                    ->formatStateUsing(function ($state) {
+                        return "{$state} hari";
+                    })
+                    ->sortable(),
+                TextColumn::make('tipe_pembayaran')
+                    ->label('Tipe Bayar'),
+                TextColumn::make('nik_npwp')
+                    ->label('NIK / NPWP')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('phone')
+                    ->label('Handphone')
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
                 TextColumn::make('email')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

@@ -19,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class UnitOfMeasureResource extends Resource
 {
@@ -28,6 +29,8 @@ class UnitOfMeasureResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
+    protected static ?string $modelLabel = 'Satuan';
+
     public static function form(Form $form): Form
     {
         return $form
@@ -36,8 +39,10 @@ class UnitOfMeasureResource extends Resource
                     ->schema([
                         TextInput::make('name')
                             ->required()
+                            ->label('Nama')
                             ->maxLength(255),
                         TextInput::make('abbreviation')
+                            ->label('Satuan')
                             ->required()
                             ->maxLength(255),
                     ])
@@ -49,8 +54,10 @@ class UnitOfMeasureResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
+                    ->label('Nama')
                     ->searchable(),
                 TextColumn::make('abbreviation')
+                    ->label('Satuan')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -71,7 +78,7 @@ class UnitOfMeasureResource extends Resource
             ->actions([
                 EditAction::make(),
                 DeleteAction::make()
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

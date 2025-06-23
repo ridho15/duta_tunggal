@@ -13,7 +13,7 @@ class Rak extends Model
     protected $fillable = [
         'name',
         'code',
-        'warehouse_id'
+        'warehouse_id' // Gudang
     ];
 
     public function warehouse()

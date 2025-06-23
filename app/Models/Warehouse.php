@@ -11,8 +11,14 @@ class Warehouse extends Model
     use SoftDeletes, HasFactory;
     protected $table = 'warehouses';
     protected $fillable = [
+        'kode',
         'name',
-        'location'
+        'cabang_id',
+        'location', // alamat
+        'telepon',
+        'tipe',
+        'status',
+        'warna_background',
     ];
 
     public function rak()
@@ -23,6 +29,11 @@ class Warehouse extends Model
     public function stockMovement()
     {
         return $this->hasMany(StockMovement::class, 'warehouse_id');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     protected static function booted()
