@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends Model
 {
-    use SoftDeletes, HasFactory;
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'invoices';
     protected $fillable = [
         'invoice_number',
@@ -19,7 +20,7 @@ class Invoice extends Model
         'tax',
         'other_fee',
         'total',
-        'enum' // darft, sent, paid, partially_paid, overdue
+        'status' // darft, sent, paid, partially_paid, overdue
     ];
 
     public function invoiceItem()

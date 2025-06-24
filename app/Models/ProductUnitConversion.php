@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductUnitConversion extends Model
 {
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'product_unit_conversions';
     protected $fillable = [
         'product_id',

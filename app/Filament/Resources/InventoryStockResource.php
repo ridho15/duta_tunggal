@@ -44,7 +44,7 @@ class InventoryStockResource extends Resource
                             })
                             ->required(),
                         Select::make('warehosue_id')
-                            ->label('Warehouse')
+                            ->label('Gudang')
                             ->preload()
                             ->searchable()
                             ->reactive()
@@ -86,9 +86,28 @@ class InventoryStockResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('warehouse.name')
-                    ->searchable()
-                    ->label('Warehouse'),
+                TextColumn::make('warehouse')
+                    ->label('Gudang')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('warehouse', function ($query) use ($search) {
+                            $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    }),
+                TextColumn::make('rak')
+                    ->label('Rak')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('rak', function (Builder $query) use ($search) {
+                            $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('qty_available')
                     ->label('Quantity Available')
                     ->numeric()
@@ -97,21 +116,6 @@ class InventoryStockResource extends Resource
                     ->label('Quantity Reserved')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('rak.name')
-                    ->label('Rak')
-                    ->searchable(),
             ])
             ->filters([
                 //

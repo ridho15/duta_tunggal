@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class QualityControl extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes,LogsGlobalActivity, HasFactory;
     protected $table = 'quality_controls';
     protected $fillable = [
         'purchase_receipt_item_id',

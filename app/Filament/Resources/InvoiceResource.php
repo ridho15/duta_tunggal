@@ -3,13 +3,19 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InvoiceResource\Pages;
+use App\Filament\Resources\InvoiceResource\Pages\ViewInvoice;
 use App\Models\Invoice;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
+use App\Models\SaleOrder;
 use App\Services\InvoiceService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -23,6 +29,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Str;
 
 class InvoiceResource extends Resource
 {
@@ -36,6 +43,69 @@ class InvoiceResource extends Resource
             ->schema([
                 Fieldset::make('Form Invoice')
                     ->schema([
+                        Section::make('Sumber Invoice')
+                            ->description('Silahkan Pilih Sumber Invoice')
+                            ->columns(2)
+                            ->schema([
+                                Radio::make('from_model_type')
+                                    ->label('From Type')
+                                    ->inlineLabel()
+                                    ->options([
+                                        'App\Models\PurchaseOrder' => 'Purchase Order',
+                                        'App\Models\SaleOrder' => 'Sale Order'
+                                    ])
+                                    ->reactive()
+                                    ->required(),
+                                Select::make('from_model_id')
+                                    ->label('From')
+                                    ->preload()
+                                    ->searchable()
+                                    ->reactive()
+                                    ->required()
+                                    ->options(function ($get) {
+                                        if ($get('from_model_type') == 'App\Models\PurchaseOrder') {
+                                            return PurchaseOrder::where('status', 'completed')->get()->pluck('po_number', 'id');
+                                        } elseif ($get('from_model_type') == 'App\Models\SaleOrder') {
+                                            return SaleOrder::where('status', 'completed')->get()->pluck('so_number', 'id');
+                                        }
+
+                                        return [];
+                                    })
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $items = [];
+                                        $total = 0;
+                                        if ($get('from_model_type') == 'App\Models\PurchaseOrder') {
+                                            $purchaseOrder = PurchaseOrder::find($state);
+                                            foreach ($purchaseOrder->purchaseOrderItem as $item) {
+                                                $price = $item->unit_price - $item->discount + $item->tax;
+                                                $subtotal = $price * $item->quantity;
+                                                array_push($items, [
+                                                    'product_id' => $item->product_id,
+                                                    'quantity' => $item->quantity,
+                                                    'price' => $price,
+                                                    'total' => $subtotal
+                                                ]);
+
+                                                $total += $subtotal;
+                                            }
+                                        } elseif ($get('from_model_type') == 'App\Models\SaleOrder') {
+                                            $saleOrder = SaleOrder::find($state);
+                                            foreach ($saleOrder->saleOrderItem as $item) {
+                                                $price = $item->unit_price - $item->discount + $item->tax;
+                                                $subtotal = $price * $item->quantity;
+                                                array_push($items, [
+                                                    'product_id' => $item->product_id,
+                                                    'quantity' => $item->quantity,
+                                                    'price' => $price,
+                                                    'total' => $subtotal
+                                                ]);
+                                            }
+                                        }
+
+                                        $set('invoiceItem', $items);
+                                        $set('subtotal', $total);
+                                    })
+                            ]),
                         TextInput::make('invoice_number')
                             ->label('Invoice Number')
                             ->required()
@@ -54,25 +124,44 @@ class InvoiceResource extends Resource
                         TextInput::make('subtotal')
                             ->required()
                             ->numeric()
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $total = $state + $get('tax') + $get('other_fee');
+                                $set('total', $total);
+                            })
                             ->prefix('Rp.')
                             ->default(0),
                         TextInput::make('tax')
                             ->required()
                             ->prefix('Rp.')
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $total = $get('subtotal') + $state + $get('other_fee');
+                                $set('total', $total);
+                            })
                             ->numeric()
                             ->default(0),
                         TextInput::make('other_fee')
                             ->required()
                             ->numeric()
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $total = $get('subtotal') + $get('tax') + $state;
+                                $set('total', $total);
+                            })
                             ->prefix('Rp.')
                             ->default(0),
                         TextInput::make('total')
                             ->required()
+                            ->prefix('Rp.')
+                            ->reactive()
                             ->numeric(),
                         Repeater::make('invoiceItem')
                             ->columnSpanFull()
                             ->relationship()
-                            ->columns(3)
+                            ->columns(4)
+                            ->defaultItems(0)
+                            ->reactive()
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
@@ -90,8 +179,17 @@ class InvoiceResource extends Resource
                                     ->default(0)
                                     ->required(),
                                 TextInput::make('price')
-                                    ->label('Price')
+                                    ->label('Price (Rp)')
+                                    ->prefix('Rp.')
+                                    ->default(0)
+                                    ->required()
+                                    ->numeric(),
+                                TextInput::make('total')
+                                    ->label('Total (Rp)')
                                     ->numeric()
+                                    ->default(0)
+                                    ->required()
+                                    ->prefix('Rp.')
                             ])
                     ])
             ]);
@@ -102,28 +200,54 @@ class InvoiceResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('invoice_number')
+                    ->label('Invoice Number')
                     ->searchable(),
-                TextColumn::make('from_model_type')
-                    ->searchable(),
-                TextColumn::make('from_model_id')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('invoice_date')
                     ->date()
+                    ->label('Invoice Date')
                     ->sortable(),
+                TextColumn::make('from_model_type')
+                    ->label('From')
+                    ->formatStateUsing(function ($state) {
+                        if ($state == 'App\Models\PurchaseOrder') {
+                            return 'Purchase Order';
+                        } elseif ($state == 'App\Models\SaleOrder') {
+                            return 'Sale Order';
+                        }
+
+                        return '-';
+                    }),
                 TextColumn::make('subtotal')
                     ->numeric()
+                    ->money('idr')
                     ->sortable(),
                 TextColumn::make('tax')
                     ->numeric()
+                    ->money('idr')
                     ->sortable(),
                 TextColumn::make('other_fee')
                     ->numeric()
+                    ->money('idr')
                     ->sortable(),
                 TextColumn::make('total')
                     ->numeric()
+                    ->money('idr')
                     ->sortable(),
-                TextColumn::make('status'),
+                TextColumn::make('status')
+                    ->badge()
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'draft' => 'gray',
+                            'sent' => 'warning',
+                            'paid' => 'success',
+                            'partially_paid' => 'primary',
+                            'overdue' => 'danger',
+                            default => '-'
+                        };
+                    })
+                    ->formatStateUsing(function ($state) {
+                        return Str::upper($state);
+                    }),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -148,7 +272,7 @@ class InvoiceResource extends Resource
                         ->color('success'),
                     DeleteAction::make()
                 ])
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -168,6 +292,7 @@ class InvoiceResource extends Resource
         return [
             'index' => Pages\ListInvoices::route('/'),
             'create' => Pages\CreateInvoice::route('/create'),
+            'view' => ViewInvoice::route('/{record}'),
             'edit' => Pages\EditInvoice::route('/{record}/edit'),
         ];
     }

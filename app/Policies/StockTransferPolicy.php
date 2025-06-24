@@ -13,7 +13,7 @@ class StockTransferPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->hasPermissionTo('view any stock transfer');
     }
 
     /**
@@ -21,7 +21,7 @@ class StockTransferPolicy
      */
     public function view(User $user, StockTransfer $stockTransfer): bool
     {
-        return false;
+        return $user->hasPermissionTo('view stock transfer');
     }
 
     /**
@@ -29,7 +29,7 @@ class StockTransferPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->hasPermissionTo('create stock transfer');
     }
 
     /**
@@ -37,7 +37,7 @@ class StockTransferPolicy
      */
     public function update(User $user, StockTransfer $stockTransfer): bool
     {
-        return false;
+        return $user->hasPermissionTo('update stock transfer');
     }
 
     /**
@@ -45,7 +45,7 @@ class StockTransferPolicy
      */
     public function delete(User $user, StockTransfer $stockTransfer): bool
     {
-        return false;
+        return $user->hasPermissionTo('delete stock transfer');
     }
 
     /**
@@ -53,7 +53,7 @@ class StockTransferPolicy
      */
     public function restore(User $user, StockTransfer $stockTransfer): bool
     {
-        return false;
+        return $user->hasPermissionTo('restore stock transfer');
     }
 
     /**
@@ -61,6 +61,6 @@ class StockTransferPolicy
      */
     public function forceDelete(User $user, StockTransfer $stockTransfer): bool
     {
-        return false;
+        return $user->hasPermissionTo('force-delete stock transfer');
     }
 }

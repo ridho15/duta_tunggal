@@ -6,10 +6,12 @@ use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\Pages\ViewPurchaseOrder;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PurchaseOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
+use App\Models\Invoice;
 use App\Models\OrderRequest;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
+use App\Services\InvoiceService;
 use App\Services\PurchaseOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -472,6 +474,51 @@ class PurchaseOrderResource extends Resource
                             $purchaseOrderService = app(PurchaseOrderService::class);
                             $purchaseOrderService->updateTotalAmount($record);
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total amount berhasil disinkronkan");
+                        }),
+                    Action::make('terbit_invoice')
+                        ->label('Terbitkan Invoice')
+                        ->visible(function ($record) {
+                            return $record->status == 'completed';
+                        })
+                        ->icon('heroicon-o-document-text')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->form([
+                            TextInput::make('invoice_number')
+                                ->label('Invoice Number')
+                                ->required()
+                                ->reactive()
+                                ->suffixAction(ActionsAction::make('generateInvoiceNumber')
+                                    ->icon('heroicon-m-arrow-path') // ikon reload
+                                    ->tooltip('Generate Invoice Number')
+                                    ->action(function ($set, $get, $state) {
+                                        $invoiceService = app(InvoiceService::class);
+                                        $set('invoice_number', $invoiceService->generateInvoiceNumber());
+                                    }))
+                                ->maxLength(255),
+                            DatePicker::make('invoice_date')
+                                ->required(),
+                            TextInput::make('tax')
+                                ->required()
+                                ->prefix('Rp.')
+                                ->numeric()
+                                ->default(0),
+                            TextInput::make('other_fee')
+                                ->required()
+                                ->numeric()
+                                ->prefix('Rp.')
+                                ->default(0),
+                        ])
+                        ->action(function (array $data, $record) {
+                            // Check invoice
+                            $invoice = Invoice::where('invoice_number', $data['invoice_number'])->first();
+                            if ($invoice) {
+                                HelperController::sendNotification(isSuccess: false, title: "Information", message: "Invoice number sudah digunakan");
+                                return;
+                            }
+                            $purchaseOrderService = app(PurchaseOrderService::class);
+                            $purchaseOrderService->generateInvoice($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Generate invoice berhasil");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

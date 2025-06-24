@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrderItem extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, SoftDeletes,LogsGlobalActivity;
     protected $table = 'purchase_order_items';
     protected $fillable = [
         'purchase_order_id',

@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeliveryOrderLog extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes,LogsGlobalActivity;
     protected $table = 'delivery_order_logs';
     protected $fillable = [
         'delivery_order_id',

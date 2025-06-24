@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseReceipt extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'purchase_receipts';
     protected $fillable = [
         'receipt_number',

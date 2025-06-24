@@ -6,6 +6,7 @@ use App\Filament\Resources\StockMovementResource\Pages;
 use App\Filament\Resources\StockMovementResource\RelationManagers;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Models\Warehouse;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
@@ -49,11 +50,14 @@ class StockMovementResource extends Resource
                             })
                             ->required(),
                         Select::make('warehouse_id')
-                            ->label('Warehouse')
+                            ->label('Gudang')
                             ->searchable()
                             ->preload()
                             ->reactive()
                             ->relationship('warehouse', 'name')
+                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                return "({$warehouse->kode}) {$warehouse->name}";
+                            })
                             ->required(),
                         Select::make('rak_id')
                             ->label('Rak')
@@ -106,12 +110,26 @@ class StockMovementResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('warehouse.name')
-                    ->label('Warehouse')
-                    ->searchable(),
-                TextColumn::make('rak.name')
+                TextColumn::make('warehouse')
+                    ->label('Gudang')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('warehouse', function ($query) use ($search) {
+                            $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    }),
+                TextColumn::make('rak')
                     ->label('Rak')
-                    ->searchable(),
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('rak', function ($query) use ($search) {
+                            return $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    }),
                 TextColumn::make('quantity')
                     ->numeric()
                     ->sortable(),

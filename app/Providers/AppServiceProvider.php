@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use App\Models\ReturnProduct;
 use App\Models\StockMovement;
+use App\Observers\GlobalActivityObserver;
 use App\Observers\StockMovementObserver;
 use App\Services\DeliveryOrderItemService;
 use App\Services\DeliveryOrderService;
@@ -19,6 +19,7 @@ use App\Services\QuotationService;
 use App\Services\ReturnProductService;
 use App\Services\SalesOrderService;
 use Barryvdh\Debugbar\Facades\Debugbar;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 

@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseReturnItem extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'purchase_return_items';
     protected $fillable = [
         'purchase_return_id',

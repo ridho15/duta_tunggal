@@ -279,6 +279,17 @@ class HelperController extends Controller
                 'update',
                 'delete',
                 'restore',
+                'force-delete',
+                'request',
+                'response'
+            ],
+            'stock transfer item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
                 'force-delete'
             ],
             'quotation' => [

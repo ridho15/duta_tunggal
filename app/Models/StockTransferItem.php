@@ -2,17 +2,23 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StockTransferItem extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'stock_transfer_items';
     protected $fillable = [
         'stock_transfer_id',
         'product_id',
-        'quantity'
+        'quantity',
+        'from_warehouse_id', // Gudang asal
+        'from_rak_id',
+        'to_warehouse_id', // Gudang Tujuan
+        'to_rak_id'
     ];
 
     public function stockTransfer()
@@ -23,5 +29,30 @@ class StockTransferItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
+    }
+
+    public function fromWarehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'from_warehouse_id')->withDefault();
+    }
+
+    public function fromRak()
+    {
+        return $this->belongsTo(Rak::class, 'from_rak_id')->withDefault();
+    }
+
+    public function toWarehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'to_warehouse_id')->withDefault();
+    }
+
+    public function toRak()
+    {
+        return $this->belongsTo(Rak::class, 'to_rak_id')->withDefault();
+    }
+
+    public function stockMovement()
+    {
+        return $this->morphOne(StockMovement::class, 'from_model')->withDefault();
     }
 }

@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrder extends Model
 {
-    use SoftDeletes, HasFactory;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'purchase_orders';
     protected $fillable = [
         'supplier_id',
@@ -77,6 +78,11 @@ class PurchaseOrder extends Model
     public function referModel()
     {
         return $this->morphTo(__FUNCTION__, 'refer_model_type', 'refer_model_id')->withDefault();
+    }
+
+    public function invoice()
+    {
+        return $this->morphMany(Invoice::class, 'from_model');
     }
 
     protected static function booted()

@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Listeners;
+
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+
+class LogLogout
+{
+    /**
+     * Create the event listener.
+     */
+    public function __construct()
+    {
+        //
+    }
+
+    /**
+     * Handle the event.
+     */
+    public function handle(object $event): void
+    {
+        activity()
+            ->causedBy($event->user)
+            ->withProperties([
+                'ip' => request()->ip(),
+            ])
+            ->log('User logout');
+    }
+}

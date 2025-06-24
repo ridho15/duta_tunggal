@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ReturnProductItem extends Model
 {
-    use SoftDeletes, HasFactory;
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'return_product_items';
     protected $fillable = [
         'return_product_id',

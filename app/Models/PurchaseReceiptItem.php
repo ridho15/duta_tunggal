@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\CssSelector\Node\FunctionNode;
 
 class PurchaseReceiptItem extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'purchase_receipt_items';
     protected $fillable = [
         'purchase_receipt_id',

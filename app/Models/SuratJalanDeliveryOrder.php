@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SuratJalanDeliveryOrder extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'surat_jalan_delivery_orders';
     protected $fillable = [
         'surat_jalan_id',

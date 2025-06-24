@@ -22,6 +22,38 @@ class PurchaseOrderService
 
     public function createPoFromSo($saleOrder) {}
 
+    public function generateInvoice($purchaseOrder, $data)
+    {
+        $subtotal = 0;
+        foreach ($purchaseOrder->purchaseOrderItem as $item) {
+            $subtotal += $item->quantity * $item->unit_price - $item->discount + $item->tax;
+        }
+
+        $total = $subtotal + $data['tax'] + $data['other_fee'];
+        $invoice = $purchaseOrder->invoice()->create([
+            'invoice_number' => $data['invoice_number'],
+            'invoice_date' => $data['invoice_date'],
+            'tax' => $data['tax'],
+            'other_fee' => $data['other_fee'],
+            'status' => 'draft',
+            'subtotal' => $subtotal,
+            'total' => $total
+        ]);
+
+        foreach ($purchaseOrder->purchaseOrderItem as $purchaseOrderItem) {
+            $price = $purchaseOrderItem->unit_price + $purchaseOrderItem->tax - $purchaseOrderItem->discount;
+            $total = $price * $purchaseOrderItem->quantity;
+            $invoice->invoiceItem()->create([
+                'product_id' => $purchaseOrderItem->product_id,
+                'quantity' => $purchaseOrderItem->quantity,
+                'price' => $price,
+                'total' => $total
+            ]);
+        }
+
+        return true;
+    }
+
     public function generatePoNumber()
     {
         $date = now()->format('Ymd');
