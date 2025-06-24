@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ManufacturingOrder extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $guarded = ['id'];
     protected $table = 'manufacturing_orders';
     protected $fillable = [
@@ -18,7 +18,8 @@ class ManufacturingOrder extends Model
         'quantity',
         'status', // draft, in_progress, completed
         'start_date',
-        'end_date'
+        'end_date',
+        'product_unit_conversions_id'
     ];
 
     public function product()
@@ -29,5 +30,10 @@ class ManufacturingOrder extends Model
     public function manufacturingOrderMaterial()
     {
         return $this->hasMany(manufacturingOrderMaterial::class, 'manufacturing_order_id');
+    }
+
+    public function productUnitConversion()
+    {
+        return $this->belongsTo(ProductUnitConversion::class, 'product_unit_conversions_id')->withDefault();
     }
 }

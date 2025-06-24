@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Production;
+
+class ProductionService
+{
+    public function generateProductionNumber()
+    {
+        $date = now()->format('Ymd');
+
+        // Hitung berapa PO pada hari ini
+        $last = Production::whereDate('created_at', now()->toDateString())
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $number = 1;
+
+        if ($last) {
+            // Ambil nomor urut terakhir
+            $lastNumber = intval(substr($last->invoice_number, -4));
+            $number = $lastNumber + 1;
+        }
+
+        return 'PRO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+    }
+}

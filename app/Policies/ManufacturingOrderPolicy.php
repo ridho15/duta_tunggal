@@ -61,6 +61,16 @@ class ManufacturingOrderPolicy
      */
     public function forceDelete(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
-        return $user->hasRole('Super Admin');
+        return $user->hasPermissionTo('force-delete manufacturing order');
+    }
+
+    public function response(User $user, ManufacturingOrder $manufacturingOrder): bool
+    {
+        return $user->hasPermissionTo('response manufacturing order');
+    }
+
+    public function request(User $user, ManufacturingOrder $manufacturingOrder): bool
+    {
+        return $user->hasPermissionTo('request manufacturing order');
     }
 }

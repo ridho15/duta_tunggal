@@ -10,6 +10,7 @@ use App\Services\DeliveryOrderService;
 use App\Services\InvoiceService;
 use App\Services\ManufacturingService;
 use App\Services\OrderRequestService;
+use App\Services\ProductionService;
 use App\Services\ProductService;
 use App\Services\PurchaseOrderService;
 use App\Services\PurchaseReceiptService;
@@ -71,6 +72,9 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->bind(InvoiceService::class, function ($app) {
             return new InvoiceService;
+        });
+        $this->app->bind(ProductionService::class, function ($app) {
+            return new ProductionService;
         });
     }
 

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class QualityControl extends Model
 {
-    use SoftDeletes,LogsGlobalActivity, HasFactory;
+    use SoftDeletes, LogsGlobalActivity, HasFactory;
     protected $table = 'quality_controls';
     protected $fillable = [
         'purchase_receipt_item_id',
@@ -23,6 +23,8 @@ class QualityControl extends Model
         'product_id',
         'date_send_stock',
         'rak_id',
+        'from_model_id',
+        'form_model_type',
     ];
 
     protected $appends = [
@@ -76,5 +78,10 @@ class QualityControl extends Model
     public function returnProductItem()
     {
         return $this->morphMany(ReturnProductItem::class, 'from_item_model');
+    }
+
+    public function fromModel()
+    {
+        return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
     }
 }

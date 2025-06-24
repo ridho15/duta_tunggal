@@ -4,11 +4,16 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\QualityControlResource\Pages;
 use App\Http\Controllers\HelperController;
+use App\Models\Production;
+use App\Models\PurchaseReceiptItem;
 use App\Models\QualityControl;
 use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\QualityControlService;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -39,6 +44,39 @@ class QualityControlResource extends Resource
             ->schema([
                 Fieldset::make('Form Quality Control')
                     ->schema([
+                        Section::make('From / Resource')
+                            ->description('Sumber Quality Control')
+                            ->columns(2)
+                            ->columnSpanFull()
+                            ->schema([
+                                Radio::make('from_model_type')
+                                    ->label('From Type')
+                                    ->options([
+                                        'App\Models\PurchaseReceiptItem' => 'Receipt Item',
+                                        'App\Models\Production' => 'Production'
+                                    ])
+                                    ->reactive()
+                                    ->inlineLabel()
+                                    ->required(),
+                                Select::make('form_model_id')
+                                    ->label('From')
+                                    ->preload()
+                                    ->searchable()
+                                    ->options(function ($set, $get, $state) {
+                                        if ($get('from_model_type') == 'App\Models\PurchaseReceiptItem') {
+                                            $items = [];
+                                            $listPurchaseReceiptItem = PurchaseReceiptItem::with(['purchaseReceipt.purchaseOrder'])->get();
+                                            foreach ($listPurchaseReceiptItem as $purchaseReceiptItem) {
+                                                $items[$purchaseReceiptItem->id] = $purchaseReceiptItem->purchaseReceipt->purchaseOrder->po_number;
+                                            }
+                                        } elseif ($get('from_model_type') == 'App\Models\Production') {
+                                            return Production::where('status', 'finished')->get()->pluck('production_number', 'id');
+                                        }
+
+                                        return [];
+                                    })
+                                    ->required()
+                            ]),
                         Select::make('warehouse_id')
                             ->required()
                             ->label('Gudang')
@@ -91,12 +129,17 @@ class QualityControlResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('warehouse.kode')
-                    ->label('Kode Gudang')
-                    ->searchable(),
-                TextColumn::make('warehouse.name')
-                    ->searchable()
-                    ->label('Gudang'),
+                TextColumn::make('warehouse')
+                    ->label('Gudang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('warehouse', function ($query) use ($search) {
+                            $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('purchaseReceiptItem.purchaseReceipt.purchaseOrder.po_number')
                     ->label('PO Number')
                     ->searchable(),
@@ -230,8 +273,8 @@ class QualityControlResource extends Resource
     {
         return [
             'index' => Pages\ListQualityControls::route('/'),
-            // 'create' => Pages\CreateQualityControl::route('/create'),
-            // 'edit' => Pages\EditQualityControl::route('/{record}/edit'),
+            'create' => Pages\CreateQualityControl::route('/create'),
+            'edit' => Pages\EditQualityControl::route('/{record}/edit'),
         ];
     }
 }

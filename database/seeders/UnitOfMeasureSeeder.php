@@ -13,6 +13,17 @@ class UnitOfMeasureSeeder extends Seeder
      */
     public function run(): void
     {
-        UnitOfMeasure::factory()->count(10)->create();
+        $units = [
+            ['name' => 'Piece', 'abbreviation' => 'pcs'],
+            ['name' => 'Kilogram', 'abbreviation' => 'kg'],
+            ['name' => 'Gram', 'abbreviation' => 'g'],
+            ['name' => 'Liter', 'abbreviation' => 'l'],
+            ['name' => 'Meter', 'abbreviation' => 'm'],
+            ['name' => 'Dozen', 'abbreviation' => 'doz'],
+        ];
+
+        foreach ($units as $unit) {
+            UnitOfMeasure::firstOrCreate(['name' => $unit['name']], $unit);
+        }
     }
 }

@@ -10,7 +10,7 @@ use Symfony\Component\CssSelector\Node\FunctionNode;
 
 class PurchaseReceiptItem extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'purchase_receipt_items';
     protected $fillable = [
         'purchase_receipt_id',

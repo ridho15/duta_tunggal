@@ -178,7 +178,9 @@ class HelperController extends Controller
                 'update',
                 'delete',
                 'restore',
-                'force-delete'
+                'force-delete',
+                'request',
+                'response'
             ],
             'manufacturing order item' => [
                 'view any',
@@ -187,7 +189,9 @@ class HelperController extends Controller
                 'update',
                 'delete',
                 'restore',
-                'force-delete'
+                'force-delete',
+                'request',
+                'response'
             ],
             'quality control' => [
                 'view any',
@@ -392,6 +396,15 @@ class HelperController extends Controller
                 'force-delete',
             ],
             'product unit conversion' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'production' => [
                 'view any',
                 'view',
                 'create',

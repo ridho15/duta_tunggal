@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Warehouse extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'warehouses';
     protected $fillable = [
         'kode',
@@ -35,6 +35,11 @@ class Warehouse extends Model
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    public function inventoryStock()
+    {
+        return $this->hasMany(InventoryStock::class, 'warehouse_id');
     }
 
     protected static function booted()

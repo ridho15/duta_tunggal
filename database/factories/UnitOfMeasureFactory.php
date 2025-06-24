@@ -16,17 +16,9 @@ class UnitOfMeasureFactory extends Factory
      */
     public function definition(): array
     {
-        $name = $this->faker->sentence();
-        $words = preg_split('/\s+/', trim($name));
-        $abbreviation = '';
-        foreach ($words as $word) {
-            if (ctype_alpha($word[0])) {
-                $abbreviation .= strtoupper($word[0]);
-            }
-        }
         return [
-            'name' => $name,
-            'abbreviation' => $abbreviation
+            'name' => $this->faker->randomElement(['Piece', 'Kilogram', 'Gram', 'Liter']),
+            'abbreviation' => $this->faker->randomElement(['pcs', 'kg', 'g', 'l']),
         ];
     }
 }

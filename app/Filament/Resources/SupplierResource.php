@@ -18,6 +18,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class SupplierResource extends Resource
 {
@@ -88,7 +89,7 @@ class SupplierResource extends Resource
                         ->color('success'),
                     DeleteAction::make(),
                 ])
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

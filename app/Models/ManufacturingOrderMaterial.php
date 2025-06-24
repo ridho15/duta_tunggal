@@ -9,14 +9,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ManufacturingOrderMaterial extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'manufacturing_order_materials';
     protected $fillable = [
         'manufacturing_order_id',
         'material_id',
         'qty_required',
         'qty_used',
-        'warehouse_id'
+        'warehouse_id',
+        'product_unit_conversions_id',
+        'rak_id'
     ];
 
     public function manufacturingOrder()
@@ -29,7 +31,18 @@ class ManufacturingOrderMaterial extends Model
         return $this->belongsTo(Product::class, 'material_id')->withDefault();
     }
 
-    public function warehouse(){
-        return $this->belongsTo(Warehouse::class,'warehouse_id')->withDefault();
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function productUnitConversion()
+    {
+        return $this->belongsTo(ProductUnitConversion::class, 'product_unit_conversions_id')->withDefault();
+    }
+
+    public function rak()
+    {
+        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
     }
 }
