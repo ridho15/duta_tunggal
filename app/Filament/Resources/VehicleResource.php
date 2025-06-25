@@ -4,22 +4,21 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\VehicleResource\RelationManagers\DeliveryOrderRelationManager;
 use App\Filament\Resources\VehicleResource\Pages;
-use App\Filament\Resources\VehicleResource\RelationManagers;
+use App\Filament\Resources\VehicleResource\Pages\ViewVehicle;
 use App\Models\Vehicle;
-use Filament\Forms;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class VehicleResource extends Resource
 {
@@ -75,9 +74,14 @@ class VehicleResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make()
-            ])
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make()
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
@@ -96,8 +100,9 @@ class VehicleResource extends Resource
     {
         return [
             'index' => Pages\ListVehicles::route('/'),
-            // 'create' => Pages\CreateVehicle::route('/create'),
-            // 'edit' => Pages\EditVehicle::route('/{record}/edit'),
+            'create' => Pages\CreateVehicle::route('/create'),
+            'view' => ViewVehicle::route('/{record}'),
+            'edit' => Pages\EditVehicle::route('/{record}/edit'),
         ];
     }
 }

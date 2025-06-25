@@ -19,7 +19,7 @@ class ProductionService
 
         if ($last) {
             // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->invoice_number, -4));
+            $lastNumber = intval(substr($last->production_number, -4));
             $number = $lastNumber + 1;
         }
 

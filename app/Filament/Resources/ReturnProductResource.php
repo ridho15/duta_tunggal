@@ -91,7 +91,7 @@ class ReturnProductResource extends Resource
                             })
                             ->preload(),
                         Select::make('warehouse_id')
-                            ->label('Warehouse')
+                            ->label('Gudang')
                             ->searchable()
                             ->preload()
                             ->relationship('warehouse', 'name')
@@ -235,13 +235,15 @@ class ReturnProductResource extends Resource
                         if ($record->from_model_type == 'App\Models\DeliveryOrder') {
                             return $record->fromModel->do_number;
                         } elseif ($record->from_model_type == 'App\Models\PurchaseReceipt') {
-                            $record->fromModel->receipt_number;
+                            return $record->fromModel->receipt_number;
+                        } elseif ($record->from_model_type == 'App\Models\QualityControl') {
+                            return $record->fromModel->qc_number;
                         }
 
                         return '-';
                     }),
                 TextColumn::make('warehouse.name')
-                    ->label('Warehouse')
+                    ->label('Gudang')
                     ->searchable(),
                 TextColumn::make('status')
                     ->formatStateUsing(function ($state) {

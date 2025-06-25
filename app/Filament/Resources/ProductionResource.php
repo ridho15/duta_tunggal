@@ -76,6 +76,19 @@ class ProductionResource extends Resource
                 TextColumn::make('manufacturingOrder.mo_number')
                     ->label('Manufacture Number')
                     ->searchable(),
+                TextColumn::make('manufacturingOrder.product')
+                    ->label('Product')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->sku}) {$state->name}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('manufacturingOrder', function ($query) use ($search) {
+                            $query->whereHas('product', function ($query) use ($search) {
+                                $query->where('sku', 'LIKE', '%' . $search . '%')
+                                    ->orWhere('name', 'LIKE', '%' . $search . '%');
+                            });
+                        });
+                    }),
                 TextColumn::make('production_date')
                     ->date()
                     ->sortable(),

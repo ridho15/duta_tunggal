@@ -32,7 +32,7 @@ class ReturnProduct extends Model
 
     public function fromModel()
     {
-        return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id');
+        return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
     }
 
     protected static function booted()

@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
 use App\Models\QualityControl;
-use App\Models\ReturnProduct;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -63,6 +62,13 @@ class QualityControlService
                     'qty_accepted' => $qualityControl->purchaseReceiptItem->qty_accepted - $qualityControl->rejected_quantity
                 ]);
             }
+        }
+
+        if ($qualityControl->from_model_type == 'App\Models\Production' && $qualityControl->passed_quantity >= $qualityControl->fromModel->manufacturingOrder->quantity) {
+            $qualityControl->fromModel->manufacturingOrder->update([
+                'status' => 'completed'
+            ]);
+            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing Completed");
         }
 
         $qualityControl->update([
