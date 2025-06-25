@@ -37,6 +37,8 @@ class InvoiceResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
+    protected static ?string $navigationGroup = 'Finance';
+
     public static function form(Form $form): Form
     {
         return $form
@@ -51,13 +53,21 @@ class InvoiceResource extends Resource
                                     ->label('From Type')
                                     ->inlineLabel()
                                     ->options([
-                                        'App\Models\PurchaseOrder' => 'Purchase Order',
-                                        'App\Models\SaleOrder' => 'Sale Order'
+                                        'App\Models\PurchaseOrder' => 'Pembelian',
+                                        'App\Models\SaleOrder' => 'Penjualan'
                                     ])
                                     ->reactive()
                                     ->required(),
                                 Select::make('from_model_id')
-                                    ->label('From')
+                                    ->label(function ($get) {
+                                        if ($get('from_model_type') == 'App\Models\PurchaseOrder') {
+                                            return 'Pilih PO';
+                                        } elseif ($get('from_model_type') == 'App\Models\SaleOrder') {
+                                            return 'Pilih SO';
+                                        }
+
+                                        return "Pilih";
+                                    })
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
@@ -120,6 +130,10 @@ class InvoiceResource extends Resource
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
                         DatePicker::make('invoice_date')
+                            ->label('Invoice Date')
+                            ->required(),
+                        DatePicker::make('due_date')
+                            ->label('Due Date')
                             ->required(),
                         TextInput::make('subtotal')
                             ->required()

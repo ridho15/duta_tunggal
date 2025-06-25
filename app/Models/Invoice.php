@@ -20,6 +20,7 @@ class Invoice extends Model
         'tax',
         'other_fee',
         'total',
+        'due_date',
         'status' // darft, sent, paid, partially_paid, overdue
     ];
 

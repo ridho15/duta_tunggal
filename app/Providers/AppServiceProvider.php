@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Invoice;
 use App\Models\StockMovement;
 use App\Observers\GlobalActivityObserver;
+use App\Observers\InvoiceObserver;
 use App\Observers\StockMovementObserver;
+use App\Services\ChartOfAccountService;
 use App\Services\DeliveryOrderItemService;
 use App\Services\DeliveryOrderService;
 use App\Services\InvoiceService;
@@ -76,6 +79,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ProductionService::class, function ($app) {
             return new ProductionService;
         });
+        $this->app->bind(ChartOfAccountService::class, function ($app) {
+            return new ChartOfAccountService;
+        });
     }
 
     /**
@@ -84,5 +90,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         StockMovement::observe(StockMovementObserver::class);
+        Invoice::observe(InvoiceObserver::class);
     }
 }
