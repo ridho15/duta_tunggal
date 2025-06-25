@@ -11,10 +11,28 @@ use Illuminate\Support\Facades\Auth;
 
 class QualityControlService
 {
+    public function generateQcNumber()
+    {
+        $date = now()->format('Ymd');
+
+        // Hitung berapa PO pada hari ini
+        $last = QualityControl::whereDate('created_at', now()->toDateString())
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $number = 1;
+
+        if ($last) {
+            // Ambil nomor urut terakhir
+            $lastNumber = intval(substr($last->qc_number, -4));
+            $number = $lastNumber + 1;
+        }
+
+        return 'QC-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+    }
     public function createQCFromPurchaseReceiptItem($purchaseReceiptItem, $data)
     {
-        return QualityControl::create([
-            'purchase_receipt_item_id' => $purchaseReceiptItem->id,
+        return $purchaseReceiptItem->qualityControl()->create([
             'passed_quantity' => $purchaseReceiptItem->qty_accepted,
             'rejected_quantity' => 0,
             'status' => 0,
@@ -40,9 +58,11 @@ class QualityControlService
                 'quantity' => $qualityControl->rejected_quantity,
             ]);
 
-            $qualityControl->purchaseReceiptItem->update([
-                'qty_accepted' => $qualityControl->purchaseReceiptItem->qty_accepted - $qualityControl->rejected_quantity
-            ]);
+            if ($qualityControl->from_model_type == 'App\Models\PurchaseReceiptItem') {
+                $qualityControl->purchaseReceiptItem->update([
+                    'qty_accepted' => $qualityControl->purchaseReceiptItem->qty_accepted - $qualityControl->rejected_quantity
+                ]);
+            }
         }
 
         $qualityControl->update([

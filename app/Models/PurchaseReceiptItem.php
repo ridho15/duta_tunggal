@@ -62,6 +62,6 @@ class PurchaseReceiptItem extends Model
 
     public function qualityControl()
     {
-        return $this->hasOne(QualityControl::class, 'purchase_receipt_item_id')->withDefault();
+        return $this->morphOne(QualityControl::class, 'from_model')->withDefault();
     }
 }

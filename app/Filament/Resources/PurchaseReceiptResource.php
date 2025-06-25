@@ -25,6 +25,7 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -223,17 +224,14 @@ class PurchaseReceiptResource extends Resource
                 TextColumn::make('other_cost')
                     ->money('idr')
                     ->sortable(),
-                TextColumn::make('status')
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    })->color(function ($state) {
-                        return match ($state) {
-                            'draft' => 'gray',
-                            'partial' => 'primary',
-                            'completed' => 'success'
-                        };
-                    })
-                    ->badge(),
+                SelectColumn::make('status')
+                    ->options(function () {
+                        return [
+                            'draft' => 'Draft',
+                            'partial' => 'Partial',
+                            'completed' => 'Completed'
+                        ];
+                    }),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

@@ -12,7 +12,7 @@ class QualityControl extends Model
     use SoftDeletes, LogsGlobalActivity, HasFactory;
     protected $table = 'quality_controls';
     protected $fillable = [
-        'purchase_receipt_item_id',
+        'qc_number',
         'inspected_by',
         'passed_quantity',
         'rejected_quantity',
@@ -24,7 +24,7 @@ class QualityControl extends Model
         'date_send_stock',
         'rak_id',
         'from_model_id',
-        'form_model_type',
+        'from_model_type',
     ];
 
     protected $appends = [
@@ -38,11 +38,6 @@ class QualityControl extends Model
         } else {
             return 'Belum diproses';
         }
-    }
-
-    public function purchaseReceiptItem()
-    {
-        return $this->belongsTo(PurchaseReceiptItem::class, 'purchase_receipt_item_id')->withDefault();
     }
 
     public function inspectedBy()

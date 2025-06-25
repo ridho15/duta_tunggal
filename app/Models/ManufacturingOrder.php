@@ -36,4 +36,9 @@ class ManufacturingOrder extends Model
     {
         return $this->belongsTo(ProductUnitConversion::class, 'product_unit_conversions_id')->withDefault();
     }
+
+    public function production()
+    {
+        return $this->hasOne(Production::class, 'manufacturing_order_id')->withDefault();
+    }
 }

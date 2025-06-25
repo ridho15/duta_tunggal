@@ -13,6 +13,7 @@ use App\Models\ReturnProduct;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Services\ReturnProductService;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -50,6 +51,14 @@ class ReturnProductResource extends Resource
                         TextInput::make('return_number')
                             ->label('Return Number')
                             ->required()
+                            ->reactive()
+                            ->prefixAction(ActionsAction::make('generateReturnNumber')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Return Number')
+                                ->action(function ($set, $get, $state) {
+                                    $returnProductService = app(ReturnProductService::class);
+                                    $set('return_number', $returnProductService->generateReturnNumber());
+                                }))
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
                         Radio::make('from_model_type')
