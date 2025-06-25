@@ -72,6 +72,11 @@ class VendorPaymentResource extends Resource
                             ->prefix('Rp.')
                             ->default(0)
                             ->numeric(),
+                        TextInput::make('diskon')
+                            ->label('Diskon')
+                            ->default(0)
+                            ->numeric()
+                            ->prefix('Rp'),
                         Textarea::make('notes')
                             ->label('Catatan')
                             ->string(),

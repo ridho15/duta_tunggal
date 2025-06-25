@@ -18,6 +18,7 @@ class VendorPayment extends Model
         'ntpn',
         'total_payment',
         'notes',
+        'diskon',
         'status', //'Draft', 'Partial', 'Paid'
 
     ];

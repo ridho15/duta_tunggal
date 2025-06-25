@@ -12,10 +12,14 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Tables\Enums\ActionsPosition;
 
 class ChartOfAccountResource extends Resource
 {
@@ -63,6 +67,8 @@ class ChartOfAccountResource extends Resource
                     ->default(1),
                 Select::make('parent_id')
                     ->label('Induk Akun')
+                    ->preload()
+                    ->searchable()
                     ->relationship('coaParent', 'code')
                     ->nullable(),
                 Toggle::make('is_active')
@@ -93,6 +99,9 @@ class ChartOfAccountResource extends Resource
                 IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean(),
+                TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -110,11 +119,12 @@ class ChartOfAccountResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
+                EditAction::make(),
+                DeleteAction::make(),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -130,8 +140,8 @@ class ChartOfAccountResource extends Resource
     {
         return [
             'index' => Pages\ListChartOfAccounts::route('/'),
-            'create' => Pages\CreateChartOfAccount::route('/create'),
-            'edit' => Pages\EditChartOfAccount::route('/{record}/edit'),
+            // 'create' => Pages\CreateChartOfAccount::route('/create'),
+            // 'edit' => Pages\EditChartOfAccount::route('/{record}/edit'),
         ];
     }
 }
