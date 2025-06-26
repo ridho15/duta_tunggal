@@ -3,7 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\VendorPaymentResource\Pages;
+use App\Http\Controllers\HelperController;
+use App\Models\Deposit;
 use App\Models\Invoice;
+use App\Models\Supplier;
 use App\Models\VendorPayment;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -48,6 +51,7 @@ class VendorPaymentResource extends Resource
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $invoice = Invoice::find($state);
                                 $set('supplier_id', $invoice->fromModel->supplier_id);
+                                $set('total_payment', $invoice->total);
                             })
                             ->relationship('invoice', 'invoice_number', function (Builder $query) {
                                 $query->where('from_model_type', 'App\Models\PurchaseOrder');
@@ -58,17 +62,22 @@ class VendorPaymentResource extends Resource
                             ->preload()
                             ->searchable()
                             ->reactive()
+                            ->validationMessages([
+                                'required' => 'Supplier belum dipilih'
+                            ])
+                            ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
+                                return "({$supplier->code}) {$supplier->name}";
+                            })
                             ->relationship('supplier', 'name')
-                            ->required(),
-                        DatePicker::make('payment_date')
-                            ->label('Payment Date')
                             ->required(),
                         TextInput::make('ntpn')
                             ->label('NTPN')
                             ->maxLength(255)
-                            ->default(null),
+                            ->required(),
                         TextInput::make('total_payment')
+                            ->label('Total Pembayaran')
                             ->required()
+                            ->reactive()
                             ->prefix('Rp.')
                             ->default(0)
                             ->numeric(),
@@ -80,16 +89,8 @@ class VendorPaymentResource extends Resource
                         Textarea::make('notes')
                             ->label('Catatan')
                             ->string(),
-                        Radio::make('status')
-                            ->label('Status')
-                            ->inline()
-                            ->options([
-                                'Draft' => 'Draft',
-                                'Partial' => 'Partial',
-                                'Paid' => 'Paid'
-                            ])
-                            ->required(),
                         Repeater::make('vendorPaymentDetail')
+                            ->label('Payment Detail')
                             ->relationship()
                             ->addAction(function (Action $action) {
                                 return $action->color('primary')
@@ -100,20 +101,42 @@ class VendorPaymentResource extends Resource
                             ->columns(2)
                             ->schema([
                                 TextInput::make('amount')
-                                    ->label('Amount')
+                                    ->label('Pembayaran')
                                     ->numeric()
+                                    ->validationMessages([
+                                        'numeric' => 'Pembayaran tidak valid !'
+                                    ])
                                     ->prefix('Rp')
                                     ->default(0),
                                 Select::make('coa_id')
                                     ->label('COA')
                                     ->preload()
+                                    ->validationMessages([
+                                        'required' => 'COA belum dipilih'
+                                    ])
                                     ->searchable()
                                     ->relationship('coa', 'code')
                                     ->required(),
+                                DatePicker::make('payment_date')
+                                    ->label('Tanggal Pembayaran')
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Tanggal pembayaran tidak boleh kosong'
+                                    ]),
                                 Radio::make('method')
                                     ->inline()
                                     ->label("Payment Method")
                                     ->required()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $supplier = Supplier::find($get('../../supplier_id'));
+                                        if ($supplier) {
+                                            $deposit = $supplier->deposit;
+                                            if (!$deposit) {
+                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
+                                                $set('method', null);
+                                            }
+                                        }
+                                    })
                                     ->options([
                                         'Cash' => 'Cash',
                                         'Bank Transfer' => 'Bank Transfer',
@@ -132,12 +155,17 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('invoice.invoice_number')
                     ->label('Invoice')
                     ->searchable(),
-                TextColumn::make('supplier.name')
+                TextColumn::make('supplier')
                     ->label('Supplier')
-                    ->searchable(),
-                TextColumn::make('payment_date')
-                    ->date()
-                    ->sortable(),
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('supplier', function ($query) use ($search) {
+                            $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('ntpn')
                     ->searchable(),
                 TextColumn::make('total_payment')

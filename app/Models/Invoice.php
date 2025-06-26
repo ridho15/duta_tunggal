@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'invoices';
     protected $fillable = [
         'invoice_number',
@@ -32,6 +32,11 @@ class Invoice extends Model
     public function fromModel()
     {
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
+    }
+
+    public function accountPayable()
+    {
+        return $this->hasOne(AccountPayable::class, 'invoice_id')->withDefault();
     }
 
     protected static function booted()

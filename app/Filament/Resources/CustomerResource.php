@@ -6,6 +6,8 @@ use App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\SalesRelationManager;
 use App\Models\Customer;
+use App\Services\CustomerService;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -41,6 +43,14 @@ class CustomerResource extends Resource
                         TextInput::make('code')
                             ->label('Kode Customer')
                             ->required()
+                            ->reactive()
+                            ->suffixAction(Action::make('generateCode')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Kode Customer')
+                                ->action(function ($set, $get, $state) {
+                                    $customerService = app(CustomerService::class);
+                                    $set('code', $customerService->generateCode());
+                                }))
                             ->validationMessages([
                                 'unique' => 'Kode customer sudah digunakan',
                                 'required' => 'Kode customer tidak boleh kosong',
@@ -77,6 +87,9 @@ class CustomerResource extends Resource
                         TextInput::make('telephone')
                             ->label('Telepon')
                             ->tel()
+                            ->validationMessages([
+                                'regex' => 'Telepon tidak valid !'
+                            ])
                             ->placeholder('Contoh: 0211234567')
                             ->regex('/^0[2-9][0-9]{1,3}[0-9]{5,8}$/')
                             ->helperText('Hanya nomor telepon rumah/kantor, bukan nomor HP.')
@@ -85,6 +98,10 @@ class CustomerResource extends Resource
                         TextInput::make('phone')
                             ->label('Handphone')
                             ->tel()
+                            ->validationMessages([
+                                'required' => 'Nomor handphone tidak boleh kosong',
+                                'regex' => 'Nomor handphone tidak valid !'
+                            ])
                             ->maxLength(15)
                             ->rules(['regex:/^08[0-9]{8,12}$/'])
                             ->required()

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Supplier extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'suppliers';
     protected $fillable = [
         'code',
@@ -22,5 +22,10 @@ class Supplier extends Model
     public function purchaseOrder()
     {
         return $this->hasMany(PurchaseOrder::class, 'supplier_id');
+    }
+
+    public function deposit()
+    {
+        return $this->morphOne(Deposit::class, 'from_model')->withDefault();
     }
 }

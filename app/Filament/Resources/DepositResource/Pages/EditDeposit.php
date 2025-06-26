@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Filament\Resources\VendorPaymentResource\Pages;
+namespace App\Filament\Resources\DepositResource\Pages;
 
-use App\Filament\Resources\VendorPaymentResource;
+use App\Filament\Resources\DepositResource;
 use Filament\Actions;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
-class EditVendorPayment extends EditRecord
+class EditDeposit extends EditRecord
 {
-    protected static string $resource = VendorPaymentResource::class;
+    protected static string $resource = DepositResource::class;
 
     protected function getHeaderActions(): array
     {

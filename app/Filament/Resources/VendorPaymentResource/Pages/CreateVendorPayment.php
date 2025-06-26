@@ -9,4 +9,10 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateVendorPayment extends CreateRecord
 {
     protected static string $resource = VendorPaymentResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $data['status'] = 'Draft';
+        return $data;
+    }
 }

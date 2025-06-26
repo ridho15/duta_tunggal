@@ -40,13 +40,16 @@ class AccountPayableResource extends Resource
                     ->relationship('supplier', 'name'),
                 TextInput::make('total')
                     ->required()
+                    ->prefix('Rp')
                     ->numeric(),
                 TextInput::make('paid')
                     ->required()
+                    ->prefix('Rp')
                     ->numeric()
                     ->default(0.00),
                 TextInput::make('remaining')
                     ->required()
+                    ->prefix('Rp')
                     ->numeric(),
                 TextInput::make('status')
                     ->required(),
@@ -60,7 +63,10 @@ class AccountPayableResource extends Resource
                 TextColumn::make('invoice.invoice_number')
                     ->label('Invoice')
                     ->searchable(),
-                TextColumn::make('supplier.name')
+                TextColumn::make('supplier')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    })
                     ->label('Supplier')
                     ->searchable(),
                 TextColumn::make('total')

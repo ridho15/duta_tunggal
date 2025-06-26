@@ -14,7 +14,6 @@ class VendorPayment extends Model
     protected $fillable = [
         'invoice_id',
         'supplier_id',
-        'payment_date',
         'ntpn',
         'total_payment',
         'notes',

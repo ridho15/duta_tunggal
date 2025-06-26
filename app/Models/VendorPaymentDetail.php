@@ -15,7 +15,8 @@ class VendorPaymentDetail extends Model
         'vendor_payment_id',
         'method',
         'amount',
-        'coa_id'
+        'coa_id',
+        'payment_date'
     ];
 
     public function vendorPayment()

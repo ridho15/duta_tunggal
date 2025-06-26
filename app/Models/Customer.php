@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'customers';
     protected $fillable = [
         'name',
@@ -45,5 +45,10 @@ class Customer extends Model
             });
         }
         return $query;
+    }
+
+    public function deposit()
+    {
+        return $this->morphOne(Deposit::class, 'from_model')->withDefault();
     }
 }
