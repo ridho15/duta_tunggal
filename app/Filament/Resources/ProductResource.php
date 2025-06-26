@@ -8,6 +8,7 @@ use App\Filament\Resources\ProductResource\RelationManagers\InventoryStockRelati
 use App\Filament\Resources\ProductResource\RelationManagers\StockMovementRelationManager;
 use App\Models\Cabang;
 use App\Models\Product;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -17,6 +18,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
@@ -213,6 +215,19 @@ class ProductResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
+                    Action::make('cetakLabel')
+                        ->label('Cetak Label / Print Barcode')
+                        ->color('success')
+                        ->icon('heroicon-o-printer')
+                        ->action(function ($record) {
+                            $pdf = Pdf::loadView('pdf.product-single-barcode', [
+                                'product' => $record
+                            ])->setPaper([0, 0, 300, 200]);
+
+                            return response()->streamDownload(function () use ($pdf) {
+                                echo $pdf->stream();
+                            }, 'Product_' . $record->sku . '.pdf');
+                        })
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

@@ -31,11 +31,19 @@ class ProductCategoryResource extends Resource
                 TextInput::make('name')
                     ->label('Nama Kategori')
                     ->maxLength(100)
+                    ->validationMessages([
+                        'required' => 'Nama kategori tidak boleh kosong',
+                        'max' => 'Nama kategori terlalu panjang'
+                    ])
                     ->required(),
                 TextInput::make('kode')
                     ->label('Kode Kategori')
                     ->maxLength(50)
                     ->unique(ignoreRecord: true)
+                    ->validationMessages([
+                        'requried' => "Kode Kategori tidak boleh kosong",
+                        'unique' => 'Kode Kategori sudah digunakan'
+                    ])
                     ->required(),
                 Select::make('cabang_id')
                     ->label('Cabang')
