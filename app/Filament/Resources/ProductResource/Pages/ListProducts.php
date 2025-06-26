@@ -226,10 +226,10 @@ class ListProducts extends ListRecords
                         $date = now()->format('Ymd');
                         if ($data['hasil_cetak'] == 'Excel') {
                             return Excel::download(new ProductExport($data), 'Product_' . $date . '.xlsx');
-                        } elseif ($data['hasil_cetak'] == 'pdf') {
-                            $listProduct = Product::with(['cabang', 'productCategory'])->where('cabang_id', $this->data['cabang_id'])
-                                ->where('id', '>=', $this->data['dari_product_id'])
-                                ->where('id', '<=', $this->data['sampai_product_id'])
+                        } elseif ($data['hasil_cetak'] == 'Pdf') {
+                            $listProduct = Product::with(['cabang', 'productCategory'])->where('cabang_id', $data['cabang_id'])
+                                ->where('id', '>=', $data['dari_product_id'])
+                                ->where('id', '<=', $data['sampai_product_id'])
                                 ->get();
                             $pdf = Pdf::loadView('pdf.product', [
                                 'listProduct' => $listProduct
@@ -239,7 +239,134 @@ class ListProducts extends ListRecords
                                 echo $pdf->stream();
                             }, 'Product_' . $date . '.pdf');
                         }
+                    }),
+                Action::make('printBarcode')
+                    ->label('Print Barcode')
+                    ->icon('heroicon-o-printer')
+                    ->color('success')
+                    ->form(function () {
+                        return [
+                            Fieldset::make('Print Barcode')
+                                ->columnSpanFull()
+                                ->columns(2)
+                                ->schema([
+                                    Select::make('dari_product_id')
+                                        ->label('Mulai dari Kode Produk')
+                                        ->preload()
+                                        ->reactive()
+                                        ->searchable(['sku', 'name'])
+                                        ->options(function ($get) {
+                                            return Product::get()->pluck('sku', 'id');
+                                        })
+                                        ->getOptionLabelFromRecordUsing(function (Product $product) {
+                                            return "({$product->sku}) {$product->name}";
+                                        })->required()
+                                        ->validationMessages([
+                                            'required' => 'Mulai dari Kode Produk belum dipilih'
+                                        ]),
+                                    Select::make('sampai_product_id')
+                                        ->label('Sampai Kode Produk')
+                                        ->preload()
+                                        ->reactive()
+                                        ->searchable(['sku', 'name'])
+                                        ->options(function ($get) {
+                                            return Product::get()->pluck('sku', 'id');
+                                        })
+                                        ->getOptionLabelFromRecordUsing(function (Product $product) {
+                                            return "({$product->sku}) {$product->name}";
+                                        })->required()
+                                        ->validationMessages([
+                                            'required' => 'Sampai Kode Produk belum dipilih'
+                                        ]),
+                                ])
+                        ];
                     })
+                    ->action(function (array $data) {
+                        $date = now()->format('Ymd');
+                        $listProduct = Product::where('id', '>=', $data['dari_product_id'])
+                            ->where('id', '<=', $data['sampai_product_id'])
+                            ->get();
+                        $pdf = Pdf::loadView('pdf.product-barcode', [
+                            'listProduct' => $listProduct
+                        ])->setPaper('A4', 'landscape');
+
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->stream();
+                        }, 'Product_Barcode' . $date . '.pdf');
+                    }),
+                Action::make('kalkulasiItemValue')
+                    ->label('Kalkulasi Item Value')
+                    ->icon('heroicon-o-calculator')
+                    ->color('warning')
+                    ->form(function () {
+                        return [
+                            Fieldset::make('Kalkulasi')
+                                ->columnSpanFull()
+                                ->columns(2)
+                                ->schema([
+                                    Select::make('cabang_id')
+                                        ->label('Cabang')
+                                        ->preload()
+                                        ->searchable()
+                                        ->required()
+                                        ->reactive()
+                                        ->validationMessages([
+                                            'required' => 'Cabang belum dipilih'
+                                        ])
+                                        ->relationship('cabang', 'id')
+                                        ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
+                                            return "({$cabang->kode}) {$cabang->nama}";
+                                        }),
+                                    Select::make('product_id')
+                                        ->label('Product')
+                                        ->preload()
+                                        ->reactive()
+                                        ->searchable()
+                                        ->afterStateUpdated(function ($set, $get, $state) {
+                                            $product = Product::find($state);
+                                            if ($product) {
+                                                $set('biaya', $product->biaya);
+                                                $set('tipe_pajak', $product->tipe_pajak);
+                                                $set('pajak', $product->pajak);
+                                                $set('item_value', $product->item_value);
+                                            }
+                                        })
+                                        ->options(function ($get) {
+                                            return Product::where('cabang_id', $get('cabang_id'))->get()->pluck('sku', 'id');
+                                        })
+                                        ->required(),
+                                    TextInput::make('biaya')
+                                        ->label('Biaya (Rp)')
+                                        ->prefix('Rp')
+                                        ->numeric()
+                                        ->required()
+                                        ->reactive()
+                                        ->default(0),
+                                    Radio::make('tipe_pajak')
+                                        ->label('Tipe Pajak')
+                                        ->reactive()
+                                        ->inline()
+                                        ->options([
+                                            'Non Pajak' => 'Non Pajak',
+                                            'Inklusif' => 'Inklusif',
+                                            'Eksklusif' => 'Eklusif'
+                                        ])
+                                        ->required(),
+                                    TextInput::make('pajak')
+                                        ->label('Pajak (%)')
+                                        ->numeric()
+                                        ->default(0)
+                                        ->suffix('%'),
+                                    TextInput::make('item_value')
+                                        ->label('Item Value (%)')
+                                        ->numeric()
+                                        ->default(0)
+                                        ->reactive()
+                                        ->prefix('Rp'),
+                                ])
+                        ];
+                    })
+                    ->action(function () {})
             ])->button()->label('Action')
         ];
     }

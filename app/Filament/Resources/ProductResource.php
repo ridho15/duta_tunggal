@@ -193,7 +193,9 @@ class ProductResource extends Resource
                 TextColumn::make('biaya')
                     ->money('idr')
                     ->label('Biaya (Rp)'),
-                TextColumn::make('item_value')->label('Item Value (Rp)'),
+                TextColumn::make('item_value')->label('Item Value (Rp)')
+                    ->money('idr')
+                    ->sortable(),
                 TextColumn::make('pajak')
                     ->label('Pajak (%)'),
                 TextColumn::make('tipe_pajak')

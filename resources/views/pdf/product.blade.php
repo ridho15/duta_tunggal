@@ -7,13 +7,15 @@
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 11px;
+            font-size: 9px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: auto;
+            table-layout: fixed;
+            /* ⬅️ penting agar kolom tidak melebar liar */
+            word-wrap: break-word;
         }
 
         th,
@@ -24,12 +26,17 @@
             vertical-align: top;
         }
 
+        tr {
+            page-break-inside: avoid;
+        }
+
         thead {
             background-color: #f2f2f2;
         }
 
         th {
             font-weight: bold;
+            background-color: #f0f0f0;
         }
 
         h2 {
@@ -86,7 +93,7 @@
                     {{ $unitConversion->nilai_konversi }} {{ $unitConversion->uom->name }}<br>
                     @endforeach
                 </td>
-                <td>{{ $product->description }}</td>
+                <td style="max-width: 120px; overflow: hidden;">{{ Str::limit($product->description, 200) }}</td>
             </tr>
             @endforeach
         </tbody>
