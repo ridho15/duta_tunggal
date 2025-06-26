@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Purchase Order - {{ $purchaseOrder->po_number }}</title>
+    <title>Pembelian - {{ $purchaseOrder->po_number }}</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -83,7 +83,7 @@
         </tr>
     </table>
 
-    <div class="title">PURCHASE ORDER</div>
+    <div class="title">PEMBELIAN</div>
 
     <table>
         <tr>

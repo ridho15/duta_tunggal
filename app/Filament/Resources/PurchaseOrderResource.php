@@ -558,7 +558,7 @@ class PurchaseOrderResource extends Resource
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
-                            }, 'Purchase_Order_' . $record->po_number . '.pdf');
+                            }, 'Pembelian_' . $record->po_number . '.pdf');
                         }),
                     Action::make('update_total_amount')
                         ->label('Sync Total Amount')

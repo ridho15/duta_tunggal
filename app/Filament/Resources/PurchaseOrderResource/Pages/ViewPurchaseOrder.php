@@ -88,7 +88,7 @@ class ViewPurchaseOrder extends ViewRecord
 
                     return response()->streamDownload(function () use ($pdf) {
                         echo $pdf->stream();
-                    }, 'Purchase_Order_' . $record->po_number . '.pdf');
+                    }, 'Pembelian_' . $record->po_number . '.pdf');
                 }),
         ];
     }

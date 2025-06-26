@@ -17,6 +17,8 @@ class EditPurchaseOrder extends EditRecord
 {
     protected static string $resource = PurchaseOrderResource::class;
 
+    protected static ?string $title = 'Ubah Pembelian';
+
     protected function getHeaderActions(): array
     {
         return [
@@ -90,7 +92,7 @@ class EditPurchaseOrder extends EditRecord
 
                     return response()->streamDownload(function () use ($pdf) {
                         echo $pdf->stream();
-                    }, 'Purchase_Order_' . $record->po_number . '.pdf');
+                    }, 'Pembelian_' . $record->po_number . '.pdf');
                 }),
         ];
     }
