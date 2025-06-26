@@ -167,16 +167,28 @@ class ProductResource extends Resource
                     ->label('Nama Produk')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('cabang.nama')
+                TextColumn::make('cabang')
                     ->label('Cabang')
                     ->sortable()
-                    ->searchable(),
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('sell_price')
                     ->sortable()
                     ->money('idr')
                     ->label('Harga Jual (Rp)'),
                 TextColumn::make('harga_batas')
                     ->label('Harga Batas (%)')
+                    ->sortable(),
+                TextColumn::make('cost_price')
+                    ->label('Cost Price (Rp)')
+                    ->money('idr')
                     ->sortable(),
                 TextColumn::make('biaya')
                     ->money('idr')

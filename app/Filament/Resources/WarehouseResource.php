@@ -4,7 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\WarehouseResource\Pages;
 use App\Filament\Resources\WarehouseResource\Pages\ViewWarehouse;
+use App\Models\Cabang;
 use App\Models\Warehouse;
+use App\Services\WarehouseService;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Fieldset;
@@ -46,17 +49,35 @@ class WarehouseResource extends Resource
                         TextInput::make('kode')
                             ->label('Kode')
                             ->maxLength(20)
+                            ->reactive()
                             ->unique(ignoreRecord: true)
+                            ->suffixAction(Action::make('generateKodeGudang')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Kode Gudang')
+                                ->action(function ($set, $get, $state) {
+                                    $warehouseService = app(WarehouseService::class);
+                                    $set('kode', $warehouseService->generateKodeGudang());
+                                }))
+                            ->validationMessages([
+                                'required' => 'Kode Gudang wajib diisi',
+                                'unique' => 'Kode gudang sudah digunakan'
+                            ])
                             ->required(),
                         TextInput::make('name')
                             ->label('Nama')
                             ->maxLength(100)
                             ->required(),
-                        Select::make('branch_id')
+                        Select::make('cabang_id')
                             ->label('Cabang')
                             ->preload()
-                            ->searchable()
+                            ->validationMessages([
+                                'required' => "Cabang wajib dipilih"
+                            ])
+                            ->searchable(['kode', 'nama'])
                             ->relationship('cabang', 'nama')
+                            ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
+                                return "({$cabang->kode}) {$cabang->nama}";
+                            })
                             ->required(),
                         Radio::make('tipe')
                             ->label('Tipe')

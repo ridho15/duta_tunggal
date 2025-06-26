@@ -22,6 +22,7 @@ use App\Services\QualityControlService;
 use App\Services\QuotationService;
 use App\Services\ReturnProductService;
 use App\Services\SalesOrderService;
+use App\Services\WarehouseService;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\AliasLoader;
@@ -81,6 +82,9 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->bind(ChartOfAccountService::class, function ($app) {
             return new ChartOfAccountService;
+        });
+        $this->app->bind(WarehouseService::class, function ($app) {
+            return new WarehouseService;
         });
     }
 

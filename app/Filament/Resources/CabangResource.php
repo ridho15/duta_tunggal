@@ -51,18 +51,35 @@ class CabangResource extends Resource
                             ->label('Kode')
                             ->unique(ignoreRecord: true)
                             ->maxLength(20)
+                            ->validationMessages([
+                                'required' => 'Kode Cabang tidak boleh kosong',
+                                'unique' => 'Kode cabang sudah digunakan'
+                            ])
                             ->required(),
                         TextInput::make('nama')
                             ->label('Nama')
                             ->maxLength(100)
+                            ->validationMessages([
+                                'required' => 'Nama Cabang tidak boleh kosong'
+                            ])
                             ->required(),
                         Textarea::make('alamat')
                             ->label('Alamat')
+                            ->validationMessages([
+                                'required' => 'Alamat tidak boleh kosong'
+                            ])
                             ->required(),
                         TextInput::make('telepon')
                             ->label('Telepon')
                             ->tel()
                             ->maxLength(15)
+                            ->validationMessages([
+                                'regex' => 'Nomor Telepon tidak valid !',
+                                'required' => 'Nomor telepon wajib diisi'
+                            ])
+                            ->validationMessages([
+                                'required' => 'Telepon tidak boleh kosong'
+                            ])
                             ->rules(['regex:/^08[0-9]{8,12}$/'])
                             ->required(),
                         TextInput::make('kenaikan_harga')
