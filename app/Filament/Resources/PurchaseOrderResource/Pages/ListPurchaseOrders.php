@@ -11,7 +11,7 @@ class ListPurchaseOrders extends ListRecords
 {
     protected static string $resource = PurchaseOrderResource::class;
 
-    protected static ?string $title = 'Purchase Order';
+    protected static ?string $title = 'Pembelian';
 
     protected function getHeaderActions(): array
     {

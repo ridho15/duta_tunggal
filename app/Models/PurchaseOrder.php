@@ -22,6 +22,8 @@ class PurchaseOrder extends Model
         'close_reason',
         'date_approved',
         'approved_by',
+        'warehouse_id',
+        'tempo_hutang', // hari
         'note',
         'close_requested_by',
         'close_requested_at',
@@ -32,8 +34,19 @@ class PurchaseOrder extends Model
         'completed_at',
         'created_by',
         'refer_model_type',
-        'refer_model_id'
+        'refer_model_id',
+        'delivery_date'
     ];
+
+    public function purchaseOrderCurrency()
+    {
+        return $this->hasMany(PurchaseOrderCurrency::class, 'purchase_order_id');
+    }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
 
     public function supplier()
     {

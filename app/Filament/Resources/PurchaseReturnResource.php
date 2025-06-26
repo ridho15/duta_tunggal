@@ -34,7 +34,7 @@ class PurchaseReturnResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up-on-square-stack';
 
-    protected static ?string $navigationGroup = 'Purchase Order';
+    protected static ?string $navigationGroup = 'Pembelian';
 
     public static function form(Form $form): Form
     {

@@ -12,6 +12,7 @@ class Supplier extends Model
     use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'suppliers';
     protected $fillable = [
+        'code',
         'name',
         'address',
         'phone',

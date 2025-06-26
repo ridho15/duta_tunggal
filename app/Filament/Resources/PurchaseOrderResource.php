@@ -6,11 +6,14 @@ use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\Pages\ViewPurchaseOrder;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PurchaseOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
+use App\Models\Currency;
 use App\Models\Invoice;
 use App\Models\OrderRequest;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
+use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Services\InvoiceService;
 use App\Services\PurchaseOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -18,6 +21,7 @@ use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
@@ -50,13 +54,17 @@ class PurchaseOrderResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Purchase Order';
+    protected static ?string $navigationGroup = 'Pembelian';
+
+    protected static ?string $navigationLabel = 'Pembelian';
+
+    protected static ?string $pluralModelLabel = 'Pembelian';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Fieldset::make('Form Purchase Order')
+                Fieldset::make('Form Pembelian')
                     ->schema([
                         Section::make('Reference')
                             ->description("Referensi untuk membuat PO, boleh di abaikan")
@@ -72,7 +80,15 @@ class PurchaseOrderResource extends Resource
                                     ])
                                     ->nullable(),
                                 Select::make('refer_model_id')
-                                    ->label('Refer From')
+                                    ->label(function ($get) {
+                                        if ($get('refer_model_type') == 'App\Models\SaleOrder') {
+                                            return 'Refer From Sales Order';
+                                        } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
+                                            return "Refer From Order Request";
+                                        }
+
+                                        return "Refer From";
+                                    })
                                     ->reactive()
                                     ->preload()
                                     ->searchable()
@@ -122,11 +138,19 @@ class PurchaseOrderResource extends Resource
                             ->label('Supplier')
                             ->preload()
                             ->relationship('supplier', 'name')
-                            ->searchable()
+                            ->searchable(['code', 'name'])
+                            ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
+                                return "({$supplier->code}) {$supplier->name}";
+                            })
                             ->required(),
                         TextInput::make('po_number')
                             ->required()
                             ->reactive()
+                            ->unique(ignoreRecord: true)
+                            ->validationMessages([
+                                'required' => 'PO Number tidak boleh kosong',
+                                'unique' => 'PO Number sudah digunakan'
+                            ])
                             ->suffixAction(
                                 ActionsAction::make('generatePoNumber')
                                     ->icon('heroicon-m-arrow-path') // ikon reload
@@ -138,16 +162,36 @@ class PurchaseOrderResource extends Resource
                             )
                             ->maxLength(255),
                         DatePicker::make('order_date')
+                            ->label('Tanggal Pembelian')
+                            ->validationMessages([
+                                'required' => 'Tanggal Pembelian tidak boleh kosong'
+                            ])
                             ->required(),
-                        DatePicker::make('expected_date'),
-                        TextInput::make('total_amount')
+                        DatePicker::make('delivery_date')
+                            ->label('Tanggal Pengiriman'),
+                        DatePicker::make('expected_date')
+                            ->label('Tanggal Diharapkan'),
+                        Select::make('warehouse_id')
+                            ->label('Gudang')
+                            ->preload()
+                            ->searchable(['name', 'kode'])
                             ->required()
-                            ->prefix('Rp.')
+                            ->validationMessages([
+                                'required' => 'Gudang belum dipilih',
+                            ])
+                            ->relationship('warehouse', 'nama')
+                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                return "({$warehouse->kode}) {$warehouse->name}";
+                            }),
+                        TextInput::make('tempo_hutang')
+                            ->label('Tempo Hutang (Hari)')
                             ->numeric()
-                            ->disabled()
-                            ->default(0),
+                            ->default(0)
+                            ->required()
+                            ->suffix('Hari'),
                         Textarea::make('note')
-                            ->label('Notes'),
+                            ->label('Keterangan')
+                            ->string(),
                         Toggle::make('is_asset')
                             ->label('Asset ?')
                             ->required(),
@@ -156,20 +200,8 @@ class PurchaseOrderResource extends Resource
                             ->columnSpanFull()
                             ->relationship()
                             ->columns(3)
+                            ->reactive()
                             ->defaultItems(0)
-                            ->afterStateUpdated(function (Get $get, $state, $livewire) {
-                                $purchaseOrder = $livewire->getRecord();
-                                $total_amount = 0;
-                                foreach ($state as $item) {
-                                    $total_amount += ($item['quantity'] * $item['unit_price']) - $item['discount'] + $item['tax'];
-                                }
-
-                                if ($purchaseOrder) {
-                                    $purchaseOrder->update([
-                                        'total_amount' => $total_amount
-                                    ]);
-                                }
-                            })
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
@@ -240,7 +272,44 @@ class PurchaseOrderResource extends Resource
                                         'promo' => 'Promo'
                                     ])
                                     ->default('default')
-                            ])
+                            ]),
+                        Repeater::make('purchaseOrderCurrency')
+                            ->label("Mata Uang")
+                            ->relationship()
+                            ->columnSpanFull()
+                            ->columns(2)
+                            ->schema([
+                                Select::make('currency_id')
+                                    ->label('Mata uang')
+                                    ->preload()
+                                    ->searchable()
+                                    ->reactive()
+                                    ->relationship('currency', 'name')
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Mata uang belum dipilih'
+                                    ]),
+                                TextInput::make('nominal')
+                                    ->label('Nominal')
+                                    ->reactive()
+                                    ->prefix(function ($get) {
+                                        $currency = Currency::find($get('currency_id'));
+                                        if ($currency) {
+                                            return $currency->symbol;
+                                        }
+
+                                        return null;
+                                    })
+                                    ->numeric(),
+                            ]),
+                        TextInput::make('total_amount')
+                            ->required()
+                            ->prefix('Rp.')
+                            ->numeric()
+                            ->readOnly()
+                            ->helperText("Untuk melihat total silahkan simpan data terlebih dahulu")
+                            ->default(0),
+
                     ])
             ]);
     }
@@ -252,14 +321,41 @@ class PurchaseOrderResource extends Resource
                 $query->orderByDesc('order_date');
             })
             ->columns([
-                TextColumn::make('supplier.name')
+                TextColumn::make('supplier')
                     ->label('Supplier')
-                    ->searchable(),
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('supplier', function ($query) use ($search) {
+                            $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    }),
                 TextColumn::make('po_number')
+                    ->label('PO Number')
                     ->searchable(),
+                TextColumn::make('warehouse')
+                    ->label('Gudang')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('warehouse', function (Builder $query) use ($search) {
+                            $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    }),
                 TextColumn::make('order_date')
                     ->date()
                     ->sortable(),
+                TextColumn::make('delivery_date')
+                    ->label('Tanggal Pengiriman')
+                    ->date()
+                    ->sortable(),
+                TextColumn::make('tempo_hutang')
+                    ->label('Tempo Hutang')
+                    ->sortable()
+                    ->suffix(' Hari'),
                 TextColumn::make('status')
                     ->label('Status PO')
                     ->formatStateUsing(function ($state) {
@@ -289,6 +385,7 @@ class PurchaseOrderResource extends Resource
                     })
                     ->badge(),
                 TextColumn::make('expected_date')
+                    ->label('Tanggal Diharapkan')
                     ->date()
                     ->sortable(),
                 TextColumn::make('total_amount')

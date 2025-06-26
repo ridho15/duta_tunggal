@@ -31,7 +31,7 @@ class PurchaseReceiptItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-chevron-up-down';
 
-    protected static ?string $navigationGroup = 'Purchase Order';
+    protected static ?string $navigationGroup = 'Pembelian';
 
     public static function form(Form $form): Form
     {
