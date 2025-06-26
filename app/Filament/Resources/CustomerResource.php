@@ -41,20 +41,37 @@ class CustomerResource extends Resource
                         TextInput::make('code')
                             ->label('Kode Customer')
                             ->required()
+                            ->validationMessages([
+                                'unique' => 'Kode customer sudah digunakan',
+                                'required' => 'Kode customer tidak boleh kosong',
+                            ])
                             ->unique(ignoreRecord: true),
                         TextInput::make('name')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Nama customer tidak boleh kosong',
+                            ])
                             ->label('Nama Customer')
                             ->maxLength(255),
                         TextInput::make('perusahaan')
                             ->label('Perusahaan')
+                            ->validationMessages([
+                                'required' => 'Perusahaan tidak boleh kosong',
+                            ])
                             ->required(),
                         TextInput::make('nik_npwp')
                             ->label('NIK / NPWP')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'NIK / NPWP tidak boleh kosong',
+                                'numeric' => 'NIK / NPWP tidak valid !'
+                            ])
                             ->numeric(),
                         TextInput::make('address')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Alamat tidak boleh kosong',
+                            ])
                             ->label('Alamat')
                             ->maxLength(255),
                         TextInput::make('telephone')

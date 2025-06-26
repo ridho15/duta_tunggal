@@ -39,16 +39,25 @@ class CurrencyResource extends Resource
                         TextInput::make('name')
                             ->label('Mata Uang')
                             ->required()
+                            ->validationMessages([
+                                'requried' => 'Mata uang tidak boleh osong'
+                            ])
                             ->maxLength(255),
                         TextInput::make('symbol')
                             ->maxLength(255)
                             ->default(null),
                         TextInput::make('code')
                             ->label('Kode')
+                            ->validationMessages([
+                                'max' => 'Kode terlalu panjang'
+                            ])
                             ->maxLength(255),
                         TextInput::make('to_rupiah')
                             ->label('Nilai')
                             ->required()
+                            ->validationMessages([
+                                'required' => "Nilai tidak boleh kosong"
+                            ])
                             ->prefix('Rp.')
                             ->numeric()
                             ->default(0),

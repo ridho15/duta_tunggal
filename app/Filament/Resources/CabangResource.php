@@ -77,9 +77,6 @@ class CabangResource extends Resource
                                 'regex' => 'Nomor Telepon tidak valid !',
                                 'required' => 'Nomor telepon wajib diisi'
                             ])
-                            ->validationMessages([
-                                'required' => 'Telepon tidak boleh kosong'
-                            ])
                             ->rules(['regex:/^08[0-9]{8,12}$/'])
                             ->required(),
                         TextInput::make('kenaikan_harga')
@@ -87,7 +84,11 @@ class CabangResource extends Resource
                             ->numeric()
                             ->default(0),
                         ColorPicker::make('warna_background')
-                            ->label('Warna Background'),
+                            ->label('Warna Background')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Warna belum dipilih'
+                            ]),
                         Radio::make('tipe_penjualan')
                             ->label('Tipe Penjualan')
                             ->inlineLabel()
@@ -96,10 +97,16 @@ class CabangResource extends Resource
                                 'Pajak' => 'Pajak',
                                 'Non Pajak' => 'Non Pajak',
                             ])
+                            ->validationMessages([
+                                'required' => 'Tipe penjualan belum dipilih'
+                            ])
                             ->default('Semua')
                             ->required(),
                         TextInput::make('kode_invoice_pajak')
                             ->label('Kode Invoice Pajak')
+                            ->validationMessages([
+                                'max' => 'Kode invoice pajak terlalu panjang'
+                            ])
                             ->maxLength(50),
                         TextInput::make('kode_invoice_non_pajak')
                             ->label('Kode Invoice Non Pajak')
