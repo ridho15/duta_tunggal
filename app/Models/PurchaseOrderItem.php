@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrderItem extends Model
 {
-    use SoftDeletes, SoftDeletes,LogsGlobalActivity;
+    use SoftDeletes, SoftDeletes, LogsGlobalActivity;
     protected $table = 'purchase_order_items';
     protected $fillable = [
         'purchase_order_id',
@@ -17,9 +17,10 @@ class PurchaseOrderItem extends Model
         'unit_price',
         'discount',
         'tax',
-        'opsi_harga', // default, negotiated, promo
+        'tipe_pajak', // Non Pajak, Inklusif, Eklusif
         'refer_item_model_id',
-        'refer_item_model_type'
+        'refer_item_model_type',
+        'currency_id'
     ];
 
     public function purchaseOrder()
@@ -40,5 +41,10 @@ class PurchaseOrderItem extends Model
     public function purchaseReceiptItem()
     {
         return $this->hasMany(PurchaseReceiptItem::class, 'purchase_order_item_id');
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 }

@@ -19,6 +19,7 @@ use App\Services\PurchaseOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Placeholder;
@@ -33,6 +34,7 @@ use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Resources\Resource;
+use Filament\Support\Enums\Alignment;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -196,11 +198,21 @@ class PurchaseOrderResource extends Resource
                             ->label('Asset ?')
                             ->required(),
                         Repeater::make('purchaseOrderItem')
-                            ->label('Order Item')
+                            ->label('Order Items')
                             ->columnSpanFull()
                             ->relationship()
+                            ->addActionAlignment(Alignment::Right)
                             ->columns(3)
                             ->reactive()
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
+                                $data['subtotal'] = static::getSubtotal($data);
+                                return $data;
+                            })
+                            ->addAction(function (ActionsAction $action) {
+                                return $action->color('primary')
+                                    ->icon('heroicon-o-plus-circle')
+                                    ->label('Tambah Order Items');
+                            })
                             ->defaultItems(0)
                             ->schema([
                                 Select::make('product_id')
@@ -216,16 +228,38 @@ class PurchaseOrderResource extends Resource
                                         $product = Product::find($state);
                                         $set('unit_price', $product->cost_price);
 
-                                        $subtotal = ($get('quantity') * $get('unit_price')) - $get('discount') + $get('tax');
+                                        $subtotal = static::getSubtotal([
+                                            'quantity' => $get('quantity'),
+                                            'unit_price' => $get('unit_price'),
+                                            'tax' => $get('tax'),
+                                            'discount' => $get('discount')
+                                        ]);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->required(),
+                                Select::make('currency_id')
+                                    ->label('Mata Uang')
+                                    ->preload()
+                                    ->searchable()
+                                    ->required()
+                                    ->relationship('currency', 'name')
+                                    ->getOptionLabelFromRecordUsing(function (Currency $currency) {
+                                        return "{$currency->name} ({$currency->symbol})";
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Mata uang belum dipilih'
+                                    ]),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = ($get('quantity') * $get('unit_price')) - $get('discount') + $get('tax');
+                                        $subtotal = static::getSubtotal([
+                                            'quantity' => $get('quantity'),
+                                            'unit_price' => $get('unit_price'),
+                                            'tax' => $get('tax'),
+                                            'discount' => $get('discount')
+                                        ]);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->numeric(),
@@ -233,7 +267,12 @@ class PurchaseOrderResource extends Resource
                                     ->label('Unit Price')
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = ($get('quantity') * $get('unit_price')) - $get('discount') + $get('tax');
+                                        $subtotal = static::getSubtotal([
+                                            'quantity' => $get('quantity'),
+                                            'unit_price' => $get('unit_price'),
+                                            'tax' => $get('tax'),
+                                            'discount' => $get('discount')
+                                        ]);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->prefix('Rp.')
@@ -242,7 +281,12 @@ class PurchaseOrderResource extends Resource
                                     ->label('Discount')
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = ($get('quantity') * $get('unit_price')) - $get('discount') + $get('tax');
+                                        $subtotal = static::getSubtotal([
+                                            'quantity' => $get('quantity'),
+                                            'unit_price' => $get('unit_price'),
+                                            'tax' => $get('tax'),
+                                            'discount' => $get('discount')
+                                        ]);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->prefix('Rp.')
@@ -251,7 +295,12 @@ class PurchaseOrderResource extends Resource
                                     ->label('Tax')
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = ($get('quantity') * $get('unit_price')) - $get('discount') + $get('tax');
+                                        $subtotal = static::getSubtotal([
+                                            'quantity' => $get('quantity'),
+                                            'unit_price' => $get('unit_price'),
+                                            'tax' => $get('tax'),
+                                            'discount' => $get('discount')
+                                        ]);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->prefix('Rp.')
@@ -260,22 +309,86 @@ class PurchaseOrderResource extends Resource
                                     ->label('Sub Total')
                                     ->reactive()
                                     ->prefix('Rp.')
+                                    ->default(0)
                                     ->readOnly(),
-                                Radio::make('opsi_harga')
-                                    ->label('Opsi Harga')
+                                Radio::make('tipe_pajak')
+                                    ->label('Tipe Pajak')
                                     ->inline()
                                     ->required()
-                                    ->columnSpanFull()
                                     ->options([
-                                        'default' => 'Default',
-                                        'negotiated' => 'Negotiated',
-                                        'promo' => 'Promo'
+                                        'Non Pajak' => 'Non Pajak',
+                                        'Inklusif' => 'Inklusif',
+                                        'Eklusif' => 'Eklusif'
                                     ])
                                     ->default('default')
                             ]),
+                        Repeater::make('purchaseOrderBiaya')
+                            ->columnSpanFull()
+                            ->relationship()
+                            ->addActionAlignment(Alignment::Right)
+                            ->addAction(function (ActionsAction $action) {
+                                return $action->color('primary')
+                                    ->icon('heroicon-o-plus-circle')
+                                    ->label('Tambah Biaya');
+                            })
+                            ->label('Biaya Lain')
+                            ->columns(5)
+                            ->schema([
+                                TextInput::make('nama_biaya')
+                                    ->label('Nama Biaya')
+                                    ->string()
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->validationMessages([
+                                        'required' => 'Nama biaya belum diisi',
+                                        'string' => 'Nama biaya tidak valid !',
+                                        'max' => 'Nama biaya terlalu panjang'
+                                    ]),
+                                Select::make('currency_id')
+                                    ->label('Mata Uang')
+                                    ->preload()
+                                    ->searchable()
+                                    ->relationship('currency', 'name')
+                                    ->required()
+                                    ->getOptionLabelFromRecordUsing(function (Currency $currency) {
+                                        return "{$currency->name} ({$currency->symbol})";
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Mata uang belum dipilih'
+                                    ]),
+                                TextInput::make('total')
+                                    ->label('Total')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Total tidak boleh kosong',
+                                        'numeric' => 'Total biaya tidak valid !',
+                                    ])
+                                    ->default(0),
+                                Radio::make('untuk_pembelian')
+                                    ->label('Untuk Pembelian')
+                                    ->options([
+                                        0 => 'Non Pajak',
+                                        1 => 'Pajak'
+                                    ])
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Tipe Pajak belum dipilih'
+                                    ]),
+                                Checkbox::make('masuk_invoice')
+                                    ->label('Masuk Invoice')
+                                    ->default(false),
+                            ]),
                         Repeater::make('purchaseOrderCurrency')
                             ->label("Mata Uang")
+                            ->addActionAlignment(Alignment::Right)
                             ->relationship()
+                            ->addAction(function (ActionsAction $action) {
+                                return $action->color('primary')
+                                    ->icon('heroicon-o-plus-circle')
+                                    ->label('Tambah Mata Uang');
+                            })
                             ->columnSpanFull()
                             ->columns(2)
                             ->schema([
@@ -286,6 +399,9 @@ class PurchaseOrderResource extends Resource
                                     ->reactive()
                                     ->relationship('currency', 'name')
                                     ->required()
+                                    ->getOptionLabelFromRecordUsing(function (Currency $currency) {
+                                        return "{$currency->name} ({$currency->symbol})";
+                                    })
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih'
                                     ]),
@@ -312,6 +428,11 @@ class PurchaseOrderResource extends Resource
 
                     ])
             ]);
+    }
+
+    public static function getSubtotal($data)
+    {
+        return ($data['quantity'] * $data['unit_price']) - $data['discount'] + $data['tax'];
     }
 
     public static function table(Table $table): Table

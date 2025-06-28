@@ -98,6 +98,11 @@ class PurchaseOrder extends Model
         return $this->morphMany(Invoice::class, 'from_model');
     }
 
+    public function purchaseOrderBiaya()
+    {
+        return $this->hasMany(PurchaseOrderBiaya::class, 'purchase_order_id');
+    }
+
     protected static function booted()
     {
         static::deleting(function ($purchaseOrder) {

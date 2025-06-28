@@ -102,4 +102,9 @@ class EditPurchaseOrder extends EditRecord
         $purchaseOrderService = app(PurchaseOrderService::class);
         $purchaseOrderService->updateTotalAmount($this->getRecord());
     }
+
+    protected function getSubmitFormAction(): Action
+    {
+        return $this->getSaveFormAction()->icon('heroicon-o-pencil-square')->color('warning');
+    }
 }

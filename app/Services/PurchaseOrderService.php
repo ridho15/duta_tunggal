@@ -13,6 +13,10 @@ class PurchaseOrderService
             $total += $item->quantity * $item->unit_price - $item->discount + $item->tax;
         }
 
+        foreach ($purchaseOrder->purchaseOrderBiaya as $item) {
+            $total += $item->total;
+        }
+
         $purchaseOrder->update([
             'total_amount' => $total
         ]);
