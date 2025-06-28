@@ -15,12 +15,17 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Validation\Rule;
 
 class ProductCategoryResource extends Resource
 {
     protected static ?string $model = ProductCategory::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+
+    protected static ?string $modelLabel = 'Kategori Produk';
+
+    protected static ?string $pluralModelLabel = 'Kategori Produk';
 
     protected static ?string $navigationGroup = 'Master Data';
 
@@ -39,7 +44,11 @@ class ProductCategoryResource extends Resource
                 TextInput::make('kode')
                     ->label('Kode Kategori')
                     ->maxLength(50)
-                    ->unique(ignoreRecord: true)
+                    ->unique(ignoreRecord: true, modifyRuleUsing: function ($record) {
+                        return Rule::unique('product_categories', 'kode')
+                            ->where('deleted_at', null)
+                            ->ignore($record?->id ?? null);
+                    })
                     ->validationMessages([
                         'requried' => "Kode Kategori tidak boleh kosong",
                         'unique' => 'Kode Kategori sudah digunakan'

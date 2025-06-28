@@ -38,6 +38,10 @@ class ProductResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
+    protected static ?string $modelLabel = 'Produk';
+
+    protected static ?string $pluralModelLabel = 'Produk';
+
     public static function form(Form $form): Form
     {
         return $form
