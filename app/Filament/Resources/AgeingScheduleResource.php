@@ -3,24 +3,21 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\AgeingScheduleResource\Pages;
-use App\Filament\Resources\AgeingScheduleResource\RelationManagers;
 use App\Models\AccountPayable;
 use App\Models\AgeingSchedule;
-use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Enums\ActionsPosition;
 
 class AgeingScheduleResource extends Resource
@@ -57,7 +54,17 @@ class AgeingScheduleResource extends Resource
                             ->required()
                             ->prefix("Days")
                             ->numeric(),
-                        TextInput::make('bucket')
+                        Radio::make('bucket')
+                            ->inline()
+                            ->options(function () {
+                                return [
+                                    'Current' => 'Current',
+                                    '31–60' => '31–60',
+                                    '61–90' => '61–90',
+                                    '>90' => '>90'
+                                ];
+                            })
+                            ->default('Current')
                             ->required(),
                     ])
             ]);
@@ -101,8 +108,13 @@ class AgeingScheduleResource extends Resource
             ])
             ->actionsColumnLabel('Action')
             ->actions([
-                ViewAction::make()
-                    ->color('primary')
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([]);
     }
@@ -118,8 +130,8 @@ class AgeingScheduleResource extends Resource
     {
         return [
             'index' => Pages\ListAgeingSchedules::route('/'),
-            // 'create' => Pages\CreateAgeingSchedule::route('/create'),
-            // 'edit' => Pages\EditAgeingSchedule::route('/{record}/edit'),
+            'create' => Pages\CreateAgeingSchedule::route('/create'),
+            'edit' => Pages\EditAgeingSchedule::route('/{record}/edit'),
         ];
     }
 }

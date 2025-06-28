@@ -16,7 +16,7 @@ class AgeingSchedule extends Model
         'invoice_date',
         'due_date',
         'days_outstanding',
-        'bucket'
+        'bucket' // 'Current','31–60','61–90','>90'
     ];
 
     public function accountPayable()

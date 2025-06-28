@@ -28,4 +28,9 @@ class VendorPaymentDetail extends Model
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
     }
+
+    public function depositLog()
+    {
+        return $this->morphMany(DepositLog::class, 'reference');
+    }
 }

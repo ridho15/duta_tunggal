@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AccountPayableResource\Pages;
 
 use App\Filament\Resources\AccountPayableResource;
 use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListAccountPayables extends ListRecords
@@ -12,6 +13,9 @@ class ListAccountPayables extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            CreateAction::make()
+                ->icon('heroicon-o-plus-circle')
+        ];
     }
 }

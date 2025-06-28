@@ -13,7 +13,7 @@ class DepositLog extends Model
     protected $table = 'deposit_logs';
     protected $fillable = [
         'deposit_id',
-        'type', // create, use, return, cancel
+        'type', // create, use, return, cancel, 'add
         'reference_type',
         'reference_id',
         'amount',
@@ -29,5 +29,10 @@ class DepositLog extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
+    }
+
+    public function reference()
+    {
+        return $this->morphTo(__FUNCTION__, 'reference_type', 'reference_id')->withDefault();
     }
 }

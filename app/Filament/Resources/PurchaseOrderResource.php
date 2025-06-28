@@ -772,6 +772,10 @@ class PurchaseOrderResource extends Resource
                                     }))
                                 ->maxLength(255),
                             DatePicker::make('invoice_date')
+                                ->label('Tanggal Invoice')
+                                ->required(),
+                            DatePicker::make('due_date')
+                                ->label('Tanggal Jatuh Tempo')
                                 ->required(),
                             TextInput::make('tax')
                                 ->required()

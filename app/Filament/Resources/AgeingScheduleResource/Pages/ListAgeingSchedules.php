@@ -6,6 +6,7 @@ use App\Filament\Resources\AgeingScheduleResource;
 use App\Models\AgeingSchedule;
 use Filament\Actions;
 use Filament\Actions\Action;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListAgeingSchedules extends ListRecords
@@ -21,7 +22,9 @@ class ListAgeingSchedules extends ListRecords
                 ->icon('heroicon-o-arrow-path')
                 ->action(function () {
                     $listAgeingSchedule = AgeingSchedule::get();
-                })
+                }),
+            CreateAction::make()
+                ->icon('heroicon-o-plus-circle')
         ];
     }
 }

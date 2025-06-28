@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AccountPayableResource\Pages;
 
 use App\Filament\Resources\AccountPayableResource;
 use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditAccountPayable extends EditRecord
@@ -13,7 +14,8 @@ class EditAccountPayable extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make()
+                ->icon('heroicon-o-trash'),
         ];
     }
 }

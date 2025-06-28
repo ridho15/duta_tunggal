@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\VendorPaymentResource\Pages;
 use App\Http\Controllers\HelperController;
+use App\Models\AccountPayable;
+use App\Models\ChartOfAccount;
 use App\Models\Deposit;
 use App\Models\Invoice;
 use App\Models\Supplier;
@@ -97,15 +99,48 @@ class VendorPaymentResource extends Resource
                                     ->icon('heroicon-o-plus-circle');
                             })
                             ->columnSpanFull()
+                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
+                                return $data;
+                            })
+                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
+                                return $data;
+                            })
                             ->addActionLabel('Tambah Pembayaran')
                             ->columns(2)
                             ->schema([
                                 TextInput::make('amount')
                                     ->label('Pembayaran')
                                     ->numeric()
+                                    ->reactive()
                                     ->validationMessages([
                                         'numeric' => 'Pembayaran tidak valid !'
                                     ])
+                                    ->afterStateUpdated(function ($get, $set, $state) {
+                                        if ($get('method') == 'Deposit') {
+                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
+                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
+                                            if (!$deposit) {
+                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
+                                                $set('method', null);
+                                            } else {
+                                                // Check saldo deposit
+                                                if ($get('amount') > $deposit->remaining_amount) {
+                                                    HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
+                                                    $set('amount', 0);
+                                                }
+                                            }
+                                        }
+
+                                        $accountPayable = AccountPayable::where('invoice_id', $get('../../invoice_id'))->first();
+                                        if ($accountPayable) {
+                                            if ($accountPayable->remaining < $state) {
+                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Pembayaran melebihi sisa pembayaran");
+                                                $set('amount', 0);
+                                            }
+                                        } else {
+                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Account payable tidak ditemukan !");
+                                        }
+                                    })
                                     ->prefix('Rp')
                                     ->default(0),
                                 Select::make('coa_id')
@@ -114,8 +149,11 @@ class VendorPaymentResource extends Resource
                                     ->validationMessages([
                                         'required' => 'COA belum dipilih'
                                     ])
-                                    ->searchable()
+                                    ->searchable(['code', 'name'])
                                     ->relationship('coa', 'code')
+                                    ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
+                                        return "({$chartOfAccount->code}) {$chartOfAccount->name}";
+                                    })
                                     ->required(),
                                 DatePicker::make('payment_date')
                                     ->label('Tanggal Pembayaran')
@@ -127,13 +165,32 @@ class VendorPaymentResource extends Resource
                                     ->inline()
                                     ->label("Payment Method")
                                     ->required()
+                                    ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'Payment method belum dipilih'
+                                    ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $supplier = Supplier::find($get('../../supplier_id'));
-                                        if ($supplier) {
-                                            $deposit = $supplier->deposit;
+                                        if ($state == 'Deposit') {
+                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
+                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
                                             if (!$deposit) {
                                                 HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
                                                 $set('method', null);
+                                            } else {
+                                                // Check saldo deposit
+                                                if ($get('amount') > $deposit->remaining_amount) {
+                                                    HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
+                                                    $set('amount', 0);
+                                                }
+                                            }
+                                        }
+                                    })
+                                    ->helperText(function ($get) {
+                                        if ($get('method') == 'Deposit') {
+                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
+                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
+                                            if ($deposit) {
+                                                return "Saldo : Rp." . number_format($deposit->remaining_amount, 0, ',', '.');
                                             }
                                         }
                                     })

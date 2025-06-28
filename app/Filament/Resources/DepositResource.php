@@ -7,13 +7,16 @@ use App\Filament\Resources\DepositResource\Pages\ViewDeposit;
 use App\Filament\Resources\DepositResource\Pages\ViewDepositLog;
 use App\Filament\Resources\DepositResource\RelationManagers;
 use App\Filament\Resources\DepositResource\RelationManagers\DepositLogRelationManager;
+use App\Http\Controllers\HelperController;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\Deposit;
+use App\Models\DepositLog;
 use App\Models\Supplier;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -22,6 +25,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
@@ -32,9 +36,8 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Enums\ActionsPosition;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class DepositResource extends Resource
 {
@@ -65,6 +68,7 @@ class DepositResource extends Resource
                                     ])->label('From'),
                                 Select::make('from_model_id')
                                     ->required()
+                                    ->searchable()
                                     ->options(function ($get) {
                                         if ($get('from_model_type') == 'App\Models\Supplier') {
                                             return Supplier::get()->pluck('code', 'id');
@@ -74,7 +78,6 @@ class DepositResource extends Resource
 
                                         return [];
                                     })->preload()
-                                    ->searchable()
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "({$record->code}) {$record->name}";
                                     })
@@ -204,7 +207,46 @@ class DepositResource extends Resource
                         ->color('primary'),
                     EditAction::make()
                         ->color('success'),
-                    DeleteAction::make()
+                    DeleteAction::make(),
+                    Action::make('tambahSaldo')
+                        ->label('Tambah Saldo')
+                        ->icon('heroicon-o-plus-circle')
+                        ->color('success')
+                        ->modal()
+                        ->modalSubmitActionLabel("Tambah Saldo")
+                        ->form(function () {
+                            return [
+                                Grid::make(2)
+                                    ->schema([
+                                        TextInput::make('amount')
+                                            ->label('Total')
+                                            ->prefix('Rp')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Total tidak boleh kosong'
+                                            ]),
+                                        Textarea::make('note')
+                                            ->label('Catatan')
+                                            ->string()
+                                            ->nullable(),
+                                    ])
+                            ];
+                        })
+                        ->action(function (array $data, $record) {
+                            $record->amount += $data['amount'];
+                            $record->remaining_amount += $data['amount'];
+                            $record->save();
+                            $record->depositLogRef()->create([
+                                'deposit_id' => $record->id,
+                                'type' => 'add',
+                                'amount' => $data['amount'],
+                                'note' => $data['note'],
+                                'created_by' => Auth::user()->id
+                            ]);
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil di tambahkan");
+                        })
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

@@ -17,7 +17,7 @@ class AccountPayable extends Model
         'total',
         'paid',
         'remaining',
-        'status'
+        'status' //Lunas / Belum Lunas
     ];
 
     public function invoice()
@@ -28,5 +28,10 @@ class AccountPayable extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
+    }
+
+    public function ageingSchedule()
+    {
+        return $this->hasOne(AgeingSchedule::class, 'account_payable_id')->withDefault();
     }
 }

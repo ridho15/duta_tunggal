@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\DepositResource\RelationManagers;
 
 use Filament\Forms;
+use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -34,6 +35,10 @@ class DepositLogRelationManager extends RelationManager
                             return "Customer";
                         } elseif ($state == 'App\Models\Supplier') {
                             return 'Supplier';
+                        } elseif ($state == 'App\Models\Deposit') {
+                            return "Deposit";
+                        } elseif ($state == 'App\Models\VendorPaymentDetail') {
+                            return "Payment";
                         }
 
                         return '-';
@@ -45,13 +50,14 @@ class DepositLogRelationManager extends RelationManager
                         return match ($state) {
                             'create' => 'primary',
                             'use' => 'success',
+                            'add' => 'primary',
                             'return' => 'warning',
                             'cancel' => 'danger'
                         };
                     })->formatStateUsing(function ($state) {
                         return Str::upper($state);
                     }),
-                TextColumn::make('Amount')
+                TextColumn::make('amount')
                     ->label('Amount')
                     ->sortable()
                     ->money('idr'),

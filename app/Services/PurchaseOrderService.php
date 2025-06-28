@@ -42,6 +42,7 @@ class PurchaseOrderService
             'invoice_date' => $data['invoice_date'],
             'tax' => $data['tax'],
             'other_fee' => $data['other_fee'],
+            'due_date' => $data['due_date'],
             'status' => 'draft',
             'subtotal' => $subtotal,
             'total' => $total

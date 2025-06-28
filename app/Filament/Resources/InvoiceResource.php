@@ -12,7 +12,6 @@ use App\Services\InvoiceService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
@@ -29,6 +28,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class InvoiceResource extends Resource
@@ -221,15 +221,26 @@ class InvoiceResource extends Resource
                     ->label('Invoice Date')
                     ->sortable(),
                 TextColumn::make('from_model_type')
-                    ->label('From')
+                    ->label('Pembelian / Penjualan')
                     ->formatStateUsing(function ($state) {
                         if ($state == 'App\Models\PurchaseOrder') {
-                            return 'Purchase Order';
+                            return 'Pembelian';
                         } elseif ($state == 'App\Models\SaleOrder') {
-                            return 'Sale Order';
+                            return 'Penjualan';
                         }
 
                         return '-';
+                    }),
+                TextColumn::make('fromModel')
+                    ->label("Number Pembelian / Penjualan")
+                    ->formatStateUsing(function ($record) {
+                        if ($record->from_model_type == 'App\Models\PurchaseOrder') {
+                            return $record->fromModel->po_number;
+                        } elseif ($record->from_model_type == 'App\Models\SaleOrder') {
+                            return $record->fromModel->so_number;
+                        }
+
+                        return null;
                     }),
                 TextColumn::make('subtotal')
                     ->numeric()
@@ -299,6 +310,11 @@ class InvoiceResource extends Resource
         return [
             //
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->orderBy('invoice_date', 'DESC');
     }
 
     public static function getPages(): array

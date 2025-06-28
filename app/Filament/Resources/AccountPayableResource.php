@@ -4,15 +4,23 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AccountPayableResource\Pages;
 use App\Models\AccountPayable;
+use App\Models\Supplier;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
 
 class AccountPayableResource extends Resource
 {
@@ -26,33 +34,39 @@ class AccountPayableResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('invoice_id')
-                    ->required()
-                    ->preload()
-                    ->searchable()
-                    ->label('Invoice')
-                    ->relationship('invoice', 'invoice_number'),
-                Select::make('supplier_id')
-                    ->label('Supplier')
-                    ->preload()
-                    ->searchable()
-                    ->required()
-                    ->relationship('supplier', 'name'),
-                TextInput::make('total')
-                    ->required()
-                    ->prefix('Rp')
-                    ->numeric(),
-                TextInput::make('paid')
-                    ->required()
-                    ->prefix('Rp')
-                    ->numeric()
-                    ->default(0.00),
-                TextInput::make('remaining')
-                    ->required()
-                    ->prefix('Rp')
-                    ->numeric(),
-                TextInput::make('status')
-                    ->required(),
+                Fieldset::make('Account Payable')
+                    ->schema([
+                        Select::make('invoice_id')
+                            ->required()
+                            ->preload()
+                            ->searchable()
+                            ->label('Invoice')
+                            ->relationship('invoice', 'invoice_number'),
+                        Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->preload()
+                            ->searchable(['name', 'code'])
+                            ->required()
+                            ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
+                                return "({$supplier->code}) {$supplier->name}";
+                            })
+                            ->relationship('supplier', 'name'),
+                        TextInput::make('total')
+                            ->required()
+                            ->prefix('Rp')
+                            ->numeric(),
+                        TextInput::make('paid')
+                            ->required()
+                            ->prefix('Rp')
+                            ->numeric()
+                            ->default(0.00),
+                        TextInput::make('remaining')
+                            ->required()
+                            ->prefix('Rp')
+                            ->numeric(),
+                        Checkbox::make('status')
+                            ->label('Lunas / Belum Lunas')
+                    ])
             ]);
     }
 
@@ -110,8 +124,13 @@ class AccountPayableResource extends Resource
                 //
             ])
             ->actions([
-                ViewAction::make()
-                    ->color('primary')
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([]);
     }
@@ -123,12 +142,17 @@ class AccountPayableResource extends Resource
         ];
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->orderBy('created_at', 'DESC');
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListAccountPayables::route('/'),
-            // 'create' => Pages\CreateAccountPayable::route('/create'),
-            // 'edit' => Pages\EditAccountPayable::route('/{record}/edit'),
+            'create' => Pages\CreateAccountPayable::route('/create'),
+            'edit' => Pages\EditAccountPayable::route('/{record}/edit'),
         ];
     }
 }

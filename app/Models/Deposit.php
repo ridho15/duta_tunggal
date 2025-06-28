@@ -42,4 +42,24 @@ class Deposit extends Model
     {
         return $this->hasMany(DepositLog::class, 'deposit_id');
     }
+
+    public function depositLogRef()
+    {
+        return $this->morphMany(DepositLog::class, 'reference');
+    }
+
+    protected static function booted()
+    {
+        static::deleting(function ($deposit) {
+            if ($deposit->isForceDeleting()) {
+                $deposit->depositLog()->forceDelete();
+            } else {
+                $deposit->depositLog()->delete();
+            }
+        });
+
+        static::restoring(function ($deposit) {
+            $deposit->depositLog()->withTrashed()->restore();
+        });
+    }
 }

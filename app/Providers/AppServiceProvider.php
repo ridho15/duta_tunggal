@@ -2,9 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\Deposit;
+use App\Models\DepositLog;
 use App\Models\Invoice;
 use App\Models\StockMovement;
 use App\Models\VendorPaymentDetail;
+use App\Observers\DepositLogObserser;
+use App\Observers\DepositObserver;
 use App\Observers\GlobalActivityObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\StockMovementObserver;
@@ -110,5 +114,7 @@ class AppServiceProvider extends ServiceProvider
         StockMovement::observe(StockMovementObserver::class);
         Invoice::observe(InvoiceObserver::class);
         VendorPaymentDetail::observe(VendorPaymentDetailObserver::class);
+        Deposit::observe(DepositObserver::class);
+        DepositLog::observe(DepositLogObserser::class);
     }
 }
