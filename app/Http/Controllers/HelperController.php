@@ -485,6 +485,15 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'purchase order biaya' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
         ];
 
         return $listPermissions;
