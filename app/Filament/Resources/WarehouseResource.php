@@ -29,6 +29,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
 
 class WarehouseResource extends Resource
 {
@@ -65,6 +66,10 @@ class WarehouseResource extends Resource
                             ->required(),
                         TextInput::make('name')
                             ->label('Nama')
+                            ->validationMessages([
+                                'required' => 'Nama gudang tidak boleh kosong',
+                                'max' => 'Nama gudang terlalu panjang'
+                            ])
                             ->maxLength(100)
                             ->required(),
                         Select::make('cabang_id')
@@ -86,13 +91,28 @@ class WarehouseResource extends Resource
                                 'Kecil' => 'Kecil',
                                 'Besar' => 'Besar',
                             ])
+                            ->validationMessages([
+                                'required' => 'Tipe gudang belum dipilih'
+                            ])
                             ->default('Kecil')
                             ->required(),
                         Textarea::make('location')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Alamat wajib diisi'
+                            ])
                             ->label('Alamat'),
                         TextInput::make('telepon')
+                            ->tel()
                             ->label('Telepon')
-                            ->maxLength(20),
+                            ->validationMessages([
+                                'required' => 'Nomor Telepon tidak boleh kosong',
+                                'regex' => 'Nomor Telepon tidak valid !'
+                            ])
+                            ->helperText('Contoh : 07512345678')
+                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
+                            ->required()
+                            ->maxLength(255),
                         Checkbox::make('status')
                             ->label('Status (Aktif / Tidak Aktif)')
                             ->default(false),
@@ -116,10 +136,16 @@ class WarehouseResource extends Resource
                     ->label('Nama')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('cabang.nama')
+                TextColumn::make('cabang')
                     ->label('Cabang')
-                    ->sortable()
-                    ->searchable(),
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('cabang', function ($query) use ($search) {
+                            $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    }),
                 TextColumn::make('tipe')
                     ->label('Tipe')
                     ->badge()
