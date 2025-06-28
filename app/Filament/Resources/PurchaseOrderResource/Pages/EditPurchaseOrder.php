@@ -103,8 +103,8 @@ class EditPurchaseOrder extends EditRecord
         $purchaseOrderService->updateTotalAmount($this->getRecord());
     }
 
-    protected function getSubmitFormAction(): Action
+    protected function getRedirectUrl(): ?string
     {
-        return $this->getSaveFormAction()->icon('heroicon-o-pencil-square')->color('warning');
+        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
     }
 }

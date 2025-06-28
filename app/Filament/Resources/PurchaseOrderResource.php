@@ -266,6 +266,10 @@ class PurchaseOrderResource extends Resource
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->reactive()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Unit price tidak boleh kosong',
+                                    ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
                                         $subtotal = static::getSubtotal([
                                             'quantity' => $get('quantity'),
@@ -280,6 +284,10 @@ class PurchaseOrderResource extends Resource
                                 TextInput::make('discount')
                                     ->label('Discount')
                                     ->reactive()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Discount tidak boleh kosong. Minimal 0'
+                                    ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
                                         $subtotal = static::getSubtotal([
                                             'quantity' => $get('quantity'),
@@ -294,6 +302,10 @@ class PurchaseOrderResource extends Resource
                                 TextInput::make('tax')
                                     ->label('Tax')
                                     ->reactive()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Tax tidak boleh kosong, Minimal 0'
+                                    ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
                                         $subtotal = static::getSubtotal([
                                             'quantity' => $get('quantity'),
@@ -320,7 +332,9 @@ class PurchaseOrderResource extends Resource
                                         'Inklusif' => 'Inklusif',
                                         'Eklusif' => 'Eklusif'
                                     ])
-                                    ->default('default')
+                                    ->validationMessages([
+                                        'required' => 'Tipe Pajak belum dipilih'
+                                    ]),
                             ]),
                         Repeater::make('purchaseOrderBiaya')
                             ->columnSpanFull()
@@ -359,7 +373,13 @@ class PurchaseOrderResource extends Resource
                                 TextInput::make('total')
                                     ->label('Total')
                                     ->numeric()
-                                    ->prefix('Rp')
+                                    ->reactive()
+                                    ->prefix(function ($get) {
+                                        $currency = Currency::find($get('currency_id'));
+                                        if ($currency) {
+                                            return $currency->symbol;
+                                        }
+                                    })
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Total tidak boleh kosong',
@@ -422,6 +442,7 @@ class PurchaseOrderResource extends Resource
                             ->required()
                             ->prefix('Rp.')
                             ->numeric()
+                            ->reactive()
                             ->readOnly()
                             ->helperText("Untuk melihat total silahkan simpan data terlebih dahulu")
                             ->default(0),

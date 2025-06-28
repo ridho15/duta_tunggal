@@ -10,11 +10,14 @@ class PurchaseOrderService
     {
         $total = 0;
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            $total += $item->quantity * $item->unit_price - $item->discount + $item->tax;
+            $unit_price = $item->unit_price * $item->currency->to_rupiah;
+            $discount = $item->discount * $item->currency->to_rupiah;
+            $tax = $item->tax = $item->currency->to_rupiah;
+            $total += ($item->quantity * $unit_price) - $discount + $tax;
         }
 
         foreach ($purchaseOrder->purchaseOrderBiaya as $item) {
-            $total += $item->total;
+            $total += $item->total * $item->currency->to_rupiah;
         }
 
         $purchaseOrder->update([
