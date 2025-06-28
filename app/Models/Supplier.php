@@ -14,9 +14,16 @@ class Supplier extends Model
     protected $fillable = [
         'code',
         'name',
+        'perusahaan',
         'address',
         'phone',
-        'email'
+        'email',
+        'handphone',
+        'fax',
+        'npwp',
+        'tempo_hutang', // hari,
+        'kontak_person',
+        'keterangan'
     ];
 
     public function purchaseOrder()

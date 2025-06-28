@@ -9,11 +9,14 @@ use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class PurchaseOrderRelationManager extends RelationManager
 {
     protected static string $relationship = 'purchaseOrder';
+
+    protected static ?string $title = 'History Purchasing';
 
     public function form(Form $form): Form
     {
@@ -26,11 +29,41 @@ class PurchaseOrderRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('id')
             ->columns([
+                TextColumn::make('supplier')
+                    ->label('Supplier')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('supplier', function ($query) use ($search) {
+                            $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    }),
                 TextColumn::make('po_number')
+                    ->label('PO Number')
                     ->searchable(),
+                TextColumn::make('warehouse')
+                    ->label('Gudang')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('warehouse', function (Builder $query) use ($search) {
+                            $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    }),
                 TextColumn::make('order_date')
                     ->date()
                     ->sortable(),
+                TextColumn::make('delivery_date')
+                    ->label('Tanggal Pengiriman')
+                    ->date()
+                    ->sortable(),
+                TextColumn::make('tempo_hutang')
+                    ->label('Tempo Hutang')
+                    ->sortable()
+                    ->suffix(' Hari'),
                 TextColumn::make('status')
                     ->label('Status PO')
                     ->formatStateUsing(function ($state) {
@@ -60,6 +93,7 @@ class PurchaseOrderRelationManager extends RelationManager
                     })
                     ->badge(),
                 TextColumn::make('expected_date')
+                    ->label('Tanggal Diharapkan')
                     ->date()
                     ->sortable(),
                 TextColumn::make('total_amount')

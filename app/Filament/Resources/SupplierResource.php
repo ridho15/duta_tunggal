@@ -9,6 +9,7 @@ use App\Models\Supplier;
 use App\Services\SupplierService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -37,7 +38,7 @@ class SupplierResource extends Resource
                 Fieldset::make('Form Supplier')
                     ->schema([
                         TextInput::make('code')
-                            ->label('Kode')
+                            ->label('Kode Supplier')
                             ->reactive()
                             ->unique(ignoreRecord: true)
                             ->validationMessages([
@@ -53,11 +54,19 @@ class SupplierResource extends Resource
                                 })),
                         TextInput::make('name')
                             ->required()
-                            ->label('Nama')
+                            ->label('Nama Supplier')
                             ->validationMessages([
                                 'required' => 'Nama tidak boleh kosong'
                             ])
                             ->maxLength(255),
+                        TextInput::make('perusahaan')
+                            ->label('Nama Perusahaan')
+                            ->string()
+                            ->validationMessages([
+                                'required' => 'Nama perusahaan tidak boleh kosong'
+                            ])
+                            ->maxLength(255)
+                            ->required(),
                         TextInput::make('address')
                             ->required()
                             ->label('Alamat')
@@ -67,12 +76,24 @@ class SupplierResource extends Resource
                             ->maxLength(255),
                         TextInput::make('phone')
                             ->tel()
-                            ->label('Nomor Handphone')
+                            ->label('Telepon')
+                            ->validationMessages([
+                                'required' => 'Nomor Telepon tidak boleh kosong',
+                                'regex' => 'Nomor Telepon tidak valid !'
+                            ])
+                            ->helperText('Contoh : 07512345678')
+                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
+                            ->required()
+                            ->maxLength(255),
+                        TextInput::make('handphone')
+                            ->tel()
+                            ->label('Handphone')
                             ->validationMessages([
                                 'required' => 'Nomor Handphone tidak boleh kosong',
                                 'regex' => 'Nomor handphone tidak valid !'
                             ])
-                            ->rules(['regex:/^08[0-9]{8,12}$/'])
+                            ->helperText('Contoh : 081234567890')
+                            ->rules(['regex:/^08[1-9][0-9]{7,10}$/'])
                             ->required()
                             ->maxLength(255),
                         TextInput::make('email')
@@ -83,6 +104,24 @@ class SupplierResource extends Resource
                             ])
                             ->required()
                             ->maxLength(255),
+                        TextInput::make('fax')
+                            ->label('Fax')
+                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
+                            ->required()
+                            ->tel()
+                            ->helperText('Contoh : 0213456789')
+                            ->validationMessages([
+                                'required' => 'Fax tidak boleh kosong',
+                                'regex' => 'Fax tidak valid !'
+                            ]),
+                        TextInput::make('kontak_person')
+                            ->label('Kontak Person')
+                            ->string()
+                            ->nullable(),
+                        Textarea::make('keterangan')
+                            ->label('Keterangan')
+                            ->string()
+                            ->nullable()
                     ])
             ]);
     }
@@ -92,18 +131,23 @@ class SupplierResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('code')
-                    ->label('Kode')
+                    ->label('Kode Supplier')
                     ->searchable(),
                 TextColumn::make('name')
-                    ->label('Nama')
+                    ->label('Nama Supplier')
+                    ->searchable(),
+                TextColumn::make('perusahaan')
+                    ->label('Nama Perusahaan')
                     ->searchable(),
                 TextColumn::make('address')
                     ->label('Alamat')
                     ->searchable(),
                 TextColumn::make('phone')
-                    ->label('Nomor Handphone')
+                    ->label('Telepon')
                     ->searchable(),
-                TextColumn::make('email')
+                TextColumn::make('tempo_hutang')
+                    ->label('Tempo Hutang')
+                    ->suffix(" Hari")
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
