@@ -9,6 +9,7 @@ use App\Observers\GlobalActivityObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\StockMovementObserver;
 use App\Observers\VendorPaymentDetailObserver;
+use App\Services\CabangService;
 use App\Services\ChartOfAccountService;
 use App\Services\CustomerService;
 use App\Services\DeliveryOrderItemService;
@@ -95,6 +96,9 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->bind(CustomerService::class, function ($app) {
             return new CustomerService;
+        });
+        $this->app->bind(CabangService::class, function ($app) {
+            return new CabangService;
         });
     }
 

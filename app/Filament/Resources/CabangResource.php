@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CabangResource\Pages;
 use App\Filament\Resources\CabangResource\Pages\ViewCabang;
 use App\Models\Cabang;
+use App\Services\CabangService;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Fieldset;
@@ -51,10 +53,18 @@ class CabangResource extends Resource
                             ->label('Kode')
                             ->unique(ignoreRecord: true)
                             ->maxLength(20)
+                            ->reactive()
                             ->validationMessages([
                                 'required' => 'Kode Cabang tidak boleh kosong',
                                 'unique' => 'Kode cabang sudah digunakan'
                             ])
+                            ->suffixAction(Action::make('generateKodeCabang')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Kode Cabang')
+                                ->action(function ($set, $get, $state) {
+                                    $cabangService = app(CabangService::class);
+                                    $set('kode', $cabangService->generateKodeCabang());
+                                }))
                             ->required(),
                         TextInput::make('nama')
                             ->label('Nama')
@@ -70,15 +80,16 @@ class CabangResource extends Resource
                             ])
                             ->required(),
                         TextInput::make('telepon')
-                            ->label('Telepon')
                             ->tel()
-                            ->maxLength(15)
+                            ->label('Telepon')
                             ->validationMessages([
-                                'regex' => 'Nomor Telepon tidak valid !',
-                                'required' => 'Nomor telepon wajib diisi'
+                                'required' => 'Nomor Telepon tidak boleh kosong',
+                                'regex' => 'Nomor Telepon tidak valid !'
                             ])
-                            ->rules(['regex:/^08[0-9]{8,12}$/'])
-                            ->required(),
+                            ->helperText('Contoh : 07512345678')
+                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
+                            ->required()
+                            ->maxLength(255),
                         TextInput::make('kenaikan_harga')
                             ->label('Kenaikan Harga (%)')
                             ->numeric()
