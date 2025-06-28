@@ -76,6 +76,7 @@ class WarehouseResource extends Resource
                             ->label('Cabang')
                             ->preload()
                             ->validationMessages([
+                                'exists' => 'Cabang tidak tersedia',
                                 'required' => "Cabang wajib dipilih"
                             ])
                             ->searchable(['kode', 'nama'])
