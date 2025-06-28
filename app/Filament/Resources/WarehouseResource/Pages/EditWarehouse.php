@@ -4,6 +4,7 @@ namespace App\Filament\Resources\WarehouseResource\Pages;
 
 use App\Filament\Resources\WarehouseResource;
 use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditWarehouse extends EditRecord
@@ -13,7 +14,8 @@ class EditWarehouse extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make()
+                ->icon('heroicon-o-trash'),
         ];
     }
 }

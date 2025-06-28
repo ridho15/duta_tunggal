@@ -4,6 +4,7 @@ namespace App\Filament\Resources\WarehouseResource\Pages;
 
 use App\Filament\Resources\WarehouseResource;
 use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -15,7 +16,9 @@ class ViewWarehouse extends ViewRecord
     {
         return [
             EditAction::make()
-                ->icon('heroicon-o-pencil-square')
+                ->icon('heroicon-o-pencil-square'),
+            DeleteAction::make()
+                ->icon('heroicon-o-trash')
         ];
     }
 }
