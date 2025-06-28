@@ -8,6 +8,7 @@ use App\Filament\Resources\ProductResource\RelationManagers\InventoryStockRelati
 use App\Filament\Resources\ProductResource\RelationManagers\StockMovementRelationManager;
 use App\Models\Cabang;
 use App\Models\Product;
+use App\Models\PurchaseOrderItem;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -231,6 +232,122 @@ class ProductResource extends Resource
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
                             }, 'Product_' . $record->sku . '.pdf');
+                        }),
+                    Action::make('kalkulasiItemValue')
+                        ->label('Kalkulasi Item Value')
+                        ->icon('heroicon-o-calculator')
+                        ->color('warning')
+                        ->modalCancelActionLabel('Tutup')
+                        ->modalSubmitAction(false)
+                        ->modalContentFooter(function ($record) {
+                            $listPurchaseOrderItem = PurchaseOrderItem::where('product_id', $record->id)
+                                ->whereHas('purchaseOrder', function ($query) {
+                                    $query->where('status', 'completed');
+                                })->get();
+
+                            return view('filament.custom.modal-product', [
+                                'listPurchaseOrderItem' => $listPurchaseOrderItem
+                            ]);
+                        })
+                        ->form(function ($record) {
+                            return [
+                                Fieldset::make('Kalkulasi')
+                                    ->columnSpanFull()
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('cabang_id')
+                                            ->label('Cabang')
+                                            ->preload()
+                                            ->searchable(['kode', 'nama'])
+                                            ->required()
+                                            ->reactive()
+                                            ->disabled()
+                                            ->validationMessages([
+                                                'required' => 'Cabang belum dipilih'
+                                            ])
+                                            ->default(function ($record) {
+                                                return $record->cabang_id;
+                                            })
+                                            ->relationship('cabang', 'kode')
+                                            ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
+                                                return "({$cabang->kode}) {$cabang->nama}";
+                                            }),
+                                        Select::make('product_id')
+                                            ->label('Product')
+                                            ->preload()
+                                            ->reactive()
+                                            ->disabled()
+                                            ->searchable(['name', 'sku'])
+                                            ->afterStateUpdated(function ($set, $get, $state) {
+                                                $product = Product::find($state);
+                                                if ($product) {
+                                                    $set('biaya', $product->biaya);
+                                                    $set('tipe_pajak', $product->tipe_pajak);
+                                                    $set('pajak', $product->pajak);
+                                                    $set('item_value', $product->item_value);
+                                                }
+                                            })
+                                            ->default(function ($record) {
+                                                return $record->id;
+                                            })
+                                            ->helperText(function ($state) {
+                                                $product = Product::find($state);
+                                                if ($product) {
+                                                    return "Produk : ({$product->sku}) {$product->name}";
+                                                }
+
+                                                return "Produk : ";
+                                            })
+                                            ->options(function ($get) {
+                                                return Product::where('cabang_id', $get('cabang_id'))->get()->pluck('sku', 'id');
+                                            })
+                                            ->required(),
+                                        TextInput::make('biaya')
+                                            ->label('Biaya (Rp)')
+                                            ->prefix('Rp')
+                                            ->numeric()
+                                            ->required()
+                                            ->disabled()
+                                            ->default(function ($record) {
+                                                return $record->biaya;
+                                            })
+                                            ->reactive()
+                                            ->default(0),
+                                        Radio::make('tipe_pajak')
+                                            ->label('Tipe Pajak')
+                                            ->reactive()
+                                            ->inline()
+                                            ->default(function ($record) {
+                                                return $record->tipe_pajak;
+                                            })
+                                            ->disabled()
+                                            ->options([
+                                                'Non Pajak' => 'Non Pajak',
+                                                'Inklusif' => 'Inklusif',
+                                                'Eksklusif' => 'Eklusif'
+                                            ])
+                                            ->required(),
+                                        TextInput::make('pajak')
+                                            ->label('Pajak (%)')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->disabled()
+                                            ->default(function ($record) {
+                                                return $record->pajak;
+                                            })
+                                            ->suffix('%'),
+                                        TextInput::make('item_value')
+                                            ->label('Item Value (%)')
+                                            ->numeric()
+                                            ->disabled()
+                                            ->default(function ($record) {
+                                                return $record->item_value;
+                                            })
+                                            ->default(0)
+                                            ->reactive()
+                                            ->prefix('Rp'),
+                                    ])
+                            ];
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

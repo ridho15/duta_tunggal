@@ -88,14 +88,19 @@ class QualityControlResource extends Resource
                                     ->options(function ($set, $get, $state) {
                                         if ($get('from_model_type') == 'App\Models\PurchaseReceiptItem') {
                                             $items = [];
-                                            $listPurchaseReceiptItem = PurchaseReceiptItem::with(['purchaseReceipt.purchaseOrder'])->get();
+                                            $listPurchaseReceiptItem = PurchaseReceiptItem::with(['purchaseReceipt.purchaseOrder'])->whereHas('purchaseReceipt', function (Builder $query) {
+                                                $query->whereHas('purchaseOrder', function ($query) {
+                                                    $query->where('status', '!=', 'draft');
+                                                });
+                                            })->get();
                                             foreach ($listPurchaseReceiptItem as $purchaseReceiptItem) {
                                                 $items[$purchaseReceiptItem->id] = $purchaseReceiptItem->purchaseReceipt->purchaseOrder->po_number;
                                             }
+                                            return $items;
                                         } elseif ($get('from_model_type') == 'App\Models\Production') {
                                             return Production::where('status', 'finished')->get()->pluck('production_number', 'id');
                                         }
-
+                                        
                                         return [];
                                     })
                                     ->required()

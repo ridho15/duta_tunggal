@@ -31,7 +31,14 @@ class QualityControlService
     }
     public function createQCFromPurchaseReceiptItem($purchaseReceiptItem, $data)
     {
+        $qualityControlService = app(QualityControlService::class);
+        $qc_number = $qualityControlService->generateQcNumber();
+        $qualityControl = QualityControl::where('qc_number', $qc_number)->first();
+        while ($qualityControl) {
+            $qc_number = $qc_number . '1';
+        }
         return $purchaseReceiptItem->qualityControl()->create([
+            'qc_number' => $qc_number,
             'passed_quantity' => $purchaseReceiptItem->qty_accepted,
             'rejected_quantity' => 0,
             'status' => 0,
@@ -79,13 +86,7 @@ class QualityControlService
 
     public function checkPenerimaanBarang($qualityControl)
     {
-        $purchaseOrder = PurchaseOrder::select(['id'])->with(['purchaseOrderItem' => function ($query) {
-            $query->select(['id', 'quantity', 'purchase_order_id'])->with(['purchaseReceiptItem' => function ($query) {
-                $query->where('is_sent', 1)->select(['id', 'is_sent', 'qty_accepted', 'purchase_order_item_id', 'purchase_receipt_id'])->with(['qualityControl' => function ($query) {
-                    $query->select(['id', 'purchase_receipt_item_id', 'passed_quantity', 'status'])->where('status', 1);
-                }]);
-            }]);
-        }])->whereHas('purchaseOrderItem', function ($query) use ($qualityControl) {
+        $purchaseOrder = PurchaseOrder::whereHas('purchaseOrderItem', function ($query) use ($qualityControl) {
             $query->whereHas('purchaseReceiptItem', function ($query) use ($qualityControl) {
                 $query->where('is_sent', 1)->whereHas('qualityControl', function ($query) use ($qualityControl) {
                     $query->where('status', 1)->where('id', $qualityControl->id);

@@ -118,6 +118,16 @@ class SupplierResource extends Resource
                             ->label('Kontak Person')
                             ->string()
                             ->nullable(),
+                        TextInput::make('tempo_hutang')
+                            ->label('Tempo Hutang')
+                            ->suffix("Hari")
+                            ->numeric()
+                            ->required()
+                            ->default(0)
+                            ->validationMessages([
+                                'required' => 'Tempo Hutang tidak boleh kosong',
+                                'numeric' => 'Tempo Hutang tidak valid !'
+                            ]),
                         Textarea::make('keterangan')
                             ->label('Keterangan')
                             ->string()

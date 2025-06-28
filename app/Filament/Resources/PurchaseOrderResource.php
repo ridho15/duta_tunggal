@@ -139,10 +139,17 @@ class PurchaseOrderResource extends Resource
                         Select::make('supplier_id')
                             ->label('Supplier')
                             ->preload()
+                            ->reactive()
                             ->relationship('supplier', 'name')
                             ->searchable(['code', 'name'])
                             ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
                                 return "({$supplier->code}) {$supplier->name}";
+                            })
+                            ->afterStateUpdated(function ($state, $set) {
+                                $supplier = Supplier::find($state);
+                                if ($supplier) {
+                                    $set('tempo_hutang', $supplier->tempo_hutang);
+                                }
                             })
                             ->required(),
                         TextInput::make('po_number')
@@ -188,6 +195,7 @@ class PurchaseOrderResource extends Resource
                         TextInput::make('tempo_hutang')
                             ->label('Tempo Hutang (Hari)')
                             ->numeric()
+                            ->reactive()
                             ->default(0)
                             ->required()
                             ->suffix('Hari'),
@@ -279,7 +287,14 @@ class PurchaseOrderResource extends Resource
                                         ]);
                                         $set('subtotal', $subtotal);
                                     })
-                                    ->prefix('Rp.')
+                                    ->prefix(function ($get) {
+                                        $currency = Currency::find($get('currency_id'));
+                                        if ($currency) {
+                                            return $currency->symbol;
+                                        }
+
+                                        return null;
+                                    })
                                     ->default(0),
                                 TextInput::make('discount')
                                     ->label('Discount')
@@ -297,7 +312,14 @@ class PurchaseOrderResource extends Resource
                                         ]);
                                         $set('subtotal', $subtotal);
                                     })
-                                    ->prefix('Rp.')
+                                    ->prefix(function ($get) {
+                                        $currency = Currency::find($get('currency_id'));
+                                        if ($currency) {
+                                            return $currency->symbol;
+                                        }
+
+                                        return null;
+                                    })
                                     ->default(0),
                                 TextInput::make('tax')
                                     ->label('Tax')
@@ -315,12 +337,26 @@ class PurchaseOrderResource extends Resource
                                         ]);
                                         $set('subtotal', $subtotal);
                                     })
-                                    ->prefix('Rp.')
+                                    ->prefix(function ($get) {
+                                        $currency = Currency::find($get('currency_id'));
+                                        if ($currency) {
+                                            return $currency->symbol;
+                                        }
+
+                                        return null;
+                                    })
                                     ->default(0),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total')
                                     ->reactive()
-                                    ->prefix('Rp.')
+                                    ->prefix(function ($get) {
+                                        $currency = Currency::find($get('currency_id'));
+                                        if ($currency) {
+                                            return $currency->symbol;
+                                        }
+
+                                        return null;
+                                    })
                                     ->default(0)
                                     ->readOnly(),
                                 Radio::make('tipe_pajak')

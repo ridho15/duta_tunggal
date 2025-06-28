@@ -20,8 +20,10 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Form;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ListProducts extends ListRecords
@@ -221,7 +223,7 @@ class ListProducts extends ListRecords
                                 ])
                         ];
                     })
-                    ->labeledFrom("Cetak")
+                    ->modalSubmitActionLabel("Print / Cetak")
                     ->action(function (array $data) {
                         $date = now()->format('Ymd');
                         if ($data['hasil_cetak'] == 'Excel') {
@@ -244,6 +246,7 @@ class ListProducts extends ListRecords
                     ->label('Print Barcode')
                     ->icon('heroicon-o-printer')
                     ->color('success')
+                    ->modalSubmitActionLabel("Print / Cetak")
                     ->form(function () {
                         return [
                             Fieldset::make('Print Barcode')
@@ -294,79 +297,6 @@ class ListProducts extends ListRecords
                             echo $pdf->stream();
                         }, 'Product_Barcode' . $date . '.pdf');
                     }),
-                Action::make('kalkulasiItemValue')
-                    ->label('Kalkulasi Item Value')
-                    ->icon('heroicon-o-calculator')
-                    ->color('warning')
-                    ->form(function () {
-                        return [
-                            Fieldset::make('Kalkulasi')
-                                ->columnSpanFull()
-                                ->columns(2)
-                                ->schema([
-                                    Select::make('cabang_id')
-                                        ->label('Cabang')
-                                        ->preload()
-                                        ->searchable()
-                                        ->required()
-                                        ->reactive()
-                                        ->validationMessages([
-                                            'required' => 'Cabang belum dipilih'
-                                        ])
-                                        ->relationship('cabang', 'id')
-                                        ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
-                                            return "({$cabang->kode}) {$cabang->nama}";
-                                        }),
-                                    Select::make('product_id')
-                                        ->label('Product')
-                                        ->preload()
-                                        ->reactive()
-                                        ->searchable()
-                                        ->afterStateUpdated(function ($set, $get, $state) {
-                                            $product = Product::find($state);
-                                            if ($product) {
-                                                $set('biaya', $product->biaya);
-                                                $set('tipe_pajak', $product->tipe_pajak);
-                                                $set('pajak', $product->pajak);
-                                                $set('item_value', $product->item_value);
-                                            }
-                                        })
-                                        ->options(function ($get) {
-                                            return Product::where('cabang_id', $get('cabang_id'))->get()->pluck('sku', 'id');
-                                        })
-                                        ->required(),
-                                    TextInput::make('biaya')
-                                        ->label('Biaya (Rp)')
-                                        ->prefix('Rp')
-                                        ->numeric()
-                                        ->required()
-                                        ->reactive()
-                                        ->default(0),
-                                    Radio::make('tipe_pajak')
-                                        ->label('Tipe Pajak')
-                                        ->reactive()
-                                        ->inline()
-                                        ->options([
-                                            'Non Pajak' => 'Non Pajak',
-                                            'Inklusif' => 'Inklusif',
-                                            'Eksklusif' => 'Eklusif'
-                                        ])
-                                        ->required(),
-                                    TextInput::make('pajak')
-                                        ->label('Pajak (%)')
-                                        ->numeric()
-                                        ->default(0)
-                                        ->suffix('%'),
-                                    TextInput::make('item_value')
-                                        ->label('Item Value (%)')
-                                        ->numeric()
-                                        ->default(0)
-                                        ->reactive()
-                                        ->prefix('Rp'),
-                                ])
-                        ];
-                    })
-                    ->action(function () {})
             ])->button()->label('Action')
         ];
     }

@@ -5,8 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PurchaseReceiptResource\Pages;
 use App\Filament\Resources\PurchaseReceiptResource\Pages\ViewPurchaseReceipt;
 use App\Filament\Resources\PurchaseReceiptResource\RelationManagers\PurchaseReceiptItemRelationManager;
+use App\Models\Currency;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceipt;
+use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\PurchaseReceiptService;
 use Filament\Forms\Components\Actions\Action;
@@ -31,6 +33,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class PurchaseReceiptResource extends Resource
 {
@@ -50,6 +53,10 @@ class PurchaseReceiptResource extends Resource
                             ->label('Receipt Number')
                             ->string()
                             ->reactive()
+                            ->validationMessages([
+                                'required' => 'Receipt number tidak boleh kosong',
+                                'unique' => 'Receipt number sudah digunakan'
+                            ])
                             ->suffixAction(Action::make('generateReceiptNumber')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
                                 ->tooltip('Generate Receipt Number')
@@ -57,10 +64,14 @@ class PurchaseReceiptResource extends Resource
                                     $purchaseReceipService = app(PurchaseReceiptService::class);
                                     $set('receipt_number', $purchaseReceipService->generateReceiptNumber());
                                 }))
-                            ->unique(ignoreRecord: true)
+                            ->unique(ignoreRecord: true, modifyRuleUsing: function ($record) {
+                                return Rule::unique('purchase_receipts', 'receipt_number')
+                                    ->whereNull('deleted_at')
+                                    ->ignore($record?->id ?? null);
+                            })
                             ->required(),
                         Select::make('purchase_order_id')
-                            ->label('Purchase Order')
+                            ->label('Kode Pembelian')
                             ->preload()
                             ->searchable()
                             ->reactive()
@@ -90,18 +101,42 @@ class PurchaseReceiptResource extends Resource
                             ->label('Received By')
                             ->preload()
                             ->searchable()
+                            ->validationMessages([
+                                'required' => 'Penerima belum dipilih',
+                                'exists' => 'Penerima tidak tersedia'
+                            ])
                             ->relationship('receivedBy', 'name')
                             ->required(),
                         Select::make('currency_id')
-                            ->label('Currency')
+                            ->label('Mata Uang')
                             ->preload()
-                            ->searchable()
+                            ->reactive()
+                            ->validationMessages([
+                                'exists' => "Mata uang tidak tersedia",
+                                'required' => 'Mata uang belum dipilih'
+                            ])
+                            ->searchable(['name'])
                             ->relationship('currency', 'name')
+                            ->getOptionLabelFromRecordUsing(function (Currency $currency) {
+                                return "{$currency->name} ({$currency->symbol})";
+                            })
                             ->required(),
                         TextInput::make('other_cost')
                             ->label('Biaya Lainnya')
                             ->numeric()
-                            ->prefix('Rp.')
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'Biaya lain tidak boleh kosong. Minimal 0',
+                                'numeric' => 'Biaya lain tidak valid !'
+                            ])
+                            ->prefix(function ($get) {
+                                $currency = Currency::find($get('currency_id'));
+                                if ($currency) {
+                                    return $currency->symbol;
+                                }
+
+                                return null;
+                            })
                             ->default(0)
                             ->required(),
                         Textarea::make('notes')
@@ -148,6 +183,10 @@ class PurchaseReceiptResource extends Resource
                                     ->reactive()
                                     ->required()
                                     ->searchable()
+                                    ->validationMessages([
+                                        'required' => 'Gudang belum dipilih',
+                                        'exists' => 'Gudang tidak tersedia'
+                                    ])
                                     ->relationship('warehouse', 'name')
                                     ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                         return "({$warehouse->kode}) {$warehouse->name}";
@@ -160,21 +199,36 @@ class PurchaseReceiptResource extends Resource
                                     ->relationship('rak', 'name', function ($get, Builder $query) {
                                         $query->where('warehouse_id', $get('warehouse_id'));
                                     })
+                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
+                                        return "({$rak->code}) {$rak->name}";
+                                    })
                                     ->nullable(),
                                 TextInput::make('qty_received')
                                     ->label('Quantity Received')
                                     ->numeric()
                                     ->helperText("Quantity yang datang")
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Quantity diterima tidak boleh kosong.minimal 0',
+                                        'numeric' => 'Quantity diterima tidak valid !'
+                                    ])
                                     ->default(0),
                                 TextInput::make('qty_accepted')
                                     ->label('Quantity Accepted')
                                     ->numeric()
+                                    ->validationMessages([
+                                        'required' => 'Quantity diambil tidak boleh kosong.minimal 0',
+                                        'numeric' => 'Quantity diambil tidak valid !'
+                                    ])
                                     ->default(0)
                                     ->helperText("Quantity yang di ambil")
                                     ->required(),
                                 TextInput::make('qty_rejected')
                                     ->label('Quantity Rejected')
+                                    ->validationMessages([
+                                        'required' => 'Quantity ditolak tidak boleh kosong.minimal 0',
+                                        'numeric' => 'Quantity ditolak tidak valid !'
+                                    ])
                                     ->numeric()
                                     ->helperText("Quantity yang di tolak")
                                     ->default(0)
