@@ -9,7 +9,7 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
 use App\Services\InvoiceService;
-use Filament\Forms\Components\Actions\Action;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -19,6 +19,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
@@ -308,7 +309,22 @@ class InvoiceResource extends Resource
                         ->color('primary'),
                     EditAction::make()
                         ->color('success'),
-                    DeleteAction::make()
+                    DeleteAction::make(),
+                    Action::make('cetak_invoice')
+                        ->label('Cetak Invoice')
+                        ->color('primary')
+                        ->icon('heroicon-o-document-text')
+                        ->action(function ($record) {
+                            if ($record->from_model_type == 'App\Models\PurchaseOrder') {
+                                $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
+                                    'invoice' => $record
+                                ])->setPaper('A4', 'potrait');
+
+                                return response()->streamDownload(function () use ($pdf) {
+                                    echo $pdf->stream();
+                                }, 'Invoice_PO_' . $record->invoice_number . '.pdf');
+                            }
+                        })
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

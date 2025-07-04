@@ -32,10 +32,8 @@ class PurchaseOrderService
     public function generateInvoice($purchaseOrder, $data)
     {
         $subtotal = 0;
-        $totalTax = 0;
-        $totalOtherFee = 0;
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            $subtotal += $item->quantity * $item->unit_price - $item->discount;
+            $subtotal += $item->quantity * $item->unit_price - $item->discount + $item->tax;
         }
 
         $total = $subtotal + $data['tax'] + $data['other_fee'];
