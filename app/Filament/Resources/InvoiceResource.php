@@ -10,6 +10,7 @@ use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
 use App\Services\InvoiceService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -135,7 +136,7 @@ class InvoiceResource extends Resource
                             ->label('Invoice Number')
                             ->required()
                             ->reactive()
-                            ->suffixAction(Action::make('generateInvoiceNumber')
+                            ->suffixAction(ActionsAction::make('generateInvoiceNumber')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
                                 ->tooltip('Generate Invoice Number')
                                 ->action(function ($set, $get, $state) {
