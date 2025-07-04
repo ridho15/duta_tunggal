@@ -781,7 +781,9 @@ class PurchaseOrderResource extends Resource
                                 ->required()
                                 ->prefix('Rp.')
                                 ->numeric()
-                                ->default(0),
+                                ->default(function ($record) {
+                                    return $record->tax;
+                                }),
                             TextInput::make('other_fee')
                                 ->required()
                                 ->numeric()

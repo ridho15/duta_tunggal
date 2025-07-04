@@ -86,29 +86,34 @@ class InvoiceResource extends Resource
                                         $total = 0;
                                         if ($get('from_model_type') == 'App\Models\PurchaseOrder') {
                                             $purchaseOrder = PurchaseOrder::find($state);
-                                            foreach ($purchaseOrder->purchaseOrderItem as $item) {
-                                                $price = $item->unit_price - $item->discount + $item->tax;
-                                                $subtotal = $price * $item->quantity;
-                                                array_push($items, [
-                                                    'product_id' => $item->product_id,
-                                                    'quantity' => $item->quantity,
-                                                    'price' => $price,
-                                                    'total' => $subtotal
-                                                ]);
+                                            if ($purchaseOrder) {
+                                                foreach ($purchaseOrder->purchaseOrderItem as $item) {
+                                                    $price = $item->unit_price - $item->discount + $item->tax;
+                                                    $subtotal = $price * $item->quantity;
+                                                    array_push($items, [
+                                                        'product_id' => $item->product_id,
+                                                        'quantity' => $item->quantity,
+                                                        'price' => $price,
+                                                        'total' => $subtotal
+                                                    ]);
 
-                                                $total += $subtotal;
+                                                    $total += $subtotal;
+                                                }
                                             }
                                         } elseif ($get('from_model_type') == 'App\Models\SaleOrder') {
                                             $saleOrder = SaleOrder::find($state);
-                                            foreach ($saleOrder->saleOrderItem as $item) {
-                                                $price = $item->unit_price - $item->discount + $item->tax;
-                                                $subtotal = $price * $item->quantity;
-                                                array_push($items, [
-                                                    'product_id' => $item->product_id,
-                                                    'quantity' => $item->quantity,
-                                                    'price' => $price,
-                                                    'total' => $subtotal
-                                                ]);
+                                            if ($saleOrder) {
+                                                foreach ($saleOrder->saleOrderItem as $item) {
+                                                    $price = $item->unit_price - $item->discount + $item->tax;
+                                                    $subtotal = $price * $item->quantity;
+                                                    array_push($items, [
+                                                        'product_id' => $item->product_id,
+                                                        'quantity' => $item->quantity,
+                                                        'price' => $price,
+                                                        'total' => $subtotal
+                                                    ]);
+                                                    $total += $subtotal;
+                                                }
                                             }
                                         }
 
@@ -189,7 +194,6 @@ class InvoiceResource extends Resource
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
-                                    ->prefix('Rp.')
                                     ->default(0)
                                     ->required(),
                                 TextInput::make('price')

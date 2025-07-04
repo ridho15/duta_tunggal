@@ -8,44 +8,74 @@
         body {
             font-family: sans-serif;
             font-size: 10px;
-            margin: 5px;
+            margin: 20px;
         }
 
-        .barcode-wrapper {
+        .barcode-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .barcode-table td {
+            width: 33.33%;
+            padding: 10px;
             text-align: center;
-            padding: 5px;
-            border: 1px dashed #aaa;
+            vertical-align: top;
+            border: 1px dashed #ccc;
         }
 
-        .product-name {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        .barcode {
-            margin: 5px 0;
+        .barcode-label {
             display: inline-block;
-            text-align: center;
         }
 
-        .sku {
-            font-size: 10px;
-            margin-top: 2px;
+        .barcode-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .barcode-image {
+            margin: 5px 0;
+        }
+
+        .barcode-code {
+            font-size: 9px;
+            margin-top: 3px;
         }
     </style>
 </head>
 
 <body>
-    <div class="barcode-wrapper">
-        <div class="product-name">{{ $product->name }}</div>
 
-        <div class="barcode">
-            {!! DNS1D::getBarcodeHTML($product->sku, 'C128', 1.5, 40) !!}
-        </div>
+    <h3 style="text-align: center;">Label Barcode Produk</h3>
 
-        <div class="sku">{{ $product->sku }}</div>
-    </div>
+    <table class="barcode-table">
+        @for($i = 1; $i <= 30; $i++) @if($i%3==1) <tr>
+            @endif
+            <td>
+                <div class="barcode-label">
+                    <table>
+                        <tr>
+                            <td style="border: none">
+                                <div class="barcode-image" style="">
+                                    {!! DNS1D::getBarcodeHTML($product->sku, 'C128', 1.5, 40) !!}
+                                </div>
+                                <div class="barcode-code">{{ $product->sku }}</div>
+                            </td>
+                            <td style="border: none">
+                                <div style="margin-top: 10px">
+                                    <div class="barcode-name">{{ Str::upper($product->name) }}</div>
+                                    <div class="barcode-name">{{ $product->name }}</div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+            @if($i%3 == 0)
+            </tr>
+            @endif
+            @endfor
+    </table>
 </body>
 
 </html>

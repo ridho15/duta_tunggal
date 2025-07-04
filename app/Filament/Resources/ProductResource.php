@@ -227,7 +227,7 @@ class ProductResource extends Resource
                         ->action(function ($record) {
                             $pdf = Pdf::loadView('pdf.product-single-barcode', [
                                 'product' => $record
-                            ])->setPaper([0, 0, 300, 200]);
+                            ])->setPaper('A4', 'landscape');
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();

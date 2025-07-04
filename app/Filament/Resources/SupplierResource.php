@@ -59,6 +59,12 @@ class SupplierResource extends Resource
                                 'required' => 'Nama tidak boleh kosong'
                             ])
                             ->maxLength(255),
+                        TextInput::make('npwp')
+                            ->label('NPWP')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'NPWP tidak boleh kosong'
+                            ])->maxLength(255),
                         TextInput::make('perusahaan')
                             ->label('Nama Perusahaan')
                             ->string()
@@ -145,6 +151,9 @@ class SupplierResource extends Resource
                     ->searchable(),
                 TextColumn::make('name')
                     ->label('Nama Supplier')
+                    ->searchable(),
+                TextColumn::make('npwp')
+                    ->label('NPWP')
                     ->searchable(),
                 TextColumn::make('perusahaan')
                     ->label('Nama Perusahaan')

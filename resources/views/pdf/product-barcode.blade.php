@@ -53,13 +53,23 @@
         <tr>
             @foreach($row as $product)
             <td>
-                <div class="barcode-label">
-                    <div class="barcode-name">{{ $product->name }}</div>
-                    <div class="barcode-image">
-                        {!! DNS1D::getBarcodeHTML($product->sku, 'C128', 1.5, 40) !!}
-                    </div>
-                    <div class="barcode-code">{{ $product->sku }}</div>
-                </div>
+                <table>
+                    <tr>
+                        <td style="border: none">
+                            <div class="">
+                                {!! DNS1D::getBarcodeHTML($product->sku, 'C128', 1.5, 40) !!}
+                            </div>
+                            <div class="barcode-code">{{ $product->sku }}</div>
+                        </td>
+                        <td style="border: none">
+                            <div style="margin-top: 10px">
+                                <div class="barcode-code">{{ Str::upper($product->name) }}</div>
+                                <div class="barcode-code">{{ $product->name }}</div>
+
+                            </div>
+                        </td>
+                    </tr>
+                </table>
             </td>
             @endforeach
 
