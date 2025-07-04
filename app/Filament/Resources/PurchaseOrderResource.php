@@ -781,14 +781,21 @@ class PurchaseOrderResource extends Resource
                                 ->required()
                                 ->prefix('Rp.')
                                 ->numeric()
-                                ->default(function ($record) {
-                                    return $record->tax;
-                                }),
+                                ->default(0),
                             TextInput::make('other_fee')
                                 ->required()
                                 ->numeric()
                                 ->prefix('Rp.')
-                                ->default(0),
+                                ->default(function ($record) {
+                                    $otherFee = 0;
+                                    foreach ($record->purchaseOrderBiaya as $biaya) {
+                                        if ($biaya->masuk_invoice == 1) {
+                                            $otherFee += ($biaya->total * $biaya->currency->to_rupiah);
+                                        }
+                                    }
+
+                                    return $otherFee;
+                                }),
                         ])
                         ->action(function (array $data, $record) {
                             // Check invoice

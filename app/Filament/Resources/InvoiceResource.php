@@ -84,6 +84,7 @@ class InvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $items = [];
                                         $total = 0;
+                                        $otherFee = 0;
                                         if ($get('from_model_type') == 'App\Models\PurchaseOrder') {
                                             $purchaseOrder = PurchaseOrder::find($state);
                                             if ($purchaseOrder) {
@@ -98,6 +99,12 @@ class InvoiceResource extends Resource
                                                     ]);
 
                                                     $total += $subtotal;
+                                                }
+
+                                                foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
+                                                    if ($biaya->masuk_invoice == 1) {
+                                                        $otherFee += ($biaya->total * $biaya->currency->to_rupiah);
+                                                    }
                                                 }
                                             }
                                         } elseif ($get('from_model_type') == 'App\Models\SaleOrder') {
@@ -119,6 +126,8 @@ class InvoiceResource extends Resource
 
                                         $set('invoiceItem', $items);
                                         $set('subtotal', $total);
+                                        $set('other_fee', $otherFee);
+                                        $set('total', $total + $otherFee);
                                     })
                             ]),
                         TextInput::make('invoice_number')
