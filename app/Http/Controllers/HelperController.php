@@ -526,8 +526,12 @@ class HelperController extends Controller
 
     public static function hitungSubtotal($quantity, $unit_price, $discount, $tax)
     {
-        $subtotal = ((int) $quantity * (int) $unit_price) - (int) $discount + (int) $tax;
-        return $subtotal;
+        $subtotal = $quantity * $unit_price;
+        $discountAmount = $subtotal * $discount / 100;
+        $afterDiscount = $subtotal - $discountAmount;
+        $tax_amount = $afterDiscount * $tax / 100;
+        $total = $afterDiscount + $tax_amount;
+        return $total;
     }
 
     public static function sendNotification($isSuccess = false, $title = "", $message = "")

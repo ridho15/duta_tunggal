@@ -119,16 +119,18 @@ class PurchaseOrderResource extends Resource
                                             }
                                         } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
                                             $orderRequest = OrderRequest::find($state);
-                                            foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
-                                                $subtotal = ((int)$orderRequestItem->quantity * (int) $orderRequestItem->unit_price) - (int) $orderRequestItem->discount + (int) $orderRequestItem->tax;
-                                                array_push($items, [
-                                                    'product_id' => $orderRequestItem->product_id,
-                                                    'quantity' => $orderRequestItem->quantity,
-                                                    'unit_price' => $orderRequestItem->product->cost_price,
-                                                    'discount' => 0,
-                                                    'tax' => 0,
-                                                    'subtotal' => $subtotal
-                                                ]);
+                                            if ($orderRequest) {
+                                                foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
+                                                    $subtotal = ((int)$orderRequestItem->quantity * (int) $orderRequestItem->unit_price) - (int) $orderRequestItem->discount + (int) $orderRequestItem->tax;
+                                                    array_push($items, [
+                                                        'product_id' => $orderRequestItem->product_id,
+                                                        'quantity' => $orderRequestItem->quantity,
+                                                        'unit_price' => $orderRequestItem->product->cost_price,
+                                                        'discount' => 0,
+                                                        'tax' => 0,
+                                                        'subtotal' => $subtotal
+                                                    ]);
+                                                }
                                             }
                                         }
 
@@ -213,7 +215,7 @@ class PurchaseOrderResource extends Resource
                             ->columns(3)
                             ->reactive()
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
-                                $data['subtotal'] = static::getSubtotal($data);
+                                $data['subtotal'] = HelperController::hitungSubtotal($data['quantity'], $data['unit_price'], $data['discount'], $data['tax']);
                                 return $data;
                             })
                             ->addAction(function (ActionsAction $action) {
@@ -235,14 +237,7 @@ class PurchaseOrderResource extends Resource
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         $product = Product::find($state);
                                         $set('unit_price', $product->cost_price);
-
-                                        $subtotal = static::getSubtotal([
-                                            'quantity' => $get('quantity'),
-                                            'unit_price' => $get('unit_price'),
-                                            'tax' => $get('tax'),
-                                            'discount' => $get('discount')
-                                        ]);
-                                        $set('subtotal', $subtotal);
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
                                     ->required(),
                                 Select::make('currency_id')
@@ -250,6 +245,7 @@ class PurchaseOrderResource extends Resource
                                     ->preload()
                                     ->searchable()
                                     ->required()
+                                    ->reactive()
                                     ->relationship('currency', 'name')
                                     ->getOptionLabelFromRecordUsing(function (Currency $currency) {
                                         return "{$currency->name} ({$currency->symbol})";
@@ -262,13 +258,7 @@ class PurchaseOrderResource extends Resource
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = static::getSubtotal([
-                                            'quantity' => $get('quantity'),
-                                            'unit_price' => $get('unit_price'),
-                                            'tax' => $get('tax'),
-                                            'discount' => $get('discount')
-                                        ]);
-                                        $set('subtotal', $subtotal);
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
                                     ->numeric(),
                                 TextInput::make('unit_price')
@@ -279,13 +269,7 @@ class PurchaseOrderResource extends Resource
                                         'required' => 'Unit price tidak boleh kosong',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = static::getSubtotal([
-                                            'quantity' => $get('quantity'),
-                                            'unit_price' => $get('unit_price'),
-                                            'tax' => $get('tax'),
-                                            'discount' => $get('discount')
-                                        ]);
-                                        $set('subtotal', $subtotal);
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
@@ -299,52 +283,30 @@ class PurchaseOrderResource extends Resource
                                 TextInput::make('discount')
                                     ->label('Discount')
                                     ->reactive()
+                                    ->numeric()
                                     ->required()
+                                    ->maxValue(100)
                                     ->validationMessages([
                                         'required' => 'Discount tidak boleh kosong. Minimal 0'
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = static::getSubtotal([
-                                            'quantity' => $get('quantity'),
-                                            'unit_price' => $get('unit_price'),
-                                            'tax' => $get('tax'),
-                                            'discount' => $get('discount')
-                                        ]);
-                                        $set('subtotal', $subtotal);
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
-                                    ->prefix(function ($get) {
-                                        $currency = Currency::find($get('currency_id'));
-                                        if ($currency) {
-                                            return $currency->symbol;
-                                        }
-
-                                        return null;
-                                    })
+                                    ->suffix('%')
                                     ->default(0),
                                 TextInput::make('tax')
                                     ->label('Tax')
                                     ->reactive()
+                                    ->numeric()
+                                    ->maxValue(100)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Tax tidak boleh kosong, Minimal 0'
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $subtotal = static::getSubtotal([
-                                            'quantity' => $get('quantity'),
-                                            'unit_price' => $get('unit_price'),
-                                            'tax' => $get('tax'),
-                                            'discount' => $get('discount')
-                                        ]);
-                                        $set('subtotal', $subtotal);
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
-                                    ->prefix(function ($get) {
-                                        $currency = Currency::find($get('currency_id'));
-                                        if ($currency) {
-                                            return $currency->symbol;
-                                        }
-
-                                        return null;
-                                    })
+                                    ->suffix('%')
                                     ->default(0),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total')
@@ -485,11 +447,6 @@ class PurchaseOrderResource extends Resource
 
                     ])
             ]);
-    }
-
-    public static function getSubtotal($data)
-    {
-        return ($data['quantity'] * $data['unit_price']) - $data['discount'] + $data['tax'];
     }
 
     public static function table(Table $table): Table

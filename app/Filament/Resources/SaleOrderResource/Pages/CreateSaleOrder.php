@@ -21,7 +21,7 @@ class CreateSaleOrder extends CreateRecord
 
     protected function afterCreate()
     {
-        $salesOrderService = new SalesOrderService;
+        $salesOrderService = app(SalesOrderService::class);
         $salesOrderService->updateTotalAmount($this->getRecord());
     }
 }

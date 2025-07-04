@@ -11,14 +11,18 @@ use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
 use App\Models\Supplier;
+use App\Services\CustomerService;
 use App\Services\SalesOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Database\Seeders\SaleOrderSeeder;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -43,33 +47,42 @@ class SaleOrderResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Sales Order';
+    protected static ?string $navigationGroup = 'Penjualan';
+
+    protected static ?string $navigationLabel = 'Penjualan';
+
+    protected static ?string $pluralModelLabel = 'Penjualan';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Fieldset::make('Form Sales')
+                Fieldset::make('Form Penjualan')
                     ->schema([
-                        Placeholder::make('status')
-                            ->label('Status')
-                            ->content(function ($record) {
-                                return $record ? Str::upper($record->status) : '-';
-                            }),
-                        Select::make('options_form')
-                            ->label('Opions From')
-                            ->searchable()
-                            ->preload()
-                            ->reactive()
-                            ->hiddenOn(['edit', 'view'])
-                            ->loadingMessage("loading...")
-                            ->options(function () {
-                                return [
-                                    '0' => 'None',
-                                    '1' => 'Refer Penjualan',
-                                    '2' => 'Refer Quotation',
-                                ];
-                            })->default(0),
+                        Section::make()
+                            ->columns(2)
+                            ->columnSpanFull()
+                            ->schema([
+                                Placeholder::make('status')
+                                    ->label('Status')
+                                    ->content(function ($record) {
+                                        return $record ? Str::upper($record->status) : '-';
+                                    }),
+                                Select::make('options_form')
+                                    ->label('Opions From')
+                                    ->searchable()
+                                    ->preload()
+                                    ->reactive()
+                                    ->hiddenOn(['edit', 'view'])
+                                    ->loadingMessage("loading...")
+                                    ->options(function () {
+                                        return [
+                                            '0' => 'None',
+                                            '1' => 'Refer Penjualan',
+                                            '2' => 'Refer Quotation',
+                                        ];
+                                    })->default(0),
+                            ]),
                         Select::make('quotation_id')
                             ->label('Quotation')
                             ->searchable()
@@ -78,19 +91,22 @@ class SaleOrderResource extends Resource
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $items = [];
                                 $quotation = Quotation::find($state);
-                                foreach ($quotation->quotationItem as $item) {
-                                    array_push($items, [
-                                        'product_id' => $item->product_id,
-                                        'quantity' => $item->quantity,
-                                        'unit_price' => $item->unit_price,
-                                        'discount' => $item->discount,
-                                        'tax' => $item->tax,
-                                        'notes' => $item->notes
-                                    ]);
+                                if ($quotation) {
+                                    foreach ($quotation->quotationItem as $item) {
+                                        array_push($items, [
+                                            'product_id' => $item->product_id,
+                                            'quantity' => $item->quantity,
+                                            'unit_price' => $item->unit_price,
+                                            'discount' => $item->discount,
+                                            'tax' => $item->tax,
+                                            'notes' => $item->notes,
+                                            'subtotal' => $item->quantity * ($item->unit_price + $item->tax - $item->discount)
+                                        ]);
+                                    }
+                                    $set('total_amount', $quotation->total_amount);
+                                    $set('customer_id', $quotation->customer_id);
+                                    $set('saleOrderItem', $items);
                                 }
-                                $set('total_amount', $quotation->total_amount);
-                                $set('customer_id', $quotation->customer_id);
-                                $set('saleOrderItem', $items);
                             })
                             ->visible(function ($get) {
                                 return $get('options_form') == 2;
@@ -136,17 +152,74 @@ class SaleOrderResource extends Resource
                                 $set('shipped_to', $customer->address);
                             })
                             ->relationship('customer', 'name')
+                            ->getOptionLabelFromRecordUsing(function (Customer $customer) {
+                                return "({$customer->code}) {$customer->name}";
+                            })
                             ->createOptionForm([
                                 Fieldset::make('Form Customer')
                                     ->schema([
+                                        TextInput::make('code')
+                                            ->label('Kode Customer')
+                                            ->required()
+                                            ->reactive()
+                                            ->suffixAction(ActionsAction::make('generateCode')
+                                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                                ->tooltip('Generate Kode Customer')
+                                                ->action(function ($set, $get, $state) {
+                                                    $customerService = app(CustomerService::class);
+                                                    $set('code', $customerService->generateCode());
+                                                }))
+                                            ->validationMessages([
+                                                'unique' => 'Kode customer sudah digunakan',
+                                                'required' => 'Kode customer tidak boleh kosong',
+                                            ])
+                                            ->unique(ignoreRecord: true),
                                         TextInput::make('name')
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Nama customer tidak boleh kosong',
+                                            ])
+                                            ->label('Nama Customer')
                                             ->maxLength(255),
+                                        TextInput::make('perusahaan')
+                                            ->label('Perusahaan')
+                                            ->validationMessages([
+                                                'required' => 'Perusahaan tidak boleh kosong',
+                                            ])
+                                            ->required(),
+                                        TextInput::make('nik_npwp')
+                                            ->label('NIK / NPWP')
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'NIK / NPWP tidak boleh kosong',
+                                                'numeric' => 'NIK / NPWP tidak valid !'
+                                            ])
+                                            ->numeric(),
                                         TextInput::make('address')
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Alamat tidak boleh kosong',
+                                            ])
+                                            ->label('Alamat')
+                                            ->maxLength(255),
+                                        TextInput::make('telephone')
+                                            ->label('Telepon')
+                                            ->tel()
+                                            ->validationMessages([
+                                                'regex' => 'Telepon tidak valid !'
+                                            ])
+                                            ->placeholder('Contoh: 0211234567')
+                                            ->regex('/^0[2-9][0-9]{1,3}[0-9]{5,8}$/')
+                                            ->helperText('Hanya nomor telepon rumah/kantor, bukan nomor HP.')
                                             ->required()
                                             ->maxLength(255),
                                         TextInput::make('phone')
+                                            ->label('Handphone')
                                             ->tel()
+                                            ->validationMessages([
+                                                'required' => 'Nomor handphone tidak boleh kosong',
+                                                'regex' => 'Nomor handphone tidak valid !'
+                                            ])
                                             ->maxLength(15)
                                             ->rules(['regex:/^08[0-9]{8,12}$/'])
                                             ->required()
@@ -154,7 +227,43 @@ class SaleOrderResource extends Resource
                                         TextInput::make('email')
                                             ->email()
                                             ->required()
-                                            ->maxLength(255)
+                                            ->maxLength(255),
+                                        TextInput::make('fax')
+                                            ->label('Fax')
+                                            ->required(),
+                                        TextInput::make('tempo_kredit')
+                                            ->numeric()
+                                            ->label('Tempo Kredit (Hari)')
+                                            ->helperText('Hari')
+                                            ->required()
+                                            ->default(0),
+                                        TextInput::make('kredit_limit')
+                                            ->label('Kredit Limit (Rp.)')
+                                            ->default(0)
+                                            ->required()
+                                            ->numeric()
+                                            ->prefix('Rp.'),
+                                        Radio::make('tipe_pembayaran')
+                                            ->label('Tipe Bayar Customer')
+                                            ->inlineLabel()
+                                            ->options([
+                                                'Bebas' => 'Bebas',
+                                                'COD (Bayar Lunas)' => 'COD (Bayar Lunas)',
+                                                'Kredit' => 'Kredit (Bayar Kredit)'
+                                            ])->required(),
+                                        Radio::make('tipe')
+                                            ->label('Tipe Customer')
+                                            ->inlineLabel()
+                                            ->options([
+                                                'PKP' => 'PKP',
+                                                'PRI' => 'PRI'
+                                            ])
+                                            ->required(),
+                                        Checkbox::make('isSpecial')
+                                            ->label('Spesial (Ya / Tidak)'),
+                                        Textarea::make('keterangan')
+                                            ->label('Keterangan')
+                                            ->nullable(),
                                     ]),
                             ]),
                         TextInput::make('so_number')
@@ -167,7 +276,7 @@ class SaleOrderResource extends Resource
                                 ->tooltip('Generate SO Number')
                                 ->action(function ($set, $get, $state) {
                                     $salesOrderService = app(SalesOrderService::class);
-                                    $set('receipt_number', $salesOrderService->generateSoNumber());
+                                    $set('so_number', $salesOrderService->generateSoNumber());
                                 }))
                             ->maxLength(255),
                         DatePicker::make('order_date')

@@ -175,11 +175,11 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
-                    ->money('idr')
+                    ->suffix('%')
                     ->sortable(),
                 TextColumn::make('tax')
                     ->label('Tax')
-                    ->money('idr')
+                    ->suffix('%')
                     ->sortable(),
                 TextColumn::make('tipe_pajak')
                     ->label('Tipe Pajak')

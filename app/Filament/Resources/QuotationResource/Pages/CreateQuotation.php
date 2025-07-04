@@ -14,7 +14,7 @@ class CreateQuotation extends CreateRecord
     protected $quotationService;
     public function boot()
     {
-        $this->quotationService = new QuotationService();
+        $this->quotationService = app(QuotationService::class);
     }
     protected function afterCreate()
     {

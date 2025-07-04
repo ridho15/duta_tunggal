@@ -11,7 +11,7 @@ class QuotationService
     {
         $total = 0;
         foreach ($quotation->quotationItem as $item) {
-            $total += $item->total_price;
+            $total += $item->quantity * ($item->unit_price + $item->tax - $item->discount);
         }
 
         $quotation->update([

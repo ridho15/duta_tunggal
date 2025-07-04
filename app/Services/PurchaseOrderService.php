@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
 
 class PurchaseOrderService
@@ -10,14 +11,7 @@ class PurchaseOrderService
     {
         $total = 0;
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            $unit_price = $item->unit_price * $item->currency->to_rupiah;
-            $discount = $item->discount * $item->currency->to_rupiah;
-            $tax = $item->tax = $item->currency->to_rupiah;
-            $total += ($item->quantity * $unit_price) - $discount + $tax;
-        }
-
-        foreach ($purchaseOrder->purchaseOrderBiaya as $item) {
-            $total += $item->total * $item->currency->to_rupiah;
+            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax);
         }
 
         $purchaseOrder->update([
