@@ -494,6 +494,15 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'tax setting' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
         ];
 
         return $listPermissions;

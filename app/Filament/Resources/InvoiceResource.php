@@ -384,6 +384,14 @@ class InvoiceResource extends Resource
                                 return response()->streamDownload(function () use ($pdf) {
                                     echo $pdf->stream();
                                 }, 'Invoice_PO_' . $record->invoice_number . '.pdf');
+                            } elseif ($record->from_model_type == 'App\Models\SaleOrder') {
+                                $pdf = Pdf::loadView('pdf.sale-order-invoice', [
+                                    'invoice' => $record
+                                ])->setPaper('A4', 'potrait');
+
+                                return response()->streamDownload(function () use ($pdf) {
+                                    echo $pdf->stream();
+                                }, 'Invoice_SO_' . $record->invoice_number . '.pdf');
                             }
                         })
                 ])
