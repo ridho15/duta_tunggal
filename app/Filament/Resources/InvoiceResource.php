@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
+use App\Models\TaxSetting;
 use App\Services\InvoiceService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -128,6 +129,7 @@ class InvoiceResource extends Resource
 
                                         $set('invoiceItem', $items);
                                         $set('subtotal', $total);
+                                        $set('dpp', $total);
                                         $set('other_fee', $otherFee);
                                         $set('total', $total + $otherFee);
                                     })
@@ -154,33 +156,84 @@ class InvoiceResource extends Resource
                         TextInput::make('subtotal')
                             ->required()
                             ->numeric()
+                            ->validationMessages([
+                                'required' => 'Subtotal tidak boleh kosong',
+                                'numeric' => 'Subtotal tidak valid !'
+                            ])
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get) {
-                                $total = ($get('subtotal') + $get('other_fee') + ($get('tax') / 100));
-                                $set('total', $total);
-                            })
-                            ->suffix('%')
-                            ->default(0),
-                        TextInput::make('tax')
-                            ->required()
-                            ->suffix('%')
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $get) {
-                                $total = ($get('subtotal') + $get('other_fee') + ($get('tax') / 100));
-                                $set('total', $total);
-                            })
-                            ->numeric()
-                            ->default(0),
-                        TextInput::make('other_fee')
-                            ->required()
-                            ->numeric()
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $get) {
-                                $total = ($get('subtotal') + $get('other_fee') + ($get('tax') / 100));
-                                $set('total', $total);
+                                $set('total', static::hitungTotal($get));
                             })
                             ->prefix('Rp.')
                             ->default(0),
+                        TextInput::make('dpp')
+                            ->label('DPP')
+                            ->helperText('Dasar Penggunaan Pajak')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'DPP tidak boleh kosong',
+                                'numeric' => 'DPP tidak valid !'
+                            ])
+                            ->numeric()
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get) {
+                                $set('total', static::hitungTotal($get));
+                            })
+                            ->prefix('Rp.')
+                            ->default(0),
+                        TextInput::make('other_fee')
+                            ->label('Other Fee')
+                            ->required()
+                            ->numeric()
+                            ->validationMessages([
+                                'required' => 'Other fee tidak boleh kosong',
+                                'numeric' => 'Other fee tidak valid !'
+                            ])
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get) {
+                                $set('total', static::hitungTotal($get));
+                            })
+                            ->prefix('Rp.')
+                            ->default(0),
+                        TextInput::make('tax')
+                            ->label('Tax (%)')
+                            ->validationMessages([
+                                'required' => 'Tax tidak boleh kosong',
+                                'numeric' => 'Tax tidak valid'
+                            ])
+                            ->maxValue(100)
+                            ->required()
+                            ->suffix('%')
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get) {
+                                $set('total', static::hitungTotal($get));
+                            })
+                            ->numeric()
+                            ->default(0),
+                        TextInput::make('ppn_rate')
+                            ->label('PPN Rate (%)')
+                            ->validationMessages([
+                                'required' => 'PPN Rate tidak boleh kosong',
+                                'numeric' => 'PPN Rate tidak valid'
+                            ])
+                            ->maxValue(100)
+                            ->required()
+                            ->suffix('%')
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get) {
+                                $set('total', static::hitungTotal($get));
+                            })
+                            ->numeric()
+                            ->default(function () {
+                                $taxSetting = TaxSetting::where('status', true)
+                                    ->where('effective_date', '<=', now())
+                                    ->where('type', 'PPN')
+                                    ->orderByDesc('effective_date')
+                                    ->first();
+                                if ($taxSetting) {
+                                    return $taxSetting->rate;
+                                }
+                            }),
                         TextInput::make('total')
                             ->required()
                             ->prefix('Rp.')
@@ -222,6 +275,13 @@ class InvoiceResource extends Resource
                             ])
                     ])
             ]);
+    }
+
+    public static function hitungTotal($get)
+    {
+        $totalTax = ((int) $get('subtotal') + (int) $get('other_fee')) * ((int) $get('tax') / 100);
+        $total = (int) $get('subtotal') + (int) $get('other_fee') + $totalTax;
+        return $total;
     }
 
     public static function table(Table $table): Table

@@ -9,18 +9,21 @@ use App\Http\Controllers\HelperController;
 use App\Models\Customer;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\Rak;
 use App\Models\SaleOrder;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\CustomerService;
+use App\Services\PurchaseOrderService;
 use App\Services\SalesOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -42,6 +45,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -743,29 +747,88 @@ class SaleOrderResource extends Resource
                             return Auth::user()->hasPermissionTo('create purchase order');
                         })
                         ->form([
-                            Select::make('supplier_id')
-                                ->label('Supplier')
-                                ->preload()
-                                ->searchable()
-                                ->options(function () {
-                                    return Supplier::select(['id', 'name'])->get()->pluck('name', 'id');
-                                })->required(),
-                            TextInput::make('po_number')
-                                ->label('PO Number')
-                                ->string()
-                                ->maxLength(255)
-                                ->required(),
-                            DatePicker::make('order_date')
-                                ->label('Order Date')
-                                ->required(),
-                            DatePicker::make('expected_date')
-                                ->label('Expected Date')
-                                ->nullable(),
-                            Textarea::make('note')
-                                ->label('Note')
-                                ->nullable()
+                            Fieldset::make("Form")
+                                ->schema([
+                                    Select::make('supplier_id')
+                                        ->label('Supplier')
+                                        ->preload()
+                                        ->reactive()
+                                        ->searchable()
+                                        ->validationMessages([
+                                            'required' => 'Supplier harus dipilih',
+                                        ])
+                                        ->afterStateUpdated(function ($state, $set) {
+                                            $supplier = Supplier::find($state);
+                                            if ($supplier) {
+                                                $set('tempo_hutang', $supplier->tempo_hutang);
+                                            }
+                                        })
+                                        ->options(function () {
+                                            return Supplier::select(['id', 'name', 'code', DB::raw("CONCAT('(', code, ') ', name) as label")])->get()->pluck('label', 'id');
+                                        })->required(),
+                                    TextInput::make('po_number')
+                                        ->label('PO Number')
+                                        ->string()
+                                        ->reactive()
+                                        ->validationMessages([
+                                            'required' => 'PO Number tidak boleh kosong',
+                                            'string' => 'PO Number tidak valid !',
+                                            'unique' => 'PO Number sudah digunakan'
+                                        ])
+                                        ->suffixAction(ActionsAction::make('generatePoNumber')
+                                            ->icon('heroicon-m-arrow-path') // ikon reload
+                                            ->tooltip('Generate PO Number')
+                                            ->action(function ($set, $get, $state) {
+                                                $purchaseOrderService = app(PurchaseOrderService::class);
+                                                $set('po_number', $purchaseOrderService->generatePoNumber());
+                                            }))
+                                        ->maxLength(255)
+                                        ->rule(function ($state) {
+                                            $purchaseOrder = PurchaseOrder::where('po_number', $state)->first();
+                                            if ($purchaseOrder) {
+                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "PO number sudah digunakan");
+                                                throw ValidationException::withMessages([
+                                                    "items" => 'PO Number sudah digunakan'
+                                                ]);
+                                            }
+                                        })
+                                        ->required(),
+                                    DatePicker::make('order_date')
+                                        ->label('Tanggal Pembelian')
+                                        ->validationMessages([
+                                            'required' => 'Tanggal Pembelian tidak boleh kosong'
+                                        ])
+                                        ->required(),
+                                    DatePicker::make('delivery_date')
+                                        ->label('Tanggal Pengiriman'),
+                                    DatePicker::make('expected_date')
+                                        ->label('Tanggal Diharapkan'),
+                                    Select::make('warehouse_id')
+                                        ->label('Gudang')
+                                        ->preload()
+                                        ->searchable(['name', 'kode'])
+                                        ->required()
+                                        ->options(function () {
+                                            return Warehouse::select(['id', 'kode', 'name', DB::raw("CONCAT('(', kode, ') ', name) as label")])->get()->pluck('label', 'id');
+                                        })
+                                        ->validationMessages([
+                                            'required' => 'Gudang belum dipilih',
+                                        ]),
+                                    TextInput::make('tempo_hutang')
+                                        ->label('Tempo Hutang (Hari)')
+                                        ->numeric()
+                                        ->reactive()
+                                        ->default(0)
+                                        ->validationMessages([
+                                            'required' => 'Tempo Hutan tidak boleh kosong',
+                                        ])
+                                        ->required()
+                                        ->suffix('Hari'),
+                                    Textarea::make('note')
+                                        ->label('Note')
+                                        ->nullable()
+                                ])
                         ])
-                        ->requiresConfirmation()
                         ->action(function (array $data, $record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->createPurchaseOrder($record, $data);

@@ -77,6 +77,14 @@
                 {{ $item->shipped_to }}
                 @endforeach</td>
         </tr>
+        <tr>
+            <td style="border: none;">Driver</td>
+            <td style="border: none;">: {{ $deliveryOrder->driver->name }}</td>
+        </tr>
+        <tr>
+            <td style="border: none;">Vehicle</td>
+            <td style="border: none;">: {{ $deliveryOrder->vehicle->plate }} - {{ $deliveryOrder->vehicle->type }}</td>
+        </tr>
     </table>
 
     <br>

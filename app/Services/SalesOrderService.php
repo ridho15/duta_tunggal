@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\HelperController;
+use App\Models\Currency;
 use App\Models\SaleOrder;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -84,19 +85,23 @@ class SalesOrderService
     public function createPurchaseOrder($saleOrder, $data)
     {
         // Create Purchase order
-        $saleOrder->purchaseOrder()->create([
+        $purchaseOrder = $saleOrder->purchaseOrder()->create([
             'po_number' => $data['po_number'],
             'supplier_id' => $data['supplier_id'],
             'order_date' => $data['order_date'],
             'note' => $data['note'],
-            'expected_date' => $data['expected_date']
+            'warehouse_id' => $data['warehouse_id'],
+            'delivery_date' => $data['delivery_date'],
+            'expected_date' => $data['expected_date'],
+            'tempo_hutang' => $data['tempo_hutang'],
         ]);
 
         foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
             $saleOrderItem->purchaseOrderItem()->create([
-                'purchase_order_id' => $saleOrder->purchaseOrder->id,
+                'purchase_order_id' => $purchaseOrder->id,
                 'product_id' => $saleOrderItem->product_id,
                 'quantity' => $saleOrderItem->quantity,
+                'currency_id' => Currency::first()->id,
                 'unit_price' => $saleOrderItem->product->sell_price,
                 'discount' => 0,
                 'tax' => 0,

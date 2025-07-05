@@ -5,17 +5,26 @@ namespace App\Filament\Resources\SaleOrderResource\Pages;
 use App\Filament\Resources\SaleOrderResource;
 use App\Http\Controllers\HelperController;
 use App\Models\ChartOfAccount;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
+use App\Models\Warehouse;
+use App\Services\PurchaseOrderService;
 use App\Services\SalesOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ViewSaleOrder extends ViewRecord
 {
@@ -168,6 +177,101 @@ class ViewSaleOrder extends ViewRecord
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->titipSaldo($record, $data);
                         HelperController::sendNotification(isSuccess: true, title: "Information", message: "Saldo Titip Customer berhasil disimpan");
+                    }),
+                Action::make('create_purchase_order')
+                    ->label('Create Purchase Order')
+                    ->color('success')
+                    ->icon('heroicon-o-document-duplicate')
+                    ->visible(function ($record) {
+                        return Auth::user()->hasPermissionTo('create purchase order');
+                    })
+                    ->form([
+                        Fieldset::make("Form")
+                            ->schema([
+                                Select::make('supplier_id')
+                                    ->label('Supplier')
+                                    ->preload()
+                                    ->reactive()
+                                    ->searchable()
+                                    ->validationMessages([
+                                        'required' => 'Supplier harus dipilih',
+                                    ])
+                                    ->afterStateUpdated(function ($state, $set) {
+                                        $supplier = Supplier::find($state);
+                                        if ($supplier) {
+                                            $set('tempo_hutang', $supplier->tempo_hutang);
+                                        }
+                                    })
+                                    ->options(function () {
+                                        return Supplier::select(['id', 'name', 'code', DB::raw("CONCAT('(', code, ') ', name) as label")])->get()->pluck('label', 'id');
+                                    })->required(),
+                                TextInput::make('po_number')
+                                    ->label('PO Number')
+                                    ->string()
+                                    ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'PO Number tidak boleh kosong',
+                                        'string' => 'PO Number tidak valid !',
+                                        'unique' => 'PO Number sudah digunakan'
+                                    ])
+                                    ->suffixAction(ActionsAction::make('generatePoNumber')
+                                        ->icon('heroicon-m-arrow-path') // ikon reload
+                                        ->tooltip('Generate PO Number')
+                                        ->action(function ($set, $get, $state) {
+                                            $purchaseOrderService = app(PurchaseOrderService::class);
+                                            $set('po_number', $purchaseOrderService->generatePoNumber());
+                                        }))
+                                    ->maxLength(255)
+                                    ->rule(function ($state) {
+                                        $purchaseOrder = PurchaseOrder::where('po_number', $state)->first();
+                                        if ($purchaseOrder) {
+                                            HelperController::sendNotification(isSuccess: false, title: 'Information', message: "PO number sudah digunakan");
+                                            throw ValidationException::withMessages([
+                                                "items" => 'PO Number sudah digunakan'
+                                            ]);
+                                        }
+                                    })
+                                    ->required(),
+                                DatePicker::make('order_date')
+                                    ->label('Tanggal Pembelian')
+                                    ->validationMessages([
+                                        'required' => 'Tanggal Pembelian tidak boleh kosong'
+                                    ])
+                                    ->required(),
+                                DatePicker::make('delivery_date')
+                                    ->label('Tanggal Pengiriman'),
+                                DatePicker::make('expected_date')
+                                    ->label('Tanggal Diharapkan'),
+                                Select::make('warehouse_id')
+                                    ->label('Gudang')
+                                    ->preload()
+                                    ->searchable(['name', 'kode'])
+                                    ->required()
+                                    ->options(function () {
+                                        return Warehouse::select(['id', 'kode', 'name', DB::raw("CONCAT('(', kode, ') ', name) as label")])->get()->pluck('label', 'id');
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Gudang belum dipilih',
+                                    ]),
+                                TextInput::make('tempo_hutang')
+                                    ->label('Tempo Hutang (Hari)')
+                                    ->numeric()
+                                    ->reactive()
+                                    ->default(0)
+                                    ->validationMessages([
+                                        'required' => 'Tempo Hutan tidak boleh kosong',
+                                    ])
+                                    ->required()
+                                    ->suffix('Hari'),
+                                Textarea::make('note')
+                                    ->label('Note')
+                                    ->nullable()
+                            ])
+                    ])
+                    ->action(function (array $data, $record) {
+                        $salesOrderService = app(SalesOrderService::class);
+                        $salesOrderService->createPurchaseOrder($record, $data);
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order Created");
                     }),
                 Action::make('sync_total_amount')
                     ->icon('heroicon-o-arrow-path-rounded-square')

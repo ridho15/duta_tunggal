@@ -12,6 +12,7 @@ use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Services\DeliveryOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -52,7 +53,19 @@ class DeliveryOrderResource extends Resource
                         TextInput::make('do_number')
                             ->label('Develiry Order Number')
                             ->maxLength(255)
+                            ->reactive()
+                            ->suffixAction(ActionsAction::make('generateDoNumber')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate DO Number')
+                                ->action(function ($set, $get, $state) {
+                                    $deliveryOrderService = app(DeliveryOrderService::class);
+                                    $set('do_number', $deliveryOrderService->generateDoNumber());
+                                }))
                             ->required()
+                            ->validationMessages([
+                                'required' => 'DO Number tidak boleh kosong',
+                                'unique' => 'DO number sudah digunakan'
+                            ])
                             ->unique(ignoreRecord: true),
                         Select::make('sales_order_id')
                             ->label('From Sales')
@@ -81,17 +94,27 @@ class DeliveryOrderResource extends Resource
                             ->multiple()
                             ->nullable(),
                         DateTimePicker::make('delivery_date')
+                            ->label('Delivery Date')
+                            ->validationMessages([
+                                'required' => 'Delivery Date tidak boleh kosong',
+                            ])
                             ->required(),
                         Select::make('driver_id')
                             ->label('Driver')
                             ->searchable()
                             ->preload()
+                            ->validationMessages([
+                                'required' => 'Driver tidak boleh kosong',
+                            ])
                             ->relationship('driver', 'name')
                             ->required(),
                         Select::make('vehicle_id')
                             ->label('Vehicle')
                             ->preload()
                             ->searchable()
+                            ->validationMessages([
+                                'required' => 'Vehicle tidak boleh kosong',
+                            ])
                             ->relationship('vehicle', 'plate')
                             ->required(),
                         Textarea::make('notes')
@@ -337,7 +360,7 @@ class DeliveryOrderResource extends Resource
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
                         ->visible(function () {
-                            return Auth::user()->hasRole(['Owner']);
+                            return Auth::user()->hasRole(['Super Admin', 'Owner']);
                         })
                         ->color('success')
                         ->action(function ($record) {
@@ -359,6 +382,11 @@ class DeliveryOrderResource extends Resource
         return [
             //
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->orderBy('delivery_date', 'DESC');
     }
 
     public static function getPages(): array

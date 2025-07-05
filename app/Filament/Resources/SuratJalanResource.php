@@ -4,8 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SuratJalanResource\Pages;
 use App\Http\Controllers\HelperController;
+use App\Models\DeliveryOrder;
 use App\Models\SuratJalan;
+use App\Services\SuratJalanService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -42,10 +45,25 @@ class SuratJalanResource extends Resource
                         TextInput::make('sj_number')
                             ->label('Surat Jalan Number')
                             ->required()
+                            ->reactive()
+                            ->suffixAction(ActionsAction::make('generateCode')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Kode')
+                                ->action(function ($set, $get, $state) {
+                                    $suratJalanService = app(SuratJalanService::class);
+                                    $set('sj_number', $suratJalanService->generateCode());
+                                }))
+                            ->validationMessages([
+                                'required' => "Surat Jalan Number tidak boleh kosong",
+                                'unique' => 'Surat Jalan number sudah digunakan'
+                            ])
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
                         DateTimePicker::make('issued_at')
                             ->label('Issue At')
+                            ->validationMessages([
+                                'required' => 'Tanggal Surat jalan harus dibuat'
+                            ])
                             ->helperText('Tanggal surat jalan dibuat')
                             ->required(),
                         Select::make('delivery_order_id')

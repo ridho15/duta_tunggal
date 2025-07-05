@@ -31,6 +31,7 @@ use App\Services\QuotationService;
 use App\Services\ReturnProductService;
 use App\Services\SalesOrderService;
 use App\Services\SupplierService;
+use App\Services\SuratJalanService;
 use App\Services\WarehouseService;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Database\Eloquent\Model;
@@ -103,6 +104,9 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->bind(CabangService::class, function ($app) {
             return new CabangService;
+        });
+        $this->app->bind(SuratJalanService::class, function ($app) {
+            return new SuratJalanService;
         });
     }
 

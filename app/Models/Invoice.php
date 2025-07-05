@@ -21,7 +21,9 @@ class Invoice extends Model
         'other_fee',
         'total',
         'due_date',
-        'status' // darft, sent, paid, partially_paid, overdue
+        'status', // darft, sent, paid, partially_paid, overdue
+        'ppn_rate',
+        'dpp', //Dasar penggunaan pajak,
     ];
 
     public function invoiceItem()

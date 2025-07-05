@@ -143,6 +143,9 @@ class PurchaseOrderResource extends Resource
                             ->preload()
                             ->reactive()
                             ->relationship('supplier', 'name')
+                            ->validationMessages([
+                                'required' => 'Supplier belum dipilih',
+                            ])
                             ->searchable(['code', 'name'])
                             ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
                                 return "({$supplier->code}) {$supplier->name}";
