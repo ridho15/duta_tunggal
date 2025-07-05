@@ -101,7 +101,7 @@ class SalesOrderService
                 'purchase_order_id' => $purchaseOrder->id,
                 'product_id' => $saleOrderItem->product_id,
                 'quantity' => $saleOrderItem->quantity,
-                'currency_id' => Currency::first()->id,
+                'currency_id' => Currency::where('name', 'Rupiah')->first()->id,
                 'unit_price' => $saleOrderItem->product->sell_price,
                 'discount' => 0,
                 'tax' => 0,
