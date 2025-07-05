@@ -66,21 +66,23 @@ class QuotationItemRelationManager extends RelationManager
                         TextInput::make('discount')
                             ->label('Discount')
                             ->numeric()
+                            ->maxValue(100)
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
                             })
                             ->reactive()
                             ->default(0)
-                            ->prefix('Rp.'),
+                            ->suffix('%'),
                         TextInput::make('tax')
                             ->label('Tax')
                             ->numeric()
+                            ->maxValue(100)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
                             })
                             ->default(0)
-                            ->prefix('Rp.'),
+                            ->suffix('Rp.'),
                         TextInput::make('total_price')
                             ->label('Total Price')
                             ->numeric()
@@ -114,11 +116,11 @@ class QuotationItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
-                    ->money('idr')
+                    ->suffix(' %')
                     ->sortable(),
                 TextColumn::make('tax')
                     ->label('Tax')
-                    ->money('idr')
+                    ->suffix(' %')
                     ->sortable(),
                 TextColumn::make('total_price')
                     ->label('Total Price')
@@ -133,7 +135,7 @@ class QuotationItemRelationManager extends RelationManager
             ])
             ->actions([
                 EditAction::make(),
-                DeleteAction::make(),
+                DeleteAction::make()
             ])
             ->bulkActions([
                 BulkActionGroup::make([

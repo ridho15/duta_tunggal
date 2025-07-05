@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class InventoryStock extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'inventory_stocks';
     protected $fillable = [
         'product_id',
         'warehouse_id',
         'qty_available',
         'qty_reserved',
+        'qty_min',
         'rak_id', // nullable,
     ];
 

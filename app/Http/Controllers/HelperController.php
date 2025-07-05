@@ -531,7 +531,7 @@ class HelperController extends Controller
         $afterDiscount = $subtotal - $discountAmount;
         $tax_amount = $afterDiscount * $tax / 100;
         $total = $afterDiscount + $tax_amount;
-        return $total;
+        return round($total, 2);
     }
 
     public static function sendNotification($isSuccess = false, $title = "", $message = "")

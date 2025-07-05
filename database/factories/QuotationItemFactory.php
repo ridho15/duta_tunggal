@@ -21,9 +21,9 @@ class QuotationItemFactory extends Factory
         $quotation = Quotation::inRandomOrder()->first()->id;
         $product = Product::inRandomOrder()->first();
         $unit_price = $product->sell_price;
-        $discount = random_int(0, 20000);
+        $discount = random_int(0, 20);
         $quantity = random_int(1, 20);
-        $tax = random_int(0, 10000);
+        $tax = random_int(0, 20);
         $total_price = ($unit_price * $quantity) - $discount + $tax;
         return [
             'quotation_id' => $quotation,

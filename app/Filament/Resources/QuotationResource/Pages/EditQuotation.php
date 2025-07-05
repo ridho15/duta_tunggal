@@ -11,12 +11,6 @@ use Filament\Resources\Pages\EditRecord;
 class EditQuotation extends EditRecord
 {
     protected static string $resource = QuotationResource::class;
-
-    protected $quotationService;
-    public function boot()
-    {
-        $this->quotationService = new QuotationService();
-    }
     protected function getHeaderActions(): array
     {
         return [
@@ -27,6 +21,7 @@ class EditQuotation extends EditRecord
 
     protected function afterSave()
     {
-        $this->quotationService->updateTotalAmount($this->getRecord());
+        $quotationService = app(QuotationService::class);
+        $quotationService->updateTotalAmount($this->getRecord());
     }
 }

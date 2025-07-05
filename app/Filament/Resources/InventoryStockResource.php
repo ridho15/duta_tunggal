@@ -58,6 +58,11 @@ class InventoryStockResource extends Resource
                             ->required()
                             ->numeric()
                             ->default(0),
+                        TextInput::make('qty_min')
+                            ->label('Quantity Minimal')
+                            ->required()
+                            ->numeric()
+                            ->default(0),
                         Select::make('rak_id')
                             ->label('Rak')
                             ->preload()
@@ -114,6 +119,10 @@ class InventoryStockResource extends Resource
                     ->sortable(),
                 TextColumn::make('qty_reserved')
                     ->label('Quantity Reserved')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('qty_min')
+                    ->label('Quantity Minimal')
                     ->numeric()
                     ->sortable(),
             ])

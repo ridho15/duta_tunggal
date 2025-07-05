@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\HelperController;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -11,7 +12,7 @@ class QuotationService
     {
         $total = 0;
         foreach ($quotation->quotationItem as $item) {
-            $total += $item->quantity * ($item->unit_price + $item->tax - $item->discount);
+            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax);
         }
 
         $quotation->update([

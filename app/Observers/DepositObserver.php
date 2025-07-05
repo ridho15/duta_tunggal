@@ -23,10 +23,7 @@ class DepositObserver
     /**
      * Handle the Deposit "updated" event.
      */
-    public function updated(Deposit $deposit): void
-    {
-        //
-    }
+    public function updated(Deposit $deposit): void {}
 
     /**
      * Handle the Deposit "deleted" event.

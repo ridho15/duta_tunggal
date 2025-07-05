@@ -13,7 +13,7 @@ class DepositLog extends Model
     protected $table = 'deposit_logs';
     protected $fillable = [
         'deposit_id',
-        'type', // create, use, return, cancel, 'add
+        'type', // create, use, return, cancel, add
         'reference_type',
         'reference_id',
         'amount',

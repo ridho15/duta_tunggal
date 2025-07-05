@@ -7,14 +7,16 @@ use App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder;
 use App\Filament\Resources\SaleOrderResource\RelationManagers\SaleOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
 use App\Models\Customer;
+use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Quotation;
+use App\Models\Rak;
 use App\Models\SaleOrder;
 use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Services\CustomerService;
 use App\Services\SalesOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Database\Seeders\SaleOrderSeeder;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
@@ -38,8 +40,10 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SaleOrderResource extends Resource
 {
@@ -105,6 +109,7 @@ class SaleOrderResource extends Resource
                                     }
                                     $set('total_amount', $quotation->total_amount);
                                     $set('customer_id', $quotation->customer_id);
+                                    $set('shipped_to', $quotation->customer->address);
                                     $set('saleOrderItem', $items);
                                 }
                             })
@@ -125,18 +130,21 @@ class SaleOrderResource extends Resource
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $items = [];
                                 $saleOrder = SaleOrder::find($state);
-                                foreach ($saleOrder->saleOrderItem as $item) {
-                                    array_push($items, [
-                                        'product_id' => $item->product_id,
-                                        'unit_price' => $item->unit_price,
-                                        'quantity' => $item->quantity,
-                                        'discount' => $item->discount,
-                                        'tax' => $item->tax,
-                                        'notes' => $item->notes,
-                                    ]);
+                                if ($saleOrder) {
+                                    foreach ($saleOrder->saleOrderItem as $item) {
+                                        array_push($items, [
+                                            'product_id' => $item->product_id,
+                                            'unit_price' => $item->unit_price,
+                                            'quantity' => $item->quantity,
+                                            'discount' => $item->discount,
+                                            'tax' => $item->tax,
+                                            'notes' => $item->notes,
+                                        ]);
+                                    }
+                                    $set('total_amount', $saleOrder->total_amount);
+                                    $set('customer_id', $saleOrder->customer_id);
+                                    $set('shipped_to', $saleOrder->customer->address);
                                 }
-                                $set('total_amount', $saleOrder->total_amount);
-                                $set('customer_id', $saleOrder->customer_id);
                                 $set('saleOrderItem', $items);
                             })
                             ->options(SaleOrder::select(['id', 'so_number', 'customer_id'])->get()->pluck('so_number', 'id'))
@@ -147,9 +155,19 @@ class SaleOrderResource extends Resource
                             ->preload()
                             ->searchable()
                             ->reactive()
+                            ->helperText(function ($state) {
+                                $customer = Customer::find($state);
+                                if ($customer && $customer->deposit->remaining_amount) {
+                                    return "Saldo : Rp." . number_format($customer->deposit->remaining_amount, 0, ',', '.');
+                                }
+
+                                return null;
+                            })
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $customer = Customer::find($state);
-                                $set('shipped_to', $customer->address);
+                                if ($customer) {
+                                    $set('shipped_to', $customer->address);
+                                }
                             })
                             ->relationship('customer', 'name')
                             ->getOptionLabelFromRecordUsing(function (Customer $customer) {
@@ -284,6 +302,7 @@ class SaleOrderResource extends Resource
                         DatePicker::make('delivery_date'),
                         TextInput::make('shipped_to')
                             ->label('Shipped To')
+                            ->reactive()
                             ->nullable(),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
@@ -298,11 +317,42 @@ class SaleOrderResource extends Resource
                             ->columnSpanFull()
                             ->reactive()
                             ->columns(3)
+                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
+                                return $data;
+                            })
+                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data) {
+                                return $data;
+                            })
                             ->addActionLabel("Add Items")
                             ->schema([
+                                Select::make('warehouse_id')
+                                    ->label('Gudang')
+                                    ->searchable(['name', 'kode'])
+                                    ->preload()
+                                    ->reactive()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Gudang belum dipilih'
+                                    ])
+                                    ->relationship('warehouse', 'name')
+                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                        return "({$warehouse->kode}) {$warehouse->name}";
+                                    }),
+                                Select::make('rak_id')
+                                    ->label('Rak')
+                                    ->preload()
+                                    ->reactive()
+                                    ->searchable(['name', 'code'])
+                                    ->relationship('rak', 'name', function (Builder $query, $get) {
+                                        return $query->where('warehouse_id', $get('warehouse_id'));
+                                    })
+                                    ->nullable()
+                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
+                                        return "({$rak->code}) {$rak->name}";
+                                    }),
                                 Select::make('product_id')
                                     ->label('Product')
-                                    ->searchable()
+                                    ->searchable(['sku', 'name'])
                                     ->preload()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
@@ -310,8 +360,28 @@ class SaleOrderResource extends Resource
                                         $set('unit_price', $product->sell_price);
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
+                                    ->validationMessages([
+                                        'required' => 'Produk belum dipilih'
+                                    ])
                                     ->required()
-                                    ->relationship('product', 'id')
+                                    ->helperText(function ($get) {
+                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
+                                            return $query->where('warehouse_id', $get('warehouse_id'))
+                                                ->orWhere('rak_id', $get('rak_id'));
+                                        })
+                                            ->where('product_id', $get('product_id'))->first();
+                                        if ($inventoryStock) {
+                                            return "Stock : " . $inventoryStock->qty_available;
+                                        }
+
+                                        return null;
+                                    })
+                                    ->relationship('product', 'name', function (Builder $query,  $get) {
+                                        return $query->whereHas('inventoryStock', function (Builder $query) use ($get) {
+                                            $query->where('warehouse_id', $get('warehouse_id'))
+                                                ->orWhere('rak_id', $get('rak_id'));
+                                        });
+                                    })
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
                                     }),
@@ -319,8 +389,36 @@ class SaleOrderResource extends Resource
                                     ->label('Quantity')
                                     ->numeric()
                                     ->reactive()
+                                    ->rule(function ($get) {
+                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
+                                            return $query->where('warehouse_id', $get('warehouse_id'))
+                                                ->orWhere('rak_id', $get('rak_id'));
+                                        })
+                                            ->where('product_id', $get('product_id'))->first();
+                                        if ($inventoryStock && ($inventoryStock->qty_available < $get('quantity'))) {
+                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock tidak mencukupi");
+                                            throw ValidationException::withMessages([
+                                                'saleOrderItem' => 'Stock tidak mencukupi'
+                                            ]);
+                                        }
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Quantity harus diisi',
+                                        'numeric' => 'Quantity tidak valid !'
+                                    ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
+                                    })
+                                    ->helperText(function ($get) {
+                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
+                                            return $query->where('warehouse_id', $get('warehouse_id'))
+                                                ->orWhere('rak_id', $get('rak_id'));
+                                        })
+                                            ->where('product_id', $get('product_id'))->first();
+
+                                        if ($inventoryStock && ($inventoryStock->qty_available < $get('quantity'))) {
+                                            return "Stock tidak mencukupi";
+                                        }
                                     })
                                     ->required()
                                     ->default(0),
@@ -328,6 +426,10 @@ class SaleOrderResource extends Resource
                                     ->label('Unit Price')
                                     ->numeric()
                                     ->default(0)
+                                    ->validationMessages([
+                                        'required' => 'Unit Price harus diisi',
+                                        'numeric' => 'Unit Price tidak valid !'
+                                    ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
@@ -341,7 +443,7 @@ class SaleOrderResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
-                                    ->prefix('Rp.'),
+                                    ->suffix('%'),
                                 TextInput::make('tax')
                                     ->label('Tax')
                                     ->numeric()
@@ -350,7 +452,7 @@ class SaleOrderResource extends Resource
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                                     })
                                     ->default(0)
-                                    ->prefix('Rp.'),
+                                    ->suffix('%'),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total')
                                     ->reactive()
@@ -415,10 +517,6 @@ class SaleOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->money('idr')
-                    ->sortable(),
-                TextColumn::make('titip_saldo')
-                    ->label('Titip Saldo')
                     ->money('idr')
                     ->sortable(),
                 TextColumn::make('requestApproveBy.name')
@@ -601,17 +699,41 @@ class SaleOrderResource extends Resource
                         ->label('Saldo Titip Customer')
                         ->icon('heroicon-o-banknotes')
                         ->color('warning')
-                        ->form([
-                            TextInput::make('titip_saldo')
-                                ->numeric()
-                                ->prefix('Rp.')
-                                ->required()
-                                ->default(0),
-                        ])
+                        ->form(function ($record) {
+                            if ($record->customer->deposit->id == null) {
+                                return [
+                                    TextInput::make('titip_saldo')
+                                        ->numeric()
+                                        ->prefix('Rp.')
+                                        ->required()
+                                        ->default(0),
+                                    Select::make('coa_id')
+                                        ->label('COA')
+                                        ->preload()
+                                        ->searchable()
+                                        ->relationship('coa', 'name')
+                                        ->required(),
+                                    Textarea::make('note')
+                                        ->label('Note')
+                                        ->nullable()
+                                ];
+                            } else {
+                                return [
+                                    TextInput::make('titip_saldo')
+                                        ->numeric()
+                                        ->prefix('Rp.')
+                                        ->required()
+                                        ->default(0),
+                                    Textarea::make('note')
+                                        ->label('Note')
+                                        ->nullable()
+                                ];
+                            }
+                        })
                         ->action(function (array $data, $record) {
-                            $record->update([
-                                'titip_saldo' => $data['titip_saldo'],
-                            ]);
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->titipSaldo($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Saldo Titip Customer berhasil disimpan");
                         }),
                     Action::make('create_purchase_order')
                         ->label('Create Purchase Order')

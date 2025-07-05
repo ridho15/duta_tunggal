@@ -4,16 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\QuotationResource\Pages;
 use App\Filament\Resources\QuotationResource\Pages\ViewQuotation;
-use App\Filament\Resources\QuotationResource\RelationManagers;
 use App\Filament\Resources\QuotationResource\RelationManagers\QuotationItemRelationManager;
 use App\Http\Controllers\HelperController;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Services\QuotationService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
@@ -23,7 +20,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -33,8 +29,6 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -45,7 +39,7 @@ class QuotationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
 
-    protected static ?string $navigationGroup = 'Quotation';
+    protected static ?string $navigationGroup = 'Penjualan';
 
     public static function form(Form $form): Form
     {
@@ -75,6 +69,7 @@ class QuotationResource extends Resource
                             ->label('Customer')
                             ->searchable()
                             ->preload()
+                            ->reactive()
                             ->relationship('customer', 'name')
                             ->required(),
                         DatePicker::make('date')
@@ -142,17 +137,19 @@ class QuotationResource extends Resource
                                         $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
                                     })
                                     ->reactive()
+                                    ->maxValue(100)
                                     ->default(0)
-                                    ->prefix('Rp.'),
+                                    ->suffix('%'),
                                 TextInput::make('tax')
                                     ->label('Tax')
                                     ->numeric()
                                     ->reactive()
+                                    ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
                                     })
                                     ->default(0)
-                                    ->prefix('Rp.'),
+                                    ->suffix('%'),
                                 TextInput::make('total_price')
                                     ->label('Total Price')
                                     ->numeric()

@@ -48,4 +48,9 @@ class Cabang extends Model
             $cabang->warehouse()->withTrashed()->restore();
         });
     }
+
+    public function product()
+    {
+        return $this->hasMany(Product::class, 'cabang_id');
+    }
 }

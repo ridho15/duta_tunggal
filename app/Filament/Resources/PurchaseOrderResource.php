@@ -736,8 +736,9 @@ class PurchaseOrderResource extends Resource
                                 ->required(),
                             TextInput::make('tax')
                                 ->required()
-                                ->prefix('Rp.')
+                                ->suffix('%')
                                 ->numeric()
+                                ->maxValue(100)
                                 ->default(0),
                             TextInput::make('other_fee')
                                 ->required()

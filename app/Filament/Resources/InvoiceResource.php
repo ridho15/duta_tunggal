@@ -155,18 +155,18 @@ class InvoiceResource extends Resource
                             ->required()
                             ->numeric()
                             ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                $total = $state + $get('tax') + $get('other_fee');
+                            ->afterStateUpdated(function ($set, $get) {
+                                $total = ($get('subtotal') + $get('other_fee') + ($get('tax') / 100));
                                 $set('total', $total);
                             })
-                            ->prefix('Rp.')
+                            ->suffix('%')
                             ->default(0),
                         TextInput::make('tax')
                             ->required()
-                            ->prefix('Rp.')
+                            ->suffix('%')
                             ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                $total = $get('subtotal') + $state + $get('other_fee');
+                            ->afterStateUpdated(function ($set, $get) {
+                                $total = ($get('subtotal') + $get('other_fee') + ($get('tax') / 100));
                                 $set('total', $total);
                             })
                             ->numeric()
@@ -175,8 +175,8 @@ class InvoiceResource extends Resource
                             ->required()
                             ->numeric()
                             ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                $total = $get('subtotal') + $get('tax') + $state;
+                            ->afterStateUpdated(function ($set, $get) {
+                                $total = ($get('subtotal') + $get('other_fee') + ($get('tax') / 100));
                                 $set('total', $total);
                             })
                             ->prefix('Rp.')

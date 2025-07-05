@@ -51,4 +51,9 @@ class Customer extends Model
     {
         return $this->morphOne(Deposit::class, 'from_model')->withDefault();
     }
+
+    public function depositLog()
+    {
+        return $this->morphMany(DepositLog::class, 'reference');
+    }
 }

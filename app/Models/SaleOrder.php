@@ -30,7 +30,6 @@ class SaleOrder extends Model
         'shipped_to',
         'reject_by',
         'reject_at',
-        'titip_saldo',
         'reason_close'
     ];
 
@@ -82,6 +81,10 @@ class SaleOrder extends Model
     public function purchaseOrder()
     {
         return $this->morphMany(PurchaseOrder::class, 'refer_model');
+    }
+
+    public function depositLog(){
+        return $this->morphMany(DepositLog::class,'reference');
     }
 
     protected static function booted()

@@ -124,4 +124,38 @@ class SalesOrderService
 
         return 'RN-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
+
+    public function titipSaldo($saleOrder, $data)
+    {
+        if ($saleOrder->customer->deposit->id == null) {
+            $deposit = $saleOrder->customer->deposit()->create([
+                'amount' => $data['titip_saldo'],
+                'used_amount' => 0,
+                'remaining_amount' => $data['titip_saldo'],
+                'coa_id' => $data['coa_id'],
+                'created_by' => Auth::user()->id,
+            ]);
+        } else {
+            $deposit = $saleOrder->customer->deposit()->update([
+                'amount' => $saleOrder->customer->deposit->amount + $data['titip_saldo'],
+                'remaining_amount' => $saleOrder->customer->deposit->amount + $data['titip_saldo']
+            ]);
+
+            $saleOrder->customer->deposit->depositLog()->create([
+                'deposit_id' => $deposit->id,
+                'type' => 'add',
+                'amount' => $data['titip_saldo'],
+                'note' => $data['note'],
+                'created_by' => Auth::user()->id,
+            ]);
+
+            $saleOrder->depositLog()->create([
+                'deposit_id' => $deposit->id,
+                'type' => 'add',
+                'amount' => $data['titip_saldo'],
+                'note' => $data['note'],
+                'created_by' => Auth::user()->id,
+            ]);
+        }
+    }
 }

@@ -17,7 +17,9 @@ class SaleOrderItem extends Model
         'quantity',
         'unit_price',
         'discount',
-        'tax'
+        'tax',
+        'warehouse_id',
+        'rak_id'
     ];
 
     public function saleOrder()
@@ -33,5 +35,15 @@ class SaleOrderItem extends Model
     public function purchaseOrderItem()
     {
         return $this->morphMany(PurchaseOrderItem::class, 'refer_item_model');
+    }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function rak()
+    {
+        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
     }
 }
