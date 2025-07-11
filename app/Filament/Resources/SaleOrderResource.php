@@ -23,7 +23,6 @@ use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -292,6 +291,10 @@ class SaleOrderResource extends Resource
                             ->label('SO Number')
                             ->required()
                             ->reactive()
+                            ->validationMessages([
+                                'required' => 'SO number tidak boleh kosong',
+                                'unique' => 'SO Number sudah digunakan !'
+                            ])
                             ->unique(ignoreRecord: true)
                             ->suffixAction(ActionsAction::make('generateSoNumber')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
@@ -316,6 +319,16 @@ class SaleOrderResource extends Resource
                             ->reactive()
                             ->default(0)
                             ->numeric(),
+                        Radio::make('tipe_pengiriman')
+                            ->label('Tipe Pengiriman Ke Customer')
+                            ->inline()
+                            ->options([
+                                'Ambil Sendiri' => 'Customer Ambil Sendiri',
+                                'Kirim Langsung' => 'Kirim Ke Customer'
+                            ])->required()
+                            ->validationMessages([
+                                'required' => 'Tipe Pengiriman belum di pilih'
+                            ]),
                         Repeater::make('saleOrderItem')
                             ->relationship()
                             ->columnSpanFull()
@@ -329,31 +342,6 @@ class SaleOrderResource extends Resource
                             })
                             ->addActionLabel("Add Items")
                             ->schema([
-                                Select::make('warehouse_id')
-                                    ->label('Gudang')
-                                    ->searchable(['name', 'kode'])
-                                    ->preload()
-                                    ->reactive()
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'Gudang belum dipilih'
-                                    ])
-                                    ->relationship('warehouse', 'name')
-                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                        return "({$warehouse->kode}) {$warehouse->name}";
-                                    }),
-                                Select::make('rak_id')
-                                    ->label('Rak')
-                                    ->preload()
-                                    ->reactive()
-                                    ->searchable(['name', 'code'])
-                                    ->relationship('rak', 'name', function (Builder $query, $get) {
-                                        return $query->where('warehouse_id', $get('warehouse_id'));
-                                    })
-                                    ->nullable()
-                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return "({$rak->code}) {$rak->name}";
-                                    }),
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->searchable(['sku', 'name'])
@@ -380,14 +368,38 @@ class SaleOrderResource extends Resource
 
                                         return null;
                                     })
-                                    ->relationship('product', 'name', function (Builder $query,  $get) {
-                                        return $query->whereHas('inventoryStock', function (Builder $query) use ($get) {
-                                            $query->where('warehouse_id', $get('warehouse_id'))
-                                                ->orWhere('rak_id', $get('rak_id'));
-                                        });
-                                    })
+                                    ->relationship('product', 'name')
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
+                                    }),
+                                Select::make('warehouse_id')
+                                    ->label('Gudang')
+                                    ->searchable(['name', 'kode'])
+                                    ->preload()
+                                    ->reactive()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Gudang belum dipilih'
+                                    ])
+                                    ->relationship('warehouse', 'name', function (Builder $query, $get) {
+                                        $query->whereHas('inventoryStock', function (Builder $query) use ($get) {
+                                            $query->where('product_id', $get('product_id'));
+                                        });
+                                    })
+                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                        return "({$warehouse->kode}) {$warehouse->name}";
+                                    }),
+                                Select::make('rak_id')
+                                    ->label('Rak')
+                                    ->preload()
+                                    ->reactive()
+                                    ->searchable(['name', 'code'])
+                                    ->relationship('rak', 'name', function (Builder $query, $get) {
+                                        return $query->where('warehouse_id', $get('warehouse_id'));
+                                    })
+                                    ->nullable()
+                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
+                                        return "({$rak->code}) {$rak->name}";
                                     }),
                                 TextInput::make('quantity')
                                     ->label('Quantity')

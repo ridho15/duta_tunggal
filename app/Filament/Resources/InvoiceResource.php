@@ -323,7 +323,7 @@ class InvoiceResource extends Resource
                     ->sortable(),
                 TextColumn::make('tax')
                     ->numeric()
-                    ->money('idr')
+                    ->suffix(' %')
                     ->sortable(),
                 TextColumn::make('other_fee')
                     ->numeric()

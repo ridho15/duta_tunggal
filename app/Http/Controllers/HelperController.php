@@ -503,6 +503,23 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'bill of material' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],'bill of material item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
         ];
 
         return $listPermissions;

@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Quotation;
 use App\Services\QuotationService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\FileUpload;
@@ -63,16 +64,36 @@ class QuotationResource extends Resource
                             }),
                         TextInput::make('quotation_number')
                             ->required()
+                            ->label('Quotation Number')
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'Quotation number tidak boleh kosong',
+                                'unique' => 'Quotation number sudah digunakan'
+                            ])
                             ->unique(ignoreRecord: true)
+                            ->suffixAction(ActionsAction::make('generateQuotationNumber')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate Quotation Number')
+                                ->action(function ($set, $get, $state) {
+                                    $quotationService = app(QuotationService::class);
+                                    $set('quotation_number', $quotationService->generateCode());
+                                }))
                             ->maxLength(255),
                         Select::make('customer_id')
                             ->label('Customer')
                             ->searchable()
                             ->preload()
                             ->reactive()
+                            ->validationMessages([
+                                'required' => 'Customer waji dipilih'
+                            ])
                             ->relationship('customer', 'name')
                             ->required(),
                         DatePicker::make('date')
+                            ->label('Tanggal')
+                            ->validationMessages([
+                                'required' => 'Tanggal wajib dipilih'
+                            ])
                             ->required(),
                         DatePicker::make('valid_until'),
                         TextInput::make('total_amount')
@@ -103,6 +124,10 @@ class QuotationResource extends Resource
                                     ->label('Product')
                                     ->preload()
                                     ->searchable()
+                                    ->validationMessages([
+                                        'required' => 'Produk wajib dipilih'
+                                    ])
+                                    ->required()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::find($state);
@@ -116,6 +141,10 @@ class QuotationResource extends Resource
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->numeric()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Unit price wajib diisi'
+                                    ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('total_price', HelperController::hitungSubtotal($get('quantity'), $state, $get('discount'), $get('tax')));
@@ -125,6 +154,10 @@ class QuotationResource extends Resource
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Quantity wajib diisi'
+                                    ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('total_price', HelperController::hitungSubtotal($state, $get('unit_price'), $get('discount'), $get('tax')));
                                     })
@@ -144,6 +177,10 @@ class QuotationResource extends Resource
                                     ->label('Tax')
                                     ->numeric()
                                     ->reactive()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Tax tidak boleh kosong'
+                                    ])
                                     ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
@@ -154,6 +191,7 @@ class QuotationResource extends Resource
                                     ->label('Total Price')
                                     ->numeric()
                                     ->reactive()
+                                    ->required()
                                     ->default(0)
                                     ->prefix('Rp.'),
                                 Textarea::make('notes')

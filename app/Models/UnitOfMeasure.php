@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UnitOfMeasure extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'unit_of_measures';
     protected $fillable = [
         'name',
@@ -19,5 +19,10 @@ class UnitOfMeasure extends Model
     public function product()
     {
         return $this->hasMany(Product::class, 'uom_id');
+    }
+
+    public function productUnitConversion()
+    {
+        return $this->hasMany(ProductUnitConversion::class, 'uom_id');
     }
 }

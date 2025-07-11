@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SaleOrder extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'sale_orders';
     protected $fillable = [
         'customer_id',
@@ -30,7 +30,8 @@ class SaleOrder extends Model
         'shipped_to',
         'reject_by',
         'reject_at',
-        'reason_close'
+        'reason_close',
+        'tipe_pengiriman' // Ambil Sendiri, Kirim Langsung
     ];
 
     public function customer()
@@ -83,8 +84,9 @@ class SaleOrder extends Model
         return $this->morphMany(PurchaseOrder::class, 'refer_model');
     }
 
-    public function depositLog(){
-        return $this->morphMany(DepositLog::class,'reference');
+    public function depositLog()
+    {
+        return $this->morphMany(DepositLog::class, 'reference');
     }
 
     protected static function booted()

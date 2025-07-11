@@ -112,11 +112,11 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
-                    ->money('idr')
+                    ->suffix(' %')
                     ->sortable(),
                 TextColumn::make('tax')
                     ->label('Tax')
-                    ->money('idr')
+                    ->suffix(' %')
                     ->sortable(),
                 TextColumn::make('id')
                     ->label('Sub Total')
@@ -131,17 +131,13 @@ class SaleOrderItemRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                CreateAction::make()
-                    ->icon('heroicon-o-plus-circle'),
+                // CreateAction::make()
+                //     ->icon('heroicon-o-plus-circle'),
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make(),
             ])
             ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                
             ]);
     }
 }

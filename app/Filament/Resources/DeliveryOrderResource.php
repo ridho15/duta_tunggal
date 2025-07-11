@@ -89,7 +89,7 @@ class DeliveryOrderResource extends Resource
                                 $set('deliveryOrderItem', $items);
                             })
                             ->relationship('salesOrders', 'so_number', function (Builder $query) {
-                                $query->whereIn('status', ['approved', 'completed']);
+                                $query->where('tipe_pengiriman', 'Kirim Langsung')->whereIn('status', ['approved', 'completed']);
                             })
                             ->multiple()
                             ->nullable(),

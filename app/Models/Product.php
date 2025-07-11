@@ -28,6 +28,7 @@ class Product extends Model
         'description',
         'uom_id', // Satuan
         'is_asset',
+        'is_manufacture',
     ];
 
     public function cabang()

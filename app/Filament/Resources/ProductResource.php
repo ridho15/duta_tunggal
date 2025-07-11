@@ -10,6 +10,7 @@ use App\Models\Cabang;
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -26,6 +27,7 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -158,6 +160,9 @@ class ProductResource extends Resource
                         Toggle::make('is_asset')
                             ->label('Is Asset')
                             ->reactive(),
+                        Checkbox::make('is_manufacture')
+                            ->label('Manufacture ?')
+                            ->nullable(),
                     ])
             ]);
     }
@@ -209,6 +214,9 @@ class ProductResource extends Resource
                     ->badge()->label('Tipe Pajak'),
                 TextColumn::make('productCategory.name')
                     ->label('Kategori'),
+                IconColumn::make('is_manufacture')
+                    ->label('Manufacture ?')
+                    ->boolean()
             ])
             ->filters([
                 //
@@ -337,7 +345,7 @@ class ProductResource extends Resource
                                             })
                                             ->suffix('%'),
                                         TextInput::make('item_value')
-                                            ->label('Item Value (%)')
+                                            ->label('Item Value')
                                             ->numeric()
                                             ->disabled()
                                             ->default(function ($record) {
