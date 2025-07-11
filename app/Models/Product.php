@@ -71,6 +71,16 @@ class Product extends Model
         return $this->hasMany(PurchaseOrderItem::class, 'product_id');
     }
 
+    public function billOfMaterial()
+    {
+        return $this->hasMany(BillOfMaterial::class, 'product_id');
+    }
+
+    public function billOfMaterialItem()
+    {
+        return $this->hasMany(BillOfMaterialItem::class, 'product_id');
+    }
+
     protected static function booted()
     {
         static::deleting(function ($product) {

@@ -135,7 +135,8 @@ class BillOfMaterialResource extends Resource
                                     ->reactive()
                                     ->searchable()
                                     ->validationMessages([
-                                        'required' => 'Material belum dipilih'
+                                        'required' => 'Material belum dipilih',
+                                        'exists' => 'Material tidak tersedia !'
                                     ])
                                     ->afterStateUpdated(function($set, $get, $state){
                                         $product = Product::find($state);
