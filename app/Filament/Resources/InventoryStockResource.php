@@ -37,7 +37,11 @@ class InventoryStockResource extends Resource
                         Select::make('product_id')
                             ->label('Product')
                             ->preload()
-                            ->searchable()
+                            ->searchable(['sku', 'name'])
+                            ->validationMessages([
+                                'required' => 'Product belum dipilih',
+                                'exists' => 'Product tidak tersedia'
+                            ])
                             ->relationship('product', 'id')
                             ->getOptionLabelFromRecordUsing(function (Product $product) {
                                 return "({$product->sku}) {$product->name}";
@@ -46,27 +50,40 @@ class InventoryStockResource extends Resource
                         Select::make('warehosue_id')
                             ->label('Gudang')
                             ->preload()
-                            ->searchable()
+                            ->searchable(['kode', 'name'])
+                            ->validationMessages([
+                                'required' => 'Gudang belum dipilih',
+                                'exists' => 'Gudang tidak tersedia'
+                            ])
                             ->reactive()
                             ->relationship('warehouse', 'name')
                             ->required(),
                         TextInput::make('qty_available')
                             ->required()
                             ->numeric()
+                            ->validationMessages([
+                                'required' => 'Quantity available tidak boleh kosong'
+                            ])
                             ->default(0),
                         TextInput::make('qty_reserved')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Quantity reserved tidak boleh kosong'
+                            ])
                             ->numeric()
                             ->default(0),
                         TextInput::make('qty_min')
                             ->label('Quantity Minimal')
                             ->required()
                             ->numeric()
+                            ->validationMessages([
+                                'required' => 'Quantity minimal tidak boleh kosong'
+                            ])
                             ->default(0),
                         Select::make('rak_id')
                             ->label('Rak')
                             ->preload()
-                            ->searchable()
+                            ->searchable(['name', 'code'])
                             ->reactive()
                             ->relationship('rak', 'name', function ($get, Builder $query) {
                                 $query->where('warehouse_id', $get('warehouse_id'));
