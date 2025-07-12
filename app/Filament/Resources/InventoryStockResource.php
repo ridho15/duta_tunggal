@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\InventoryStockResource\Pages;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\Warehouse;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -56,7 +57,10 @@ class InventoryStockResource extends Resource
                                 'exists' => 'Gudang tidak tersedia'
                             ])
                             ->reactive()
-                            ->relationship('warehouse', 'name')
+                            ->relationship('warehouse', 'id')
+                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                return "({$warehouse->kode}) {$warehouse->name}";
+                            })
                             ->required(),
                         TextInput::make('qty_available')
                             ->required()
