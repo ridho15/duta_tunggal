@@ -17,7 +17,7 @@ class ManufacturingOrderMaterial extends Model
         'qty_required',
         'qty_used',
         'warehouse_id',
-        'product_unit_conversions_id',
+        'uom_id',
         'rak_id'
     ];
 
@@ -36,9 +36,9 @@ class ManufacturingOrderMaterial extends Model
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
     }
 
-    public function productUnitConversion()
+    public function uom()
     {
-        return $this->belongsTo(ProductUnitConversion::class, 'product_unit_conversions_id')->withDefault();
+        return $this->belongsTo(UnitOfMeasure::class, 'uom_id')->withDefault();
     }
 
     public function rak()

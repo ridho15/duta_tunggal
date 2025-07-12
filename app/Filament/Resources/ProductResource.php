@@ -9,7 +9,9 @@ use App\Filament\Resources\ProductResource\RelationManagers\StockMovementRelatio
 use App\Models\Cabang;
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;
+use App\Services\ProductService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -53,6 +55,19 @@ class ProductResource extends Resource
                     ->schema([
                         TextInput::make('sku')
                             ->label('SKU')
+                            ->validationMessages([
+                                'required' => 'SKU tidak boleh kosong',
+                                'unique' => 'SKU sudah digunakan !',
+                                'max' => 'SKU terlalu panjang'
+                            ])
+                            ->reactive()
+                            ->suffixAction(ActionsAction::make('generateSku')
+                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                ->tooltip('Generate SKU')
+                                ->action(function ($set, $get, $state) {
+                                    $productService = app(ProductService::class);
+                                    $set('sku', $productService->generateSku());
+                                }))
                             ->unique(ignoreRecord: true)
                             ->required()
                             ->maxLength(255),
@@ -128,11 +143,20 @@ class ProductResource extends Resource
                             ->numeric()
                             ->default(0),
                         TextInput::make('kode_merk')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Kode merek tidak boleh kosong',
+                                'max' => 'Kode merek terlalu panjang'
+                            ])
                             ->label('Kode Merk')
                             ->maxLength(50),
                         Select::make('uom_id')
                             ->label('Satuan')
                             ->preload()
+                            ->validationMessages([
+                                'required' => 'Satuan belum dipilih',
+                                'exists' => "Satuan tidak tersedia"
+                            ])
                             ->searchable()
                             ->relationship('uom', 'name')
                             ->required(),

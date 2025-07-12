@@ -7,6 +7,25 @@ use App\Models\StockMovement;
 
 class ProductService
 {
+    public function generateSku()
+    {
+        $date = now()->format('Ymd');
+
+        // Hitung berapa PO pada hari ini
+        $last = Product::whereDate('created_at', now()->toDateString())
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $number = 1;
+
+        if ($last) {
+            // Ambil nomor urut terakhir
+            $lastNumber = intval(substr($last->sku, -4));
+            $number = $lastNumber + 1;
+        }
+
+        return 'SKU-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+    }
     public function updateHargaPerKategori($data)
     {
         $listProduct = Product::where('cabang_id', $data['cabang_id'])

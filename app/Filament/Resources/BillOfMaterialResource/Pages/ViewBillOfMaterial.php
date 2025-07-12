@@ -21,4 +21,19 @@ class ViewBillOfMaterial extends ViewRecord
                 ->icon('heroicon-o-pencil-square')
         ];
     }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $product = $this->getRecord()->product;
+        $listConversions = [];
+        foreach ($product->unitConversions as $index => $conversion) {
+            $listConversions[$index] = [
+                'uom_id' => $conversion->uom_id,
+                'nilai_konversi' => $conversion->nilai_konversi
+            ];
+        }
+
+        $data['satuan_konversi'] = $listConversions;
+        return $data;
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ManufacturingOrderResource\Pages;
 use App\Filament\Resources\ManufacturingOrderResource\Pages\ViewManufacturingOrder;
 use App\Http\Controllers\HelperController;
+use App\Models\BillOfMaterial;
 use App\Models\InventoryStock;
 use App\Models\ManufacturingOrder;
 use App\Models\Product;
@@ -15,6 +16,7 @@ use App\Services\ManufacturingService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -51,6 +53,10 @@ class ManufacturingOrderResource extends Resource
                         TextInput::make('mo_number')
                             ->required()
                             ->reactive()
+                            ->validationMessages([
+                                'required' => 'MO Number tidak boleh kosong',
+                                'unique' => 'MO number sudah digunakan !'
+                            ])
                             ->unique(ignoreRecord: true)
                             ->suffixAction(Action::make('generateMoNumber')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
@@ -64,97 +70,124 @@ class ManufacturingOrderResource extends Resource
                             ->required()
                             ->label('Product')
                             ->preload()
+                            ->validationMessages([
+                                'required' => 'Produk belum dipilih',
+                                'unique' => ''
+                            ])
                             ->reactive()
                             ->searchable()
-                            ->relationship('product', 'name')
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $product = Product::find($get('product_id'));
+                                if ($product) {
+                                    $set('uom_id', $product->uom_id);
+                                    static::hitungMaterial($product, $set, $get('quantity'));
+                                }
+                            })
+                            ->relationship('product', 'name', function (Builder $query) {
+                                $query->where('is_manufacture', true);
+                            })
                             ->getOptionLabelFromRecordUsing(function (Product $product) {
                                 return "({$product->sku}) {$product->name}";
                             }),
                         TextInput::make('quantity')
                             ->label('Quantity')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Quantity tidak boleh kosong',
+                                'numeric' => 'Quantity tidak valid !'
+                            ])
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $product = Product::find($get('product_id'));
+                                if ($product) {
+                                    static::hitungMaterial($product, $set, $get('quantity'));
+                                }
+                            })
                             ->numeric()
-                            ->default(0),
-                        Select::make('product_unit_conversions_id')
-                            ->label('Satuan Conversi')
+                            ->default(1),
+                        Select::make('uom_id')
+                            ->label('Satuan')
                             ->reactive()
                             ->preload()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Satuan belum dipilih',
+                                'exists' => 'Satuan tidak tersedia'
+                            ])
                             ->searchable()
-                            ->relationship('productUnitConversion', 'id', function (Builder $query, $get) {
-                                $query->where('product_id', $get('product_id'));
-                            })
-                            ->getOptionLabelFromRecordUsing(function (ProductUnitConversion $productUnitConversion) {
-                                return "{$productUnitConversion->uom->name} {$productUnitConversion->nilai_konversi}";
-                            })
-                            ->createOptionForm(function ($get) {
-                                return [
-                                    Fieldset::make('Satuan Conversi')
-                                        ->schema([
-                                            Select::make('product_id')
-                                                ->label('Product')
-                                                ->preload()
-                                                ->searchable()
-                                                ->required()
-                                                ->reactive()
-                                                ->relationship('product', 'id')
-                                                ->getOptionLabelFromRecordUsing(function (Product $product) {
-                                                    return "({$product->sku}) {$product->name}";
-                                                }),
-                                            Select::make('uom_id')
-                                                ->label('Satuan')
-                                                ->preload()
-                                                ->searchable()
-                                                ->reactive()
-                                                ->relationship('uom', 'name')
-                                                ->required(),
-                                            TextInput::make('nilai_konversi')
-                                                ->label('Nilai Konversi')
-                                                ->numeric()
-                                                ->default(0)
-                                                ->required()
-                                        ])
-                                ];
-                            }),
+                            ->relationship('uom', 'name'),
                         DateTimePicker::make('start_date')
                             ->label('Tanggal Mulai'),
                         DateTimePicker::make('end_date')
                             ->label('Tanggal Selesai'),
                         Repeater::make('manufacturingOrderMaterial')
                             ->relationship()
+                            ->label('Materials')
+                            ->addAction(function (Action $action) {
+                                return $action->color('primary')
+                                    ->label('Tambah Material')
+                                    ->icon('heroicon-o-plus-circle');
+                            })
                             ->columnSpanFull()
                             ->columns(3)
                             ->schema([
                                 Select::make('material_id')
-                                    ->label('Material')
-                                    ->helperText("Bahan Baku")
+                                    ->label('Material (Bahan Baku)')
                                     ->preload()
                                     ->searchable()
+                                    ->validationMessages([
+                                        'required' => 'Bahan baku belum dipilih'
+                                    ])
                                     ->required()
+                                    ->reactive()
+                                    ->afterStateUpdated(function($get, $set, $state){
+                                        $product = Product::find($state);
+                                        if($product){
+                                            $set('uom_id', $product->uom_id);
+                                        }
+                                    })
                                     ->relationship('material', 'sku')
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
+                                    })->helperText(function ($get) {
+                                        $inventoryStock = InventoryStock::where('product_id', $get('material_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->when($get('rak_id') != null, function ($query) use ($get) {
+                                                $query->where('rak_id', $get('rak_id'));
+                                            })
+                                            ->first();
+                                        if ($inventoryStock) {
+                                            return "Stock Material : {$inventoryStock->qty_available}";
+                                        }
+
+                                        return "Stock Material : 0";
                                     }),
-                                Select::make('product_unit_conversions_id')
+                                Select::make('uom_id')
                                     ->label('Satuan')
                                     ->preload()
                                     ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'Satuan belum dipilih',
+                                        'exists' => 'Satuan tidak tersedia !'
+                                    ])
                                     ->searchable()
                                     ->required()
-                                    ->relationship('productUnitConversion', 'id', function (Builder $query, $get) {
-                                        $query->where('product_id', $get('material_id'));
-                                    })
-                                    ->getOptionLabelFromRecordUsing(function (ProductUnitConversion $productUnitConversion) {
-                                        return "{$productUnitConversion->uom->name} {$productUnitConversion->nilai_konversi}";
-                                    }),
+                                    ->relationship('uom', 'name'),
                                 TextInput::make('qty_required')
                                     ->label('Quantity Required')
                                     ->helperText("Quantity yang dibutuhkan")
                                     ->numeric()
+                                    ->validationMessages([
+                                        'required' => 'Quantity yang dibutuhkan belum diisi',
+                                    ])
                                     ->required()
                                     ->default(0),
                                 TextInput::make('qty_used')
                                     ->label('Quantity Used')
                                     ->numeric()
+                                    ->validationMessages([
+                                        'required' => 'Quantity yang digunakan belum diisi'
+                                    ])
                                     ->helperText('Quantity yang digunakan')
                                     ->required()
                                     ->default(0),
@@ -162,6 +195,10 @@ class ManufacturingOrderResource extends Resource
                                     ->label('Gudang')
                                     ->preload()
                                     ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'Gudang belum dipilih',
+                                        'exists' => 'Gudang tidak tersedia'
+                                    ])
                                     ->searchable()
                                     ->required()
                                     ->relationship('warehouse', 'name', function (Builder $query, $get) {
@@ -177,17 +214,6 @@ class ManufacturingOrderResource extends Resource
                                     ->preload()
                                     ->reactive()
                                     ->searchable()
-                                    ->helperText(function ($get) {
-                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
-                                            $query->where('warehouse_id', $get('warehouse_id'))
-                                                ->orWhere('rak_id', $get('rak_id'));
-                                        })->where('product_id', $get('material_id'))->first();
-                                        if ($inventoryStock) {
-                                            return "Stock Material : {$inventoryStock->qty_available}";
-                                        }
-
-                                        return "Stock Material : 0";
-                                    })
                                     ->relationship('rak', 'id', function (Builder $query, $get) {
                                         $query->where('warehouse_id', $get('warehouse_id'));
                                     })->getOptionLabelFromRecordUsing(function (Rak $rak) {
@@ -196,6 +222,24 @@ class ManufacturingOrderResource extends Resource
                             ])
                     ])
             ]);
+    }
+
+    public static function hitungMaterial($product, $set, $quantity)
+    {
+        $billOfMaterial = $product->billOfMaterial->first();
+        if ($billOfMaterial) {
+            $listMaterial = [];
+            foreach ($billOfMaterial->items as $index => $item) {
+                $listMaterial[$index] = [
+                    'material_id' => $item->product_id,
+                    'qty_required' => $item->quantity * $quantity,
+                    'qty_used' => $item->quantity * $quantity,
+                    'uom_id' => $item->uom_id,
+                ];
+            }
+
+            $set('manufacturingOrderMaterial', $listMaterial);
+        }
     }
 
     public static function table(Table $table): Table

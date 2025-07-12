@@ -7,6 +7,7 @@ use App\Filament\Resources\BillOfMaterialResource\Pages\ViewBillOfMaterial;
 use App\Models\BillOfMaterial;
 use App\Models\Cabang;
 use App\Models\Product;
+use App\Models\UnitOfMeasure;
 use App\Services\BillOfMaterialService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Fieldset;
@@ -17,14 +18,17 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Tables\Enums\ActionsPosition;
 
 class BillOfMaterialResource extends Resource
 {
@@ -90,6 +94,15 @@ class BillOfMaterialResource extends Resource
                                 $product = Product::find($state);
                                 if ($product) {
                                     $set('uom_id', $product->uom_id);
+                                    $listConversions = [];
+                                    foreach ($product->unitConversions as $index => $conversion) {
+                                        $listConversions[$index] = [
+                                            'uom_id' => $conversion->uom_id,
+                                            'nilai_konversi' => $conversion->nilai_konversi
+                                        ];
+                                    }
+
+                                    $set('satuan_konversi', $listConversions);
                                 }
                             })
                             ->validationMessages([
@@ -105,11 +118,7 @@ class BillOfMaterialResource extends Resource
                             ->preload()
                             ->reactive()
                             ->searchable(['name'])
-                            ->relationship('uom', 'name', function (Builder $query, $get) {
-                                $query->whereHas('productUnitConversion', function ($query) use ($get) {
-                                    $query->where('product_id', $get('product_id'));
-                                });
-                            })
+                            ->relationship('uom', 'name')
                             ->validationMessages([
                                 'required' => 'Unit of measure belum dipilih',
                                 'exists' => 'Unit of measure tidak ditemukan !'
@@ -124,9 +133,47 @@ class BillOfMaterialResource extends Resource
                             ->nullable(),
                         Toggle::make('is_active')
                             ->required(),
+                        Repeater::make('satuan_konversi')
+                            ->columnSpanFull()
+                            ->columns(2)
+                            ->reactive()
+                            ->disabled()
+                            ->label("Satuan Konversi")
+                            ->schema([
+                                Select::make('uom_id')
+                                    ->label('Satuan')
+                                    ->preload()
+                                    ->disabled()
+                                    ->reactive()
+                                    ->searchable()
+                                    ->options(function () {
+                                        return UnitOfMeasure::get()->pluck('name', 'id');
+                                    }),
+                                TextInput::make('nilai_konversi')
+                                    ->label('Nilai Konversi')
+                                    ->reactive()
+                                    ->disabled()
+                                    ->numeric(),
+                            ]),
                         Repeater::make('items')
                             ->relationship()
                             ->columnSpanFull()
+                            ->addAction(function (Action $action) {
+                                return $action->color('primary')
+                                    ->icon('heroicon-o-plus-circle');
+                            })
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data) {
+                                $listConversions = [];
+                                $product = Product::find($data['product_id']);
+                                foreach ($product->unitConversions as $index => $conversion) {
+                                    $listConversions[$index] = [
+                                        'uom_id' => $conversion->uom_id,
+                                        'nilai_konversi' => $conversion->nilai_konversi
+                                    ];
+                                }
+                                $data['satuan_konversi'] = $listConversions;
+                                return $data;
+                            })
                             ->columns(2)
                             ->schema([
                                 Select::make('product_id')
@@ -138,10 +185,19 @@ class BillOfMaterialResource extends Resource
                                         'required' => 'Material belum dipilih',
                                         'exists' => 'Material tidak tersedia !'
                                     ])
-                                    ->afterStateUpdated(function($set, $get, $state){
+                                    ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::find($state);
-                                        if($product){
+                                        if ($product) {
                                             $set('uom_id', $product->uom_id);
+                                            $listConversions = [];
+                                            foreach ($product->unitConversions as $index => $conversion) {
+                                                $listConversions[$index] = [
+                                                    'uom_id' => $conversion->uom_id,
+                                                    'nilai_konversi' => $conversion->nilai_konversi
+                                                ];
+                                            }
+
+                                            $set('satuan_konversi', $listConversions);
                                         }
                                     })
                                     ->relationship('product', 'name')
@@ -169,7 +225,27 @@ class BillOfMaterialResource extends Resource
                                     ->default(0),
                                 Textarea::make('note')
                                     ->label('Catatan')
-                                    ->nullable()
+                                    ->nullable(),
+                                Repeater::make('satuan_konversi')
+                                    ->label('Satuan Konversi')
+                                    ->disabled()
+                                    ->reactive()
+                                    ->columnSpanFull()
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('uom_id')
+                                            ->label('Satuan')
+                                            ->preload()
+                                            ->reactive()
+                                            ->searchable()
+                                            ->relationship('uom', 'name')
+                                            ->required(),
+                                        TextInput::make('nilai_konversi')
+                                            ->label('Nilai Konversi')
+                                            ->numeric()
+                                            ->reactive()
+                                            ->required(),
+                                    ])
                             ])
 
                     ])
@@ -214,6 +290,12 @@ class BillOfMaterialResource extends Resource
                     ->sortable(),
                 IconColumn::make('is_active')
                     ->boolean(),
+                TextColumn::make('items.product')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->sku}) {$state->name}";
+                    })
+                    ->label("Material")
+                    ->badge(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -232,9 +314,14 @@ class BillOfMaterialResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make()
-            ])
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

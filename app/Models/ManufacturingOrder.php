@@ -19,7 +19,7 @@ class ManufacturingOrder extends Model
         'status', // draft, in_progress, completed
         'start_date',
         'end_date',
-        'product_unit_conversions_id'
+        'uom_id'
     ];
 
     public function product()
@@ -32,9 +32,9 @@ class ManufacturingOrder extends Model
         return $this->hasMany(manufacturingOrderMaterial::class, 'manufacturing_order_id');
     }
 
-    public function productUnitConversion()
+    public function uom()
     {
-        return $this->belongsTo(ProductUnitConversion::class, 'product_unit_conversions_id')->withDefault();
+        return $this->belongsTo(UnitOfMeasure::class, 'uom_id')->withDefault();
     }
 
     public function production()
