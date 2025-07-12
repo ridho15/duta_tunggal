@@ -11,6 +11,7 @@ use App\Models\ManufacturingOrder;
 use App\Models\Product;
 use App\Models\ProductUnitConversion;
 use App\Models\Rak;
+use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
 use App\Services\ManufacturingService;
 use Filament\Forms\Components\Actions\Action;
@@ -81,6 +82,15 @@ class ManufacturingOrderResource extends Resource
                                 if ($product) {
                                     $set('uom_id', $product->uom_id);
                                     static::hitungMaterial($product, $set, $get('quantity'));
+                                    $listConversions = [];
+                                    foreach ($product->unitConversions as $index => $conversion) {
+                                        $listConversions[$index] = [
+                                            'uom_id' => $conversion->uom_id,
+                                            'nilai_konversi' => $conversion->nilai_konversi
+                                        ];
+                                    }
+
+                                    $set('satuan_konversi', $listConversions);
                                 }
                             })
                             ->relationship('product', 'name', function (Builder $query) {
@@ -88,6 +98,38 @@ class ManufacturingOrderResource extends Resource
                             })
                             ->getOptionLabelFromRecordUsing(function (Product $product) {
                                 return "({$product->sku}) {$product->name}";
+                            }),
+                        Select::make('warehouse_id')
+                            ->label('Gudang')
+                            ->preload()
+                            ->reactive()
+                            ->searchable(['kode', 'name'])
+                            ->relationship('warehouse', 'id', function (Builder $query, $get) {
+                                $query->whereHas('inventoryStock', function ($query) use ($get) {
+                                    $query->where('product_id', $get('product_id'));
+                                });
+                            })
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Gudang belum dipilih',
+                                'exists' => 'Gudang tidak tersedia'
+                            ])
+                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                return "({$warehouse->kode}) {$warehouse->name}";
+                            }),
+                        Select::make('rak_id')
+                            ->label('Rak')
+                            ->preload()
+                            ->reactive()
+                            ->searchable(['code', 'name'])
+                            ->relationship('rak', 'id', function (Builder $query, $get) {
+                                $query->where('warehouse_id', $get('warehouse_id'));
+                            })
+                            ->validationMessages([
+                                'exists' => 'Rak tidak tersedia'
+                            ])
+                            ->getOptionLabelFromRecordUsing(function (Rak $rak) {
+                                return "({$rak->code}) {$rak->name}";
                             }),
                         TextInput::make('quantity')
                             ->label('Quantity')
@@ -120,6 +162,28 @@ class ManufacturingOrderResource extends Resource
                             ->label('Tanggal Mulai'),
                         DateTimePicker::make('end_date')
                             ->label('Tanggal Selesai'),
+                        Repeater::make('satuan_konversi')
+                            ->columnSpanFull()
+                            ->columns(2)
+                            ->reactive()
+                            ->disabled()
+                            ->label("Satuan Konversi")
+                            ->schema([
+                                Select::make('uom_id')
+                                    ->label('Satuan')
+                                    ->preload()
+                                    ->disabled()
+                                    ->reactive()
+                                    ->searchable()
+                                    ->options(function () {
+                                        return UnitOfMeasure::get()->pluck('name', 'id');
+                                    }),
+                                TextInput::make('nilai_konversi')
+                                    ->label('Nilai Konversi')
+                                    ->reactive()
+                                    ->disabled()
+                                    ->numeric(),
+                            ]),
                         Repeater::make('manufacturingOrderMaterial')
                             ->relationship()
                             ->label('Materials')
@@ -127,6 +191,18 @@ class ManufacturingOrderResource extends Resource
                                 return $action->color('primary')
                                     ->label('Tambah Material')
                                     ->icon('heroicon-o-plus-circle');
+                            })
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data) {
+                                $listConversions = [];
+                                $product = Product::find($data['material_id']);
+                                foreach ($product->unitConversions as $index => $conversion) {
+                                    $listConversions[$index] = [
+                                        'uom_id' => $conversion->uom_id,
+                                        'nilai_konversi' => $conversion->nilai_konversi
+                                    ];
+                                }
+                                $data['satuan_konversi'] = $listConversions;
+                                return $data;
                             })
                             ->columnSpanFull()
                             ->columns(3)
@@ -140,10 +216,19 @@ class ManufacturingOrderResource extends Resource
                                     ])
                                     ->required()
                                     ->reactive()
-                                    ->afterStateUpdated(function($get, $set, $state){
+                                    ->afterStateUpdated(function ($get, $set, $state) {
                                         $product = Product::find($state);
-                                        if($product){
+                                        if ($product) {
                                             $set('uom_id', $product->uom_id);
+                                            $listConversions = [];
+                                            foreach ($product->unitConversions as $index => $conversion) {
+                                                $listConversions[$index] = [
+                                                    'uom_id' => $conversion->uom_id,
+                                                    'nilai_konversi' => $conversion->nilai_konversi
+                                                ];
+                                            }
+
+                                            $set('satuan_konversi', $listConversions);
                                         }
                                     })
                                     ->relationship('material', 'sku')
@@ -174,21 +259,77 @@ class ManufacturingOrderResource extends Resource
                                     ->required()
                                     ->relationship('uom', 'name'),
                                 TextInput::make('qty_required')
-                                    ->label('Quantity Required')
-                                    ->helperText("Quantity yang dibutuhkan")
+                                    ->label('Quantity Required (Dibutuhkan)')
+                                    ->helperText(function ($get) {
+                                        $inventoryStock = InventoryStock::where('product_id', $get('material_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->when($get('rak_id') != null, function ($query) use ($get) {
+                                                $query->where('rak_id', $get('rak_id'));
+                                            })
+                                            ->first();
+                                        if ($inventoryStock) {
+                                            if ($inventoryStock->qty_available < $get('qty_used')) {
+                                                return "Quantity tidak mencukupi";
+                                            }
+                                        }
+
+                                        return null;
+                                    })
                                     ->numeric()
                                     ->validationMessages([
                                         'required' => 'Quantity yang dibutuhkan belum diisi',
                                     ])
+                                    ->reactive()
+                                    ->maxValue(function ($get) {
+                                        $inventoryStock = InventoryStock::where('product_id', $get('material_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->when($get('rak_id') != null, function ($query) use ($get) {
+                                                $query->where('rak_id', $get('rak_id'));
+                                            })
+                                            ->first();
+                                        if ($inventoryStock) {
+                                            return $inventoryStock->qty_available;
+                                        }
+
+                                        return 0;
+                                    })
                                     ->required()
                                     ->default(0),
                                 TextInput::make('qty_used')
-                                    ->label('Quantity Used')
+                                    ->label('Quantity Used (Digunakan)')
                                     ->numeric()
                                     ->validationMessages([
                                         'required' => 'Quantity yang digunakan belum diisi'
                                     ])
-                                    ->helperText('Quantity yang digunakan')
+                                    ->helperText(function ($get) {
+                                        $inventoryStock = InventoryStock::where('product_id', $get('material_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->when($get('rak_id') != null, function ($query) use ($get) {
+                                                $query->where('rak_id', $get('rak_id'));
+                                            })
+                                            ->first();
+                                        if ($inventoryStock) {
+                                            if ($inventoryStock->qty_available < $get('qty_used')) {
+                                                return "Quantity tidak mencukupi";
+                                            }
+                                        }
+
+                                        return null;
+                                    })
+                                    ->reactive()
+                                    ->maxValue(function ($get) {
+                                        $inventoryStock = InventoryStock::where('product_id', $get('material_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->when($get('rak_id') != null, function ($query) use ($get) {
+                                                $query->where('rak_id', $get('rak_id'));
+                                            })
+                                            ->first();
+                                        if ($inventoryStock) {
+                                            return $inventoryStock->qty_available;
+                                        }
+
+                                        return 0;
+                                    })
                                     ->required()
                                     ->default(0),
                                 Select::make('warehouse_id')
@@ -219,12 +360,32 @@ class ManufacturingOrderResource extends Resource
                                     })->getOptionLabelFromRecordUsing(function (Rak $rak) {
                                         return "({$rak->code}) {$rak->name}";
                                     }),
+                                Repeater::make('satuan_konversi')
+                                    ->label('Satuan Konversi')
+                                    ->disabled()
+                                    ->reactive()
+                                    ->columnSpanFull()
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('uom_id')
+                                            ->label('Satuan')
+                                            ->preload()
+                                            ->reactive()
+                                            ->searchable()
+                                            ->relationship('uom', 'name')
+                                            ->required(),
+                                        TextInput::make('nilai_konversi')
+                                            ->label('Nilai Konversi')
+                                            ->numeric()
+                                            ->reactive()
+                                            ->required(),
+                                    ])
                             ])
                     ])
             ]);
     }
 
-    public static function hitungMaterial($product, $set, $quantity)
+    public static function hitungMaterial($product, $set, $quantity, $from = "product")
     {
         $billOfMaterial = $product->billOfMaterial->first();
         if ($billOfMaterial) {
@@ -235,6 +396,8 @@ class ManufacturingOrderResource extends Resource
                     'qty_required' => $item->quantity * $quantity,
                     'qty_used' => $item->quantity * $quantity,
                     'uom_id' => $item->uom_id,
+                    'warehouse_id' => null,
+                    'rak_id' => null,
                 ];
             }
 
@@ -260,15 +423,33 @@ class ManufacturingOrderResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
+                TextColumn::make('warehouse')
+                    ->label('Gudang')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('warehouse', function ($query) use ($search) {
+                            $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    }),
+                TextColumn::make('rak')
+                    ->label('Rak')
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('rak', function ($query) use ($search) {
+                            $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    })->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    }),
                 TextColumn::make('quantity')
                     ->label('Quantity')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('productUnitConversion')
+                TextColumn::make('uom.name')
                     ->label('Satuan')
-                    ->formatStateUsing(function ($state) {
-                        return "{$state->nilai_konversi} {$state->uom->name}";
-                    }),
+                    ->searchable(),
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()

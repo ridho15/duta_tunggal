@@ -5,12 +5,14 @@ namespace App\Providers;
 use App\Models\Deposit;
 use App\Models\DepositLog;
 use App\Models\Invoice;
+use App\Models\ManufacturingOrder;
 use App\Models\StockMovement;
 use App\Models\VendorPaymentDetail;
 use App\Observers\DepositLogObserser;
 use App\Observers\DepositObserver;
 use App\Observers\GlobalActivityObserver;
 use App\Observers\InvoiceObserver;
+use App\Observers\ManufacturingOrder as ObserversManufacturingOrder;
 use App\Observers\StockMovementObserver;
 use App\Observers\VendorPaymentDetailObserver;
 use App\Services\CabangService;
@@ -116,6 +118,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         StockMovement::observe(StockMovementObserver::class);
+        ManufacturingOrder::observe(ObserversManufacturingOrder::class);
         Invoice::observe(InvoiceObserver::class);
         VendorPaymentDetail::observe(VendorPaymentDetailObserver::class);
         Deposit::observe(DepositObserver::class);

@@ -133,6 +133,12 @@ class ProductionResource extends Resource
                         })
                         ->requiresConfirmation()
                         ->action(function ($record) {
+                            $manufacturingOrder = $record->manufacturingOrder;
+                            if ($manufacturingOrder) {
+                                $manufacturingOrder->update([
+                                    'status' => 'completed'
+                                ]);
+                            }
                             $record->update([
                                 'status' => 'finished'
                             ]);

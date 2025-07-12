@@ -19,7 +19,9 @@ class ManufacturingOrder extends Model
         'status', // draft, in_progress, completed
         'start_date',
         'end_date',
-        'uom_id'
+        'uom_id',
+        'warehouse_id',
+        'rak_id',
     ];
 
     public function product()
@@ -40,5 +42,15 @@ class ManufacturingOrder extends Model
     public function production()
     {
         return $this->hasOne(Production::class, 'manufacturing_order_id')->withDefault();
+    }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function rak()
+    {
+        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
     }
 }

@@ -192,6 +192,11 @@ class StockMovementResource extends Resource
         ];
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->orderBy('date', 'DESC');
+    }
+
     public static function getPages(): array
     {
         return [

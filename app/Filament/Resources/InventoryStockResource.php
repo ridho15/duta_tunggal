@@ -171,6 +171,11 @@ class InventoryStockResource extends Resource
         ];
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->orderBy('updated_at', 'DESC');
+    }
+
     public static function getPages(): array
     {
         return [
