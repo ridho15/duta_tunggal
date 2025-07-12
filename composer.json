@@ -12,6 +12,7 @@
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
         "filament/filament": "^3.3",
+        "guava/calendar": "^1.14",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "livewire/flux": "^2.1.1",
@@ -19,6 +20,7 @@
         "maatwebsite/excel": "^3.1",
         "milon/barcode": "^12.0",
         "saade/filament-autograph": "^3.2",
+        "saade/filament-fullcalendar": "^3.2",
         "spatie/laravel-activitylog": "*",
         "spatie/laravel-permission": "^6.19"
     },
