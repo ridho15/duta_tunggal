@@ -29,7 +29,7 @@ class ManufacturingOrder extends Model
 
     public function manufacturingOrderMaterial()
     {
-        return $this->hasMany(manufacturingOrderMaterial::class, 'manufacturing_order_id');
+        return $this->hasMany(ManufacturingOrderMaterial::class, 'manufacturing_order_id');
     }
 
     public function uom()
