@@ -43,13 +43,11 @@ class AdminPanelProvider extends PanelProvider
                 // AccountWidget::class,
                 // Widgets\FilamentInfoWidget::class,
             ])
-            ->plugins([
-                FilamentFullCalendarPlugin::make()
-                    ->selectable()
-                    ->editable()
-                    ->timezone('Asia/Jakarta')
-                    ->locale('id')
-            ])
+            ->plugin(FilamentFullCalendarPlugin::make()
+                ->selectable()
+                ->schedulerLicenseKey("")
+                ->config([])
+                ->editable())
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
