@@ -6,7 +6,7 @@ use Filament\Widgets\ChartWidget;
 
 class PenjualanPerKategoriChart extends ChartWidget
 {
-    protected static ?string $heading = 'Chart';
+    protected static ?string $heading = 'Penjualan Per Kategori';
 
     protected function getData(): array
     {

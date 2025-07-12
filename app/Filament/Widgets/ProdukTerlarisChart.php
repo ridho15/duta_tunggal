@@ -6,7 +6,7 @@ use Filament\Widgets\ChartWidget;
 
 class ProdukTerlarisChart extends ChartWidget
 {
-    protected static ?string $heading = 'Chart';
+    protected static ?string $heading = 'Produk Terlaris';
 
     protected function getData(): array
     {

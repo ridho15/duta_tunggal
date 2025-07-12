@@ -9,6 +9,7 @@ use Filament\Widgets\TableWidget as BaseWidget;
 
 class StockMinimumTable extends BaseWidget
 {
+    protected static ?string $heading = 'Stock Minimum';
     public function table(Table $table): Table
     {
         return $table

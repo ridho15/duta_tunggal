@@ -6,7 +6,7 @@ use Filament\Widgets\ChartWidget;
 
 class AccountReceivableChart extends ChartWidget
 {
-    protected static ?string $heading = 'Chart';
+    protected static ?string $heading = 'Account Receivable';
 
     protected function getData(): array
     {

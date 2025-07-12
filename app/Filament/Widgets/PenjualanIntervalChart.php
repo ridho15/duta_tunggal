@@ -6,7 +6,7 @@ use Filament\Widgets\ChartWidget;
 
 class PenjualanIntervalChart extends ChartWidget
 {
-    protected static ?string $heading = 'Chart';
+    protected static ?string $heading = 'Penjualan Interval';
 
     protected function getData(): array
     {

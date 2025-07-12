@@ -9,6 +9,8 @@ use Filament\Widgets\TableWidget as BaseWidget;
 
 class PenerimaanBarangBelumSelesaiTable extends BaseWidget
 {
+    protected static ?string $heading = "Penerimaan Barang Belum Selesai";
+
     public function table(Table $table): Table
     {
         return $table

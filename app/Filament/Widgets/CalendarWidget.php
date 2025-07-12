@@ -8,6 +8,8 @@ class CalendarWidget extends FullCalendarWidget
 {
     protected static string $view = 'filament.widgets.calendar-widget';
 
+    protected static ?string $title = 'Kalender';
+
     public function fetchEvents(array $fetchInfo): array
     {
         return [];
