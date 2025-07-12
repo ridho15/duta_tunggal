@@ -48,7 +48,7 @@ class InventoryStockResource extends Resource
                                 return "({$product->sku}) {$product->name}";
                             })
                             ->required(),
-                        Select::make('warehosue_id')
+                        Select::make('warehouse_id')
                             ->label('Gudang')
                             ->preload()
                             ->searchable(['kode', 'name'])
