@@ -34,7 +34,7 @@ class AccountReceivableResource extends Resource
     {
         return $form
             ->schema([
-                Fieldset::make('Account Payable')
+                Fieldset::make('Account Receivable')
                     ->schema([
                         Select::make('invoice_id')
                             ->required()
