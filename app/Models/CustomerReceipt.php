@@ -7,18 +7,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class VendorPayment extends Model
+class CustomerReceipt extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
-    protected $table = 'vendor_payments';
+    protected $table = 'customer_receipts';
     protected $fillable = [
         'invoice_id',
-        'supplier_id',
+        'customer_id',
+        'payment_date',
         'ntpn',
         'total_payment',
         'notes',
-        'diskon',
-        'status', //'Draft', 'Partial', 'Paid'
+        'status'
     ];
 
     public function invoice()
@@ -26,13 +26,13 @@ class VendorPayment extends Model
         return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();
     }
 
-    public function supplier()
+    public function customer()
     {
-        return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
+        return $this->belongsTo(Customer::class, 'customer_id')->withDefault();
     }
 
-    public function vendorPaymentDetail()
+    public function customerReceiptItem()
     {
-        return $this->hasMany(VendorPaymentDetail::class, 'vendor_payment_id');
+        return $this->hasMany(CustomerReceiptItem::class, 'customer_receipt_id');
     }
 }

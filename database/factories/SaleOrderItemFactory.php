@@ -3,7 +3,9 @@
 namespace Database\Factories;
 
 use App\Models\Product;
+use App\Models\Rak;
 use App\Models\SaleOrder;
+use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,19 +20,17 @@ class SaleOrderItemFactory extends Factory
      */
     public function definition(): array
     {
-        $saleOrderId = SaleOrder::inRandomOrder()->first()->id;
-        $product = Product::inRandomOrder()->first();
-        $quantity = random_int(1, 20);
-        $unit_price = $product->sell_price;
-        $discount = random_int(1000, 100000);
-        $tax = random_int(1000, 100000);
+        $warehouse = Warehouse::has('rak')->inRandomOrder()->first()->id;
+        $rak = Rak::where('warehouse_id', $warehouse)->inRandomOrder()->first()->id;
         return [
-            'sale_order_id' => $saleOrderId,
-            'product_id' => $product->id,
-            'quantity' => $quantity,
-            'unit_price' => $unit_price,
-            'discount' => $discount,
-            'tax' => $tax
+            'sale_order_id' => SaleOrder::inRandomOrder()->first()->id, // akan di-set saat seeding
+            'product_id'    => Product::inRandomOrder()->first()->id, // pastikan data produk tersedia
+            'quantity'      => rand(1, 20),
+            'unit_price'    => $this->faker->numberBetween(10000, 500000),
+            'discount'      => $this->faker->numberBetween(0, 20),
+            'tax'           => $this->faker->numberBetween(0, 11),
+            'warehouse_id'  => $warehouse,
+            'rak_id'        => $rak,
         ];
     }
 }

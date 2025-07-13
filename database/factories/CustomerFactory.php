@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Customer>
@@ -17,10 +18,21 @@ class CustomerFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->name(),
-            'address' => $this->faker->address(),
-            'phone' => $this->faker->phoneNumber(),
-            'email' => $this->faker->email()
+            'name'              => $this->faker->name(),
+            'code'              => 'CUST-' . strtoupper(Str::random(5)),
+            'address'           => $this->faker->address(),
+            'telephone'         => $this->faker->numerify('021#######'),
+            'phone'             => $this->faker->numerify('08##########'),
+            'email'             => $this->faker->unique()->safeEmail(),
+            'perusahaan'        => $this->faker->company(),
+            'tipe'              => $this->faker->randomElement(['PKP', 'PRI']),
+            'fax'               => $this->faker->numerify('021#######'),
+            'tempo_kredit'      => $this->faker->randomElement([0, 15, 30, 45, 60]),
+            'kredit_limit'      => $this->faker->numberBetween(1000000, 10000000),
+            'tipe_pembayaran'   => $this->faker->randomElement(['Bebas','COD (Bayar Lunas)','Kredit']),
+            'nik_npwp'          => $this->faker->numerify('################'),
+            'keterangan'        => $this->faker->optional()->sentence(),
+            'isSpecial'         => $this->faker->boolean(50)
         ];
     }
 }

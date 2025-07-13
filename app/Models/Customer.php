@@ -24,7 +24,7 @@ class Customer extends Model
         'isSpecial', // ya / tidak
         'tempo_kredit', // harim
         'kredit_limit', // Rp
-        'tipe_pembayaran', // Bebas, Kredit, Cash,
+        'tipe_pembayaran', //'Bebas','COD (Bayar Lunas)','Kredit'
         'nik_npwp', // NIK / NPWP,
         'keterangan',
     ];

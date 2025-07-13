@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Supplier>
@@ -17,10 +18,18 @@ class SupplierFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->name(),
-            'address' => $this->faker->address(),
-            'phone' => $this->faker->phoneNumber(),
-            'email' => $this->faker->email()
+            'code'           => 'SUP-' . strtoupper(Str::random(5)),
+            'name'           => $this->faker->company(),
+            'perusahaan'     => $this->faker->companySuffix(),
+            'address'        => $this->faker->address(),
+            'phone'          => $this->faker->numerify('021#######'),
+            'email'          => $this->faker->unique()->safeEmail(),
+            'handphone'      => $this->faker->numerify('08##########'),
+            'fax'            => $this->faker->numerify('021#######'),
+            'npwp'           => $this->faker->numerify('##.###.###.#-###.###'),
+            'tempo_hutang'   => $this->faker->randomElement([0, 15, 30, 45, 60]),
+            'kontak_person'  => $this->faker->name(),
+            'keterangan'     => $this->faker->optional()->sentence(),
         ];
     }
 }

@@ -29,6 +29,17 @@ class HelperController extends Controller
         return '/' . $filePath;
     }
 
+    public static function generateRandomColors(int $count): array
+    {
+        $colors = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $colors[] = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
+        }
+
+        return $colors;
+    }
+
     public static function listPermission()
     {
         $listPermissions = [
@@ -511,7 +522,35 @@ class HelperController extends Controller
                 'delete',
                 'restore',
                 'force-delete',
-            ],'bill of material item' => [
+            ],
+            'bill of material item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'account receivable' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'customer receipt' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'customer receipt item' => [
                 'view any',
                 'view',
                 'create',

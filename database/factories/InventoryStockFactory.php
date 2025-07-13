@@ -54,6 +54,7 @@ class InventoryStockFactory extends Factory
             'rak_id' => $rak?->id, // pakai safe navigation
             'qty_available' => $this->faker->numberBetween(10, 100),
             'qty_reserved' => $this->faker->numberBetween(10, 100),
+            'qty_min' => $this->faker->numberBetween(10, 20),
         ];
     }
 }

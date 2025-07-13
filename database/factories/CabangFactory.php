@@ -22,7 +22,7 @@ class CabangFactory extends Factory
             'alamat' => $this->faker->address,
             'telepon' => $this->faker->phoneNumber,
             'kenaikan_harga' => $this->faker->randomFloat(2, 0, 20), // antara 0% - 20%
-            'status' => $this->faker->randomElement(['Aktif', 'Tidak Aktif']),
+            'status' => $this->faker->boolean(50),
             'warna_background' => $this->faker->safeHexColor,
             'tipe_penjualan' => $this->faker->randomElement(['Semua', 'Pajak', 'Non Pajak']),
             'kode_invoice_pajak' => 'INV-PJK-' . $this->faker->unique()->numerify('###'),
