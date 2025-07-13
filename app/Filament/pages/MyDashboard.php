@@ -9,6 +9,7 @@ use App\Filament\Widgets\PenjualanPerKategoriChart;
 use App\Filament\Widgets\ProdukTerlarisChart;
 use App\Filament\Widgets\StockMinimumTable;
 use App\Filament\Widgets\TopCustomerChart;
+use App\Filament\Widgets\TopTagihanOutstanding;
 use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Section;
@@ -34,6 +35,7 @@ class MyDashboard extends Dashboard
                 StockMinimumTable::class,
                 PenjualanPerKategoriChart::class,
                 TopCustomerChart::class,
+                TopTagihanOutstanding::class,
             ];
         }
 

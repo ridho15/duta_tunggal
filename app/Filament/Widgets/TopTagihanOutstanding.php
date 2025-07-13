@@ -17,19 +17,19 @@ class TopTagihanOutstanding extends BaseWidget
             ->query(
                 function () {
                     return AgeingSchedule::query()
-                        ->where('from_type', 'customer') // sesuaikan jika perlu
+                        // ->where('from_type', 'customer') // sesuaikan jika perlu
                         ->orderByDesc('days_outstanding')
                         ->limit(10);
                 }
             )
             ->columns([
-                TextColumn::make('from_id')
-                    ->label('Customer')
-                    ->formatStateUsing(function ($state) {
-                        $customer = Customer::find($state);
-                        return $customer ? $customer->name : 'Unknown';
-                    })
-                    ->sortable(),
+                // TextColumn::make('from_id')
+                //     ->label('Customer')
+                //     ->formatStateUsing(function ($state) {
+                //         $customer = Customer::find($state);
+                //         return $customer ? $customer->name : 'Unknown';
+                //     })
+                //     ->sortable(),
 
                 TextColumn::make('invoice_date')
                     ->label('Tgl Invoice')
