@@ -3,7 +3,6 @@
 namespace App\Filament\Widgets;
 
 use App\Models\StockTransfer;
-use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 

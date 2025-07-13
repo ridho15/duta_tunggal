@@ -2,7 +2,7 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\MyDashboard;
+use App\Filament\pages\MyDashboard;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;

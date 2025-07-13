@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament;
+namespace App\Filament\pages;
 
 use App\Filament\Widgets\CalendarWidget;
 use App\Filament\Widgets\Penjualan7HariChart;
