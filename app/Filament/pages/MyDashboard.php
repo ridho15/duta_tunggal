@@ -2,6 +2,9 @@
 
 namespace App\Filament\pages;
 
+use App\Filament\Widgets\AccontReceivablePayableChart;
+use App\Filament\Widgets\AccountReceivablePayableChart;
+use App\Filament\Widgets\ArApChart;
 use App\Filament\Widgets\CalendarWidget;
 use App\Filament\Widgets\Penjualan7HariChart;
 use App\Filament\Widgets\PenjualanOverview;
@@ -34,6 +37,7 @@ class MyDashboard extends Dashboard
                 ProdukTerlarisChart::class,
                 StockMinimumTable::class,
                 PenjualanPerKategoriChart::class,
+                AccountReceivablePayableChart::class,
                 TopCustomerChart::class,
                 TopTagihanOutstanding::class,
             ];
