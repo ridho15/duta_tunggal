@@ -4,12 +4,20 @@ namespace App\Filament\pages;
 
 use App\Filament\Widgets\AccontReceivablePayableChart;
 use App\Filament\Widgets\AccountReceivablePayableChart;
+use App\Filament\Widgets\AgeingScheduleChart;
 use App\Filament\Widgets\ArApChart;
 use App\Filament\Widgets\CalendarWidget;
+use App\Filament\Widgets\DoBelumSelesaiTable;
+use App\Filament\Widgets\MutasiKeluarBelumSelesaiTable;
+use App\Filament\Widgets\MutasiMasukBelumSelesaiTable;
+use App\Filament\Widgets\PenawaranHargaTable;
+use App\Filament\Widgets\PenerimaanBarangBelumSelesaiTable;
 use App\Filament\Widgets\Penjualan7HariChart;
 use App\Filament\Widgets\PenjualanOverview;
 use App\Filament\Widgets\PenjualanPerKategoriChart;
+use App\Filament\Widgets\PoBelumSelesaiTable;
 use App\Filament\Widgets\ProdukTerlarisChart;
+use App\Filament\Widgets\SoBelumSelesaiTable;
 use App\Filament\Widgets\StockMinimumTable;
 use App\Filament\Widgets\TopCustomerChart;
 use App\Filament\Widgets\TopTagihanOutstanding;
@@ -40,6 +48,31 @@ class MyDashboard extends Dashboard
                 AccountReceivablePayableChart::class,
                 TopCustomerChart::class,
                 TopTagihanOutstanding::class,
+            ];
+        } elseif (Auth::user()->hasRole(['Accounting', 'Super Admin', 'Finance Manager'])) {
+            return [
+                AccountWidget::class,
+                AgeingScheduleChart::class,
+            ];
+        } elseif (Auth::user()->hasRole(['Sales', 'Super Admin'])) {
+            return [
+                AccountWidget::class,
+                PenawaranHargaTable::class,
+                SoBelumSelesaiTable::class,
+            ];
+        } elseif (Auth::user()->hasRole(['Inventory Manager', 'Admin Inventory'])) {
+            return [
+                AccountWidget::class,
+                StockMinimumTable::class,
+                PoBelumSelesaiTable::class,
+            ];
+        } elseif (Auth::user()->hasRole(['Super Admin', 'Gudang'])) {
+            return [
+                AccountWidget::class,
+                DoBelumSelesaiTable::class,
+                MutasiKeluarBelumSelesaiTable::class,
+                MutasiMasukBelumSelesaiTable::class,
+                PenerimaanBarangBelumSelesaiTable::class
             ];
         }
 

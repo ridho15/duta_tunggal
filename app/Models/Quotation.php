@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Quotation extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'quotations';
     protected $fillable = [
         'quotation_number',
@@ -20,7 +20,7 @@ class Quotation extends Model
         'status_payment',
         'po_file_path',
         'notes',
-        'status',
+        'status', // 'draft','request_approve','approve','reject'
         'created_by',
         'request_approve_by',
         'request_approve_at',
