@@ -43,6 +43,7 @@ class QualityControlResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
+    protected static ?int $navigationSort = 8;
     public static function form(Form $form): Form
     {
         return $form
@@ -100,7 +101,7 @@ class QualityControlResource extends Resource
                                         } elseif ($get('from_model_type') == 'App\Models\Production') {
                                             return Production::where('status', 'finished')->get()->pluck('production_number', 'id');
                                         }
-                                        
+
                                         return [];
                                     })
                                     ->required()

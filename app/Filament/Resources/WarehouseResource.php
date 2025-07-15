@@ -41,6 +41,8 @@ class WarehouseResource extends Resource
 
     protected static ?string $modelLabel = 'Gudang';
 
+    protected static ?int $navigationSort = 26;
+
     public static function form(Form $form): Form
     {
         return $form

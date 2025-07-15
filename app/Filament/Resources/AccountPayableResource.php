@@ -30,6 +30,8 @@ class AccountPayableResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance';
 
+    protected static ?int $navigationSort = 18;
+
     public static function form(Form $form): Form
     {
         return $form

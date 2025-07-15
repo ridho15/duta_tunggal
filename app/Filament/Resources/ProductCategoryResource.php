@@ -29,6 +29,8 @@ class ProductCategoryResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
+    protected static ?int $navigationSort = 26;
+
     public static function form(Form $form): Form
     {
         return $form

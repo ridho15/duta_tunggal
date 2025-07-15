@@ -33,6 +33,8 @@ class PurchaseReceiptItemResource extends Resource
 
     protected static ?string $navigationGroup = 'Pembelian';
 
+    protected static ?int $navigationSort = 5;
+
     public static function form(Form $form): Form
     {
         return $form

@@ -31,6 +31,8 @@ class UnitOfMeasureResource extends Resource
 
     protected static ?string $modelLabel = 'Satuan';
 
+    protected static ?int $navigationSort = 26;
+
     public static function form(Form $form): Form
     {
         return $form

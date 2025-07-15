@@ -30,6 +30,8 @@ class CurrencyResource extends Resource
 
     protected static ?string $modelLabel = 'Mata Uang';
 
+    protected static ?int $navigationSort = 26;
+
     public static function form(Form $form): Form
     {
         return $form

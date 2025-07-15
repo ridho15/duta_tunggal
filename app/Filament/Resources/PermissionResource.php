@@ -20,6 +20,8 @@ class PermissionResource extends Resource
 
     protected static ?string $navigationGroup = 'Roles & Permissions';
 
+    protected static ?int $navigationSort = 27;
+
     public static function form(Form $form): Form
     {
         return $form

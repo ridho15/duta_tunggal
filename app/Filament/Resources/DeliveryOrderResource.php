@@ -44,6 +44,8 @@ class DeliveryOrderResource extends Resource
 
     protected static ?string $navigationGroup = 'Delivery Order';
 
+    protected static ?int $navigationSort = 13;
+
     public static function form(Form $form): Form
     {
         return $form

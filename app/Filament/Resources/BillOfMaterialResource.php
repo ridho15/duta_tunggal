@@ -38,6 +38,8 @@ class BillOfMaterialResource extends Resource
 
     protected static ?string $navigationGroup = 'Manufacturing Order';
 
+    protected static ?int $navigationSort = 15;
+
     public static function form(Form $form): Form
     {
         return $form

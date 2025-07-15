@@ -36,6 +36,8 @@ class PurchaseReturnResource extends Resource
 
     protected static ?string $navigationGroup = 'Pembelian';
 
+    protected static ?int $navigationSort = 6;
+
     public static function form(Form $form): Form
     {
         return $form

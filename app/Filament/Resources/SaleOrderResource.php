@@ -60,6 +60,8 @@ class SaleOrderResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Penjualan';
 
+    protected static ?int $navigationSort = 0;
+
     public static function form(Form $form): Form
     {
         return $form
