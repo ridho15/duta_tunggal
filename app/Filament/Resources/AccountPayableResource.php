@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AccountPayableResource\Pages;
 use App\Models\AccountPayable;
+use App\Models\Invoice;
 use App\Models\Supplier;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
@@ -42,11 +43,27 @@ class AccountPayableResource extends Resource
                             ->required()
                             ->preload()
                             ->searchable()
+                            ->reactive()
                             ->label('Invoice')
-                            ->relationship('invoice', 'invoice_number'),
+                            ->afterStateUpdated(function ($state, $set) {
+                                $invoice = Invoice::find($state);
+                                if ($invoice) {
+                                    $set('supplier_id', $invoice->fromModel->supplier_id);
+                                }
+                            })
+                            ->validationMessages([
+                                'required' => 'Invoice belum dipilih',
+                            ])
+                            ->relationship('invoice', 'invoice_number', function (Builder $query, $get) {
+                                $query->where('from_model_type', 'App\Models\PurchaseOrder');
+                            }),
                         Select::make('supplier_id')
                             ->label('Supplier')
                             ->preload()
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'Supplier belum dpilih'
+                            ])
                             ->searchable(['name', 'code'])
                             ->required()
                             ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {

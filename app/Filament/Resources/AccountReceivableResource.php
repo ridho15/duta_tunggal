@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\AccountReceivableResource\Pages;
 use App\Models\AccountReceivable;
 use App\Models\Customer;
+use App\Models\Invoice;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -42,11 +43,27 @@ class AccountReceivableResource extends Resource
                             ->required()
                             ->preload()
                             ->searchable()
+                            ->reactive()
+                            ->afterStateUpdated(function ($get, $set, $state) {
+                                $invoice = Invoice::find($state);
+                                if ($invoice) {
+                                    $set('customer_id', $invoice->fromModel->customer_id);
+                                }
+                            })
+                            ->validationMessages([
+                                'required' => 'Invoice belum dipilih'
+                            ])
                             ->label('Invoice')
-                            ->relationship('invoice', 'invoice_number'),
+                            ->relationship('invoice', 'invoice_number', function (Builder $query, $get) {
+                                $query->where('from_model_type', 'App\Models\SaleOrder');
+                            }),
                         Select::make('customer_id')
                             ->label('Customer')
                             ->preload()
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'Customer belum dipilih'
+                            ])
                             ->searchable(['name', 'code'])
                             ->required()
                             ->getOptionLabelFromRecordUsing(function (Customer $customer) {
