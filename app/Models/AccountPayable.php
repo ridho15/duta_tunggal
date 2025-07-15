@@ -32,6 +32,6 @@ class AccountPayable extends Model
 
     public function ageingSchedule()
     {
-        return $this->hasOne(AgeingSchedule::class, 'account_payable_id')->withDefault();
+        return $this->morphOne(AgeingSchedule::class, 'from_model')->withDefault();
     }
 }

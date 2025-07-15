@@ -22,7 +22,7 @@ class Customer extends Model
         'tipe', // PKP, PRI,
         'fax',
         'isSpecial', // ya / tidak
-        'tempo_kredit', // harim
+        'tempo_kredit', // harian
         'kredit_limit', // Rp
         'tipe_pembayaran', //'Bebas','COD (Bayar Lunas)','Kredit'
         'nik_npwp', // NIK / NPWP,

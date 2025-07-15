@@ -4,10 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AgeingScheduleResource\Pages;
 use App\Models\AccountPayable;
+use App\Models\AccountReceivable;
 use App\Models\AgeingSchedule;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -19,6 +21,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\DB;
 
 class AgeingScheduleResource extends Resource
 {
@@ -36,15 +39,50 @@ class AgeingScheduleResource extends Resource
             ->schema([
                 Fieldset::make('Form Ageing Schedule')
                     ->schema([
-                        Select::make('account_payable_id')
-                            ->label('Account Payable')
-                            ->preload()
-                            ->searchable()
-                            ->relationship('accountPayable', 'id')
-                            ->getOptionLabelFromRecordUsing(function (AccountPayable $accountPayable) {
-                                return "{$accountPayable->invoice->invoice_number} {$accountPayable->supplier->name}";
-                            })
-                            ->required(),
+                        Section::make('reference')
+                            ->description('Referensi untuk membuat Ageing Schedule,tidaks boleh di abaikan')
+                            ->columns(2)
+                            ->columnSpanFull()
+                            ->schema([
+                                Radio::make('from_model_type')
+                                    ->label('From')
+                                    ->options([
+                                        'App\Models\AccountPayable' => 'Payable',
+                                        'App\Models\AccountReceivable' => 'Receivable'
+                                    ])
+                                    ->required()
+                                    ->inlineLabel()
+                                    ->reactive(),
+                                Select::make('from_model_id')
+                                    ->reactive()
+                                    ->label(function ($get, $set) {
+                                        if ($get('from_model_type') == 'App\Models\AccountPayable') {
+                                            return "From Payable";
+                                        } elseif ($get('from_model_type') == 'App\Models\AccountReceivable') {
+                                            return "From Receivable";
+                                        }
+                                        return "From";
+                                    })->required()
+                                    ->preload()
+                                    ->searchable()
+                                    ->options(function ($get, $set) {
+                                        if ($get('from_model_type') == 'App\Models\AccountPayable') {
+                                            $listAccountPayable = AccountPayable::join('invoices', 'account_payables.invoice_id', '=', 'invoices.id')
+                                                ->join('suppliers', 'account_payables.supplier_id', "=", 'suppliers.id')
+                                                ->selectRaw('account_payables.id, CONCAT(invoices.invoice_number, " - ", suppliers.name) as label')
+                                                ->pluck('label', 'account_payables.id');
+
+                                            return $listAccountPayable;
+                                        } elseif ($get('from_model_type') == 'App\Models\AccountReceivable') {
+                                            $listAccountReceivable = AccountReceivable::join('invoices', 'account_receivables.invoice_id', '=', 'invoices.id')
+                                                ->join('customers', 'account_receivables.customer_id', '=', 'customers.id')
+                                                ->selectRaw('account_receivables.id, CONCAT(invoices.invoice_number, " - ", customers.name) as label')
+                                                ->pluck('label', 'account_receivables.id');
+
+                                            return $listAccountReceivable;
+                                        }
+                                    }),
+                            ]),
                         DatePicker::make('invoice_date')
                             ->label('Invoice Date')
                             ->required(),
@@ -76,10 +114,20 @@ class AgeingScheduleResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('accountPayable')
-                    ->label('Account Payable')
+                TextColumn::make('from_model_type')
+                    ->label('From')
                     ->formatStateUsing(function ($state) {
-                        return "{$state->invoice->invoice_number} {$state->supplier->name}";
+                        switch ($state) {
+                            case 'App\Models\AccountPayable':
+                                return "Payable";
+                                break;
+                            case 'App\Models\AccountReceivable':
+                                return "Receivable";
+                                break;
+                            default:
+                                # code...
+                                break;
+                        }
                     }),
                 TextColumn::make('invoice_date')
                     ->date()
@@ -108,7 +156,6 @@ class AgeingScheduleResource extends Resource
             ->filters([
                 //
             ])
-            ->actionsColumnLabel('Action')
             ->actions([
                 ActionGroup::make([
                     ViewAction::make()
@@ -116,7 +163,8 @@ class AgeingScheduleResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
-                ])
+                ])->button()
+                    ->label('Action')
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([]);
     }

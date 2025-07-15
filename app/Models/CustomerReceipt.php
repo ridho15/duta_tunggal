@@ -18,7 +18,8 @@ class CustomerReceipt extends Model
         'ntpn',
         'total_payment',
         'notes',
-        'status'
+        'diskon',
+        'status' // 'Draft','Partial','Paid'
     ];
 
     public function invoice()

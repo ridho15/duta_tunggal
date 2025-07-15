@@ -132,7 +132,8 @@ class AccountReceivableResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
-                ])
+                ])->button()
+                    ->label('Action')
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([]);
     }

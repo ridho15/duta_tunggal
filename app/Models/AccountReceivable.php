@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class AccountReceivable extends Model
 {
     use HasFactory, SoftDeletes, LogsGlobalActivity;
-    protected $table = 'account_payables';
+    protected $table = 'account_receivables';
     protected $fillable = [
         'invoice_id',
         'customer_id',
@@ -32,6 +32,6 @@ class AccountReceivable extends Model
 
     public function ageingSchedule()
     {
-        return $this->hasOne(AgeingSchedule::class, 'account_payable_id')->withDefault();
+        return $this->morphOne(AgeingSchedule::class, 'from_model')->withDefault();
     }
 }

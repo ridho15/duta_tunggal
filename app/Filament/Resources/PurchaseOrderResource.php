@@ -771,7 +771,8 @@ class PurchaseOrderResource extends Resource
                             $purchaseOrderService->generateInvoice($record, $data);
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Generate invoice berhasil");
                         })
-                ])
+                ])->button()
+                    ->label('Action')
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([

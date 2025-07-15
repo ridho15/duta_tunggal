@@ -12,15 +12,16 @@ class AgeingSchedule extends Model
     use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'ageing_schedules';
     protected $fillable = [
-        'account_payable_id',
+        'from_model_type',
+        'from_model_id',
         'invoice_date',
         'due_date',
         'days_outstanding',
         'bucket' // 'Current','31–60','61–90','>90'
     ];
 
-    public function accountPayable()
+    public function fromModel()
     {
-        return $this->belongsTo(AccountPayable::class, 'account_payable_id')->withDefault();
+        return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id');
     }
 }

@@ -15,7 +15,8 @@ class CustomerReceiptItem extends Model
         'customer_receipt_id',
         'method',
         'amount',
-        'coa_id'
+        'coa_id',
+        'payment_date',
     ];
 
     public function customerReceipt()

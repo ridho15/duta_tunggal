@@ -4,13 +4,16 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\InvoiceResource\Pages;
 use App\Filament\Resources\InvoiceResource\Pages\ViewInvoice;
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
+use App\Models\Supplier;
 use App\Models\TaxSetting;
 use App\Services\InvoiceService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
@@ -62,6 +65,25 @@ class InvoiceResource extends Resource
                                         'App\Models\SaleOrder' => 'Penjualan'
                                     ])
                                     ->reactive()
+                                    ->afterStateUpdated(function ($get, $set) {
+                                        if ($get('from_model_type') == 'App\Models\SaleOrder') {
+                                            $taxSetting = TaxSetting::whereDate('effective_date', '<=', Carbon::now())
+                                                ->where('status', true)
+                                                ->where('type', 'PPN')
+                                                ->first();
+                                            if ($taxSetting) {
+                                                $set('tax', $taxSetting->rate);
+                                            }
+                                        } elseif ($get('from_model_type') == 'App\Models\PurchaseOrder') {
+                                            $taxSetting = TaxSetting::whereDate('effective_date', '<=', Carbon::now())
+                                                ->where('status', true)
+                                                ->where('type', 'PPH')
+                                                ->first();
+                                            if ($taxSetting) {
+                                                $set('tax', $taxSetting->rate);
+                                            }
+                                        }
+                                    })
                                     ->required(),
                                 Select::make('from_model_id')
                                     ->label(function ($get) {
@@ -76,6 +98,9 @@ class InvoiceResource extends Resource
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'From Pembelian / Penjualan tidak boleh kosong'
+                                    ])
                                     ->required()
                                     ->options(function ($get) {
                                         if ($get('from_model_type') == 'App\Models\PurchaseOrder') {
@@ -134,12 +159,18 @@ class InvoiceResource extends Resource
                                         $set('dpp', $total);
                                         $set('other_fee', $otherFee);
                                         $set('total', $total + $otherFee);
+
+                                        static::updateDueDate($get, $set);
                                     })
                             ]),
                         TextInput::make('invoice_number')
                             ->label('Invoice Number')
                             ->required()
                             ->reactive()
+                            ->validationMessages([
+                                'required' => 'Invoice number tidak boleh kosong',
+                                'unique' => 'Invoice number sudah digunakan'
+                            ])
                             ->suffixAction(ActionsAction::make('generateInvoiceNumber')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
                                 ->tooltip('Generate Invoice Number')
@@ -151,9 +182,20 @@ class InvoiceResource extends Resource
                             ->maxLength(255),
                         DatePicker::make('invoice_date')
                             ->label('Invoice Date')
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'Invoice date tidak boleh kosong'
+                            ])
+                            ->afterStateUpdated(function ($get, $set) {
+                                static::updateDueDate($get, $set);
+                            })
                             ->required(),
                         DatePicker::make('due_date')
                             ->label('Due Date')
+                            ->validationMessages([
+                                'required' => 'Due Date tidak boleh kosong'
+                            ])
+                            ->reactive()
                             ->required(),
                         TextInput::make('subtotal')
                             ->required()
@@ -211,7 +253,9 @@ class InvoiceResource extends Resource
                                 $set('total', static::hitungTotal($get));
                             })
                             ->numeric()
-                            ->default(0),
+                            ->default(function ($get) {
+                                return 0;
+                            }),
                         TextInput::make('ppn_rate')
                             ->label('PPN Rate (%)')
                             ->validationMessages([
@@ -277,6 +321,21 @@ class InvoiceResource extends Resource
                             ])
                     ])
             ]);
+    }
+
+    public static function updateDueDate($get, $set)
+    {
+        if ($get('from_model_type') == 'App\Models\SaleOrder') {
+            $saleOrder = SaleOrder::find($get('from_model_id'));
+            if ($get('invoice_date') != null && $saleOrder) {
+                $set('due_date', Carbon::parse($get('invoice_date'))->addDays($saleOrder->customer->tempo_kredit)->format('Y-m-d'));
+            }
+        } elseif ($get('from_model_type') == 'App\Models\PurchaseOrder') {
+            $purchaseOrder = PurchaseOrder::find($get('from_model_id'));
+            if ($get('invoice_date') != null && $purchaseOrder) {
+                $set('due_date', Carbon::parse($get('invoice_date'))->addDays($purchaseOrder->supplier->tempo_hutang)->format('Y-m-d'));
+            }
+        }
     }
 
     public static function hitungTotal($get)

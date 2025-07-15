@@ -16,6 +16,6 @@ class TaxSetting extends Model
         'rate',
         'effective_date',
         'status',
-        'type'
+        'type', //PPN, PPH, Custom
     ];
 }

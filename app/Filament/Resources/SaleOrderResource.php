@@ -499,9 +499,17 @@ class SaleOrderResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('customer.name')
+                TextColumn::make('customer')
                     ->label('Customer')
-                    ->searchable(),
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->code}) {$state->name}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('customer', function ($query) use ($search) {
+                            $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('so_number')
                     ->searchable(),
                 TextColumn::make('order_date')
@@ -707,7 +715,7 @@ class SaleOrderResource extends Resource
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
                         ->visible(function () {
-                            return Auth::user()->hasRole(['Owner']);
+                            return Auth::user()->hasRole(['Owner', 'Super Admin']);
                         })
                         ->color('success')
                         ->action(function ($record) {
@@ -860,7 +868,8 @@ class SaleOrderResource extends Resource
                             $salesOrderService->updateTotalAmount($record);
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil di update");
                         })
-                ])
+                ])->button()
+                    ->label('Action')
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
@@ -875,7 +884,6 @@ class SaleOrderResource extends Resource
             SaleOrderItemRelationManager::class
         ];
     }
-
     public static function getPages(): array
     {
         return [
