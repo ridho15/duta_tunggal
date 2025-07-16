@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockMovementResource\Pages;
+use App\Filament\Resources\StockMovementResource\Pages\ViewStockMovement;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
@@ -198,6 +199,7 @@ class StockMovementResource extends Resource
     {
         return [
             'index' => Pages\ListStockMovements::route('/'),
+            'view' => ViewStockMovement::route('/{record}'),
             // 'create' => Pages\CreateStockMovement::route('/create'),
             // 'edit' => Pages\EditStockMovement::route('/{record}/edit'),
         ];
