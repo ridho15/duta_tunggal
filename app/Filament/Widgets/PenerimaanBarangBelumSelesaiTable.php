@@ -6,6 +6,7 @@ use App\Filament\Resources\PurchaseReceiptResource;
 use App\Models\PurchaseReceipt;
 use Filament\Tables;
 use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
