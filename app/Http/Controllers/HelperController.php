@@ -559,6 +559,33 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'purchase return' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'purchase return item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'invoice' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
         ];
 
         return $listPermissions;

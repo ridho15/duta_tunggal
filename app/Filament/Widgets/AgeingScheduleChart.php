@@ -45,7 +45,6 @@ class AgeingScheduleChart extends ChartWidget
             $arData[] = $ar;
             $apData[] = $ap;
         }
-
         return [
             'labels' => $buckets,
             'datasets' => [

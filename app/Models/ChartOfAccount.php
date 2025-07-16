@@ -25,4 +25,9 @@ class ChartOfAccount extends Model
     {
         return $this->belongsTo(ChartOfAccount::class, 'parent_id')->withDefault();
     }
+
+    public function journalEntry()
+    {
+        return $this->hasMany(JournalEntry::class, 'coa_id');
+    }
 }

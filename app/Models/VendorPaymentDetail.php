@@ -33,4 +33,9 @@ class VendorPaymentDetail extends Model
     {
         return $this->morphMany(DepositLog::class, 'reference');
     }
+
+    public function journalEntry()
+    {
+        return $this->morphOne(JournalEntry::class, 'source')->withDefault();
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\AccountReceivable;
 use App\Models\CustomerReceiptItem;
 use App\Models\Deposit;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class CustomerReceiptItemObserver
@@ -56,6 +57,16 @@ class CustomerReceiptItemObserver
                 'amount' => $customerReceiptItem->amount,
                 'type' => 'use',
                 'created_by' => Auth::user()->id
+            ]);
+        }
+
+        if ($customerReceiptItem->coa_id) {
+            $customerReceiptItem->journalEntry()->create([
+                'coa_id' => $customerReceiptItem->coa_id,
+                'date' => Carbon::now(),
+                'description' => 'Customer receipt item',
+                'credit' => $customerReceiptItem->amount,
+                'journal_type' => 'Sales',
             ]);
         }
     }

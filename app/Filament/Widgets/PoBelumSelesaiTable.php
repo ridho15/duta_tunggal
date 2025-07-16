@@ -2,13 +2,16 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\PurchaseOrder;
 use Filament\Tables;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Filament\Tables\Enums\ActionsPosition;
 
 class PoBelumSelesaiTable extends BaseWidget
 {
@@ -20,6 +23,13 @@ class PoBelumSelesaiTable extends BaseWidget
                 return PurchaseOrder::query()
                     ->where('status', '!=', 'completed');
             })
+            ->actions([
+                ViewAction::make()
+                    ->color('primary')
+                    ->url(function ($record) {
+                        return PurchaseOrderResource::getUrl('view', ['record' => $record]);
+                    })
+            ], position: ActionsPosition::BeforeColumns)
             ->columns([
                 TextColumn::make('supplier')
                     ->label('Supplier')

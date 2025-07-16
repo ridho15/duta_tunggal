@@ -7,30 +7,29 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class CustomerReceiptItem extends Model
+class JournalEntry extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
-    protected $table = 'customer_receipt_items';
+    protected $table = 'journal_entries';
     protected $fillable = [
-        'customer_receipt_id',
-        'method',
-        'amount',
         'coa_id',
-        'payment_date',
+        'date',
+        'reference',
+        'description',
+        'debit',
+        'credit',
+        'journal_type', // misal: 'sales', 'purchase', 'manual'
+        'source_type',
+        'source_id'
     ];
-
-    public function customerReceipt()
-    {
-        return $this->belongsTo(CustomerReceipt::class, 'customer_receipt_id')->withDefault();
-    }
 
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
     }
 
-    public function journalEntry()
+    public function source()
     {
-        return $this->morphOne(JournalEntry::class, 'source')->withDefault();
+        return $this->morphTo(__FUNCTION__, 'source_type', 'source_id')->withDefault();
     }
 }

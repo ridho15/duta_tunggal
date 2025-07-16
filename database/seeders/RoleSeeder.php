@@ -100,6 +100,13 @@ class RoleSeeder extends Seeder
             'guard_name' => 'web'
         ]);
 
+        $purchasing = Role::updateOrCreate([
+            'name' => 'Purchasing',
+        ], [
+            'name' => 'Purchasing',
+            'guard_name' => 'web'
+        ]);
+
 
         $owner->syncPermissions(Permission::all());
         $superAdmin->syncPermissions(Permission::all());

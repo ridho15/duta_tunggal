@@ -10,6 +10,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Filament\Tables\Enums\ActionsPosition;
 
 class StockMinimumTable extends BaseWidget
 {
@@ -27,7 +28,7 @@ class StockMinimumTable extends BaseWidget
                     ->url(function ($record) {
                         return InventoryStockResource::getUrl('view', ['record' => $record->id]);
                     })
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->columns([
                 TextColumn::make('product')->formatStateUsing(function ($state) {
                     return "({$state->sku}) {$state->name}";

@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ChartOfAccountResource\Pages;
+use App\Filament\Resources\ChartOfAccountResource\Pages\ViewChartOfAccount;
+use App\Filament\Resources\ChartOfAccountResource\RelationManagers\JournalEntryRelationManager;
 use App\Models\ChartOfAccount;
 use App\Services\ChartOfAccountService;
 use Filament\Forms\Components\Actions\Action;
@@ -12,10 +14,12 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -121,8 +125,13 @@ class ChartOfAccountResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make(),
+                ActionGroup::make([
+                    ViewAction::make()
+                        ->color('primary'),
+                    EditAction::make()
+                        ->color('success'),
+                    DeleteAction::make(),
+                ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
@@ -134,7 +143,7 @@ class ChartOfAccountResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            JournalEntryRelationManager::class
         ];
     }
 
@@ -142,8 +151,9 @@ class ChartOfAccountResource extends Resource
     {
         return [
             'index' => Pages\ListChartOfAccounts::route('/'),
-            // 'create' => Pages\CreateChartOfAccount::route('/create'),
-            // 'edit' => Pages\EditChartOfAccount::route('/{record}/edit'),
+            'create' => Pages\CreateChartOfAccount::route('/create'),
+            'view' => ViewChartOfAccount::route('/{record}'),
+            'edit' => Pages\EditChartOfAccount::route('/{record}/edit'),
         ];
     }
 }

@@ -4,9 +4,12 @@ namespace App\Observers;
 
 use App\Http\Controllers\HelperController;
 use App\Models\AccountPayable;
+use App\Models\ChartOfAccount;
 use App\Models\Deposit;
 use App\Models\DepositLog;
+use App\Models\JournalEntry;
 use App\Models\VendorPaymentDetail;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class VendorPaymentDetailObserver
@@ -61,6 +64,16 @@ class VendorPaymentDetailObserver
                 'amount' => $vendorPaymentDetail->amount,
                 'type' => 'use',
                 'created_by' => Auth::user()->id
+            ]);
+        }
+
+        if ($vendorPaymentDetail->coa_id) {
+            $vendorPaymentDetail->journalEntry()->create([
+                'coa_id' => $vendorPaymentDetail->coa_id,
+                'date' => Carbon::now(),
+                'description' => 'Vendor Payment Detail',
+                'credit' => $vendorPaymentDetail->amount,
+                'journal_type' => 'Purchase',
             ]);
         }
     }

@@ -23,6 +23,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\BulkAction;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
@@ -385,11 +386,24 @@ class QuotationResource extends Resource
 
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil di update");
                         })
-                ]),
+                ])->button()
+                    ->label('Action')
+                    ->color('primary'),
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
+                    BulkAction::make('sync_total_amounts')
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->color('primary')
+                        ->requiresConfirmation()
+                        ->action(function ($records) {
+                            $quotationService = app(QuotationService::class);
+                            foreach ($records as $record) {
+                                $quotationService->updateTotalAmount($record);
+                            }
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil diupdate");
+                        })
                 ]),
             ]);
     }

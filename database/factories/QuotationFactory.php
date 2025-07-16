@@ -22,6 +22,7 @@ class QuotationFactory extends Factory
             'customer_id' => Customer::inRandomOrder()->first()->id,
             'date' => $this->faker->date(),
             'notes' => $this->faker->sentence(),
+            'status' => $this->faker->randomElement(['draft', 'request_approve', 'approve', 'reject'])
         ];
     }
 }
