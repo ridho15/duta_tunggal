@@ -4,12 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\InvoiceResource\Pages;
 use App\Filament\Resources\InvoiceResource\Pages\ViewInvoice;
-use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
-use App\Models\Supplier;
 use App\Models\TaxSetting;
 use App\Services\InvoiceService;
 use Barryvdh\DomPDF\Facade\Pdf;

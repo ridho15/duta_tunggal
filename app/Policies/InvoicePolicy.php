@@ -13,7 +13,7 @@ class InvoicePolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->hasPermissionTo('view any invoice');
     }
 
     /**
@@ -21,7 +21,7 @@ class InvoicePolicy
      */
     public function view(User $user, Invoice $invoice): bool
     {
-        return false;
+        return $user->hasPermissionTo('view invoice');
     }
 
     /**
@@ -29,7 +29,7 @@ class InvoicePolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->hasPermissionTo('create invoice');
     }
 
     /**
@@ -37,7 +37,7 @@ class InvoicePolicy
      */
     public function update(User $user, Invoice $invoice): bool
     {
-        return false;
+        return $user->hasPermissionTo('update invoice');
     }
 
     /**
@@ -45,7 +45,7 @@ class InvoicePolicy
      */
     public function delete(User $user, Invoice $invoice): bool
     {
-        return false;
+        return $user->hasPermissionTo('delete invoice');
     }
 
     /**
@@ -53,7 +53,7 @@ class InvoicePolicy
      */
     public function restore(User $user, Invoice $invoice): bool
     {
-        return false;
+        return $user->hasPermissionTo('restore invoice');
     }
 
     /**
@@ -61,6 +61,6 @@ class InvoicePolicy
      */
     public function forceDelete(User $user, Invoice $invoice): bool
     {
-        return false;
+        return $user->hasPermissionTo('force-delete invoice');
     }
 }
