@@ -18,4 +18,11 @@ class ListQualityControls extends ListRecords
                 ->icon('heroicon-o-plus-circle'),
         ];
     }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            QualityControlResource\Widgets\PurchaseReturnAutomationStatsWidget::class,
+        ];
+    }
 }

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\InventoryStock;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 class SaleOrder extends Model
 {
@@ -31,8 +33,10 @@ class SaleOrder extends Model
         'reject_by',
         'reject_at',
         'reason_close',
-        'tipe_pengiriman' // Ambil Sendiri, Kirim Langsung
+        'tipe_pengiriman', // Ambil Sendiri, Kirim Langsung
+        'created_by'
     ];
+
 
     public function customer()
     {
@@ -69,6 +73,11 @@ class SaleOrder extends Model
         return $this->belongsTo(User::class, 'reject_by')->withDefault();
     }
 
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by')->withDefault();
+    }
+
     public function deliveryOrder()
     {
         return $this->belongsToMany(DeliveryOrder::class, 'delivery_sales_orders', 'sales_order_id', 'delivery_order_id');
@@ -87,6 +96,48 @@ class SaleOrder extends Model
     public function depositLog()
     {
         return $this->morphMany(DepositLog::class, 'reference');
+    }
+
+    /**
+     * Check if any items in this sale order have insufficient stock
+     */
+    public function hasInsufficientStock()
+    {
+        foreach ($this->saleOrderItem as $item) {
+            $availableStock = InventoryStock::where('product_id', $item->product_id)
+                ->where('warehouse_id', $item->warehouse_id)
+                ->where('rak_id', $item->rak_id)
+                ->sum('qty_available');
+            
+            if ($availableStock < $item->quantity) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get items with insufficient stock
+     */
+    public function getInsufficientStockItems()
+    {
+        $insufficientItems = [];
+        foreach ($this->saleOrderItem as $item) {
+            $availableStock = InventoryStock::where('product_id', $item->product_id)
+                ->where('warehouse_id', $item->warehouse_id)
+                ->where('rak_id', $item->rak_id)
+                ->sum('qty_available');
+            
+            if ($availableStock < $item->quantity) {
+                $insufficientItems[] = [
+                    'item' => $item,
+                    'available' => $availableStock,
+                    'needed' => $item->quantity,
+                    'shortage' => $item->quantity - $availableStock
+                ];
+            }
+        }
+        return $insufficientItems;
     }
 
     protected static function booted()

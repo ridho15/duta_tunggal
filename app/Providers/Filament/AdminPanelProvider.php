@@ -61,6 +61,10 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->authMiddleware([
                 Authenticate::class,
+            ])
+            ->assets([
+                // Custom CSS for sale orders
+                \Filament\Support\Assets\Css::make('custom-sale-order', asset('css/custom-sale-order.css')),
             ]);
     }
 }

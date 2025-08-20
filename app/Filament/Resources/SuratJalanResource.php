@@ -10,6 +10,7 @@ use App\Services\SuratJalanService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -27,6 +28,11 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use App\Models\Customer;
+use App\Models\Driver;
+use App\Models\Vehicle;
 
 class SuratJalanResource extends Resource
 {
@@ -87,10 +93,62 @@ class SuratJalanResource extends Resource
                 TextColumn::make('sj_number')
                     ->label('Surat Jalan Number')
                     ->searchable(),
+                TextColumn::make('delivery_orders_count')
+                    ->label('Jumlah DO')
+                    ->getStateUsing(function (SuratJalan $record): int {
+                        return $record->deliveryOrder->count();
+                    })
+                    ->badge()
+                    ->color('primary'),
                 TextColumn::make('deliveryOrder.do_number')
                     ->searchable()
                     ->label('Delivery Order')
-                    ->badge(),
+                    ->formatStateUsing(function (SuratJalan $record): string {
+                        return $record->deliveryOrder->pluck('do_number')->implode(', ');
+                    })
+                    ->limit(50)
+                    ->tooltip(function (SuratJalan $record): string {
+                        return $record->deliveryOrder->pluck('do_number')->implode(', ');
+                    }),
+                TextColumn::make('customers')
+                    ->label('Customer')
+                    ->getStateUsing(function (SuratJalan $record): string {
+                        $customers = collect();
+                        foreach ($record->deliveryOrder as $deliveryOrder) {
+                            foreach ($deliveryOrder->salesOrders as $salesOrder) {
+                                if ($salesOrder->customer) {
+                                    $customers->push("({$salesOrder->customer->code}) {$salesOrder->customer->name}");
+                                }
+                            }
+                        }
+                        return $customers->unique()->implode(', ');
+                    })
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('deliveryOrder.salesOrders.customer', function (Builder $query) use ($search) {
+                            $query->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%");
+                        });
+                    })
+                    ->wrap(),
+                TextColumn::make('driver_info')
+                    ->label('Driver')
+                    ->getStateUsing(function (SuratJalan $record): string {
+                        $drivers = $record->deliveryOrder->pluck('driver.name')->filter()->unique();
+                        return $drivers->implode(', ') ?: '-';
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('vehicle_info')
+                    ->label('Kendaraan')
+                    ->getStateUsing(function (SuratJalan $record): string {
+                        $vehicles = $record->deliveryOrder->map(function ($deliveryOrder) {
+                            if ($deliveryOrder->vehicle) {
+                                return "{$deliveryOrder->vehicle->license_plate} ({$deliveryOrder->vehicle->vehicle_type})";
+                            }
+                            return null;
+                        })->filter()->unique();
+                        return $vehicles->implode(', ') ?: '-';
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('issued_at')
                     ->description('Tanggal Surat Jalan dibuat')
                     ->dateTime()
@@ -118,7 +176,85 @@ class SuratJalanResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('customer')
+                    ->label('Filter Customer')
+                    ->relationship('deliveryOrder.salesOrders.customer', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->getOptionLabelFromRecordUsing(function (Customer $record): string {
+                        return "({$record->code}) {$record->name}";
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+                        
+                        return $query->whereHas('deliveryOrder.salesOrders', function (Builder $query) use ($data) {
+                            $query->where('customer_id', $data['value']);
+                        });
+                    }),
+                    
+                SelectFilter::make('status')
+                    ->label('Filter Status')
+                    ->options([
+                        '0' => 'Draft',
+                        '1' => 'Terbit'
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+                        
+                        return $query->where('status', $data['value']);
+                    }),
+                    
+                Filter::make('issued_date_range')
+                    ->label('Filter Tanggal Terbit')
+                    ->form([
+                        DatePicker::make('issued_from')
+                            ->label('Dari Tanggal'),
+                        DatePicker::make('issued_until')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['issued_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('issued_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['issued_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('issued_at', '<=', $date),
+                            );
+                    }),
+                    
+                SelectFilter::make('driver')
+                    ->label('Filter Driver')
+                    ->options(Driver::all()->pluck('name', 'id'))
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+                        
+                        return $query->whereHas('deliveryOrder', function (Builder $query) use ($data) {
+                            $query->where('driver_id', $data['value']);
+                        });
+                    }),
+                    
+                SelectFilter::make('vehicle')
+                    ->label('Filter Kendaraan')
+                    ->options(Vehicle::all()->mapWithKeys(function ($vehicle) {
+                        return [$vehicle->id => "{$vehicle->license_plate} - {$vehicle->vehicle_type}"];
+                    }))
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+                        
+                        return $query->whereHas('deliveryOrder', function (Builder $query) use ($data) {
+                            $query->where('vehicle_id', $data['value']);
+                        });
+                    }),
             ])
             ->actions([
                 ActionGroup::make([

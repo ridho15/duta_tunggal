@@ -41,6 +41,14 @@ class SaleOrderItemRelationManager extends RelationManager
                                 $set('unit_price', $product->sell_price);
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                             })
+                            ->helperText(function ($get) {
+                                if (!$get('product_id')) return null;
+                                
+                                $inventoryStock = \App\Models\InventoryStock::where('product_id', $get('product_id'))
+                                    ->sum('qty_available');
+                                
+                                return "Stock tersedia: " . number_format($inventoryStock, 0, ',', '.');
+                            })
                             ->required()
                             ->relationship('product', 'id')
                             ->getOptionLabelFromRecordUsing(function (Product $product) {
@@ -52,6 +60,32 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
+                            })
+                            ->helperText(function ($get) {
+                                if (!$get('product_id') || !$get('quantity')) return null;
+                                
+                                $inventoryStock = \App\Models\InventoryStock::where('product_id', $get('product_id'))
+                                    ->sum('qty_available');
+                                
+                                $quantity = (float) $get('quantity');
+                                
+                                if ($inventoryStock < $quantity) {
+                                    return "⚠️ Stock tidak mencukupi! Tersedia: " . number_format($inventoryStock, 0, ',', '.');
+                                } else {
+                                    return "✅ Stock tersedia: " . number_format($inventoryStock, 0, ',', '.');
+                                }
+                            })
+                            ->rule(function ($get) {
+                                return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    if (!$get('product_id')) return;
+                                    
+                                    $inventoryStock = \App\Models\InventoryStock::where('product_id', $get('product_id'))
+                                        ->sum('qty_available');
+                                    
+                                    if ($inventoryStock < $value) {
+                                        $fail('Quantity melebihi stock yang tersedia (' . number_format($inventoryStock, 0, ',', '.') . ')');
+                                    }
+                                };
                             })
                             ->required()
                             ->default(0),
@@ -105,7 +139,45 @@ class SaleOrderItemRelationManager extends RelationManager
                     }),
                 TextColumn::make('quantity')
                     ->label('Quantity')
+                    ->badge()
+                    ->color(function ($state, $record) {
+                        $inventoryStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
+                            ->where(function ($query) use ($record) {
+                                $query->where('warehouse_id', $record->warehouse_id)
+                                      ->orWhere('rak_id', $record->rak_id);
+                            })
+                            ->first();
+                        
+                        $availableStock = $inventoryStock ? $inventoryStock->qty_available : 0;
+                        
+                        if ($availableStock < $state) {
+                            return 'danger'; // Red if quantity exceeds available stock
+                        }
+                        return 'primary'; // Blue for normal quantity
+                    })
                     ->sortable(),
+                TextColumn::make('available_stock')
+                    ->label('Stock Tersedia')
+                    ->getStateUsing(function ($record) {
+                        $inventoryStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
+                            ->where(function ($query) use ($record) {
+                                $query->where('warehouse_id', $record->warehouse_id)
+                                      ->orWhere('rak_id', $record->rak_id);
+                            })
+                            ->first();
+                        
+                        return $inventoryStock ? $inventoryStock->qty_available : 0;
+                    })
+                    ->badge()
+                    ->color(function ($state, $record) {
+                        if ($state < $record->quantity) {
+                            return 'danger'; // Red if insufficient stock
+                        } elseif ($state <= ($record->quantity * 1.2)) {
+                            return 'warning'; // Yellow if stock is low (within 20% of quantity)
+                        }
+                        return 'success'; // Green if sufficient stock
+                    })
+                    ->sortable(false),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
                     ->money('idr')

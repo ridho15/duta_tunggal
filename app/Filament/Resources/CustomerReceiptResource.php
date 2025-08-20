@@ -164,10 +164,10 @@ class CustomerReceiptResource extends Resource
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if ($state == 'Deposit') {
-                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
-                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
+                                            $deposit = Deposit::where('from_model_type', 'App\Models\Customer')
+                                                ->where('from_model_id', $get('../../customer_id'))->where('status', 'active')->first();
                                             if (!$deposit) {
-                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
+                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada customer ini");
                                                 $set('method', null);
                                             } else {
                                                 // Check saldo deposit
@@ -180,8 +180,8 @@ class CustomerReceiptResource extends Resource
                                     })
                                     ->helperText(function ($get) {
                                         if ($get('method') == 'Deposit') {
-                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
-                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
+                                            $deposit = Deposit::where('from_model_type', 'App\Models\Customer')
+                                                ->where('from_model_id', $get('../../customer_id'))->where('status', 'active')->first();
                                             if ($deposit) {
                                                 return "Saldo : Rp." . number_format($deposit->remaining_amount, 0, ',', '.');
                                             }

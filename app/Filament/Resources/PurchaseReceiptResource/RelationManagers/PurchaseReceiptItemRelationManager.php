@@ -61,17 +61,46 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                     ->label('Quantity Received')
                     ->numeric()
                     ->required()
+                    ->reactive()
+                    ->afterStateUpdated(function ($state, $set, $get) {
+                        $qtyReceived = (float) ($state ?? 0);
+                        $qtyAccepted = (float) ($get('qty_accepted') ?? 0);
+                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
+                        $set('qty_rejected', $qtyRejected);
+                    })
                     ->default(0),
                 TextInput::make('qty_accepted')
                     ->label('Quantity Accepted')
                     ->numeric()
+                    ->reactive()
+                    ->afterStateUpdated(function ($state, $set, $get, $component) {
+                        $qtyReceived = (float) ($get('qty_received') ?? 0);
+                        $qtyAccepted = (float) ($state ?? 0);
+                        
+                        // Validation: qty_accepted cannot exceed qty_received
+                        if ($qtyAccepted > $qtyReceived) {
+                            $component->state($qtyReceived);
+                            $qtyAccepted = $qtyReceived;
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Peringatan')
+                                ->body("Quantity Accepted tidak boleh melebihi Quantity Received ({$qtyReceived})")
+                                ->warning()
+                                ->send();
+                        }
+                        
+                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
+                        $set('qty_rejected', $qtyRejected);
+                    })
                     ->default(0)
                     ->required(),
                 TextInput::make('qty_rejected')
                     ->label('Quantity Rejected')
                     ->numeric()
-                    ->default(0)
-                    ->required(),
+                    ->helperText("Otomatis dihitung dari Qty Received - Qty Accepted")
+                    ->disabled()
+                    ->dehydrated(true)
+                    ->default(0),
                 Repeater::make('purchaseReceiptItemPhoto')
                     ->relationship()
                     ->addActionLabel('Tambah Photo')

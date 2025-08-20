@@ -64,4 +64,16 @@ class PurchaseReceiptItem extends Model
     {
         return $this->morphOne(QualityControl::class, 'from_model')->withDefault();
     }
+
+    protected static function booted()
+    {
+        // Automatically calculate qty_rejected when saving
+        static::saving(function ($purchaseReceiptItem) {
+            $qtyReceived = (float) ($purchaseReceiptItem->qty_received ?? 0);
+            $qtyAccepted = (float) ($purchaseReceiptItem->qty_accepted ?? 0);
+            
+            // Calculate qty_rejected automatically
+            $purchaseReceiptItem->qty_rejected = max(0, $qtyReceived - $qtyAccepted);
+        });
+    }
 }

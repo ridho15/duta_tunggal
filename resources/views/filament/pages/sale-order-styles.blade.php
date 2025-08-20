@@ -1,0 +1,14 @@
+<style>
+.insufficient-stock-row {
+    background-color: #fef2f2 !important;
+    border-left: 4px solid #ef4444 !important;
+}
+
+.insufficient-stock-row:hover {
+    background-color: #fee2e2 !important;
+}
+
+.insufficient-stock-row td {
+    background-color: transparent !important;
+}
+</style>

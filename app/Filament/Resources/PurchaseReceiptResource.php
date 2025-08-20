@@ -214,6 +214,13 @@ class PurchaseReceiptResource extends Resource
                                         'required' => 'Quantity diterima tidak boleh kosong.minimal 0',
                                         'numeric' => 'Quantity diterima tidak valid !'
                                     ])
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, $set, $get) {
+                                        $qtyReceived = (float) ($state ?? 0);
+                                        $qtyAccepted = (float) ($get('qty_accepted') ?? 0);
+                                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
+                                        $set('qty_rejected', $qtyRejected);
+                                    })
                                     ->default(0),
                                 TextInput::make('qty_accepted')
                                     ->label('Quantity Accepted')
@@ -224,17 +231,34 @@ class PurchaseReceiptResource extends Resource
                                     ])
                                     ->default(0)
                                     ->helperText("Quantity yang di ambil")
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, $set, $get, $component) {
+                                        $qtyReceived = (float) ($get('qty_received') ?? 0);
+                                        $qtyAccepted = (float) ($state ?? 0);
+                                        
+                                        // Validation: qty_accepted cannot exceed qty_received
+                                        if ($qtyAccepted > $qtyReceived) {
+                                            $component->state($qtyReceived);
+                                            $qtyAccepted = $qtyReceived;
+                                            
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Peringatan')
+                                                ->body("Quantity Accepted tidak boleh melebihi Quantity Received ({$qtyReceived})")
+                                                ->warning()
+                                                ->send();
+                                        }
+                                        
+                                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
+                                        $set('qty_rejected', $qtyRejected);
+                                    })
                                     ->required(),
                                 TextInput::make('qty_rejected')
                                     ->label('Quantity Rejected')
-                                    ->validationMessages([
-                                        'required' => 'Quantity ditolak tidak boleh kosong.minimal 0',
-                                        'numeric' => 'Quantity ditolak tidak valid !'
-                                    ])
                                     ->numeric()
-                                    ->helperText("Quantity yang di tolak")
-                                    ->default(0)
-                                    ->required(),
+                                    ->helperText("Quantity yang ditolak (otomatis dihitung)")
+                                    ->disabled()
+                                    ->dehydrated(true)
+                                    ->default(0),
                                 Textarea::make('reason_rejected')
                                     ->label('Reason Rejected')
                                     ->string()

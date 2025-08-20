@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             WarehouseSeeder::class,
             RakSeeder::class,
             DeliveryOrderSeeder::class,
+            SuratJalanSeeder::class,
         ]);
     }
 }

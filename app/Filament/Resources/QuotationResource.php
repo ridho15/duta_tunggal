@@ -6,15 +6,19 @@ use App\Filament\Resources\QuotationResource\Pages;
 use App\Filament\Resources\QuotationResource\Pages\ViewQuotation;
 use App\Filament\Resources\QuotationResource\RelationManagers\QuotationItemRelationManager;
 use App\Http\Controllers\HelperController;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quotation;
+use App\Services\CustomerService;
 use App\Services\QuotationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -87,9 +91,123 @@ class QuotationResource extends Resource
                             ->preload()
                             ->reactive()
                             ->validationMessages([
-                                'required' => 'Customer waji dipilih'
+                                'required' => 'Customer wajib dipilih'
                             ])
                             ->relationship('customer', 'name')
+                            ->getOptionLabelFromRecordUsing(function (Customer $customer) {
+                                return "({$customer->code}) {$customer->name}";
+                            })
+                            ->createOptionForm([
+                                Fieldset::make('Form Customer')
+                                    ->schema([
+                                        TextInput::make('code')
+                                            ->label('Kode Customer')
+                                            ->required()
+                                            ->reactive()
+                                            ->suffixAction(ActionsAction::make('generateCode')
+                                                ->icon('heroicon-m-arrow-path') // ikon reload
+                                                ->tooltip('Generate Kode Customer')
+                                                ->action(function ($set, $get, $state) {
+                                                    $customerService = app(CustomerService::class);
+                                                    $set('code', $customerService->generateCode());
+                                                }))
+                                            ->validationMessages([
+                                                'unique' => 'Kode customer sudah digunakan',
+                                                'required' => 'Kode customer tidak boleh kosong',
+                                            ])
+                                            ->unique(ignoreRecord: true),
+                                        TextInput::make('name')
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Nama customer tidak boleh kosong',
+                                            ])
+                                            ->label('Nama Customer')
+                                            ->maxLength(255),
+                                        TextInput::make('perusahaan')
+                                            ->label('Perusahaan')
+                                            ->validationMessages([
+                                                'required' => 'Perusahaan tidak boleh kosong',
+                                            ])
+                                            ->required(),
+                                        TextInput::make('nik_npwp')
+                                            ->label('NIK / NPWP')
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'NIK / NPWP tidak boleh kosong',
+                                                'numeric' => 'NIK / NPWP tidak valid !'
+                                            ])
+                                            ->numeric(),
+                                        TextInput::make('address')
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Alamat tidak boleh kosong',
+                                            ])
+                                            ->label('Alamat')
+                                            ->maxLength(255),
+                                        TextInput::make('telephone')
+                                            ->label('Telepon')
+                                            ->tel()
+                                            ->validationMessages([
+                                                'regex' => 'Telepon tidak valid !'
+                                            ])
+                                            ->placeholder('Contoh: 0211234567')
+                                            ->regex('/^0[2-9][0-9]{1,3}[0-9]{5,8}$/')
+                                            ->helperText('Hanya nomor telepon rumah/kantor, bukan nomor HP.')
+                                            ->required()
+                                            ->maxLength(255),
+                                        TextInput::make('phone')
+                                            ->label('Handphone')
+                                            ->tel()
+                                            ->validationMessages([
+                                                'required' => 'Nomor handphone tidak boleh kosong',
+                                                'regex' => 'Nomor handphone tidak valid !'
+                                            ])
+                                            ->maxLength(15)
+                                            ->rules(['regex:/^08[0-9]{8,12}$/'])
+                                            ->required()
+                                            ->maxLength(255),
+                                        TextInput::make('email')
+                                            ->email()
+                                            ->required()
+                                            ->maxLength(255),
+                                        TextInput::make('fax')
+                                            ->label('Fax')
+                                            ->required(),
+                                        TextInput::make('tempo_kredit')
+                                            ->numeric()
+                                            ->label('Tempo Kredit (Hari)')
+                                            ->helperText('Hari')
+                                            ->required()
+                                            ->default(0),
+                                        TextInput::make('kredit_limit')
+                                            ->label('Kredit Limit (Rp.)')
+                                            ->default(0)
+                                            ->required()
+                                            ->numeric()
+                                            ->prefix('Rp.'),
+                                        Radio::make('tipe_pembayaran')
+                                            ->label('Tipe Bayar Customer')
+                                            ->inlineLabel()
+                                            ->options([
+                                                'Bebas' => 'Bebas',
+                                                'COD (Bayar Lunas)' => 'COD (Bayar Lunas)',
+                                                'Kredit' => 'Kredit (Bayar Kredit)'
+                                            ])->required(),
+                                        Radio::make('tipe')
+                                            ->label('Tipe Customer')
+                                            ->inlineLabel()
+                                            ->options([
+                                                'PKP' => 'PKP',
+                                                'PRI' => 'PRI'
+                                            ])
+                                            ->required(),
+                                        Checkbox::make('isSpecial')
+                                            ->label('Spesial (Ya / Tidak)'),
+                                        Textarea::make('keterangan')
+                                            ->label('Keterangan')
+                                            ->nullable(),
+                                    ]),
+                            ])
                             ->required(),
                         DatePicker::make('date')
                             ->label('Tanggal')

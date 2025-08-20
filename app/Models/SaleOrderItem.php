@@ -6,6 +6,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 class SaleOrderItem extends Model
 {
@@ -21,6 +22,7 @@ class SaleOrderItem extends Model
         'warehouse_id',
         'rak_id'
     ];
+
 
     public function saleOrder()
     {
@@ -45,5 +47,30 @@ class SaleOrderItem extends Model
     public function rak()
     {
         return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+    }
+
+    public function deliveryOrderItems()
+    {
+        return $this->hasMany(DeliveryOrderItem::class, 'sale_order_item_id');
+    }
+
+    public function getRemainingQuantityAttribute()
+    {
+        $deliveredQuantity = $this->deliveryOrderItems()
+            ->whereHas('deliveryOrder', function ($query) {
+                $query->whereNotIn('status', ['cancelled', 'rejected']);
+            })
+            ->sum('quantity');
+        
+        return $this->quantity - $deliveredQuantity;
+    }
+
+    public function getDeliveredQuantityAttribute()
+    {
+        return $this->deliveryOrderItems()
+            ->whereHas('deliveryOrder', function ($query) {
+                $query->whereNotIn('status', ['cancelled', 'rejected']);
+            })
+            ->sum('quantity');
     }
 }

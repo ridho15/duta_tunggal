@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\SaleOrderResource\Pages;
 
 use App\Filament\Resources\SaleOrderResource;
+use Illuminate\Contracts\View\View;
 use Filament\Actions;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;

@@ -33,4 +33,19 @@ class SuratJalan extends Model
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
+
+    // Helper method to get customers through delivery orders and sales orders
+    public function customers()
+    {
+        return $this->hasManyThrough(
+            Customer::class,
+            SaleOrder::class,
+            'id', // Foreign key on sale_orders table
+            'id', // Foreign key on customers table
+            'id', // Local key on surat_jalans table
+            'customer_id' // Local key on sale_orders table
+        )->join('delivery_sales_orders', 'sale_orders.id', '=', 'delivery_sales_orders.sales_order_id')
+         ->join('surat_jalan_delivery_orders', 'delivery_sales_orders.delivery_order_id', '=', 'surat_jalan_delivery_orders.delivery_order_id')
+         ->where('surat_jalan_delivery_orders.surat_jalan_id', $this->id ?? 0);
+    }
 }

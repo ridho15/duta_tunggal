@@ -49,7 +49,14 @@
     <h3 style="text-align: center;">Label Barcode Produk</h3>
 
     <table class="barcode-table">
-        @for($i = 1; $i <= 30; $i++) @if($i%3==1) <tr>
+        @php
+            $totalLabels = ($copies ?? 1) * 10; // 10 rows per page
+            $labelsPerRow = 3;
+        @endphp
+        
+        @for($i = 1; $i <= $totalLabels; $i++) 
+            @if($i % $labelsPerRow == 1) 
+            <tr>
             @endif
             <td>
                 <div class="barcode-label">
@@ -71,10 +78,18 @@
                     </table>
                 </div>
             </td>
-            @if($i%3 == 0)
+            @if($i % $labelsPerRow == 0)
             </tr>
             @endif
+        @endfor
+        
+        {{-- Close incomplete row if needed --}}
+        @if($totalLabels % $labelsPerRow != 0)
+            @for($j = 0; $j < $labelsPerRow - ($totalLabels % $labelsPerRow); $j++)
+                <td></td>
             @endfor
+            </tr>
+        @endif
     </table>
 </body>
 

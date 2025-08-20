@@ -15,6 +15,7 @@ class Product extends Model
         'name', // Nama Product
         'sku', // Kode
         'cabang_id',
+        'supplier_id',
         'product_category_id',
         'cost_price', // Harga Beli Asli (Rp.)
         'sell_price', // Harga jual (Rp.)
@@ -29,11 +30,37 @@ class Product extends Model
         'uom_id', // Satuan
         'is_asset',
         'is_manufacture',
+        'is_active',
     ];
+
+    protected $casts = [
+        'is_asset' => 'boolean',
+        'is_manufacture' => 'boolean', 
+        'is_active' => 'boolean',
+        'cost_price' => 'decimal:2',
+        'sell_price' => 'decimal:2',
+        'biaya' => 'decimal:2',
+    ];
+
+    // Scopes for active/inactive products
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeInactive($query)
+    {
+        return $query->where('is_active', false);
+    }
 
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
     }
 
     public function unitConversions()

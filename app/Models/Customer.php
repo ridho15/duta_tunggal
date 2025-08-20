@@ -56,4 +56,21 @@ class Customer extends Model
     {
         return $this->morphMany(DepositLog::class, 'reference');
     }
+
+    public function accountReceivables()
+    {
+        return $this->hasMany(AccountReceivable::class, 'customer_id');
+    }
+
+    public function invoices()
+    {
+        return $this->hasManyThrough(
+            Invoice::class,
+            SaleOrder::class,
+            'customer_id', // Foreign key on sale_orders table
+            'from_model_id', // Foreign key on invoices table
+            'id', // Local key on customers table
+            'id' // Local key on sale_orders table
+        )->where('invoices.from_model_type', 'App\Models\SaleOrder');
+    }
 }

@@ -35,7 +35,6 @@ class PurchaseOrder extends Model
         'created_by',
         'refer_model_type',
         'refer_model_id',
-        'delivery_date'
     ];
 
     public function purchaseOrderCurrency()

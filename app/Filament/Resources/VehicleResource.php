@@ -7,6 +7,7 @@ use App\Filament\Resources\VehicleResource\Pages;
 use App\Filament\Resources\VehicleResource\Pages\ViewVehicle;
 use App\Models\Vehicle;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -17,6 +18,7 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
 
@@ -28,6 +30,10 @@ class VehicleResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
+    protected static ?string $modelLabel = 'Kendaraan';
+
+    protected static ?string $pluralModelLabel = 'Kendaraan';
+
     protected static ?int $navigationSort = 26;
     public static function form(Form $form): Form
     {
@@ -36,12 +42,35 @@ class VehicleResource extends Resource
                 Fieldset::make('Form Vehicle')
                     ->schema([
                         TextInput::make('plate')
+                            ->label('Plat Nomor / Nomor Polisi')
+                            ->placeholder('Contoh: B 1234 ABC')
                             ->required()
+                            ->unique(ignoreRecord: true)
+                            ->validationMessages([
+                                'required' => 'Plat nomor tidak boleh kosong',
+                                'unique' => 'Plat nomor sudah terdaftar'
+                            ])
                             ->maxLength(255),
-                        TextInput::make('type')
+                        Select::make('type')
+                            ->label('Jenis Kendaraan')
+                            ->options([
+                                'Truck' => 'Truck',
+                                'Pickup' => 'Pickup',
+                                'Van' => 'Van',
+                                'Motor' => 'Motor',
+                                'Mobil Box' => 'Mobil Box',
+                                'Container' => 'Container',
+                                'Trailer' => 'Trailer',
+                                'Lainnya' => 'Lainnya'
+                            ])
+                            ->searchable()
                             ->required()
-                            ->maxLength(255),
+                            ->validationMessages([
+                                'required' => 'Jenis kendaraan harus dipilih'
+                            ]),
                         TextInput::make('capacity')
+                            ->label('Kapasitas')
+                            ->placeholder('Contoh: 5 Ton, 1000 kg, 20 m³')
                             ->required()
                             ->maxLength(255),
                     ])
@@ -53,11 +82,31 @@ class VehicleResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('plate')
-                    ->searchable(),
+                    ->label('Plat Nomor')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->copyMessage('Plat nomor disalin!')
+                    ->copyMessageDuration(1500),
                 TextColumn::make('type')
-                    ->searchable(),
+                    ->label('Jenis Kendaraan')
+                    ->searchable()
+                    ->sortable()
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Truck' => 'success',
+                        'Pickup' => 'warning', 
+                        'Van' => 'info',
+                        'Motor' => 'gray',
+                        'Mobil Box' => 'primary',
+                        'Container' => 'danger',
+                        'Trailer' => 'secondary',
+                        default => 'gray',
+                    }),
                 TextColumn::make('capacity')
-                    ->searchable(),
+                    ->label('Kapasitas')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -72,7 +121,20 @@ class VehicleResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('type')
+                    ->label('Jenis Kendaraan')
+                    ->options([
+                        'Truck' => 'Truck',
+                        'Pickup' => 'Pickup',
+                        'Van' => 'Van',
+                        'Motor' => 'Motor',
+                        'Mobil Box' => 'Mobil Box',
+                        'Container' => 'Container',
+                        'Trailer' => 'Trailer',
+                        'Lainnya' => 'Lainnya'
+                    ])
+                    ->multiple()
+                    ->preload(),
             ])
             ->actions([
                 ActionGroup::make([

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SupplierResource\Pages;
 use App\Filament\Resources\SupplierResource\Pages\ViewSupplier;
 use App\Filament\Resources\SupplierResource\RelationManagers\PurchaseOrderRelationManager;
+use App\Filament\Resources\SupplierResource\RelationManagers\ProductsRelationManager;
 use App\Models\Supplier;
 use App\Services\SupplierService;
 use Filament\Forms\Components\Actions\Action;
@@ -54,19 +55,6 @@ class SupplierResource extends Resource
                                     $supplierService = app(SupplierService::class);
                                     $set('code', $supplierService->generateCode());
                                 })),
-                        TextInput::make('name')
-                            ->required()
-                            ->label('Nama Supplier')
-                            ->validationMessages([
-                                'required' => 'Nama tidak boleh kosong'
-                            ])
-                            ->maxLength(255),
-                        TextInput::make('npwp')
-                            ->label('NPWP')
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'NPWP tidak boleh kosong'
-                            ])->maxLength(255),
                         TextInput::make('perusahaan')
                             ->label('Nama Perusahaan')
                             ->string()
@@ -75,6 +63,23 @@ class SupplierResource extends Resource
                             ])
                             ->maxLength(255)
                             ->required(),
+                        TextInput::make('name')
+                            ->required()
+                            ->label('Nama Supplier')
+                            ->validationMessages([
+                                'required' => 'Nama tidak boleh kosong'
+                            ])
+                            ->maxLength(255),
+                        TextInput::make('kontak_person')
+                            ->label('Nama Contact Person')
+                            ->string()
+                            ->nullable(),
+                        TextInput::make('npwp')
+                            ->label('NPWP')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'NPWP tidak boleh kosong'
+                            ])->maxLength(255),
                         TextInput::make('address')
                             ->required()
                             ->label('Alamat')
@@ -122,10 +127,6 @@ class SupplierResource extends Resource
                                 'required' => 'Fax tidak boleh kosong',
                                 'regex' => 'Fax tidak valid !'
                             ]),
-                        TextInput::make('kontak_person')
-                            ->label('Kontak Person')
-                            ->string()
-                            ->nullable(),
                         TextInput::make('tempo_hutang')
                             ->label('Tempo Hutang')
                             ->suffix("Hari")
@@ -151,14 +152,17 @@ class SupplierResource extends Resource
                 TextColumn::make('code')
                     ->label('Kode Supplier')
                     ->searchable(),
+                TextColumn::make('perusahaan')
+                    ->label('Nama Perusahaan')
+                    ->searchable(),
                 TextColumn::make('name')
                     ->label('Nama Supplier')
                     ->searchable(),
+                TextColumn::make('kontak_person')
+                    ->label('Nama Contact Person')
+                    ->searchable(),
                 TextColumn::make('npwp')
                     ->label('NPWP')
-                    ->searchable(),
-                TextColumn::make('perusahaan')
-                    ->label('Nama Perusahaan')
                     ->searchable(),
                 TextColumn::make('address')
                     ->label('Alamat')
@@ -205,7 +209,8 @@ class SupplierResource extends Resource
     public static function getRelations(): array
     {
         return [
-            PurchaseOrderRelationManager::class
+            PurchaseOrderRelationManager::class,
+            ProductsRelationManager::class,
         ];
     }
 

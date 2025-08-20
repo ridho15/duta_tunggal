@@ -25,6 +25,7 @@ class QualityControl extends Model
         'rak_id',
         'from_model_id',
         'from_model_type',
+        'purchase_return_processed',
     ];
 
     protected $appends = [

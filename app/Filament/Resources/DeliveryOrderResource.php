@@ -6,6 +6,7 @@ use App\Filament\Resources\DeliveryOrderResource\Pages;
 use App\Filament\Resources\DeliveryOrderResource\Pages\ViewDeliveryOrder;
 use App\Http\Controllers\HelperController;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderApprovalLog;
 use App\Models\Product;
 use App\Models\PurchaseReceiptItem;
 use App\Models\SaleOrder;
@@ -35,6 +36,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 
 class DeliveryOrderResource extends Resource
 {
@@ -79,12 +82,16 @@ class DeliveryOrderResource extends Resource
                                 $items = [];
                                 foreach ($listSaleOrder as $saleOrder) {
                                     foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
-                                        array_push($items, [
-                                            'options_from' => 2,
-                                            'sale_order_item_id' => $saleOrderItem->id,
-                                            'product_id' => $saleOrderItem->product_id,
-                                            'quantity' => $saleOrderItem->quantity,
-                                        ]);
+                                        $remainingQty = $saleOrderItem->remaining_quantity;
+                                        // Only add items that still have remaining quantity
+                                        if ($remainingQty > 0) {
+                                            array_push($items, [
+                                                'options_from' => 2,
+                                                'sale_order_item_id' => $saleOrderItem->id,
+                                                'product_id' => $saleOrderItem->product_id,
+                                                'quantity' => $remainingQty,
+                                            ]);
+                                        }
                                     }
                                 }
 
@@ -96,11 +103,16 @@ class DeliveryOrderResource extends Resource
                             ->multiple()
                             ->nullable(),
                         DateTimePicker::make('delivery_date')
-                            ->label('Delivery Date')
+                            ->label('Tanggal Pengiriman')
+                            ->required()
                             ->validationMessages([
-                                'required' => 'Delivery Date tidak boleh kosong',
+                                'required' => 'Tanggal pengiriman wajib diisi',
+                                'date' => 'Format tanggal tidak valid'
                             ])
-                            ->required(),
+                            ->native(false)
+                            ->displayFormat('d/m/Y H:i')
+                            ->seconds(false)
+                            ->helperText('Tentukan tanggal dan waktu pengiriman yang direncanakan'),
                         Select::make('driver_id')
                             ->label('Driver')
                             ->searchable()
@@ -136,6 +148,48 @@ class DeliveryOrderResource extends Resource
                                 }
                                 return $data;
                             })
+                            ->rules([
+                                function (Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $salesOrderIds = $get('sales_order_id') ?? [];
+                                        if (empty($salesOrderIds) || empty($value)) {
+                                            return;
+                                        }
+
+                                        // Validasi setiap delivery item
+                                        foreach ($value as $deliveryItem) {
+                                            if (!empty($deliveryItem['sale_order_item_id']) && !empty($deliveryItem['quantity'])) {
+                                                $saleOrderItem = SaleOrderItem::find($deliveryItem['sale_order_item_id']);
+                                                
+                                                if ($saleOrderItem) {
+                                                    // Validasi 1: Quantity delivery item tidak boleh lebih besar dari quantity sale order item asli
+                                                    if ($deliveryItem['quantity'] > $saleOrderItem->quantity) {
+                                                        $productName = $saleOrderItem->product->name ?? "Unknown Product";
+                                                        $fail("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) tidak boleh lebih besar dari quantity sale order item ({$saleOrderItem->quantity}).");
+                                                        return;
+                                                    }
+                                                    
+                                                    // Validasi 2: Quantity delivery item tidak boleh melebihi remaining quantity
+                                                    if ($deliveryItem['quantity'] > $saleOrderItem->remaining_quantity) {
+                                                        $productName = $saleOrderItem->product->name ?? "Unknown Product";
+                                                        $fail("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).");
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Validasi 3: Pastikan tidak ada duplicate sale order item dalam satu delivery order
+                                        $saleOrderItemIds = collect($value)->pluck('sale_order_item_id')->filter();
+                                        $duplicates = $saleOrderItemIds->duplicates();
+                                        
+                                        if ($duplicates->isNotEmpty()) {
+                                            $fail("Tidak boleh ada duplicate sale order item dalam satu delivery order.");
+                                            return;
+                                        }
+                                    };
+                                },
+                            ])
                             ->schema([
                                 Radio::make('options_from')
                                     ->label('Option From')
@@ -180,8 +234,10 @@ class DeliveryOrderResource extends Resource
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $saleOrderItem = SaleOrderItem::find($state);
-                                        $set('product_id', $saleOrderItem->product_id);
-                                        $set('quantity', $saleOrderItem->quantity);
+                                        if ($saleOrderItem) {
+                                            $set('product_id', $saleOrderItem->product_id);
+                                            $set('quantity', $saleOrderItem->remaining_quantity);
+                                        }
                                     })
                                     ->searchable()
                                     ->relationship('saleOrderItem', 'id', function (Builder $query, $get) {
@@ -191,7 +247,9 @@ class DeliveryOrderResource extends Resource
                                         });
                                     })
                                     ->getOptionLabelFromRecordUsing(function (SaleOrderItem $saleOrderItem) {
-                                        return "{$saleOrderItem->saleOrder->so_number} - ({$saleOrderItem->product->sku}) {$saleOrderItem->product->name}";
+                                        $remaining = $saleOrderItem->remaining_quantity;
+                                        $total = $saleOrderItem->quantity;
+                                        return "{$saleOrderItem->saleOrder->so_number} - ({$saleOrderItem->product->sku}) {$saleOrderItem->product->name} [Sisa: {$remaining}/{$total}]";
                                     })
                                     ->nullable(),
                                 Select::make('product_id')
@@ -208,7 +266,69 @@ class DeliveryOrderResource extends Resource
                                     ->label('Quantity')
                                     ->numeric()
                                     ->reactive()
-                                    ->default(0),
+                                    ->default(0)
+                                    ->rules(['required', 'numeric', 'min:1'])
+                                    ->validationAttribute('quantity')
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, $set, $get, $component) {
+                                        $saleOrderItemId = $get('sale_order_item_id');
+                                        $optionsFrom = $get('options_from');
+                                        
+                                        if ($optionsFrom == 2 && $saleOrderItemId) {
+                                            $saleOrderItem = SaleOrderItem::find($saleOrderItemId);
+                                            if ($saleOrderItem) {
+                                                $originalQuantity = $saleOrderItem->quantity;
+                                                $remainingQuantity = $saleOrderItem->remaining_quantity;
+                                                
+                                                // Validasi 1: Tidak boleh lebih besar dari quantity asli sale order item
+                                                if ($state > $originalQuantity) {
+                                                    $component->state($originalQuantity);
+                                                    \Filament\Notifications\Notification::make()
+                                                        ->title('Quantity Validation')
+                                                        ->body("Quantity tidak boleh lebih besar dari quantity sale order item asli. Maksimal: {$originalQuantity}")
+                                                        ->warning()
+                                                        ->send();
+                                                    return;
+                                                }
+                                                
+                                                // Validasi 2: Tidak boleh lebih besar dari remaining quantity
+                                                if ($state > $remainingQuantity) {
+                                                    $component->state($remainingQuantity);
+                                                    
+                                                    if ($remainingQuantity <= 0) {
+                                                        \Filament\Notifications\Notification::make()
+                                                            ->title('Quantity Validation')
+                                                            ->body("Semua quantity untuk item ini sudah dikirim. Sisa quantity: {$remainingQuantity}")
+                                                            ->warning()
+                                                            ->send();
+                                                    } else {
+                                                        \Filament\Notifications\Notification::make()
+                                                            ->title('Quantity Validation')
+                                                            ->body("Quantity tidak boleh melebihi sisa yang belum dikirim. Maksimal: {$remainingQuantity}")
+                                                            ->warning()
+                                                            ->send();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    })
+                                    ->helperText(function ($get) {
+                                        $saleOrderItemId = $get('sale_order_item_id');
+                                        $optionsFrom = $get('options_from');
+                                        
+                                        if ($optionsFrom == 2 && $saleOrderItemId) {
+                                            $saleOrderItem = SaleOrderItem::find($saleOrderItemId);
+                                            if ($saleOrderItem) {
+                                                $remaining = $saleOrderItem->remaining_quantity;
+                                                $delivered = $saleOrderItem->delivered_quantity;
+                                                $total = $saleOrderItem->quantity;
+                                                
+                                                return "Total SO: {$total} | Sudah dikirim: {$delivered} | Sisa: {$remaining} | Max: {$total}";
+                                            }
+                                        }
+                                        
+                                        return null;
+                                    }),
                                 Textarea::make('reason')
                                     ->label('Reason')
                                     ->nullable()
@@ -253,6 +373,18 @@ class DeliveryOrderResource extends Resource
                     ->label('Sales Orders')
                     ->badge()
                     ->searchable(),
+                TextColumn::make('salesOrders.createdBy.name')
+                    ->label('Sales')
+                    ->badge()
+                    ->color('info')
+                    ->formatStateUsing(function ($state) {
+                        return $state ?? 'System';
+                    })
+                    ->visible(function () {
+                        // Hanya tampilkan kolom Sales jika user adalah Super Sales, Sales Manager atau Admin
+                        $user = Auth::user();
+                        return $user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin']);
+                    }),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -269,6 +401,23 @@ class DeliveryOrderResource extends Resource
             ->filters([
                 //
             ])
+            ->modifyQueryUsing(function (Builder $query) {
+                $user = Auth::user();
+                
+                // Jika user adalah Super Sales, Sales Manager, Admin, Owner - bisa lihat semua
+                if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+                    return $query;
+                }
+                
+                // Jika user adalah Sales - hanya bisa lihat delivery order dari sale order yang dia buat
+                if ($user->hasRole('Sales')) {
+                    return $query->whereHas('salesOrders', function (Builder $subQuery) use ($user) {
+                        $subQuery->where('created_by', $user->id);
+                    });
+                }
+                
+                return $query;
+            })
             ->actions([
                 ActionGroup::make([
                     ViewAction::make()
@@ -310,9 +459,24 @@ class DeliveryOrderResource extends Resource
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response delivery order') && ($record->status == 'request_approve');
                         })
-                        ->action(function ($record) {
+                        ->form([
+                            Textarea::make('comments')
+                                ->label('Comments')
+                                ->placeholder('Optional approval comments...')
+                                ->nullable()
+                        ])
+                        ->action(function ($record, array $data) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
                             $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved');
+                            
+                            DeliveryOrderApprovalLog::create([
+                                'delivery_order_id' => $record->id,
+                                'user_id' => Auth::id(),
+                                'action' => 'approved',
+                                'comments' => $data['comments'] ?? null,
+                                'approved_at' => now(),
+                            ]);
+                            
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve Delivery Order");
                         }),
                     Action::make('closed')
@@ -336,9 +500,24 @@ class DeliveryOrderResource extends Resource
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response delivery order') && ($record->status == 'request_approve');
                         })
-                        ->action(function ($record) {
+                        ->form([
+                            Textarea::make('comments')
+                                ->label('Rejection Reason')
+                                ->placeholder('Please provide reason for rejection...')
+                                ->required()
+                        ])
+                        ->action(function ($record, array $data) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
                             $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'reject');
+                            
+                            DeliveryOrderApprovalLog::create([
+                                'delivery_order_id' => $record->id,
+                                'user_id' => Auth::id(),
+                                'action' => 'rejected',
+                                'comments' => $data['comments'],
+                                'approved_at' => now(),
+                            ]);
+                            
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Delivery Order");
                         }),
                     Action::make('pdf_delivery_order')
@@ -382,7 +561,7 @@ class DeliveryOrderResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\DeliveryOrderResource\RelationManagers\ApprovalLogsRelationManager::class,
         ];
     }
 

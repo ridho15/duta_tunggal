@@ -45,6 +45,10 @@ class ListProducts extends ListRecords
                         return [
                             Fieldset::make('Update Harga Per Product')
                                 ->schema([
+                                    Hidden::make('is_searching')
+                                        ->default(false),
+                                    Hidden::make('product_info_message')
+                                        ->default(''),
                                     Select::make('cabang_id')
                                         ->label('Cabang')
                                         ->preload()
@@ -53,7 +57,14 @@ class ListProducts extends ListRecords
                                         ->columnSpanFull()
                                         ->relationship('cabang', 'nama')
                                         ->afterStateUpdated(function ($set, $get, $state) {
-                                            $listProduct = Product::select(['id', 'sku', 'name', 'sell_price', 'cost_price'])->where('cabang_id', $state)->get();
+                                            // Set loading state for initial load
+                                            $set('is_searching', true);
+                                            $set('product_info_message', 'Memuat produk...');
+
+                                            $listProduct = Product::select(['id', 'sku', 'name', 'sell_price', 'cost_price'])
+                                                ->where('cabang_id', $state)
+                                                ->orderBy('sku')
+                                                ->get();
                                             $items = [];
                                             foreach ($listProduct as $item) {
                                                 array_push($items, [
@@ -64,10 +75,82 @@ class ListProducts extends ListRecords
                                             }
 
                                             $set('listProduct', $items);
+                                            $set('search_product', ''); // Reset search when cabang changes
+                                            $set('product_count', $listProduct->count()); // Set initial count
+
+                                            // Clear loading state and set initial message
+                                            $set('product_info_message', "Menampilkan {$listProduct->count()} produk");
+                                            $set('is_searching', false);
                                         })
                                         ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
                                             return "({$cabang->kode}) {$cabang->nama}";
                                         }),
+                                    TextInput::make('search_product')
+                                        ->label('Cari Product (SKU/Nama)')
+                                        ->placeholder('Ketik untuk mencari product...')
+                                        ->reactive()
+                                        ->debounce(500)
+                                        ->afterStateUpdated(function ($set, $get, $state) {
+                                            // Set loading state
+                                            $set('is_searching', true);
+                                            $set('product_info_message', 'Mencari produk...');
+
+                                            $cabangId = $get('cabang_id');
+                                            if (!$cabangId) {
+                                                $set('is_searching', false);
+                                                return;
+                                            }
+
+                                            $query = Product::select(['id', 'sku', 'name', 'sell_price', 'cost_price'])
+                                                ->where('cabang_id', $cabangId);
+
+                                            if ($state) {
+                                                $query->where(function ($q) use ($state) {
+                                                    $q->where('sku', 'LIKE', '%' . $state . '%')
+                                                        ->orWhere('name', 'LIKE', '%' . $state . '%');
+                                                });
+                                            }
+
+                                            $listProduct = $query->orderBy('sku')->get();
+                                            $items = [];
+                                            foreach ($listProduct as $item) {
+                                                array_push($items, [
+                                                    'product_id' => $item->id,
+                                                    'cost_price' => $item->cost_price,
+                                                    'sell_price' => $item->sell_price
+                                                ]);
+                                            }
+
+                                            $set('listProduct', $items);
+                                            $set('product_count', $listProduct->count());
+
+                                            // Update info message and clear loading state
+                                            if ($state) {
+                                                $set('product_info_message', "Ditemukan {$listProduct->count()} produk dengan kata kunci: '{$state}'");
+                                            } else {
+                                                $set('product_info_message', "Menampilkan {$listProduct->count()} produk");
+                                            }
+                                            $set('is_searching', false);
+                                        })
+                                        ->columnSpanFull()
+                                        ->visible(fn($get) => $get('cabang_id'))
+                                        ->suffixIcon(fn($get) => $get('is_searching') ? 'heroicon-m-arrow-path' : 'heroicon-m-magnifying-glass')
+                                        ->suffixIconColor(fn($get) => $get('is_searching') ? 'warning' : 'gray')
+                                        ->helperText(fn($get) => $get('is_searching') ? 'Sedang mencari produk...' : 'Ketik untuk mencari berdasarkan SKU atau nama produk'),
+                                    Placeholder::make('product_info')
+                                        ->label('')
+                                        ->content(function ($get) {
+                                            $isSearching = $get('is_searching');
+                                            $message = $get('product_info_message');
+
+                                            if ($isSearching) {
+                                                return $message;
+                                            }
+
+                                            return $message ?? 'Silakan pilih cabang terlebih dahulu';
+                                        })
+                                        ->visible(fn($get) => $get('cabang_id'))
+                                        ->columnSpanFull(),
                                     Repeater::make('listProduct')
                                         ->defaultItems(0)
                                         ->reactive()
@@ -281,6 +364,69 @@ class ListProducts extends ListRecords
                                         ->validationMessages([
                                             'required' => 'Sampai Kode Produk belum dipilih'
                                         ]),
+                                    Select::make('ukuran_kertas')
+                                        ->label('Ukuran Kertas')
+                                        ->required()
+                                        ->default('A4')
+                                        ->options([
+                                            'A4' => 'A4 (210 x 297 mm)',
+                                            'A5' => 'A5 (148 x 210 mm)',
+                                            'Letter' => 'Letter (216 x 279 mm)',
+                                            'Legal' => 'Legal (216 x 356 mm)',
+                                            'Sticker' => 'Sticker Label (100 x 150 mm)',
+                                        ])
+                                        ->validationMessages([
+                                            'required' => 'Ukuran kertas belum dipilih'
+                                        ]),
+                                    Select::make('orientasi')
+                                        ->label('Orientasi Kertas')
+                                        ->required()
+                                        ->default('portrait')
+                                        ->options([
+                                            'portrait' => 'Portrait (Tegak)',
+                                            'landscape' => 'Landscape (Mendatar)',
+                                        ])
+                                        ->validationMessages([
+                                            'required' => 'Orientasi kertas belum dipilih'
+                                        ]),
+                                    Select::make('ukuran_barcode')
+                                        ->label('Ukuran Barcode')
+                                        ->required()
+                                        ->default('medium')
+                                        ->options([
+                                            'small' => 'Kecil (30mm x 15mm)',
+                                            'medium' => 'Sedang (40mm x 20mm)', 
+                                            'large' => 'Besar (50mm x 25mm)',
+                                            'extra_large' => 'Sangat Besar (60mm x 30mm)',
+                                        ])
+                                        ->validationMessages([
+                                            'required' => 'Ukuran barcode belum dipilih'
+                                        ]),
+                                    Select::make('barcode_per_baris')
+                                        ->label('Barcode per Baris')
+                                        ->required()
+                                        ->default('3')
+                                        ->reactive()
+                                        ->options(function ($get) {
+                                            $ukuranKertas = $get('ukuran_kertas');
+                                            $orientasi = $get('orientasi');
+                                            
+                                            // Adjust options based on paper size and orientation
+                                            if ($ukuranKertas === 'A4') {
+                                                return $orientasi === 'landscape' 
+                                                    ? ['2' => '2', '3' => '3', '4' => '4', '5' => '5']
+                                                    : ['2' => '2', '3' => '3', '4' => '4'];
+                                            } elseif ($ukuranKertas === 'A5') {
+                                                return ['1' => '1', '2' => '2', '3' => '3'];
+                                            } elseif ($ukuranKertas === 'Sticker') {
+                                                return ['1' => '1', '2' => '2'];
+                                            }
+                                            
+                                            return ['2' => '2', '3' => '3', '4' => '4'];
+                                        })
+                                        ->validationMessages([
+                                            'required' => 'Jumlah barcode per baris belum dipilih'
+                                        ]),
                                 ])
                         ];
                     })
@@ -289,13 +435,18 @@ class ListProducts extends ListRecords
                         $listProduct = Product::where('id', '>=', $data['dari_product_id'])
                             ->where('id', '<=', $data['sampai_product_id'])
                             ->get();
+                        
                         $pdf = Pdf::loadView('pdf.product-barcode', [
-                            'listProduct' => $listProduct
-                        ])->setPaper('A4', 'landscape');
+                            'listProduct' => $listProduct,
+                            'ukuran_barcode' => $data['ukuran_barcode'],
+                            'barcode_per_baris' => $data['barcode_per_baris'],
+                            'ukuran_kertas' => $data['ukuran_kertas'],
+                            'orientasi' => $data['orientasi']
+                        ])->setPaper($data['ukuran_kertas'], $data['orientasi']);
 
                         return response()->streamDownload(function () use ($pdf) {
                             echo $pdf->stream();
-                        }, 'Product_Barcode' . $date . '.pdf');
+                        }, 'Product_Barcode_' . $date . '.pdf');
                     }),
             ])->button()->label('Action')
         ];

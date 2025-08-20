@@ -13,6 +13,16 @@ class DeliveryOrderPolicy
      */
     public function viewAny(User $user): bool
     {
+        // Super Sales, Sales Manager dan Admin bisa lihat semua
+        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+            return $user->hasPermissionTo('view any delivery order');
+        }
+        
+        // Sales hanya bisa lihat jika ada permission
+        if ($user->hasRole('Sales')) {
+            return $user->hasPermissionTo('view any delivery order');
+        }
+        
         return $user->hasPermissionTo('view any delivery order');
     }
 
@@ -21,6 +31,19 @@ class DeliveryOrderPolicy
      */
     public function view(User $user, DeliveryOrder $deliveryOrder): bool
     {
+        // Super Sales, Sales Manager dan Admin bisa lihat semua delivery order
+        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+            return $user->hasPermissionTo('view delivery order');
+        }
+        
+        // Sales hanya bisa lihat delivery order dari sale order yang dia buat
+        if ($user->hasRole('Sales')) {
+            // Cek apakah delivery order ini terkait dengan sale order yang dibuat oleh user ini
+            $userSaleOrders = $deliveryOrder->salesOrders()->where('created_by', $user->id)->exists();
+            
+            return $user->hasPermissionTo('view delivery order') && $userSaleOrders;
+        }
+        
         return $user->hasPermissionTo('view delivery order');
     }
 
@@ -37,6 +60,18 @@ class DeliveryOrderPolicy
      */
     public function update(User $user, DeliveryOrder $deliveryOrder): bool
     {
+        // Super Sales, Sales Manager dan Admin bisa update semua delivery order
+        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+            return $user->hasPermissionTo('update delivery order');
+        }
+        
+        // Sales hanya bisa update delivery order dari sale order yang dia buat
+        if ($user->hasRole('Sales')) {
+            $userSaleOrders = $deliveryOrder->salesOrders()->where('created_by', $user->id)->exists();
+            
+            return $user->hasPermissionTo('update delivery order') && $userSaleOrders;
+        }
+        
         return $user->hasPermissionTo('update delivery order');
     }
 
@@ -45,6 +80,18 @@ class DeliveryOrderPolicy
      */
     public function delete(User $user, DeliveryOrder $deliveryOrder): bool
     {
+        // Super Sales, Sales Manager dan Admin bisa delete semua delivery order
+        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+            return $user->hasPermissionTo('delete delivery order');
+        }
+        
+        // Sales hanya bisa delete delivery order dari sale order yang dia buat
+        if ($user->hasRole('Sales')) {
+            $userSaleOrders = $deliveryOrder->salesOrders()->where('created_by', $user->id)->exists();
+            
+            return $user->hasPermissionTo('delete delivery order') && $userSaleOrders;
+        }
+        
         return $user->hasPermissionTo('delete delivery order');
     }
 

@@ -9,6 +9,7 @@ use App\Filament\Resources\ProductResource\RelationManagers\StockMovementRelatio
 use App\Models\Cabang;
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;
+use App\Models\Supplier;
 use App\Services\ProductService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -34,6 +35,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Forms\Components\Grid;
 
 class ProductResource extends Resource
 {
@@ -86,6 +90,16 @@ class ProductResource extends Resource
                             ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
                                 return "({$cabang->kode}) {$cabang->nama}";
                             }),
+                        Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->preload()
+                            ->searchable()
+                            ->nullable()
+                            ->relationship('supplier', 'name')
+                            ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
+                                return "({$supplier->code}) {$supplier->name}";
+                            })
+                            ->helperText('Pilih supplier untuk produk ini (opsional)'),
                         Select::make('product_category_id')
                             ->label('Product Category')
                             ->searchable()
@@ -189,6 +203,11 @@ class ProductResource extends Resource
                         Checkbox::make('is_manufacture')
                             ->label('Manufacture ?')
                             ->nullable(),
+                        Toggle::make('is_active')
+                            ->label('Status Aktif')
+                            ->default(true)
+                            ->helperText('Nonaktifkan produk untuk menyembunyikan dari transaksi')
+                            ->reactive(),
                     ])
             ]);
     }
@@ -217,23 +236,40 @@ class ProductResource extends Resource
                                 ->orWhere('nama', 'LIKE', '%' . $search . '%');
                         });
                     }),
+                TextColumn::make('supplier.name')
+                    ->label('Supplier')
+                    ->searchable()
+                    ->sortable()
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($record->supplier) {
+                            return "({$record->supplier->code}) {$record->supplier->name}";
+                        }
+                        return '-';
+                    })
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('sell_price')
                     ->sortable()
+                    ->searchable()
                     ->money('idr')
                     ->label('Harga Jual (Rp)'),
                 TextColumn::make('harga_batas')
                     ->label('Harga Batas (%)')
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('cost_price')
                     ->label('Cost Price (Rp)')
                     ->money('idr')
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('biaya')
                     ->money('idr')
-                    ->label('Biaya (Rp)'),
+                    ->label('Biaya (Rp)')
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('item_value')->label('Item Value (Rp)')
                     ->money('idr')
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('pajak')
                     ->label('Pajak (%)'),
                 TextColumn::make('tipe_pajak')
@@ -242,10 +278,107 @@ class ProductResource extends Resource
                     ->label('Kategori'),
                 IconColumn::make('is_manufacture')
                     ->label('Manufacture ?')
+                    ->boolean(),
+                IconColumn::make('is_active')
+                    ->label('Status')
                     ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger')
             ])
             ->filters([
-                //
+                Filter::make('harga_jual_range')
+                    ->label('Filter Harga Jual')
+                    ->form([
+                        Grid::make(2)->schema([
+                            TextInput::make('harga_jual_min')
+                                ->label('Harga Jual Minimum')
+                                ->numeric()
+                                ->prefix('Rp'),
+                            TextInput::make('harga_jual_max')
+                                ->label('Harga Jual Maximum')
+                                ->numeric()
+                                ->prefix('Rp'),
+                        ])
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['harga_jual_min'],
+                                fn(Builder $query, $price): Builder => $query->where('sell_price', '>=', $price),
+                            )
+                            ->when(
+                                $data['harga_jual_max'],
+                                fn(Builder $query, $price): Builder => $query->where('sell_price', '<=', $price),
+                            );
+                    }),
+
+                Filter::make('cost_price_range')
+                    ->label('Filter Harga Beli')
+                    ->form([
+                        Grid::make(2)->schema([
+                            TextInput::make('cost_price_min')
+                                ->label('Harga Beli Minimum')
+                                ->numeric()
+                                ->prefix('Rp'),
+                            TextInput::make('cost_price_max')
+                                ->label('Harga Beli Maximum')
+                                ->numeric()
+                                ->prefix('Rp'),
+                        ])
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['cost_price_min'],
+                                fn(Builder $query, $price): Builder => $query->where('cost_price', '>=', $price),
+                            )
+                            ->when(
+                                $data['cost_price_max'],
+                                fn(Builder $query, $price): Builder => $query->where('cost_price', '<=', $price),
+                            );
+                    }),
+
+                Filter::make('biaya_range')
+                    ->label('Filter Biaya')
+                    ->form([
+                        Grid::make(2)->schema([
+                            TextInput::make('biaya_min')
+                                ->label('Biaya Minimum')
+                                ->numeric()
+                                ->prefix('Rp'),
+                            TextInput::make('biaya_max')
+                                ->label('Biaya Maximum')
+                                ->numeric()
+                                ->prefix('Rp'),
+                        ])
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['biaya_min'],
+                                fn(Builder $query, $price): Builder => $query->where('biaya', '>=', $price),
+                            )
+                            ->when(
+                                $data['biaya_max'],
+                                fn(Builder $query, $price): Builder => $query->where('biaya', '<=', $price),
+                            );
+                    }),
+
+                SelectFilter::make('is_active')
+                    ->label('Filter Status')
+                    ->options([
+                        '1' => 'Aktif',
+                        '0' => 'Nonaktif',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+
+                        return $query->where('is_active', $data['value']);
+                    }),
             ])
             ->actions([
                 ActionGroup::make([
@@ -258,14 +391,71 @@ class ProductResource extends Resource
                         ->label('Cetak Label / Print Barcode')
                         ->color('success')
                         ->icon('heroicon-o-printer')
-                        ->action(function ($record) {
-                            $pdf = Pdf::loadView('pdf.product-single-barcode', [
-                                'product' => $record
-                            ])->setPaper('A4', 'landscape');
+                        ->form([
+                            Fieldset::make('Pengaturan Print Barcode')
+                                ->schema([
+                                    Select::make('print_size')
+                                        ->label('Ukuran Print')
+                                        ->required()
+                                        ->options([
+                                            'extra-small' => 'Extra Small (8x10 per halaman)',
+                                            'small' => 'Small (5x10 per halaman)',
+                                            'medium' => 'Medium (4x8 per halaman)',
+                                            'standard' => 'Standard (3x10 per halaman)',
+                                            'large' => 'Large (2x6 per halaman)'
+                                        ])
+                                        ->default('standard')
+                                        ->helperText('Pilih ukuran label barcode sesuai kebutuhan'),
+                                    Select::make('paper_size')
+                                        ->label('Ukuran Kertas')
+                                        ->required()
+                                        ->options([
+                                            'A4' => 'A4 (21 x 29.7 cm)',
+                                            'Letter' => 'Letter (21.6 x 27.9 cm)',
+                                            'Legal' => 'Legal (21.6 x 35.6 cm)'
+                                        ])
+                                        ->default('A4'),
+                                    Select::make('orientation')
+                                        ->label('Orientasi Kertas')
+                                        ->required()
+                                        ->options([
+                                            'portrait' => 'Portrait (Tegak)',
+                                            'landscape' => 'Landscape (Mendatar)'
+                                        ])
+                                        ->default('landscape'),
+                                    TextInput::make('copies')
+                                        ->label('Jumlah Copy per Produk')
+                                        ->numeric()
+                                        ->default(1)
+                                        ->helperText('Berapa banyak label per produk yang akan dicetak'),
+                                ])
+                        ])
+                        ->action(function (array $data, $record) {
+                            $printSize = $data['print_size'];
+                            $paperSize = $data['paper_size'];
+                            $orientation = $data['orientation'];
+                            $copies = $data['copies'] ?? 1;
+
+                            // Determine which template to use based on size
+                            $templateMap = [
+                                'extra-small' => 'pdf.product-barcode-extra-small',
+                                'small' => 'pdf.product-barcode-small',
+                                'medium' => 'pdf.product-barcode-medium',
+                                'standard' => 'pdf.product-single-barcode',
+                                'large' => 'pdf.product-barcode-large'
+                            ];
+
+                            $template = $templateMap[$printSize] ?? 'pdf.product-single-barcode';
+
+                            // Create PDF with selected settings
+                            $pdf = Pdf::loadView($template, [
+                                'product' => $record,
+                                'copies' => $copies
+                            ])->setPaper($paperSize, $orientation);
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
-                            }, 'Product_' . $record->sku . '.pdf');
+                            }, 'Barcode_' . $record->sku . '_' . $printSize . '.pdf');
                         }),
                     Action::make('kalkulasiItemValue')
                         ->label('Kalkulasi Item Value')
@@ -382,12 +572,154 @@ class ProductResource extends Resource
                                             ->prefix('Rp'),
                                     ])
                             ];
+                        }),
+
+                    Action::make('toggle_active')
+                        ->label(fn(Product $record): string => $record->is_active ? 'Nonaktifkan' : 'Aktifkan')
+                        ->icon(fn(Product $record): string => $record->is_active ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                        ->color(fn(Product $record): string => $record->is_active ? 'danger' : 'success')
+                        ->requiresConfirmation()
+                        ->modalHeading(fn(Product $record): string => $record->is_active ? 'Nonaktifkan Produk' : 'Aktifkan Produk')
+                        ->modalDescription(fn(Product $record): string => $record->is_active
+                            ? 'Apakah Anda yakin ingin menonaktifkan produk ini? Produk yang nonaktif tidak akan muncul dalam transaksi baru.'
+                            : 'Apakah Anda yakin ingin mengaktifkan produk ini?')
+                        ->action(function (Product $record): void {
+                            $record->update(['is_active' => !$record->is_active]);
+
+                            \Filament\Notifications\Notification::make()
+                                ->title($record->is_active ? 'Produk Diaktifkan' : 'Produk Dinonaktifkan')
+                                ->body("Produk {$record->name} berhasil " . ($record->is_active ? 'diaktifkan' : 'dinonaktifkan'))
+                                ->success()
+                                ->send();
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
+
+                    Action::make('bulk_activate')
+                        ->label('Aktifkan Produk')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Aktifkan Produk Terpilih')
+                        ->modalDescription('Apakah Anda yakin ingin mengaktifkan semua produk yang dipilih?')
+                        ->action(function ($records) {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if (!$record->is_active) {
+                                    $record->update(['is_active' => true]);
+                                    $count++;
+                                }
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Produk Diaktifkan')
+                                ->body("{$count} produk berhasil diaktifkan")
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    Action::make('bulk_deactivate')
+                        ->label('Nonaktifkan Produk')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Nonaktifkan Produk Terpilih')
+                        ->modalDescription('Apakah Anda yakin ingin menonaktifkan semua produk yang dipilih? Produk yang nonaktif tidak akan muncul dalam transaksi baru.')
+                        ->action(function ($records) {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if ($record->is_active) {
+                                    $record->update(['is_active' => false]);
+                                    $count++;
+                                }
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Produk Dinonaktifkan')
+                                ->body("{$count} produk berhasil dinonaktifkan")
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    // Bulk barcode print action
+                    Action::make('bulk_print_barcode')
+                        ->label('Print Barcode (Bulk)')
+                        ->icon('heroicon-o-printer')
+                        ->color('success')
+                        ->form([
+                            Fieldset::make('Pengaturan Print Barcode Bulk')
+                                ->schema([
+                                    Select::make('print_size')
+                                        ->label('Ukuran Print')
+                                        ->required()
+                                        ->options([
+                                            'extra-small' => 'Extra Small (8x10 per halaman)',
+                                            'small' => 'Small (5x10 per halaman)',
+                                            'medium' => 'Medium (4x8 per halaman)',
+                                            'standard' => 'Standard (3x10 per halaman)',
+                                            'large' => 'Large (2x6 per halaman)'
+                                        ])
+                                        ->default('standard')
+                                        ->helperText('Pilih ukuran label barcode sesuai kebutuhan'),
+                                    Select::make('paper_size')
+                                        ->label('Ukuran Kertas')
+                                        ->required()
+                                        ->options([
+                                            'A4' => 'A4 (21 x 29.7 cm)',
+                                            'Letter' => 'Letter (21.6 x 27.9 cm)',
+                                            'Legal' => 'Legal (21.6 x 35.6 cm)'
+                                        ])
+                                        ->default('A4'),
+                                    Select::make('orientation')
+                                        ->label('Orientasi Kertas')
+                                        ->required()
+                                        ->options([
+                                            'portrait' => 'Portrait (Tegak)',
+                                            'landscape' => 'Landscape (Mendatar)'
+                                        ])
+                                        ->default('landscape'),
+                                    TextInput::make('copies_per_product')
+                                        ->label('Jumlah Copy per Produk')
+                                        ->numeric()
+                                        ->default(1)
+                                        ->helperText('Berapa banyak label per produk yang akan dicetak'),
+                                ])
+                        ])
+                        ->action(function (array $data, $records) {
+                            $products = collect($records);
+                            $printSize = $data['print_size'];
+                            $paperSize = $data['paper_size'];
+                            $orientation = $data['orientation'];
+                            $copiesPerProduct = $data['copies_per_product'] ?? 1;
+
+                            // Determine which template to use based on size
+                            $templateMap = [
+                                'extra-small' => 'pdf.product-barcode-extra-small',
+                                'small' => 'pdf.product-barcode-small',
+                                'medium' => 'pdf.product-barcode-medium',
+                                'standard' => 'pdf.product-barcode',
+                                'large' => 'pdf.product-barcode-large'
+                            ];
+
+                            $template = $templateMap[$printSize] ?? 'pdf.product-barcode';
+
+                            // Create PDF with selected settings
+                            $pdf = Pdf::loadView($template, [
+                                'listProduct' => $products,
+                                'print_size' => $printSize,
+                                'copies_per_product' => $copiesPerProduct
+                            ])->setPaper($paperSize, $orientation);
+
+                            return response()->streamDownload(function () use ($pdf) {
+                                echo $pdf->stream();
+                            }, 'Bulk_Barcode_' . count($products) . '_products_' . $printSize . '.pdf');
+                        })
+                        ->deselectRecordsAfterCompletion(),
                 ]),
             ]);
     }

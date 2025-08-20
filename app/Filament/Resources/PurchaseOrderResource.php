@@ -183,8 +183,6 @@ class PurchaseOrderResource extends Resource
                                 'required' => 'Tanggal Pembelian tidak boleh kosong'
                             ])
                             ->required(),
-                        DatePicker::make('delivery_date')
-                            ->label('Tanggal Pengiriman'),
                         DatePicker::make('expected_date')
                             ->label('Tanggal Diharapkan'),
                         Select::make('warehouse_id')
@@ -256,7 +254,8 @@ class PurchaseOrderResource extends Resource
                                         return "{$currency->name} ({$currency->symbol})";
                                     })
                                     ->validationMessages([
-                                        'required' => 'Mata uang belum dipilih'
+                                        'required' => 'Mata uang belum dipilih',
+                                        'exists' => 'Mata uang tidak tersedia'
                                     ]),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
@@ -371,7 +370,8 @@ class PurchaseOrderResource extends Resource
                                         return "{$currency->name} ({$currency->symbol})";
                                     })
                                     ->validationMessages([
-                                        'required' => 'Mata uang belum dipilih'
+                                        'required' => 'Mata uang belum dipilih',
+                                        'exists' => 'Mata uang tidak tersedia'
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
@@ -426,7 +426,8 @@ class PurchaseOrderResource extends Resource
                                         return "{$currency->name} ({$currency->symbol})";
                                     })
                                     ->validationMessages([
-                                        'required' => 'Mata uang belum dipilih'
+                                        'required' => 'Mata uang belum dipilih',
+                                        'exists' => 'Mata uang tidak tersedia'
                                     ]),
                                 TextInput::make('nominal')
                                     ->label('Nominal')
@@ -486,10 +487,6 @@ class PurchaseOrderResource extends Resource
                         return "({$state->kode}) {$state->name}";
                     }),
                 TextColumn::make('order_date')
-                    ->date()
-                    ->sortable(),
-                TextColumn::make('delivery_date')
-                    ->label('Tanggal Pengiriman')
                     ->date()
                     ->sortable(),
                 TextColumn::make('tempo_hutang')

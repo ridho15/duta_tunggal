@@ -7,6 +7,7 @@ use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\SalesRelationManager;
 use App\Models\Customer;
 use App\Services\CustomerService;
+use App\Services\CreditValidationService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
@@ -185,7 +186,70 @@ class CustomerResource extends Resource
                     })
                     ->sortable(),
                 TextColumn::make('tipe_pembayaran')
-                    ->label('Tipe Bayar'),
+                    ->label('Tipe Bayar')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Kredit' => 'warning',
+                        'COD (Bayar Lunas)' => 'success',
+                        'Bebas' => 'primary',
+                        default => 'gray',
+                    }),
+                TextColumn::make('kredit_limit')
+                    ->label('Kredit Limit')
+                    ->money('idr')
+                    ->sortable()
+                    ->visible(fn () => true),
+                TextColumn::make('current_credit_usage')
+                    ->label('Kredit Terpakai')
+                    ->getStateUsing(function (Customer $record): float {
+                        if ($record->tipe_pembayaran !== 'Kredit') return 0;
+                        $creditService = app(CreditValidationService::class);
+                        return $creditService->getCurrentCreditUsage($record);
+                    })
+                    ->money('idr')
+                    ->color(function (Customer $record): string {
+                        if ($record->tipe_pembayaran !== 'Kredit') return 'gray';
+                        $creditService = app(CreditValidationService::class);
+                        $percentage = $creditService->getCreditUsagePercentage($record);
+                        return match (true) {
+                            $percentage >= 90 => 'danger',
+                            $percentage >= 80 => 'warning',
+                            default => 'success',
+                        };
+                    }),
+                TextColumn::make('credit_usage_percentage')
+                    ->label('% Kredit')
+                    ->getStateUsing(function (Customer $record): string {
+                        if ($record->tipe_pembayaran !== 'Kredit') return '-';
+                        $creditService = app(CreditValidationService::class);
+                        return $creditService->getCreditUsagePercentage($record) . '%';
+                    })
+                    ->badge()
+                    ->color(function (Customer $record): string {
+                        if ($record->tipe_pembayaran !== 'Kredit') return 'gray';
+                        $creditService = app(CreditValidationService::class);
+                        $percentage = $creditService->getCreditUsagePercentage($record);
+                        return match (true) {
+                            $percentage >= 90 => 'danger',
+                            $percentage >= 80 => 'warning',
+                            default => 'success',
+                        };
+                    }),
+                TextColumn::make('overdue_status')
+                    ->label('Status Jatuh Tempo')
+                    ->getStateUsing(function (Customer $record): string {
+                        if ($record->tipe_pembayaran !== 'Kredit') return '-';
+                        $creditService = app(CreditValidationService::class);
+                        $overdueCount = $creditService->getOverdueInvoices($record)->count();
+                        return $overdueCount > 0 ? "{$overdueCount} Tagihan" : 'Normal';
+                    })
+                    ->badge()
+                    ->color(function (Customer $record): string {
+                        if ($record->tipe_pembayaran !== 'Kredit') return 'gray';
+                        $creditService = app(CreditValidationService::class);
+                        $overdueCount = $creditService->getOverdueInvoices($record)->count();
+                        return $overdueCount > 0 ? 'danger' : 'success';
+                    }),
                 TextColumn::make('nik_npwp')
                     ->label('NIK / NPWP')
                     ->searchable()

@@ -18,6 +18,7 @@ use App\Models\Warehouse;
 use App\Services\CustomerService;
 use App\Services\PurchaseOrderService;
 use App\Services\SalesOrderService;
+use App\Services\CreditValidationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
@@ -32,6 +33,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -41,6 +43,8 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -78,7 +82,7 @@ class SaleOrderResource extends Resource
                                         return $record ? Str::upper($record->status) : '-';
                                     }),
                                 Select::make('options_form')
-                                    ->label('Opions From')
+                                    ->label('Options From')
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
@@ -162,11 +166,30 @@ class SaleOrderResource extends Resource
                             ->reactive()
                             ->helperText(function ($state) {
                                 $customer = Customer::find($state);
-                                if ($customer && $customer->deposit->remaining_amount) {
-                                    return "Saldo : Rp." . number_format($customer->deposit->remaining_amount, 0, ',', '.');
+                                if (!$customer) return null;
+
+                                $creditService = app(CreditValidationService::class);
+                                $creditSummary = $creditService->getCreditSummary($customer);
+
+                                $helper = [];
+
+                                // Deposit info
+                                if ($customer->deposit->remaining_amount) {
+                                    $helper[] = "Saldo: Rp." . number_format($customer->deposit->remaining_amount, 0, ',', '.');
                                 }
 
-                                return null;
+                                // Credit info for credit customers
+                                if ($customer->tipe_pembayaran === 'Kredit') {
+                                    $helper[] = "Kredit Limit: Rp." . number_format($creditSummary['credit_limit'], 0, ',', '.');
+                                    $helper[] = "Terpakai: Rp." . number_format($creditSummary['current_usage'], 0, ',', '.') . " ({$creditSummary['usage_percentage']}%)";
+                                    $helper[] = "Tersedia: Rp." . number_format($creditSummary['available_credit'], 0, ',', '.');
+
+                                    if ($creditSummary['overdue_count'] > 0) {
+                                        $helper[] = "⚠️ {$creditSummary['overdue_count']} tagihan jatuh tempo (Rp." . number_format($creditSummary['overdue_total'], 0, ',', '.') . ")";
+                                    }
+                                }
+
+                                return implode(' | ', $helper);
                             })
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $customer = Customer::find($state);
@@ -320,7 +343,23 @@ class SaleOrderResource extends Resource
                             ->disabled()
                             ->reactive()
                             ->default(0)
-                            ->numeric(),
+                            ->numeric()
+                            ->rule(function ($get) {
+                                return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    $customerId = $get('customer_id');
+                                    if (!$customerId || !$value) return;
+
+                                    $customer = Customer::find($customerId);
+                                    if (!$customer) return;
+
+                                    $creditService = app(CreditValidationService::class);
+                                    $validation = $creditService->canCustomerMakePurchase($customer, (float)$value);
+
+                                    if (!$validation['can_purchase']) {
+                                        $fail(implode(' ', $validation['messages']));
+                                    }
+                                };
+                            }),
                         Radio::make('tipe_pengiriman')
                             ->label('Tipe Pengiriman Ke Customer')
                             ->inline()
@@ -359,16 +398,34 @@ class SaleOrderResource extends Resource
                                     ])
                                     ->required()
                                     ->helperText(function ($get) {
-                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
-                                            return $query->where('warehouse_id', $get('warehouse_id'))
-                                                ->orWhere('rak_id', $get('rak_id'));
-                                        })
-                                            ->where('product_id', $get('product_id'))->first();
-                                        if ($inventoryStock) {
-                                            return "Stock : " . $inventoryStock->qty_available;
+                                        if (!$get('product_id')) {
+                                            return null;
                                         }
 
-                                        return null;
+                                        // Get total stock across all locations
+                                        $totalStock = InventoryStock::where('product_id', $get('product_id'))
+                                            ->sum('qty_available');
+
+                                        if ($totalStock > 0) {
+                                            // Get stock by warehouses
+                                            $stockByWarehouse = InventoryStock::where('product_id', $get('product_id'))
+                                                ->where('qty_available', '>', 0)
+                                                ->with(['warehouse', 'rak'])
+                                                ->get()
+                                                ->groupBy('warehouse_id')
+                                                ->map(function ($items) {
+                                                    $warehouseName = $items->first()->warehouse->name ?? 'Unknown';
+                                                    $warehouseTotal = $items->sum('qty_available');
+                                                    return $warehouseName . ': ' . number_format($warehouseTotal, 0, ',', '.');
+                                                })
+                                                ->values()
+                                                ->take(3) // Limit to 3 warehouses for display
+                                                ->implode(' | ');
+
+                                            return "📦 Total Stock: " . number_format($totalStock, 0, ',', '.') . " (" . $stockByWarehouse . ")";
+                                        }
+
+                                        return "⚠️ Tidak ada stock tersedia";
                                     })
                                     ->relationship('product', 'name')
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
@@ -390,6 +447,21 @@ class SaleOrderResource extends Resource
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                         return "({$warehouse->kode}) {$warehouse->name}";
+                                    })
+                                    ->helperText(function ($get) {
+                                        if (!$get('product_id') || !$get('warehouse_id')) {
+                                            return null;
+                                        }
+
+                                        $warehouseStock = InventoryStock::where('product_id', $get('product_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->sum('qty_available');
+
+                                        if ($warehouseStock > 0) {
+                                            return "🏪 Stock di gudang ini: " . number_format($warehouseStock, 0, ',', '.');
+                                        }
+
+                                        return "⚠️ Tidak ada stock di gudang ini";
                                     }),
                                 Select::make('rak_id')
                                     ->label('Rak')
@@ -402,24 +474,27 @@ class SaleOrderResource extends Resource
                                     ->nullable()
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
                                         return "({$rak->code}) {$rak->name}";
+                                    })
+                                    ->helperText(function ($get) {
+                                        if (!$get('product_id') || !$get('warehouse_id') || !$get('rak_id')) {
+                                            return $get('rak_id') ? null : 'Rak bersifat opsional';
+                                        }
+
+                                        $rakStock = InventoryStock::where('product_id', $get('product_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->where('rak_id', $get('rak_id'))
+                                            ->sum('qty_available');
+
+                                        if ($rakStock > 0) {
+                                            return "🗃️ Stock di rak ini: " . number_format($rakStock, 0, ',', '.');
+                                        }
+
+                                        return "⚠️ Tidak ada stock di rak ini";
                                     }),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
                                     ->reactive()
-                                    ->rule(function ($get) {
-                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
-                                            return $query->where('warehouse_id', $get('warehouse_id'))
-                                                ->orWhere('rak_id', $get('rak_id'));
-                                        })
-                                            ->where('product_id', $get('product_id'))->first();
-                                        if ($inventoryStock && ($inventoryStock->qty_available < $get('quantity'))) {
-                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock tidak mencukupi");
-                                            throw ValidationException::withMessages([
-                                                'saleOrderItem' => 'Stock tidak mencukupi'
-                                            ]);
-                                        }
-                                    })
                                     ->validationMessages([
                                         'required' => 'Quantity harus diisi',
                                         'numeric' => 'Quantity tidak valid !'
@@ -428,14 +503,39 @@ class SaleOrderResource extends Resource
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
                                     })
                                     ->helperText(function ($get) {
-                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
-                                            return $query->where('warehouse_id', $get('warehouse_id'))
-                                                ->orWhere('rak_id', $get('rak_id'));
-                                        })
-                                            ->where('product_id', $get('product_id'))->first();
+                                        if (!$get('product_id')) {
+                                            return 'Pilih produk terlebih dahulu untuk melihat stock';
+                                        }
 
-                                        if ($inventoryStock && ($inventoryStock->qty_available < $get('quantity'))) {
-                                            return "Stock tidak mencukupi";
+                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
+                                            if ($get('warehouse_id') && $get('rak_id')) {
+                                                return $query->where('warehouse_id', $get('warehouse_id'))
+                                                            ->where('rak_id', $get('rak_id'));
+                                            } elseif ($get('warehouse_id')) {
+                                                return $query->where('warehouse_id', $get('warehouse_id'));
+                                            } elseif ($get('rak_id')) {
+                                                return $query->where('rak_id', $get('rak_id'));
+                                            }
+                                            return $query;
+                                        })
+                                        ->where('product_id', $get('product_id'))->first();
+
+                                        if (!$inventoryStock) {
+                                            return '⚠️ Tidak ada stock tersedia di lokasi ini';
+                                        }
+
+                                        $availableStock = $inventoryStock->qty_available;
+                                        $currentQuantity = (float) ($get('quantity') ?? 0);
+
+                                        if ($currentQuantity > 0) {
+                                            if ($availableStock < $currentQuantity) {
+                                                return "❌ Stock tidak mencukupi! Tersedia: " . number_format($availableStock, 0, ',', '.') . " | Diminta: " . number_format($currentQuantity, 0, ',', '.');
+                                            } else {
+                                                $remaining = $availableStock - $currentQuantity;
+                                                return "✅ Stock tersedia: " . number_format($availableStock, 0, ',', '.') . " | Sisa setelah order: " . number_format($remaining, 0, ',', '.');
+                                            }
+                                        } else {
+                                            return "📦 Stock tersedia: " . number_format($availableStock, 0, ',', '.');
                                         }
                                     })
                                     ->required()
@@ -486,7 +586,45 @@ class SaleOrderResource extends Resource
                                         $unit_price = $livewire->data['unit_price'] ?? 0;
                                         $discount = $livewire->data['discount'] ?? 0;
                                         $tax = $livewire->data['tax'] ?? 0;
-                                        $component->state(HelperController::hitungSubtotal($$quantity, $unit_price, $discount, $tax));
+                                        $component->state(HelperController::hitungSubtotal($quantity, $unit_price, $discount, $tax));
+
+                                        // Calculate and update total amount
+                                        $items = $livewire->data['saleOrderItem'] ?? [];
+                                        $totalAmount = 0;
+                                        foreach ($items as $item) {
+                                            $totalAmount += HelperController::hitungSubtotal(
+                                                $item['quantity'] ?? 0,
+                                                $item['unit_price'] ?? 0,
+                                                $item['discount'] ?? 0,
+                                                $item['tax'] ?? 0
+                                            );
+                                        }
+                                        $livewire->data['total_amount'] = $totalAmount;
+
+                                        // Check credit validation
+                                        $customerId = $livewire->data['customer_id'] ?? null;
+                                        if ($customerId && $totalAmount > 0) {
+                                            $customer = Customer::find($customerId);
+                                            if ($customer) {
+                                                $creditService = app(CreditValidationService::class);
+                                                $validation = $creditService->canCustomerMakePurchase($customer, (float)$totalAmount);
+
+                                                if (!$validation['can_purchase']) {
+                                                    Notification::make()
+                                                        ->title('Peringatan Kredit')
+                                                        ->body(implode('<br>', $validation['messages']))
+                                                        ->danger()
+                                                        ->persistent()
+                                                        ->send();
+                                                } elseif (!empty($validation['warnings'])) {
+                                                    Notification::make()
+                                                        ->title('Peringatan Kredit')
+                                                        ->body(implode('<br>', $validation['warnings']))
+                                                        ->warning()
+                                                        ->send();
+                                                }
+                                            }
+                                        }
                                     })
                                     ->prefix('Rp.')
                             ])
@@ -548,6 +686,28 @@ class SaleOrderResource extends Resource
                     ->numeric()
                     ->money('idr')
                     ->sortable(),
+                TextColumn::make('stock_status')
+                    ->label('Status Stok')
+                    ->badge()
+                    ->formatStateUsing(function (SaleOrder $record): string {
+                        return $record->hasInsufficientStock() ? 'KURANG STOK' : 'STOK OK';
+                    })
+                    ->color(function (SaleOrder $record): string {
+                        return $record->hasInsufficientStock() ? 'danger' : 'success';
+                    })
+                    ->size('sm')
+                    ->weight('bold')
+                    ->tooltip(function (SaleOrder $record): ?string {
+                        if ($record->hasInsufficientStock()) {
+                            $insufficientItems = $record->getInsufficientStockItems();
+                            $tooltip = "⚠️ Item dengan stok kurang:\n";
+                            foreach ($insufficientItems as $item) {
+                                $tooltip .= "• {$item['item']->product->name}: Tersedia {$item['available']}, Dibutuhkan {$item['needed']}\n";
+                            }
+                            return trim($tooltip);
+                        }
+                        return '✅ Semua item memiliki stok yang cukup';
+                    }),
                 TextColumn::make('requestApproveBy.name')
                     ->label('Request Approve By')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -597,8 +757,51 @@ class SaleOrderResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('customer')
+                    ->label('Customer')
+                    ->searchable()
+                    ->preload()
+                    ->relationship('customer', 'name')
+                    ->getOptionLabelFromRecordUsing(function (Customer $customer) {
+                        return "({$customer->code}) {$customer->name}";
+                    }),
+                SelectFilter::make('stock_status')
+                    ->label('Status Stok')
+                    ->options([
+                        'sufficient' => 'Stok Tersedia',
+                        'insufficient' => 'Kurang Stok'
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if ($data['value'] === 'insufficient') {
+                            return $query->whereHas('saleOrderItem', function (Builder $q) {
+                                $q->whereRaw('quantity > (
+                                    SELECT COALESCE(SUM(qty_available), 0) 
+                                    FROM inventory_stocks 
+                                    WHERE inventory_stocks.product_id = sale_order_items.product_id 
+                                    AND inventory_stocks.warehouse_id = sale_order_items.warehouse_id 
+                                    AND inventory_stocks.rak_id = sale_order_items.rak_id
+                                )');
+                            });
+                        }
+
+                        if ($data['value'] === 'sufficient') {
+                            return $query->whereDoesntHave('saleOrderItem', function (Builder $q) {
+                                $q->whereRaw('quantity > (
+                                    SELECT COALESCE(SUM(qty_available), 0) 
+                                    FROM inventory_stocks 
+                                    WHERE inventory_stocks.product_id = sale_order_items.product_id 
+                                    AND inventory_stocks.warehouse_id = sale_order_items.warehouse_id 
+                                    AND inventory_stocks.rak_id = sale_order_items.rak_id
+                                )');
+                            });
+                        }
+
+                        return $query;
+                    })
             ])
+            ->recordClasses(function (SaleOrder $record): string {
+                return $record->hasInsufficientStock() ? 'insufficient-stock-row' : '';
+            })
             ->actions([
                 ActionGroup::make([
                     ViewAction::make()

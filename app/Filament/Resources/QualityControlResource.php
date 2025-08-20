@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\QualityControlResource\Pages;
 use App\Filament\Resources\QualityControlResource\Pages\ViewQualityControl;
+use App\Filament\Resources\QualityControlResource\Widgets;
 use App\Http\Controllers\HelperController;
 use App\Models\InventoryStock;
 use App\Models\Production;
@@ -12,6 +13,7 @@ use App\Models\QualityControl;
 use App\Models\Rak;
 use App\Models\ReturnProduct;
 use App\Models\Warehouse;
+use App\Services\PurchaseReturnAutomationService;
 use App\Services\QualityControlService;
 use App\Services\ReturnProductService;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -246,6 +248,30 @@ class QualityControlResource extends Resource
                     ->formatStateUsing(function ($state) {
                         return $state == 1 ? 'Sudah Proses' : 'Belum Proses';
                     }),
+                TextColumn::make('purchase_return_status')
+                    ->label('Purchase Return')
+                    ->badge()
+                    ->formatStateUsing(function (QualityControl $record): string {
+                        if ($record->rejected_quantity <= 0) {
+                            return 'N/A';
+                        }
+                        return $record->purchase_return_processed ? 'Processed' : 'Pending';
+                    })
+                    ->color(function (QualityControl $record): string {
+                        if ($record->rejected_quantity <= 0) {
+                            return 'gray';
+                        }
+                        return $record->purchase_return_processed ? 'success' : 'warning';
+                    })
+                    ->tooltip(function (QualityControl $record): ?string {
+                        if ($record->rejected_quantity <= 0) {
+                            return 'No rejected items';
+                        }
+                        if ($record->purchase_return_processed) {
+                            return 'Purchase return created on: ' . $record->purchase_return_processed->format('Y-m-d H:i:s');
+                        }
+                        return 'Rejected items can be returned automatically';
+                    }),
                 TextColumn::make('warehouse')
                     ->label('Gudang')
                     ->formatStateUsing(function ($state) {
@@ -360,6 +386,36 @@ class QualityControlResource extends Resource
                             if ($record->from_model_type == 'App\Models\PurchaseReceiptItem') {
                                 $qualityControlService->checkPenerimaanBarang($record);
                             }
+                        }),
+                    Action::make('create_purchase_return')
+                        ->label('Create Purchase Return')
+                        ->color('warning')
+                        ->icon('heroicon-o-arrow-up-on-square-stack')
+                        ->visible(function ($record) {
+                            return $record->rejected_quantity > 0 
+                                && !$record->purchase_return_processed
+                                && $record->from_model_type === 'App\Models\PurchaseReceiptItem';
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Create Purchase Return')
+                        ->modalDescription('This will automatically create a purchase return for the rejected items from this quality control.')
+                        ->action(function ($record) {
+                            $automationService = app(PurchaseReturnAutomationService::class);
+                            $result = $automationService->triggerReturnForQualityControl($record->id);
+                            
+                            if ($result['success']) {
+                                HelperController::sendNotification(
+                                    isSuccess: true, 
+                                    title: "Success", 
+                                    message: $result['message']
+                                );
+                            } else {
+                                HelperController::sendNotification(
+                                    isSuccess: false, 
+                                    title: "Error", 
+                                    message: $result['message']
+                                );
+                            }
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
@@ -374,6 +430,13 @@ class QualityControlResource extends Resource
     {
         return [
             //
+        ];
+    }
+
+    public static function getWidgets(): array
+    {
+        return [
+            Widgets\PurchaseReturnAutomationStatsWidget::class,
         ];
     }
 
