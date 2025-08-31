@@ -14,11 +14,18 @@ class VendorPayment extends Model
     protected $fillable = [
         'invoice_id',
         'supplier_id',
+        'selected_invoices',
+        'payment_date',
         'ntpn',
         'total_payment',
         'notes',
         'diskon',
+        'payment_adjustment',
         'status', //'Draft', 'Partial', 'Paid'
+    ];
+
+    protected $casts = [
+        'selected_invoices' => 'array',
     ];
 
     public function invoice()

@@ -18,6 +18,10 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\ViewField;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\ActionGroup;
@@ -45,54 +49,171 @@ class VendorPaymentResource extends Resource
     {
         return $form
             ->schema([
-                Fieldset::make('Form Vendor Payment')
+                Fieldset::make('Vendor Payment Form')
                     ->schema([
-                        Select::make('invoice_id')
-                            ->label('Invoice')
-                            ->preload()
-                            ->searchable()
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                $invoice = Invoice::find($state);
-                                $set('supplier_id', $invoice->fromModel->supplier_id);
-                                $set('total_payment', $invoice->total);
-                            })
-                            ->relationship('invoice', 'invoice_number', function (Builder $query) {
-                                $query->where('from_model_type', 'App\Models\PurchaseOrder');
-                            })
-                            ->required(),
-                        Select::make('supplier_id')
-                            ->label('Supplier')
-                            ->preload()
-                            ->searchable()
-                            ->reactive()
-                            ->validationMessages([
-                                'required' => 'Supplier belum dipilih'
-                            ])
-                            ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
-                                return "({$supplier->code}) {$supplier->name}";
-                            })
-                            ->relationship('supplier', 'name')
-                            ->required(),
-                        TextInput::make('ntpn')
-                            ->label('NTPN')
-                            ->maxLength(255)
-                            ->required(),
-                        TextInput::make('total_payment')
-                            ->label('Total Pembayaran')
-                            ->required()
-                            ->reactive()
-                            ->prefix('Rp.')
-                            ->default(0)
-                            ->numeric(),
-                        TextInput::make('diskon')
-                            ->label('Diskon')
-                            ->default(0)
-                            ->numeric()
-                            ->prefix('Rp'),
-                        Textarea::make('notes')
-                            ->label('Catatan')
-                            ->string(),
+                        Section::make('Pilih Supplier')
+                            ->description('Pilih supplier terlebih dahulu untuk melihat invoice yang belum dibayar')
+                            ->columns(2)
+                            ->schema([
+                                Select::make('supplier_id')
+                                    ->label('Supplier')
+                                    ->preload()
+                                    ->searchable()
+                                    ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'Supplier belum dipilih'
+                                    ])
+                                    ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
+                                        return "({$supplier->code}) {$supplier->name}";
+                                    })
+                                    ->relationship('supplier', 'name')
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $set('selected_invoices', []);
+                                        $set('total_payment', 0);
+                                        $set('payment_adjustment', 0);
+                                    })
+                                    ->required(),
+
+                                DatePicker::make('payment_date')
+                                    ->label('Tanggal Pembayaran')
+                                    ->required()
+                                    ->default(now()),
+                            ]),
+
+                        Section::make('Invoice yang Belum Dibayar')
+                            ->description('Pilih invoice yang akan dibayar (bisa multiple)')
+                            ->schema([
+                                CheckboxList::make('selected_invoices')
+                                    ->label('Pilih Invoice')
+                                    ->options(function ($get) {
+                                        $supplierId = $get('supplier_id');
+                                        if (!$supplierId) return [];
+
+                                        // Get unpaid/partial invoices for selected supplier
+                                        $invoices = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
+                                            ->whereHas('fromModel', function ($query) use ($supplierId) {
+                                                $query->where('supplier_id', $supplierId);
+                                            })
+                                            ->whereHas('accountPayable', function ($query) {
+                                                $query->where('remaining', '>', 0);
+                                            })
+                                            ->with(['accountPayable'])
+                                            ->get();
+
+                                        return $invoices->mapWithKeys(function ($invoice) {
+                                            $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
+                                            return [
+                                                $invoice->id => "{$invoice->invoice_number} - Sisa: Rp " . number_format($remaining, 0, ',', '.')
+                                            ];
+                                        })->toArray();
+                                    })
+                                    ->columns(1)
+                                    ->reactive()
+                                    ->required()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if (!$state || empty($state)) {
+                                            $set('total_payment', 0);
+                                            return;
+                                        }
+
+                                        // Calculate total from selected invoices
+                                        $total = 0;
+                                        $invoices = Invoice::whereIn('id', $state)
+                                            ->with('accountPayable')
+                                            ->get();
+                                        
+                                        foreach ($invoices as $invoice) {
+                                            $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
+                                            $total += $remaining;
+                                        }
+                                        
+                                        $adjustment = $get('payment_adjustment') ?? 0;
+                                        $set('total_payment', $total - $adjustment);
+                                    }),
+
+                                ViewField::make('invoice_table')
+                                    ->label('Detail Invoice Terpilih')
+                                    ->view('components.invoice-table')
+                                    ->viewData(function ($get) {
+                                        $selectedInvoices = $get('selected_invoices');
+                                        if (!$selectedInvoices || empty($selectedInvoices)) {
+                                            return ['invoices' => []];
+                                        }
+
+                                        $invoices = Invoice::whereIn('id', $selectedInvoices)
+                                            ->with('accountPayable')
+                                            ->get()
+                                            ->map(function ($invoice) {
+                                                return [
+                                                    'invoice_number' => $invoice->invoice_number,
+                                                    'total' => $invoice->total,
+                                                    'remaining' => $invoice->accountPayable->remaining ?? $invoice->total,
+                                                ];
+                                            });
+
+                                        return ['invoices' => $invoices];
+                                    })
+                                    ->visible(fn ($get) => !empty($get('selected_invoices'))),
+                            ]),
+
+                        Section::make('Detail Pembayaran')
+                            ->columns(2)
+                            ->schema([
+                                TextInput::make('payment_adjustment')
+                                    ->label('Penyesuaian Pembayaran')
+                                    ->helperText('Masukkan nilai positif untuk potongan atau nilai negatif untuk penambahan')
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $selectedInvoices = $get('selected_invoices');
+                                        if (!$selectedInvoices || empty($selectedInvoices)) return;
+
+                                        $total = 0;
+                                        $invoices = Invoice::whereIn('id', $selectedInvoices)
+                                            ->with('accountPayable')
+                                            ->get();
+                                        
+                                        foreach ($invoices as $invoice) {
+                                            $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
+                                            $total += $remaining;
+                                        }
+                                        
+                                        $adjustment = $state ?? 0;
+                                        $set('total_payment', $total - $adjustment);
+                                    }),
+
+                                TextInput::make('total_payment')
+                                    ->label('Total Pembayaran')
+                                    ->required()
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->readonly(),
+
+                                TextInput::make('ntpn')
+                                    ->label('NTPN')
+                                    ->maxLength(255)
+                                    ->required(),
+
+                                TextInput::make('diskon')
+                                    ->label('Diskon')
+                                    ->default(0)
+                                    ->numeric()
+                                    ->prefix('Rp'),
+                            ]),
+
+                        Section::make('Catatan')
+                            ->schema([
+                                Textarea::make('notes')
+                                    ->label('Catatan')
+                                    ->rows(3),
+                            ]),
+
+                        // Hidden fields for backward compatibility
+                        Hidden::make('invoice_id'),
+                        Hidden::make('status')->default('Draft'),
+
                         Repeater::make('vendorPaymentDetail')
                             ->label('Payment Detail')
                             ->relationship()
@@ -101,9 +222,6 @@ class VendorPaymentResource extends Resource
                                     ->icon('heroicon-o-plus-circle');
                             })
                             ->columnSpanFull()
-                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
-                                return $data;
-                            })
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
                                 return $data;
                             })
@@ -125,7 +243,6 @@ class VendorPaymentResource extends Resource
                                                 HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
                                                 $set('method', null);
                                             } else {
-                                                // Check saldo deposit
                                                 if ($get('amount') > $deposit->remaining_amount) {
                                                     HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
                                                     $set('amount', 0);
@@ -133,18 +250,16 @@ class VendorPaymentResource extends Resource
                                             }
                                         }
 
-                                        $accountPayable = AccountPayable::where('invoice_id', $get('../../invoice_id'))->first();
-                                        if ($accountPayable) {
-                                            if ($accountPayable->remaining < $state) {
-                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Pembayaran melebihi sisa pembayaran");
-                                                $set('amount', 0);
-                                            }
-                                        } else {
-                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Account payable tidak ditemukan !");
+                                        // Validate against total payment
+                                        $totalPayment = $get('../../total_payment') ?? 0;
+                                        if ($state > $totalPayment) {
+                                            HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Pembayaran melebihi total pembayaran");
+                                            $set('amount', 0);
                                         }
                                     })
                                     ->prefix('Rp')
                                     ->default(0),
+
                                 Select::make('coa_id')
                                     ->label('COA')
                                     ->preload()
@@ -157,12 +272,14 @@ class VendorPaymentResource extends Resource
                                         return "({$chartOfAccount->code}) {$chartOfAccount->name}";
                                     })
                                     ->required(),
+
                                 DatePicker::make('payment_date')
                                     ->label('Tanggal Pembayaran')
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Tanggal pembayaran tidak boleh kosong'
                                     ]),
+
                                 Radio::make('method')
                                     ->inline()
                                     ->label("Payment Method")
@@ -179,7 +296,6 @@ class VendorPaymentResource extends Resource
                                                 HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
                                                 $set('method', null);
                                             } else {
-                                                // Check saldo deposit
                                                 if ($get('amount') > $deposit->remaining_amount) {
                                                     HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
                                                     $set('amount', 0);
@@ -211,9 +327,6 @@ class VendorPaymentResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('invoice.invoice_number')
-                    ->label('Invoice')
-                    ->searchable(),
                 TextColumn::make('supplier')
                     ->label('Supplier')
                     ->formatStateUsing(function ($state) {
@@ -225,24 +338,69 @@ class VendorPaymentResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('ntpn')
-                    ->searchable(),
+
+                TextColumn::make('selected_invoices')
+                    ->label('Invoices')
+                    ->formatStateUsing(function ($state, $record) {
+                        if (!$state || empty($state)) {
+                            // Fallback to single invoice for backward compatibility
+                            return $record->invoice ? $record->invoice->invoice_number : '-';
+                        }
+                        
+                        $invoices = Invoice::whereIn('id', $state)->pluck('invoice_number')->toArray();
+                        return implode(', ', $invoices);
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->where(function ($query) use ($search) {
+                            // Search in invoice_id for backward compatibility
+                            $query->whereHas('invoice', function ($q) use ($search) {
+                                $q->where('invoice_number', 'LIKE', '%' . $search . '%');
+                            })
+                            // Search in selected_invoices JSON
+                            ->orWhereHas('invoice', function ($q) use ($search) {
+                                $invoiceIds = Invoice::where('invoice_number', 'LIKE', '%' . $search . '%')->pluck('id');
+                                foreach ($invoiceIds as $id) {
+                                    $q->orWhereJsonContains('selected_invoices', $id);
+                                }
+                            });
+                        });
+                    }),
+
+                TextColumn::make('payment_date')
+                    ->label('Tanggal Bayar')
+                    ->date()
+                    ->sortable(),
+
                 TextColumn::make('total_payment')
                     ->label('Total Payment')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
+
+                TextColumn::make('payment_adjustment')
+                    ->label('Adjustment')
+                    ->money('IDR')
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('ntpn')
+                    ->searchable()
+                    ->toggleable(),
+
                 TextColumn::make('status')
                     ->label('Status')
-                    ->badge(),
+                    ->badge()
+                    ->colors([
+                        'secondary' => 'Draft',
+                        'warning' => 'Partial', 
+                        'success' => 'Paid',
+                    ]),
+
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -263,7 +421,8 @@ class VendorPaymentResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getRelations(): array
@@ -278,6 +437,7 @@ class VendorPaymentResource extends Resource
         return [
             'index' => Pages\ListVendorPayments::route('/'),
             'create' => Pages\CreateVendorPayment::route('/create'),
+            'view' => Pages\ViewVendorPayment::route('/{record}'),
             'edit' => Pages\EditVendorPayment::route('/{record}/edit'),
         ];
     }

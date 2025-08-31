@@ -1,42 +1,29 @@
 <?php
 
-namespace App\Filament\Resources\DepositResource\Pages;
+namespace App\Filament\Resources\DepositAdjustmentResource\Pages;
 
-use App\Filament\Resources\DepositResource;
+use App\Filament\Resources\DepositAdjustmentResource;
 use App\Http\Controllers\HelperController;
 use Filament\Actions;
-use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
 
-class EditDeposit extends EditRecord
+class EditDepositAdjustment extends EditRecord
 {
-    protected static string $resource = DepositResource::class;
+    protected static string $resource = DepositAdjustmentResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
             Actions\ViewAction::make(),
-            DeleteAction::make()
-                ->icon('heroicon-o-trash'),
+            Actions\DeleteAction::make(),
         ];
-    }
-
-    protected function mutateFormDataBeforeFill(array $data): array
-    {
-        // Convert status string to boolean for form display
-        $data['status'] = $data['status'] === 'active';
-        
-        return $data;
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
         // Auto-calculate remaining amount
         $data['remaining_amount'] = $data['amount'] - ($data['used_amount'] ?? 0);
-        
-        // Convert status boolean to string for database
-        $data['status'] = $data['status'] ? 'active' : 'closed';
 
         return $data;
     }
@@ -47,8 +34,8 @@ class EditDeposit extends EditRecord
         $this->record->depositLogRef()->create([
             'deposit_id' => $this->record->id,
             'type' => 'edit',
-            'amount' => 0, // No amount change, just edit
-            'note' => 'Deposit information updated: ' . ($this->record->note ?? 'No additional notes'),
+            'amount' => 0,
+            'note' => 'Deposit edited by Finance: ' . ($this->record->note ?? 'No additional notes'),
             'created_by' => Auth::id()
         ]);
 
@@ -61,6 +48,6 @@ class EditDeposit extends EditRecord
 
     public function getTitle(): string
     {
-        return 'Edit Deposit';
+        return 'Edit Deposit (Finance)';
     }
 }

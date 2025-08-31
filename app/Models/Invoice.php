@@ -24,6 +24,17 @@ class Invoice extends Model
         'status', // darft, sent, paid, partially_paid, overdue
         'ppn_rate',
         'dpp', //Dasar penggunaan pajak,
+        'customer_name',
+        'customer_phone',
+        'supplier_name',
+        'supplier_phone',
+        'delivery_orders',
+        'purchase_receipts',
+    ];
+
+    protected $casts = [
+        'delivery_orders' => 'array',
+        'purchase_receipts' => 'array',
     ];
 
     public function invoiceItem()

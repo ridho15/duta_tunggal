@@ -18,6 +18,12 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\ViewField;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\ActionGroup;
@@ -45,56 +51,171 @@ class CustomerReceiptResource extends Resource
     {
         return $form
             ->schema([
-                Fieldset::make('Form')
+                Fieldset::make('Customer Receipt Form')
                     ->schema([
-                        Select::make('invoice_id')
-                            ->label('Invoice')
-                            ->preload()
-                            ->searchable()
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                $invoice = Invoice::find($state);
-                                $set('customer_id', $invoice->fromModel->customer_id);
-                                $set('total_payment', $invoice->total);
-                            })
-                            ->relationship('invoice', 'invoice_number', function (Builder $query) {
-                                $query->where('from_model_type', 'App\Models\SaleOrder');
-                            })
-                            ->required(),
-                        Select::make('customer_id')
-                            ->label('Customer')
-                            ->preload()
-                            ->searchable()
-                            ->reactive()
-                            ->validationMessages([
-                                'required' => 'Customer belum dipilih'
-                            ])
-                            ->getOptionLabelFromRecordUsing(function (Customer $customer) {
-                                return "({$customer->code}) {$customer->name}";
-                            })
-                            ->relationship('customer', 'name')
-                            ->required(),
-                        DatePicker::make('payment_date')
-                            ->required(),
-                        TextInput::make('ntpn')
-                            ->label('NTPN')
-                            ->maxLength(255)
-                            ->required(),
-                        TextInput::make('total_payment')
-                            ->label('Total Pembayaran')
-                            ->required()
-                            ->reactive()
-                            ->prefix('Rp.')
-                            ->default(0)
-                            ->numeric(),
-                        TextInput::make('diskon')
-                            ->label('Diskon')
-                            ->default(0)
-                            ->numeric()
-                            ->prefix('Rp'),
-                        Textarea::make('notes')
-                            ->label('Catatan')
-                            ->string(),
+                        Section::make('Pilih Customer')
+                            ->description('Pilih customer terlebih dahulu untuk melihat invoice yang belum dibayar')
+                            ->columns(2)
+                            ->schema([
+                                Select::make('customer_id')
+                                    ->label('Customer')
+                                    ->preload()
+                                    ->searchable()
+                                    ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'Customer belum dipilih'
+                                    ])
+                                    ->getOptionLabelFromRecordUsing(function (Customer $customer) {
+                                        return "({$customer->code}) {$customer->name}";
+                                    })
+                                    ->relationship('customer', 'name')
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $set('selected_invoices', []);
+                                        $set('total_payment', 0);
+                                        $set('payment_adjustment', 0);
+                                    })
+                                    ->required(),
+
+                                DatePicker::make('payment_date')
+                                    ->label('Tanggal Pembayaran')
+                                    ->required()
+                                    ->default(now()),
+                            ]),
+
+                        Section::make('Invoice yang Belum Dibayar')
+                            ->description('Pilih invoice yang akan dibayar (bisa multiple)')
+                            ->schema([
+                                CheckboxList::make('selected_invoices')
+                                    ->label('Pilih Invoice')
+                                    ->options(function ($get) {
+                                        $customerId = $get('customer_id');
+                                        if (!$customerId) return [];
+
+                                        // Get unpaid/partial invoices for selected customer
+                                        $invoices = Invoice::where('from_model_type', 'App\Models\SaleOrder')
+                                            ->whereHas('fromModel', function ($query) use ($customerId) {
+                                                $query->where('customer_id', $customerId);
+                                            })
+                                            ->whereHas('accountReceivable', function ($query) {
+                                                $query->where('remaining', '>', 0);
+                                            })
+                                            ->with(['accountReceivable'])
+                                            ->get();
+
+                                        return $invoices->mapWithKeys(function ($invoice) {
+                                            $remaining = $invoice->accountReceivable->remaining ?? $invoice->total;
+                                            return [
+                                                $invoice->id => "{$invoice->invoice_number} - Sisa: Rp " . number_format($remaining, 0, ',', '.')
+                                            ];
+                                        })->toArray();
+                                    })
+                                    ->columns(1)
+                                    ->reactive()
+                                    ->required()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if (!$state || empty($state)) {
+                                            $set('total_payment', 0);
+                                            return;
+                                        }
+
+                                        // Calculate total from selected invoices
+                                        $total = 0;
+                                        $invoices = Invoice::whereIn('id', $state)
+                                            ->with('accountReceivable')
+                                            ->get();
+                                        
+                                        foreach ($invoices as $invoice) {
+                                            $remaining = $invoice->accountReceivable->remaining ?? $invoice->total;
+                                            $total += $remaining;
+                                        }
+                                        
+                                        $adjustment = $get('payment_adjustment') ?? 0;
+                                        $set('total_payment', $total - $adjustment);
+                                    }),
+
+                                ViewField::make('invoice_table')
+                                    ->label('Detail Invoice Terpilih')
+                                    ->view('components.invoice-table')
+                                    ->viewData(function ($get) {
+                                        $selectedInvoices = $get('selected_invoices');
+                                        if (!$selectedInvoices || empty($selectedInvoices)) {
+                                            return ['invoices' => []];
+                                        }
+
+                                        $invoices = Invoice::whereIn('id', $selectedInvoices)
+                                            ->with('accountReceivable')
+                                            ->get()
+                                            ->map(function ($invoice) {
+                                                return [
+                                                    'invoice_number' => $invoice->invoice_number,
+                                                    'total' => $invoice->total,
+                                                    'remaining' => $invoice->accountReceivable->remaining ?? $invoice->total,
+                                                ];
+                                            });
+
+                                        return ['invoices' => $invoices];
+                                    })
+                                    ->visible(fn ($get) => !empty($get('selected_invoices'))),
+                            ]),
+
+                        Section::make('Detail Pembayaran')
+                            ->columns(2)
+                            ->schema([
+                                TextInput::make('payment_adjustment')
+                                    ->label('Penyesuaian Pembayaran')
+                                    ->helperText('Masukkan nilai positif untuk potongan atau nilai negatif untuk penambahan')
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $selectedInvoices = $get('selected_invoices');
+                                        if (!$selectedInvoices || empty($selectedInvoices)) return;
+
+                                        $total = 0;
+                                        $invoices = Invoice::whereIn('id', $selectedInvoices)
+                                            ->with('accountReceivable')
+                                            ->get();
+                                        
+                                        foreach ($invoices as $invoice) {
+                                            $remaining = $invoice->accountReceivable->remaining ?? $invoice->total;
+                                            $total += $remaining;
+                                        }
+                                        
+                                        $adjustment = $state ?? 0;
+                                        $set('total_payment', $total - $adjustment);
+                                    }),
+
+                                TextInput::make('total_payment')
+                                    ->label('Total Pembayaran')
+                                    ->required()
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->readonly(),
+
+                                TextInput::make('ntpn')
+                                    ->label('NTPN')
+                                    ->maxLength(255)
+                                    ->required(),
+
+                                TextInput::make('diskon')
+                                    ->label('Diskon')
+                                    ->default(0)
+                                    ->numeric()
+                                    ->prefix('Rp'),
+                            ]),
+
+                        Section::make('Catatan')
+                            ->schema([
+                                Textarea::make('notes')
+                                    ->label('Catatan')
+                                    ->rows(3),
+                            ]),
+
+                        // Hidden fields for backward compatibility
+                        Hidden::make('invoice_id'),
+                        Hidden::make('status')->default('Draft'),
+
                         Repeater::make('customerReceiptItem')
                             ->relationship()
                             ->columnSpanFull()
@@ -116,7 +237,6 @@ class CustomerReceiptResource extends Resource
                                                 HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada customer ini");
                                                 $set('method', null);
                                             } else {
-                                                // Check saldo deposit
                                                 if ($get('amount') > $deposit->remaining_amount) {
                                                     HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
                                                     $set('amount', 0);
@@ -124,18 +244,16 @@ class CustomerReceiptResource extends Resource
                                             }
                                         }
 
-                                        $accountReceivable = AccountReceivable::where('invoice_id', $get('../../invoice_id'))->first();
-                                        if ($accountReceivable) {
-                                            if ($accountReceivable->remaining < $state) {
-                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Pembayaran melebihi sisa pembayaran");
-                                                $set('amount', 0);
-                                            }
-                                        } else {
-                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Account receivable tidak ditemukan !");
+                                        // Validate against total payment
+                                        $totalPayment = $get('../../total_payment') ?? 0;
+                                        if ($state > $totalPayment) {
+                                            HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Pembayaran melebihi total pembayaran");
+                                            $set('amount', 0);
                                         }
                                     })
                                     ->prefix('Rp')
                                     ->default(0),
+
                                 Select::make('coa_id')
                                     ->label('COA')
                                     ->preload()
@@ -148,12 +266,14 @@ class CustomerReceiptResource extends Resource
                                         return "({$chartOfAccount->code}) {$chartOfAccount->name}";
                                     })
                                     ->required(),
+
                                 DatePicker::make('payment_date')
                                     ->label('Tanggal Pembayaran')
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Tanggal pembayaran tidak boleh kosong'
                                     ]),
+
                                 Radio::make('method')
                                     ->inline()
                                     ->label("Payment Method")
@@ -170,7 +290,6 @@ class CustomerReceiptResource extends Resource
                                                 HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada customer ini");
                                                 $set('method', null);
                                             } else {
-                                                // Check saldo deposit
                                                 if ($get('amount') > $deposit->remaining_amount) {
                                                     HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
                                                     $set('amount', 0);
@@ -202,9 +321,6 @@ class CustomerReceiptResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('invoice.invoice_number')
-                    ->label('Invoice')
-                    ->searchable(),
                 TextColumn::make('customer')
                     ->label('Customer')
                     ->formatStateUsing(function ($state) {
@@ -216,24 +332,69 @@ class CustomerReceiptResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('ntpn')
-                    ->searchable(),
+
+                TextColumn::make('selected_invoices')
+                    ->label('Invoices')
+                    ->formatStateUsing(function ($state, $record) {
+                        if (!$state || empty($state)) {
+                            // Fallback to single invoice for backward compatibility
+                            return $record->invoice ? $record->invoice->invoice_number : '-';
+                        }
+                        
+                        $invoices = Invoice::whereIn('id', $state)->pluck('invoice_number')->toArray();
+                        return implode(', ', $invoices);
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->where(function ($query) use ($search) {
+                            // Search in invoice_id for backward compatibility
+                            $query->whereHas('invoice', function ($q) use ($search) {
+                                $q->where('invoice_number', 'LIKE', '%' . $search . '%');
+                            })
+                            // Search in selected_invoices JSON
+                            ->orWhereHas('invoice', function ($q) use ($search) {
+                                $invoiceIds = Invoice::where('invoice_number', 'LIKE', '%' . $search . '%')->pluck('id');
+                                foreach ($invoiceIds as $id) {
+                                    $q->orWhereJsonContains('selected_invoices', $id);
+                                }
+                            });
+                        });
+                    }),
+
+                TextColumn::make('payment_date')
+                    ->label('Tanggal Bayar')
+                    ->date()
+                    ->sortable(),
+
                 TextColumn::make('total_payment')
                     ->label('Total Payment')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
+
+                TextColumn::make('payment_adjustment')
+                    ->label('Adjustment')
+                    ->money('IDR')
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('ntpn')
+                    ->searchable()
+                    ->toggleable(),
+
                 TextColumn::make('status')
                     ->label('Status')
-                    ->badge(),
+                    ->badge()
+                    ->colors([
+                        'secondary' => 'Draft',
+                        'warning' => 'Partial', 
+                        'success' => 'Paid',
+                    ]),
+
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -254,7 +415,8 @@ class CustomerReceiptResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getRelations(): array

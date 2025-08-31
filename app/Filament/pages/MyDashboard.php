@@ -6,6 +6,7 @@ use App\Filament\Widgets\AccontReceivablePayableChart;
 use App\Filament\Widgets\AccountReceivablePayableChart;
 use App\Filament\Widgets\AgeingScheduleChart;
 use App\Filament\Widgets\ArApChart;
+use App\Filament\Widgets\ArApSummaryWidget;
 use App\Filament\Widgets\CalendarWidget;
 use App\Filament\Widgets\DoBelumSelesaiTable;
 use App\Filament\Widgets\MutasiKeluarBelumSelesaiTable;
@@ -55,6 +56,7 @@ class MyDashboard extends Dashboard
         }
         if (Auth::user()->hasRole(['Accounting', 'Super Admin', 'Finance Manager'])) {
             $listWidgets[] = SaldoStatsOverview::class;
+            $listWidgets[] = ArApSummaryWidget::class;
             $listWidgets[] = TotalPenjualanPembelianStats::class;
             $listWidgets[] = AgeingScheduleChart::class;
             $listWidgets[] = UmurPiutangChart::class;

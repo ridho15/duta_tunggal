@@ -1,39 +1,34 @@
 <?php
 
-namespace App\Filament\Resources\DepositResource\Pages;
+namespace App\Filament\Resources\DepositAdjustmentResource\Pages;
 
-use App\Filament\Resources\DepositResource;
+use App\Filament\Resources\DepositAdjustmentResource;
 use App\Http\Controllers\HelperController;
-use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
 
-class CreateDeposit extends CreateRecord
+class CreateDepositAdjustment extends CreateRecord
 {
-    protected static string $resource = DepositResource::class;
+    protected static string $resource = DepositAdjustmentResource::class;
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Auto-calculate remaining amount
         $data['remaining_amount'] = $data['amount'] - ($data['used_amount'] ?? 0);
-        
-        // Convert status boolean to string for database
-        $data['status'] = $data['status'] ? 'active' : 'closed';
-        
-        // Set creator
         $data['created_by'] = Auth::id();
+        $data['status'] = 'active';
 
         return $data;
     }
 
     protected function afterCreate(): void
     {
-        // Create initial deposit log
+        // Create deposit log entry
         $this->record->depositLogRef()->create([
             'deposit_id' => $this->record->id,
             'type' => 'create',
             'amount' => $this->record->amount,
-            'note' => 'Initial deposit created: ' . ($this->record->note ?? 'No additional notes'),
+            'note' => 'Initial deposit created by Finance: ' . ($this->record->note ?? 'No additional notes'),
             'created_by' => Auth::id()
         ]);
 
@@ -46,6 +41,6 @@ class CreateDeposit extends CreateRecord
 
     public function getTitle(): string
     {
-        return 'Create New Deposit';
+        return 'Create New Deposit (Finance)';
     }
 }
