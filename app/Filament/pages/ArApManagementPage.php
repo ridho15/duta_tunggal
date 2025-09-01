@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\pages;
 
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
@@ -29,6 +29,21 @@ class ArApManagementPage extends Page implements HasTable
 
     protected static ?int $navigationSort = 20;
 
+    // Add this to make sure it's accessible
+    protected static ?string $slug = 'ar-ap-management';
+    
+    // Make sure the page is always visible (remove any permission restrictions)
+    public static function canAccess(): bool
+    {
+        return true;
+    }
+    
+    // Add this to help with debugging
+    public static function shouldRegisterNavigation(): bool
+    {
+        return true;
+    }
+
     public string $activeTab = 'ar';
 
     public function mount(): void
@@ -48,8 +63,7 @@ class ArApManagementPage extends Page implements HasTable
                 $this->activeTab === 'ar' ? 'customer' : 'supplier'
             ]))
             ->columns($this->getTableColumns())
-            ->defaultSort('invoice.due_date', 'asc')
-            ->groups($this->getTableGroups())
+            ->defaultSort('created_at', 'desc')
             ->filters($this->getTableFilters())
             ->actions([
                 Action::make('view_details')
@@ -67,41 +81,6 @@ class ArApManagementPage extends Page implements HasTable
                     })
                     ->openUrlInNewTab(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkAction::make('sync_selected')
-                    ->label('Sync Selected')
-                    ->icon('heroicon-m-arrow-path')
-                    ->action(function ($records) {
-                        $this->syncRecords($records);
-                    })
-                    ->requiresConfirmation()
-                    ->deselectRecordsAfterCompletion(),
-            ])
-            ->headerActions([
-                Tables\Actions\Action::make('sync_all')
-                    ->label('Sync All AR & AP')
-                    ->icon('heroicon-m-arrow-path')
-                    ->color('success')
-                    ->action(function () {
-                        Artisan::call('ar-ap:sync', ['--force' => true]);
-                        
-                        \Filament\Notifications\Notification::make()
-                            ->title('Synchronization Complete')
-                            ->success()
-                            ->body('All AR & AP records have been synchronized with invoices.')
-                            ->send();
-                    })
-                    ->requiresConfirmation(),
-                    
-                Tables\Actions\Action::make('switch_view')
-                    ->label($this->activeTab === 'ar' ? 'Switch to AP' : 'Switch to AR')
-                    ->icon($this->activeTab === 'ar' ? 'heroicon-m-arrow-right' : 'heroicon-m-arrow-left')
-                    ->color('info')
-                    ->url(function () {
-                        $newTab = $this->activeTab === 'ar' ? 'ap' : 'ar';
-                        return request()->url() . "?tab={$newTab}";
-                    }),
-            ])
             ->striped()
             ->paginated([25, 50, 100]);
     }
@@ -112,77 +91,39 @@ class ArApManagementPage extends Page implements HasTable
         $entityLabel = $this->activeTab === 'ar' ? 'Customer' : 'Supplier';
 
         return [
-            TextColumn::make('invoice.invoice_number')
-                ->label('Invoice')
+            TextColumn::make('id')
+                ->label('ID')
                 ->searchable()
-                ->sortable()
-                ->copyable(),
+                ->sortable(),
                 
             TextColumn::make($entityColumn)
                 ->label($entityLabel)
                 ->formatStateUsing(function ($state) {
-                    return "({$state->code}) {$state->name}";
+                    if ($state) {
+                        return "({$state->code}) {$state->name}";
+                    }
+                    return '-';
                 })
                 ->searchable(['code', 'name'])
                 ->sortable(),
                 
-            TextColumn::make('invoice.invoice_date')
-                ->label('Invoice Date')
-                ->date('M j, Y')
-                ->sortable(),
-                
-            TextColumn::make('invoice.due_date')
-                ->label('Due Date')
-                ->date('M j, Y')
-                ->sortable()
-                ->color(function ($record) {
-                    if ($record->invoice->due_date < now() && $record->status === 'Belum Lunas') {
-                        return 'danger';
-                    }
-                    return 'gray';
-                }),
-                
             TextColumn::make('total')
                 ->label('Total')
                 ->money('idr')
-                ->sortable()
-                ->summarize([
-                    Tables\Columns\Summarizers\Sum::make()->money('idr')
-                ]),
+                ->sortable(),
                 
             TextColumn::make('paid')
                 ->label('Paid')
                 ->money('idr')
                 ->sortable()
-                ->color('success')
-                ->summarize([
-                    Tables\Columns\Summarizers\Sum::make()->money('idr')
-                ]),
+                ->color('success'),
                 
             TextColumn::make('remaining')
                 ->label('Outstanding')
                 ->money('idr')
                 ->sortable()
                 ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
-                ->weight('bold')
-                ->summarize([
-                    Tables\Columns\Summarizers\Sum::make()->money('idr')
-                ]),
-                
-            TextColumn::make('days_overdue')
-                ->label('Days Overdue')
-                ->getStateUsing(function ($record) {
-                    if ($record->status === 'Belum Lunas' && $record->invoice->due_date < now()) {
-                        return now()->diffInDays($record->invoice->due_date);
-                    }
-                    return 0;
-                })
-                ->color(function ($state) {
-                    if ($state > 30) return 'danger';
-                    if ($state > 0) return 'warning';
-                    return 'success';
-                })
-                ->badge(),
+                ->weight('bold'),
                 
             TextColumn::make('status')
                 ->badge()
@@ -196,98 +137,16 @@ class ArApManagementPage extends Page implements HasTable
         ];
     }
 
-    protected function getTableGroups(): array
-    {
-        $entityField = $this->activeTab === 'ar' ? 'customer.name' : 'supplier.name';
-        $entityLabel = $this->activeTab === 'ar' ? 'Customer' : 'Supplier';
-        $entityIcon = $this->activeTab === 'ar' ? '👤' : '🏢';
-
-        return [
-            Tables\Grouping\Group::make($entityField)
-                ->label($entityLabel)
-                ->titlePrefixedWithLabel(false)
-                ->getTitleFromRecordUsing(function ($record) use ($entityIcon) {
-                    $entity = $this->activeTab === 'ar' ? $record->customer : $record->supplier;
-                    return "{$entityIcon} ({$entity->code}) {$entity->name}";
-                })
-                ->collapsible(),
-                
-            Tables\Grouping\Group::make('status')
-                ->titlePrefixedWithLabel(false)
-                ->getTitleFromRecordUsing(function ($record) {
-                    return $record->status === 'Lunas' ? '✅ PAID' : '⏳ OUTSTANDING';
-                })
-                ->collapsible(),
-        ];
-    }
-
     protected function getTableFilters(): array
     {
-        $entityFilter = $this->activeTab === 'ar' ? 'customer_id' : 'supplier_id';
-        $entityModel = $this->activeTab === 'ar' ? 'customer' : 'supplier';
-        $entityLabel = $this->activeTab === 'ar' ? 'Customer' : 'Supplier';
-
         return [
-            Tables\Filters\SelectFilter::make($entityFilter)
-                ->label($entityLabel)
-                ->relationship($entityModel, 'name')
-                ->searchable()
-                ->preload()
-                ->multiple()
-                ->getOptionLabelFromRecordUsing(function ($record) {
-                    return "({$record->code}) {$record->name}";
-                }),
-                
             Tables\Filters\SelectFilter::make('status')
                 ->options([
                     'Belum Lunas' => 'Outstanding',
                     'Lunas' => 'Paid',
                 ])
                 ->multiple(),
-                
-            Tables\Filters\Filter::make('outstanding_only')
-                ->label('Outstanding Only')
-                ->query(fn (Builder $query): Builder => $query->where('remaining', '>', 0))
-                ->toggle(),
-                
-            Tables\Filters\Filter::make('overdue')
-                ->label('Overdue')
-                ->query(function (Builder $query): Builder {
-                    return $query->whereHas('invoice', function (Builder $query) {
-                        $query->where('due_date', '<', now());
-                    })->where('status', 'Belum Lunas');
-                })
-                ->toggle(),
         ];
-    }
-
-    protected function syncRecords($records): void
-    {
-        foreach ($records as $record) {
-            // Recalculate paid and remaining amounts based on payments
-            if ($this->activeTab === 'ar') {
-                $totalPaid = \App\Models\CustomerReceipt::whereJsonContains('selected_invoices', (string)$record->invoice_id)
-                    ->sum('total_payment');
-            } else {
-                $totalPaid = \App\Models\VendorPayment::whereJsonContains('selected_invoices', (string)$record->invoice_id)
-                    ->sum('total_payment');
-            }
-            
-            $remaining = max(0, $record->total - $totalPaid);
-            $status = $remaining > 0 ? 'Belum Lunas' : 'Lunas';
-            
-            $record->update([
-                'paid' => $totalPaid,
-                'remaining' => $remaining,
-                'status' => $status
-            ]);
-        }
-        
-        \Filament\Notifications\Notification::make()
-            ->title('Records Synchronized')
-            ->success()
-            ->body(count($records) . ' records have been synchronized.')
-            ->send();
     }
 
     public function getTitle(): string

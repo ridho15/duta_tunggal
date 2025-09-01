@@ -89,18 +89,24 @@ class VendorPaymentResource extends Resource
                                     ->viewData(function ($get) {
                                         $supplierId = $get('supplier_id');
                                         if (!$supplierId) {
-                                            return ['invoices' => [], 'selectedInvoices' => []];
+                                            return [
+                                                'invoices' => [], 
+                                                'selectedInvoices' => [],
+                                                'message' => 'Silahkan pilih supplier terlebih dahulu'
+                                            ];
                                         }
 
                                         // Get unpaid/partial invoices for selected supplier
-                                        $invoices = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
-                                            ->whereHas('fromModel', function ($query) use ($supplierId) {
-                                                $query->where('supplier_id', $supplierId);
+                                        $invoices = Invoice::join('purchase_orders', function($join) {
+                                                $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
+                                                     ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder');
                                             })
+                                            ->where('purchase_orders.supplier_id', $supplierId)
                                             ->whereHas('accountPayable', function ($query) {
                                                 $query->where('remaining', '>', 0);
                                             })
                                             ->with(['accountPayable'])
+                                            ->select('invoices.*')
                                             ->get()
                                             ->map(function ($invoice) {
                                                 return [
@@ -115,9 +121,14 @@ class VendorPaymentResource extends Resource
                                                 ];
                                             });
 
+                                        $message = $invoices->isEmpty() 
+                                            ? 'Invoice supplier belum ada' 
+                                            : '';
+
                                         return [
                                             'invoices' => $invoices,
-                                            'selectedInvoices' => $get('selected_invoices') ?? []
+                                            'selectedInvoices' => $get('selected_invoices') ?? [],
+                                            'message' => $message
                                         ];
                                     })
                                     ->visible(fn ($get) => !empty($get('supplier_id'))),
@@ -145,14 +156,15 @@ class VendorPaymentResource extends Resource
                                 Select::make('coa_id')
                                     ->label('COA')
                                     ->preload()
+                                    ->searchable(['code', 'name'])
+                                    ->options(function () {
+                                        return ChartOfAccount::all()->mapWithKeys(function ($coa) {
+                                            return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                        });
+                                    })
                                     ->validationMessages([
                                         'required' => 'COA belum dipilih'
                                     ])
-                                    ->searchable(['code', 'name'])
-                                    ->relationship('coa', 'code')
-                                    ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
-                                        return "({$chartOfAccount->code}) {$chartOfAccount->name}";
-                                    })
                                     ->required(),
                             ]),
 
@@ -237,14 +249,15 @@ class VendorPaymentResource extends Resource
                                         Select::make('coa_id')
                                             ->label('COA')
                                             ->preload()
+                                            ->searchable(['code', 'name'])
+                                            ->options(function () {
+                                                return ChartOfAccount::all()->mapWithKeys(function ($coa) {
+                                                    return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                                });
+                                            })
                                             ->validationMessages([
                                                 'required' => 'COA belum dipilih'
                                             ])
-                                            ->searchable(['code', 'name'])
-                                            ->relationship('coa', 'code')
-                                            ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
-                                                return "({$chartOfAccount->code}) {$chartOfAccount->name}";
-                                            })
                                             ->required(),
 
                                         DatePicker::make('payment_date')

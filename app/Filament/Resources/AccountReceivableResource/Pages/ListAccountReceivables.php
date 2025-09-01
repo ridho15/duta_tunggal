@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\AccountReceivableResource\Pages;
 
 use App\Filament\Resources\AccountReceivableResource;
+use App\Filament\Widgets\AccountReceivableStatsWidget;
 use App\Models\AccountReceivable;
 use Filament\Actions;
 use Filament\Actions\CreateAction;
@@ -119,69 +120,6 @@ class ListAccountReceivables extends ListRecords
     {
         return [
             AccountReceivableStatsWidget::class,
-        ];
-    }
-}
-
-// Custom widget untuk stats yang dinamis
-class AccountReceivableStatsWidget extends \Filament\Widgets\StatsOverviewWidget
-{
-    protected function getStats(): array
-    {
-        // Get the current page instance to access filters
-        $livewire = \Livewire\Livewire::current();
-        $tableFilters = $livewire->tableFilters ?? [];
-        
-        // Build query with current filters
-        $query = AccountReceivable::query();
-        
-        if (!empty($tableFilters)) {
-            // Apply customer filter
-            if (isset($tableFilters['customer_id']['values']) && !empty($tableFilters['customer_id']['values'])) {
-                $query->whereIn('customer_id', $tableFilters['customer_id']['values']);
-            }
-            
-            // Apply status filter
-            if (isset($tableFilters['status']['values']) && !empty($tableFilters['status']['values'])) {
-                $query->whereIn('status', $tableFilters['status']['values']);
-            }
-            
-            // Apply outstanding filter
-            if (isset($tableFilters['outstanding_only']['isActive']) && $tableFilters['outstanding_only']['isActive']) {
-                $query->where('remaining', '>', 0);
-            }
-            
-            // Apply overdue filter
-            if (isset($tableFilters['overdue']['isActive']) && $tableFilters['overdue']['isActive']) {
-                $query->whereHas('invoice', function ($q) {
-                    $q->where('due_date', '<', now());
-                })->where('status', 'Belum Lunas');
-            }
-        }
-        
-        // Calculate totals based on filtered data
-        $totals = $query->selectRaw('
-            SUM(total) as total_amount,
-            SUM(paid) as paid_amount, 
-            SUM(remaining) as remaining_amount,
-            COUNT(*) as record_count
-        ')->first();
-        
-        return [
-            \Filament\Widgets\StatsOverviewWidget\Card::make('Total Amount', 'RP. ' . number_format($totals->total_amount ?? 0, 0, ',', '.'))
-                ->description($totals->record_count . ' records')
-                ->descriptionIcon('heroicon-m-banknotes')
-                ->color('primary'),
-                
-            \Filament\Widgets\StatsOverviewWidget\Card::make('Paid Amount', 'RP. ' . number_format($totals->paid_amount ?? 0, 0, ',', '.'))
-                ->description('Already received')
-                ->descriptionIcon('heroicon-m-check-circle')
-                ->color('success'),
-                
-            \Filament\Widgets\StatsOverviewWidget\Card::make('Outstanding', 'RP. ' . number_format($totals->remaining_amount ?? 0, 0, ',', '.'))
-                ->description('Remaining to collect')
-                ->descriptionIcon('heroicon-m-clock')
-                ->color('warning'),
         ];
     }
 }

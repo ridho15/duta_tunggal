@@ -52,6 +52,11 @@ class Invoice extends Model
         return $this->hasOne(AccountPayable::class, 'invoice_id')->withDefault();
     }
 
+    public function accountReceivable()
+    {
+        return $this->hasOne(AccountReceivable::class, 'invoice_id')->withDefault();
+    }
+
     protected static function booted()
     {
         static::deleting(function ($invoice) {

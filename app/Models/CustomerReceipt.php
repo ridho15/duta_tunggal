@@ -21,6 +21,8 @@ class CustomerReceipt extends Model
         'notes',
         'diskon',
         'payment_adjustment',
+        'payment_method',
+        'coa_id',
         'status' // 'Draft','Partial','Paid'
     ];
 
@@ -41,5 +43,10 @@ class CustomerReceipt extends Model
     public function customerReceiptItem()
     {
         return $this->hasMany(CustomerReceiptItem::class, 'customer_receipt_id');
+    }
+
+    public function coa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
     }
 }

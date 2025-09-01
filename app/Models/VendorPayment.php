@@ -18,6 +18,8 @@ class VendorPayment extends Model
         'payment_date',
         'ntpn',
         'total_payment',
+        'coa_id',
+        'payment_method',
         'notes',
         'diskon',
         'payment_adjustment',
@@ -41,5 +43,10 @@ class VendorPayment extends Model
     public function vendorPaymentDetail()
     {
         return $this->hasMany(VendorPaymentDetail::class, 'vendor_payment_id');
+    }
+
+    public function coa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
     }
 }

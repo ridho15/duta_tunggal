@@ -91,18 +91,24 @@ class CustomerReceiptResource extends Resource
                                     ->viewData(function ($get) {
                                         $customerId = $get('customer_id');
                                         if (!$customerId) {
-                                            return ['invoices' => [], 'selectedInvoices' => []];
+                                            return [
+                                                'invoices' => [], 
+                                                'selectedInvoices' => [],
+                                                'message' => 'Silahkan pilih customer terlebih dahulu'
+                                            ];
                                         }
 
-                                        // Get unpaid/partial invoices for selected customer
-                                        $invoices = Invoice::where('from_model_type', 'App\Models\SaleOrder')
-                                            ->whereHas('fromModel', function ($query) use ($customerId) {
-                                                $query->where('customer_id', $customerId);
+                                        // Get unpaid/partial invoices for selected customer  
+                                        $invoices = Invoice::join('sale_orders', function($join) {
+                                                $join->on('invoices.from_model_id', '=', 'sale_orders.id')
+                                                     ->where('invoices.from_model_type', '=', 'App\Models\SaleOrder');
                                             })
+                                            ->where('sale_orders.customer_id', $customerId)
                                             ->whereHas('accountReceivable', function ($query) {
                                                 $query->where('remaining', '>', 0);
                                             })
                                             ->with(['accountReceivable'])
+                                            ->select('invoices.*')
                                             ->get()
                                             ->map(function ($invoice) {
                                                 return [
@@ -117,9 +123,14 @@ class CustomerReceiptResource extends Resource
                                                 ];
                                             });
 
+                                        $message = $invoices->isEmpty() 
+                                            ? 'Invoice customer belum ada' 
+                                            : '';
+
                                         return [
                                             'invoices' => $invoices,
-                                            'selectedInvoices' => $get('selected_invoices') ?? []
+                                            'selectedInvoices' => $get('selected_invoices') ?? [],
+                                            'message' => $message
                                         ];
                                     })
                                     ->visible(fn ($get) => !empty($get('customer_id'))),
@@ -147,14 +158,15 @@ class CustomerReceiptResource extends Resource
                                 Select::make('coa_id')
                                     ->label('COA')
                                     ->preload()
+                                    ->searchable(['code', 'name'])
+                                    ->options(function () {
+                                        return ChartOfAccount::all()->mapWithKeys(function ($coa) {
+                                            return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                        });
+                                    })
                                     ->validationMessages([
                                         'required' => 'COA belum dipilih'
                                     ])
-                                    ->searchable(['code', 'name'])
-                                    ->relationship('coa', 'code')
-                                    ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
-                                        return "({$chartOfAccount->code}) {$chartOfAccount->name}";
-                                    })
                                     ->required(),
                             ]),
 
@@ -231,14 +243,15 @@ class CustomerReceiptResource extends Resource
                                         Select::make('coa_id')
                                             ->label('COA')
                                             ->preload()
+                                            ->searchable(['code', 'name'])
+                                            ->options(function () {
+                                                return ChartOfAccount::all()->mapWithKeys(function ($coa) {
+                                                    return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                                });
+                                            })
                                             ->validationMessages([
                                                 'required' => 'COA belum dipilih'
                                             ])
-                                            ->searchable(['code', 'name'])
-                                            ->relationship('coa', 'code')
-                                            ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
-                                                return "({$chartOfAccount->code}) {$chartOfAccount->name}";
-                                            })
                                             ->required(),
 
                                         DatePicker::make('payment_date')

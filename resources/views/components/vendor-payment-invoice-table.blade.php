@@ -144,6 +144,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 @else
 <div class="text-center py-8 text-gray-500">
-    <p>Silakan pilih vendor terlebih dahulu untuk melihat invoice</p>
+    <p>{{ $message ?? 'Silakan pilih supplier terlebih dahulu untuk melihat invoice' }}</p>
 </div>
 @endif
