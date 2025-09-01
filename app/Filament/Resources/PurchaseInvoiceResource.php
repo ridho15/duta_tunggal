@@ -45,41 +45,18 @@ class PurchaseInvoiceResource extends Resource
     {
         return $form
             ->schema([
-                Fieldset::make('Form Invoice Pembelian')
+                Section::make('Form Invoice')
                     ->schema([
-                        Section::make('Informasi Invoice')
+                        // Header Section - Sumber Invoice
+                        Section::make('Sumber Invoice')
+                            ->description('Silahkan Pilih Supplier')
                             ->columns(2)
-                            ->schema([
-                                TextInput::make('invoice_number')
-                                    ->label('Nomor Invoice')
-                                    ->required()
-                                    ->suffixAction(
-                                        Action::make('generate')
-                                            ->icon('heroicon-m-arrow-path')
-                                            ->tooltip('Generate Invoice Number')
-                                            ->action(function ($set, $get) {
-                                                $invoiceService = app(InvoiceService::class);
-                                                $set('invoice_number', $invoiceService->generateInvoiceNumber());
-                                            })
-                                    )
-                                    ->maxLength(255),
-                                
-                                DatePicker::make('invoice_date')
-                                    ->label('Tanggal Invoice')
-                                    ->required()
-                                    ->default(now()),
-                                
-                                DatePicker::make('due_date')
-                                    ->label('Tanggal Jatuh Tempo')
-                                    ->required(),
-                            ]),
-                            
-                        Section::make('Pilih Supplier')
-                            ->description('Pilih supplier terlebih dahulu')
                             ->schema([
                                 Select::make('selected_supplier')
                                     ->label('Supplier')
-                                    ->options(Supplier::all()->pluck('name', 'id'))
+                                    ->options(Supplier::all()->mapWithKeys(function ($supplier) {
+                                        return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                    }))
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
@@ -91,13 +68,9 @@ class PurchaseInvoiceResource extends Resource
                                         $set('subtotal', 0);
                                         $set('total', 0);
                                     }),
-                            ]),
-                            
-                        Section::make('Pilih Purchase Order')
-                            ->description('Pilih purchase order dari supplier terpilih')
-                            ->schema([
+                                    
                                 Select::make('selected_purchase_order')
-                                    ->label('Purchase Order')
+                                    ->label('PO')
                                     ->options(function ($get) {
                                         $supplierId = $get('selected_supplier');
                                         if (!$supplierId) return [];
@@ -129,7 +102,7 @@ class PurchaseInvoiceResource extends Resource
                                                 return count($invoicedReceiptIds) < count($allReceiptIds);
                                             })
                                             ->mapWithKeys(function ($po) {
-                                                return [$po->id => "{$po->po_number} - {$po->supplier->name}"];
+                                                return [$po->id => $po->po_number];
                                             });
                                     })
                                     ->searchable()
@@ -141,12 +114,51 @@ class PurchaseInvoiceResource extends Resource
                                         $set('total', 0);
                                     }),
                             ]),
-                            
-                        Section::make('Pilih Purchase Receipts')
-                            ->description('Pilih satu atau lebih purchase receipt dari purchase order terpilih')
+
+                        // Invoice Info Section
+                        Section::make()
+                            ->columns(2)
                             ->schema([
-                                Select::make('selected_purchase_receipts')
-                                    ->label('Purchase Receipts')
+                                TextInput::make('invoice_number')
+                                    ->label('Invoice Number')
+                                    ->required()
+                                    ->suffixAction(
+                                        Action::make('generate')
+                                            ->icon('heroicon-m-arrow-path')
+                                            ->tooltip('Generate Invoice Number')
+                                            ->action(function ($set, $get) {
+                                                $invoiceService = app(InvoiceService::class);
+                                                $set('invoice_number', $invoiceService->generateInvoiceNumber());
+                                            })
+                                    )
+                                    ->maxLength(255),
+                                    
+                                TextInput::make('due_date_display')
+                                    ->label('Due Date')
+                                    ->disabled()
+                                    ->placeholder('Auto calculated'),
+                                    
+                                DatePicker::make('invoice_date')
+                                    ->label('Invoice Date')
+                                    ->required()
+                                    ->default(now()),
+                                    
+                                DatePicker::make('due_date')
+                                    ->label('Due Date')
+                                    ->required()
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if ($state) {
+                                            $set('due_date_display', $state);
+                                        }
+                                    }),
+                            ]),
+
+                        // Purchase Receipts Selection
+                        Section::make('Silahkan Pilih Purchase Receipt')
+                            ->schema([
+                                Forms\Components\CheckboxList::make('selected_purchase_receipts')
+                                    ->label('')
                                     ->options(function ($get) {
                                         $purchaseOrderId = $get('selected_purchase_order');
                                         if (!$purchaseOrderId) return [];
@@ -170,15 +182,14 @@ class PurchaseInvoiceResource extends Resource
                                         
                                         return $purchaseReceipts->mapWithKeys(function ($receipt) use ($invoicedReceiptIds) {
                                             $isInvoiced = in_array($receipt->id, $invoicedReceiptIds);
-                                            $label = "{$receipt->receipt_number} - {$receipt->receipt_date}";
+                                            $label = "{$receipt->receipt_number} - Rp. " . number_format($receipt->total ?? 0, 0, ',', '.');
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
                                             }
                                             return [$receipt->id => $label];
                                         })->toArray();
                                     })
-                                    ->multiple()
-                                    ->searchable()
+                                    ->columns(1)
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
@@ -236,35 +247,23 @@ class PurchaseInvoiceResource extends Resource
                                         // Calculate tax and total
                                         $tax = $get('tax') ?? 0;
                                         $otherFee = $get('other_fee') ?? 0;
-                                        $finalTotal = $subtotal + ($subtotal * $tax / 100) + $otherFee;
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     }),
                             ]),
-                            
-                        Section::make('Detail Invoice')
+
+                        // Biaya Lain Section
+                        Section::make('Biaya Lain - lain')
                             ->columns(2)
                             ->schema([
-                                TextInput::make('subtotal')
-                                    ->label('Subtotal')
-                                    ->prefix('Rp.')
-                                    ->numeric()
-                                    ->readonly(),
+                                TextInput::make('other_cost_name')
+                                    ->label('Biaya Lain - lain')
+                                    ->default('Biaya Lain - lain')
+                                    ->reactive(),
                                     
-                                TextInput::make('tax')
-                                    ->label('Pajak (%)')
-                                    ->numeric()
-                                    ->suffix('%')
-                                    ->default(2)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $otherFee = $get('other_fee') ?? 0;
-                                        $finalTotal = $subtotal + ($subtotal * $state / 100) + $otherFee;
-                                        $set('total', $finalTotal);
-                                    }),
-                                    
-                                TextInput::make('other_fee')
-                                    ->label('Biaya Lain')
+                                TextInput::make('other_cost_total')
+                                    ->label('Total Biaya')
                                     ->prefix('Rp.')
                                     ->numeric()
                                     ->default(0)
@@ -272,15 +271,72 @@ class PurchaseInvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
                                         $tax = $get('tax') ?? 0;
-                                        $finalTotal = $subtotal + ($subtotal * $tax / 100) + $state;
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $state + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
+                                        $set('other_fee', $state);
                                     }),
                                     
-                                TextInput::make('total')
-                                    ->label('Total')
+                                Forms\Components\Toggle::make('add_other_cost')
+                                    ->label('Tambah Biaya')
+                                    ->reactive()
+                                    ->columnSpanFull(),
+                            ]),
+
+                        // Tax and Total Section
+                        Section::make()
+                            ->columns(4)
+                            ->schema([
+                                TextInput::make('dpp')
+                                    ->label('DPP')
                                     ->prefix('Rp.')
                                     ->numeric()
                                     ->readonly(),
+                                    
+                                TextInput::make('other_fee')
+                                    ->label('Other Fee')
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->readonly(),
+                                    
+                                TextInput::make('tax')
+                                    ->label('Tax (%)')
+                                    ->numeric()
+                                    ->suffix('%')
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $subtotal = $get('subtotal') ?? 0;
+                                        $otherFee = $get('other_fee') ?? 0;
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $state / 100) + ($subtotal * $ppnRate / 100);
+                                        $set('total', $finalTotal);
+                                    }),
+                                    
+                                TextInput::make('ppn_rate')
+                                    ->label('PPN Rate (%)')
+                                    ->numeric()
+                                    ->suffix('%')
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $subtotal = $get('subtotal') ?? 0;
+                                        $otherFee = $get('other_fee') ?? 0;
+                                        $tax = $get('tax') ?? 0;
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $state / 100);
+                                        $set('total', $finalTotal);
+                                    }),
+                            ]),
+
+                        // Grand Total
+                        Section::make('Grand Total Invoice')
+                            ->schema([
+                                TextInput::make('total')
+                                    ->label('')
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->readonly()
+                                    ->extraAttributes(['class' => 'text-lg font-bold']),
                             ]),
                             
                         // Hidden fields
@@ -288,7 +344,7 @@ class PurchaseInvoiceResource extends Resource
                         Hidden::make('from_model_id'),
                         Hidden::make('supplier_name'),
                         Hidden::make('supplier_phone'),
-                        Hidden::make('dpp'),
+                        Hidden::make('subtotal'),
                         Hidden::make('status')->default('draft'),
                         Hidden::make('purchase_receipts'),
                         

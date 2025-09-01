@@ -28,51 +28,165 @@ class DepositLogRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('id')
             ->columns([
-                TextColumn::make('reference_type')
-                    ->label('Reference Type')
-                    ->formatStateUsing(function ($state) {
-                        if ($state == 'App\Models\Customer') {
-                            return "Customer";
-                        } elseif ($state == 'App\Models\Supplier') {
-                            return 'Supplier';
-                        } elseif ($state == 'App\Models\Deposit') {
-                            return "Deposit";
-                        } elseif ($state == 'App\Models\VendorPaymentDetail') {
-                            return "Payment";
-                        }
-
-                        return '-';
-                    }),
+                TextColumn::make('created_at')
+                    ->label('Date')
+                    ->dateTime('M j, Y H:i')
+                    ->sortable(),
+                    
                 TextColumn::make('type')
-                    ->label('Type')
+                    ->label('Transaction Type')
                     ->badge()
                     ->color(function ($state) {
                         return match ($state) {
                             'create' => 'primary',
                             'use' => 'success',
-                            'add' => 'primary',
+                            'add' => 'info',
                             'return' => 'warning',
-                            'cancel' => 'danger'
+                            'cancel' => 'danger',
+                            'adjustment' => 'gray'
                         };
-                    })->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    }),
+                    })
+                    ->formatStateUsing(function ($state) {
+                        return match ($state) {
+                            'create' => 'CREATE',
+                            'use' => 'USED',
+                            'add' => 'ADDED',
+                            'return' => 'RETURNED',
+                            'cancel' => 'CANCELLED',
+                            'adjustment' => 'ADJUSTMENT',
+                            default => Str::upper($state)
+                        };
+                    })
+                    ->searchable(),
+                    
                 TextColumn::make('amount')
                     ->label('Amount')
                     ->sortable()
-                    ->money('idr'),
+                    ->money('idr')
+                    ->color(function ($state, $record) {
+                        return match ($record->type) {
+                            'create', 'add', 'return' => 'success',
+                            'use', 'cancel' => 'danger',
+                            default => 'primary'
+                        };
+                    }),
+                    
+                TextColumn::make('reference_type')
+                    ->label('Reference')
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($state == 'App\Models\Customer') {
+                            return "Customer Payment";
+                        } elseif ($state == 'App\Models\Supplier') {
+                            return 'Supplier Payment';
+                        } elseif ($state == 'App\Models\Deposit') {
+                            return "Deposit Operation";
+                        } elseif ($state == 'App\Models\VendorPaymentDetail') {
+                            return "Vendor Payment";
+                        } elseif ($state == 'App\Models\CustomerReceiptItem') {
+                            return "Customer Receipt";
+                        }
+                        return $state ? class_basename($state) : 'Manual';
+                    })
+                    ->badge()
+                    ->color('gray'),
+                    
                 TextColumn::make('note')
-                    ->label('Catatan')
-                    ->searchable(),
+                    ->label('Description')
+                    ->searchable()
+                    ->limit(50)
+                    ->tooltip(function (TextColumn $column): ?string {
+                        $state = $column->getState();
+                        if ($state && strlen($state) > 50) {
+                            return $state;
+                        }
+                        return null;
+                    }),
+                    
                 TextColumn::make('createdBy.name')
                     ->label('Created By')
-                    ->searchable(),
+                    ->searchable()
+                    ->default('System'),
+                    
+                TextColumn::make('remaining_balance')
+                    ->label('Balance After')
+                    ->money('idr')
+                    ->sortable()
+                    ->color('success'),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('type')
+                    ->label('Transaction Type')
+                    ->options([
+                        'create' => 'Create',
+                        'use' => 'Used',
+                        'add' => 'Added',
+                        'return' => 'Returned',
+                        'cancel' => 'Cancelled',
+                        'adjustment' => 'Adjustment',
+                    ])
+                    ->multiple(),
+                    
+                Tables\Filters\Filter::make('date_range')
+                    ->form([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\DatePicker::make('from_date')
+                                    ->label('From Date'),
+                                Forms\Components\DatePicker::make('to_date')
+                                    ->label('To Date'),
+                            ]),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['from_date'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['to_date'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
+                    
+                Tables\Filters\Filter::make('amount_range')
+                    ->form([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('min_amount')
+                                    ->label('Min Amount')
+                                    ->numeric()
+                                    ->prefix('Rp'),
+                                Forms\Components\TextInput::make('max_amount')
+                                    ->label('Max Amount')
+                                    ->numeric()
+                                    ->prefix('Rp'),
+                            ]),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['min_amount'],
+                                fn (Builder $query, $amount): Builder => $query->where('amount', '>=', $amount),
+                            )
+                            ->when(
+                                $data['max_amount'],
+                                fn (Builder $query, $amount): Builder => $query->where('amount', '<=', $amount),
+                            );
+                    }),
             ])
-            ->headerActions([])
+            ->defaultSort('created_at', 'desc')
+            ->headerActions([
+                Tables\Actions\Action::make('export')
+                    ->label('Export History')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->action(function () {
+                        // Export functionality can be added here
+                    }),
+            ])
             ->actions([])
-            ->bulkActions([]);
+            ->bulkActions([])
+            ->emptyStateHeading('No deposit history found')
+            ->emptyStateDescription('Deposit history will appear here as transactions are made.');
     }
 }

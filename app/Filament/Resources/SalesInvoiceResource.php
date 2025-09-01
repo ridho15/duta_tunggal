@@ -45,41 +45,18 @@ class SalesInvoiceResource extends Resource
     {
         return $form
             ->schema([
-                Fieldset::make('Form Invoice Penjualan')
+                Section::make('Form Invoice')
                     ->schema([
-                        Section::make('Informasi Invoice')
+                        // Header Section - Sumber Invoice
+                        Section::make('Sumber Invoice')
+                            ->description('Silahkan Pilih Customer')
                             ->columns(2)
-                            ->schema([
-                                TextInput::make('invoice_number')
-                                    ->label('Nomor Invoice')
-                                    ->required()
-                                    ->suffixAction(
-                                        Action::make('generate')
-                                            ->icon('heroicon-m-arrow-path')
-                                            ->tooltip('Generate Invoice Number')
-                                            ->action(function ($set, $get) {
-                                                $invoiceService = app(InvoiceService::class);
-                                                $set('invoice_number', $invoiceService->generateInvoiceNumber());
-                                            })
-                                    )
-                                    ->maxLength(255),
-                                
-                                DatePicker::make('invoice_date')
-                                    ->label('Tanggal Invoice')
-                                    ->required()
-                                    ->default(now()),
-                                
-                                DatePicker::make('due_date')
-                                    ->label('Tanggal Jatuh Tempo')
-                                    ->required(),
-                            ]),
-                            
-                        Section::make('Pilih Customer')
-                            ->description('Pilih customer terlebih dahulu')
                             ->schema([
                                 Select::make('selected_customer')
                                     ->label('Customer')
-                                    ->options(Customer::all()->pluck('name', 'id'))
+                                    ->options(Customer::all()->mapWithKeys(function ($customer) {
+                                        return [$customer->id => "({$customer->code}) {$customer->name}"];
+                                    }))
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
@@ -91,13 +68,9 @@ class SalesInvoiceResource extends Resource
                                         $set('subtotal', 0);
                                         $set('total', 0);
                                     }),
-                            ]),
-                            
-                        Section::make('Pilih Sale Order')
-                            ->description('Pilih sale order dari customer terpilih')
-                            ->schema([
+                                    
                                 Select::make('selected_sale_order')
-                                    ->label('Sale Order')
+                                    ->label('SO')
                                     ->options(function ($get) {
                                         $customerId = $get('selected_customer');
                                         if (!$customerId) return [];
@@ -131,7 +104,7 @@ class SalesInvoiceResource extends Resource
                                                 return count($invoicedDOIds) < count($allDOIds);
                                             })
                                             ->mapWithKeys(function ($so) {
-                                                return [$so->id => "{$so->so_number} - {$so->customer->name}"];
+                                                return [$so->id => $so->so_number];
                                             });
                                     })
                                     ->searchable()
@@ -143,12 +116,51 @@ class SalesInvoiceResource extends Resource
                                         $set('total', 0);
                                     }),
                             ]),
-                            
-                        Section::make('Pilih Delivery Orders')
-                            ->description('Pilih satu atau lebih delivery order dari sale order terpilih')
+
+                        // Invoice Info Section
+                        Section::make()
+                            ->columns(2)
                             ->schema([
-                                Select::make('selected_delivery_orders')
-                                    ->label('Delivery Orders')
+                                TextInput::make('invoice_number')
+                                    ->label('Invoice Number')
+                                    ->required()
+                                    ->suffixAction(
+                                        Action::make('generate')
+                                            ->icon('heroicon-m-arrow-path')
+                                            ->tooltip('Generate Invoice Number')
+                                            ->action(function ($set, $get) {
+                                                $invoiceService = app(InvoiceService::class);
+                                                $set('invoice_number', $invoiceService->generateInvoiceNumber());
+                                            })
+                                    )
+                                    ->maxLength(255),
+                                    
+                                TextInput::make('due_date_display')
+                                    ->label('Due Date')
+                                    ->disabled()
+                                    ->placeholder('Auto calculated'),
+                                    
+                                DatePicker::make('invoice_date')
+                                    ->label('Invoice Date')
+                                    ->required()
+                                    ->default(now()),
+                                    
+                                DatePicker::make('due_date')
+                                    ->label('Due Date')
+                                    ->required()
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if ($state) {
+                                            $set('due_date_display', $state);
+                                        }
+                                    }),
+                            ]),
+
+                        // Delivery Orders Selection
+                        Section::make('Silahkan Pilih DO')
+                            ->schema([
+                                Forms\Components\CheckboxList::make('selected_delivery_orders')
+                                    ->label('')
                                     ->options(function ($get) {
                                         $saleOrderId = $get('selected_sale_order');
                                         if (!$saleOrderId) return [];
@@ -176,15 +188,14 @@ class SalesInvoiceResource extends Resource
                                         
                                         return $deliveryOrders->mapWithKeys(function ($do) use ($invoicedDOIds) {
                                             $isInvoiced = in_array($do->id, $invoicedDOIds);
-                                            $label = "{$do->do_number} - {$do->delivery_date}";
+                                            $label = "{$do->do_number} - Rp. " . number_format($do->total ?? 0, 0, ',', '.');
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
                                             }
                                             return [$do->id => $label];
                                         })->toArray();
                                     })
-                                    ->multiple()
-                                    ->searchable()
+                                    ->columns(1)
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
@@ -242,35 +253,23 @@ class SalesInvoiceResource extends Resource
                                         // Calculate tax and total
                                         $tax = $get('tax') ?? 0;
                                         $otherFee = $get('other_fee') ?? 0;
-                                        $finalTotal = $subtotal + ($subtotal * $tax / 100) + $otherFee;
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     }),
                             ]),
-                            
-                        Section::make('Detail Invoice')
+
+                        // Biaya Lain Section
+                        Section::make('Biaya Lain - lain')
                             ->columns(2)
                             ->schema([
-                                TextInput::make('subtotal')
-                                    ->label('Subtotal')
-                                    ->prefix('Rp.')
-                                    ->numeric()
-                                    ->readonly(),
+                                TextInput::make('other_cost_name')
+                                    ->label('Biaya Lain - lain')
+                                    ->default('Biaya Lain - lain')
+                                    ->reactive(),
                                     
-                                TextInput::make('tax')
-                                    ->label('Pajak (%)')
-                                    ->numeric()
-                                    ->suffix('%')
-                                    ->default(11)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $otherFee = $get('other_fee') ?? 0;
-                                        $finalTotal = $subtotal + ($subtotal * $state / 100) + $otherFee;
-                                        $set('total', $finalTotal);
-                                    }),
-                                    
-                                TextInput::make('other_fee')
-                                    ->label('Biaya Lain')
+                                TextInput::make('other_cost_total')
+                                    ->label('Total Biaya')
                                     ->prefix('Rp.')
                                     ->numeric()
                                     ->default(0)
@@ -278,15 +277,72 @@ class SalesInvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
                                         $tax = $get('tax') ?? 0;
-                                        $finalTotal = $subtotal + ($subtotal * $tax / 100) + $state;
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $state + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
+                                        $set('other_fee', $state);
                                     }),
                                     
-                                TextInput::make('total')
-                                    ->label('Total')
+                                Forms\Components\Toggle::make('add_other_cost')
+                                    ->label('Tambah Biaya')
+                                    ->reactive()
+                                    ->columnSpanFull(),
+                            ]),
+
+                        // Tax and Total Section
+                        Section::make()
+                            ->columns(4)
+                            ->schema([
+                                TextInput::make('dpp')
+                                    ->label('DPP')
                                     ->prefix('Rp.')
                                     ->numeric()
                                     ->readonly(),
+                                    
+                                TextInput::make('other_fee')
+                                    ->label('Other Fee')
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->readonly(),
+                                    
+                                TextInput::make('tax')
+                                    ->label('Tax (%)')
+                                    ->numeric()
+                                    ->suffix('%')
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $subtotal = $get('subtotal') ?? 0;
+                                        $otherFee = $get('other_fee') ?? 0;
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $state / 100) + ($subtotal * $ppnRate / 100);
+                                        $set('total', $finalTotal);
+                                    }),
+                                    
+                                TextInput::make('ppn_rate')
+                                    ->label('PPN Rate (%)')
+                                    ->numeric()
+                                    ->suffix('%')
+                                    ->default(11)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $subtotal = $get('subtotal') ?? 0;
+                                        $otherFee = $get('other_fee') ?? 0;
+                                        $tax = $get('tax') ?? 0;
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $state / 100);
+                                        $set('total', $finalTotal);
+                                    }),
+                            ]),
+
+                        // Grand Total
+                        Section::make('Grand Total Invoice')
+                            ->schema([
+                                TextInput::make('total')
+                                    ->label('')
+                                    ->prefix('Rp.')
+                                    ->numeric()
+                                    ->readonly()
+                                    ->extraAttributes(['class' => 'text-lg font-bold']),
                             ]),
                             
                         // Hidden fields
@@ -294,7 +350,7 @@ class SalesInvoiceResource extends Resource
                         Hidden::make('from_model_id'),
                         Hidden::make('customer_name'),
                         Hidden::make('customer_phone'),
-                        Hidden::make('dpp'),
+                        Hidden::make('subtotal'),
                         Hidden::make('status')->default('draft'),
                         Hidden::make('delivery_orders'),
                         

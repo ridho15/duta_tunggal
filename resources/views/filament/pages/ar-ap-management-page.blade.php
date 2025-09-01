@@ -3,33 +3,41 @@
         <!-- Header Cards with AR/AP Summary -->
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             @php
-                if ($this->activeTab === 'ar') {
-                    $stats = \App\Models\AccountReceivable::selectRaw('
-                        SUM(total) as total_amount,
-                        SUM(paid) as paid_amount,
-                        SUM(remaining) as outstanding_amount,
-                        COUNT(*) as total_count,
-                        COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as outstanding_count
-                    ')->first();
-                    $overdue = \App\Models\AccountReceivable::whereHas('invoice', function ($query) {
-                        $query->where('due_date', '<', now());
-                    })->where('status', 'Belum Lunas')->sum('remaining');
-                } else {
-                    $stats = \App\Models\AccountPayable::selectRaw('
-                        SUM(total) as total_amount,
-                        SUM(paid) as paid_amount,
-                        SUM(remaining) as outstanding_amount,
-                        COUNT(*) as total_count,
-                        COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as outstanding_count
-                    ')->first();
-                    $overdue = \App\Models\AccountPayable::whereHas('invoice', function ($query) {
-                        $query->where('due_date', '<', now());
-                    })->where('status', 'Belum Lunas')->sum('remaining');
+                try {
+                    if ($this->activeTab === 'ar') {
+                        $stats = \App\Models\AccountReceivable::selectRaw('
+                            SUM(total) as total_amount,
+                            SUM(paid) as paid_amount,
+                            SUM(remaining) as outstanding_amount,
+                            COUNT(*) as total_count,
+                            COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as outstanding_count
+                        ')->first();
+                        $overdue = \App\Models\AccountReceivable::whereHas('invoice', function ($query) {
+                            $query->where('due_date', '<', now());
+                        })->where('status', 'Belum Lunas')->sum('remaining');
+                    } else {
+                        $stats = \App\Models\AccountPayable::selectRaw('
+                            SUM(total) as total_amount,
+                            SUM(paid) as paid_amount,
+                            SUM(remaining) as outstanding_amount,
+                            COUNT(*) as total_count,
+                            COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as outstanding_count
+                        ')->first();
+                        $overdue = \App\Models\AccountPayable::whereHas('invoice', function ($query) {
+                            $query->where('due_date', '<', now());
+                        })->where('status', 'Belum Lunas')->sum('remaining');
+                    }
+                    
+                    $entityType = $this->activeTab === 'ar' ? 'Receivable' : 'Payable';
+                    $entityIcon = $this->activeTab === 'ar' ? '📈' : '📉';
+                    $entityColor = $this->activeTab === 'ar' ? 'text-green-600' : 'text-blue-600';
+                } catch (\Exception $e) {
+                    $stats = (object) ['total_amount' => 0, 'paid_amount' => 0, 'outstanding_amount' => 0, 'total_count' => 0, 'outstanding_count' => 0];
+                    $overdue = 0;
+                    $entityType = $this->activeTab === 'ar' ? 'Receivable' : 'Payable';
+                    $entityIcon = $this->activeTab === 'ar' ? '📈' : '📉';
+                    $entityColor = $this->activeTab === 'ar' ? 'text-green-600' : 'text-blue-600';
                 }
-                
-                $entityType = $this->activeTab === 'ar' ? 'Receivable' : 'Payable';
-                $entityIcon = $this->activeTab === 'ar' ? '📈' : '📉';
-                $entityColor = $this->activeTab === 'ar' ? 'text-green-600' : 'text-blue-600';
             @endphp
             
             <div class="overflow-hidden bg-white rounded-lg shadow">
@@ -113,7 +121,13 @@
                        class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm 
                               {{ $this->activeTab === 'ar' ? 'border-indigo-500 text-indigo-600' : '' }}">
                         📈 Account Receivable
-                        @php $arCount = \App\Models\AccountReceivable::where('status', 'Belum Lunas')->count(); @endphp
+                        @php 
+                            try {
+                                $arCount = \App\Models\AccountReceivable::where('status', 'Belum Lunas')->count(); 
+                            } catch (\Exception $e) {
+                                $arCount = 0;
+                            }
+                        @endphp
                         @if($arCount > 0)
                             <span class="bg-red-100 text-red-800 ml-2 py-0.5 px-2 rounded-full text-xs">{{ $arCount }}</span>
                         @endif
@@ -122,7 +136,13 @@
                        class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
                               {{ $this->activeTab === 'ap' ? 'border-indigo-500 text-indigo-600' : '' }}">
                         📉 Account Payable  
-                        @php $apCount = \App\Models\AccountPayable::where('status', 'Belum Lunas')->count(); @endphp
+                        @php 
+                            try {
+                                $apCount = \App\Models\AccountPayable::where('status', 'Belum Lunas')->count(); 
+                            } catch (\Exception $e) {
+                                $apCount = 0;
+                            }
+                        @endphp
                         @if($apCount > 0)
                             <span class="bg-red-100 text-red-800 ml-2 py-0.5 px-2 rounded-full text-xs">{{ $apCount }}</span>
                         @endif
@@ -149,13 +169,13 @@
         <div class="bg-white shadow rounded-lg p-6">
             <h4 class="text-md font-medium text-gray-900 mb-4">Quick Actions</h4>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button onclick="Livewire.dispatch('syncAllRecords')" 
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                <div class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 cursor-pointer"
+                     onclick="window.location.href='{{ url()->current() }}?sync=all'">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
                     Sync All Records
-                </button>
+                </div>
                 
                 <a href="{{ route('filament.admin.resources.' . ($this->activeTab === 'ar' ? 'customer-receipts' : 'vendor-payments') . '.create') }}" 
                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">

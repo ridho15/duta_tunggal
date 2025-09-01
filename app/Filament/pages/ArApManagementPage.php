@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms;
 use Filament\Tables\Actions\Action;
+use Illuminate\Support\Facades\Artisan;
 
 class ArApManagementPage extends Page implements HasTable
 {
@@ -47,10 +48,7 @@ class ArApManagementPage extends Page implements HasTable
                 $this->activeTab === 'ar' ? 'customer' : 'supplier'
             ]))
             ->columns($this->getTableColumns())
-            ->defaultSort([
-                ['invoice.due_date', 'asc'],
-                ['remaining', 'desc']
-            ])
+            ->defaultSort('invoice.due_date', 'asc')
             ->groups($this->getTableGroups())
             ->filters($this->getTableFilters())
             ->actions([
@@ -58,10 +56,14 @@ class ArApManagementPage extends Page implements HasTable
                     ->label('View')
                     ->icon('heroicon-m-eye')
                     ->url(function ($record) {
-                        $resource = $this->activeTab === 'ar' 
-                            ? 'account-receivables' 
-                            : 'account-payables';
-                        return route("filament.admin.resources.{$resource}.view", ['record' => $record]);
+                        try {
+                            $resource = $this->activeTab === 'ar' 
+                                ? 'account-receivables' 
+                                : 'account-payables';
+                            return route("filament.admin.resources.{$resource}.view", ['record' => $record->id]);
+                        } catch (\Exception $e) {
+                            return '#';
+                        }
                     })
                     ->openUrlInNewTab(),
             ])
@@ -81,7 +83,7 @@ class ArApManagementPage extends Page implements HasTable
                     ->icon('heroicon-m-arrow-path')
                     ->color('success')
                     ->action(function () {
-                        \Artisan::call('ar-ap:sync --force');
+                        Artisan::call('ar-ap:sync', ['--force' => true]);
                         
                         \Filament\Notifications\Notification::make()
                             ->title('Synchronization Complete')

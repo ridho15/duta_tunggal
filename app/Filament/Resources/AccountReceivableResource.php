@@ -201,10 +201,7 @@ class AccountReceivableResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort([
-                ['invoice.due_date', 'desc'],
-                ['remaining', 'desc']
-            ])
+            ->defaultSort('invoice.due_date', 'desc')
             ->groups([
                 Tables\Grouping\Group::make('customer.name')
                     ->label('Customer')

@@ -4,18 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DepositResource\Pages;
 use App\Filament\Resources\DepositResource\Pages\ViewDeposit;
-use App\Filament\Resources\DepositResource\Pages\ViewDepositLog;
-use App\Filament\Resources\DepositResource\RelationManagers;
 use App\Filament\Resources\DepositResource\RelationManagers\DepositLogRelationManager;
 use App\Http\Controllers\HelperController;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\Deposit;
-use App\Models\DepositLog;
 use App\Models\Supplier;
 use Filament\Forms;
-use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Section;
@@ -53,114 +48,95 @@ class DepositResource extends Resource
     {
         return $form
             ->schema([
-                Section::make('Deposit Information')
-                    ->description('Create or manage deposit for Customer/Supplier')
+                Section::make('From Supplier / Customer')
+                    ->description('Referensi untuk membuat Deposit, tidak boleh di abaikan')
                     ->schema([
                         Grid::make(2)
                             ->schema([
                                 Radio::make('from_model_type')
+                                    ->label('From')
                                     ->required()
                                     ->reactive()
-                                    ->inlineLabel()
+                                    ->inline()
                                     ->options([
                                         'App\Models\Supplier' => 'Supplier',
                                         'App\Models\Customer' => 'Customer'
                                     ])
-                                    ->label('Entity Type')
-                                    ->helperText('Select whether this deposit is from a Customer or Supplier'),
+                                    ->afterStateUpdated(function ($set) {
+                                        $set('from_model_id', null);
+                                    }),
                                     
                                 Select::make('from_model_id')
+                                    ->label('From')
                                     ->required()
                                     ->searchable()
+                                    ->placeholder('Pilih salah satu opsi')
                                     ->options(function ($get) {
                                         if ($get('from_model_type') == 'App\Models\Supplier') {
-                                            return Supplier::get()->pluck('code', 'id');
+                                            return Supplier::get()->mapWithKeys(function ($supplier) {
+                                                return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                            });
                                         } elseif ($get('from_model_type') == 'App\Models\Customer') {
-                                            return Customer::get()->pluck('code', 'id');
+                                            return Customer::get()->mapWithKeys(function ($customer) {
+                                                return [$customer->id => "({$customer->code}) {$customer->name}"];
+                                            });
                                         }
                                         return [];
                                     })
-                                    ->preload()
-                                    ->getOptionLabelFromRecordUsing(function ($record) {
-                                        return "({$record->code}) {$record->name}";
-                                    })
-                                    ->label(function ($get) {
-                                        if ($get('from_model_type') == 'App\Models\Supplier') {
-                                            return 'Select Supplier';
-                                        } elseif ($get('from_model_type') == 'App\Models\Customer') {
-                                            return 'Select Customer';
-                                        }
-                                        return "Select Entity";
-                                    })
-                                    ->validationMessages([
-                                        'required' => 'Please select an entity'
-                                    ])
-                                    ->helperText('Choose the specific customer or supplier for this deposit'),
+                                    ->preload(),
                             ]),
+                    ]),
+                    
+                Section::make()
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('deposit_number')
+                            ->label('Nomor Deposit')
+                            ->maxLength(255)
+                            ->default(function () {
+                                return 'DEP-' . date('Y-m-d') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
+                            }),
                             
-                        Grid::make(3)
-                            ->schema([
-                                TextInput::make('amount')
-                                    ->label('Deposit Amount')
-                                    ->prefix('Rp')
-                                    ->required()
-                                    ->default(0)
-                                    ->numeric()
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, $set, $get) {
-                                        $usedAmount = $get('used_amount') ?? 0;
-                                        $set('remaining_amount', $state - $usedAmount);
-                                    })
-                                    ->helperText('Total deposit amount'),
-                                    
-                                TextInput::make('used_amount')
-                                    ->required()
-                                    ->label('Used Amount')
-                                    ->prefix('Rp')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, $set, $get) {
-                                        $totalAmount = $get('amount') ?? 0;
-                                        $set('remaining_amount', $totalAmount - $state);
-                                    })
-                                    ->helperText('Amount already used'),
-                                    
-                                TextInput::make('remaining_amount')
-                                    ->required()
-                                    ->label('Remaining Amount')
-                                    ->prefix('Rp')
-                                    ->default(0)
-                                    ->numeric()
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->helperText('Calculated automatically'),
-                            ]),
+                        TextInput::make('amount')
+                            ->label('Total')
+                            ->prefix('Rp')
+                            ->required()
+                            ->default(0)
+                            ->numeric()
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $usedAmount = $get('used_amount') ?? 0;
+                                $set('remaining_amount', $state - $usedAmount);
+                            }),
+                    ]),
+                    
+                Section::make()
+                    ->columns(2)
+                    ->schema([
+                        Textarea::make('note')
+                            ->label('Catatan')
+                            ->placeholder('Masukkan catatan deposit...')
+                            ->rows(3),
                             
                         Select::make('coa_id')
                             ->label('Chart Of Account')
                             ->required()
                             ->preload()
                             ->searchable(['code', 'name'])
+                            ->placeholder('Pilih salah satu opsi')
                             ->relationship('coa', 'code')
                             ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
                                 return "({$chartOfAccount->code}) {$chartOfAccount->name}";
-                            })
-                            ->helperText('Select the appropriate chart of account for this deposit'),
-                            
-                        Textarea::make('note')
-                            ->label('Notes')
-                            ->string()
-                            ->placeholder('Enter any additional notes about this deposit...')
-                            ->rows(3),
-                            
-                        Forms\Components\Toggle::make('status')
-                            ->label('Active Status')
-                            ->default(true)
-                            ->helperText('Toggle to activate/deactivate this deposit')
-                            ->onIcon('heroicon-m-check')
-                            ->offIcon('heroicon-m-x-mark'),
-                    ])
+                            }),
+                    ]),
+                    
+                // Hidden fields for backward compatibility
+                Hidden::make('used_amount')->default(0),
+                Hidden::make('remaining_amount')
+                    ->default(function ($get) {
+                        return $get('amount') ?? 0;
+                    }),
+                Hidden::make('status')->default(true),
             ]);
     }
 
@@ -168,6 +144,12 @@ class DepositResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('deposit_number')
+                    ->label('Nomor Deposit')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+                    
                 TextColumn::make('fromModel')
                     ->label('Nama')
                     ->formatStateUsing(function ($state) {
@@ -182,7 +164,7 @@ class DepositResource extends Resource
                     ->sortable(),
                     
                 TextColumn::make('from_model_type')
-                    ->label('Type')
+                    ->label('Role')
                     ->formatStateUsing(function ($state) {
                         if ($state == 'App\Models\Supplier') {
                             return 'Supplier';
@@ -196,6 +178,14 @@ class DepositResource extends Resource
                         'App\Models\Customer' => 'success',
                         'App\Models\Supplier' => 'info',
                         default => 'gray',
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $searchLower = strtolower($search);
+                        if (str_contains('customer', $searchLower)) {
+                            $query->where('from_model_type', 'App\Models\Customer');
+                        } elseif (str_contains('supplier', $searchLower)) {
+                            $query->where('from_model_type', 'App\Models\Supplier');
+                        }
                     })
                     ->sortable(),
                     
@@ -213,6 +203,7 @@ class DepositResource extends Resource
                     ->label('Used Amount')
                     ->money('idr')
                     ->sortable()
+                    ->toggleable()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
                             ->money('idr')
@@ -223,6 +214,7 @@ class DepositResource extends Resource
                     ->label('Remaining')
                     ->money('idr')
                     ->sortable()
+                    ->toggleable()
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
@@ -244,39 +236,42 @@ class DepositResource extends Resource
                     ->limit(30)
                     ->tooltip(function (TextColumn $column): ?string {
                         $state = $column->getState();
-                        if (strlen($state) > 30) {
-                            return $state;
+                        if ($state && strlen("({$state->code}) {$state->name}") > 30) {
+                            return "({$state->code}) {$state->name}";
                         }
                         return null;
-                    }),
+                    })
+                    ->toggleable(),
                     
-                IconColumn::make('status')
+                Tables\Columns\IconColumn::make('status')
                     ->label('Status')
                     ->boolean()
                     ->trueIcon('heroicon-o-check-circle')
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
-                    ->falseColor('danger'),
-                    
-                TextColumn::make('createdBy.name')
-                    ->searchable()
-                    ->label('Created By')
+                    ->falseColor('danger')
                     ->toggleable(),
+                    
+                TextColumn::make('note')
+                    ->label('Catatan')
+                    ->limit(50)
+                    ->tooltip(function (TextColumn $column): ?string {
+                        $state = $column->getState();
+                        if ($state && strlen($state) > 50) {
+                            return $state;
+                        }
+                        return null;
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                     
                 TextColumn::make('created_at')
                     ->label('Created At')
                     ->dateTime('M j, Y H:i')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
                     
                 TextColumn::make('updated_at')
                     ->label('Updated At')
-                    ->dateTime('M j, Y H:i')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                    
-                TextColumn::make('deleted_at')
-                    ->label('Deleted At')
                     ->dateTime('M j, Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -302,7 +297,7 @@ class DepositResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('from_model_type')
-                    ->label('Entity Type')
+                    ->label('Role')
                     ->options([
                         'App\Models\Customer' => 'Customer',
                         'App\Models\Supplier' => 'Supplier',
@@ -312,13 +307,13 @@ class DepositResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status')
                     ->options([
-                        'active' => 'Active',
-                        'closed' => 'Closed',
+                        1 => 'Active',
+                        0 => 'Inactive',
                     ])
                     ->multiple(),
                     
                 Tables\Filters\SelectFilter::make('from_model_id')
-                    ->label('Specific Entity')
+                    ->label('Nama')
                     ->relationship('fromModel', 'name')
                     ->searchable()
                     ->getOptionLabelFromRecordUsing(function ($record) {
@@ -333,6 +328,54 @@ class DepositResource extends Resource
                 Tables\Filters\Filter::make('empty_balance')
                     ->label('Empty Balance')
                     ->query(fn (Builder $query): Builder => $query->where('remaining_amount', '<=', 0)),
+                    
+                Tables\Filters\Filter::make('amount_range')
+                    ->form([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('amount_from')
+                                    ->label('Amount From')
+                                    ->numeric()
+                                    ->prefix('Rp'),
+                                Forms\Components\TextInput::make('amount_to')
+                                    ->label('Amount To')  
+                                    ->numeric()
+                                    ->prefix('Rp'),
+                            ]),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['amount_from'],
+                                fn (Builder $query, $amount): Builder => $query->where('amount', '>=', $amount),
+                            )
+                            ->when(
+                                $data['amount_to'],
+                                fn (Builder $query, $amount): Builder => $query->where('amount', '<=', $amount),
+                            );
+                    }),
+                    
+                Tables\Filters\Filter::make('date_range')
+                    ->form([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\DatePicker::make('created_from')
+                                    ->label('Created From'),
+                                Forms\Components\DatePicker::make('created_until')
+                                    ->label('Created Until'),
+                            ]),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 ActionGroup::make([

@@ -49,14 +49,14 @@ class VendorPaymentResource extends Resource
     {
         return $form
             ->schema([
-                Fieldset::make('Vendor Payment Form')
+                Section::make('Vendor Payment')
                     ->schema([
-                        Section::make('Pilih Supplier')
-                            ->description('Pilih supplier terlebih dahulu untuk melihat invoice yang belum dibayar')
+                        // Header Section - Vendor and Payment Date
+                        Section::make()
                             ->columns(2)
                             ->schema([
                                 Select::make('supplier_id')
-                                    ->label('Supplier')
+                                    ->label('Vendor')
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
@@ -75,19 +75,22 @@ class VendorPaymentResource extends Resource
                                     ->required(),
 
                                 DatePicker::make('payment_date')
-                                    ->label('Tanggal Pembayaran')
+                                    ->label('Payment Date')
                                     ->required()
                                     ->default(now()),
                             ]),
 
-                        Section::make('Invoice yang Belum Dibayar')
-                            ->description('Pilih invoice yang akan dibayar (bisa multiple)')
+                        // Invoice Selection Section
+                        Section::make('Silahkan Pilih Invoice')
                             ->schema([
-                                CheckboxList::make('selected_invoices')
-                                    ->label('Pilih Invoice')
-                                    ->options(function ($get) {
+                                ViewField::make('vendor_invoice_selection_table')
+                                    ->label('')
+                                    ->view('components.vendor-payment-invoice-table')
+                                    ->viewData(function ($get) {
                                         $supplierId = $get('supplier_id');
-                                        if (!$supplierId) return [];
+                                        if (!$supplierId) {
+                                            return ['invoices' => [], 'selectedInvoices' => []];
+                                        }
 
                                         // Get unpaid/partial invoices for selected supplier
                                         $invoices = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
@@ -98,167 +101,46 @@ class VendorPaymentResource extends Resource
                                                 $query->where('remaining', '>', 0);
                                             })
                                             ->with(['accountPayable'])
-                                            ->get();
-
-                                        return $invoices->mapWithKeys(function ($invoice) {
-                                            $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
-                                            return [
-                                                $invoice->id => "{$invoice->invoice_number} - Sisa: Rp " . number_format($remaining, 0, ',', '.')
-                                            ];
-                                        })->toArray();
-                                    })
-                                    ->columns(1)
-                                    ->reactive()
-                                    ->required()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        if (!$state || empty($state)) {
-                                            $set('total_payment', 0);
-                                            return;
-                                        }
-
-                                        // Calculate total from selected invoices
-                                        $total = 0;
-                                        $invoices = Invoice::whereIn('id', $state)
-                                            ->with('accountPayable')
-                                            ->get();
-                                        
-                                        foreach ($invoices as $invoice) {
-                                            $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
-                                            $total += $remaining;
-                                        }
-                                        
-                                        $adjustment = $get('payment_adjustment') ?? 0;
-                                        $set('total_payment', $total - $adjustment);
-                                    }),
-
-                                ViewField::make('invoice_table')
-                                    ->label('Detail Invoice Terpilih')
-                                    ->view('components.invoice-table')
-                                    ->viewData(function ($get) {
-                                        $selectedInvoices = $get('selected_invoices');
-                                        if (!$selectedInvoices || empty($selectedInvoices)) {
-                                            return ['invoices' => []];
-                                        }
-
-                                        $invoices = Invoice::whereIn('id', $selectedInvoices)
-                                            ->with('accountPayable')
                                             ->get()
                                             ->map(function ($invoice) {
                                                 return [
+                                                    'id' => $invoice->id,
                                                     'invoice_number' => $invoice->invoice_number,
                                                     'total' => $invoice->total,
                                                     'remaining' => $invoice->accountPayable->remaining ?? $invoice->total,
+                                                    'receipt' => '',
+                                                    'balance' => '',
+                                                    'payment_balance' => '',
+                                                    'adjustment_description' => '',
                                                 ];
                                             });
 
-                                        return ['invoices' => $invoices];
+                                        return [
+                                            'invoices' => $invoices,
+                                            'selectedInvoices' => $get('selected_invoices') ?? []
+                                        ];
                                     })
-                                    ->visible(fn ($get) => !empty($get('selected_invoices'))),
+                                    ->visible(fn ($get) => !empty($get('supplier_id'))),
+
+                                Hidden::make('selected_invoices')
+                                    ->reactive(),
                             ]),
 
-                        Section::make('Detail Pembayaran')
-                            ->columns(2)
+                        // Payment Details Section
+                        Section::make()
+                            ->columns(3)
                             ->schema([
-                                TextInput::make('payment_adjustment')
-                                    ->label('Penyesuaian Pembayaran')
-                                    ->helperText('Masukkan nilai positif untuk potongan atau nilai negatif untuk penambahan')
-                                    ->prefix('Rp.')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        $selectedInvoices = $get('selected_invoices');
-                                        if (!$selectedInvoices || empty($selectedInvoices)) return;
-
-                                        $total = 0;
-                                        $invoices = Invoice::whereIn('id', $selectedInvoices)
-                                            ->with('accountPayable')
-                                            ->get();
-                                        
-                                        foreach ($invoices as $invoice) {
-                                            $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
-                                            $total += $remaining;
-                                        }
-                                        
-                                        $adjustment = $state ?? 0;
-                                        $set('total_payment', $total - $adjustment);
-                                    }),
+                                TextInput::make('ntpn')
+                                    ->label('NTPN')
+                                    ->maxLength(255)
+                                    ->required(),
 
                                 TextInput::make('total_payment')
                                     ->label('Total Pembayaran')
                                     ->required()
                                     ->prefix('Rp.')
                                     ->numeric()
-                                    ->readonly(),
-
-                                TextInput::make('ntpn')
-                                    ->label('NTPN')
-                                    ->maxLength(255)
-                                    ->required(),
-
-                                TextInput::make('diskon')
-                                    ->label('Diskon')
-                                    ->default(0)
-                                    ->numeric()
-                                    ->prefix('Rp'),
-                            ]),
-
-                        Section::make('Catatan')
-                            ->schema([
-                                Textarea::make('notes')
-                                    ->label('Catatan')
-                                    ->rows(3),
-                            ]),
-
-                        // Hidden fields for backward compatibility
-                        Hidden::make('invoice_id'),
-                        Hidden::make('status')->default('Draft'),
-
-                        Repeater::make('vendorPaymentDetail')
-                            ->label('Payment Detail')
-                            ->relationship()
-                            ->addAction(function (Action $action) {
-                                return $action->color('primary')
-                                    ->icon('heroicon-o-plus-circle');
-                            })
-                            ->columnSpanFull()
-                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
-                                return $data;
-                            })
-                            ->addActionLabel('Tambah Pembayaran')
-                            ->columns(2)
-                            ->schema([
-                                TextInput::make('amount')
-                                    ->label('Pembayaran')
-                                    ->numeric()
-                                    ->reactive()
-                                    ->validationMessages([
-                                        'numeric' => 'Pembayaran tidak valid !'
-                                    ])
-                                    ->afterStateUpdated(function ($get, $set, $state) {
-                                        if ($get('method') == 'Deposit') {
-                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
-                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
-                                            if (!$deposit) {
-                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
-                                                $set('method', null);
-                                            } else {
-                                                if ($get('amount') > $deposit->remaining_amount) {
-                                                    HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
-                                                    $set('amount', 0);
-                                                }
-                                            }
-                                        }
-
-                                        // Validate against total payment
-                                        $totalPayment = $get('../../total_payment') ?? 0;
-                                        if ($state > $totalPayment) {
-                                            HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Pembayaran melebihi total pembayaran");
-                                            $set('amount', 0);
-                                        }
-                                    })
-                                    ->prefix('Rp')
-                                    ->default(0),
+                                    ->reactive(),
 
                                 Select::make('coa_id')
                                     ->label('COA')
@@ -272,53 +154,146 @@ class VendorPaymentResource extends Resource
                                         return "({$chartOfAccount->code}) {$chartOfAccount->name}";
                                     })
                                     ->required(),
+                            ]),
 
-                                DatePicker::make('payment_date')
-                                    ->label('Tanggal Pembayaran')
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'Tanggal pembayaran tidak boleh kosong'
-                                    ]),
+                        // Notes and Payment Method Section
+                        Section::make()
+                            ->columns(2)
+                            ->schema([
+                                Textarea::make('notes')
+                                    ->label('Catatan')
+                                    ->rows(3)
+                                    ->columnSpan(1),
 
-                                Radio::make('method')
+                                Radio::make('payment_method')
+                                    ->label('Payment Method')
                                     ->inline()
-                                    ->label("Payment Method")
                                     ->required()
-                                    ->reactive()
-                                    ->validationMessages([
-                                        'required' => 'Payment method belum dipilih'
-                                    ])
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        if ($state == 'Deposit') {
-                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
-                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
-                                            if (!$deposit) {
-                                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
-                                                $set('method', null);
-                                            } else {
-                                                if ($get('amount') > $deposit->remaining_amount) {
-                                                    HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
-                                                    $set('amount', 0);
-                                                }
-                                            }
-                                        }
-                                    })
-                                    ->helperText(function ($get) {
-                                        if ($get('method') == 'Deposit') {
-                                            $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
-                                                ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
-                                            if ($deposit) {
-                                                return "Saldo : Rp." . number_format($deposit->remaining_amount, 0, ',', '.');
-                                            }
-                                        }
-                                    })
                                     ->options([
                                         'Cash' => 'Cash',
                                         'Bank Transfer' => 'Bank Transfer',
                                         'Credit' => 'Credit',
                                         'Deposit' => 'Deposit'
-                                    ]),
-                            ])
+                                    ])
+                                    ->columnSpan(1),
+                            ]),
+
+                        // Hidden fields for backward compatibility
+                        Hidden::make('invoice_id'),
+                        Hidden::make('status')->default('Draft'),
+                        Hidden::make('payment_adjustment')->default(0),
+                        Hidden::make('diskon')->default(0),
+
+                        // Keep repeater for compatibility but make it collapsible
+                        Section::make('Detail Payment Items')
+                            ->collapsed()
+                            ->schema([
+                                Repeater::make('vendorPaymentDetail')
+                                    ->label('Payment Detail')
+                                    ->relationship()
+                                    ->addAction(function (Action $action) {
+                                        return $action->color('primary')
+                                            ->icon('heroicon-o-plus-circle');
+                                    })
+                                    ->columnSpanFull()
+                                    ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
+                                        return $data;
+                                    })
+                                    ->addActionLabel('Tambah Pembayaran')
+                                    ->columns(2)
+                                    ->schema([
+                                        TextInput::make('amount')
+                                            ->label('Pembayaran')
+                                            ->numeric()
+                                            ->reactive()
+                                            ->validationMessages([
+                                                'numeric' => 'Pembayaran tidak valid !'
+                                            ])
+                                            ->afterStateUpdated(function ($get, $set, $state) {
+                                                if ($get('method') == 'Deposit') {
+                                                    $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
+                                                        ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
+                                                    if (!$deposit) {
+                                                        HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
+                                                        $set('method', null);
+                                                    } else {
+                                                        if ($get('amount') > $deposit->remaining_amount) {
+                                                            HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
+                                                            $set('amount', 0);
+                                                        }
+                                                    }
+                                                }
+
+                                                // Validate against total payment
+                                                $totalPayment = $get('../../total_payment') ?? 0;
+                                                if ($state > $totalPayment) {
+                                                    HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Pembayaran melebihi total pembayaran");
+                                                    $set('amount', 0);
+                                                }
+                                            })
+                                            ->prefix('Rp')
+                                            ->default(0),
+
+                                        Select::make('coa_id')
+                                            ->label('COA')
+                                            ->preload()
+                                            ->validationMessages([
+                                                'required' => 'COA belum dipilih'
+                                            ])
+                                            ->searchable(['code', 'name'])
+                                            ->relationship('coa', 'code')
+                                            ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
+                                                return "({$chartOfAccount->code}) {$chartOfAccount->name}";
+                                            })
+                                            ->required(),
+
+                                        DatePicker::make('payment_date')
+                                            ->label('Tanggal Pembayaran')
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Tanggal pembayaran tidak boleh kosong'
+                                            ]),
+
+                                        Radio::make('method')
+                                            ->inline()
+                                            ->label("Payment Method")
+                                            ->required()
+                                            ->reactive()
+                                            ->validationMessages([
+                                                'required' => 'Payment method belum dipilih'
+                                            ])
+                                            ->afterStateUpdated(function ($set, $get, $state) {
+                                                if ($state == 'Deposit') {
+                                                    $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
+                                                        ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
+                                                    if (!$deposit) {
+                                                        HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Deposit tidak tersedia pada supplier ini");
+                                                        $set('method', null);
+                                                    } else {
+                                                        if ($get('amount') > $deposit->remaining_amount) {
+                                                            HelperController::sendNotification(isSuccess: false, title: 'Information', message: "Saldo deposit tidak cukup");
+                                                            $set('amount', 0);
+                                                        }
+                                                    }
+                                                }
+                                            })
+                                            ->helperText(function ($get) {
+                                                if ($get('method') == 'Deposit') {
+                                                    $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
+                                                        ->where('from_model_id', $get('../../supplier_id'))->where('status', 'active')->first();
+                                                    if ($deposit) {
+                                                        return "Saldo : Rp." . number_format($deposit->remaining_amount, 0, ',', '.');
+                                                    }
+                                                }
+                                            })
+                                            ->options([
+                                                'Cash' => 'Cash',
+                                                'Bank Transfer' => 'Bank Transfer',
+                                                'Credit' => 'Credit',
+                                                'Deposit' => 'Deposit'
+                                            ]),
+                                    ])
+                            ]),
                     ])
             ]);
     }
