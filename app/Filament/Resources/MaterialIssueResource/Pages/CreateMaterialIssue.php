@@ -72,18 +72,6 @@ class CreateMaterialIssue extends CreateRecord
         $totalCost = $this->record->items->sum('total_cost');
         $this->record->update(['total_cost' => $totalCost]);
 
-        // 1) Refresh material fulfillment on related plan
-        /** @var MaterialIssue $mi */
-        $mi = $this->record;
-        if ($mi->production_plan_id) {
-            try {
-                $manufacturingService = app(ManufacturingService::class);
-                $manufacturingService->updateMaterialFulfillment($mi->productionPlan);
-            } catch (\Throwable $e) {
-                // ignore
-            }
-        }
-
         // 2) Auto journal if created directly as completed
         /** @var MaterialIssue $mi */
         if ($mi->status === 'completed') {

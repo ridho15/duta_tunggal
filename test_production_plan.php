@@ -6,7 +6,6 @@ $app = require_once __DIR__.'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Models\ProductionPlan;
-use App\Models\MaterialFulfillment;
 
 echo "Creating Production Plan with status 'draft'...\n";
 
@@ -26,32 +25,8 @@ $plan = ProductionPlan::create([
 
 echo "Production Plan created with ID: {$plan->id} and status: {$plan->status}\n";
 
-$fulfillments = MaterialFulfillment::where('production_plan_id', $plan->id)->get();
-
-echo "Material Fulfillments count: {$fulfillments->count()}\n";
-
-if ($fulfillments->count() > 0) {
-    echo "Fulfillments exist!\n";
-    foreach ($fulfillments as $f) {
-        echo "ID: {$f->id}, Material: {$f->material_id}, Issued: {$f->issued_quantity}, Availability: {$f->availability_percentage}%\n";
-    }
-} else {
-    echo "No fulfillments created.\n";
-}
-
 echo "\nNow updating status to 'scheduled'...\n";
 
 $plan->update(['status' => 'scheduled']);
 
-$fulfillmentsAfter = MaterialFulfillment::where('production_plan_id', $plan->id)->get();
-
-echo "Material Fulfillments count after scheduled: {$fulfillmentsAfter->count()}\n";
-
-if ($fulfillmentsAfter->count() > 0) {
-    echo "Fulfillments after scheduled:\n";
-    foreach ($fulfillmentsAfter as $f) {
-        echo "ID: {$f->id}, Material: {$f->material_id}, Issued: {$f->issued_quantity}, Availability: {$f->availability_percentage}%\n";
-    }
-} else {
-    echo "No fulfillments after scheduled.\n";
-}
+echo "Production Plan updated to scheduled.\n";

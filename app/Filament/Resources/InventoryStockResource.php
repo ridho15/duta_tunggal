@@ -185,7 +185,7 @@ class InventoryStockResource extends Resource
         return [
             'index' => Pages\ListInventoryStocks::route('/'),
             // 'create' => Pages\CreateInventoryStock::route('/create'),
-            // 'view' => ViewInventoryStock::route('/{record}'),
+            'view' => ViewInventoryStock::route('/{record}'),
             // 'edit' => Pages\EditInventoryStock::route('/{record}/edit'),
         ];
     }
