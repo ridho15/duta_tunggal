@@ -3,9 +3,10 @@
 namespace App\Filament\Resources\DeliveryOrderResource\Pages;
 
 use App\Filament\Resources\DeliveryOrderResource;
-use App\Models\SaleOrderItem;
-use App\Models\Product;
-use Filament\Actions;
+use App\Models\DeliveryOrder;
+use App\Services\DeliveryOrderItemService;
+use App\Services\DeliveryOrderService;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateDeliveryOrder extends CreateRecord
@@ -14,46 +15,45 @@ class CreateDeliveryOrder extends CreateRecord
     
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Additional validation before creating
-        $this->validateDeliveryOrderItems($data);
-        return $data;
-    }
-    
-    protected function validateDeliveryOrderItems(array $data): void
-    {
-        if (empty($data['sales_order_id']) || empty($data['deliveryOrderItem'])) {
-            return;
-        }
-
-        $deliveryItems = $data['deliveryOrderItem'];
-        
-        // Validasi setiap delivery item
-        foreach ($deliveryItems as $deliveryItem) {
-            if (!empty($deliveryItem['sale_order_item_id']) && !empty($deliveryItem['quantity'])) {
-                $saleOrderItem = SaleOrderItem::find($deliveryItem['sale_order_item_id']);
+        // Validate warehouse confirmation for all selected sales orders
+        $salesOrderIds = $data['sales_order_id'] ?? [];
+        if (!empty($salesOrderIds)) {
+            foreach ($salesOrderIds as $salesOrderId) {
+                $salesOrder = \App\Models\SaleOrder::find($salesOrderId);
+                if (!$salesOrder) {
+                    throw new \Exception("Sales Order dengan ID {$salesOrderId} tidak ditemukan.");
+                }
                 
-                if ($saleOrderItem) {
-                    // Validasi 1: Quantity delivery item tidak boleh lebih besar dari quantity sale order item asli
-                    if ($deliveryItem['quantity'] > $saleOrderItem->quantity) {
-                        $productName = $saleOrderItem->product->name ?? "Unknown Product";
-                        throw new \Exception("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) tidak boleh lebih besar dari quantity sale order item ({$saleOrderItem->quantity}).");
-                    }
-                    
-                    // Validasi 2: Quantity delivery item tidak boleh melebihi remaining quantity
-                    if ($deliveryItem['quantity'] > $saleOrderItem->remaining_quantity) {
-                        $productName = $saleOrderItem->product->name ?? "Unknown Product";
-                        throw new \Exception("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).");
-                    }
+                if ($salesOrder->status !== 'confirmed') {
+                    throw new \Exception("Sales Order {$salesOrder->so_number} belum dikonfirmasi warehouse (status: {$salesOrder->status}).");
+                }
+                
+                if (!$salesOrder->warehouse_confirmed_at) {
+                    throw new \Exception("Sales Order {$salesOrder->so_number} belum memiliki tanggal konfirmasi warehouse.");
                 }
             }
+            
+            // Set warehouse_id from the first sales order (assuming all sales orders from same warehouse)
+            $firstSalesOrder = \App\Models\SaleOrder::find($salesOrderIds[0]);
+            if ($firstSalesOrder && !$data['warehouse_id']) {
+                $data['warehouse_id'] = $firstSalesOrder->warehouse_id;
+            }
         }
+
+        // Additional validation before creating
+        app(DeliveryOrderItemService::class)->validateItemsForSalesOrder(
+            (int) ($data['sales_order_id'] ?? 0),
+            $data['deliveryOrderItem'] ?? []
+        );
+
+        return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        $deliveryOrder = $this->record;
         
-        // Validasi tidak ada duplicate sale order item
-        $saleOrderItemIds = collect($deliveryItems)->pluck('sale_order_item_id')->filter();
-        $duplicates = $saleOrderItemIds->duplicates();
-        
-        if ($duplicates->isNotEmpty()) {
-            throw new \Exception("Tidak boleh ada duplicate sale order item dalam satu delivery order.");
-        }
+        // Note: Delivery order posting to ledger happens on completion, not creation
+        // This allows for approval/review before committing to inventory reduction
     }
 }

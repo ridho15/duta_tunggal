@@ -16,7 +16,7 @@ return new class extends Migration
             $table->dateTime('delivery_date');
             $table->integer('driver_id');
             $table->integer('vehicle_id');
-            $table->enum('status', ['draft', 'sent', 'received', 'supplier', 'completed']); // draft -> sent -> received -> supplier -> completed
+            $table->enum('status', ['draft', 'sent', 'confirmed', 'received', 'supplier', 'completed']); // draft -> sent -> confirmed -> received -> supplier -> completed
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();

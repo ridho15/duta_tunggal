@@ -1,13 +1,12 @@
 <?php
 
-namespace App\Filament\pages;
+namespace App\Filament\Pages;
 
 use App\Filament\Widgets\AccontReceivablePayableChart;
 use App\Filament\Widgets\AccountReceivablePayableChart;
 use App\Filament\Widgets\AgeingScheduleChart;
 use App\Filament\Widgets\ArApChart;
 use App\Filament\Widgets\ArApSummaryWidget;
-use App\Filament\Widgets\CalendarWidget;
 use App\Filament\Widgets\DoBelumSelesaiTable;
 use App\Filament\Widgets\MutasiKeluarBelumSelesaiTable;
 use App\Filament\Widgets\MutasiMasukBelumSelesaiTable;
@@ -32,7 +31,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Form;
 use Filament\Pages\Dashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
-use Filament\Widgets\AccountWidget;
+// use Filament\Widgets\AccountWidget; // Commented out - widget doesn't exist
 use Illuminate\Support\Facades\Auth;
 
 class MyDashboard extends Dashboard
@@ -42,7 +41,7 @@ class MyDashboard extends Dashboard
     public function getWidgets(): array
     {
         $listWidgets = [];
-        $listWidgets[] = AccountWidget::class;
+        // $listWidgets[] = AccountWidget::class; // Commented out - widget doesn't exist
         if (Auth::user()->hasRole(['Owner', 'Super Admin'])) {
             $listWidgets[] = SaldoStatsOverview::class;
             $listWidgets[] = PenjualanOverview::class;
@@ -85,6 +84,13 @@ class MyDashboard extends Dashboard
     public function persistsFiltersInSession(): bool
     {
         return false;
+    }
+
+    public static function getRouteName(?string $panel = null): string
+    {
+        // Use the parent's generated route name so it matches Filament's
+        // registered route (e.g. `filament.admin.pages.my-dashboard`).
+        return parent::getRouteName($panel);
     }
 
     public function filtersForm(Form $form): Form

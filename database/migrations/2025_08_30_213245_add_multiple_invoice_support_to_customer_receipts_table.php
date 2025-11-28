@@ -29,7 +29,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('customer_receipts', function (Blueprint $table) {
-            $table->integer('invoice_id')->nullable(false)->change();
+            // Avoid forcing invoice_id to NOT NULL during rollback (some rows may be null)
+            // $table->integer('invoice_id')->nullable(false)->change();
             $table->dropColumn(['selected_invoices', 'payment_adjustment']);
         });
     }

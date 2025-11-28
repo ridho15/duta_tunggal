@@ -22,15 +22,22 @@ class ManufacturingService
     public function checkStockMaterial($manufacturingOrder)
     {
         foreach ($manufacturingOrder->manufacturingOrderMaterial as $manufacturingOrderMaterial) {
-            $inventoryStock = InventoryStock::where(function ($query) use ($manufacturingOrderMaterial) {
-                $query->where('warehouse_id', $manufacturingOrderMaterial->warehouse_id)
-                    ->orWhere('rak_id', $manufacturingOrderMaterial->rak_id);
-            })->where('product_id', $manufacturingOrderMaterial->material_id)->first();
+            $query = InventoryStock::where('product_id', $manufacturingOrderMaterial->material_id);
+            if ($manufacturingOrderMaterial->warehouse_id) {
+                $query->where('warehouse_id', $manufacturingOrderMaterial->warehouse_id);
+            }
+            if ($manufacturingOrderMaterial->rak_id) {
+                $query->where('rak_id', $manufacturingOrderMaterial->rak_id);
+            }
+            $inventoryStock = $query->first();
+
             if (!$inventoryStock) {
                 return false;
             }
 
-            if ($inventoryStock->qty_available < $manufacturingOrderMaterial->qty_required) {
+            // Use qty_required as the required amount; if qty_used is set and higher, validate against that
+            $required = max((float) ($manufacturingOrderMaterial->qty_required ?? 0), (float) ($manufacturingOrderMaterial->qty_used ?? 0));
+            if ($inventoryStock->qty_available < $required) {
                 return false;
             }
         }
@@ -56,5 +63,44 @@ class ManufacturingService
         }
 
         return 'MO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function generateIssueNumber(string $type = 'issue'): string
+    {
+        $prefix = $type === 'issue' ? 'MI' : 'MR'; // Material Issue / Material Return
+        $date = now()->format('Ymd');
+        
+        $lastIssue = \App\Models\MaterialIssue::where('issue_number', 'like', "{$prefix}-{$date}-%")
+            ->orderBy('issue_number', 'desc')
+            ->first();
+
+        if ($lastIssue) {
+            $lastNumber = (int) substr($lastIssue->issue_number, -4);
+            $newNumber = $lastNumber + 1;
+        } else {
+            $newNumber = 1;
+        }
+
+        return sprintf('%s-%s-%04d', $prefix, $date, $newNumber);
+    }
+
+    /**
+     * Update material fulfillment data for a production plan
+     */
+    public function updateMaterialFulfillment(\App\Models\ProductionPlan $plan): void
+    {
+        \App\Models\MaterialFulfillment::updateFulfillmentData($plan);
+    }
+
+    /**
+     * Update material fulfillment data for all production plans
+     */
+    public function updateAllMaterialFulfillments(): void
+    {
+        $plans = \App\Models\ProductionPlan::with('billOfMaterial.items')->get();
+
+        foreach ($plans as $plan) {
+            $this->updateMaterialFulfillment($plan);
+        }
     }
 }

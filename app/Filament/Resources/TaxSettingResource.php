@@ -26,9 +26,9 @@ class TaxSettingResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 24;
+    protected static ?int $navigationSort = 12;
 
     public static function form(Form $form): Form
     {

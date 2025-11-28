@@ -11,6 +11,14 @@ class Quotation extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'quotations';
+    protected $casts = [
+        'date' => 'datetime',
+        'valid_until' => 'datetime',
+        'request_approve_at' => 'datetime',
+        'reject_at' => 'datetime',
+        'approve_at' => 'datetime',
+    ];
+
     protected $fillable = [
         'quotation_number',
         'customer_id',

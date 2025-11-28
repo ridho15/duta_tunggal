@@ -13,6 +13,7 @@ class CustomerReceiptItem extends Model
     protected $table = 'customer_receipt_items';
     protected $fillable = [
         'customer_receipt_id',
+        'invoice_id',
         'method',
         'amount',
         'coa_id',
@@ -24,6 +25,11 @@ class CustomerReceiptItem extends Model
         return $this->belongsTo(CustomerReceipt::class, 'customer_receipt_id')->withDefault();
     }
 
+    public function invoice()
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();
+    }
+
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
@@ -32,5 +38,10 @@ class CustomerReceiptItem extends Model
     public function journalEntry()
     {
         return $this->morphOne(JournalEntry::class, 'source')->withDefault();
+    }
+
+    public function depositLog()
+    {
+        return $this->morphMany(DepositLog::class, 'reference');
     }
 }

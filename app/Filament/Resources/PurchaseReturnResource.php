@@ -34,9 +34,10 @@ class PurchaseReturnResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up-on-square-stack';
 
-    protected static ?string $navigationGroup = 'Pembelian';
+    // Group updated to the standardized Purchase Order group
+    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -116,7 +117,7 @@ class PurchaseReturnResource extends Resource
                                 TextInput::make('unit_price')
                                     ->label('Unit Price (Rp.)')
                                     ->numeric()
-                                    ->prefix('Rp.')
+                                    ->indonesianMoney()
                                     ->default(0)
                                     ->required(),
                                 Textarea::make('reason')

@@ -96,6 +96,10 @@
             <td><strong>Supplier:</strong></td>
             <td colspan="3">{{ $purchaseOrder->supplier->name }}<br>{{ $purchaseOrder->supplier->address }}</td>
         </tr>
+        <tr>
+            <td><strong>Tipe:</strong></td>
+            <td colspan="3">{{ $purchaseOrder->is_asset ? 'Asset' : 'Non Asset' }}</td>
+        </tr>
     </table>
 
     <table>
@@ -135,6 +139,40 @@
             </tr>
         </tbody>
     </table>
+
+    @if($purchaseOrder->is_asset)
+    <div style="margin-top: 20px;">
+        <h3 style="text-decoration: underline; margin-bottom: 10px;">Informasi Asset</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Nama Asset</th>
+                    <th>Nilai Perolehan</th>
+                    <th>Umur Manfaat (Tahun)</th>
+                    <th>Nilai Sisa</th>
+                    <th>COA Aset</th>
+                    <th>COA Akumulasi</th>
+                    <th>COA Beban</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($purchaseOrder->assets as $index => $asset)
+                <tr>
+                    <td>{{ $index + 1 }}</td>
+                    <td>{{ $asset->name }}</td>
+                    <td class="right">Rp.{{ number_format($asset->purchase_cost, 0, ',', '.') }}</td>
+                    <td class="right">{{ $asset->useful_life_years }}</td>
+                    <td class="right">Rp.{{ number_format($asset->salvage_value, 0, ',', '.') }}</td>
+                    <td>({{ $asset->assetCoa->code }}) {{ $asset->assetCoa->name }}</td>
+                    <td>({{ $asset->accumulatedDepreciationCoa->code }}) {{ $asset->accumulatedDepreciationCoa->name }}</td>
+                    <td>({{ $asset->depreciationExpenseCoa->code }}) {{ $asset->depreciationExpenseCoa->name }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endif
 
     <div class="signature">
         <div class="box">

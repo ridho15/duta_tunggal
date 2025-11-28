@@ -84,7 +84,7 @@
             </tr>
             <tr>
                 <td class="right">Biaya Lain-lain:</td>
-                <td class="right">Rp {{ number_format($invoice->other_fee, 0, ',', '.') }}</td>
+                <td class="right">Rp {{ number_format($invoice->other_fee_total, 0, ',', '.') }}</td>
             </tr>
             <tr>
                 <td class="right"><strong>Total Pembayaran:</strong></td>

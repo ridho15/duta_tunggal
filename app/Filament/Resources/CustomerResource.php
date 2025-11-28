@@ -35,7 +35,8 @@ class CustomerResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 26;
+    // Position Master Data as the 7th group
+    protected static ?int $navigationSort = 7;
 
     public static function form(Form $form): Form
     {
@@ -127,7 +128,7 @@ class CustomerResource extends Resource
                             ->default(0)
                             ->required()
                             ->numeric()
-                            ->prefix('Rp.'),
+                            ->indonesianMoney(),
                         Radio::make('tipe_pembayaran')
                             ->label('Tipe Bayar Customer')
                             ->inlineLabel()
@@ -196,7 +197,7 @@ class CustomerResource extends Resource
                     }),
                 TextColumn::make('kredit_limit')
                     ->label('Kredit Limit')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable()
                     ->visible(fn () => true),
                 TextColumn::make('current_credit_usage')
@@ -206,7 +207,7 @@ class CustomerResource extends Resource
                         $creditService = app(CreditValidationService::class);
                         return $creditService->getCurrentCreditUsage($record);
                     })
-                    ->money('idr')
+                    ->money('IDR')
                     ->color(function (Customer $record): string {
                         if ($record->tipe_pembayaran !== 'Kredit') return 'gray';
                         $creditService = app(CreditValidationService::class);

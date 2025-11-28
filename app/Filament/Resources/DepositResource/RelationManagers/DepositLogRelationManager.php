@@ -43,6 +43,7 @@ class DepositLogRelationManager extends RelationManager
                             'add' => 'info',
                             'return' => 'warning',
                             'cancel' => 'danger',
+                            'edit' => 'warning',
                             'adjustment' => 'gray'
                         };
                     })
@@ -53,6 +54,7 @@ class DepositLogRelationManager extends RelationManager
                             'add' => 'ADDED',
                             'return' => 'RETURNED',
                             'cancel' => 'CANCELLED',
+                            'edit' => 'EDITED',
                             'adjustment' => 'ADJUSTMENT',
                             default => Str::upper($state)
                         };
@@ -62,7 +64,7 @@ class DepositLogRelationManager extends RelationManager
                 TextColumn::make('amount')
                     ->label('Amount')
                     ->sortable()
-                    ->money('idr')
+                    ->money('IDR')
                     ->color(function ($state, $record) {
                         return match ($record->type) {
                             'create', 'add', 'return' => 'success',
@@ -109,7 +111,7 @@ class DepositLogRelationManager extends RelationManager
                     
                 TextColumn::make('remaining_balance')
                     ->label('Balance After')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable()
                     ->color('success'),
             ])
@@ -155,11 +157,11 @@ class DepositLogRelationManager extends RelationManager
                                 Forms\Components\TextInput::make('min_amount')
                                     ->label('Min Amount')
                                     ->numeric()
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                                 Forms\Components\TextInput::make('max_amount')
                                     ->label('Max Amount')
                                     ->numeric()
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                             ]),
                     ])
                     ->query(function (Builder $query, array $data): Builder {

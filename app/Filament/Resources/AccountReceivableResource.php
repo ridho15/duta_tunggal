@@ -30,9 +30,9 @@ class AccountReceivableResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Penjualan';
 
-    protected static ?int $navigationSort = 19;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -73,16 +73,16 @@ class AccountReceivableResource extends Resource
                             ->relationship('customer', 'name'),
                         TextInput::make('total')
                             ->required()
-                            ->prefix('Rp')
+                            ->indonesianMoney()
                             ->numeric(),
                         TextInput::make('paid')
                             ->required()
-                            ->prefix('Rp')
+                            ->indonesianMoney()
                             ->numeric()
                             ->default(0.00),
                         TextInput::make('remaining')
                             ->required()
-                            ->prefix('Rp')
+                            ->indonesianMoney()
                             ->numeric(),
                         Checkbox::make('status')
                             ->label('Lunas / Belum Lunas')
@@ -93,6 +93,9 @@ class AccountReceivableResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (Builder $query) {
+                return $query->with(['invoice.fromModel']);
+            })
             ->columns([
                 TextColumn::make('invoice.invoice_number')
                     ->label('Invoice Number')
@@ -106,7 +109,12 @@ class AccountReceivableResource extends Resource
                         return "({$state->code}) {$state->name}";
                     })
                     ->label('Customer')
-                    ->searchable(['code', 'name'])
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('customer', function (Builder $query) use ($search) {
+                            $query->where('code', 'like', "%{$search}%")
+                                  ->orWhere('name', 'like', "%{$search}%");
+                        });
+                    })
                     ->sortable(),
                     
                 TextColumn::make('invoice.invoice_date')
@@ -128,33 +136,34 @@ class AccountReceivableResource extends Resource
                 TextColumn::make('total')
                     ->label('Total Amount')
                     ->sortable()
-                    ->money('idr')
+                    ->searchable()
+                    ->money('IDR')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('idr')
+                            ->money('IDR')
                             ->label('Total AR')
                     ]),
                     
                 TextColumn::make('paid')
                     ->label('Paid Amount')
                     ->sortable()
-                    ->money('idr')
+                    ->money('IDR')
                     ->color('success')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('idr')
+                            ->money('IDR')
                             ->label('Total Paid')
                     ]),
                     
                 TextColumn::make('remaining')
                     ->label('Outstanding')
                     ->sortable()
-                    ->money('idr')
+                    ->money('IDR')
                     ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
                     ->weight('bold')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('idr')
+                            ->money('IDR')
                             ->label('Total Outstanding')
                     ]),
                     
@@ -174,20 +183,24 @@ class AccountReceivableResource extends Resource
                     ->badge()
                     ->sortable(),
                     
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->color(function ($state) {
-                        return match ($state) {
-                            'Belum Lunas' => 'warning',
-                            'Lunas' => 'success',
-                            default => 'gray'
-                        };
+                TextColumn::make('createdBy.name')
+                    ->label('Created By')
+                    ->searchable()
+                    ->sortable()
+                    ->default('System'),
+                    
+                TextColumn::make('invoice.fromModel.createdBy.name')
+                    ->label('SO Created By')
+                    ->getStateUsing(function ($record) {
+                        return $record->invoice->fromModel?->createdBy?->name ?? 'System';
                     })
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    })
-                    ->badge()
-                    ->sortable(),
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw("
+                            (SELECT name FROM users WHERE users.id = (
+                                SELECT created_by FROM sale_orders WHERE sale_orders.id = invoices.from_model_id
+                            )) {$direction}
+                        ");
+                    }),
                     
                 TextColumn::make('created_at')
                     ->label('Created At')
@@ -262,11 +275,11 @@ class AccountReceivableResource extends Resource
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
                                     ->numeric()
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
                                     ->numeric()
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -306,9 +319,9 @@ class AccountReceivableResource extends Resource
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DatePicker::make('created_from')
-                                    ->label('Created From'),
+                                    ->label('Start Date'),
                                 Forms\Components\DatePicker::make('created_until')
-                                    ->label('Created Until'),
+                                    ->label('End Date'),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -358,30 +371,33 @@ class AccountReceivableResource extends Resource
                         return $indicators;
                     }),
                     
-                Tables\Filters\SelectFilter::make('overdue_days')
-                    ->label('Overdue Period')
-                    ->options([
-                        '1-30' => '1-30 Days',
-                        '31-60' => '31-60 Days',
-                        '60+' => '60+ Days',
+                Tables\Filters\Filter::make('invoice_date_range')
+                    ->form([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\DatePicker::make('invoice_from')
+                                    ->label('Invoice Date From'),
+                                Forms\Components\DatePicker::make('invoice_until')
+                                    ->label('Invoice Date Until'),
+                            ])
                     ])
-                    ->query(function (Builder $query, $data) {
-                        if (!$data['value']) return $query;
-                        
+                    ->query(function (Builder $query, array $data): Builder {
                         return $query->whereHas('invoice', function (Builder $query) use ($data) {
-                            $now = now();
-                            switch ($data['value']) {
-                                case '1-30':
-                                    $query->whereBetween('due_date', [$now->copy()->subDays(30), $now->copy()->subDay()]);
-                                    break;
-                                case '31-60':
-                                    $query->whereBetween('due_date', [$now->copy()->subDays(60), $now->copy()->subDays(31)]);
-                                    break;
-                                case '60+':
-                                    $query->where('due_date', '<', $now->copy()->subDays(60));
-                                    break;
-                            }
-                        })->where('status', 'Belum Lunas');
+                            $query->when($data['invoice_from'], fn (Builder $query, $date): Builder => 
+                                    $query->whereDate('invoice_date', '>=', $date))
+                                ->when($data['invoice_until'], fn (Builder $query, $date): Builder => 
+                                    $query->whereDate('invoice_date', '<=', $date));
+                        });
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['invoice_from'] ?? null) {
+                            $indicators['invoice_from'] = 'Invoice from: ' . \Carbon\Carbon::parse($data['invoice_from'])->toFormattedDateString();
+                        }
+                        if ($data['invoice_until'] ?? null) {
+                            $indicators['invoice_until'] = 'Invoice until: ' . \Carbon\Carbon::parse($data['invoice_until'])->toFormattedDateString();
+                        }
+                        return $indicators;
                     }),
             ])
             ->actions([

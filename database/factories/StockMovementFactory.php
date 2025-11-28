@@ -13,14 +13,28 @@ class StockMovementFactory extends Factory
 {
     public function definition(): array
     {
-        $type = ['purchase' => 'purchase', 'sales' => 'sales', 'transfer_in' => 'transfer_in', 'transfer_out' => 'transfer_out', 'manufacture_in' => 'manufacture_in', 'manufacture_out' => 'manufacture_out', 'adjustment' => 'adjustment'];
+        $type = collect([
+            'purchase_in',
+            'sales',
+            'transfer_in',
+            'transfer_out',
+            'manufacture_in',
+            'manufacture_out',
+            'adjustment_in',
+            'adjustment_out',
+        ])->random();
+
+        $value = $this->faker->randomFloat(2, 100, 1_000);
+
         return [
             'product_id' => Product::factory(),
             'warehouse_id' => Warehouse::factory(),
             'quantity' => $this->faker->numberBetween(10, 100),
-            'type' => array_rand($type),
+            'value' => $value,
+            'type' => $type,
             'reference_id' => $this->faker->word(),
-            'date' => $this->faker->dateTime()
+            'date' => $this->faker->dateTime(),
+            'meta' => ['faker' => true],
         ];
     }
 }

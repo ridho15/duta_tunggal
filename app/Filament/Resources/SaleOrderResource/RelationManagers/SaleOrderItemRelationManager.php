@@ -39,7 +39,7 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $product = Product::find($state);
                                 $set('unit_price', $product->sell_price);
-                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                             })
                             ->helperText(function ($get) {
                                 if (!$get('product_id')) return null;
@@ -59,7 +59,7 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->numeric()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
+                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax'), $get('tipe_pajak') ?? null));
                             })
                             ->helperText(function ($get) {
                                 if (!$get('product_id') || !$get('quantity')) return null;
@@ -95,18 +95,18 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
+                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state, $get('tipe_pajak') ?? null));
                             })
-                            ->prefix('Rp.'),
+                            ->indonesianMoney(),
                         TextInput::make('discount')
                             ->label('Discount')
                             ->numeric()
                             ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                             })
-                            ->prefix('Rp.'),
+                            ->indonesianMoney(),
                         TextInput::make('tax')
                             ->label('Tax')
                             ->numeric()
@@ -115,13 +115,13 @@ class SaleOrderItemRelationManager extends RelationManager
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                             })
                             ->default(0)
-                            ->prefix('Rp.'),
+                            ->indonesianMoney(),
                         TextInput::make('subtotal')
                             ->label('Sub Total')
                             ->reactive()
                             ->readOnly()
                             ->default(0)
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                     ])
             ]);
     }
@@ -180,7 +180,7 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->sortable(false),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
@@ -192,9 +192,9 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('id')
                     ->label('Sub Total')
-                    ->money('idr')
+                    ->money('IDR')
                     ->formatStateUsing(function ($record) {
-                        $hasil = HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax);
+                        $hasil = HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, $record->tipe_pajak ?? null);
                         return "Rp. " . number_format($hasil, 2, ',', '.');
                     })
                     ->sortable(),

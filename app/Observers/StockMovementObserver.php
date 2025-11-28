@@ -25,10 +25,13 @@ class StockMovementObserver
             ]);
         }
 
-        if ($stockMovement->type == 'transfer_in' || $stockMovement->type == 'manufacture_in') {
+        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
+        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
+
+        if (in_array($stockMovement->type, $inTypes, true)) {
             $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
             $inventoryStock->save();
-        } elseif ($stockMovement->type = 'transfer_out' || $stockMovement->type == 'manufacture_out') {
+        } elseif (in_array($stockMovement->type, $outTypes, true)) {
             $inventoryStock->qty_available = $inventoryStock->qty_available - $stockMovement->quantity;
             $inventoryStock->save();
         }

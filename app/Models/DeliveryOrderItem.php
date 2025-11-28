@@ -40,6 +40,11 @@ class DeliveryOrderItem extends Model
         return $this->belongsTo(SaleOrderItem::class, 'sale_order_item_id')->withDefault();
     }
 
+    public function stockMovement()
+    {
+        return $this->morphOne(StockMovement::class, 'from_model')->withDefault();
+    }
+
     protected static function booted()
     {
         static::saving(function ($deliveryOrderItem) {

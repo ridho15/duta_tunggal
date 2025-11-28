@@ -5,18 +5,42 @@ namespace App\Providers;
 use App\Models\CustomerReceiptItem;
 use App\Models\Deposit;
 use App\Models\DepositLog;
+use App\Models\FinishedGoodsCompletion;
 use App\Models\Invoice;
 use App\Models\ManufacturingOrder;
+use App\Models\MaterialIssue;
+use App\Models\MaterialIssueItem;
+use App\Models\Product;
+use App\Models\Production;
 use App\Models\StockMovement;
+use App\Models\StockReservation;
 use App\Models\VendorPaymentDetail;
+use App\Models\VendorPayment;
+use App\Models\VoucherRequest;
+use App\Models\Asset;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseReceipt;
+use App\Models\JournalEntry;
 use App\Observers\CustomerReceiptItemObserver;
 use App\Observers\DepositLogObserser;
 use App\Observers\DepositObserver;
+use App\Observers\FinishedGoodsCompletionObserver;
 use App\Observers\GlobalActivityObserver;
 use App\Observers\InvoiceObserver;
+use App\Observers\JournalEntryObserver;
 use App\Observers\ManufacturingOrder as ObserversManufacturingOrder;
+use App\Observers\MaterialIssueObserver;
+use App\Observers\MaterialIssueItemObserver;
+use App\Observers\ProductObserver;
+use App\Observers\ProductionObserver;
 use App\Observers\StockMovementObserver;
+use App\Observers\StockReservationObserver;
 use App\Observers\VendorPaymentDetailObserver;
+use App\Observers\VoucherRequestObserver;
+use App\Observers\AssetObserver;
+use App\Observers\VendorPaymentObserver;
+use App\Observers\PurchaseOrderObserver;
+use App\Observers\PurchaseReceiptObserver;
 use App\Services\CabangService;
 use App\Services\ChartOfAccountService;
 use App\Services\CustomerService;
@@ -41,6 +65,9 @@ use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
+use Filament\Tables\Table;
+use Filament\Forms\Components\TextInput;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -52,66 +79,118 @@ class AppServiceProvider extends ServiceProvider
         $loader = AliasLoader::getInstance();
         $loader->alias('Debugbar', Debugbar::class);
 
-        $this->app->bind(QualityControlService::class, function ($app) {
-            return new QualityControlService;
+        // Ensure Filament classes are loaded before registering macros
+        class_exists(\Filament\Forms\Components\TextInput::class);
+        class_exists(\Filament\Tables\Table::class);
+
+        // Register Filament macros
+        $this->registerFilamentMacros();
+    }
+
+    protected function registerFilamentMacros(): void
+    {
+        // Log that we're registering macros
+        \Illuminate\Support\Facades\Log::info('Registering Filament macros in AppServiceProvider');
+
+        // Pastikan tampilan angka uang di Table menggunakan format Indonesia
+        Table::$defaultCurrency = 'IDR';
+        Table::$defaultNumberLocale = 'id';
+
+        // Deklarasi mask global untuk input uang menggunakan format Indonesia
+        TextInput::macro('indonesianMoney', function (): TextInput {
+            /** @var TextInput $this */
+            return $this
+                ->prefix('Rp')
+                ->placeholder('500.000')
+                ->formatStateUsing(function ($state) {
+                    if ($state === null || $state === '') {
+                        return '0';
+                    }
+
+                    // Normalize and parse different possible input formats:
+                    // - "100.000" (thousand separator)
+                    // - "100000.00" (dot as decimal)
+                    // - "100,000.00" or "100.000,00" (mixed separators)
+                    $str = (string) $state;
+                    // Keep only digits, dots and commas
+                    $clean = preg_replace('/[^\d\.,]/', '', $str);
+                    if ($clean === '') {
+                        return '0';
+                    }
+
+                    // If both separators present, assume '.' thousands and ',' decimal
+                    if (strpos($clean, '.') !== false && strpos($clean, ',') !== false) {
+                        $clean = str_replace('.', '', $clean); // remove thousands
+                        $clean = str_replace(',', '.', $clean); // make decimal dot
+                    } elseif (substr_count($clean, '.') > 1) {
+                        // multiple dots -> dots are thousands separators
+                        $clean = str_replace('.', '', $clean);
+                    } elseif (strpos($clean, '.') !== false) {
+                        // single dot: decide if it's thousands (last group length 3)
+                        $parts = explode('.', $clean);
+                        $last = end($parts);
+                        if (strlen($last) === 3) {
+                            // treat dot as thousands separator
+                            $clean = str_replace('.', '', $clean);
+                        }
+                        // otherwise keep dot as decimal separator
+                    } elseif (strpos($clean, ',') !== false) {
+                        // only comma present: decide if it's thousands (group length 3)
+                        $parts = explode(',', $clean);
+                        $last = end($parts);
+                        if (strlen($last) === 3) {
+                            // treat comma as thousands
+                            $clean = str_replace(',', '', $clean);
+                        } else {
+                            // treat comma as decimal separator
+                            $clean = str_replace(',', '.', $clean);
+                        }
+                    }
+
+                    // Parse to float then format as integer rupiah string (no decimals)
+                    $value = (float) $clean;
+                    return number_format((float)$value, 0, ',', '.');
+                })
+                ->dehydrateStateUsing(function ($state) {
+                    if ($state === null || $state === '') {
+                        return 0;
+                    }
+
+                    $str = (string) $state;
+                    $clean = preg_replace('/[^\d\.,]/', '', $str);
+                    if ($clean === '') {
+                        return 0;
+                    }
+
+                    if (strpos($clean, '.') !== false && strpos($clean, ',') !== false) {
+                        $clean = str_replace('.', '', $clean);
+                        $clean = str_replace(',', '.', $clean);
+                    } elseif (substr_count($clean, '.') > 1) {
+                        $clean = str_replace('.', '', $clean);
+                    } elseif (strpos($clean, '.') !== false) {
+                        $parts = explode('.', $clean);
+                        $last = end($parts);
+                        if (strlen($last) === 3) {
+                            $clean = str_replace('.', '', $clean);
+                        }
+                    } elseif (strpos($clean, ',') !== false) {
+                        $parts = explode(',', $clean);
+                        $last = end($parts);
+                        if (strlen($last) === 3) {
+                            $clean = str_replace(',', '', $clean);
+                        } else {
+                            $clean = str_replace(',', '.', $clean);
+                        }
+                    }
+
+                    // Convert to float then round to nearest whole rupiah and return int
+                    $value = (float) $clean;
+                    return (int) round($value);
+                });
+                // ->helperText('Format: 500.000 (gunakan titik sebagai pemisah ribuan)');
         });
-        $this->app->bind(ManufacturingService::class, function ($app) {
-            return new ManufacturingService;
-        });
-        $this->app->bind(SalesOrderService::class, function ($app) {
-            return new SalesOrderService;
-        });
-        $this->app->bind(QuotationService::class, function ($app) {
-            return new QuotationService;
-        });
-        $this->app->bind(DeliveryOrderService::class, function ($app) {
-            return new DeliveryOrderService;
-        });
-        $this->app->bind(ReturnProductService::class, function ($app) {
-            return new ReturnProductService;
-        });
-        $this->app->bind(DeliveryOrderItemService::class, function ($app) {
-            return new DeliveryOrderItemService;
-        });
-        $this->app->bind(OrderRequestService::class, function ($app) {
-            return new OrderRequestService;
-        });
-        $this->app->bind(PurchaseOrderService::class, function ($app) {
-            return new PurchaseOrderService;
-        });
-        $this->app->bind(PurchaseReceiptService::class, function ($app) {
-            return new PurchaseReceiptService;
-        });
-        $this->app->bind(ProductService::class, function ($app) {
-            return new ProductService;
-        });
-        $this->app->bind(PurchaseReturnService::class, function ($app) {
-            return new PurchaseReturnService;
-        });
-        $this->app->bind(InvoiceService::class, function ($app) {
-            return new InvoiceService;
-        });
-        $this->app->bind(ProductionService::class, function ($app) {
-            return new ProductionService;
-        });
-        $this->app->bind(ChartOfAccountService::class, function ($app) {
-            return new ChartOfAccountService;
-        });
-        $this->app->bind(WarehouseService::class, function ($app) {
-            return new WarehouseService;
-        });
-        $this->app->bind(SupplierService::class, function ($app) {
-            return new SupplierService;
-        });
-        $this->app->bind(CustomerService::class, function ($app) {
-            return new CustomerService;
-        });
-        $this->app->bind(CabangService::class, function ($app) {
-            return new CabangService;
-        });
-        $this->app->bind(SuratJalanService::class, function ($app) {
-            return new SuratJalanService;
-        });
+
+        \Illuminate\Support\Facades\Log::info('indonesianMoney macro registered in AppServiceProvider');
     }
 
     /**
@@ -120,11 +199,34 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         StockMovement::observe(StockMovementObserver::class);
+        StockReservation::observe(StockReservationObserver::class);
         ManufacturingOrder::observe(ObserversManufacturingOrder::class);
+        MaterialIssue::observe(MaterialIssueObserver::class);
+        MaterialIssueItem::observe(MaterialIssueItemObserver::class);
+        Production::observe(ProductionObserver::class);
+        FinishedGoodsCompletion::observe(FinishedGoodsCompletionObserver::class);
         Invoice::observe(InvoiceObserver::class);
+        VendorPayment::observe(VendorPaymentObserver::class);
         VendorPaymentDetail::observe(VendorPaymentDetailObserver::class);
         CustomerReceiptItem::observe(CustomerReceiptItemObserver::class);
         Deposit::observe(DepositObserver::class);
         DepositLog::observe(DepositLogObserser::class);
+        VoucherRequest::observe(VoucherRequestObserver::class);
+        Asset::observe(AssetObserver::class);
+        PurchaseReceipt::observe(PurchaseReceiptObserver::class);
+        PurchaseOrder::observe(PurchaseOrderObserver::class);
+        Product::observe(ProductObserver::class);
+        JournalEntry::observe(JournalEntryObserver::class);
+
+        // Override Filament's database-notifications Livewire component with
+        // our local subclass to ensure it exposes a public `$data` property.
+        // This avoids Livewire trying to set a non-existent `$data` property
+        // on the vendor component when payloads are mapped incorrectly.
+        Livewire::component('database-notifications', \App\Livewire\DatabaseNotifications::class);
+        // Filament prefixes some component names (for example when used
+        // inside panels). Register the prefixed name as well so any
+        // Livewire updates targeting the prefixed component are handled
+        // by our wrapper too.
+        Livewire::component('filament.livewire.database-notifications', \App\Livewire\DatabaseNotifications::class);
     }
 }

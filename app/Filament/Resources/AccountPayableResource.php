@@ -24,6 +24,8 @@ use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use App\Filament\Resources\AccountPayableResource\RelationManagers;
 
 class AccountPayableResource extends Resource
 {
@@ -31,9 +33,9 @@ class AccountPayableResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Pembelian';
 
-    protected static ?int $navigationSort = 18;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -51,6 +53,8 @@ class AccountPayableResource extends Resource
                                 $invoice = Invoice::find($state);
                                 if ($invoice) {
                                     $set('supplier_id', $invoice->fromModel->supplier_id);
+                                    $set('total', (float) $invoice->total);
+                                    $set('remaining', (float) $invoice->total);
                                 }
                             })
                             ->validationMessages([
@@ -74,19 +78,60 @@ class AccountPayableResource extends Resource
                             ->relationship('supplier', 'name'),
                         TextInput::make('total')
                             ->required()
-                            ->prefix('Rp')
-                            ->numeric(),
+                            ->indonesianMoney()
+                            ->numeric()
+                            ->readonly()
+                            ->reactive()
+                            ->dehydrateStateUsing(function ($state) {
+                                // Ensure total is properly processed for readonly field
+                                if (is_string($state)) {
+                                    // Remove formatting and convert to float
+                                    $cleaned = preg_replace('/[^\d.,]/', '', $state);
+                                    // Handle Indonesian format (dots as thousand separators, comma as decimal)
+                                    $parts = explode(',', $cleaned);
+                                    if (count($parts) > 1) {
+                                        $integer = str_replace('.', '', $parts[0]);
+                                        $decimal = $parts[1];
+                                        return (float)($integer . '.' . $decimal);
+                                    } else {
+                                        $integer = str_replace('.', '', $parts[0]);
+                                        return (float)$integer;
+                                    }
+                                }
+                                return (float)$state;
+                            })
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $total = is_numeric($state) ? (float) $state : 0;
+                                $paid = is_numeric($get('paid')) ? (float) $get('paid') : 0;
+                                $set('remaining', $total - $paid);
+                            })
+                            ->helperText('Total akan terisi otomatis berdasarkan invoice yang dipilih'),
                         TextInput::make('paid')
                             ->required()
-                            ->prefix('Rp')
+                            ->indonesianMoney()
                             ->numeric()
-                            ->default(0.00),
+                            ->default(0.00)
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $total = is_numeric($get('total')) ? (float) $get('total') : 0;
+                                $paid = is_numeric($state) ? (float) $state : 0;
+                                $set('remaining', $total - $paid);
+                            }),
                         TextInput::make('remaining')
                             ->required()
-                            ->prefix('Rp')
-                            ->numeric(),
-                        Checkbox::make('status')
-                            ->label('Lunas / Belum Lunas')
+                            ->indonesianMoney()
+                            ->numeric()
+                            ->reactive()
+                            ->helperText('Sisa pembayaran akan terisi otomatis berdasarkan total invoice'),
+                        Radio::make('status')
+                            ->label('Status Pembayaran')
+                            ->options([
+                                'Belum Lunas' => 'Belum Lunas',
+                                'Lunas' => 'Lunas',
+                            ])
+                            ->default('Belum Lunas')
+                            ->required()
+                            ->inline()
                     ])
             ]);
     }
@@ -94,6 +139,22 @@ class AccountPayableResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (Builder $query) {
+                // Join invoices to allow computed grouping & sorting by overdue status
+                $query->leftJoin('invoices', 'account_payables.invoice_id', '=', 'invoices.id')
+                    ->select('account_payables.*')
+                    ->addSelect(
+                        DB::raw("CASE 
+                            WHEN account_payables.status = 'Lunas' THEN 'PAID'
+                            WHEN invoices.due_date < CURDATE() AND DATEDIFF(CURDATE(), invoices.due_date) > 60 THEN 'OVERDUE 60+ Days'
+                            WHEN invoices.due_date < CURDATE() AND DATEDIFF(CURDATE(), invoices.due_date) > 30 THEN 'OVERDUE 30+ Days'
+                            WHEN invoices.due_date < CURDATE() THEN 'OVERDUE'
+                            ELSE 'CURRENT'
+                        END AS overdue_group")
+                    );
+                // Eager load required relations still
+                return $query->with(['invoice.fromModel']);
+            })
             ->columns([
                 TextColumn::make('invoice.invoice_number')
                     ->label('Invoice Number')
@@ -107,7 +168,12 @@ class AccountPayableResource extends Resource
                         return "({$state->code}) {$state->name}";
                     })
                     ->label('Supplier')
-                    ->searchable(['code', 'name'])
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('supplier', function (Builder $query) use ($search) {
+                            $query->where('code', 'like', "%{$search}%")
+                                  ->orWhere('name', 'like', "%{$search}%");
+                        });
+                    })
                     ->sortable(),
                     
                 TextColumn::make('invoice.invoice_date')
@@ -129,33 +195,34 @@ class AccountPayableResource extends Resource
                 TextColumn::make('total')
                     ->label('Total Amount')
                     ->sortable()
-                    ->money('idr')
+                    ->searchable()
+                    ->money('IDR')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('idr')
+                            ->money('IDR')
                             ->label('Total AP')
                     ]),
                     
                 TextColumn::make('paid')
                     ->label('Paid Amount')
                     ->sortable()
-                    ->money('idr')
+                    ->money('IDR')
                     ->color('success')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('idr')
+                            ->money('IDR')
                             ->label('Total Paid')
                     ]),
                     
                 TextColumn::make('remaining')
                     ->label('Outstanding')
                     ->sortable()
-                    ->money('idr')
+                    ->money('IDR')
                     ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
                     ->weight('bold')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('idr')
+                            ->money('IDR')
                             ->label('Total Outstanding')
                     ]),
                     
@@ -189,6 +256,25 @@ class AccountPayableResource extends Resource
                     })
                     ->badge()
                     ->sortable(),
+                    
+                TextColumn::make('createdBy.name')
+                    ->label('Created By')
+                    ->searchable()
+                    ->sortable()
+                    ->default('System'),
+                    
+                TextColumn::make('invoice.fromModel.createdBy.name')
+                    ->label('PO Created By')
+                    ->getStateUsing(function ($record) {
+                        return $record->invoice->fromModel?->createdBy?->name ?? 'System';
+                    })
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw("
+                            (SELECT name FROM users WHERE users.id = (
+                                SELECT created_by FROM purchase_orders WHERE purchase_orders.id = invoices.from_model_id
+                            )) {$direction}
+                        ");
+                    }),
                     
                 TextColumn::make('created_at')
                     ->label('Created At')
@@ -263,11 +349,11 @@ class AccountPayableResource extends Resource
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
                                     ->numeric()
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
                                     ->numeric()
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -307,9 +393,9 @@ class AccountPayableResource extends Resource
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DatePicker::make('created_from')
-                                    ->label('Created From'),
+                                    ->label('Start Date'),
                                 Forms\Components\DatePicker::make('created_until')
-                                    ->label('Created Until'),
+                                    ->label('End Date'),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -384,6 +470,35 @@ class AccountPayableResource extends Resource
                             }
                         })->where('status', 'Belum Lunas');
                     }),
+                    
+                Tables\Filters\Filter::make('invoice_date_range')
+                    ->form([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\DatePicker::make('invoice_from')
+                                    ->label('Invoice Date From'),
+                                Forms\Components\DatePicker::make('invoice_until')
+                                    ->label('Invoice Date Until'),
+                            ])
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->whereHas('invoice', function (Builder $query) use ($data) {
+                            $query->when($data['invoice_from'], fn (Builder $query, $date): Builder => 
+                                    $query->whereDate('invoice_date', '>=', $date))
+                                ->when($data['invoice_until'], fn (Builder $query, $date): Builder => 
+                                    $query->whereDate('invoice_date', '<=', $date));
+                        });
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['invoice_from'] ?? null) {
+                            $indicators['invoice_from'] = 'Invoice from: ' . \Carbon\Carbon::parse($data['invoice_from'])->toFormattedDateString();
+                        }
+                        if ($data['invoice_until'] ?? null) {
+                            $indicators['invoice_until'] = 'Invoice until: ' . \Carbon\Carbon::parse($data['invoice_until'])->toFormattedDateString();
+                        }
+                        return $indicators;
+                    }),
             ])
             ->actions([
                 ActionGroup::make([
@@ -400,7 +515,7 @@ class AccountPayableResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\PaymentHistoryRelationManager::class,
         ];
     }
 
@@ -414,6 +529,7 @@ class AccountPayableResource extends Resource
         return [
             'index' => Pages\ListAccountPayables::route('/'),
             'create' => Pages\CreateAccountPayable::route('/create'),
+            'view' => Pages\ViewAccountPayable::route('/{record}'),
             'edit' => Pages\EditAccountPayable::route('/{record}/edit'),
         ];
     }

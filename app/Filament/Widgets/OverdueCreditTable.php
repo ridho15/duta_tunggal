@@ -40,14 +40,14 @@ class OverdueCreditTable extends BaseWidget
                     ->searchable(),
                 Tables\Columns\TextColumn::make('kredit_limit')
                     ->label('Kredit Limit')
-                    ->money('idr'),
+                    ->money('IDR'),
                 Tables\Columns\TextColumn::make('current_usage')
                     ->label('Kredit Terpakai')
                     ->getStateUsing(function (Customer $record): float {
                         $creditService = app(CreditValidationService::class);
                         return $creditService->getCurrentCreditUsage($record);
                     })
-                    ->money('idr'),
+                    ->money('IDR'),
                 Tables\Columns\TextColumn::make('overdue_count')
                     ->label('Jml Jatuh Tempo')
                     ->getStateUsing(function (Customer $record): int {
@@ -62,7 +62,7 @@ class OverdueCreditTable extends BaseWidget
                         $creditService = app(CreditValidationService::class);
                         return $creditService->getOverdueInvoices($record)->sum('total');
                     })
-                    ->money('idr')
+                    ->money('IDR')
                     ->color('danger'),
                 Tables\Columns\TextColumn::make('oldest_overdue')
                     ->label('Jatuh Tempo Tertua')

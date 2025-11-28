@@ -5,15 +5,18 @@ namespace App\Filament\Resources\PurchaseReceiptResource\RelationManagers;
 use App\Models\Currency;
 use App\Models\QualityControl;
 use App\Services\QualityControlService;
+use App\Services\PurchaseReceiptService;
+use App\Http\Controllers\HelperController;
 use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
+use App\Notifications\FilamentDatabaseNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
+use Filament\Facades\Filament;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -28,6 +31,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\Auth;
 
 class PurchaseReceiptItemRelationManager extends RelationManager
 {
@@ -48,105 +52,46 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                             $query->where('purchase_order_id', $purchaseOrderId);
                         });
                     })
-                    ->reactive()
-                    ->getOptionLabelFromRecordUsing(function ($record) {
-                        return "{$record->sku} - {$record->name}";
-                    }),
-                Select::make('warehouse_id')
-                    ->label('Gudang')
-                    ->preload()
-                    ->searchable()
-                    ->relationship('warehouse', 'name'),
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->name} ({$record->code})"),
                 TextInput::make('qty_received')
                     ->label('Quantity Received')
                     ->numeric()
-                    ->required()
-                    ->reactive()
-                    ->afterStateUpdated(function ($state, $set, $get) {
-                        $qtyReceived = (float) ($state ?? 0);
-                        $qtyAccepted = (float) ($get('qty_accepted') ?? 0);
-                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
-                        $set('qty_rejected', $qtyRejected);
-                    })
-                    ->default(0),
+                    ->required(),
                 TextInput::make('qty_accepted')
                     ->label('Quantity Accepted')
                     ->numeric()
-                    ->reactive()
-                    ->afterStateUpdated(function ($state, $set, $get, $component) {
-                        $qtyReceived = (float) ($get('qty_received') ?? 0);
-                        $qtyAccepted = (float) ($state ?? 0);
-                        
-                        // Validation: qty_accepted cannot exceed qty_received
-                        if ($qtyAccepted > $qtyReceived) {
-                            $component->state($qtyReceived);
-                            $qtyAccepted = $qtyReceived;
-                            
-                            \Filament\Notifications\Notification::make()
-                                ->title('Peringatan')
-                                ->body("Quantity Accepted tidak boleh melebihi Quantity Received ({$qtyReceived})")
-                                ->warning()
-                                ->send();
-                        }
-                        
-                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
-                        $set('qty_rejected', $qtyRejected);
-                    })
-                    ->default(0)
                     ->required(),
                 TextInput::make('qty_rejected')
                     ->label('Quantity Rejected')
-                    ->numeric()
-                    ->helperText("Otomatis dihitung dari Qty Received - Qty Accepted")
-                    ->disabled()
-                    ->dehydrated(true)
-                    ->default(0),
-                Repeater::make('purchaseReceiptItemPhoto')
-                    ->relationship()
-                    ->addActionLabel('Tambah Photo')
-                    ->schema([
-                        FileUpload::make('photo_url')
-                            ->label('Photo')
-                            ->image()
-                            ->maxSize(1024)
-                            ->required(),
-                    ]),
+                    ->numeric(),
+                Select::make('warehouse_id')
+                    ->label('Warehouse')
+                    ->relationship('warehouse', 'name')
+                    ->required(),
+                Select::make('rak_id')
+                    ->label('Rak')
+                    ->relationship('rak', 'name'),
+                TextInput::make('reason_rejected')
+                    ->label('Reason Rejected'),
+                FileUpload::make('photos')
+                    ->label('Photos')
+                    ->multiple()
+                    ->directory('purchase-receipt-items')
+                    ->visibility('public'),
             ]);
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('id')
+            ->recordTitleAttribute('product.name')
             ->columns([
-                TextColumn::make('is_sent')
-                    ->label('Terkirim?')
-                    ->badge()
-                    ->color(function ($state) {
-                        if ($state == 0) {
-                            return 'gray';
-                        } else {
-                            return 'success';
-                        }
-                    })
-                    ->formatStateUsing(function ($state) {
-                        if ($state == 1) {
-                            return "Terkirim QC";
-                        } else {
-                            return "Belum Terkirim QC";
-                        }
-                    }),
-                TextColumn::make('product')
+                TextColumn::make('product.name')
                     ->label('Product')
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->sku}) {$state->name}";
-                    })->searchable(),
-                TextColumn::make('warehouse.name')
-                    ->label('Warehouse')
-                    ->searchable(),
-                TextColumn::make('rak.name')
-                    ->label('Rak')
-                    ->searchable(),
+                    ->formatStateUsing(function ($record) {
+                        return '(' . $record->product->sku . ') ' . $record->product->name;
+                    })
+                    ->sortable(),
                 TextColumn::make('qty_received')
                     ->label('Quantity Received')
                     ->sortable(),
@@ -156,22 +101,80 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                 TextColumn::make('qty_rejected')
                     ->label('Quantity Rejected')
                     ->sortable(),
+                TextColumn::make('warehouse.name')
+                    ->label('Warehouse')
+                    ->formatStateUsing(function ($record) {
+                        if ($record->warehouse) {
+                            return '(' . $record->warehouse->kode . ') ' . $record->warehouse->name;
+                        }
+                        return '';
+                    })
+                    ->sortable(),
+                TextColumn::make('rak.name')
+                    ->label('Rak')
+                    ->sortable(),
+                IconColumn::make('is_sent')
+                    ->label('Sent to QC')
+                    ->boolean()
+                    ->getStateUsing(function ($record) {
+                        // dd($record->qualityControl()->exists());
+                        return $record->qualityControl()->exists() && $record->is_sent == 1;
+                    }),
                 ImageColumn::make('purchaseReceiptItemPhoto.photo_url')
-                    ->label('Photo')
-                    ->size(75)
-                    ->circular()
-                    ->stacked(),
+                    ->label('Photos')
+                    ->circular(),
             ])
             ->filters([
                 //
             ])
             ->headerActions([
-                CreateAction::make()
-                    ->label('Add Item')
-                    ->icon('heroicon-o-plus-circle'),
+                CreateAction::make(),
             ])
             ->actions([
                 ActionGroup::make([
+                    Action::make('send_to_qc')
+                        ->label('Kirim ke Quality Control')
+                        ->icon('heroicon-o-arrow-right-circle')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Kirim ke Quality Control')
+                        ->modalDescription('Apakah Anda yakin ingin mengirim item ini ke Quality Control? Tindakan ini tidak dapat dibatalkan.')
+                        ->modalSubmitActionLabel('Ya, Kirim ke QC')
+                        ->action(function ($record) {
+                            // Check if already sent to QC
+                            if ($record->qualityControl()->exists()) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Sudah dikirim ke QC')
+                                    ->body('Item ini sudah dikirim ke Quality Control.')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
+                            // Create Quality Control record
+                            $qcService = app(QualityControlService::class);
+                            $qcData = [
+                                'passed_quantity' => 0, // Start with 0, will be determined by QC inspection
+                                'rejected_quantity' => $record->qty_rejected ?? 0,
+                                'warehouse_id' => $record->warehouse_id,
+                                'rak_id' => $record->rak_id,
+                                'inspected_by' => Auth::id(),
+                            ];
+
+                            $qc = $qcService->createQCFromPurchaseReceiptItem($record, $qcData);
+
+                            // Update is_sent status
+                            $record->update(['is_sent' => 1]);
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Berhasil dikirim ke QC')
+                                ->body('Item berhasil dikirim ke Quality Control.')
+                                ->success()
+                                ->send();
+                        })
+                        ->visible(function ($record) {
+                            return !$record->qualityControl()->exists() && $record->qty_received > 0;
+                        }),
                     EditAction::make()
                         ->color('success')
                         ->hidden(function ($record) {
@@ -180,27 +183,6 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                     DeleteAction::make()
                         ->hidden(function ($record) {
                             return $record->is_sent == 1;
-                        }),
-                    Action::make('kirim_qc')
-                        ->label('Kirim QC')
-                        ->color('success')
-                        ->hidden(function ($record) {
-                            return $record->is_sent == 1;
-                        })
-                        ->icon('heroicon-o-paper-airplane')
-                        ->requiresConfirmation()
-                        ->action(function ($record) {
-                            $qualityControlService = app(QualityControlService::class);
-                            $record->update([
-                                'is_sent' => 1
-                            ]);
-
-                            $qualityControlService->createQCFromPurchaseReceiptItem($record);
-                            Notification::make()
-                                ->title("Success")
-                                ->color('success')
-                                ->body('Berhasil mengirimkan data ke quality control')
-                                ->send();
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)

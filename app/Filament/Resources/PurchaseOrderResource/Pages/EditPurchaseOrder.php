@@ -107,4 +107,30 @@ class EditPurchaseOrder extends EditRecord
     {
         return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
     }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $record = $this->getRecord();
+        $total = 0;
+
+        if ($record) {
+            foreach ($record->purchaseOrderItem as $item) {
+                $total += HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);
+            }
+
+            foreach ($record->purchaseOrderBiaya as $biaya) {
+                $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
+                $total += $biayaAmount;
+            }
+        }
+
+        $data['total_amount'] = $total;
+
+        return $data;
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return $data;
+    }
 }

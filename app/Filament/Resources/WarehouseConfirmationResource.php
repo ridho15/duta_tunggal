@@ -24,7 +24,7 @@ class WarehouseConfirmationResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 12;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {

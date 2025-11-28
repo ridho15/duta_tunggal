@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();
             $table->string('name');
-            $table->enum('type', ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']);
+            $table->enum('type', ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense', 'Contra Asset']);
             $table->integer('level')->default(1);
             $table->integer('parent_id')->nullable();
             $table->boolean('is_active')->default(true);

@@ -29,9 +29,9 @@ class AgeingScheduleResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Akuntansi';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 15;
 
     public static function form(Form $form): Form
     {

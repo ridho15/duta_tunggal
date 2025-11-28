@@ -20,8 +20,30 @@ class ReturnProductItemFactory extends Factory
     public function definition(): array
     {
         $returnProduct = ReturnProduct::has('warehouse.rak')->inRandomOrder()->first();
-        $deliveryOrderItem = $returnProduct->fromModel->deliveryOrderItem()->where('quantity', '>', 1)->inRandomOrder()->first();
+
+        // Find a valid delivery order item
+        $deliveryOrderItem = null;
+        if ($returnProduct && $returnProduct->fromModel) {
+            $deliveryOrderItem = $returnProduct->fromModel->deliveryOrderItem()->where('quantity', '>', 1)->inRandomOrder()->first();
+        }
+
+        // If no valid delivery order item found, create a fallback
+        if (!$deliveryOrderItem) {
+            // Find any delivery order item or create one
+            $deliveryOrderItem = DeliveryOrderItem::where('quantity', '>', 1)->inRandomOrder()->first();
+
+            if (!$deliveryOrderItem) {
+                // Create a delivery order item if none exists
+                $deliveryOrder = \App\Models\DeliveryOrder::factory()->create();
+                $deliveryOrderItem = \App\Models\DeliveryOrderItem::factory()->create([
+                    'delivery_order_id' => $deliveryOrder->id,
+                    // Don't specify quantity here - let DeliveryOrderItemFactory calculate it
+                ]);
+            }
+        }
+
         $rakId = $returnProduct->warehouse->rak()->inRandomOrder()->first()->id;
+
         return [
             'return_product_id' => $returnProduct->id,
             'from_item_model_id' => $deliveryOrderItem->id,

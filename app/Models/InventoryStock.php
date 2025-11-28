@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Observers\InventoryStockObserver;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,13 @@ class InventoryStock extends Model
         'rak_id', // nullable,
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::observe(InventoryStockObserver::class);
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
@@ -33,5 +41,13 @@ class InventoryStock extends Model
     public function rak()
     {
         return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+    }
+
+    /**
+     * Get the qty_on_hand attribute (available - reserved).
+     */
+    public function getQtyOnHandAttribute()
+    {
+        return $this->qty_available - $this->qty_reserved;
     }
 }

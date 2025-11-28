@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Deposit;
 use App\Models\DepositLog;
 use Illuminate\Support\Facades\Auth;
+use App\Services\LedgerPostingService;
 
 class DepositObserver
 {
@@ -18,6 +19,19 @@ class DepositObserver
             'amount' => $deposit->amount,
             'created_by' => Auth::user()->id
         ]);
+
+        // Post deposit to ledger to ensure journal entries exist for all creation paths
+        // DISABLED: Journal entries are now handled by CreateDeposit::afterCreate()
+        // to avoid duplication
+        /*
+        try {
+            $ledger = new LedgerPostingService();
+            $ledger->postDeposit($deposit);
+        } catch (\Throwable $e) {
+            // Log but don't break the request flow
+            \Illuminate\Support\Facades\Log::error('Failed posting deposit to ledger: ' . $e->getMessage(), ['deposit_id' => $deposit->id]);
+        }
+        */
     }
 
     /**

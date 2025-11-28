@@ -8,7 +8,9 @@ use App\Models\Product;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceiptItem;
 use App\Models\User;
+use App\Models\InventoryStock;
 use App\Services\QualityControlService;
+use App\Services\ProductService;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
@@ -31,9 +33,15 @@ class PurchaseReceiptItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-chevron-up-down';
 
-    protected static ?string $navigationGroup = 'Pembelian';
+    // Put Purchase Receipt Item under the Purchase Order group
+    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 2;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function form(Form $form): Form
     {
@@ -112,7 +120,7 @@ class PurchaseReceiptItemResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('is_sent')
-                    ->label('Terkirim?')
+                    ->label('Status Stock')
                     ->badge()
                     ->color(function ($state) {
                         if ($state == 0) {
@@ -123,9 +131,9 @@ class PurchaseReceiptItemResource extends Resource
                     })
                     ->formatStateUsing(function ($state) {
                         if ($state == 1) {
-                            return "Terkirim QC";
+                            return "Sudah Masuk Stock";
                         } else {
-                            return "Belum Terkirim QC";
+                            return "Belum Masuk Stock";
                         }
                     }),
                 TextColumn::make('purchaseReceipt.receipt_number')
@@ -185,34 +193,7 @@ class PurchaseReceiptItemResource extends Resource
                 EditAction::make()
                     ->color('success')
                     ->hidden(function ($record) {
-                        return $record->is_sent == 1;
-                    }),
-                Action::make('kirim_qc')
-                    ->label('Kirim QC')
-                    ->color('success')
-                    ->hidden(function ($record) {
-                        return $record->is_sent == 1;
-                    })
-                    ->icon('heroicon-o-paper-airplane')
-                    ->requiresConfirmation()
-                    ->form([
-                        Select::make('inspected_by')
-                            ->label('Inspected By')
-                            ->preload()
-                            ->searchable()
-                            ->options(function () {
-                                return User::select(['name', 'id'])->get()->pluck('name', 'id');
-                            })
-                            ->required()
-                    ])
-                    ->action(function (array $data, $record) {
-                        $qualityControlService = app(QualityControlService::class);
-                        $record->update([
-                            'is_sent' => 1
-                        ]);
-
-                        $qualityControlService->createQCFromPurchaseReceiptItem($record, $data);
-                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: 'Berhasil mengirimkan data ke quality control');
+                        return $record->is_sent == 1 || $record->qualityControl()->where('status', 1)->exists();
                     }),
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([]);

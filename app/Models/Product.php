@@ -28,14 +28,23 @@ class Product extends Model
         'kode_merk',
         'description',
         'uom_id', // Satuan
-        'is_asset',
         'is_manufacture',
+        'is_raw_material',
+        'inventory_coa_id',
+        'sales_coa_id',
+        'sales_return_coa_id',
+        'sales_discount_coa_id',
+        'goods_delivery_coa_id',
+        'cogs_coa_id',
+        'purchase_return_coa_id',
+        'unbilled_purchase_coa_id',
+        'temporary_procurement_coa_id',
         'is_active',
     ];
 
     protected $casts = [
-        'is_asset' => 'boolean',
-        'is_manufacture' => 'boolean', 
+        'is_manufacture' => 'boolean',
+        'is_raw_material' => 'boolean',
         'is_active' => 'boolean',
         'cost_price' => 'decimal:2',
         'sell_price' => 'decimal:2',
@@ -76,6 +85,51 @@ class Product extends Model
     public function uom()
     {
         return $this->belongsTo(UnitOfMeasure::class, 'uom_id')->withDefault();
+    }
+
+    public function inventoryCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'inventory_coa_id')->withDefault();
+    }
+
+    public function salesCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'sales_coa_id')->withDefault();
+    }
+
+    public function salesReturnCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'sales_return_coa_id')->withDefault();
+    }
+
+    public function salesDiscountCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'sales_discount_coa_id')->withDefault();
+    }
+
+    public function goodsDeliveryCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'goods_delivery_coa_id')->withDefault();
+    }
+
+    public function cogsCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'cogs_coa_id')->withDefault();
+    }
+
+    public function purchaseReturnCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'purchase_return_coa_id')->withDefault();
+    }
+
+    public function unbilledPurchaseCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'unbilled_purchase_coa_id')->withDefault();
+    }
+
+    public function temporaryProcurementCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'temporary_procurement_coa_id')->withDefault();
     }
 
     public function stockMovement()

@@ -17,4 +17,9 @@ class ViewDeposit extends ViewRecord
                 ->icon('heroicon-o-pencil-square')
         ];
     }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return $data;
+    }
 }

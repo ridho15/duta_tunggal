@@ -48,17 +48,17 @@ class DepositByEntityWidget extends BaseWidget
                     
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Total Deposit')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('used_amount')
                     ->label('Used')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('remaining_amount')
                     ->label('Available')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable()
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger'),
                     

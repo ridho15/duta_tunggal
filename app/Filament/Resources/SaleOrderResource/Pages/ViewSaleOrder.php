@@ -144,7 +144,7 @@ class ViewSaleOrder extends ViewRecord
                             return [
                                 TextInput::make('titip_saldo')
                                     ->numeric()
-                                    ->prefix('Rp.')
+                                    ->indonesianMoney()
                                     ->required()
                                     ->default(0),
                                 Select::make('coa_id')
@@ -163,7 +163,7 @@ class ViewSaleOrder extends ViewRecord
                             return [
                                 TextInput::make('titip_saldo')
                                     ->numeric()
-                                    ->prefix('Rp.')
+                                    ->indonesianMoney()
                                     ->required()
                                     ->default(0),
                                 Textarea::make('note')

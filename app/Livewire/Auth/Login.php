@@ -43,7 +43,10 @@ class Login extends Component
         RateLimiter::clear($this->throttleKey());
         Session::regenerate();
 
-        $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
+    // After successful login, prefer the Filament admin dashboard as the
+    // default destination. Keep `redirectIntended` so any previously
+    // intended URL (e.g. pages protected by auth) is respected first.
+    $this->redirectIntended(default: route('filament.admin.pages.my-dashboard', absolute: false), navigate: true);
     }
 
     /**

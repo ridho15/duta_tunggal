@@ -35,6 +35,8 @@ class PurchaseOrder extends Model
         'created_by',
         'refer_model_type',
         'refer_model_id',
+        'is_import',
+        'ppn_option',
     ];
 
     public function purchaseOrderCurrency()
@@ -100,6 +102,11 @@ class PurchaseOrder extends Model
     public function purchaseOrderBiaya()
     {
         return $this->hasMany(PurchaseOrderBiaya::class, 'purchase_order_id');
+    }
+
+    public function assets()
+    {
+        return $this->hasMany(Asset::class, 'purchase_order_id');
     }
 
     protected static function booted()

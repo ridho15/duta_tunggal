@@ -47,12 +47,14 @@ class StockMovementRelationManager extends RelationManager
                 Radio::make('type')
                     ->label('Type')
                     ->options([
-                        'purchase' => 'Purchase',
+                        'purchase_in' => 'Purchase In',
                         'sales' => 'Sales',
                         'transfer_in' => 'Transfer In',
                         'transfer_out' => 'Transfer Out',
                         'manufacture_in' => 'Manufacture In',
                         'manufacture_out' => 'Manufacture Out',
+                        'adjustment_in' => 'Adjustment In',
+                        'adjustment_out' => 'Adjustment Out',
                     ])
                     ->required(),
                 TextInput::make('reference_id')
@@ -82,20 +84,26 @@ class StockMovementRelationManager extends RelationManager
                 TextColumn::make('type')
                     ->color(function ($state) {
                         return match ($state) {
+                            'purchase_in' => 'success',
+                            'sales' => 'danger',
                             'transfer_in' => 'primary',
                             'transfer_out' => 'warning',
                             'manufacture_in' => 'info',
                             'manufacture_out' => 'warning',
+                            'adjustment_in' => 'secondary',
+                            'adjustment_out' => 'danger',
                             default => 'primary',
                         };
                     })->formatStateUsing(function ($state) {
                         return match ($state) {
-                            'purchase' => 'Purchase',
+                            'purchase_in' => 'Purchase In',
                             'sales' => 'Sales',
                             'transfer_in' => 'Transfer In',
                             'transfer_out' => 'Transfer Out',
                             'manufacture_in' => 'Manufacture In',
                             'manufacture_out' => 'Manufacture Out',
+                            'adjustment_in' => 'Adjustment In',
+                            'adjustment_out' => 'Adjustment Out',
                             default => '-'
                         };
                     })

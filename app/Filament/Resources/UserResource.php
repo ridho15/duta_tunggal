@@ -35,9 +35,11 @@ class UserResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
 
-    protected static ?string $navigationGroup = 'Roles & Permissions';
+    // Use the user-friendly group name
+    protected static ?string $navigationGroup = 'User Roles Management';
 
-    protected static ?int $navigationSort = 27;
+    // Order similarly with other role/permission resources
+    protected static ?int $navigationSort = 8;
 
     public static function form(Form $form): Form
     {

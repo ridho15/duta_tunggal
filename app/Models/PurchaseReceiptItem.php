@@ -6,6 +6,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\CssSelector\Node\FunctionNode;
 
 class PurchaseReceiptItem extends Model
@@ -62,7 +63,9 @@ class PurchaseReceiptItem extends Model
 
     public function qualityControl()
     {
-        return $this->morphOne(QualityControl::class, 'from_model')->withDefault();
+        return $this->hasOne(\App\Models\QualityControl::class, 'from_model_id', 'id')
+                    ->where('from_model_type', \App\Models\PurchaseReceiptItem::class)
+                    ->withDefault();
     }
 
     protected static function booted()

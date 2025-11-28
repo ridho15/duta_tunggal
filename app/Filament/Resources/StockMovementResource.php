@@ -5,8 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\StockMovementResource\Pages;
 use App\Filament\Resources\StockMovementResource\Pages\ViewStockMovement;
 use App\Models\Product;
+use App\Models\Rak;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
@@ -19,6 +21,8 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -30,7 +34,7 @@ class StockMovementResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {
@@ -75,10 +79,14 @@ class StockMovementResource extends Resource
                             ->inlineLabel()
                             ->options(function () {
                                 return [
+                                    'purchase_in' => 'Purchase In',
+                                    'sales' => 'Sales',
                                     'transfer_in' => 'Transfer In',
                                     'transfer_out' => 'Transfer Out',
                                     'manufacture_in' => 'Manufacture In',
                                     'manufacture_out' => 'Manufacture Out',
+                                    'adjustment_in' => 'Adjustment In',
+                                    'adjustment_out' => 'Adjustment Out',
                                 ];
                             })
                             ->required(),
@@ -134,18 +142,26 @@ class StockMovementResource extends Resource
                 TextColumn::make('type')
                     ->color(function ($state) {
                         return match ($state) {
+                            'purchase_in' => 'success',
+                            'sales' => 'danger',
                             'transfer_in' => 'primary',
                             'transfer_out' => 'warning',
                             'manufacture_in' => 'info',
                             'manufacture_out' => 'warning',
+                            'adjustment_in' => 'secondary',
+                            'adjustment_out' => 'danger',
                             default => 'gray',
                         };
                     })->formatStateUsing(function ($state) {
                         return match ($state) {
+                            'purchase_in' => 'Purchase In',
+                            'sales' => 'Sales',
                             'transfer_in' => 'Transfer In',
                             'transfer_out' => 'Transfer Out',
                             'manufacture_in' => 'Manufacture In',
                             'manufacture_out' => 'Manufacture Out',
+                            'adjustment_in' => 'Adjustment In',
+                            'adjustment_out' => 'Adjustment Out',
                             default => '-'
                         };
                     })
@@ -170,7 +186,62 @@ class StockMovementResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('product')
+                    ->relationship('product', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->label('Product')
+                    ->getOptionLabelFromRecordUsing(function (Product $product) {
+                        return "({$product->sku}) {$product->name}";
+                    }),
+                SelectFilter::make('warehouse')
+                    ->relationship('warehouse', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->label('Gudang')
+                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                        return "({$warehouse->kode}) {$warehouse->name}";
+                    }),
+                SelectFilter::make('rak')
+                    ->relationship('rak', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->label('Rak')
+                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
+                        return "({$rak->code}) {$rak->name}";
+                    }),
+                SelectFilter::make('type')
+                    ->options([
+                        'purchase_in' => 'Purchase In',
+                        'sales' => 'Sales',
+                        'transfer_in' => 'Transfer In',
+                        'transfer_out' => 'Transfer Out',
+                        'manufacture_in' => 'Manufacture In',
+                        'manufacture_out' => 'Manufacture Out',
+                        'adjustment_in' => 'Adjustment In',
+                        'adjustment_out' => 'Adjustment Out',
+                    ])
+                    ->multiple()
+                    ->label('Type'),
+                Filter::make('date')
+                    ->form([
+                        DatePicker::make('date_from')
+                            ->label('Date From'),
+                        DatePicker::make('date_to')
+                            ->label('Date To'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['date_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('date', '>=', $date),
+                            )
+                            ->when(
+                                $data['date_to'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('date', '<=', $date),
+                            );
+                    })
+                    ->label('Date Range'),
             ])
             ->actions([
                 ViewAction::make()

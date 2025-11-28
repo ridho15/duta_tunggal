@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sale_orders', function (Blueprint $table) {
-            $table->enum('status', ['draft', 'request_approve', 'request_close', 'approved', 'closed', 'completed', 'confirmed', 'received', 'canceled', 'reject'])->default('draft')->change();
+            $table->enum('status', ['draft', 'request_approve', 'request_close', 'approved', 'closed', 'completed', 'partial_confirmed', 'confirmed', 'received', 'canceled', 'reject'])->default('draft')->change();
         });
     }
 

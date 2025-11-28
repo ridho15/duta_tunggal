@@ -7,14 +7,27 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class SaleOrder extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'sale_orders';
+    protected $casts = [
+        'order_date' => 'datetime',
+        'delivery_date' => 'datetime',
+        'request_approve_at' => 'datetime',
+        'request_close_at' => 'datetime',
+        'approve_at' => 'datetime',
+        'close_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'reject_at' => 'datetime',
+        'warehouse_confirmed_at' => 'datetime',
+    ];
     protected $fillable = [
         'customer_id',
+        'quotation_id',
         'so_number',
         'order_date',
         'status', // draft, request_approve, request_close, approved, closed, completed, confirmed, received, canceled, 'reject
@@ -34,7 +47,8 @@ class SaleOrder extends Model
         'reject_at',
         'reason_close',
         'tipe_pengiriman', // Ambil Sendiri, Kirim Langsung
-        'created_by'
+        'created_by',
+        'warehouse_confirmed_at'
     ];
 
 
@@ -88,6 +102,11 @@ class SaleOrder extends Model
         return $this->hasMany(DeliverySalesOrder::class, 'sales_order_id');
     }
 
+    public function warehouseConfirmation()
+    {
+        return $this->hasOne(WarehouseConfirmation::class, 'sale_order_id');
+    }
+
     public function purchaseOrder()
     {
         return $this->morphMany(PurchaseOrder::class, 'refer_model');
@@ -127,7 +146,6 @@ class SaleOrder extends Model
                 ->where('warehouse_id', $item->warehouse_id)
                 ->where('rak_id', $item->rak_id)
                 ->sum('qty_available');
-            
             if ($availableStock < $item->quantity) {
                 $insufficientItems[] = [
                     'item' => $item,

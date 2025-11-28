@@ -66,27 +66,38 @@ class ProductService
 
         return true;
     }
-    public function createStockMovement($product_id, $warehouse_id, $quantity, $type, $date, $notes, $rak_id, $fromModel)
+    public function createStockMovement(
+        int $product_id,
+        int $warehouse_id,
+        float $quantity,
+        string $type,
+        $date,
+        ?string $notes,
+        ?int $rak_id,
+        $fromModel,
+        ?float $value = null,
+        array $meta = []
+    )
     {
-        if ($fromModel) {
-            return $fromModel->stockMovement()->create([
-                'product_id' => $product_id,
-                'warehouse_id' => $warehouse_id,
-                'quantity' => $quantity,
-                'type' => $type,
-                'date' => $date,
-                'notes' => $notes,
-                'rak_id' => $rak_id
-            ]);
-        }
-        return StockMovement::create([
+        $payload = [
             'product_id' => $product_id,
             'warehouse_id' => $warehouse_id,
             'quantity' => $quantity,
+            'value' => $value,
             'type' => $type,
             'date' => $date,
             'notes' => $notes,
-            'rak_id' => $rak_id
-        ]);
+            'rak_id' => $rak_id,
+        ];
+
+        if (!empty($meta)) {
+            $payload['meta'] = $meta;
+        }
+
+        if ($fromModel) {
+            return $fromModel->stockMovement()->create($payload);
+        }
+
+        return StockMovement::create($payload);
     }
 }

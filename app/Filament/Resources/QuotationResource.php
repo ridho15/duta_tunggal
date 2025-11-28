@@ -9,6 +9,7 @@ use App\Http\Controllers\HelperController;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quotation;
+use App\Models\InventoryStock;
 use App\Services\CustomerService;
 use App\Services\QuotationService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -24,6 +25,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
@@ -37,6 +40,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class QuotationResource extends Resource
@@ -45,7 +49,8 @@ class QuotationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
 
-    protected static ?string $navigationGroup = 'Penjualan';
+    // Keep resource label, but group renamed to include english hint
+    protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
 
     protected static ?int $navigationSort = 1;
     public static function form(Form $form): Form
@@ -184,7 +189,7 @@ class QuotationResource extends Resource
                                             ->default(0)
                                             ->required()
                                             ->numeric()
-                                            ->prefix('Rp.'),
+                                            ->indonesianMoney(),
                                         Radio::make('tipe_pembayaran')
                                             ->label('Tipe Bayar Customer')
                                             ->inlineLabel()
@@ -219,7 +224,7 @@ class QuotationResource extends Resource
                         TextInput::make('total_amount')
                             ->numeric()
                             ->readOnly()
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->default(0),
                         FileUpload::make('po_file_path')
                             ->label('File')
@@ -239,6 +244,10 @@ class QuotationResource extends Resource
                             ->relationship()
                             ->columnSpanFull()
                             ->columns(3)
+                            ->minItems(1)
+                            ->mutateRelationshipDataBeforeCreateUsing(function(array $data){
+                                return $data;
+                            })
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
@@ -251,26 +260,79 @@ class QuotationResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::find($state);
-                                        $set('unit_price', $product->sell_price);
-                                        $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        if ($product) {
+                                            // Set raw numeric price first
+                                            $set('unit_price', (int) $product->sell_price);
+                                            // Recalculate total using numeric price
+                                            $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
+
+                                            $set('total_price', HelperController::hitungSubtotal(
+                                                (int)$get('quantity'),
+                                                $numericUnit,
+                                                (int)$get('discount'),
+                                                (int)$get('tax'),
+                                                $get('tipe_pajak') ?? null
+                                            ));
+
+                                            // Set stock info for this product across warehouses
+                                            try {
+                                                Log::debug('QuotationResource: fetching stocks for product', ['product_id' => $product->id]);
+                                                $stocks = InventoryStock::with('warehouse')
+                                                    ->where('product_id', $product->id)
+                                                    ->get();
+
+                                                $info = $stocks->map(function ($s) {
+                                                    $warehouse = $s->warehouse->name ?? '—';
+                                                    // Use qty_available as the quantity that can be ordered for sales
+                                                    $qty = (int) ($s->qty_available ?? ($s->qty_on_hand ?? 0));
+                                                    return "{$warehouse}: {$qty}";
+                                                })->filter()->all();
+
+                                                $final = count($info) ? implode("\n", $info) : 'Tidak ada informasi stok';
+                                                Log::debug('QuotationResource: stock_info resolved', ['product_id' => $product->id, 'stock_info' => $final]);
+                                                $set('stock_info', $final);
+                                            } catch (\Throwable $e) {
+                                                Log::error('QuotationResource: error reading stock', ['error' => $e->getMessage()]);
+                                                $set('stock_info', 'Error membaca data stok');
+                                            }
+                                        }
                                     })
-                                    ->relationship('product', 'id')
+                                    ->relationship('product', 'name')
+                                    ->searchable()
+                                    ->getSearchResultsUsing(function (string $search) {
+                                        // Return array of id => label to satisfy Filament Select expectations
+                                        return Product::query()
+                                            ->where('name', 'like', "%{$search}%")
+                                            ->orWhere('sku', 'like', "%{$search}%")
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(function (Product $p) {
+                                                $label = "({$p->sku}) {$p->name}";
+                                                return [$p->id => $label];
+                                            })->toArray();
+                                    })
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
                                     }),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
-                                    ->numeric()
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Unit price wajib diisi'
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('total_price', HelperController::hitungSubtotal($get('quantity'), $state, $get('discount'), $get('tax')));
+                                        $numericUnit = HelperController::parseIndonesianMoney($state);
+                                        $set('total_price', HelperController::hitungSubtotal(
+                                            (int)$get('quantity'),
+                                            $numericUnit,
+                                            (int)$get('discount'),
+                                            (int)$get('tax'),
+                                            $get('tipe_pajak') ?? null
+                                        ));
                                     })
                                     ->default(0)
-                                    ->prefix('Rp.'),
+                                    ->indonesianMoney(),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
@@ -279,15 +341,29 @@ class QuotationResource extends Resource
                                         'required' => 'Quantity wajib diisi'
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('total_price', HelperController::hitungSubtotal($state, $get('unit_price'), $get('discount'), $get('tax')));
+                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $set('total_price', HelperController::hitungSubtotal(
+                                            (int)$state,
+                                            $numericUnit,
+                                            (int)$get('discount'),
+                                            (int)$get('tax'),
+                                            $get('tipe_pajak') ?? null
+                                        ));
                                     })
                                     ->reactive()
-                                    ->default(0),
+                                    ->default(1),
                                 TextInput::make('discount')
                                     ->label('Discount')
                                     ->numeric()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
+                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $set('total_price', HelperController::hitungSubtotal(
+                                            (int)$get('quantity'),
+                                            $numericUnit,
+                                            (int)$state,
+                                            (int)$get('tax'),
+                                            $get('tipe_pajak') ?? null
+                                        ));
                                     })
                                     ->reactive()
                                     ->maxValue(100)
@@ -303,20 +379,55 @@ class QuotationResource extends Resource
                                     ])
                                     ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
+                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $set('total_price', HelperController::hitungSubtotal(
+                                            (int)$get('quantity'),
+                                            $numericUnit,
+                                            (int)$get('discount'),
+                                            (int)$state,
+                                            $get('tipe_pajak') ?? null
+                                        ));
                                     })
                                     ->default(0)
                                     ->suffix('%'),
                                 TextInput::make('total_price')
                                     ->label('Total Price')
-                                    ->numeric()
                                     ->reactive()
                                     ->required()
                                     ->default(0)
-                                    ->prefix('Rp.'),
+                                    ->indonesianMoney(),
                                 Textarea::make('notes')
                                     ->label('Notes')
                                     ->nullable(),
+                                Textarea::make('stock_info')
+                                    ->label('Stock per Warehouse')
+                                    ->rows(3)
+                                    ->disabled()
+                                    ->default(function ($get) {
+                                        $productId = $get('product_id');
+                                        if (!$productId) {
+                                            return 'Tidak ada informasi stok';
+                                        }
+                                        try {
+                                            Log::debug('QuotationResource: default stock_info for product', ['product_id' => $productId]);
+                                            $stocks = InventoryStock::with('warehouse')
+                                                ->where('product_id', $productId)
+                                                ->get();
+                                            $info = $stocks->map(function ($s) {
+                                                $warehouse = $s->warehouse->name ?? '—';
+                                                // Use qty_available as the quantity that can be ordered for sales
+                                                $qty = (int) ($s->qty_available ?? ($s->qty_on_hand ?? 0));
+                                                return "{$warehouse}: {$qty}";
+                                            })->filter()->all();
+
+                                            return count($info) ? implode("\n", $info) : 'Tidak ada informasi stok';
+                                        } catch (\Throwable $e) {
+                                            Log::error('QuotationResource: error computing default stock_info', ['error' => $e->getMessage()]);
+                                            return 'Error membaca data stok';
+                                        }
+                                    })
+                                    ->columnSpan(3)
+                                    ->helperText('Menampilkan stok tersedia per warehouse (read-only).'),
 
                             ])
                     ]),
@@ -341,7 +452,7 @@ class QuotationResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
@@ -361,14 +472,7 @@ class QuotationResource extends Resource
                             'reject' => 'danger',
                         };
                     }),
-                TextColumn::make('status_payment')
-                    ->badge()
-                    ->color(function ($state) {
-                        return match ($state) {
-                            'Belum Bayar' => 'gray',
-                            'Sudah Bayar' => 'success'
-                        };
-                    }),
+                
                 TextColumn::make('po_file_path')
                     ->searchable(),
 
@@ -523,6 +627,41 @@ class QuotationResource extends Resource
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil diupdate");
                         })
                 ]),
+            ]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Quotation Information')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('quotation_number'),
+                        Infolists\Components\TextEntry::make('customer.name'),
+                        Infolists\Components\TextEntry::make('date')
+                            ->date(),
+                        Infolists\Components\TextEntry::make('valid_until')
+                            ->date(),
+                        Infolists\Components\TextEntry::make('total_amount')
+                            ->money('IDR', 0),
+                        Infolists\Components\TextEntry::make('notes'),
+                    ]),
+                Infolists\Components\Section::make('Quotation Items')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('quotationItem')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('product.name'),
+                                Infolists\Components\TextEntry::make('quantity'),
+                                Infolists\Components\TextEntry::make('unit_price')
+                                    ->money('IDR', 0),
+                                Infolists\Components\TextEntry::make('discount'),
+                                Infolists\Components\TextEntry::make('tax'),
+                                Infolists\Components\TextEntry::make('total_price')
+                                    ->money('IDR', 0),
+                                Infolists\Components\TextEntry::make('notes'),
+                            ])
+                            ->columns(3),
+                    ]),
             ]);
     }
 

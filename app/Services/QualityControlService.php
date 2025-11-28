@@ -5,11 +5,17 @@ namespace App\Services;
 use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
 use App\Models\QualityControl;
+use App\Models\JournalEntry;
+use App\Models\StockMovement;
+use App\Models\ChartOfAccount;
+use App\Services\ReturnProductService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class QualityControlService
 {
+    protected static $coaCache = [];
     public function generateQcNumber()
     {
         $date = now()->format('Ymd');
@@ -29,46 +35,80 @@ class QualityControlService
 
         return 'QC-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
+
+    /**
+     * Create a Quality Control record from a PurchaseReceiptItem.
+     * This does not create receipts immediately; when QC is completed, a receipt
+     * will be generated from the QC result.
+     *
+     * @param \App\Models\PurchaseReceiptItem $purchaseReceiptItem
+     * @param array $data
+     * @return \App\Models\QualityControl
+     */
     public function createQCFromPurchaseReceiptItem($purchaseReceiptItem, $data)
     {
-        $qualityControlService = app(QualityControlService::class);
-        $qc_number = $qualityControlService->generateQcNumber();
-        $qualityControl = QualityControl::where('qc_number', $qc_number)->first();
-        while ($qualityControl) {
-            $qc_number = $qc_number . '1';
-        }
-        return $purchaseReceiptItem->qualityControl()->create([
-            'qc_number' => $qc_number,
-            'passed_quantity' => $purchaseReceiptItem->qty_accepted,
-            'rejected_quantity' => 0,
+        $qualityControl = QualityControl::create([
+            'qc_number' => $this->generateQcNumber(),
+            'passed_quantity' => $data['passed_quantity'] ?? 0, // Start with 0, will be determined by QC inspection
+            'rejected_quantity' => $data['rejected_quantity'] ?? 0,
             'status' => 0,
-            'inspected_by' => $data['inspected_by'],
+            'inspected_by' => $data['inspected_by'] ?? null,
             'warehouse_id' => $purchaseReceiptItem->warehouse_id,
             'product_id' => $purchaseReceiptItem->product_id,
-            'rak_id' => $purchaseReceiptItem->rak_id
+            'rak_id' => $purchaseReceiptItem->rak_id ?? null,
+            'from_model_type' => \App\Models\PurchaseReceiptItem::class,
+            'from_model_id' => $purchaseReceiptItem->id,
         ]);
+
+        return $qualityControl;
+    }
+
+    /**
+     * Create a Quality Control record from a PurchaseOrderItem.
+     * This creates QC directly from PO item without requiring a receipt first.
+     *
+     * @param \App\Models\PurchaseOrderItem $purchaseOrderItem
+     * @param array $data
+     * @return \App\Models\QualityControl
+     */
+    public function createQCFromPurchaseOrderItem($purchaseOrderItem, $data)
+    {
+        $qualityControl = QualityControl::create([
+            'qc_number' => $this->generateQcNumber(),
+            'passed_quantity' => $data['passed_quantity'] ?? $purchaseOrderItem->quantity,
+            'rejected_quantity' => $data['rejected_quantity'] ?? 0,
+            'status' => 0,
+            'inspected_by' => $data['inspected_by'] ?? null,
+            'warehouse_id' => $data['warehouse_id'] ?? $purchaseOrderItem->purchaseOrder->warehouse_id,
+            'product_id' => $purchaseOrderItem->product_id,
+            'rak_id' => $data['rak_id'] ?? null,
+            'from_model_type' => \App\Models\PurchaseOrderItem::class,
+            'from_model_id' => $purchaseOrderItem->id,
+        ]);
+
+        return $qualityControl;
     }
 
     public function completeQualityControl($qualityControl, $data)
     {
         $productService = app(ProductService::class);
-        if ($qualityControl->passed_quantity > 0) {
-            $productService->createStockMovement($qualityControl->product_id, $qualityControl->warehouse_id, $qualityControl->passed_quantity, 'transfer_in', Carbon::now(), $qualityControl->notes, $qualityControl->rak_id, $qualityControl);
-        }
 
         if ($qualityControl->rejected_quantity > 0) {
-            $returnProduct = $qualityControl->returnProduct()->create($data);
+            $returnProductService = app(ReturnProductService::class);
+            $returnData = array_merge($data, [
+                'return_number' => $returnProductService->generateReturnNumber(),
+                'from_model_id' => $qualityControl->id,
+                'from_model_type' => QualityControl::class,
+                'warehouse_id' => $qualityControl->warehouse_id,
+                'status' => 'draft',
+            ]);
+            $returnProduct = $qualityControl->returnProduct()->create($returnData);
             $qualityControl->returnProductItem()->create([
                 'return_product_id' => $returnProduct->id,
                 'product_id' => $qualityControl->product_id,
                 'quantity' => $qualityControl->rejected_quantity,
+                'condition' => $data['item_condition'] ?? 'damage',
             ]);
-
-            if ($qualityControl->from_model_type == 'App\Models\PurchaseReceiptItem') {
-                $qualityControl->purchaseReceiptItem->update([
-                    'qty_accepted' => $qualityControl->purchaseReceiptItem->qty_accepted - $qualityControl->rejected_quantity
-                ]);
-            }
         }
 
         if ($qualityControl->from_model_type == 'App\Models\Production' && $qualityControl->passed_quantity >= $qualityControl->fromModel->manufacturingOrder->quantity) {
@@ -82,36 +122,313 @@ class QualityControlService
             'status' => 1,
             'date_send_stock' => Carbon::now()
         ]);
+
+        // Note: qty_accepted on PurchaseReceiptItem should NOT be updated here
+        // QC only provides inspection results, acceptance decision is separate process
+        // Update qty_accepted on PurchaseReceiptItem if QC is from PurchaseReceiptItem
+        // if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
+        //     $purchaseReceiptItem = $qualityControl->fromModel;
+        //     if ($purchaseReceiptItem) {
+        //         $purchaseReceiptItem->update([
+        //             'qty_accepted' => $qualityControl->passed_quantity
+        //         ]);
+        //     }
+        // }
+
+        // Create journal entries and inventory stock for passed QC items from PurchaseOrderItem or PurchaseReceiptItem
+        if (($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' || $qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') && $qualityControl->passed_quantity > 0) {
+            $this->createJournalEntriesAndInventoryForQC($qualityControl);
+        }
+
+        // Handle Purchase Receipt and Purchase Order completion based on QC results
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
+            $this->handlePurchaseReceiptCompletion($qualityControl);
+        }
+    }
+
+    /**
+     * Create journal entries and inventory stock for QC passed items
+     */
+    public function createJournalEntriesAndInventoryForQC(QualityControl $qualityControl): void
+    {
+        // Load necessary relationships based on model type
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $qualityControl->loadMissing([
+                'fromModel.purchaseOrder.purchaseOrderCurrency',
+                'product.inventoryCoa',
+                'product.temporaryProcurementCoa',
+                'product.unbilledPurchaseCoa'
+            ]);
+        } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
+            $qualityControl->loadMissing([
+                'fromModel.purchaseOrderItem.purchaseOrder.purchaseOrderCurrency',
+                'product.inventoryCoa',
+                'product.temporaryProcurementCoa',
+                'product.unbilledPurchaseCoa'
+            ]);
+        }
+
+        $fromModel = $qualityControl->fromModel;
+        $product = $qualityControl->product;
+        $passedQuantity = $qualityControl->passed_quantity;
+
+        // Get unit price based on model type
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $unitPrice = $fromModel?->unit_price ?? 0;
+        } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
+            $unitPrice = $fromModel?->purchaseOrderItem?->unit_price ?? 0;
+        } else {
+            $unitPrice = 0;
+        }
+
+        if ($passedQuantity <= 0 || $unitPrice <= 0) {
+            return;
+        }
+
+        $amount = round($passedQuantity * $unitPrice, 2);
+
+        // Get COA accounts
+        $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes(['1140.10', '1140.01']);
+        $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
+        $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+
+        if (!$inventoryCoa || !$temporaryProcurementCoa || !$unbilledPurchaseCoa) {
+            // Skip posting if required COA accounts are not available (e.g., in test environment)
+            return;
+        }
+
+        $date = now()->toDateString();
+        $reference = $qualityControl->qc_number;
+
+        // Prevent duplicate posting
+        if (JournalEntry::where('source_type', QualityControl::class)
+            ->where('source_id', $qualityControl->id)
+            ->where('description', 'like', '%QC Inventory%')
+            ->exists()) {
+            return;
+        }
+
+        $entries = [];
+
+        // Debit inventory account
+        $entries[] = JournalEntry::create([
+            'coa_id' => $inventoryCoa->id,
+            'date' => $date,
+            'reference' => $reference,
+            'description' => 'QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number,
+            'debit' => $amount,
+            'credit' => 0,
+            'journal_type' => 'inventory',
+            'source_type' => QualityControl::class,
+            'source_id' => $qualityControl->id,
+        ]);
+
+        // Credit temporary procurement position
+        $entries[] = JournalEntry::create([
+            'coa_id' => $temporaryProcurementCoa->id,
+            'date' => $date,
+            'reference' => $reference,
+            'description' => 'QC Inventory - Credit temporary procurement for QC passed items: ' . $qualityControl->qc_number,
+            'debit' => 0,
+            'credit' => $amount,
+            'journal_type' => 'inventory',
+            'source_type' => QualityControl::class,
+            'source_id' => $qualityControl->id,
+        ]);
+
+        // Create stock movement to update inventory
+        $existingMovement = StockMovement::where('from_model_type', QualityControl::class)
+            ->where('from_model_id', $qualityControl->id)
+            ->first();
+
+        if (!$existingMovement) {
+            $meta = [
+                'source' => 'quality_control',
+                'qc_id' => $qualityControl->id,
+                'qc_number' => $qualityControl->qc_number,
+                'unit_cost' => $unitPrice,
+                'currency' => $qualityControl->from_model_type === 'App\Models\PurchaseOrderItem'
+                    ? optional($fromModel->purchaseOrder->purchaseOrderCurrency->first())->currency_code
+                    : optional($fromModel->purchaseReceipt->currency)->code,
+                'purchase_order_item_id' => $qualityControl->from_model_type === 'App\Models\PurchaseOrderItem'
+                    ? $fromModel?->id
+                    : $fromModel?->purchase_order_item_id,
+                'passed_quantity' => $passedQuantity,
+                'rejected_quantity' => $qualityControl->rejected_quantity,
+            ];
+
+            StockMovement::create([
+                'product_id' => $product->id,
+                'warehouse_id' => $qualityControl->warehouse_id,
+                'quantity' => $passedQuantity,
+                'value' => $amount,
+                'type' => 'purchase_in',
+                'date' => $date,
+                'notes' => 'Stock inbound from QC completion: ' . $qualityControl->qc_number,
+                'meta' => $meta,
+                'rak_id' => $qualityControl->rak_id,
+                'from_model_type' => QualityControl::class,
+                'from_model_id' => $qualityControl->id,
+            ]);
+        }
+    }
+
+    protected function resolveCoaByCodes(array $codes): ?\App\Models\ChartOfAccount
+    {
+        foreach ($codes as $code) {
+            if (!$code) {
+                continue;
+            }
+
+            if (!array_key_exists($code, self::$coaCache)) {
+                self::$coaCache[$code] = ChartOfAccount::where('code', $code)->first();
+            }
+
+            if (self::$coaCache[$code]) {
+                return self::$coaCache[$code];
+            }
+        }
+
+        return null;
     }
 
     public function checkPenerimaanBarang($qualityControl)
     {
-        $purchaseOrder = PurchaseOrder::whereHas('purchaseOrderItem', function ($query) use ($qualityControl) {
-            $query->whereHas('purchaseReceiptItem', function ($query) use ($qualityControl) {
-                $query->where('is_sent', 1)->whereHas('qualityControl', function ($query) use ($qualityControl) {
-                    $query->where('status', 1)->where('id', $qualityControl->id);
-                });
-            });
-        })->first();
+        // Find the purchase order that this quality control belongs to
+        $purchaseOrder = null;
+
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
+            $purchaseReceiptItem = $qualityControl->fromModel;
+            if ($purchaseReceiptItem && $purchaseReceiptItem->purchaseOrderItem) {
+                $purchaseOrder = $purchaseReceiptItem->purchaseOrderItem->purchaseOrder;
+            }
+        } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $purchaseOrderItem = $qualityControl->fromModel;
+            if ($purchaseOrderItem) {
+                $purchaseOrder = $purchaseOrderItem->purchaseOrder;
+            }
+        }
+
+        if (!$purchaseOrder) {
+            Log::info('checkPenerimaanBarang: No purchase order found for QC ' . $qualityControl->id);
+            return;
+        }
+
+        // Load relationships
+        $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem']);
+
+        // Force refresh the quality control relationship to ensure we have the latest status
+        foreach ($purchaseOrder->purchaseOrderItem as $purchaseOrderItem) {
+            foreach ($purchaseOrderItem->purchaseReceiptItem as $purchaseReceiptItem) {
+                // Query QC directly from database based on the relationship
+                $qc = QualityControl::where('from_model_type', 'App\Models\PurchaseReceiptItem')
+                    ->where('from_model_id', $purchaseReceiptItem->id)
+                    ->first();
+                $purchaseReceiptItem->qualityControl = $qc;
+            }
+        }
+
+        Log::info('checkPenerimaanBarang: Loaded PO relationships for PO ' . $purchaseOrder->id);
+        Log::info('checkPenerimaanBarang: PO has ' . $purchaseOrder->purchaseOrderItem->count() . ' items');
 
         $totalQuantityDibutuhkan = 0;
         $totalQuantityYangDiterima = 0;
-        if ($purchaseOrder) {
-            foreach ($purchaseOrder->purchaseOrderItem as $purchaseOrderItem) {
-                $totalQuantityDibutuhkan += $purchaseOrderItem->quantity;
-                foreach ($purchaseOrderItem->purchaseReceiptItem as $purchaseReceiptItem) {
-                    $totalQuantityYangDiterima += $purchaseReceiptItem->qualityControl->passed_quantity;
+
+        foreach ($purchaseOrder->purchaseOrderItem as $purchaseOrderItem) {
+            $totalQuantityDibutuhkan += $purchaseOrderItem->quantity;
+            foreach ($purchaseOrderItem->purchaseReceiptItem as $purchaseReceiptItem) {
+                Log::info('checkPenerimaanBarang: Checking receipt item ' . $purchaseReceiptItem->id . ', is_sent=' . $purchaseReceiptItem->is_sent . ', qty_accepted=' . $purchaseReceiptItem->qty_accepted . ', has_qc=' . ($purchaseReceiptItem->qualityControl ? 'yes' : 'no') . ', qc_status=' . ($purchaseReceiptItem->qualityControl ? $purchaseReceiptItem->qualityControl->status : 'none') . ', qc_id=' . ($purchaseReceiptItem->qualityControl ? $purchaseReceiptItem->qualityControl->id : 'none'));
+                if ($purchaseReceiptItem->is_sent && $purchaseReceiptItem->qualityControl && $purchaseReceiptItem->qualityControl->status == 1) {
+                    $totalQuantityYangDiterima += $purchaseReceiptItem->qty_accepted;
                 }
             }
-            if ($totalQuantityDibutuhkan == $totalQuantityYangDiterima) {
-                $purchaseOrder->update([
-                    'status' => 'completed',
-                    'completed_by' => Auth::user()->id,
-                    'completed_at' => Carbon::now()
-                ]);
+        }
 
-                HelperController::sendNotification(isSuccess: true, message: 'Purchase Order Completed', title: 'Information');
+        Log::info('checkPenerimaanBarang: PO ' . $purchaseOrder->id . ' - Dibutuhkan: ' . $totalQuantityDibutuhkan . ', Diterima: ' . $totalQuantityYangDiterima);
+
+        if ($totalQuantityDibutuhkan == $totalQuantityYangDiterima) {
+            Log::info('checkPenerimaanBarang: Completing PO ' . $purchaseOrder->id);
+            $purchaseOrder->update([
+                'status' => 'completed',
+                'completed_by' => Auth::user()->id,
+                'completed_at' => Carbon::now()
+            ]);
+
+            HelperController::sendNotification(isSuccess: true, message: 'Purchase Order Completed', title: 'Information');
+        } else {
+            Log::info('checkPenerimaanBarang: PO ' . $purchaseOrder->id . ' not completed yet');
+        }
+    }
+
+    /**
+     * Handle Purchase Receipt and Purchase Order completion based on QC results
+     * When QC is completed for a PurchaseReceiptItem, check if all items in the Purchase Order are fully received
+     */
+    public function handlePurchaseReceiptCompletion($qualityControl)
+    {
+        $purchaseReceiptItem = $qualityControl->fromModel;
+        if (!$purchaseReceiptItem) {
+            return;
+        }
+
+        // Update qty_accepted on the PurchaseReceiptItem based on QC result
+        $purchaseReceiptItem->update([
+            'qty_accepted' => $qualityControl->passed_quantity
+        ]);
+
+        // Get the purchase receipt and purchase order
+        $purchaseReceipt = $purchaseReceiptItem->purchaseReceipt;
+        $purchaseOrder = $purchaseReceipt->purchaseOrder;
+
+        if (!$purchaseOrder) {
+            return;
+        }
+
+        // Load all purchase order items and their receipts
+        $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem.qualityControl']);
+
+        $allItemsComplete = true;
+        $totalOrdered = 0;
+        $totalReceived = 0;
+
+        foreach ($purchaseOrder->purchaseOrderItem as $poItem) {
+            $totalOrdered += $poItem->quantity;
+
+            foreach ($poItem->purchaseReceiptItem as $receiptItem) {
+                // Only count items that have completed QC
+                if ($receiptItem->qualityControl && $receiptItem->qualityControl->status == 1) {
+                    $totalReceived += $receiptItem->qty_accepted;
+                } else {
+                    // If any item doesn't have completed QC, order is not complete
+                    $allItemsComplete = false;
+                }
             }
+        }
+
+        Log::info("QC Completion Check - PO {$purchaseOrder->id}: Ordered={$totalOrdered}, Received={$totalReceived}, AllComplete={$allItemsComplete}");
+
+        if ($allItemsComplete && $totalOrdered == $totalReceived) {
+            // Complete the purchase receipt
+            $purchaseReceipt->update([
+                'status' => 'completed',
+                'completed_by' => Auth::id(),
+                'completed_at' => Carbon::now()
+            ]);
+
+            // Complete the purchase order
+            $purchaseOrder->update([
+                'status' => 'completed',
+                'completed_by' => Auth::id(),
+                'completed_at' => Carbon::now()
+            ]);
+
+            Log::info("Completed Purchase Receipt {$purchaseReceipt->id} and Purchase Order {$purchaseOrder->id} due to QC completion");
+
+            HelperController::sendNotification(
+                isSuccess: true,
+                title: "Purchase Order Completed",
+                message: "Purchase Order {$purchaseOrder->po_number} has been completed. All items have been received and quality controlled."
+            );
         }
     }
 }

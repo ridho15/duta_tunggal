@@ -1,0 +1,1 @@
+<span style="color: {{ $color }}; font-weight: bold;">{{ $stock }}</span>

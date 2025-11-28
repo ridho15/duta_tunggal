@@ -97,7 +97,7 @@ class SalesRelationManager extends RelationManager
                             ->nullable(),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->required()
                             ->disabled()
                             ->reactive()
@@ -145,11 +145,11 @@ class SalesRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('titip_saldo')
                     ->label('Titip Saldo')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('requestApproveBy.name')
                     ->label('Request Approve By')

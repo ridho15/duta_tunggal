@@ -8,6 +8,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Deposit;
 use App\Models\DepositLog;
 use App\Models\JournalEntry;
+use Illuminate\Support\Facades\Log;
 use App\Models\VendorPaymentDetail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -19,62 +20,94 @@ class VendorPaymentDetailObserver
      */
     public function created(VendorPaymentDetail $vendorPaymentDetail): void
     {
-        $accountPayable = AccountPayable::where('invoice_id', $vendorPaymentDetail->vendorPayment->invoice_id)->first();
+        $accountPayable = AccountPayable::where('invoice_id', $vendorPaymentDetail->invoice_id)->first();
         $vendorPayment = $vendorPaymentDetail->vendorPayment;
         // Update account payable
         if ($accountPayable) {
-            $accountPayable->paid = $accountPayable->paid + $vendorPaymentDetail->amount;
-            $accountPayable->remaining = $accountPayable->remaining - $vendorPaymentDetail->amount;
-            $accountPayable->save();
-        }
-        // Update vendor payment
-        if ($accountPayable->remaining == 0) {
-            $vendorPayment->update([
-                'status' => 'Paid'
-            ]);
-
-            $accountPayable->invoice->update([
-                'status' => 'paid'
-            ]);
-
+            $totalReduction = $vendorPaymentDetail->amount + ($vendorPaymentDetail->adjustment_amount ?? 0);
+            $newPaid = min($accountPayable->paid + $vendorPaymentDetail->amount, $accountPayable->total); // hanya kas masuk dicatat di paid
+            $newRemaining = max(0, $accountPayable->remaining - $totalReduction);
             $accountPayable->update([
-                'status' => 'Lunas'
-            ]);
-
-            $accountPayable->ageingSchedule->delete();
-        } elseif ($accountPayable->paid > 0 && $accountPayable->total > $accountPayable->remaining) {
-            $vendorPayment->update([
-                'status' => 'Partial'
-            ]);
-
-            $accountPayable->invoice->update([
-                'status' => 'partially_paid'
+                'paid' => $newPaid,
+                'remaining' => $newRemaining,
+                'status' => $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas',
             ]);
         }
+        // Status & invoice synchronization now handled centrally after header creation.
 
-        $deposit = Deposit::where('from_model_type', 'App\Models\Supplier')
-            ->where('from_model_id', $vendorPayment->supplier_id)->where('status', 'active')->first();
-        if ($deposit) {
-            $deposit->remaining_amount = $deposit->remaining_amount - $vendorPaymentDetail->amount;
-            $deposit->used_amount = $deposit->used_amount + $vendorPaymentDetail->amount;
-            $deposit->save();
+        $detailMethod = strtolower($vendorPaymentDetail->method ?? $vendorPayment->payment_method ?? '');
+        if ($detailMethod === 'deposit') {
+            // VALIDATION: Check if supplier has available deposits before processing
+            $availableDeposits = Deposit::where('from_model_type', 'App\Models\Supplier')
+                ->where('from_model_id', $vendorPayment->supplier_id)
+                ->where('status', 'active')
+                ->where('remaining_amount', '>', 0)
+                ->orderBy('created_at', 'asc') // FIFO - oldest deposits first
+                ->get();
 
-            $vendorPaymentDetail->depositLog()->create([
-                'deposit_id' => $deposit->id,
-                'amount' => $vendorPaymentDetail->amount,
-                'type' => 'use',
-                'created_by' => Auth::user()->id
-            ]);
+            if ($availableDeposits->isEmpty()) {
+                // Prevent payment creation if no deposits are available
+                throw new \Exception("Supplier {$vendorPayment->supplier->name} tidak memiliki deposit yang tersedia untuk pembayaran. Silakan pilih metode pembayaran lain atau buat deposit terlebih dahulu.");
+            }
+
+            // Check if total available deposit balance is sufficient
+            $totalAvailableDeposit = $availableDeposits->sum('remaining_amount');
+            if ($totalAvailableDeposit < $vendorPaymentDetail->amount) {
+                throw new \Exception("Saldo deposit supplier {$vendorPayment->supplier->name} tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($vendorPaymentDetail->amount, 0, ',', '.'));
+            }
+
+            // Process deposits if validation passes
+            $remainingPaymentAmount = $vendorPaymentDetail->amount;
+
+            foreach ($availableDeposits as $deposit) {
+                if ($remainingPaymentAmount <= 0) {
+                    break; // Payment fully covered
+                }
+
+                $amountToUse = min($remainingPaymentAmount, $deposit->remaining_amount);
+
+                // Update deposit balances
+                $deposit->remaining_amount -= $amountToUse;
+                $deposit->used_amount += $amountToUse;
+
+                if ($deposit->remaining_amount <= 0) {
+                    $deposit->status = 'closed';
+                }
+                $deposit->save();
+
+                // Create deposit log for this usage
+                $vendorPaymentDetail->depositLog()->create([
+                    'deposit_id' => $deposit->id,
+                    'amount' => $amountToUse,
+                    'type' => 'use',
+                    'created_by' => Auth::id(),
+                ]);
+
+                $remainingPaymentAmount -= $amountToUse;
+            }
+
+            // If payment couldn't be fully covered by available deposits (shouldn't happen due to validation above)
+            if ($remainingPaymentAmount > 0) {
+                // Log warning or handle insufficient deposit balance
+                Log::warning("Insufficient deposit balance for vendor payment detail ID {$vendorPaymentDetail->id}. Remaining amount: {$remainingPaymentAmount}");
+            }
         }
 
         if ($vendorPaymentDetail->coa_id) {
-            $vendorPaymentDetail->journalEntry()->create([
-                'coa_id' => $vendorPaymentDetail->coa_id,
-                'date' => Carbon::now(),
-                'description' => 'Vendor Payment Detail',
-                'credit' => $vendorPaymentDetail->amount,
-                'journal_type' => 'Purchase',
-            ]);
+                $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($vendorPaymentDetail);
+                $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($vendorPaymentDetail);
+                $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($vendorPaymentDetail);
+                // Temporarily disable journal posting to avoid double entries
+                // $vendorPaymentDetail->journalEntry()->create([
+                //     'coa_id' => $vendorPaymentDetail->coa_id,
+                //     'date' => Carbon::now(),
+                //     'description' => 'Vendor Payment Detail',
+                //     'credit' => $vendorPaymentDetail->amount,
+                //     'journal_type' => 'Purchase',
+                //     'cabang_id' => $branchId,
+                //     'department_id' => $departmentId,
+                //     'project_id' => $projectId,
+                // ]);
         }
     }
 

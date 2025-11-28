@@ -34,7 +34,7 @@ class VehicleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Kendaraan';
 
-    protected static ?int $navigationSort = 26;
+    protected static ?int $navigationSort = 7;
     public static function form(Form $form): Form
     {
         return $form

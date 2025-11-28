@@ -7,7 +7,7 @@ use Livewire\Livewire;
 test('login screen can be rendered', function () {
     $response = $this->get('/login');
 
-    $response->assertStatus(200);
+    $response->assertRedirect('/admin');
 });
 
 test('users can authenticate using the login screen', function () {
@@ -20,7 +20,7 @@ test('users can authenticate using the login screen', function () {
 
     $response
         ->assertHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(route('filament.admin.pages.my-dashboard', absolute: false));
 
     $this->assertAuthenticated();
 });
@@ -43,7 +43,7 @@ test('users can logout', function () {
 
     $response = $this->actingAs($user)->post('/logout');
 
-    $response->assertRedirect('/');
+    $response->assertRedirect('/admin');
 
     $this->assertGuest();
 });

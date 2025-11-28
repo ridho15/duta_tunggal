@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
+use App\Models\InventoryStock;
 use App\Models\SaleOrder;
+use App\Models\StockReservation;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -24,6 +26,34 @@ class SalesOrderService
 
     public function confirm($salesOrder)
     {
+        // Validate stock availability before reserving
+        foreach ($salesOrder->saleOrderItem as $item) {
+            $inventoryStock = InventoryStock::where('product_id', $item->product_id)
+                ->where('warehouse_id', $item->warehouse_id)
+                ->first();
+
+            if (!$inventoryStock) {
+                throw new \Exception("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
+            }
+
+            $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
+            if ($availableForReservation < $item->quantity) {
+                $productName = $item->product ? $item->product->name : $item->product_id;
+                throw new \Exception("Insufficient stock for product {$productName}. Available: {$availableForReservation}, Requested: {$item->quantity}");
+            }
+        }
+
+        // Reserve stock for each item
+        foreach ($salesOrder->saleOrderItem as $item) {
+            StockReservation::create([
+                'sale_order_id' => $salesOrder->id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'warehouse_id' => $item->warehouse_id,
+                'rak_id' => $item->rak_id,
+            ]);
+        }
+
         return $salesOrder->update([
             'status' => 'confirmed'
         ]);
@@ -162,5 +192,134 @@ class SalesOrderService
                 'created_by' => Auth::user()->id,
             ]);
         }
+    }
+
+    public function confirmWarehouse($saleOrder, $confirmationData)
+    {
+        // Validate that SO is approved
+        if ($saleOrder->status !== 'approved') {
+            throw new \Exception('Sales Order must be approved before warehouse confirmation');
+        }
+
+        // Create warehouse confirmation record
+        $confirmation = $saleOrder->warehouseConfirmation()->create([
+            'status' => $confirmationData['status'] ?? 'confirmed',
+            'notes' => $confirmationData['notes'] ?? null,
+            'confirmed_by' => Auth::user()->id,
+            'confirmed_at' => Carbon::now()
+        ]);
+
+        // Process each item
+        foreach ($confirmationData['items'] as $itemData) {
+            $confirmation->warehouseConfirmationItems()->create([
+                'sale_order_item_id' => $itemData['sale_order_item_id'],
+                'confirmed_qty' => $itemData['confirmed_qty'],
+                'warehouse_id' => $itemData['warehouse_id'],
+                'rak_id' => $itemData['rak_id'],
+                'status' => $itemData['status']
+            ]);
+        }
+
+        // Update SO status based on confirmation
+        $overallStatus = $this->determineOverallStatus($confirmationData['items']);
+        $saleOrder->update([
+            'status' => $overallStatus,
+            'warehouse_confirmed_at' => Carbon::now()
+        ]);
+
+        // Update warehouse confirmation status based on overall status
+        $confirmationStatus = match($overallStatus) {
+            'confirmed' => 'confirmed',
+            'partial_confirmed' => 'partial_confirmed',
+            'reject' => 'rejected',
+            default => 'confirmed'
+        };
+        $confirmation->update(['status' => $confirmationStatus]);
+
+        return true;
+    }
+
+    private function determineOverallStatus($items)
+    {
+        $allConfirmed = true;
+        $allRejected = true;
+        $hasPartial = false;
+
+        foreach ($items as $item) {
+            if ($item['status'] === 'confirmed') {
+                $allRejected = false;
+            } elseif ($item['status'] === 'partial_confirmed') {
+                $allConfirmed = false;
+                $allRejected = false;
+                $hasPartial = true;
+            } elseif ($item['status'] === 'rejected') {
+                $allConfirmed = false;
+            }
+        }
+
+        if ($allConfirmed) {
+            return 'confirmed';
+        } elseif ($allRejected) {
+            return 'reject';
+        } elseif ($hasPartial) {
+            return 'partial_confirmed';
+        }
+
+        return 'confirmed'; // default
+    }
+
+    public function createDeliveryOrder($saleOrder, $deliveryData)
+    {
+        // Validate that SO is confirmed
+        if (!in_array($saleOrder->status, ['confirmed', 'partial_confirmed'])) {
+            throw new \Exception('Sales Order must be warehouse confirmed before creating delivery order');
+        }
+
+        // Create delivery order
+        $deliveryOrder = $saleOrder->deliveryOrder()->create([
+            'do_number' => $this->generateDoNumber(),
+            'delivery_date' => $deliveryData['delivery_date'],
+            'warehouse_id' => $deliveryData['warehouse_id'],
+            'driver_id' => 1, // Default driver for testing
+            'vehicle_id' => 1, // Default vehicle for testing
+            'status' => 'draft',
+            'notes' => $deliveryData['notes'] ?? null,
+            'created_by' => Auth::user()->id
+        ]);
+
+        // Copy confirmed items to delivery order
+        foreach ($saleOrder->warehouseConfirmation->warehouseConfirmationItems as $confirmedItem) {
+            if ($confirmedItem->status === 'confirmed' || $confirmedItem->status === 'partial_confirmed') {
+                $deliveryOrder->deliveryOrderItem()->create([
+                    'sale_order_item_id' => $confirmedItem->sale_order_item_id,
+                    'product_id' => $confirmedItem->saleOrderItem->product_id,
+                    'qty' => $confirmedItem->confirmed_qty,
+                    'warehouse_id' => $confirmedItem->warehouse_id,
+                    'rak_id' => $confirmedItem->rak_id
+                ]);
+            }
+        }
+
+        return true;
+    }
+
+    public function generateDoNumber()
+    {
+        $date = now()->format('Ymd');
+
+        // Hitung berapa DO pada hari ini
+        $lastDeliveryOrder = \App\Models\DeliveryOrder::whereDate('created_at', now()->toDateString())
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $number = 1;
+
+        if ($lastDeliveryOrder) {
+            // Ambil nomor urut terakhir
+            $lastNumber = intval(substr($lastDeliveryOrder->do_number, -4));
+            $number = $lastNumber + 1;
+        }
+
+        return 'DO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
 }

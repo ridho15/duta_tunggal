@@ -18,9 +18,11 @@ class PermissionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
 
-    protected static ?string $navigationGroup = 'Roles & Permissions';
+    // Rename the group to the requested label
+    protected static ?string $navigationGroup = 'User Roles Management';
 
-    protected static ?int $navigationSort = 27;
+    // Ensure the Roles group appears last in the requested order
+    protected static ?int $navigationSort = 8;
 
     public static function form(Form $form): Form
     {

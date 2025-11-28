@@ -12,6 +12,7 @@ class WarehouseConfirmation extends Model
     use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'warehouse_confirmations';
     protected $fillable = [
+        'sale_order_id',
         'manufacturing_order_id',
         'note',
         'status', // Confirmed / Rejected / Request
@@ -24,8 +25,18 @@ class WarehouseConfirmation extends Model
         return $this->belongsTo(ManufacturingOrder::class, 'manufacturing_order_id')->withDefault();
     }
 
+    public function saleOrder()
+    {
+        return $this->belongsTo(SaleOrder::class, 'sale_order_id')->withDefault();
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'confirmed_by')->withDefault();
+    }
+
+    public function warehouseConfirmationItems()
+    {
+        return $this->hasMany(WarehouseConfirmationItem::class);
     }
 }

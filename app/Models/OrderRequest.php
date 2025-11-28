@@ -14,6 +14,7 @@ class OrderRequest extends Model
     protected $fillable = [
         'request_number',
         'warehouse_id',
+        'supplier_id',
         'request_date',
         'status', // draft, approved, rejected
         'note',
@@ -23,6 +24,11 @@ class OrderRequest extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
     }
 
     public function orderRequestItem()

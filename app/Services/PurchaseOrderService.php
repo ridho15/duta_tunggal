@@ -7,16 +7,41 @@ use App\Models\PurchaseOrder;
 
 class PurchaseOrderService
 {
+    private static $updatingTotalAmount = false;
+
+    public static function isUpdatingTotalAmount()
+    {
+        return self::$updatingTotalAmount;
+    }
+
     public function updateTotalAmount($purchaseOrder)
     {
+        // Prevent infinite loop when called from observer
+        if (self::$updatingTotalAmount) {
+            return $purchaseOrder;
+        }
+
+        self::$updatingTotalAmount = true;
+
         $total = 0;
+
+        // Hitung total dari purchase order items
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax);
+            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak);
+        }
+
+        // Hitung total dari biaya lain (purchase order biaya)
+        foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
+            // Konversi ke Rupiah jika mata uang berbeda
+            $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
+            $total += $biayaAmount;
         }
 
         $purchaseOrder->update([
             'total_amount' => $total
         ]);
+
+        self::$updatingTotalAmount = false;
 
         return $purchaseOrder;
     }

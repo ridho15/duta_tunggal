@@ -29,7 +29,7 @@ class PermissionPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('creat permission');
+        return $user->hasPermissionTo('create permission');
     }
 
     /**

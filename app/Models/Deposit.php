@@ -18,14 +18,21 @@ class Deposit extends Model
         'used_amount',
         'remaining_amount',
         'coa_id',
+        'payment_coa_id',
         'note',
         'status', //active,closed
-        'created_by'
+        'created_by',
+        'deposit_number'
     ];
 
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+
+    public function paymentCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'payment_coa_id')->withDefault();
     }
 
     public function fromModel()
@@ -46,6 +53,11 @@ class Deposit extends Model
     public function depositLogRef()
     {
         return $this->morphMany(DepositLog::class, 'reference');
+    }
+
+    public function journalEntry()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
     }
 
     protected static function booted()

@@ -47,7 +47,8 @@ class DeliveryOrderResource extends Resource
 
     protected static ?string $navigationGroup = 'Delivery Order';
 
-    protected static ?int $navigationSort = 13;
+    // Position Delivery Order as the 5th group
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {
@@ -77,6 +78,36 @@ class DeliveryOrderResource extends Resource
                             ->preload()
                             ->searchable()
                             ->reactive()
+                            ->rules([
+                                function () {
+                                    return function (string $attribute, $value, \Closure $fail) {
+                                        if (empty($value)) {
+                                            return;
+                                        }
+                                        
+                                        foreach ($value as $salesOrderId) {
+                                            $salesOrder = SaleOrder::find($salesOrderId);
+                                            if (!$salesOrder) {
+                                                $fail("Sales Order dengan ID {$salesOrderId} tidak ditemukan.");
+                                                return;
+                                            }
+                                            
+                                            if ($salesOrder->status !== 'confirmed') {
+                                                $fail("Sales Order {$salesOrder->so_number} belum dikonfirmasi warehouse (status: {$salesOrder->status}). Silakan konfirmasi warehouse terlebih dahulu.");
+                                                return;
+                                            }
+                                            
+                                            if (!$salesOrder->warehouse_confirmed_at) {
+                                                $fail("Sales Order {$salesOrder->so_number} belum memiliki tanggal konfirmasi warehouse. Silakan konfirmasi warehouse terlebih dahulu.");
+                                                return;
+                                            }
+                                        }
+                                    };
+                                },
+                            ])
+                            ->validationMessages([
+                                'required' => 'Sales Order wajib dipilih',
+                            ])
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $listSaleOrder = SaleOrder::whereIn('id', $state)->get();
                                 $items = [];
@@ -98,10 +129,13 @@ class DeliveryOrderResource extends Resource
                                 $set('deliveryOrderItem', $items);
                             })
                             ->relationship('salesOrders', 'so_number', function (Builder $query) {
-                                $query->where('tipe_pengiriman', 'Kirim Langsung')->whereIn('status', ['approved', 'completed']);
+                                $query->where('tipe_pengiriman', 'Kirim Langsung')
+                                      ->whereIn('status', ['confirmed', 'completed'])
+                                      ->whereNotNull('warehouse_confirmed_at');
                             })
                             ->multiple()
-                            ->nullable(),
+                            ->nullable()
+                            ->helperText('Hanya Sales Order yang sudah dikonfirmasi warehouse yang dapat dipilih untuk membuat Delivery Order.'),
                         DateTimePicker::make('delivery_date')
                             ->label('Tanggal Pengiriman')
                             ->required()
@@ -358,14 +392,19 @@ class DeliveryOrderResource extends Resource
                 TextColumn::make('status')
                     ->formatStateUsing(function ($state) {
                         return Str::upper($state);
-                    })->color(function ($state) {
+                    })
+                    ->color(function ($state) {
                         return match ($state) {
                             'draft' => 'gray',
-                            'request_close' => 'warning',
-                            'request_approve' => 'primary',
-                            'closed' => 'danger',
-                            'approved' => 'primary',
+                            'sent' => 'primary',
+                            'received' => 'info',
+                            'supplier' => 'warning',
                             'completed' => 'success',
+                            'request_approve' => 'primary',
+                            'approved' => 'primary',
+                            'request_close' => 'warning',
+                            'closed' => 'danger',
+                            'reject' => 'danger',
                         };
                     })
                     ->badge(),
@@ -547,7 +586,15 @@ class DeliveryOrderResource extends Resource
                         ->action(function ($record) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
                             $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'completed');
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                            // Post delivery order to general ledger for HPP recognition
+                            $postResult = $deliveryOrderService->postDeliveryOrder($record);
+                            if ($postResult['status'] === 'posted') {
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed and posted to ledger");
+                            } elseif ($postResult['status'] === 'error') {
+                                HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
+                            } else {
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                            }
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)

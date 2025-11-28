@@ -6,6 +6,8 @@ use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\Pages\ViewPurchaseOrder;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PurchaseOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
+use App\Models\Asset;
+use App\Models\ChartOfAccount;
 use App\Models\Currency;
 use App\Models\Invoice;
 use App\Models\OrderRequest;
@@ -14,8 +16,11 @@ use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
 use App\Models\Supplier;
 use App\Models\Warehouse;
+use App\Services\AssetService;
 use App\Services\InvoiceService;
 use App\Services\PurchaseOrderService;
+use App\Services\QualityControlService;
+use App\Services\PurchaseReceiptService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -44,11 +49,15 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderResource extends Resource
 {
@@ -56,7 +65,8 @@ class PurchaseOrderResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Pembelian';
+    // Group label updated to include English hint per request
+    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
     protected static ?string $navigationLabel = 'Pembelian';
 
@@ -122,6 +132,8 @@ class PurchaseOrderResource extends Resource
                                         } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
                                             $orderRequest = OrderRequest::find($state);
                                             if ($orderRequest) {
+                                                $set('supplier_id', $orderRequest->supplier_id);
+                                                $set('warehouse_id', $orderRequest->warehouse_id);
                                                 foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
                                                     $subtotal = ((int)$orderRequestItem->quantity * (int) $orderRequestItem->unit_price) - (int) $orderRequestItem->discount + (int) $orderRequestItem->tax;
                                                     array_push($items, [
@@ -130,7 +142,8 @@ class PurchaseOrderResource extends Resource
                                                         'unit_price' => $orderRequestItem->product->cost_price,
                                                         'discount' => 0,
                                                         'tax' => 0,
-                                                        'subtotal' => $subtotal
+                                                        'subtotal' => $subtotal,
+                                                        'currency_id' => 7, // Default to IDR (Indonesian Rupiah)
                                                     ]);
                                                 }
                                             }
@@ -193,10 +206,40 @@ class PurchaseOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Gudang belum dipilih',
                             ])
-                            ->relationship('warehouse', 'nama')
+                            ->relationship('warehouse', 'nama', function(Builder $query) {
+                                return $query->orderBy('name')->where('status', 1);
+                            })
                             ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                 return "({$warehouse->kode}) {$warehouse->name}";
                             }),
+                        Toggle::make('is_import')
+                            ->label('Pembelian Import?')
+                            ->helperText('Aktifkan untuk menandai pembelian impor sehingga pajak impor dicatat saat pembayaran')
+                            ->reactive(),
+                        Radio::make('ppn_option')
+                            ->label('Opsi PPN')
+                            ->inline()
+                            ->reactive()
+                            ->default('standard')
+                            ->options([
+                                'standard' => 'Pakai PPN (Default)',
+                                'non_ppn' => 'Non PPN',
+                            ])
+                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                if (!in_array($state, ['standard', 'non_ppn'])) {
+                                    return;
+                                }
+
+                                if ($state === 'non_ppn') {
+                                    $items = collect($get('purchaseOrderItem') ?? [])->map(function ($item) {
+                                        $item['tax'] = 0;
+                                        $item['tipe_pajak'] = 'Non Pajak';
+                                        return $item;
+                                    })->all();
+                                    $set('purchaseOrderItem', $items);
+                                }
+                            })
+                            ->helperText('Pilih Non PPN bila pemasok tidak mengenakan PPN untuk pesanan ini'),
                         TextInput::make('tempo_hutang')
                             ->label('Tempo Hutang (Hari)')
                             ->numeric()
@@ -218,7 +261,7 @@ class PurchaseOrderResource extends Resource
                             ->columns(3)
                             ->reactive()
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
-                                $data['subtotal'] = HelperController::hitungSubtotal($data['quantity'], $data['unit_price'], $data['discount'], $data['tax']);
+                                $data['subtotal'] = HelperController::hitungSubtotal($data['quantity'], HelperController::parseIndonesianMoney($data['unit_price']), $data['discount'], $data['tax'], $data['tipe_pajak'] ?? null);
                                 return $data;
                             })
                             ->addAction(function (ActionsAction $action) {
@@ -230,28 +273,96 @@ class PurchaseOrderResource extends Resource
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
-                                    ->searchable()
-                                    ->preload()
-                                    ->getOptionLabelFromRecordUsing(function ($record) {
-                                        return "{$record->sku} - {$record->name}";
+                                    ->options(function (Get $get) {
+                                        $supplierId = $get('../../supplier_id');
+                                        if ($supplierId) {
+                                            return Product::where('supplier_id', $supplierId)->get()->mapWithKeys(function ($product) {
+                                                return [$product->id => "{$product->sku} - {$product->name}"];
+                                            });
+                                        }
+                                        return [];
                                     })
-                                    ->relationship('product', 'name')
+                                    ->searchable()
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         $product = Product::find($state);
-                                        $set('unit_price', $product->cost_price);
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        if ($product) {
+                                            $set('unit_price', $product->cost_price);
+                                            $set('discount', 0); // Default discount 0, bisa disesuaikan
+                                            $set('tax', $product->pajak ?? 0);
+                                            $set('tipe_pajak', $product->tipe_pajak ?? 'Inklusif');
+                                        }
+                                        $set('subtotal', HelperController::hitungSubtotal((int)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (int)$get('discount'), (int)$get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->required(),
                                 Select::make('currency_id')
                                     ->label('Mata Uang')
                                     ->preload()
                                     ->searchable()
-                                    ->required()
                                     ->reactive()
-                                    ->relationship('currency', 'name')
-                                    ->getOptionLabelFromRecordUsing(function (Currency $currency) {
-                                        return "{$currency->name} ({$currency->symbol})";
+                                    ->required()
+                                    ->options(function () {
+                                        return Currency::orderBy('name')->get()->mapWithKeys(function (Currency $c) {
+                                            return [$c->id => "{$c->name} ({$c->symbol})"];
+                                        });
+                                    })
+                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                        // Ensure this currency is added to purchaseOrderCurrency if not already present
+                                        // log selection to help debug validation issue
+                                        \Illuminate\Support\Facades\Log::debug('POItem.currency afterStateUpdated START', [
+                                            'state' => $state,
+                                            'state_type' => gettype($state),
+                                            'is_null' => is_null($state),
+                                            'is_empty' => empty($state),
+                                            'purchaseOrderItem' => $get('../..purchaseOrderItem') ?? null,
+                                        ]);
+
+                                        $currencies = $get('../../purchaseOrderCurrency') ?? [];
+                                        \Illuminate\Support\Facades\Log::debug('POItem.currency current currencies', [
+                                            'currencies' => $currencies,
+                                            'currencies_count' => count($currencies),
+                                        ]);
+
+                                        $currencyExists = false;
+                                        
+                                        foreach ($currencies as $index => $currency) {
+                                            \Illuminate\Support\Facades\Log::debug('POItem.currency checking currency', [
+                                                'index' => $index,
+                                                'currency' => $currency,
+                                                'currency_id' => $currency['currency_id'] ?? null,
+                                                'state' => $state,
+                                                'matches' => (($currency['currency_id'] ?? null) == $state)
+                                            ]);
+                                            if (($currency['currency_id'] ?? null) == $state) {
+                                                $currencyExists = true;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        \Illuminate\Support\Facades\Log::debug('POItem.currency exists check result', [
+                                            'currencyExists' => $currencyExists,
+                                            'will_add' => (!$currencyExists && $state)
+                                        ]);
+                                        
+                                        if (!$currencyExists && $state) {
+                                            $currencies[] = [
+                                                'currency_id' => $state,
+                                                'nominal' => 0
+                                            ];
+                                            \Illuminate\Support\Facades\Log::debug('POItem.currency adding new currency', [
+                                                'new_currencies' => $currencies
+                                            ]);
+                                            $set('../../purchaseOrderCurrency', $currencies);
+                                            
+                                            // Verify the set worked
+                                            $updatedCurrencies = $get('../../purchaseOrderCurrency') ?? [];
+                                            \Illuminate\Support\Facades\Log::debug('POItem.currency after set verification', [
+                                                'updated_currencies' => $updatedCurrencies,
+                                                'updated_count' => count($updatedCurrencies)
+                                            ]);
+                                        }
+                                        
+                                        \Illuminate\Support\Facades\Log::debug('POItem.currency afterStateUpdated END');
                                     })
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih',
@@ -262,18 +373,20 @@ class PurchaseOrderResource extends Resource
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->numeric(),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->reactive()
                                     ->required()
+                                    ->numeric()
+                                    ->indonesianMoney()
                                     ->validationMessages([
                                         'required' => 'Unit price tidak boleh kosong',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
@@ -290,11 +403,12 @@ class PurchaseOrderResource extends Resource
                                     ->numeric()
                                     ->required()
                                     ->maxValue(100)
+                                    ->indonesianMoney()
                                     ->validationMessages([
                                         'required' => 'Discount tidak boleh kosong. Minimal 0'
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        $set('subtotal', HelperController::hitungSubtotal((int)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (int)$get('discount'), (int)$get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->suffix('%')
                                     ->default(0),
@@ -304,11 +418,12 @@ class PurchaseOrderResource extends Resource
                                     ->numeric()
                                     ->maxValue(100)
                                     ->required()
+                                    ->disabled(fn (Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn')
                                     ->validationMessages([
                                         'required' => 'Tax tidak boleh kosong, Minimal 0'
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        $set('subtotal', HelperController::hitungSubtotal((int)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (int)$get('discount'), (int)$get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->suffix('%')
                                     ->default(0),
@@ -324,11 +439,45 @@ class PurchaseOrderResource extends Resource
                                         return null;
                                     })
                                     ->default(0)
-                                    ->readOnly(),
+                                    ->readOnly()
+                                    ->indonesianMoney()
+                                    ->afterStateUpdated(function ($component, $state, $livewire) {
+                                        $items = $livewire->data['purchaseOrderItem'] ?? [];
+                                        $total = 0;
+                                        foreach ($items as $item) {
+                                            $total += \App\Http\Controllers\HelperController::hitungSubtotal(
+                                                $item['quantity'] ?? 0,
+                                                \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                                $item['discount'] ?? 0,
+                                                $item['tax'] ?? 0,
+                                                $item['tipe_pajak'] ?? null
+                                            );
+                                        }
+
+                                        // Add biaya amounts converted using purchaseOrderCurrency.nominal if available
+                                        $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
+                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
+                                        foreach ($biayas as $biaya) {
+                                            $nominal = 1;
+                                            if (isset($biaya['currency_id'])) {
+                                                foreach ($currencies as $c) {
+                                                    if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
+                                                        $nominal = $c['nominal'] ?? $nominal;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            $total += ($biaya['total'] ?? 0) * $nominal;
+                                        }
+
+                                        $livewire->data['total_amount'] = $total;
+                                    }),
                                 Radio::make('tipe_pajak')
                                     ->label('Tipe Pajak')
                                     ->inline()
+                                    ->reactive()
                                     ->required()
+                                    ->disabled(fn (Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn')
                                     ->options([
                                         'Non Pajak' => 'Non Pajak',
                                         'Inklusif' => 'Inklusif',
@@ -341,6 +490,15 @@ class PurchaseOrderResource extends Resource
                         Repeater::make('purchaseOrderBiaya')
                             ->columnSpanFull()
                             ->relationship()
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
+                                // Ensure 'total' is provided as a numeric value so
+                                // the ->indonesianMoney() formatter can render it.
+                                if (isset($data['total']) && is_numeric($data['total'])) {
+                                    // cast to int if it has no cents, otherwise float
+                                    $data['total'] = (int) $data['total'] == $data['total'] ? (int) $data['total'] : (float) $data['total'];
+                                }
+                                return $data;
+                            })
                             ->addActionAlignment(Alignment::Right)
                             ->addAction(function (ActionsAction $action) {
                                 return $action->color('primary')
@@ -348,7 +506,7 @@ class PurchaseOrderResource extends Resource
                                     ->label('Tambah Biaya');
                             })
                             ->label('Biaya Lain')
-                            ->columns(5)
+                            ->columns(3)
                             ->schema([
                                 TextInput::make('nama_biaya')
                                     ->label('Nama Biaya')
@@ -360,18 +518,38 @@ class PurchaseOrderResource extends Resource
                                         'string' => 'Nama biaya tidak valid !',
                                         'max' => 'Nama biaya terlalu panjang'
                                     ]),
-                                Select::make('currency_id')
-                                    ->label('Mata Uang')
+                               Select::make('currency_id')
+                                    ->label('Mata uang')
                                     ->preload()
                                     ->searchable()
-                                    ->relationship('currency', 'name')
+                                    ->reactive()
                                     ->required()
-                                    ->getOptionLabelFromRecordUsing(function (Currency $currency) {
-                                        return "{$currency->name} ({$currency->symbol})";
+                                    ->options(function () {
+                                        return Currency::orderBy('name')->get()->mapWithKeys(function (Currency $c) {
+                                            return [$c->id => "{$c->name} ({$c->symbol})"];
+                                        });
                                     })
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih',
                                         'exists' => 'Mata uang tidak tersedia'
+                                    ]),
+                                Select::make('coa_id')
+                                    ->label('COA Biaya')
+                                    ->preload()
+                                    ->searchable()
+                                    ->relationship('coa', 'name')
+                                    ->required()
+                                    ->getOptionLabelFromRecordUsing(function (ChartOfAccount $coa) {
+                                        return "({$coa->code}) {$coa->name}";
+                                    })
+                                    ->options(function () {
+                                        return ChartOfAccount::where('type', 'Expense')->orderBy('code')->get()->mapWithKeys(function ($coa) {
+                                            return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                        });
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'COA biaya belum dipilih',
+                                        'exists' => 'COA biaya tidak tersedia'
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
@@ -388,7 +566,38 @@ class PurchaseOrderResource extends Resource
                                         'required' => 'Total tidak boleh kosong',
                                         'numeric' => 'Total biaya tidak valid !',
                                     ])
-                                    ->default(0),
+                                    ->default(0)
+                                    ->indonesianMoney()
+                                    ->afterStateUpdated(function ($component, $state, $livewire) {
+                                        $items = $livewire->data['purchaseOrderItem'] ?? [];
+                                        $total = 0;
+                                        foreach ($items as $item) {
+                                            $total += \App\Http\Controllers\HelperController::hitungSubtotal(
+                                                $item['quantity'] ?? 0,
+                                                \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                                $item['discount'] ?? 0,
+                                                $item['tax'] ?? 0,
+                                                $item['tipe_pajak'] ?? null
+                                            );
+                                        }
+
+                                        $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
+                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
+                                        foreach ($biayas as $biaya) {
+                                            $nominal = 1;
+                                            if (isset($biaya['currency_id'])) {
+                                                foreach ($currencies as $c) {
+                                                    if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
+                                                        $nominal = $c['nominal'] ?? $nominal;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            $total += ((float)$biaya['total'] ?? 0) * $nominal;
+                                        }
+
+                                        $livewire->data['total_amount'] = $total;
+                                    }),
                                 Radio::make('untuk_pembelian')
                                     ->label('Untuk Pembelian')
                                     ->options([
@@ -405,6 +614,13 @@ class PurchaseOrderResource extends Resource
                             ]),
                         Repeater::make('purchaseOrderCurrency')
                             ->label("Mata Uang")
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
+                                // Ensure 'nominal' is numeric so ->indonesianMoney() will render it
+                                if (isset($data['nominal']) && is_numeric($data['nominal'])) {
+                                    $data['nominal'] = (int) $data['nominal'] == $data['nominal'] ? (int) $data['nominal'] : (float) $data['nominal'];
+                                }
+                                return $data;
+                            })
                             ->addActionAlignment(Alignment::Right)
                             ->relationship()
                             ->addAction(function (ActionsAction $action) {
@@ -414,16 +630,28 @@ class PurchaseOrderResource extends Resource
                             })
                             ->columnSpanFull()
                             ->columns(2)
+                            ->defaultItems(1)
+                            ->default([
+                                [
+                                    'currency_id' => 7, // Default to IDR
+                                    'nominal' => 0
+                                ]
+                            ])
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Minimal satu mata uang harus dipilih'
+                            ])
                             ->schema([
                                 Select::make('currency_id')
                                     ->label('Mata uang')
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
-                                    ->relationship('currency', 'name')
                                     ->required()
-                                    ->getOptionLabelFromRecordUsing(function (Currency $currency) {
-                                        return "{$currency->name} ({$currency->symbol})";
+                                    ->options(function () {
+                                        return Currency::orderBy('name')->get()->mapWithKeys(function (Currency $c) {
+                                            return [$c->id => "{$c->name} ({$c->symbol})"];
+                                        });
                                     })
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih',
@@ -432,6 +660,7 @@ class PurchaseOrderResource extends Resource
                                 TextInput::make('nominal')
                                     ->label('Nominal')
                                     ->reactive()
+                                    ->indonesianMoney()
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
                                         if ($currency) {
@@ -440,16 +669,61 @@ class PurchaseOrderResource extends Resource
 
                                         return null;
                                     })
-                                    ->numeric(),
+                                    ->numeric()
+                                    ->afterStateUpdated(function ($component, $state, $livewire) {
+                                        $items = $livewire->data['purchaseOrderItem'] ?? [];
+                                        $total = 0;
+                                        foreach ($items as $item) {
+                                            $total += \App\Http\Controllers\HelperController::hitungSubtotal(
+                                                $item['quantity'] ?? 0,
+                                                \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                                $item['discount'] ?? 0,
+                                                $item['tax'] ?? 0,
+                                                $item['tipe_pajak'] ?? null
+                                            );
+                                        }
+
+                                        $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
+                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
+                                        foreach ($biayas as $biaya) {
+                                            $nominal = 1.0;
+                                            if (isset($biaya['currency_id'])) {
+                                                foreach ($currencies as $c) {
+                                                    if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
+                                                        $nominal = (float)($c['nominal'] ?? $nominal);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            $total += ((float)$biaya['total'] ?? 0) * $nominal;
+                                        }
+
+                                        $livewire->data['total_amount'] = $total;
+                                    }),
                             ]),
                         TextInput::make('total_amount')
+                        ->label("Total Amount")
                             ->required()
-                            ->prefix('Rp.')
-                            ->numeric()
                             ->reactive()
                             ->readOnly()
-                            ->helperText("Untuk melihat total silahkan simpan data terlebih dahulu")
-                            ->default(0),
+                            ->indonesianMoney()
+                            ->helperText('Total dihitung dari item dan biaya; tampil untuk referensi saja')
+                            ->afterStateHydrated(function ($component, $record) {
+                                if (! $record) {
+                                    return;
+                                }
+
+                                $total = 0;
+                                foreach ($record->purchaseOrderItem as $item) {
+                                    $total += \App\Http\Controllers\HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);
+                                }
+
+                                foreach ($record->purchaseOrderBiaya as $biaya) {
+                                    $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
+                                    $total += $biayaAmount;
+                                }
+                                $component->state($total);
+                            }),
 
                     ])
             ]);
@@ -475,6 +749,18 @@ class PurchaseOrderResource extends Resource
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->searchable(),
+                IconColumn::make('is_import')
+                    ->label('Import?')
+                    ->boolean()
+                    ->tooltip(fn ($state) => $state ? 'Pembelian import (pajak dicatat saat pembayaran)' : 'Pembelian lokal'),
+                TextColumn::make('ppn_option')
+                    ->label('Opsi PPN')
+                    ->formatStateUsing(function ($state) {
+                        return $state === 'non_ppn' ? 'Non PPN' : 'PPN';
+                    })
+                    ->badge()
+                    ->color(fn ($state) => $state === 'non_ppn' ? 'warning' : 'success')
+                    ->toggleable(),
                 TextColumn::make('warehouse')
                     ->label('Gudang')
                     ->searchable(query: function (Builder $query, $search) {
@@ -521,13 +807,39 @@ class PurchaseOrderResource extends Resource
                         }
                     })
                     ->badge(),
+                TextColumn::make('qc_status')
+                    ->label('QC Status')
+                    ->formatStateUsing(function ($record) {
+                        $totalItems = $record->purchaseOrderItem->count();
+                        $qcItems = $record->purchaseOrderItem->filter(function ($item) {
+                            return $item->qualityControl !== null;
+                        })->count();
+                        
+                        if ($totalItems === 0) return 'No Items';
+                        if ($qcItems === 0) return 'Not Started';
+                        if ($qcItems === $totalItems) return 'Completed';
+                        return 'Partial (' . $qcItems . '/' . $totalItems . ')';
+                    })
+                    ->color(function ($record) {
+                        $totalItems = $record->purchaseOrderItem->count();
+                        $qcItems = $record->purchaseOrderItem->filter(function ($item) {
+                            return $item->qualityControl !== null;
+                        })->count();
+                        
+                        if ($totalItems === 0) return 'gray';
+                        if ($qcItems === 0) return 'warning';
+                        if ($qcItems === $totalItems) return 'success';
+                        return 'info';
+                    })
+                    ->badge()
+                    ->toggleable(),
                 TextColumn::make('expected_date')
                     ->label('Tanggal Diharapkan')
                     ->date()
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total Amount')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('purchaseOrderItem.product.name')
                     ->label('Product')
@@ -581,7 +893,86 @@ class PurchaseOrderResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->label('Status PO')
+                    ->options([
+                        'draft' => 'Draft',
+                        'request_approval' => 'Request Approval',
+                        'approved' => 'Approved',
+                        'partially_received' => 'Partially Received',
+                        'completed' => 'Completed',
+                        'request_close' => 'Request Close',
+                        'closed' => 'Closed',
+                    ])
+                    ->placeholder('Pilih Status'),
+                SelectFilter::make('is_import')
+                    ->label('Pembelian Import')
+                    ->options([
+                        1 => 'Import',
+                        0 => 'Non Import',
+                    ])
+                    ->placeholder('Semua PO'),
+                SelectFilter::make('ppn_option')
+                    ->label('Opsi PPN')
+                    ->options([
+                        'standard' => 'PPN',
+                        'non_ppn' => 'Non PPN',
+                    ])
+                    ->placeholder('Semua Opsi PPN'),
+                SelectFilter::make('supplier_id')
+                    ->label('Supplier')
+                    ->relationship('supplier', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
+                        return "({$supplier->code}) {$supplier->name}";
+                    }),
+                SelectFilter::make('warehouse_id')
+                    ->label('Gudang')
+                    ->relationship('warehouse', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                        return "({$warehouse->kode}) {$warehouse->name}";
+                    }),
+                Filter::make('order_date')
+                    ->form([
+                        DatePicker::make('order_date_from')
+                            ->label('Tanggal Order Dari'),
+                        DatePicker::make('order_date_until')
+                            ->label('Tanggal Order Sampai'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['order_date_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('order_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['order_date_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('order_date', '<=', $date),
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+
+                        if ($data['order_date_from'] ?? null) {
+                            $indicators['order_date_from'] = 'Order dari ' . Carbon::parse($data['order_date_from'])->toFormattedDateString();
+                        }
+
+                        if ($data['order_date_until'] ?? null) {
+                            $indicators['order_date_until'] = 'Order sampai ' . Carbon::parse($data['order_date_until'])->toFormattedDateString();
+                        }
+
+                        return $indicators;
+                    }),
+                SelectFilter::make('is_asset')
+                    ->label('Tipe PO')
+                    ->options([
+                        1 => 'Asset',
+                        0 => 'Non Asset',
+                    ])
+                    ->placeholder('Pilih Tipe'),
             ])
             ->actions([
                 ActionGroup::make([
@@ -599,7 +990,8 @@ class PurchaseOrderResource extends Resource
                     Action::make('konfirmasi')
                         ->label('Konfirmasi')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response purchase order') && ($record->status == 'request_approval' || $record->status == 'request_close');
+                            return Gate::allows('response purchase order')
+                                && ($record->status == 'request_approval' || $record->status == 'request_close');
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-check-badge')
@@ -613,16 +1005,71 @@ class PurchaseOrderResource extends Resource
                                         ->string()
                                 ];
                             }
+                            // request_approval case
+                            if ($record->status == 'request_approval' && $record->is_asset) {
+                                return [
+                                    Fieldset::make('Asset Parameters')->schema([
+                                        DatePicker::make('usage_date')->label('Tanggal Pakai')->required()->default($record->order_date),
+                                        TextInput::make('useful_life_years')->label('Umur Manfaat (Tahun)')->numeric()->required()->default(5),
+                                        TextInput::make('salvage_value')->label('Nilai Sisa')->numeric()->default(0),
+                                        Select::make('asset_coa_id')->label('COA Aset')->options(function () {
+                                            return ChartOfAccount::where('type', 'Asset')->orderBy('code')->get()->mapWithKeys(fn($coa) => [$coa->id => "({$coa->code}) {$coa->name}"]);
+                                        })->searchable()->required(),
+                                        Select::make('accumulated_depreciation_coa_id')->label('COA Akumulasi Penyusutan')->options(function () {
+                                            return ChartOfAccount::where('type', 'Contra Asset')->orderBy('code')->get()->mapWithKeys(fn($coa) => [$coa->id => "({$coa->code}) {$coa->name}"]);
+                                        })->searchable()->required(),
+                                        Select::make('depreciation_expense_coa_id')->label('COA Beban Penyusutan')->options(function () {
+                                            return ChartOfAccount::where('type', 'Expense')->orderBy('code')->get()->mapWithKeys(fn($coa) => [$coa->id => "({$coa->code}) {$coa->name}"]);
+                                        })->searchable()->required(),
+                                    ])->columns(1),
+                                ];
+                            }
 
                             return null;
                         })
                         ->action(function (array $data, $record) {
                             if ($record->status == 'request_approval') {
-                                $record->update([
-                                    'status' => 'approved',
-                                    'date_approved' => Carbon::now(),
-                                    'approved_by' => Auth::user()->id,
-                                ]);
+                                DB::transaction(function () use ($record, $data) {
+                                    $status = $record->is_asset ? 'completed' : 'approved';
+                                    $record->update([
+                                        'status' => $status,
+                                        'date_approved' => Carbon::now(),
+                                        'approved_by' => Auth::user()->id,
+                                    ]);
+
+                                    if ($record->is_asset) {
+                                        $record->update([
+                                            'completed_at' => Carbon::now(),
+                                            'completed_by' => Auth::user()->id,
+                                        ]);
+                                        foreach ($record->purchaseOrderItem as $item) {
+                                            $total = \App\Http\Controllers\HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);
+
+                                            $asset = Asset::create([
+                                                'name' => $item->product->name,
+                                                'product_id' => $item->product_id,
+                                                'purchase_order_id' => $record->id,
+                                                'purchase_order_item_id' => $item->id,
+                                                'purchase_date' => $record->order_date,
+                                                'usage_date' => $data['usage_date'] ?? $record->order_date,
+                                                'purchase_cost' => $total,
+                                                'salvage_value' => $data['salvage_value'] ?? 0,
+                                                'useful_life_years' => (int)($data['useful_life_years'] ?? 5),
+                                                'asset_coa_id' => $data['asset_coa_id'],
+                                                'accumulated_depreciation_coa_id' => $data['accumulated_depreciation_coa_id'],
+                                                'depreciation_expense_coa_id' => $data['depreciation_expense_coa_id'],
+                                                'status' => 'active',
+                                                'notes' => 'Generated from PO ' . $record->po_number,
+                                            ]);
+
+                                            $asset->calculateDepreciation();
+
+                                            // Post asset acquisition journal entry
+                                            $assetService = new AssetService();
+                                            $assetService->postAssetAcquisitionJournal($asset, $record->supplier->coa_id ?? null);
+                                        }
+                                    }
+                                });
                             } elseif ($record->status == 'request_close') {
                                 $record->update([
                                     'close_reason' => $data['close_reason'],
@@ -635,7 +1082,8 @@ class PurchaseOrderResource extends Resource
                     Action::make('tolak')
                         ->label('Tolak')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response purchase order') && ($record->status == 'request_approval' || $record->status == 'request_close');
+                            return Gate::allows('response purchase order')
+                                && ($record->status == 'request_approval' || $record->status == 'request_close');
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-x-circle')
@@ -648,7 +1096,8 @@ class PurchaseOrderResource extends Resource
                     Action::make('request_approval')
                         ->label('Request Approval')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request purchase order') && $record->status == 'draft';
+                            return Gate::allows('request purchase order')
+                                && $record->status == 'draft';
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-clipboard-document-check')
@@ -661,7 +1110,8 @@ class PurchaseOrderResource extends Resource
                     Action::make('request_close')
                         ->label('Request Close')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request purchase order') && ($record->status != 'closed' || $record->status != 'completed');
+                            return Gate::allows('request purchase order')
+                                && ($record->status != 'closed' || $record->status != 'completed');
                         })
                         ->hidden(function ($record) {
                             return $record->status == 'completed';
@@ -680,6 +1130,39 @@ class PurchaseOrderResource extends Resource
                                 'status' => 'request_close',
                                 'close_reason' => $data['close_reason']
                             ]);
+                        }),
+                    Action::make('create_qc')
+                        ->label('Buat QC (Pre-Receipt)')
+                        ->icon('heroicon-o-archive-box-arrow-down')
+                        ->color('info')
+                        ->visible(function ($record) {
+                            return $record->status == 'approved' && !$record->purchaseOrderItem->pluck('qualityControl')->filter()->isNotEmpty();
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Buat Quality Control Pre-Receipt')
+                        ->modalDescription('QC ini akan dibuat berdasarkan spesifikasi di Purchase Order. Barang belum perlu diterima terlebih dahulu.')
+                        ->modalSubmitActionLabel('Buat QC')
+                        ->action(function ($record) {
+                            $qualityControlService = app(QualityControlService::class);
+                            
+                            foreach ($record->purchaseOrderItem as $poItem) {
+                                // Skip if QC already exists for this item
+                                if ($poItem->qualityControl) {
+                                    continue;
+                                }
+                                
+                                $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
+                                    'inspected_by' => Auth::id(),
+                                    'passed_quantity' => $poItem->quantity, // Assume all pass initially
+                                    'rejected_quantity' => 0,
+                                ]);
+                            }
+                            
+                            HelperController::sendNotification(
+                                isSuccess: true, 
+                                title: "QC Berhasil Dibuat", 
+                                message: "Quality Control pre-receipt telah dibuat untuk semua item di PO " . $record->po_number
+                            );
                         }),
                     Action::make('cetak_pdf')
                         ->label('Cetak PDF')
@@ -745,7 +1228,6 @@ class PurchaseOrderResource extends Resource
                             TextInput::make('other_fee')
                                 ->required()
                                 ->numeric()
-                                ->prefix('Rp.')
                                 ->default(function ($record) {
                                     $otherFee = 0;
                                     foreach ($record->purchaseOrderBiaya as $biaya) {

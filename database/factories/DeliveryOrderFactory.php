@@ -21,9 +21,11 @@ class DeliveryOrderFactory extends Factory
         return [
             'do_number' => $this->faker->unique()->word(),
             'delivery_date' => $this->faker->date(),
-            'driver_id' => Driver::inRandomOrder()->first()->id,
-            'vehicle_id' => Vehicle::inRandomOrder()->first()->id,
-            'notes' => $this->faker->sentence()
+            'driver_id' => 1, // Use static ID for testing
+            'vehicle_id' => 1, // Use static ID for testing
+            'notes' => $this->faker->sentence(),
+            'warehouse_id' => \App\Models\Warehouse::factory(),
+            'status' => 'draft',
         ];
     }
 }

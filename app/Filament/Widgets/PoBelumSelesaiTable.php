@@ -49,7 +49,7 @@ class PoBelumSelesaiTable extends BaseWidget
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total Amount')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Status PO')

@@ -1,0 +1,295 @@
+<?php
+
+namespace App\Filament\Resources\PurchaseReceiptResource\RelationManagers;
+
+use App\Models\Currency;
+use App\Models\QualityControl;
+use App\Services\QualityControlService;
+use App\Services\PurchaseReceiptService;
+use App\Http\Controllers\HelperController;
+use Filament\Forms;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Form;
+use App\Notifications\FilamentDatabaseNotification;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Tables;
+use Filament\Facades\Filament;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\CreateAction;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
+
+class PurchaseReceiptItemRelationManager extends RelationManager
+{
+    protected static string $relationship = 'purchaseReceiptItem';
+
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Select::make('product_id')
+                    ->label('Product')
+                    ->preload()
+                    ->searchable()
+                    ->required()
+                    ->relationship('product', 'name', function ($get, Builder $query) {
+                        $purchaseOrderId = $get('../../purchase_order_id');
+                        return $query->whereHas('purchaseOrderItem', function (Builder $query) use ($purchaseOrderId) {
+                            $query->where('purchase_order_id', $purchaseOrderId);
+                        });
+                    })
+                    ->reactive()
+                    ->getOptionLabelFromRecordUsing(function ($record) {
+                        return "{$record->sku} - {$record->name}";
+                    }),
+                Select::make('warehouse_id')
+                    ->label('Gudang')
+                    ->preload()
+                    ->searchable()
+                    ->relationship('warehouse', 'name'),
+                TextInput::make('qty_received')
+                    ->label('Quantity Received')
+                    ->numeric()
+                    ->required()
+                    ->reactive()
+                    ->afterStateUpdated(function ($state, $set, $get) {
+                        $qtyReceived = (float) ($state ?? 0);
+                        $qtyAccepted = (float) ($get('qty_accepted') ?? 0);
+                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
+                        $set('qty_rejected', $qtyRejected);
+                    })
+                    ->default(0),
+                TextInput::make('qty_accepted')
+                    ->label('Quantity Accepted')
+                    ->numeric()
+                    ->reactive()
+                    ->afterStateUpdated(function ($state, $set, $get, $component) {
+                        $qtyReceived = (float) ($get('qty_received') ?? 0);
+                        $qtyAccepted = (float) ($state ?? 0);
+                        
+                        // Validation: qty_accepted cannot exceed qty_received
+                        if ($qtyAccepted > $qtyReceived) {
+                            $component->state($qtyReceived);
+                            $qtyAccepted = $qtyReceived;
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Peringatan')
+                                ->body("Quantity Accepted tidak boleh melebihi Quantity Received ({$qtyReceived})")
+                                ->warning()
+                                ->send();
+                        }
+                        
+                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
+                        $set('qty_rejected', $qtyRejected);
+                    })
+                    ->default(0)
+                    ->required(),
+                TextInput::make('qty_rejected')
+                    ->label('Quantity Rejected')
+                    ->numeric()
+                    ->helperText("Otomatis dihitung dari Qty Received - Qty Accepted")
+                    ->disabled()
+                    ->dehydrated(true)
+                    ->default(0),
+                Repeater::make('purchaseReceiptItemPhoto')
+                    ->relationship()
+                    ->addActionLabel('Tambah Photo')
+                    ->schema([
+                        FileUpload::make('photo_url')
+                            ->label('Photo')
+                            ->image()
+                            ->maxSize(1024)
+                            ->required(),
+                    ]),
+            ]);
+    }
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->recordTitleAttribute('id')
+            ->columns([
+                TextColumn::make('is_sent')
+                    ->label('Status Stock')
+                    ->badge()
+                    ->color(function ($state) {
+                        if ($state == 0) {
+                            return 'gray';
+                        } else {
+                            return 'success';
+                        }
+                    })
+                    ->formatStateUsing(function ($state) {
+                        if ($state == 1) {
+                            return "Sudah Masuk Stock";
+                        } else {
+                            return "Belum Masuk Stock";
+                        }
+                    }),
+                TextColumn::make('product')
+                    ->label('Product')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->sku}) {$state->name}";
+                    })->searchable(),
+                TextColumn::make('warehouse.name')
+                    ->label('Warehouse')
+                    ->searchable(),
+                TextColumn::make('rak.name')
+                    ->label('Rak')
+                    ->searchable(),
+                TextColumn::make('qty_received')
+                    ->label('Quantity Received')
+                    ->sortable(),
+                TextColumn::make('qty_accepted')
+                    ->label('Quantity Accepted')
+                    ->sortable(),
+                TextColumn::make('qty_rejected')
+                    ->label('Quantity Rejected')
+                    ->sortable(),
+                ImageColumn::make('purchaseReceiptItemPhoto.photo_url')
+                    ->label('Photo')
+                    ->size(75)
+                    ->circular()
+                    ->stacked(),
+            ])
+            ->filters([
+                //
+            ])
+            ->headerActions([
+                CreateAction::make()
+                    ->label('Add Item')
+                    ->icon('heroicon-o-plus-circle'),
+            ])
+            ->actions([
+                ActionGroup::make([
+                    EditAction::make()
+                        ->color('success')
+                        ->hidden(function ($record) {
+                            return $record->is_sent == 1;
+                        }),
+                    DeleteAction::make()
+                        ->hidden(function ($record) {
+                            return $record->is_sent == 1;
+                        }),
+                    Action::make('decide_stock')
+                        ->label('Decide Stock')
+                        ->color('warning')
+                        ->icon('heroicon-o-archive-box-arrow-down')
+                        ->visible(function ($record) {
+                            return $record->is_sent == 0 && 
+                                   $record->qualityControl && 
+                                   $record->qualityControl->status == 1 && 
+                                   is_null($record->stock_decision);
+                        })
+                        ->form([
+                            Select::make('stock_decision')
+                                ->label('Stock Decision')
+                                ->options([
+                                    'inventory' => 'Stock to Inventory',
+                                    'return' => 'Return Product',
+                                ])
+                                ->required()
+                                ->default('inventory'),
+                            TextInput::make('return_reason')
+                                ->label('Return Reason')
+                                ->required()
+                                ->visible(fn ($get) => $get('stock_decision') === 'return'),
+                        ])
+                        ->requiresConfirmation()
+                        ->modalHeading('Decide Stock Action')
+                        ->modalDescription('Choose whether to add stock to inventory or return the product.')
+                        ->action(function ($record, array $data) {
+                            $purchaseReceiptService = app(PurchaseReceiptService::class);
+
+                            if ($data['stock_decision'] === 'inventory') {
+                                // Create temporary procurement entries first, then post inventory
+                                $tempResult = $purchaseReceiptService->createTemporaryProcurementEntriesForReceiptItem($record);
+                                if (isset($tempResult['status']) && $tempResult['status'] !== 'posted') {
+                                    HelperController::sendNotification(
+                                        isSuccess: false,
+                                        title: "Error",
+                                        message: 'Gagal membuat temporary procurement entries: ' . ($tempResult['message'] ?? 'Unknown error')
+                                    );
+                                    return;
+                                }
+
+                                // Then post inventory (this closes temporary procurement)
+                                $result = $purchaseReceiptService->postItemInventoryAfterQC($record);
+
+                                if (isset($result['status']) && $result['status'] === 'posted') {
+                                    // Mark item as sent to stock and decision made
+                                    $record->update(['is_sent' => 1, 'stock_decision' => 'inventory']);
+
+                                    Filament::auth()->user()->notify(new FilamentDatabaseNotification(
+                                        title: 'Journal Entry Dibuat',
+                                        body: 'Journal entry inventory: ' . $record->product->name . ' masuk stock',
+                                        icon: 'heroicon-o-document-text',
+                                        color: 'success',
+                                        actions: [
+                                            [
+                                                'name' => 'view_detail',
+                                                'label' => 'Lihat Detail',
+                                                'url' => '/admin/journal-entries?tableSearch=' . urlencode($record->purchaseReceipt->receipt_number),
+                                                'markAsRead' => true,
+                                            ]
+                                        ]
+                                    ));
+
+                                    HelperController::sendNotification(
+                                        isSuccess: true,
+                                        title: "Success",
+                                        message: "Item berhasil masuk stock, stock bertambah, dan journal entry dibuat"
+                                    );
+                                } else {
+                                    // If posting inventory failed, surface the message
+                                    $message = $result['message'] ?? 'Gagal saat memposting inventory';
+                                    HelperController::sendNotification(
+                                        isSuccess: false,
+                                        title: "Error",
+                                        message: $message
+                                    );
+                                }
+                            } elseif ($data['stock_decision'] === 'return') {
+                                // Handle return product logic
+                                $result = $purchaseReceiptService->postReturnProduct($record, $data['return_reason'] ?? '');
+
+                                if (isset($result['status']) && $result['status'] === 'posted') {
+                                    $record->update(['stock_decision' => 'return', 'reason_rejected' => $data['return_reason'] ?? '']);
+
+                                    HelperController::sendNotification(
+                                        isSuccess: true,
+                                        title: "Success",
+                                        message: "Item berhasil ditandai untuk return product dan journal entry dibuat"
+                                    );
+                                } else {
+                                    $message = $result['message'] ?? 'Gagal saat memposting return';
+                                    HelperController::sendNotification(
+                                        isSuccess: false,
+                                        title: "Error",
+                                        message: $message
+                                    );
+                                }
+                            }
+                        }),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
+            ->bulkActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+}

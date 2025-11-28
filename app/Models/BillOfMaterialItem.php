@@ -16,7 +16,15 @@ class BillOfMaterialItem extends Model
         'product_id',
         'quantity',
         'uom_id',
+        'unit_price',
+        'subtotal',
         'note'
+    ];
+
+    protected $casts = [
+        'quantity' => 'decimal:2',
+        'unit_price' => 'decimal:2',
+        'subtotal' => 'decimal:2',
     ];
 
     public function billOfMaterial()

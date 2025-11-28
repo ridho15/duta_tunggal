@@ -18,6 +18,11 @@ use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Facades\Filament;
+use App\Services\QualityControlService;
+use App\Notifications\FilamentDatabaseNotification;
+use App\Models\QualityControl;
+use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -50,7 +55,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     'quantity' => $get('quantity'),
                                     'unit_price' => $get('unit_price'),
                                     'tax' => $get('tax'),
-                                    'discount' => $get('discount')
+                                    'discount' => $get('discount'),
+                                    'tipe_pajak' => $get('tipe_pajak') ?? null,
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
@@ -76,7 +82,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     'quantity' => $get('quantity'),
                                     'unit_price' => $get('unit_price'),
                                     'tax' => $get('tax'),
-                                    'discount' => $get('discount')
+                                    'discount' => $get('discount'),
+                                    'tipe_pajak' => $get('tipe_pajak') ?? null,
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
@@ -93,7 +100,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->default(0),
                         TextInput::make('discount')
                             ->label('Discount')
@@ -107,7 +114,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->default(0),
                         TextInput::make('tax')
                             ->label('Tax')
@@ -121,12 +128,12 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->default(0),
                         TextInput::make('subtotal')
                             ->label('Sub Total')
                             ->reactive()
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->default(0)
                             ->readOnly(),
                         Radio::make('tipe_pajak')
@@ -138,7 +145,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 'Inklusif' => 'Inklusif',
                                 'Eklusif' => 'Eklusif'
                             ])
-                            ->default('default')
+                            ->default('Inklusif')
                     ])
             ]);
     }
@@ -171,7 +178,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
@@ -192,7 +199,38 @@ class PurchaseOrderItemRelationManager extends RelationManager
                 //
             ])
             ->headerActions([])
-            ->actions([])
+            ->actions([
+                ActionGroup::make([
+                    // Send PO item to Quality Control (QC-before-receipt flow)
+                    \Filament\Tables\Actions\Action::make('kirim_qc')
+                        ->label('Kirim QC')
+                        ->color('success')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->requiresConfirmation()
+                        ->action(function ($record) {
+                            $qualityControlService = app(QualityControlService::class);
+
+                            $qc = $qualityControlService->createQCFromPurchaseOrderItem($record, [
+                                'inspected_by' => Filament::auth()->id(),
+                                'passed_quantity' => 0,
+                                'rejected_quantity' => 0,
+                            ]);
+
+                            if ($qc) {
+                                // Notify current user
+                                if (Auth::user()) {
+                                    Auth::user()->notify(new FilamentDatabaseNotification(
+                                        title: 'QC Created',
+                                        body: 'Quality Control created for PO Item: ' . optional($record->product)->name,
+                                        icon: 'heroicon-o-check-badge',
+                                        color: 'success',
+                                        actions: []
+                                    ));
+                                }
+                            }
+                        }),
+                ])
+            ])
             ->bulkActions([]);
     }
 }

@@ -7,6 +7,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class HelperController extends Controller
 {
@@ -153,15 +154,6 @@ class HelperController extends Controller
                 'restore',
                 'force-delete'
             ],
-            'currency' => [
-                'view any',
-                'view',
-                'create',
-                'update',
-                'delete',
-                'restore',
-                'force-delete'
-            ],
             'delivery order' => [
                 'view any',
                 'view',
@@ -285,7 +277,8 @@ class HelperController extends Controller
                 'update',
                 'delete',
                 'restore',
-                'force-delete'
+                'force-delete',
+                'approve'
             ],
             'stock transfer' => [
                 'view any',
@@ -586,6 +579,19 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'voucher request' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'submit',
+                'approve',
+                'reject',
+                'cancel',
+            ],
         ];
 
         return $listPermissions;
@@ -616,14 +622,156 @@ class HelperController extends Controller
         return $pdf->stream('PO-' . $purchaseOrder->po_number . '.pdf');
     }
 
-    public static function hitungSubtotal($quantity, $unit_price, $discount, $tax)
+    public static function parseIndonesianMoney($formattedValue)
     {
-        $subtotal = $quantity * $unit_price;
-        $discountAmount = $subtotal * $discount / 100;
+        if (!$formattedValue) {
+            return 0;
+        }
+
+        // Convert to string to ensure we're working with formatted input
+        $formattedValue = (string)$formattedValue;
+
+        // Check if it contains formatting characters (dots or commas)
+        if (!preg_match('/[.,]/', $formattedValue)) {
+            // No formatting characters, treat as regular number
+            return (float)$formattedValue;
+        }
+
+        // Remove any non-numeric characters except dots and commas
+        $cleaned = preg_replace('/[^\d.,]/', '', $formattedValue);
+
+        // Determine the format by analyzing the separators
+        $hasComma = strpos($cleaned, ',') !== false;
+        $hasDot = strpos($cleaned, '.') !== false;
+
+        $integer = '';
+        $decimal = '0';
+
+        if ($hasComma && $hasDot) {
+            // Both separators present - need to determine which is decimal separator
+            $lastCommaPos = strrpos($cleaned, ',');
+            $lastDotPos = strrpos($cleaned, '.');
+
+            if ($lastDotPos > $lastCommaPos) {
+                // Dot comes after comma - likely Western format (commas as thousand sep, dot as decimal)
+                // Example: 125,000,000.50
+                $parts = explode('.', $cleaned);
+                if (count($parts) === 2) {
+                    $integer = str_replace(',', '', $parts[0]);
+                    $decimal = $parts[1];
+                } else {
+                    // Multiple dots - take last part as decimal
+                    $decimal = array_pop($parts);
+                    $integer = implode('', $parts);
+                    $integer = str_replace(',', '', $integer);
+                }
+            } else {
+                // Comma comes after dot - likely Indonesian format (dots as thousand sep, comma as decimal)
+                // Example: 125.000.000,50
+                $parts = explode(',', $cleaned);
+                if (count($parts) === 2) {
+                    $integer = str_replace('.', '', $parts[0]);
+                    $decimal = $parts[1];
+                } else {
+                    // Multiple commas - take last part as decimal
+                    $decimal = array_pop($parts);
+                    $integer = implode('', $parts);
+                    $integer = str_replace('.', '', $integer);
+                }
+            }
+        } elseif ($hasComma) {
+            // Only commas - could be Western thousand separators or Indonesian decimal
+            $parts = explode(',', $cleaned);
+            if (count($parts) === 2 && strlen($parts[1]) <= 2) {
+                // Likely Western format: 125,000,000 (no decimal) or 125,000,000.50 (handled above)
+                $integer = str_replace(',', '', $parts[0]);
+                $decimal = $parts[1];
+            } else {
+                // Multiple commas - treat as thousand separators
+                $integer = str_replace(',', '', $cleaned);
+                $decimal = '0';
+            }
+        } elseif ($hasDot) {
+            // Only dots - could be Indonesian thousand separators or decimal
+            if (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
+                // Ends with .digits (1-2 digits) - likely decimal part
+                $decimal = $matches[1];
+                $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
+                $integer = str_replace('.', '', $integer);
+            } else {
+                // All dots are thousand separators
+                $integer = str_replace('.', '', $cleaned);
+                $decimal = '0';
+            }
+        }
+
+        // Ensure decimal part is not empty
+        if (empty($decimal)) {
+            $decimal = '0';
+        }
+
+        // Combine back and return as float
+        $numeric = (float)($integer . '.' . $decimal);
+
+        return $numeric;
+    }
+
+    public static function hitungSubtotal($quantity, $unit_price, $discount, $tax, $taxType = null)
+    {
+        Log::debug('[hitungSubtotal] raw inputs', [
+            'quantity' => $quantity,
+            'unit_price_raw' => $unit_price,
+            'discount' => $discount,
+            'tax' => $tax,
+            'taxType' => $taxType,
+        ]);
+
+        // Normalize unit price if passed as formatted string (contains dot thousand separators)
+        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
+            $parsed = self::parseIndonesianMoney($unit_price);
+            Log::debug('[hitungSubtotal] parsed unit_price from string', [
+                'original' => $unit_price,
+                'parsed' => $parsed,
+            ]);
+            $unit_price = $parsed;
+        }
+
+        // Calculate base after discount
+        $subtotal = (float)$quantity * (float)$unit_price;
+        $discountAmount = $subtotal * ((float)$discount / 100);
         $afterDiscount = $subtotal - $discountAmount;
-        $tax_amount = $afterDiscount * $tax / 100;
-        $total = $afterDiscount + $tax_amount;
-        return round($total, 2);
+
+        // Use centralized tax service
+        $rate = (float)$tax; // expecting percent, e.g., 12 for 12%
+        try {
+            // Lazy import to avoid circular deps in some contexts
+            $service = \App\Services\TaxService::class;
+            $result = $service::compute($afterDiscount, $rate, $taxType);
+            $final = round($result['total'], 2);
+            Log::debug('[hitungSubtotal] tax service result', [
+                'subtotal' => $subtotal,
+                'discountAmount' => $discountAmount,
+                'afterDiscount' => $afterDiscount,
+                'rate' => $rate,
+                'final' => $final,
+            ]);
+            return $final;
+        } catch (\Throwable $e) {
+            // Fallback: previous behavior (exclusive)
+            $tax_amount = $afterDiscount * $rate / 100.0;
+            $total = $afterDiscount + $tax_amount;
+            $final = round($total, 2);
+            Log::debug('[hitungSubtotal] fallback tax calc', [
+                'subtotal' => $subtotal,
+                'discountAmount' => $discountAmount,
+                'afterDiscount' => $afterDiscount,
+                'rate' => $rate,
+                'tax_amount' => $tax_amount,
+                'final' => $final,
+                'error' => $e->getMessage(),
+            ]);
+            return $final;
+        }
     }
 
     public static function sendNotification($isSuccess = false, $title = "", $message = "")
@@ -695,5 +843,107 @@ class HelperController extends Controller
             ->causedBy(Auth::user())
             ->performedOn($model)
             ->log($message);
+    }
+
+    /**
+     * Format amount dengan pemisah ribuan titik (.) dan desimal koma (,)
+     * Format Indonesia: 1.234.567,89
+     *
+     * @param float|int|string $amount
+     * @param int $decimals
+     * @return string
+     */
+    public static function formatAmount($amount, int $decimals = 2): string
+    {
+        return number_format((float) $amount, $decimals, ',', '.');
+    }
+
+    /**
+     * Format amount tanpa desimal
+     * Format: 1.234.567
+     *
+     * @param float|int|string $amount
+     * @return string
+     */
+    public static function formatAmountNoDecimal($amount): string
+    {
+        return number_format((float) $amount, 0, ',', '.');
+    }
+
+    /**
+     * Format amount dengan prefix Rp
+     * Format: Rp 1.234.567,89
+     *
+     * @param float|int|string $amount
+     * @param int $decimals
+     * @return string
+     */
+    public static function formatCurrency($amount, int $decimals = 2): string
+    {
+        return 'Rp ' . self::formatAmount($amount, $decimals);
+    }
+
+    /**
+     * Format currency tanpa desimal
+     * Format: Rp 1.234.567
+     *
+     * @param float|int|string $amount
+     * @return string
+     */
+    public static function formatCurrencyNoDecimal($amount): string
+    {
+        return 'Rp ' . self::formatAmountNoDecimal($amount);
+    }
+
+    /**
+     * Generate request number for Order Request
+     * Format: OR-YYYYMMDD-XXXX
+     *
+     * @return string
+     */
+    public static function generateRequestNumber(): string
+    {
+        $date = now()->format('Ymd');
+        $prefix = 'OR-' . $date . '-';
+
+        // Find the latest request number for today
+        $latest = \App\Models\OrderRequest::where('request_number', 'like', $prefix . '%')
+            ->orderBy('request_number', 'desc')
+            ->first();
+
+        if ($latest) {
+            $lastNumber = (int) substr($latest->request_number, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Generate PO number for Purchase Order
+     * Format: PO-YYYYMMDD-XXXX
+     *
+     * @return string
+     */
+    public static function generatePoNumber(): string
+    {
+        $date = now()->format('Ymd');
+        $prefix = 'PO-' . $date . '-';
+
+        // Find the latest PO number for today
+        $latest = \App\Models\PurchaseOrder::where('po_number', 'like', $prefix . '%')
+            ->orderBy('po_number', 'desc')
+            ->first();
+
+        if ($latest) {
+            $lastNumber = (int) substr($latest->po_number, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 }

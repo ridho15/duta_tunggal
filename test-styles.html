@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                            950: '#172554',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="p-8 bg-gray-100">
+    <div class="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-md p-6 text-white border border-primary-400/20 hover:shadow-lg transition-shadow duration-200">
+        <h1 class="text-2xl font-bold">Test Component</h1>
+        <p class="mt-2">Testing all classes from the style string</p>
+    </div>
+    
+    <div class="mt-8 bg-white p-6 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-4">Class Breakdown:</h2>
+        <ul class="space-y-2 text-sm font-mono">
+            <li>✓ bg-gradient-to-r - Background gradient right</li>
+            <li>✓ from-primary-600 - Gradient start (#2563eb)</li>
+            <li>✓ to-primary-700 - Gradient end (#1d4ed8)</li>
+            <li>✓ rounded-xl - Border radius extra large</li>
+            <li>✓ shadow-md - Medium shadow</li>
+            <li>✓ p-6 - Padding 1.5rem</li>
+            <li>✓ text-white - White text</li>
+            <li>✓ border - Border width 1px</li>
+            <li>✓ border-primary-400/20 - Border with 20% opacity (#60a5fa)</li>
+            <li>✓ hover:shadow-lg - Large shadow on hover</li>
+            <li>✓ transition-shadow - Shadow transition</li>
+            <li>✓ duration-200 - Transition duration 200ms</li>
+        </ul>
+    </div>
+</body>
+</html>

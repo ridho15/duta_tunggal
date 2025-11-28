@@ -30,7 +30,8 @@ class InventoryStockResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 7;
+    // Position Gudang as the 3rd group
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {

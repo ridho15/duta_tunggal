@@ -1,0 +1,388 @@
+@php
+    $data = $this->getIncomeStatementData();
+    $comparison = $this->getComparisonData();
+    $cabangOptions = $this->getCabangOptions();
+@endphp
+
+<div class="space-y-6">
+    {{-- Filter Section --}}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Filter Periode</h3>
+        
+        <form wire:submit.prevent="generateReport" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Dari Tanggal</label>
+                    <input 
+                        type="date" 
+                        wire:model="start_date"
+                        class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Sampai Tanggal</label>
+                    <input 
+                        type="date" 
+                        wire:model="end_date"
+                        class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Cabang (Opsional)</label>
+                    <select 
+                        wire:model="cabang_id"
+                        class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    >
+                        <option value="">Semua Cabang</option>
+                        @foreach($cabangOptions as $id => $label)
+                            <option value="{{ $id }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                
+                <div class="flex items-end">
+                    <button 
+                        type="submit"
+                        class="w-full bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md"
+                    >
+                        Tampilkan Laporan
+                    </button>
+                </div>
+            </div>
+
+            {{-- Comparison Toggle --}}
+            <div class="flex items-center space-x-2">
+                <input 
+                    type="checkbox" 
+                    wire:model="show_comparison" 
+                    id="show_comparison"
+                    class="rounded border-gray-300"
+                />
+                <label for="show_comparison" class="text-sm font-medium">
+                    Tampilkan Perbandingan Periode
+                </label>
+            </div>
+
+            @if($show_comparison)
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Periode Pembanding - Dari</label>
+                        <input 
+                            type="date" 
+                            wire:model="comparison_start_date"
+                            class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Periode Pembanding - Sampai</label>
+                        <input 
+                            type="date" 
+                            wire:model="comparison_end_date"
+                            class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        />
+                    </div>
+                </div>
+            @endif
+        </form>
+    </div>
+
+    {{-- Summary Cards --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Total Pendapatan</p>
+                    <p class="text-2xl font-bold text-green-600">
+                        Rp {{ number_format($data['revenue']['total'], 2, ',', '.') }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ $data['revenue']['accounts']->count() }} akun
+                    </p>
+                </div>
+                <div class="bg-green-100 dark:bg-green-900 p-3 rounded-full">
+                    <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Total Beban</p>
+                    <p class="text-2xl font-bold text-red-600">
+                        Rp {{ number_format($data['expense']['total'], 2, ',', '.') }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ $data['expense']['accounts']->count() }} akun
+                    </p>
+                </div>
+                <div class="bg-red-100 dark:bg-red-900 p-3 rounded-full">
+                    <svg class="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        {{ $data['is_profit'] ? 'Laba Bersih' : 'Rugi Bersih' }}
+                    </p>
+                    <p class="text-2xl font-bold {{ $data['is_profit'] ? 'text-blue-600' : 'text-orange-600' }}">
+                        Rp {{ number_format(abs($data['net_income']), 2, ',', '.') }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ $data['revenue']['total'] > 0 ? number_format(($data['net_income'] / $data['revenue']['total']) * 100, 2) : 0 }}% margin
+                    </p>
+                </div>
+                <div class="bg-{{ $data['is_profit'] ? 'blue' : 'orange' }}-100 dark:bg-{{ $data['is_profit'] ? 'blue' : 'orange' }}-900 p-3 rounded-full">
+                    <svg class="w-8 h-8 text-{{ $data['is_profit'] ? 'blue' : 'orange' }}-600 dark:text-{{ $data['is_profit'] ? 'blue' : 'orange' }}-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        @if($data['is_profit'])
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        @else
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                        @endif
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Income Statement Report --}}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden" id="income-statement-report">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold">LAPORAN LABA RUGI</h2>
+                <h3 class="text-xl font-semibold mt-2">INCOME STATEMENT</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    Periode: {{ \Carbon\Carbon::parse($data['period']['start_date'])->format('d F Y') }} - 
+                    {{ \Carbon\Carbon::parse($data['period']['end_date'])->format('d F Y') }}
+                </p>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/4">
+                            Kode Akun
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Nama Akun
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-1/4">
+                            Jumlah
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {{-- REVENUE SECTION --}}
+                    <tr class="bg-green-50 dark:bg-green-900/20">
+                        <td colspan="3" class="px-6 py-4">
+                            <h4 class="text-lg font-bold text-green-700 dark:text-green-400">PENDAPATAN (REVENUE)</h4>
+                        </td>
+                    </tr>
+
+                    @forelse($data['revenue']['accounts'] as $account)
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="px-6 py-3 whitespace-nowrap text-sm">
+                                {{ $account['code'] }}
+                            </td>
+                            <td class="px-6 py-3 text-sm">
+                                <span class="{{ $account['parent_id'] ? 'ml-6' : '' }}">
+                                    {{ $account['name'] }}
+                                </span>
+                                @if($account['entries_count'] > 0)
+                                    <span class="text-xs text-gray-500">({{ $account['entries_count'] }} transaksi)</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-right">
+                                Rp {{ number_format($account['balance'], 2, ',', '.') }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">
+                                Tidak ada pendapatan dalam periode ini
+                            </td>
+                        </tr>
+                    @endforelse
+
+                    <tr class="bg-green-100 dark:bg-green-900/40 font-bold">
+                        <td colspan="2" class="px-6 py-4 text-sm uppercase">
+                            Total Pendapatan
+                        </td>
+                        <td class="px-6 py-4 text-sm text-right">
+                            Rp {{ number_format($data['revenue']['total'], 2, ',', '.') }}
+                        </td>
+                    </tr>
+
+                    {{-- EXPENSE SECTION --}}
+                    <tr class="bg-red-50 dark:bg-red-900/20">
+                        <td colspan="3" class="px-6 py-4 pt-8">
+                            <h4 class="text-lg font-bold text-red-700 dark:text-red-400">BEBAN (EXPENSES)</h4>
+                        </td>
+                    </tr>
+
+                    @forelse($data['expense']['accounts'] as $account)
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="px-6 py-3 whitespace-nowrap text-sm">
+                                {{ $account['code'] }}
+                            </td>
+                            <td class="px-6 py-3 text-sm">
+                                <span class="{{ $account['parent_id'] ? 'ml-6' : '' }}">
+                                    {{ $account['name'] }}
+                                </span>
+                                @if($account['entries_count'] > 0)
+                                    <span class="text-xs text-gray-500">({{ $account['entries_count'] }} transaksi)</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-3 whitespace-nowrap text-sm text-right">
+                                Rp {{ number_format($account['balance'], 2, ',', '.') }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">
+                                Tidak ada beban dalam periode ini
+                            </td>
+                        </tr>
+                    @endforelse
+
+                    <tr class="bg-red-100 dark:bg-red-900/40 font-bold">
+                        <td colspan="2" class="px-6 py-4 text-sm uppercase">
+                            Total Beban
+                        </td>
+                        <td class="px-6 py-4 text-sm text-right">
+                            Rp {{ number_format($data['expense']['total'], 2, ',', '.') }}
+                        </td>
+                    </tr>
+
+                    {{-- NET INCOME --}}
+                    <tr class="bg-{{ $data['is_profit'] ? 'blue' : 'orange' }}-50 dark:bg-{{ $data['is_profit'] ? 'blue' : 'orange' }}-900/40 font-bold text-lg">
+                        <td colspan="2" class="px-6 py-5 uppercase">
+                            {{ $data['is_profit'] ? 'LABA BERSIH' : 'RUGI BERSIH' }}
+                        </td>
+                        <td class="px-6 py-5 text-right text-{{ $data['is_profit'] ? 'blue' : 'orange' }}-700 dark:text-{{ $data['is_profit'] ? 'blue' : 'orange' }}-400">
+                            Rp {{ number_format(abs($data['net_income']), 2, ',', '.') }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- Comparison Section --}}
+    @if($comparison)
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4">Perbandingan Periode</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-4 bg-green-50 dark:bg-green-900/20 rounded">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Perubahan Pendapatan</p>
+                    <p class="text-xl font-bold {{ $comparison['changes']['revenue']['amount'] >= 0 ? 'text-green-600' : 'text-red-600' }}">
+                        {{ $comparison['changes']['revenue']['amount'] >= 0 ? '+' : '' }}
+                        Rp {{ number_format(abs($comparison['changes']['revenue']['amount']), 2, ',', '.') }}
+                    </p>
+                    <p class="text-sm text-gray-500">
+                        {{ $comparison['changes']['revenue']['percentage'] >= 0 ? '+' : '' }}
+                        {{ number_format($comparison['changes']['revenue']['percentage'], 2) }}%
+                    </p>
+                </div>
+
+                <div class="p-4 bg-red-50 dark:bg-red-900/20 rounded">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Perubahan Beban</p>
+                    <p class="text-xl font-bold {{ $comparison['changes']['expense']['amount'] >= 0 ? 'text-red-600' : 'text-green-600' }}">
+                        {{ $comparison['changes']['expense']['amount'] >= 0 ? '+' : '' }}
+                        Rp {{ number_format(abs($comparison['changes']['expense']['amount']), 2, ',', '.') }}
+                    </p>
+                    <p class="text-sm text-gray-500">
+                        {{ $comparison['changes']['expense']['percentage'] >= 0 ? '+' : '' }}
+                        {{ number_format($comparison['changes']['expense']['percentage'], 2) }}%
+                    </p>
+                </div>
+
+                <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Perubahan Laba Bersih</p>
+                    <p class="text-xl font-bold {{ $comparison['changes']['net_income']['amount'] >= 0 ? 'text-green-600' : 'text-red-600' }}">
+                        {{ $comparison['changes']['net_income']['amount'] >= 0 ? '+' : '' }}
+                        Rp {{ number_format(abs($comparison['changes']['net_income']['amount']), 2, ',', '.') }}
+                    </p>
+                    <p class="text-sm text-gray-500">
+                        {{ $comparison['changes']['net_income']['percentage'] >= 0 ? '+' : '' }}
+                        {{ number_format($comparison['changes']['net_income']['percentage'], 2) }}%
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Action Buttons --}}
+    <div class="flex justify-end space-x-2">
+        <button 
+            wire:click="print"
+            class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm flex items-center"
+        >
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print
+        </button>
+
+        <button 
+            wire:click="exportPdf"
+            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm flex items-center"
+        >
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export PDF
+        </button>
+        
+        <button 
+            wire:click="exportExcel"
+            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm flex items-center"
+        >
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export Excel
+        </button>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+    window.addEventListener('print-report', () => {
+        window.print();
+    });
+</script>
+@endpush
+
+<style>
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #income-statement-report, #income-statement-report * {
+        visibility: visible;
+    }
+    #income-statement-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    button {
+        display: none !important;
+    }
+}
+</style>

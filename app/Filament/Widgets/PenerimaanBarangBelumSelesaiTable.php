@@ -48,7 +48,7 @@ class PenerimaanBarangBelumSelesaiTable extends BaseWidget
                 TextColumn::make('currency.name')
                     ->label('Currency'),
                 TextColumn::make('other_cost')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 SelectColumn::make('status')
                     ->options(function () {

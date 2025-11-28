@@ -5,11 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ManufacturingOrderResource\Pages;
 use App\Filament\Resources\ManufacturingOrderResource\Pages\ViewManufacturingOrder;
 use App\Http\Controllers\HelperController;
-use App\Models\BillOfMaterial;
 use App\Models\InventoryStock;
+use Illuminate\Support\Facades\Gate;
 use App\Models\ManufacturingOrder;
 use App\Models\Product;
-use App\Models\ProductUnitConversion;
 use App\Models\Rak;
 use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
@@ -17,7 +16,6 @@ use App\Services\ManufacturingService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -45,7 +43,8 @@ class ManufacturingOrderResource extends Resource
 
     protected static ?string $navigationGroup = 'Manufacturing Order';
 
-    protected static ?int $navigationSort = 16;
+    // Position Manufacturing Order as the 4th group
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
@@ -84,6 +83,22 @@ class ManufacturingOrderResource extends Resource
                                 if ($product) {
                                     $set('uom_id', $product->uom_id);
                                     static::hitungMaterial($product, $set, $get('quantity'));
+
+                                    // Check material fulfillment
+                                    $fulfillmentCheck = static::checkMaterialFulfillment($product, $get('quantity') ?? 1);
+                                    if (!$fulfillmentCheck['can_produce']) {
+                                        // Send notification about material availability
+                                        \App\Http\Controllers\HelperController::sendNotification(
+                                            isSuccess: false,
+                                            title: 'Peringatan Ketersediaan Bahan Baku',
+                                            message: "Produk {$product->name}: {$fulfillmentCheck['message']}\n\n" .
+                                                     "Total bahan: {$fulfillmentCheck['summary']['total_materials']}\n" .
+                                                     "Tersedia penuh: {$fulfillmentCheck['summary']['fully_available']}\n" .
+                                                     "Tersedia sebagian: {$fulfillmentCheck['summary']['partially_available']}\n" .
+                                                     "Tidak tersedia: {$fulfillmentCheck['summary']['not_available']}"
+                                        );
+                                    }
+
                                     $listConversions = [];
                                     foreach ($product->unitConversions as $index => $conversion) {
                                         $listConversions[$index] = [
@@ -96,7 +111,19 @@ class ManufacturingOrderResource extends Resource
                                 }
                             })
                             ->relationship('product', 'name', function (Builder $query) {
-                                $query->where('is_manufacture', true);
+                                $query->where('is_manufacture', true)
+                                    ->whereHas('billOfMaterial', function ($bomQuery) {
+                                        $bomQuery->whereHas('items');
+                                    })
+                                    ->whereDoesntHave('billOfMaterial.items', function ($itemQuery) {
+                                        // Exclude products where ANY BOM item doesn't have sufficient stock
+                                        $itemQuery->whereRaw('
+                                            (SELECT COALESCE(SUM(qty_available), 0)
+                                             FROM inventory_stocks
+                                             WHERE product_id = bill_of_material_items.product_id
+                                             AND qty_available > 0) < (bill_of_material_items.quantity * 1)
+                                        ');
+                                    });
                             })
                             ->getOptionLabelFromRecordUsing(function (Product $product) {
                                 return "({$product->sku}) {$product->name}";
@@ -145,6 +172,22 @@ class ManufacturingOrderResource extends Resource
                                 $product = Product::find($get('product_id'));
                                 if ($product) {
                                     static::hitungMaterial($product, $set, $get('quantity'));
+
+                                    // Check material fulfillment when quantity changes
+                                    if ($get('quantity') > 0) {
+                                        $fulfillmentCheck = static::checkMaterialFulfillment($product, $get('quantity'));
+                                        if (!$fulfillmentCheck['can_produce']) {
+                                            \App\Http\Controllers\HelperController::sendNotification(
+                                                isSuccess: false,
+                                                title: 'Peringatan Ketersediaan Bahan Baku',
+                                                message: "Produk {$product->name} (Qty: {$get('quantity')}): {$fulfillmentCheck['message']}\n\n" .
+                                                         "Total bahan: {$fulfillmentCheck['summary']['total_materials']}\n" .
+                                                         "Tersedia penuh: {$fulfillmentCheck['summary']['fully_available']}\n" .
+                                                         "Tersedia sebagian: {$fulfillmentCheck['summary']['partially_available']}\n" .
+                                                         "Tidak tersedia: {$fulfillmentCheck['summary']['not_available']}"
+                                            );
+                                        }
+                                    }
                                 }
                             })
                             ->numeric()
@@ -233,7 +276,9 @@ class ManufacturingOrderResource extends Resource
                                             $set('satuan_konversi', $listConversions);
                                         }
                                     })
-                                    ->relationship('material', 'sku')
+                                    ->relationship('material', 'sku', function (Builder $query) {
+                                        $query->where('is_raw_material', true);
+                                    })
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
                                     })->helperText(function ($get) {
@@ -407,6 +452,72 @@ class ManufacturingOrderResource extends Resource
         }
     }
 
+    /**
+     * Check material availability for a product and quantity
+     */
+    public static function checkMaterialFulfillment(Product $product, $quantity): array
+    {
+        $billOfMaterial = $product->billOfMaterial->first();
+
+        if (!$billOfMaterial) {
+            return [
+                'can_produce' => false,
+                'message' => 'Produk ini tidak memiliki Bill of Material',
+                'summary' => []
+            ];
+        }
+
+        $totalMaterials = $billOfMaterial->items->count();
+        $fullyAvailable = 0;
+        $partiallyAvailable = 0;
+        $notAvailable = 0;
+        $materialDetails = [];
+
+        foreach ($billOfMaterial->items as $item) {
+            $requiredQuantity = $item->quantity * $quantity;
+
+            // Get current stock from inventory
+            $currentStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
+                ->where('qty_available', '>', 0)
+                ->sum('qty_available');
+
+            $availabilityPercentage = $currentStock >= $requiredQuantity ? 100 : ($currentStock > 0 ? ($currentStock / $requiredQuantity) * 100 : 0);
+
+            $materialDetails[] = [
+                'material_name' => $item->product->name ?? 'Unknown',
+                'required' => $requiredQuantity,
+                'available' => $currentStock,
+                'percentage' => $availabilityPercentage
+            ];
+
+            if ($availabilityPercentage >= 100) {
+                $fullyAvailable++;
+            } elseif ($availabilityPercentage > 0) {
+                $partiallyAvailable++;
+            } else {
+                $notAvailable++;
+            }
+        }
+
+        $canProduce = $fullyAvailable === $totalMaterials;
+
+        $message = $canProduce
+            ? "✅ Semua bahan baku tersedia untuk produksi."
+            : "⚠️ Beberapa bahan baku belum tersedia lengkap.";
+
+        return [
+            'can_produce' => $canProduce,
+            'message' => $message,
+            'summary' => [
+                'total_materials' => $totalMaterials,
+                'fully_available' => $fullyAvailable,
+                'partially_available' => $partiallyAvailable,
+                'not_available' => $notAvailable,
+            ],
+            'details' => $materialDetails
+        ];
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -508,13 +619,25 @@ class ManufacturingOrderResource extends Resource
                             return Auth::user()->hasPermissionTo('request manufacturing order') && $record->status == 'draft';
                         })
                         ->action(function ($record) {
+                            // Policy guard: transition draft -> in_progress
+                            abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
                             $manufacturingService = app(ManufacturingService::class);
                             $status = $manufacturingService->checkStockMaterial($record);
                             if ($status) {
                                 $record->update([
                                     'status' => 'in_progress'
                                 ]);
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress");
+
+                                // Create Production record automatically
+                                $productionService = app(\App\Services\ProductionService::class);
+                                \App\Models\Production::create([
+                                    'production_number' => $productionService->generateProductionNumber(),
+                                    'manufacturing_order_id' => $record->id,
+                                    'production_date' => now()->toDateString(),
+                                    'status' => 'draft',
+                                ]);
+
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created");
                             } else {
                                 HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock material tidak mencukupi");
                             }

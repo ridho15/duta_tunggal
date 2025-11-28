@@ -43,7 +43,7 @@ class InvoiceResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance';
 
-    protected static ?int $navigationSort = 23;
+    protected static ?int $navigationSort = 6;
     
     // Hide from navigation since we now have separate resources
     public static function shouldRegisterNavigation(): bool
@@ -140,6 +140,11 @@ class InvoiceResource extends Resource
                                                         $otherFee += ($biaya->total * $biaya->currency->to_rupiah);
                                                     }
                                                 }
+
+                                                if ($purchaseOrder->ppn_option === 'non_ppn') {
+                                                    $set('tax', 0);
+                                                    $set('ppn_rate', 0);
+                                                }
                                             }
                                         } elseif ($get('from_model_type') == 'App\Models\SaleOrder') {
                                             $saleOrder = SaleOrder::find($state);
@@ -161,7 +166,11 @@ class InvoiceResource extends Resource
                                         $set('invoiceItem', $items);
                                         $set('subtotal', $total);
                                         $set('dpp', $total);
-                                        $set('other_fee', $otherFee);
+                                        // Seed other_fee repeater when coming from source
+                                        $set('other_fee', $otherFee > 0 ? [[
+                                            'name' => 'Biaya Lainnya',
+                                            'amount' => $otherFee,
+                                        ]] : []);
                                         $set('total', $total + $otherFee);
 
                                         static::updateDueDate($get, $set);
@@ -212,7 +221,7 @@ class InvoiceResource extends Resource
                             ->afterStateUpdated(function ($set, $get) {
                                 $set('total', static::hitungTotal($get));
                             })
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->default(0),
                         TextInput::make('dpp')
                             ->label('DPP')
@@ -227,22 +236,30 @@ class InvoiceResource extends Resource
                             ->afterStateUpdated(function ($set, $get) {
                                 $set('total', static::hitungTotal($get));
                             })
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->default(0),
-                        TextInput::make('other_fee')
-                            ->label('Other Fee')
-                            ->required()
-                            ->numeric()
-                            ->validationMessages([
-                                'required' => 'Other fee tidak boleh kosong',
-                                'numeric' => 'Other fee tidak valid !'
+                        Repeater::make('other_fee')
+                            ->label('Other Fees')
+                            ->schema([
+                                TextInput::make('name')
+                                    ->label('Nama Biaya')
+                                    ->required()
+                                    ->maxLength(120),
+                                TextInput::make('amount')
+                                    ->label('Jumlah')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->indonesianMoney()
+                                    ->reactive()
                             ])
+                            ->default([])
+                            ->addActionLabel('Tambah Biaya')
+                            ->columns(2)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get) {
                                 $set('total', static::hitungTotal($get));
                             })
-                            ->prefix('Rp.')
-                            ->default(0),
+                            ->columnSpanFull(),
                         TextInput::make('tax')
                             ->label('Tax (%)')
                             ->validationMessages([
@@ -286,7 +303,7 @@ class InvoiceResource extends Resource
                             }),
                         TextInput::make('total')
                             ->required()
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->reactive()
                             ->numeric(),
                         Repeater::make('invoiceItem')
@@ -312,7 +329,7 @@ class InvoiceResource extends Resource
                                     ->required(),
                                 TextInput::make('price')
                                     ->label('Price (Rp)')
-                                    ->prefix('Rp.')
+                                    ->indonesianMoney()
                                     ->default(0)
                                     ->required()
                                     ->numeric(),
@@ -321,7 +338,7 @@ class InvoiceResource extends Resource
                                     ->numeric()
                                     ->default(0)
                                     ->required()
-                                    ->prefix('Rp.')
+                                    ->indonesianMoney()
                             ])
                     ])
             ]);
@@ -344,14 +361,38 @@ class InvoiceResource extends Resource
 
     public static function hitungTotal($get)
     {
-        $totalTax = ((int) $get('subtotal') + (int) $get('other_fee')) * ((int) $get('tax') / 100);
-        $total = (int) $get('subtotal') + (int) $get('other_fee') + $totalTax;
-        return $total;
+        $otherFee = static::sumOtherFee($get);
+        $subtotal = (int) $get('subtotal');
+        $taxRate = (int) $get('tax');
+        $totalTax = ($subtotal + $otherFee) * ($taxRate / 100);
+        return $subtotal + $otherFee + $totalTax;
+    }
+
+    protected static function sumOtherFee($get): int
+    {
+        $fees = $get('other_fee');
+        if (!$fees) return 0;
+        // Accept either array of numbers or array of {amount}
+        if (is_array($fees)) {
+            $sum = 0;
+            foreach ($fees as $fee) {
+                if (is_array($fee)) {
+                    $sum += (int) ($fee['amount'] ?? 0);
+                } else {
+                    $sum += (int) $fee;
+                }
+            }
+            return $sum;
+        }
+        return (int) $fees;
     }
 
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (Builder $query) {
+                return $query->with(['fromModel']);
+            })
             ->columns([
                 TextColumn::make('invoice_number')
                     ->label('Invoice Number')
@@ -382,21 +423,33 @@ class InvoiceResource extends Resource
 
                         return null;
                     }),
+                TextColumn::make('customer_name_display')
+                    ->label("Customer")
+                    ->getStateUsing(function ($record) {
+                        return $record->customer_name_display;
+                    })
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('fromModel.customer', function (Builder $query) use ($search) {
+                            $query->where('name', 'like', "%{$search}%");
+                        });
+                    }),
                 TextColumn::make('subtotal')
                     ->numeric()
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('tax')
                     ->numeric()
                     ->suffix(' %')
                     ->sortable(),
-                TextColumn::make('other_fee')
+                TextColumn::make('other_fee_total')
+                    ->label('Other Fee')
+                    ->getStateUsing(fn ($record) => $record->other_fee_total ?? 0)
                     ->numeric()
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('total')
                     ->numeric()
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
@@ -411,7 +464,14 @@ class InvoiceResource extends Resource
                         };
                     })
                     ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
+                        return match ($state) {
+                            'draft' => 'DRAF',
+                            'sent' => 'TERKIRIM',
+                            'paid' => 'DIBAYAR',
+                            'partially_paid' => 'DIBAYAR SEBAGIAN',
+                            'overdue' => 'TERLAMBAT',
+                            default => '-'
+                        };
                     }),
                 TextColumn::make('created_at')
                     ->dateTime()

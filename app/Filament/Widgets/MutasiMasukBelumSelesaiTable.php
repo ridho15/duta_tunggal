@@ -21,7 +21,7 @@ class MutasiMasukBelumSelesaiTable extends BaseWidget
         return $table
             ->query(function () {
                 return StockMovement::query()
-                    ->whereIn('type', ['purchase', 'transfer_in', 'manufacture_in']);
+                    ->whereIn('type', ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in']);
             })
             ->actions([
                 ViewAction::make()
@@ -68,18 +68,22 @@ class MutasiMasukBelumSelesaiTable extends BaseWidget
                 TextColumn::make('type')
                     ->color(function ($state) {
                         return match ($state) {
+                            'purchase_in' => 'success',
                             'transfer_in' => 'primary',
                             'transfer_out' => 'warning',
                             'manufacture_in' => 'info',
                             'manufacture_out' => 'warning',
+                            'adjustment_in' => 'secondary',
                             default => 'gray',
                         };
                     })->formatStateUsing(function ($state) {
                         return match ($state) {
+                            'purchase_in' => 'Purchase In',
                             'transfer_in' => 'Transfer In',
                             'transfer_out' => 'Transfer Out',
                             'manufacture_in' => 'Manufacture In',
                             'manufacture_out' => 'Manufacture Out',
+                            'adjustment_in' => 'Adjustment In',
                             default => '-'
                         };
                     })

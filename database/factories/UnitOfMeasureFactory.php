@@ -16,9 +16,18 @@ class UnitOfMeasureFactory extends Factory
      */
     public function definition(): array
     {
+        $units = collect([
+            ['name' => 'Piece', 'abbreviation' => 'pcs'],
+            ['name' => 'Kilogram', 'abbreviation' => 'kg'],
+            ['name' => 'Gram', 'abbreviation' => 'g'],
+            ['name' => 'Liter', 'abbreviation' => 'l'],
+        ]);
+
+        $unit = $units->random();
+
         return [
-            'name' => $this->faker->randomElement(['Piece', 'Kilogram', 'Gram', 'Liter']),
-            'abbreviation' => $this->faker->randomElement(['pcs', 'kg', 'g', 'l']),
+            'name' => $unit['name'],
+            'abbreviation' => $unit['abbreviation'],
         ];
     }
 }

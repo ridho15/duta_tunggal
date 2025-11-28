@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\pages;
+namespace App\Filament\Pages;
 
 use App\Models\Customer;
 use App\Models\Deposit;
@@ -16,15 +16,16 @@ class DepositSummaryPage extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+    // Hide from sidebar navigation — accessible only via the button on Deposit resource
+    protected static ?string $navigationIcon = null;
 
     protected static string $view = 'filament.pages.deposit-summary-page';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = null;
 
-    protected static ?string $navigationLabel = 'Deposit Summary';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?int $navigationSort = 24;
+    protected static ?int $navigationSort = null;
 
     public function table(Table $table): Table
     {
@@ -73,17 +74,17 @@ class DepositSummaryPage extends Page implements HasTable
                     
                 Tables\Columns\TextColumn::make('total_deposit')
                     ->label('Total Deposit')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('total_used')
                     ->label('Total Used')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('total_remaining')
                     ->label('Available Balance')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable()
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger')
                     ->weight('bold'),
@@ -138,5 +139,10 @@ class DepositSummaryPage extends Page implements HasTable
     public function getTitle(): string
     {
         return 'Deposit Summary by Customer & Supplier';
+    }
+
+    public function getTableRecordKey($record): string
+    {
+        return $record->from_model_type . '_' . $record->from_model_id;
     }
 }

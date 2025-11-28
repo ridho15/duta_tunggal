@@ -16,7 +16,8 @@ class CreatePurchaseOrder extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['created_by'] = Auth::user()->id;
+        $data['created_by'] = Auth::id();
+        $data['status'] = $data['status'] ?? 'draft';
         return $data;
     }
 

@@ -6,15 +6,16 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\JournalEntry;
 
 class VendorPayment extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'vendor_payments';
     protected $fillable = [
-        'invoice_id',
         'supplier_id',
         'selected_invoices',
+        'invoice_receipts',
         'payment_date',
         'ntpn',
         'total_payment',
@@ -24,16 +25,20 @@ class VendorPayment extends Model
         'diskon',
         'payment_adjustment',
         'status', //'Draft', 'Partial', 'Paid'
+        'is_import_payment',
+        'ppn_import_amount',
+        'pph22_amount',
+        'bea_masuk_amount',
     ];
 
     protected $casts = [
         'selected_invoices' => 'array',
+        'invoice_receipts' => 'array',
+        'ppn_import_amount' => 'float',
+        'pph22_amount' => 'float',
+        'bea_masuk_amount' => 'float',
+        'is_import_payment' => 'boolean',
     ];
-
-    public function invoice()
-    {
-        return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();
-    }
 
     public function supplier()
     {
@@ -48,5 +53,35 @@ class VendorPayment extends Model
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
+    public function deposits()
+    {
+        return $this->hasMany(Deposit::class, 'from_model_id')
+            ->where('from_model_type', Supplier::class)
+            ->where('from_model_id', $this->supplier_id);
+    }
+
+    /**
+     * Recalculate total_payment from VendorPaymentDetail
+     */
+    public function recalculateTotalPayment()
+    {
+        $total = $this->vendorPaymentDetail()->sum('amount');
+        $this->update(['total_payment' => $total]);
+        return $total;
+    }
+
+    /**
+     * Get calculated total from VendorPaymentDetail
+     */
+    public function getCalculatedTotalAttribute()
+    {
+        return $this->vendorPaymentDetail()->sum('amount');
     }
 }

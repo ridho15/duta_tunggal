@@ -20,10 +20,12 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Actions\Action as TableAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
 
 class ChartOfAccountResource extends Resource
 {
@@ -31,9 +33,10 @@ class ChartOfAccountResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-chart-pie';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 21;
+    // Position Finance group as the 6th group
+    protected static ?int $navigationSort = 11;
 
     public static function form(Form $form): Form
     {
@@ -63,25 +66,56 @@ class ChartOfAccountResource extends Resource
                             'Liability' => 'Liability',
                             'Equity' => 'Equity',
                             'Revenue' => 'Revenue',
-                            'Expense' => 'Expense'
+                            'Expense' => 'Expense',
+                            'Contra Asset' => 'Contra Asset',
                         ];
                     })
                     ->required(),
-                TextInput::make('level')
-                    ->required()
-                    ->numeric()
-                    ->default(1),
                 Select::make('parent_id')
                     ->label('Induk Akun')
                     ->preload()
                     ->searchable()
-                    ->relationship('coaParent', 'code')
+                    ->options(function () {
+                        return \App\Models\ChartOfAccount::query()
+                            ->whereNull('deleted_at')
+                            ->get()
+                            ->mapWithKeys(function ($coa) {
+                                return [$coa->id => $coa->code . ' - ' . $coa->name];
+                            })
+                            ->toArray();
+                    })
                     ->nullable(),
                 Toggle::make('is_active')
                     ->required()
                     ->default(true),
                 Textarea::make('description')
                     ->label('Description'),
+                TextInput::make('opening_balance')
+                    ->label('Saldo Awal')
+                    ->numeric()
+                    ->default(0)
+                    ->indonesianMoney()
+                    ->maxLength(255),
+                TextInput::make('debit')
+                    ->label('Debit')
+                    ->numeric()
+                    ->default(0)
+                    ->indonesianMoney()
+                    ->maxLength(255),
+                TextInput::make('credit')
+                    ->label('Kredit')
+                    ->numeric()
+                    ->default(0)
+                    ->indonesianMoney()
+                    ->maxLength(255),
+                TextInput::make('ending_balance')
+                    ->label('Saldo Akhir')
+                    ->numeric()
+                    ->default(0)
+                    ->indonesianMoney()
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->helperText('Otomatis dihitung berdasarkan jenis akun'),
             ]);
     }
 
@@ -96,18 +130,37 @@ class ChartOfAccountResource extends Resource
                 TextColumn::make('type')
                     ->label('Tipe')
                     ->badge(),
-                TextColumn::make('level')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('coaParent.code')
-                    ->label('Induk Akun')
-                    ->searchable(),
+                        ->label('Induk Akun')
+                        ->searchable()
+                        ->formatStateUsing(function ($state, $record) {
+                            if ($record->coaParent) {
+                                return $record->coaParent->code . ' - ' . $record->coaParent->name;
+                            }
+                            return null;
+                        }),
                 IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean(),
                 TextColumn::make('description')
                     ->label('Deskripsi')
                     ->searchable(),
+                TextColumn::make('opening_balance')
+                    ->label('Saldo Awal')
+                    ->money('IDR')
+                    ->sortable(),
+                TextColumn::make('debit')
+                    ->label('Debit')
+                    ->money('IDR')
+                    ->sortable(),
+                TextColumn::make('credit')
+                    ->label('Kredit')
+                    ->money('IDR')
+                    ->sortable(),
+                TextColumn::make('ending_balance')
+                    ->label('Saldo Akhir')
+                    ->money('IDR')
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -122,12 +175,25 @@ class ChartOfAccountResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('type')
+                    ->label('Tipe Akun')
+                    ->options([
+                        'Asset' => 'Asset',
+                        'Liability' => 'Liability',
+                        'Equity' => 'Equity',
+                        'Revenue' => 'Revenue',
+                        'Expense' => 'Expense',
+                        'Contra Asset' => 'Contra Asset',
+                    ])
+                    ->placeholder('Pilih Tipe Akun'),
             ])
             ->actions([
                 ActionGroup::make([
-                    ViewAction::make()
-                        ->color('primary'),
+                    TableAction::make('ledger')
+                        ->label('Buku Besar')
+                        ->icon('heroicon-o-book-open')
+                        ->color('info')
+                        ->url(fn ($record) => static::getUrl('view', ['record' => $record->id])),
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
@@ -155,5 +221,10 @@ class ChartOfAccountResource extends Resource
             'view' => ViewChartOfAccount::route('/{record}'),
             'edit' => Pages\EditChartOfAccount::route('/{record}/edit'),
         ];
+    }
+
+    protected function afterSave($record): void
+    {
+        $record->updateEndingBalance();
     }
 }

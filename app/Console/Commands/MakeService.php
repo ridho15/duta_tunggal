@@ -33,7 +33,7 @@ namespace App\Services;
 
 class {$name}
 {
-    // TODO: Implement service logic here
+    // Tambahkan logika service sesuai kebutuhan aplikasi.
 }
 PHP;
 

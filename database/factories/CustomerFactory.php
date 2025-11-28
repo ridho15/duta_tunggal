@@ -19,7 +19,7 @@ class CustomerFactory extends Factory
     {
         return [
             'name'              => $this->faker->name(),
-            'code'              => 'CUST-' . strtoupper(Str::random(5)),
+            'code'              => $this->faker->unique()->regexify('CUST-[A-Z0-9]{5}'),
             'address'           => $this->faker->address(),
             'telephone'         => $this->faker->numerify('021#######'),
             'phone'             => $this->faker->numerify('08##########'),

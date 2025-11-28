@@ -34,6 +34,30 @@ class ViewBillOfMaterial extends ViewRecord
         }
 
         $data['satuan_konversi'] = $listConversions;
+
+        // Convert string values to numeric for proper calculations
+        if (isset($data['items']) && is_array($data['items'])) {
+            foreach ($data['items'] as $key => $item) {
+                if (isset($item['unit_price'])) {
+                    $data['items'][$key]['unit_price'] = (float) $item['unit_price'];
+                }
+                if (isset($item['quantity'])) {
+                    $data['items'][$key]['quantity'] = (float) $item['quantity'];
+                }
+                if (isset($item['subtotal'])) {
+                    $data['items'][$key]['subtotal'] = (float) $item['subtotal'];
+                }
+            }
+        }
+
+        // Convert labor_cost and overhead_cost from indonesianMoney formatted strings to float
+        if (isset($data['labor_cost'])) {
+            $data['labor_cost'] = \App\Http\Controllers\HelperController::parseIndonesianMoney($data['labor_cost']);
+        }
+        if (isset($data['overhead_cost'])) {
+            $data['overhead_cost'] = \App\Http\Controllers\HelperController::parseIndonesianMoney($data['overhead_cost']);
+        }
+
         return $data;
     }
 }

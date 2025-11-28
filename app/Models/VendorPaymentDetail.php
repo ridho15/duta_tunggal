@@ -13,15 +13,24 @@ class VendorPaymentDetail extends Model
     protected $table = 'vendor_payment_details';
     protected $fillable = [
         'vendor_payment_id',
+        'invoice_id',
         'method',
         'amount',
+        'adjustment_amount',
+        'balance_amount',
         'coa_id',
-        'payment_date'
+        'payment_date',
+        'notes'
     ];
 
     public function vendorPayment()
     {
         return $this->belongsTo(VendorPayment::class, 'vendor_payment_id')->withDefault();
+    }
+
+    public function invoice()
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();
     }
 
     public function coa()

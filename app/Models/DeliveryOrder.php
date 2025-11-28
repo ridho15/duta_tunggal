@@ -16,8 +16,10 @@ class DeliveryOrder extends Model
         'delivery_date',
         'driver_id',
         'vehicle_id',
+        'warehouse_id',
         'status', // 'draft', 'sent', 'received', 'supplier', 'completed', 'request_approve', 'approved', 'request_close', 'closed', 'reject'
         'notes',
+        'created_by',
     ];
 
     public function driver()
@@ -62,6 +64,23 @@ class DeliveryOrder extends Model
     public function approvalLogs()
     {
         return $this->hasMany(DeliveryOrderApprovalLog::class, 'delivery_order_id');
+    }
+
+    /**
+     * Calculate total value of delivery order based on sale order items pricing
+     */
+    public function getTotalAttribute()
+    {
+        $total = 0;
+        
+        foreach ($this->deliveryOrderItem as $item) {
+            if ($item->saleOrderItem) {
+                $price = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
+                $total += $price * $item->quantity;
+            }
+        }
+        
+        return $total;
     }
 
     protected static function booted()

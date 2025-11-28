@@ -24,5 +24,22 @@ class PermissionSeeder extends Seeder
                 ]);
             }
         }
+
+        // Ensure voucher request related permissions exist for tests
+        $voucherPermissions = [
+            'submit voucher request',
+            'approve voucher request',
+            'reject voucher request',
+            'view voucher request',
+        ];
+
+        foreach ($voucherPermissions as $perm) {
+            Permission::updateOrCreate([
+                'name' => $perm
+            ], [
+                'name' => $perm,
+                'guard_name' => 'web'
+            ]);
+        }
     }
 }

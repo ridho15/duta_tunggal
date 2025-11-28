@@ -15,13 +15,20 @@ class StockMovement extends Model
         'product_id',
         'warehouse_id',
         'quantity',
-        'type', //purchase, sales, transfer_in, transfer_out, manufacture_in, manufacture_out, adjustment
+        'value',
+        'type',
         'reference_id',
         'date',
         'notes',
+        'meta',
         'rak_id',
         'from_model_type',
-        'from_model_id' // nullable
+        'from_model_id',
+    ];
+
+    protected $casts = [
+        'value' => 'decimal:2',
+        'meta' => 'array',
     ];
 
     public function product()

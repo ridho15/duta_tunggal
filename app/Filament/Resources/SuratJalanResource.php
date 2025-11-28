@@ -42,7 +42,12 @@ class SuratJalanResource extends Resource
 
     protected static ?string $navigationGroup = 'Delivery Order';
 
-    protected static ?int $navigationSort = 14;
+    protected static ?int $navigationSort = 5;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return true;
+    }
 
     public static function form(Form $form): Form
     {
@@ -79,7 +84,7 @@ class SuratJalanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query) {
-                                $query->whereIn('status', ['approved']);
+                                $query->whereIn('status', ['approved', 'completed']);
                             })
                             ->multiple()
                     ])

@@ -14,6 +14,7 @@ class ManufacturingOrder extends Model
     protected $table = 'manufacturing_orders';
     protected $fillable = [
         'mo_number',
+        'production_plan_id',
         'product_id',
         'quantity',
         'status', // draft, in_progress, completed
@@ -52,5 +53,10 @@ class ManufacturingOrder extends Model
     public function rak()
     {
         return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+    }
+
+    public function productionPlan()
+    {
+        return $this->belongsTo(ProductionPlan::class, 'production_plan_id')->withDefault();
     }
 }

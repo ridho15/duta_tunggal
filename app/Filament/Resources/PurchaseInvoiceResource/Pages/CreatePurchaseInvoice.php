@@ -17,6 +17,15 @@ class CreatePurchaseInvoice extends CreateRecord
         unset($data['selected_purchase_order']);
         unset($data['selected_purchase_receipts']);
         
+        // Ensure status is set to 'paid' for automatic journal posting
+        $data['status'] = $data['status'] ?? 'paid';
+
+        // Ensure COA fields are set with defaults if not provided
+        $data['accounts_payable_coa_id'] = $data['accounts_payable_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '2110')->first()?->id;
+        $data['ppn_masukan_coa_id'] = $data['ppn_masukan_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1170.06')->first()?->id;
+        $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
+        $data['expense_coa_id'] = $data['expense_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
+        $data['other_fee'] = $data['other_fees'] ?? [];
         return $data;
     }
 

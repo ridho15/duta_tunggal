@@ -29,7 +29,7 @@ class AddDepositAction
                     ->schema([
                         TextInput::make('amount')
                             ->label('Deposit Amount')
-                            ->prefix('Rp')
+                            ->indonesianMoney()
                             ->required()
                             ->numeric()
                             ->default(0)
@@ -41,7 +41,7 @@ class AddDepositAction
                             
                         TextInput::make('used_amount')
                             ->label('Already Used Amount')
-                            ->prefix('Rp')
+                            ->indonesianMoney()
                             ->numeric()
                             ->default(0)
                             ->reactive()
@@ -53,7 +53,7 @@ class AddDepositAction
                     
                 TextInput::make('remaining_amount')
                     ->label('Remaining Amount')
-                    ->prefix('Rp')
+                    ->indonesianMoney()
                     ->numeric()
                     ->default(0)
                     ->disabled()

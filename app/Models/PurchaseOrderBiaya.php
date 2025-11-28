@@ -14,6 +14,7 @@ class PurchaseOrderBiaya extends Model
     protected $fillable = [
         'purchase_order_id',
         'currency_id',
+        'coa_id',
         'nama_biaya',
         'total',
         'untuk_pembelian', // Non Pajak, Pajak
@@ -28,5 +29,15 @@ class PurchaseOrderBiaya extends Model
     public function currency()
     {
         return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
+    }
+
+    public function coa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+
+    public function purchaseReceiptBiayas()
+    {
+        return $this->hasMany(PurchaseReceiptBiaya::class, 'purchase_order_biaya_id');
     }
 }

@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('inventory_stocks', function (Blueprint $table) {
+            $table->dropIndex('inventory_stocks_from_model_type_from_model_id_index');
             $table->dropColumn(['from_model_type', 'from_model_id']);
         });
     }

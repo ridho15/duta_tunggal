@@ -45,5 +45,23 @@ class UserSeeder extends Seeder
 
         $user->syncRoles(Role::where('name', 'Super Admin')->first());
         $superAdmin->syncRoles(Role::where('name', 'Super Admin')->first());
+
+        // Create an Owner account and assign Owner role
+        $owner = User::updateOrCreate([
+            'email' => 'owner@example.com',
+        ], [
+            'username' => 'owner',
+            'email' => 'owner@example.com',
+            'name' => 'Owner',
+            'first_name' => 'Owner',
+            'last_name' => '',
+            'kode_user' => 'owner',
+            'status' => true,
+            'posisi' => 'Owner',
+            'manage_type' => 'all',
+            'password' => Hash::make('owner123')
+        ]);
+
+        $owner->syncRoles(Role::where('name', 'Owner')->first());
     }
 }

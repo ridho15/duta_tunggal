@@ -38,7 +38,8 @@ class PurchaseOrderFactory extends Factory
             'created_by' => 1,
             'refer_model_type' => null,
             'refer_model_id' => null,
-            'delivery_date' => now()->addDays(7),
+            'is_import' => false,
+            'ppn_option' => 'standard',
         ];
     }
 }

@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseInvoiceResource\Pages;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
@@ -29,6 +31,8 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteAction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 
 class PurchaseInvoiceResource extends Resource
 {
@@ -38,8 +42,8 @@ class PurchaseInvoiceResource extends Resource
     protected static ?string $navigationLabel = 'Invoice Pembelian';
     protected static ?string $modelLabel = 'Invoice Pembelian';
     protected static ?string $pluralModelLabel = 'Invoice Pembelian';
-    protected static ?string $navigationGroup = 'Finance';
-    protected static ?int $navigationSort = 24;
+    protected static ?string $navigationGroup = 'Finance - Pembelian';
+    protected static ?int $navigationSort = 9;
 
     public static function form(Form $form): Form
     {
@@ -65,6 +69,7 @@ class PurchaseInvoiceResource extends Resource
                                         $set('selected_purchase_order', null);
                                         $set('selected_purchase_receipts', []);
                                         $set('invoiceItem', []);
+                                        $set('receiptBiayaItems', []);
                                         $set('subtotal', 0);
                                         $set('total', 0);
                                     }),
@@ -110,8 +115,19 @@ class PurchaseInvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_purchase_receipts', []);
                                         $set('invoiceItem', []);
+                                        $set('receiptBiayaItems', []);
                                         $set('subtotal', 0);
                                         $set('total', 0);
+                                        
+                                        // Auto-set due date based on PO tempo_hutang
+                                        if ($state) {
+                                            $po = PurchaseOrder::find($state);
+                                            if ($po && $po->tempo_hutang) {
+                                                $invoiceDate = $get('invoice_date') ?: now();
+                                                $dueDate = \Carbon\Carbon::parse($invoiceDate)->addDays($po->tempo_hutang);
+                                                $set('due_date', $dueDate->toDateString());
+                                            }
+                                        }
                                     }),
                             ]),
 
@@ -133,15 +149,26 @@ class PurchaseInvoiceResource extends Resource
                                     )
                                     ->maxLength(255),
                                     
-                                TextInput::make('due_date_display')
-                                    ->label('Due Date')
-                                    ->disabled()
-                                    ->placeholder('Auto calculated'),
-                                    
                                 DatePicker::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->required()
-                                    ->default(now()),
+                                    ->default(now())
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        // Auto-update due date if PO is selected and has tempo_hutang
+                                        $poId = $get('selected_purchase_order');
+                                        if ($poId && $state) {
+                                            $po = PurchaseOrder::find($poId);
+                                            if ($po && $po->tempo_hutang) {
+                                                $dueDate = \Carbon\Carbon::parse($state)->addDays($po->tempo_hutang);
+                                                $set('due_date', $dueDate->toDateString());
+                                            }
+                                        }
+                                        
+                                        if ($state) {
+                                            $set('due_date_display', $state);
+                                        }
+                                    }),
                                     
                                 DatePicker::make('due_date')
                                     ->label('Due Date')
@@ -168,6 +195,7 @@ class PurchaseInvoiceResource extends Resource
                                         
                                         // Get all receipts from this PO
                                         $purchaseReceipts = $purchaseOrder->purchaseReceipt()
+                                            ->with('purchaseReceiptItem.purchaseOrderItem', 'purchaseReceiptBiaya')
                                             ->where('status', 'completed')
                                             ->get();
                                         
@@ -182,7 +210,18 @@ class PurchaseInvoiceResource extends Resource
                                         
                                         return $purchaseReceipts->mapWithKeys(function ($receipt) use ($invoicedReceiptIds) {
                                             $isInvoiced = in_array($receipt->id, $invoicedReceiptIds);
-                                            $label = "{$receipt->receipt_number} - Rp. " . number_format($receipt->total ?? 0, 0, ',', '.');
+                                            
+                                            // Calculate total from receipt items + biaya lainnya
+                                            $total = $receipt->purchaseReceiptItem->sum(function ($item) {
+                                                $purchaseOrderItem = $item->purchaseOrderItem;
+                                                if ($purchaseOrderItem) {
+                                                    $price = $purchaseOrderItem->unit_price + $purchaseOrderItem->tax - $purchaseOrderItem->discount;
+                                                    return $price * $item->qty_accepted;
+                                                }
+                                                return 0;
+                                            }) + $receipt->purchaseReceiptBiaya->sum('total');
+                                            
+                                            $label = "{$receipt->receipt_number} - Rp. " . number_format($total, 0, ',', '.');
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
                                             }
@@ -194,6 +233,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
                                             $set('invoiceItem', []);
+                                            $set('receiptBiayaItems', []);
                                             $set('subtotal', 0);
                                             $set('total', 0);
                                             return;
@@ -205,7 +245,7 @@ class PurchaseInvoiceResource extends Resource
                                         if (!$purchaseOrderId || !$supplierId) return;
                                         
                                         $purchaseOrder = PurchaseOrder::with('supplier')->find($purchaseOrderId);
-                                        $purchaseReceipts = PurchaseReceipt::whereIn('id', $state)->get();
+                                        $purchaseReceipts = PurchaseReceipt::with('purchaseReceiptItem.purchaseOrderItem', 'purchaseReceiptBiaya')->whereIn('id', $state)->get();
                                         
                                         // Set supplier info
                                         $set('supplier_name', $purchaseOrder->supplier->name);
@@ -215,6 +255,7 @@ class PurchaseInvoiceResource extends Resource
                                         
                                         // Calculate items from purchase receipts
                                         $items = [];
+                                        $receiptBiayaItems = [];
                                         $subtotal = 0;
                                         
                                         foreach ($purchaseReceipts as $receipt) {
@@ -225,11 +266,11 @@ class PurchaseInvoiceResource extends Resource
                                                 
                                                 if ($purchaseOrderItem) {
                                                     $price = $purchaseOrderItem->unit_price + $purchaseOrderItem->tax - $purchaseOrderItem->discount;
-                                                    $total = $price * $item->quantity_received;
+                                                    $total = $price * $item->qty_accepted;
                                                     
                                                     $items[] = [
                                                         'product_id' => $item->product_id,
-                                                        'quantity' => $item->quantity_received,
+                                                        'quantity' => $item->qty_accepted,
                                                         'price' => $price,
                                                         'total' => $total
                                                     ];
@@ -237,65 +278,122 @@ class PurchaseInvoiceResource extends Resource
                                                     $subtotal += $total;
                                                 }
                                             }
+                                            
+                                            // Add biaya lainnya from purchase receipt
+                                            foreach ($receipt->purchaseReceiptBiaya as $biaya) {
+                                                $receiptBiayaItems[] = [
+                                                    'nama_biaya' => $biaya->nama_biaya,
+                                                    'total' => $biaya->total,
+                                                ];
+                                                $subtotal += $biaya->total;
+                                            }
                                         }
                                         
                                         $set('invoiceItem', $items);
+                                        $set('receiptBiayaItems', $receiptBiayaItems);
                                         $set('subtotal', $subtotal);
                                         $set('dpp', $subtotal);
                                         $set('purchase_receipts', $state);
                                         
+                                        // Add receipt biaya to other_fees
+                                        $existingOtherFees = $get('other_fees') ?? [];
+                                        $receiptFees = collect($receiptBiayaItems)->map(function ($biaya) {
+                                            return [
+                                                'name' => $biaya['nama_biaya'],
+                                                'amount' => $biaya['total'],
+                                            ];
+                                        })->toArray();
+                                        $combinedOtherFees = array_merge($existingOtherFees, $receiptFees);
+                                        $set('other_fees', $combinedOtherFees);
+                                        
                                         // Calculate tax and total
                                         $tax = $get('tax') ?? 0;
-                                        $otherFee = $get('other_fee') ?? 0;
+                                        $otherFee = collect($combinedOtherFees)->sum('amount') ?? 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
                                         $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     }),
                             ]),
 
+                        // Invoice Items Section
+                        Section::make('Item Invoice')
+                            ->description('Item yang akan di-invoice berdasarkan Purchase Receipt yang dipilih')
+                            ->schema([
+                                Repeater::make('invoiceItem')
+                                    ->label('')
+                                    ->schema([
+                                        Select::make('product_id')
+                                            ->label('Produk')
+                                            ->options(\App\Models\Product::all()->mapWithKeys(function ($product) {
+                                                return [$product->id => $product->name];
+                                            }))
+                                            ->searchable()
+                                            ->required()
+                                            ->disabled(),
+                                        TextInput::make('quantity')
+                                            ->label('Qty')
+                                            ->numeric()
+                                            ->required()
+                                            ->disabled(),
+                                        TextInput::make('price')
+                                            ->label('Harga')
+                                            ->indonesianMoney()
+                                            ->numeric()
+                                            ->required()
+                                            ->disabled(),
+                                        TextInput::make('total')
+                                            ->label('Total')
+                                            ->indonesianMoney()
+                                            ->numeric()
+                                            ->required()
+                                            ->disabled(),
+                                    ])
+                                    ->columns(4)
+                                    ->disableItemCreation()
+                                    ->disableItemDeletion()
+                                    ->disableItemMovement(),
+                            ]),
+
                         // Biaya Lain Section
                         Section::make('Biaya Lain - lain')
-                            ->columns(2)
                             ->schema([
-                                TextInput::make('other_cost_name')
-                                    ->label('Biaya Lain - lain')
-                                    ->default('Biaya Lain - lain')
-                                    ->reactive(),
-                                    
-                                TextInput::make('other_cost_total')
-                                    ->label('Total Biaya')
-                                    ->prefix('Rp.')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->reactive()
+                                Repeater::make('other_fees')
+                                    ->label('')
+                                    ->schema([
+                                        TextInput::make('name')
+                                            ->label('Nama Biaya')
+                                            ->required()
+                                            ->default('Biaya Lain'),
+                                        TextInput::make('amount')
+                                            ->label('Jumlah')
+                                            ->indonesianMoney()
+                                            ->numeric()
+                                            ->required()
+                                            ->default(0)
+                                            ->reactive(),
+                                    ])
+                                    ->columns(2)
+                                    ->defaultItems(0)
                                     ->afterStateUpdated(function ($set, $get, $state) {
+                                        $totalOtherFee = collect($state ?? [])->sum('amount');
+                                        $set('other_fee', $totalOtherFee);
+                                        
                                         $subtotal = $get('subtotal') ?? 0;
                                         $tax = $get('tax') ?? 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $state + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
-                                        $set('other_fee', $state);
-                                    }),
-                                    
-                                Forms\Components\Toggle::make('add_other_cost')
-                                    ->label('Tambah Biaya')
-                                    ->reactive()
-                                    ->columnSpanFull(),
+                                    })
+                                    ->collapsible(),
                             ]),
 
                         // Tax and Total Section
                         Section::make()
-                            ->columns(4)
+                            ->columns(3)
                             ->schema([
                                 TextInput::make('dpp')
                                     ->label('DPP')
-                                    ->prefix('Rp.')
-                                    ->numeric()
-                                    ->readonly(),
-                                    
-                                TextInput::make('other_fee')
-                                    ->label('Other Fee')
-                                    ->prefix('Rp.')
+                                    ->indonesianMoney()
                                     ->numeric()
                                     ->readonly(),
                                     
@@ -307,24 +405,35 @@ class PurchaseInvoiceResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
-                                        $otherFee = $get('other_fee') ?? 0;
+                                        $otherFees = $get('other_fees') ?? [];
+                                        $otherFeeTotal = collect($otherFees)->sum('amount');
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $state / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $state / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
+                                        $set('other_fee', $otherFeeTotal);
                                     }),
                                     
                                 TextInput::make('ppn_rate')
                                     ->label('PPN Rate (%)')
                                     ->numeric()
                                     ->suffix('%')
-                                    ->default(0)
+                                    ->default(function () {
+                                        $taxSetting = \App\Models\TaxSetting::where('status', true)
+                                            ->where('effective_date', '<=', now())
+                                            ->where('type', 'PPN')
+                                            ->orderByDesc('effective_date')
+                                            ->first();
+                                        return $taxSetting?->rate ?? 0;
+                                    })
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
-                                        $otherFee = $get('other_fee') ?? 0;
+                                        $otherFees = $get('other_fees') ?? [];
+                                        $otherFeeTotal = collect($otherFees)->sum('amount');
                                         $tax = $get('tax') ?? 0;
-                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $state / 100);
+                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $state / 100);
                                         $set('total', $finalTotal);
+                                        $set('other_fee', $otherFeeTotal);
                                     }),
                             ]),
 
@@ -333,10 +442,78 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 TextInput::make('total')
                                     ->label('')
-                                    ->prefix('Rp.')
+                                    ->indonesianMoney()
                                     ->numeric()
                                     ->readonly()
                                     ->extraAttributes(['class' => 'text-lg font-bold']),
+                            ]),
+                            
+                        // Status Invoice
+                        Section::make('Status Invoice')
+                            ->schema([
+                                Select::make('status')
+                                    ->label('Status')
+                                    ->options([
+                                        'draft' => 'Draft',
+                                        'sent' => 'Sent',
+                                        'paid' => 'Paid',
+                                        'partially_paid' => 'Partially Paid',
+                                        'overdue' => 'Overdue',
+                                    ])
+                                    ->default('paid')
+                                    ->required(),
+                            ]),
+
+                        // COA Selection
+                        Section::make('Pemilihan COA (Chart of Account)')
+                            ->description('Pilih COA yang sesuai untuk pencatatan journal entry')
+                            ->columns(2)
+                            ->schema([
+                                Select::make('accounts_payable_coa_id')
+                                    ->label('COA Hutang Supplier (Accounts Payable)')
+                                    ->options(\App\Models\ChartOfAccount::where('type', 'liability')->get()->mapWithKeys(function ($coa) {
+                                        return [$coa->id => $coa->formatted_name];
+                                    }))
+                                    ->searchable(['code', 'name'])
+                                    ->preload()
+                                    ->required()
+                                    ->default(function () {
+                                        return \App\Models\ChartOfAccount::where('code', '2110')->first()?->id;
+                                    }),
+
+                                Select::make('ppn_masukan_coa_id')
+                                    ->label('COA PPn Masukan')
+                                    ->options(\App\Models\ChartOfAccount::where('type', 'asset')->get()->mapWithKeys(function ($coa) {
+                                        return [$coa->id => $coa->formatted_name];
+                                    }))
+                                    ->searchable(['code', 'name'])
+                                    ->preload()
+                                    ->default(function () {
+                                        return \App\Models\ChartOfAccount::where('code', '1170.06')->first()?->id;
+                                    }),
+
+                                Select::make('inventory_coa_id')
+                                    ->label('COA Inventory')
+                                    ->options(\App\Models\ChartOfAccount::where('type', 'asset')->get()->mapWithKeys(function ($coa) {
+                                        return [$coa->id => $coa->formatted_name];
+                                    }))
+                                    ->searchable(['code', 'name'])
+                                    ->preload()
+                                    ->default(function () {
+                                        return \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
+                                    }),
+
+                                Select::make('expense_coa_id')
+                                    ->label('COA Biaya Lain (Opsional)')
+                                    ->options(\App\Models\ChartOfAccount::where('type', 'expense')->get()->mapWithKeys(function ($coa) {
+                                        return [$coa->id => $coa->formatted_name];
+                                    }))
+                                    ->searchable(['code', 'name'])
+                                    ->preload()
+                                    ->default(function () {
+                                        return \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
+                                    })
+                                    ->helperText('COA ini digunakan jika ada biaya yang tidak memiliki COA di PO'),
                             ]),
                             
                         // Hidden fields
@@ -345,34 +522,153 @@ class PurchaseInvoiceResource extends Resource
                         Hidden::make('supplier_name'),
                         Hidden::make('supplier_phone'),
                         Hidden::make('subtotal'),
-                        Hidden::make('status')->default('draft'),
                         Hidden::make('purchase_receipts'),
+                        Hidden::make('receiptBiayaItems'),
                         
-                        Repeater::make('invoiceItem')
-                            ->label('Item Invoice')
+                        // Biaya Lain dari Purchase Receipt
+                        Repeater::make('receiptBiayaItems')
+                            ->label('Biaya Lain dari Purchase Receipt')
                             ->schema([
-                                Select::make('product_id')
-                                    ->label('Product')
-                                    ->relationship('product', 'name')
-                                    ->required(),
-                                TextInput::make('quantity')
-                                    ->label('Quantity')
-                                    ->numeric()
-                                    ->required(),
-                                TextInput::make('price')
-                                    ->label('Price')
-                                    ->numeric()
+                                TextInput::make('nama_biaya')
+                                    ->label('Nama Biaya')
                                     ->required(),
                                 TextInput::make('total')
                                     ->label('Total')
+                                    ->indonesianMoney()
                                     ->numeric()
                                     ->required(),
                             ])
+                            ->columns(2)
                             ->defaultItems(0)
-                            ->collapsed()
-                            ->cloneable(),
+                            ->collapsed(),
                     ])
             ]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Purchase Order Information')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('fromModel.po_number')
+                            ->label('PO Number'),
+                        Infolists\Components\TextEntry::make('fromModel.supplier.name')
+                            ->label('Supplier'),
+                        Infolists\Components\TextEntry::make('fromModel.supplier.phone')
+                            ->label('Supplier Phone'),
+                        Infolists\Components\TextEntry::make('fromModel.order_date')
+                            ->label('PO Date')
+                            ->date(),
+                        Infolists\Components\TextEntry::make('purchase_receipts_display')
+                            ->label('Purchase Receipts')
+                            ->listWithLineBreaks()
+                            ->state(function (Invoice $record) {
+                                if (!$record->purchase_receipts) return 'No receipts';
+
+                                $receipts = \App\Models\PurchaseReceipt::whereIn('id', $record->purchase_receipts)
+                                    ->get()
+                                    ->map(function ($receipt) {
+                                        return $receipt->receipt_number . ' (' . \Carbon\Carbon::parse($receipt->receipt_date)->format('d/m/Y') . ')';
+                                    })
+                                    ->toArray();
+
+                                return $receipts;
+                            }),
+                    ])
+                    ->columns(2),
+
+                Infolists\Components\Section::make('Invoice Items')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('invoice_items_display')
+                            ->label('Items')
+                            ->listWithLineBreaks()
+                            ->state(function (Invoice $record) {
+                                $items = [];
+                                foreach ($record->invoiceItem as $item) {
+                                    $product = $item->product;
+                                    $productName = $product ? $product->name : 'Unknown Product';
+                                    $items[] = sprintf(
+                                        '%s: %s x Rp %s = Rp %s',
+                                        $productName,
+                                        number_format($item->quantity, 2, ',', '.'),
+                                        number_format($item->price, 0, ',', '.'),
+                                        number_format($item->total, 0, ',', '.')
+                                    );
+                                }
+                                return $items;
+                            }),
+                    ]),
+
+                Infolists\Components\Section::make('Invoice Information')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('invoice_number')
+                            ->label('Invoice Number'),
+                        Infolists\Components\TextEntry::make('invoice_date')
+                            ->label('Invoice Date')
+                            ->date(),
+                        Infolists\Components\TextEntry::make('due_date')
+                            ->label('Due Date')
+                            ->date(),
+                        Infolists\Components\TextEntry::make('subtotal')
+                            ->label('Subtotal')
+                            ->money('IDR'),
+                        Infolists\Components\TextEntry::make('tax')
+                            ->label('Tax (%)')
+                            ->state(function (Invoice $record) {
+                                return $record->tax ? $record->tax . '%' : '0%';
+                            }),
+                        Infolists\Components\TextEntry::make('ppn_rate')
+                            ->label('PPN Rate (%)')
+                            ->state(function (Invoice $record) {
+                                return $record->ppn_rate ? $record->ppn_rate . '%' : '0%';
+                            }),
+                        Infolists\Components\TextEntry::make('dpp')
+                            ->label('DPP')
+                            ->money('IDR'),
+                        Infolists\Components\TextEntry::make('other_fee_total')
+                            ->label('Other Fees')
+                            ->money('IDR')
+                            ->state(function (Invoice $record) {
+                                return $record->getOtherFeeTotalAttribute();
+                            }),
+                        Infolists\Components\TextEntry::make('total')
+                            ->label('Invoice Total')
+                            ->money('IDR'),
+                        Infolists\Components\TextEntry::make('status')
+                            ->label('Status')
+                            ->badge(),
+                    ])
+                    ->columns(2),
+
+                Infolists\Components\Section::make('Chart of Accounts')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('accountsPayableCoa.formatted_name')
+                            ->label('Accounts Payable COA'),
+                        Infolists\Components\TextEntry::make('ppnMasukanCoa.formatted_name')
+                            ->label('PPN Masukan COA'),
+                        Infolists\Components\TextEntry::make('inventoryCoa.formatted_name')
+                            ->label('Inventory COA'),
+                        Infolists\Components\TextEntry::make('expenseCoa.formatted_name')
+                            ->label('Expense COA')
+                            ->placeholder('Not set'),
+                    ])
+                    ->columns(2)
+                    ->collapsed(),
+            ]);
+    }
+
+    public static function modifyInfolistQueryUsing(Builder $query): Builder
+    {
+        return $query->with([
+            'fromModel.purchaseOrderItem.purchaseReceiptItem',
+            'fromModel.supplier',
+            'invoiceItem.product',
+            'accountsPayableCoa',
+            'ppnMasukanCoa',
+            'inventoryCoa',
+            'expenseCoa'
+        ]);
     }
 
     public static function table(Table $table): Table
@@ -414,11 +710,11 @@ class PurchaseInvoiceResource extends Resource
                 BadgeColumn::make('status')
                     ->label('Status')
                     ->colors([
-                        'secondary' => 'draft',
-                        'warning' => 'sent',
-                        'success' => 'paid',
-                        'primary' => 'partially_paid',
-                        'danger' => 'overdue',
+                        'secondary' => 'Draft',
+                        'warning' => 'Terkirim',
+                        'success' => 'Lunas',
+                        'primary' => 'Dibayar Sebagian',
+                        'danger' => 'Terlambat',
                     ]),
             ])
             ->filters([
@@ -439,9 +735,47 @@ class PurchaseInvoiceResource extends Resource
             ->defaultSort('invoice_date', 'desc');
     }
 
-    public static function getEloquentQuery(): Builder
+    public static function mutateFormDataBeforeFill(array $data): array
     {
-        return parent::getEloquentQuery()->where('from_model_type', 'App\Models\PurchaseOrder');
+        // This is handled in the EditPurchaseInvoice page
+        return $data;
+    }
+
+    public static function mutateFormDataBeforeCreate(array $data): array
+    {
+        return static::prepareInvoiceData($data);
+    }
+
+    public static function mutateFormDataBeforeSave(array $data): array
+    {
+        return static::prepareInvoiceData($data);
+    }
+
+    protected static function prepareInvoiceData(array $data): array
+    {
+        // Remove form-specific fields and prepare data for database
+        unset($data['selected_supplier'], $data['selected_purchase_order'], $data['selected_purchase_receipts']);
+        
+        // Ensure other_fee is properly formatted
+        if (isset($data['other_fees']) && is_array($data['other_fees'])) {
+            $data['other_fee'] = collect($data['other_fees'])->map(function ($fee) {
+                return [
+                    'name' => $fee['name'] ?? 'Biaya Lain',
+                    'amount' => (float) ($fee['amount'] ?? 0),
+                ];
+            })->toArray();
+        }
+        
+        // Calculate totals if not set
+        if (!isset($data['total']) || $data['total'] == 0) {
+            $subtotal = $data['subtotal'] ?? 0;
+            $otherFeeTotal = collect($data['other_fee'] ?? [])->sum('amount');
+            $tax = $data['tax'] ?? 0;
+            $ppnRate = $data['ppn_rate'] ?? 0;
+            $data['total'] = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+        }
+        
+        return $data;
     }
 
     public static function getRelations(): array

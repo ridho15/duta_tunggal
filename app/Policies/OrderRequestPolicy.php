@@ -64,8 +64,27 @@ class OrderRequestPolicy
         return $user->hasPermissionTo('force-delete order request');
     }
 
+    /**
+     * Determine whether the user can approve the model.
+     */
     public function approve(User $user, OrderRequest $orderRequest): bool
     {
         return $user->hasPermissionTo('approve order request');
+    }
+
+    /**
+     * Determine whether the user can reject the model.
+     */
+    public function reject(User $user, OrderRequest $orderRequest): bool
+    {
+        return $user->hasPermissionTo('reject order request');
+    }
+
+    /**
+     * Determine whether the user can submit the model.
+     */
+    public function submit(User $user, OrderRequest $orderRequest): bool
+    {
+        return $user->hasPermissionTo('submit order request');
     }
 }

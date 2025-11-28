@@ -44,8 +44,24 @@ class PurchaseOrderItem extends Model
         return $this->hasMany(PurchaseReceiptItem::class, 'purchase_order_item_id');
     }
 
+    public function qualityControl()
+    {
+        return $this->morphOne(QualityControl::class, 'from_model');
+    }
+
     public function currency()
     {
         return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
+    }
+
+    public function getQuantityAttribute($value)
+    {
+        if (is_null($value)) {
+            return $value;
+        }
+
+        $float = (float) $value;
+
+        return $float == (int) $float ? (int) $float : $float;
     }
 }

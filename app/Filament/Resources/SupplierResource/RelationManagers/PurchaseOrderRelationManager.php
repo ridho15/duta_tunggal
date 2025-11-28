@@ -98,7 +98,7 @@ class PurchaseOrderRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total Amount')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('purchaseOrderItem.product.name')
                     ->label('Product')

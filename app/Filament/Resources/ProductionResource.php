@@ -33,7 +33,7 @@ class ProductionResource extends Resource
 
     protected static ?string $navigationGroup = 'Manufacturing Order';
 
-    protected static ?int $navigationSort = 17;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {

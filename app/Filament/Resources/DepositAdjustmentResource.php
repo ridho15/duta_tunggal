@@ -33,13 +33,21 @@ class DepositAdjustmentResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance';
 
-    protected static ?string $navigationLabel = 'Deposit Adjustment';
+    // Hide from Filament sidebar to avoid duplicate menu entry with `Deposit`.
+    // The page remains accessible at `/admin/deposit-adjustments` and
+    // we add a link on the main Deposit page for discovery.
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Deposit Adjustment';
 
     protected static ?string $pluralModelLabel = 'Deposit Adjustments';
 
-    protected static ?int $navigationSort = 23;
+    protected static ?int $navigationSort = 14;
+
+    // Do not register this resource in the Filament sidebar navigation.
+    // The resource remains accessible at `/admin/deposit-adjustments`
+    // and is reachable from the Deposit resource header action.
+    protected static bool $shouldRegisterNavigation = false;
 
     // Only accessible by Finance role
     public static function canAccess(): bool
@@ -92,20 +100,20 @@ class DepositAdjustmentResource extends Resource
                             ->schema([
                                 TextInput::make('amount')
                                     ->label('Deposit Amount')
-                                    ->prefix('Rp')
+                                    ->indonesianMoney()
                                     ->required()
                                     ->numeric()
                                     ->default(0),
                                     
                                 TextInput::make('used_amount')
                                     ->label('Used Amount')
-                                    ->prefix('Rp')
+                                    ->indonesianMoney()
                                     ->numeric()
                                     ->default(0),
                                     
                                 TextInput::make('remaining_amount')
                                     ->label('Remaining Amount')
-                                    ->prefix('Rp')
+                                    ->indonesianMoney()
                                     ->numeric()
                                     ->default(0),
                             ]),
@@ -146,17 +154,17 @@ class DepositAdjustmentResource extends Resource
                     
                 TextColumn::make('amount')
                     ->label('Total Deposit')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                     
                 TextColumn::make('used_amount')
                     ->label('Used Amount')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                     
                 TextColumn::make('remaining_amount')
                     ->label('Remaining')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                     
                 TextColumn::make('coa.code')
@@ -196,7 +204,7 @@ class DepositAdjustmentResource extends Resource
                                 ->schema([
                                     TextInput::make('adjustment_amount')
                                         ->label('Adjustment Amount')
-                                        ->prefix('Rp')
+                                        ->indonesianMoney()
                                         ->numeric()
                                         ->required()
                                         ->helperText('Positive to add, negative to subtract'),

@@ -10,32 +10,55 @@ class ManufacturingOrder
 {
     public function updated(ModelsManufacturingOrder $manufacturingOrder): void
     {
-        if ($manufacturingOrder->status == 'in_progress') {
-            foreach ($manufacturingOrder->manufacturingOrderMaterial as $manufacturingOrderMaterial) {
-                StockMovement::create([
-                    'product_id' => $manufacturingOrderMaterial->material_id,
-                    'warehouse_id' => $manufacturingOrderMaterial->warehouse_id,
-                    'rak_id' => $manufacturingOrderMaterial->rak_id,
-                    'quantity' => $manufacturingOrderMaterial->qty_used,
-                    'type' => 'manufacture_out',
-                    'from_model_type' => 'App\Models\ManufacturingOrder',
-                    'from_model_id' => $manufacturingOrder->id,
-                    'date' => Carbon::now()
-                ]);
+        // Stock movements are handled by MaterialIssue (for raw material out/return)
+        // and FinishedGoodsCompletion (for finished goods in). Avoid creating
+        // movements here to prevent double counting.
+
+        // Update ProductionPlan status based on ManufacturingOrder status changes
+        $this->updateProductionPlanStatus($manufacturingOrder);
+    }
+
+    /**
+     * Update ProductionPlan status based on ManufacturingOrder status changes
+     */
+    protected function updateProductionPlanStatus(ModelsManufacturingOrder $manufacturingOrder): void
+    {
+        $productionPlan = $manufacturingOrder->productionPlan;
+        if (!$productionPlan) {
+            return;
+        }
+
+        $originalStatus = $manufacturingOrder->getOriginal('status');
+
+        // If ManufacturingOrder status changed to 'in_progress', update ProductionPlan to 'in_progress'
+        if ($originalStatus !== 'in_progress' && $manufacturingOrder->status === 'in_progress') {
+            if ($productionPlan->status === 'scheduled') {
+                $productionPlan->update(['status' => 'in_progress']);
             }
         }
 
-        if ($manufacturingOrder->status == 'completed') {
-            StockMovement::create([
-                'product_id' => $manufacturingOrder->product_id,
-                'warehouse_id' => $manufacturingOrder->warehouse_id,
-                'rak_id' => $manufacturingOrder->rak_id,
-                'quantity' => $manufacturingOrder->quantity,
-                'type' => 'manufacture_in',
-                'date' => Carbon::now(),
-                'from_model_type' => 'App\Models\ManufacturingOrder',
-                'from_model_id' => $manufacturingOrder->id,
-            ]);
+        // If ManufacturingOrder status changed to 'completed', check if all MO are completed
+        if ($originalStatus !== 'completed' && $manufacturingOrder->status === 'completed') {
+            $this->checkAndUpdateProductionPlanCompletion($productionPlan);
+        }
+    }
+
+    /**
+     * Check if all ManufacturingOrders in ProductionPlan are completed and update status accordingly
+     */
+    protected function checkAndUpdateProductionPlanCompletion($productionPlan): void
+    {
+        // Get all manufacturing orders for this production plan
+        $manufacturingOrders = $productionPlan->manufacturingOrders;
+
+        // Check if all manufacturing orders are completed
+        $allCompleted = $manufacturingOrders->every(function ($mo) {
+            return $mo->status === 'completed';
+        });
+
+        // If all MO are completed and ProductionPlan is in progress, mark as completed
+        if ($allCompleted && $productionPlan->status === 'in_progress') {
+            $productionPlan->update(['status' => 'completed']);
         }
     }
 }

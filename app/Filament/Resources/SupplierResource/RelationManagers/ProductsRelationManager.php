@@ -39,12 +39,12 @@ class ProductsRelationManager extends RelationManager
                 Forms\Components\TextInput::make('cost_price')
                     ->label('Harga Beli')
                     ->numeric()
-                    ->prefix('Rp')
+                    ->indonesianMoney()
                     ->required(),
                 Forms\Components\TextInput::make('sell_price')
                     ->label('Harga Jual')
                     ->numeric()
-                    ->prefix('Rp')
+                    ->indonesianMoney()
                     ->required(),
                 Forms\Components\Select::make('uom_id')
                     ->label('Satuan')
@@ -71,11 +71,11 @@ class ProductsRelationManager extends RelationManager
                     ->sortable(),
                 Tables\Columns\TextColumn::make('cost_price')
                     ->label('Harga Beli')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sell_price')
                     ->label('Harga Jual')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('uom.name')
                     ->label('Satuan'),

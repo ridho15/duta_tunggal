@@ -1,7 +1,63 @@
 <x-filament-panels::page>
     <div class="space-y-6">
-        <!-- Header Cards with AR/AP Summary -->
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <!-- Tab Navigation -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg dark:shadow-gray-700/20 ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden">
+            <div class="p-1 bg-gray-50 dark:bg-gray-900/50">
+                <nav class="flex flex-col sm:flex-row gap-1 sm:space-x-1" aria-label="Tabs">
+                    <a href="?tab=ar" 
+                       class="flex-1 flex items-center justify-center px-3 sm:px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 {{ $this->activeTab === 'ar' ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center {{ $this->activeTab === 'ar' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-600' }}">
+                                <svg class="w-3 h-3 sm:w-4 sm:h-4 {{ $this->activeTab === 'ar' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                </svg>
+                            </div>
+                            <div class="text-left">
+                                <div class="font-semibold text-sm sm:text-base">Account Receivable</div>
+                                <div class="text-xs opacity-75 hidden sm:block">Customer invoices</div>
+                            </div>
+                            @php 
+                                try {
+                                    $arCount = \App\Models\AccountReceivable::where('status', 'Belum Lunas')->count(); 
+                                } catch (\Exception $e) {
+                                    $arCount = 0;
+                                }
+                            @endphp
+                            @if($arCount > 0)
+                                <span class="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">{{ $arCount }}</span>
+                            @endif
+                        </div>
+                    </a>
+                    <a href="?tab=ap" 
+                       class="flex-1 flex items-center justify-center px-3 sm:px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 {{ $this->activeTab === 'ap' ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center {{ $this->activeTab === 'ap' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-600' }}">
+                                <svg class="w-3 h-3 sm:w-4 sm:h-4 {{ $this->activeTab === 'ap' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                                </svg>
+                            </div>
+                            <div class="text-left">
+                                <div class="font-semibold text-sm sm:text-base">Account Payable</div>
+                                <div class="text-xs opacity-75 hidden sm:block">Supplier invoices</div>
+                            </div>
+                            @php 
+                                try {
+                                    $apCount = \App\Models\AccountPayable::where('status', 'Belum Lunas')->count(); 
+                                } catch (\Exception $e) {
+                                    $apCount = 0;
+                                }
+                            @endphp
+                            @if($apCount > 0)
+                                <span class="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">{{ $apCount }}</span>
+                            @endif
+                        </div>
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @php
                 try {
                     if ($this->activeTab === 'ar') {
@@ -15,6 +71,9 @@
                         $overdue = \App\Models\AccountReceivable::whereHas('invoice', function ($query) {
                             $query->where('due_date', '<', now());
                         })->where('status', 'Belum Lunas')->sum('remaining');
+                        $entityType = 'Receivable';
+                        $entityColor = 'text-green-600 dark:text-green-400';
+                        $entityBg = 'bg-green-100 dark:bg-green-900/30';
                     } else {
                         $stats = \App\Models\AccountPayable::selectRaw('
                             SUM(total) as total_amount,
@@ -26,172 +85,164 @@
                         $overdue = \App\Models\AccountPayable::whereHas('invoice', function ($query) {
                             $query->where('due_date', '<', now());
                         })->where('status', 'Belum Lunas')->sum('remaining');
+                        $entityType = 'Payable';
+                        $entityColor = 'text-blue-600 dark:text-blue-400';
+                        $entityBg = 'bg-blue-100 dark:bg-blue-900/30';
                     }
-                    
-                    $entityType = $this->activeTab === 'ar' ? 'Receivable' : 'Payable';
-                    $entityIcon = $this->activeTab === 'ar' ? '📈' : '📉';
-                    $entityColor = $this->activeTab === 'ar' ? 'text-green-600' : 'text-blue-600';
                 } catch (\Exception $e) {
                     $stats = (object) ['total_amount' => 0, 'paid_amount' => 0, 'outstanding_amount' => 0, 'total_count' => 0, 'outstanding_count' => 0];
                     $overdue = 0;
                     $entityType = $this->activeTab === 'ar' ? 'Receivable' : 'Payable';
-                    $entityIcon = $this->activeTab === 'ar' ? '📈' : '📉';
-                    $entityColor = $this->activeTab === 'ar' ? 'text-green-600' : 'text-blue-600';
+                    $entityColor = $this->activeTab === 'ar' ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400';
+                    $entityBg = $this->activeTab === 'ar' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-blue-100 dark:bg-blue-900/30';
                 }
             @endphp
             
-            <div class="overflow-hidden bg-white rounded-lg shadow">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0 text-2xl">{{ $entityIcon }}</div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Total {{ $entityType }}</dt>
-                                <dd class="text-lg font-medium {{ $entityColor }}">Rp {{ number_format($stats->total_amount ?? 0) }}</dd>
-                                <dd class="text-xs text-gray-400">{{ $stats->total_count ?? 0 }} invoices</dd>
-                            </dl>
-                        </div>
+            <!-- Total Card -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-700/20 ring-1 ring-gray-200 dark:ring-gray-700 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 {{ $entityBg }} rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 {{ $entityColor }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3 sm:ml-4 flex-1 min-w-0">
+                        <p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total {{ $entityType }}</p>
+                        <p class="text-lg sm:text-xl lg:text-2xl font-bold {{ $entityColor }} truncate">Rp {{ number_format($stats->total_amount ?? 0) }}</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{{ $stats->total_count ?? 0 }} invoices</p>
                     </div>
                 </div>
             </div>
 
-            <div class="overflow-hidden bg-white rounded-lg shadow">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Paid Amount</dt>
-                                <dd class="text-lg font-medium text-green-600">Rp {{ number_format($stats->paid_amount ?? 0) }}</dd>
-                                <dd class="text-xs text-gray-400">{{ ($stats->total_count ?? 0) - ($stats->outstanding_count ?? 0) }} completed</dd>
-                            </dl>
-                        </div>
+            <!-- Paid Card -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-700/20 ring-1 ring-gray-200 dark:ring-gray-700 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3 sm:ml-4 flex-1 min-w-0">
+                        <p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Paid Amount</p>
+                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-green-600 dark:text-green-400 truncate">Rp {{ number_format($stats->paid_amount ?? 0) }}</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{{ ($stats->total_count ?? 0) - ($stats->outstanding_count ?? 0) }} completed</p>
                     </div>
                 </div>
             </div>
 
-            <div class="overflow-hidden bg-white rounded-lg shadow">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Outstanding</dt>
-                                <dd class="text-lg font-medium text-yellow-600">Rp {{ number_format($stats->outstanding_amount ?? 0) }}</dd>
-                                <dd class="text-xs text-gray-400">{{ $stats->outstanding_count ?? 0 }} pending</dd>
-                            </dl>
-                        </div>
+            <!-- Outstanding Card -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-700/20 ring-1 ring-gray-200 dark:ring-gray-700 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3 sm:ml-4 flex-1 min-w-0">
+                        <p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Outstanding</p>
+                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-yellow-600 dark:text-yellow-400 truncate">Rp {{ number_format($stats->outstanding_amount ?? 0) }}</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{{ $stats->outstanding_count ?? 0 }} pending</p>
                     </div>
                 </div>
             </div>
 
-            <div class="overflow-hidden bg-white rounded-lg shadow">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Overdue</dt>
-                                <dd class="text-lg font-medium text-red-600">Rp {{ number_format($overdue) }}</dd>
-                                <dd class="text-xs text-gray-400">Past due amount</dd>
-                            </dl>
-                        </div>
+            <!-- Overdue Card -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-700/20 ring-1 ring-gray-200 dark:ring-gray-700 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.99-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3 sm:ml-4 flex-1 min-w-0">
+                        <p class="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Overdue</p>
+                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-red-600 dark:text-red-400 truncate">Rp {{ number_format($overdue) }}</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">Past due amount</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Tab Navigation -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-                    <a href="?tab=ar" 
-                       class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm 
-                              {{ $this->activeTab === 'ar' ? 'border-indigo-500 text-indigo-600' : '' }}">
-                        📈 Account Receivable
-                        @php 
-                            try {
-                                $arCount = \App\Models\AccountReceivable::where('status', 'Belum Lunas')->count(); 
-                            } catch (\Exception $e) {
-                                $arCount = 0;
-                            }
-                        @endphp
-                        @if($arCount > 0)
-                            <span class="bg-red-100 text-red-800 ml-2 py-0.5 px-2 rounded-full text-xs">{{ $arCount }}</span>
-                        @endif
-                    </a>
-                    <a href="?tab=ap" 
-                       class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                              {{ $this->activeTab === 'ap' ? 'border-indigo-500 text-indigo-600' : '' }}">
-                        📉 Account Payable  
-                        @php 
-                            try {
-                                $apCount = \App\Models\AccountPayable::where('status', 'Belum Lunas')->count(); 
-                            } catch (\Exception $e) {
-                                $apCount = 0;
-                            }
-                        @endphp
-                        @if($apCount > 0)
-                            <span class="bg-red-100 text-red-800 ml-2 py-0.5 px-2 rounded-full text-xs">{{ $apCount }}</span>
-                        @endif
-                    </a>
-                </nav>
+        <!-- Main Table -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-700/20 ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden">
+            <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+                    <div class="w-8 h-8 {{ $entityBg }} rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-4 h-4 {{ $entityColor }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $this->activeTab === 'ar' ? 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' : 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6' }}"></path>
+                        </svg>
+                    </div>
+                    {{ $this->activeTab === 'ar' ? 'Account Receivable' : 'Account Payable' }} Details
+                </h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-11">
+                    {{ $this->activeTab === 'ar' ? 'Manage customer invoices and payments' : 'Manage supplier invoices and payments' }}
+                </p>
             </div>
-
-            <!-- Main Table -->
             <div class="p-6">
-                <div class="mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">
-                        {{ $this->activeTab === 'ar' ? 'Account Receivable' : 'Account Payable' }} Details
-                    </h3>
-                    <p class="text-sm text-gray-500 mt-1">
-                        {{ $this->activeTab === 'ar' ? 'Manage customer invoices and payments' : 'Manage supplier invoices and payments' }}
-                    </p>
-                </div>
-                
                 {{ $this->table }}
             </div>
         </div>
 
         <!-- Quick Actions -->
-        <div class="bg-white shadow rounded-lg p-6">
-            <h4 class="text-md font-medium text-gray-900 mb-4">Quick Actions</h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 cursor-pointer"
-                     onclick="window.location.href='{{ url()->current() }}?sync=all'">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    Sync All Records
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-700/20 ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden">
+            <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+                    <div class="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    Quick Actions
+                </h4>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Sync Button -->
+                    <button class="group flex items-center p-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-lg transition-all duration-200 transform hover:-translate-y-1 hover:shadow-lg"
+                            wire:click="syncAll"
+                            wire:loading.attr="disabled">
+                        <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-200">
+                            <svg class="w-5 h-5 group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-semibold">Sync All Records</div>
+                            <div class="text-sm opacity-90">
+                                <span wire:loading.remove>Update data from source</span>
+                                <span wire:loading>Sync in progress…</span>
+                            </div>
+                        </div>
+                    </button>
+                    
+                    <!-- Add Payment Button -->
+                    <a href="{{ route('filament.admin.resources.' . ($this->activeTab === 'ar' ? 'customer-receipts' : 'vendor-payments') . '.create') }}" 
+                       class="group flex items-center p-4 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-all duration-200 transform hover:-translate-y-1 hover:shadow-lg">
+                        <div class="w-10 h-10 bg-gray-100 dark:bg-gray-600 rounded-lg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-200">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-semibold">Add {{ $this->activeTab === 'ar' ? 'Customer' : 'Vendor' }} Payment</div>
+                            <div class="text-sm opacity-75">Create new payment record</div>
+                        </div>
+                    </a>
+                    
+                    <!-- View Overdue Button -->
+                    <a href="{{ route('filament.admin.resources.' . ($this->activeTab === 'ar' ? 'account-receivables' : 'account-payables') . '.index', ['tableFilters[overdue][isActive]' => true]) }}" 
+                       class="group flex items-center p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-600 hover:border-red-400 dark:hover:border-red-500 text-red-700 dark:text-red-300 rounded-lg transition-all duration-200 transform hover:-translate-y-1 hover:shadow-lg">
+                        <div class="w-10 h-10 bg-red-100 dark:bg-red-900/50 rounded-lg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-200">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.99-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-semibold">View Overdue Items</div>
+                            <div class="text-sm opacity-75">Check past due invoices</div>
+                        </div>
+                    </a>
                 </div>
-                
-                <a href="{{ route('filament.admin.resources.' . ($this->activeTab === 'ar' ? 'customer-receipts' : 'vendor-payments') . '.create') }}" 
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                    </svg>
-                    Add {{ $this->activeTab === 'ar' ? 'Customer Payment' : 'Vendor Payment' }}
-                </a>
-                
-                <a href="{{ route('filament.admin.resources.' . ($this->activeTab === 'ar' ? 'account-receivables' : 'account-payables') . '.index', ['tableFilters[overdue][isActive]' => true]) }}" 
-                   class="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.99-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                    View Overdue Items
-                </a>
             </div>
         </div>
     </div>

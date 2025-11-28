@@ -27,7 +27,13 @@ return new class extends Migration
     {
         Schema::table('sale_orders', function (Blueprint $table) {
             if (Schema::hasColumn('sale_orders', 'created_by')) {
-                $table->dropForeign(['created_by']);
+                // Cek foreign key dengan query ke information_schema
+                $conn = Schema::getConnection();
+                $dbName = $conn->getDatabaseName();
+                $fkExists = $conn->selectOne("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'sale_orders' AND COLUMN_NAME = 'created_by' AND REFERENCED_TABLE_NAME = 'users'", [$dbName]);
+                if ($fkExists && isset($fkExists->CONSTRAINT_NAME)) {
+                    $table->dropForeign($fkExists->CONSTRAINT_NAME);
+                }
                 $table->dropColumn('created_by');
             }
         });

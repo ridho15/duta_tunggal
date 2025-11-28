@@ -58,13 +58,15 @@ class SaleOrderResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Penjualan';
+    // Group label updated to include English hint per request
+    protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
 
     protected static ?string $navigationLabel = 'Penjualan';
 
     protected static ?string $pluralModelLabel = 'Penjualan';
 
-    protected static ?int $navigationSort = 0;
+    // Ensure Penjualan group appears first
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -109,10 +111,11 @@ class SaleOrderResource extends Resource
                                         array_push($items, [
                                             'product_id' => $item->product_id,
                                             'quantity' => $item->quantity,
-                                            'unit_price' => $item->unit_price,
+                                            'unit_price' => (int) $item->unit_price,
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
                                             'notes' => $item->notes,
+                                            'warehouse_id' => $item->warehouse_id,
                                             'subtotal' => $item->quantity * ($item->unit_price + $item->tax - $item->discount)
                                         ]);
                                     }
@@ -143,7 +146,7 @@ class SaleOrderResource extends Resource
                                     foreach ($saleOrder->saleOrderItem as $item) {
                                         array_push($items, [
                                             'product_id' => $item->product_id,
-                                            'unit_price' => $item->unit_price,
+                                            'unit_price' => (int) $item->unit_price,
                                             'quantity' => $item->quantity,
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
@@ -288,7 +291,7 @@ class SaleOrderResource extends Resource
                                             ->default(0)
                                             ->required()
                                             ->numeric()
-                                            ->prefix('Rp.'),
+                                            ->indonesianMoney(),
                                         Radio::make('tipe_pembayaran')
                                             ->label('Tipe Bayar Customer')
                                             ->inlineLabel()
@@ -338,7 +341,6 @@ class SaleOrderResource extends Resource
                             ->nullable(),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
-                            ->prefix('Rp.')
                             ->required()
                             ->disabled()
                             ->reactive()
@@ -390,8 +392,10 @@ class SaleOrderResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::find($state);
-                                        $set('unit_price', $product->sell_price);
-                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        if ($product) {
+                                            $set('unit_price', $product->sell_price);
+                                            $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                        }
                                     })
                                     ->validationMessages([
                                         'required' => 'Produk belum dipilih'
@@ -500,7 +504,7 @@ class SaleOrderResource extends Resource
                                         'numeric' => 'Quantity tidak valid !'
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $state, $get('tax')));
+                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $state, $get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->helperText(function ($get) {
                                         if (!$get('product_id')) {
@@ -544,22 +548,22 @@ class SaleOrderResource extends Resource
                                     ->label('Unit Price')
                                     ->numeric()
                                     ->default(0)
+                                    ->indonesianMoney()
                                     ->validationMessages([
                                         'required' => 'Unit Price harus diisi',
                                         'numeric' => 'Unit Price tidak valid !'
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
-                                    })
-                                    ->prefix('Rp.'),
+                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $state, $get('tipe_pajak') ?? null));
+                                    }),
                                 TextInput::make('discount')
                                     ->label('Discount')
                                     ->numeric()
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->suffix('%'),
                                 TextInput::make('tax')
@@ -567,7 +571,7 @@ class SaleOrderResource extends Resource
                                     ->numeric()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
+                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->default(0)
                                     ->suffix('%'),
@@ -578,15 +582,15 @@ class SaleOrderResource extends Resource
                                     ->default(0)
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
-                                            $component->state(HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax));
+                                            $component->state(HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, $record->tipe_pajak ?? null));
                                         }
                                     })
                                     ->afterStateUpdated(function ($component, $state, $livewire) {
                                         $quantity = $livewire->data['quantity'] ?? 0;
-                                        $unit_price = $livewire->data['unit_price'] ?? 0;
+                                        $unit_price = HelperController::parseIndonesianMoney($livewire->data['unit_price'] ?? 0);
                                         $discount = $livewire->data['discount'] ?? 0;
                                         $tax = $livewire->data['tax'] ?? 0;
-                                        $component->state(HelperController::hitungSubtotal($quantity, $unit_price, $discount, $tax));
+                                        $component->state(HelperController::hitungSubtotal($quantity, $unit_price, $discount, $tax, $livewire->data['tipe_pajak'] ?? null));
 
                                         // Calculate and update total amount
                                         $items = $livewire->data['saleOrderItem'] ?? [];
@@ -594,9 +598,10 @@ class SaleOrderResource extends Resource
                                         foreach ($items as $item) {
                                             $totalAmount += HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
-                                                $item['unit_price'] ?? 0,
+                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
-                                                $item['tax'] ?? 0
+                                                $item['tax'] ?? 0,
+                                                $item['tipe_pajak'] ?? null
                                             );
                                         }
                                         $livewire->data['total_amount'] = $totalAmount;
@@ -626,7 +631,7 @@ class SaleOrderResource extends Resource
                                             }
                                         }
                                     })
-                                    ->prefix('Rp.')
+                                    
                             ])
                     ])
             ]);
@@ -684,16 +689,16 @@ class SaleOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('stock_status')
                     ->label('Status Stok')
                     ->badge()
-                    ->formatStateUsing(function (SaleOrder $record): string {
+                    ->state(function (SaleOrder $record): string {
                         return $record->hasInsufficientStock() ? 'KURANG STOK' : 'STOK OK';
                     })
                     ->color(function (SaleOrder $record): string {
-                        return $record->hasInsufficientStock() ? 'danger' : 'success';
+                        return $record->hasInsufficientStock() ? 'warning' : 'success';
                     })
                     ->size('sm')
                     ->weight('bold')
@@ -799,6 +804,9 @@ class SaleOrderResource extends Resource
                         return $query;
                     })
             ])
+            ->modifyQueryUsing(function (Builder $query) {
+                return $query->with('saleOrderItem');
+            })
             ->recordClasses(function (SaleOrder $record): string {
                 return $record->hasInsufficientStock() ? 'insufficient-stock-row' : '';
             })
@@ -936,7 +944,7 @@ class SaleOrderResource extends Resource
                                 return [
                                     TextInput::make('titip_saldo')
                                         ->numeric()
-                                        ->prefix('Rp.')
+                                        ->indonesianMoney()
                                         ->required()
                                         ->default(0),
                                     Select::make('coa_id')
@@ -953,7 +961,7 @@ class SaleOrderResource extends Resource
                                 return [
                                     TextInput::make('titip_saldo')
                                         ->numeric()
-                                        ->prefix('Rp.')
+                                        ->indonesianMoney()
                                         ->required()
                                         ->default(0),
                                     Textarea::make('note')

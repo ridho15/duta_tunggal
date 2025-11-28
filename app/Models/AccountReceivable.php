@@ -6,6 +6,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\User;
 
 class AccountReceivable extends Model
 {
@@ -17,7 +18,8 @@ class AccountReceivable extends Model
         'total',
         'paid',
         'remaining',
-        'status' //Lunas / Belum Lunas
+        'status', //Lunas / Belum Lunas
+        'created_by'
     ];
 
     public function invoice()
@@ -28,6 +30,11 @@ class AccountReceivable extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'customer_id')->withDefault();
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
 
     public function ageingSchedule()

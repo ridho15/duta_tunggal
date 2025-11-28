@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\DB;
 
 class JournalEntryRelationManager extends RelationManager
 {
-    protected static string $relationship = 'journalEntry';
+    protected static string $relationship = 'journalEntries';
 
     public function form(Form $form): Form
     {

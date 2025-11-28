@@ -35,4 +35,24 @@ class CabangFactory extends Factory
             'lihat_stok_cabang_lain' => $this->faker->boolean,
         ];
     }
+
+    /**
+     * Create or update cabang using updateOrCreate to prevent duplicates.
+     *
+     * @param array $attributes
+     * @return \App\Models\Cabang
+     */
+    public function createOrUpdate(array $attributes = []): \App\Models\Cabang
+    {
+        $data = array_merge($this->definition(), $attributes);
+
+        // Extract unique identifier (kode) for updateOrCreate
+        $kode = $data['kode'];
+        unset($data['kode']);
+
+        return \App\Models\Cabang::updateOrCreate(
+            ['kode' => $kode],
+            $data
+        );
+    }
 }

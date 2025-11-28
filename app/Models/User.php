@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 use App\Traits\LogsGlobalActivity;
 use Filament\Models\Contracts\FilamentUser;
@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 use Spatie\Permission\Traits\HasPermissions;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
     use HasFactory, Notifiable, HasRoles, HasPermissions, LogsGlobalActivity;
     protected $fillable = [
@@ -69,5 +69,14 @@ class User extends Authenticatable implements FilamentUser
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    /**
+     * Check if user has a specific permission
+     * This is a type-safe wrapper for hasPermissionTo method
+     */
+    public function hasPermission(string $permission): bool
+    {
+        return $this->hasPermissionTo($permission);
     }
 }

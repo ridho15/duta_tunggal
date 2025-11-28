@@ -5,6 +5,8 @@ namespace App\Filament\Resources\DepositResource\Pages;
 use App\Filament\Resources\DepositResource;
 use App\Http\Controllers\HelperController;
 use Filament\Actions;
+use Filament\Notifications\Notification;
+use App\Services\DepositNumberGenerator;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +19,34 @@ class EditDeposit extends EditRecord
     {
         return [
             Actions\ViewAction::make(),
+            Actions\Action::make('regenerate_deposit_number')
+                ->label('Regenerate Nomor')
+                ->icon('heroicon-o-arrow-path')
+                ->action(function () {
+                    try {
+                        $number = app(DepositNumberGenerator::class)->generate();
+                        $this->record->deposit_number = $number;
+                        $this->record->save();
+
+                        Notification::make()
+                            ->title('Nomor deposit diubah: ' . $number)
+                            ->success()
+                            ->send();
+
+                        // Refill the form so updated deposit_number appears
+                        $this->form->fill($this->record->toArray());
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        if ($e->getCode() == 23000) { // Integrity constraint violation
+                            Notification::make()
+                                ->title('Gagal regenerate nomor deposit')
+                                ->body('Nomor deposit sudah digunakan. Silakan coba lagi.')
+                                ->danger()
+                                ->send();
+                        } else {
+                            throw $e;
+                        }
+                    }
+                }),
             DeleteAction::make()
                 ->icon('heroicon-o-trash'),
         ];

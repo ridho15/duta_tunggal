@@ -54,7 +54,7 @@ class QuotationItemRelationManager extends RelationManager
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $state, $get('discount'), $get('tax')));
                             })
                             ->default(0)
-                            ->prefix('Rp.'),
+                            ->indonesianMoney(),
                         TextInput::make('quantity')
                             ->label('Quantity')
                             ->numeric()
@@ -88,7 +88,7 @@ class QuotationItemRelationManager extends RelationManager
                             ->numeric()
                             ->reactive()
                             ->default(0)
-                            ->prefix('Rp.'),
+                            ->indonesianMoney(),
                         Textarea::make('notes')
                             ->label('Notes')
                             ->nullable(),
@@ -109,7 +109,7 @@ class QuotationItemRelationManager extends RelationManager
                     }),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('quantity')
                     ->label('Quantity')
@@ -124,7 +124,7 @@ class QuotationItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('total_price')
                     ->label('Total Price')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
             ])
             ->filters([

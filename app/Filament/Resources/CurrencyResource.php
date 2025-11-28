@@ -30,7 +30,7 @@ class CurrencyResource extends Resource
 
     protected static ?string $modelLabel = 'Mata Uang';
 
-    protected static ?int $navigationSort = 26;
+    protected static ?int $navigationSort = 7;
 
     public static function form(Form $form): Form
     {
@@ -60,7 +60,7 @@ class CurrencyResource extends Resource
                             ->validationMessages([
                                 'required' => "Nilai tidak boleh kosong"
                             ])
-                            ->prefix('Rp.')
+                            ->indonesianMoney()
                             ->numeric()
                             ->default(0),
                     ])
@@ -81,7 +81,7 @@ class CurrencyResource extends Resource
                     ->searchable(),
                 TextColumn::make('to_rupiah')
                     ->label('Nilai')
-                    ->money('idr')
+                    ->money('IDR')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

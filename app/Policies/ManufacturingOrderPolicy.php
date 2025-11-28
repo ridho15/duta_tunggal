@@ -73,4 +73,22 @@ class ManufacturingOrderPolicy
     {
         return $user->hasPermissionTo('request manufacturing order');
     }
+
+    public function updateStatus(User $user, ManufacturingOrder $mo, string $to): bool
+    {
+        // Require permission and enforce allowed transitions
+        if (!$user->hasPermissionTo('request manufacturing order')) {
+            return false;
+        }
+
+        $from = $mo->status;
+        $allowed = [
+            'draft' => ['in_progress', 'cancelled'],
+            'in_progress' => ['completed', 'cancelled'],
+            'completed' => [],
+            'cancelled' => [],
+        ];
+
+        return in_array($to, $allowed[$from] ?? [], true);
+    }
 }

@@ -15,6 +15,7 @@ class CustomerReceipt extends Model
         'invoice_id',
         'customer_id',
         'selected_invoices',
+        'invoice_receipts',
         'payment_date',
         'ntpn',
         'total_payment',
@@ -27,7 +28,8 @@ class CustomerReceipt extends Model
     ];
 
     protected $casts = [
-        'selected_invoices' => 'array',
+        'selected_invoices' => 'json',
+        'invoice_receipts' => 'json',
     ];
 
     public function invoice()
@@ -48,5 +50,23 @@ class CustomerReceipt extends Model
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+    
+    /**
+     * Recalculate total_payment from CustomerReceiptItems
+     */
+    public function recalculateTotalPayment()
+    {
+        $total = $this->customerReceiptItem()->sum('amount');
+        $this->update(['total_payment' => $total]);
+        return $total;
+    }
+    
+    /**
+     * Get calculated total from CustomerReceiptItems
+     */
+    public function getCalculatedTotalAttribute()
+    {
+        return $this->customerReceiptItem()->sum('amount');
     }
 }
