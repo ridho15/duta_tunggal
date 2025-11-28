@@ -22,8 +22,6 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\ViewField;
-use Filament\Forms\Components\View;
 use Filament\Forms\Form;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\TextEntry;
@@ -90,21 +88,16 @@ class VendorPaymentResource extends Resource
                         // Invoice Selection Section
                         Section::make('Silahkan Pilih Invoice')
                             ->schema([
-                                ViewField::make('vendor_invoice_selection_table')
-                                    ->label('')
-                                    ->view('components.vendor-payment-invoice-table-clean')
-                                    ->viewData(function ($get) {
+                                CheckboxList::make('selected_invoices')
+                                    ->label('Pilih Invoice')
+                                    ->options(function ($get) {
                                         $supplierId = $get('supplier_id');
                                         if (!$supplierId) {
-                                            return [
-                                                'invoices' => [], 
-                                                'selectedInvoices' => [],
-                                                'message' => 'Silahkan pilih supplier terlebih dahulu'
-                                            ];
+                                            return [];
                                         }
 
                                         // Get unpaid/partial invoices for selected supplier
-                                        $invoices = Invoice::join('purchase_orders', function($join) {
+                                        return Invoice::join('purchase_orders', function($join) {
                                                 $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
                                                      ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder');
                                             })
@@ -115,30 +108,32 @@ class VendorPaymentResource extends Resource
                                             ->with(['accountPayable'])
                                             ->select('invoices.*')
                                             ->get()
-                                            ->map(function ($invoice) {
+                                            ->mapWithKeys(function ($invoice) {
+                                                $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
                                                 return [
-                                                    'id' => $invoice->id,
-                                                    'invoice_number' => $invoice->invoice_number,
-                                                    'total' => $invoice->total,
-                                                    'remaining' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                    'receipt' => '',
-                                                    'balance' => '',
-                                                    'payment_balance' => '',
-                                                    'adjustment_description' => '',
+                                                    $invoice->id => "Invoice {$invoice->invoice_number} - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.')
                                                 ];
                                             });
-
-                                        $message = $invoices->isEmpty() 
-                                            ? 'Invoice supplier belum ada' 
-                                            : '';
-
-                                        return [
-                                            'invoices' => $invoices,
-                                            'selectedInvoices' => $get('selected_invoices') ?? [],
-                                            'message' => $message
-                                        ];
                                     })
-                                    ->visible(fn ($get) => !empty($get('supplier_id'))),
+                                    ->columns(1)
+                                    ->visible(fn ($get) => !empty($get('supplier_id')))
+                                    ->helperText('Pilih invoice yang akan dibayar. Hanya menampilkan invoice dengan sisa pembayaran.')
+                                    ->afterStateUpdated(function ($state, $set, $get) {
+                                        // Calculate total payment based on selected invoices
+                                        if (empty($state)) {
+                                            $set('total_payment', 0);
+                                            return;
+                                        }
+
+                                        $total = Invoice::whereIn('id', $state)
+                                            ->with('accountPayable')
+                                            ->get()
+                                            ->sum(function ($invoice) {
+                                                return $invoice->accountPayable->remaining ?? $invoice->total;
+                                            });
+
+                                        $set('total_payment', $total);
+                                    }),
                             ]),
 
                         // Payment Details Section
@@ -471,9 +466,6 @@ class VendorPaymentResource extends Resource
                                             ]),
                                     ])
                             ]),
-                            
-                        // JavaScript Component for vendor payment calculation
-                        View::make('components.vendor-payment-javascript-init'),
                     ])
             ]);
     }
