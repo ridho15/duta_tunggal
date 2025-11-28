@@ -25,14 +25,19 @@ class MaterialIssueObserver
             $this->setAllItemsToPendingApproval($materialIssue);
         }
 
-        // If status transitioned to approved, set all pending items to approved
+        // If status transitioned to approved, reserve stock
         if ($originalStatus !== MaterialIssue::STATUS_APPROVED && $materialIssue->isApproved()) {
-            $this->setAllPendingItemsToApproved($materialIssue);
+            $this->reserveStock($materialIssue);
         }
 
-        // If status transitioned back to draft (rejected), set all items back to draft
+        // If status transitioned to completed, release reserved stock
+        if ($originalStatus !== MaterialIssue::STATUS_COMPLETED && $materialIssue->isCompleted()) {
+            $this->releaseReservedStock($materialIssue);
+        }
+
+        // If status transitioned back to draft (rejected), release any reserved stock
         if ($originalStatus !== MaterialIssue::STATUS_DRAFT && $materialIssue->isDraft()) {
-            $this->setAllItemsToDraft($materialIssue);
+            $this->releaseReservedStock($materialIssue);
         }
 
         // If status transitioned to completed, set all approved items to completed
@@ -212,5 +217,61 @@ class MaterialIssueObserver
     {
         MaterialIssueItem::where('material_issue_id', $materialIssue->id)
             ->update(['status' => MaterialIssueItem::STATUS_DRAFT]);
+    }
+
+    /**
+     * Reserve stock when material issue is approved
+     */
+    protected function reserveStock(MaterialIssue $materialIssue): void
+    {
+        try {
+            $materialIssue->loadMissing('items');
+
+            foreach ($materialIssue->items as $item) {
+                $warehouseId = $item->warehouse_id ?? $materialIssue->warehouse_id;
+
+                $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
+                    ->where('warehouse_id', $warehouseId)
+                    ->first();
+
+                if ($inventoryStock) {
+                    // Add quantity to reserved stock
+                    $inventoryStock->increment('qty_reserved', $item->quantity);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to reserve stock in MaterialIssueObserver', [
+                'material_issue_id' => $materialIssue->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Release reserved stock when material issue is completed
+     */
+    protected function releaseReservedStock(MaterialIssue $materialIssue): void
+    {
+        try {
+            $materialIssue->loadMissing('items');
+
+            foreach ($materialIssue->items as $item) {
+                $warehouseId = $item->warehouse_id ?? $materialIssue->warehouse_id;
+
+                $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
+                    ->where('warehouse_id', $warehouseId)
+                    ->first();
+
+                if ($inventoryStock && $inventoryStock->qty_reserved >= $item->quantity) {
+                    // Subtract quantity from reserved stock
+                    $inventoryStock->decrement('qty_reserved', $item->quantity);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to release reserved stock in MaterialIssueObserver', [
+                'material_issue_id' => $materialIssue->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

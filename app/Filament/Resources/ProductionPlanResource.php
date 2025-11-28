@@ -3,15 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductionPlanResource\Pages;
-use App\Filament\Resources\ProductionPlanResource\RelationManagers;
 use App\Models\ProductionPlan;
 use App\Models\SaleOrder;
 use App\Models\BillOfMaterial;
-use App\Models\Product;
-use App\Models\UnitOfMeasure;
 use App\Models\MaterialFulfillment;
+use App\Models\Warehouse;
 use App\Services\ProductionPlanService;
-use Filament\Forms;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
@@ -33,7 +30,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Str;
 
 class ProductionPlanResource extends Resource
@@ -243,8 +239,25 @@ class ProductionPlanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->getOptionLabelFromRecordUsing(function ($record) {
+                                return $record ? $record->name . ' (' . $record->abbreviation . ')' : '-';
+                            })
                             ->disabled(fn($get) => $get('source_type') === 'sale_order')
                             ->dehydrated(),
+
+                        Select::make('warehouse_id')
+                            ->label('Gudang Produksi')
+                            ->relationship('warehouse', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Gudang produksi harus dipilih'
+                            ])
+                            ->getOptionLabelFromRecordUsing(function ($record) {
+                                return $record ? "({$record->kode}) {$record->name}" : '-';
+                            })
+                            ->helperText('Gudang yang akan digunakan untuk sourcing material dan penyimpanan finished goods'),
 
                         DateTimePicker::make('start_date')
                             ->label('Tanggal Mulai')
@@ -347,6 +360,21 @@ class ProductionPlanResource extends Resource
                 TextColumn::make('uom.name')
                     ->label('Satuan'),
 
+                TextColumn::make('warehouse')
+                    ->label('Gudang Produksi')
+                    ->formatStateUsing(function ($state) {
+                        if ($state) {
+                            return "({$state->kode}) {$state->name}";
+                        }
+                        return '-';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->whereHas('warehouse', function ($query) use ($search) {
+                            $query->where('name', 'LIKE', '%' . $search . '%')
+                                ->orWhere('kode', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
+
                 TextColumn::make('start_date')
                     ->label('Tanggal Mulai')
                     ->dateTime()
@@ -390,6 +418,45 @@ class ProductionPlanResource extends Resource
                         ->color('primary'),
                     EditAction::make()
                         ->color('success'),
+                    Tables\Actions\Action::make('schedule_plan')
+                        ->label('Jadwalkan')
+                        ->icon('heroicon-o-calendar-days')
+                        ->color('warning')
+                        ->visible(function ($record) {
+                            return $record->status === 'draft';
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Jadwalkan Rencana Produksi')
+                        ->modalDescription('Apakah Anda yakin ingin menjadwalkan rencana produksi ini? Status akan berubah menjadi SCHEDULED dan MaterialIssue akan dibuat otomatis.')
+                        ->modalSubmitActionLabel('Jadwalkan')
+                        ->action(function ($record) {
+                            // Validate stock availability before scheduling
+                            $stockValidation = static::validateStockForProductionPlan($record);
+                            if (!$stockValidation['valid']) {
+                                \App\Http\Controllers\HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: "Tidak Dapat Menjadwalkan",
+                                    message: $stockValidation['message']
+                                );
+                                return;
+                            }
+
+                            try {
+                                $record->update(['status' => 'scheduled']);
+
+                                \App\Http\Controllers\HelperController::sendNotification(
+                                    isSuccess: true,
+                                    title: "Berhasil",
+                                    message: "Rencana Produksi {$record->plan_number} berhasil dijadwalkan dan MaterialIssue telah dibuat otomatis."
+                                );
+                            } catch (\Exception $e) {
+                                \App\Http\Controllers\HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: "Gagal Menjadwalkan",
+                                    message: "Terjadi kesalahan: " . $e->getMessage()
+                                );
+                            }
+                        }),
                     DeleteAction::make(),
                     Tables\Actions\Action::make('cancel_plan')
                         ->label('Cancel Plan')
@@ -566,6 +633,54 @@ class ProductionPlanResource extends Resource
             'create' => Pages\CreateProductionPlan::route('/create'),
             'view' => Pages\ViewProductionPlan::route('/{record}'),
             'edit' => Pages\EditProductionPlan::route('/{record}/edit'),
+        ];
+    }
+
+    /**
+     * Validate stock availability for ProductionPlan scheduling
+     */
+    protected static function validateStockForProductionPlan(ProductionPlan $productionPlan): array
+    {
+        if (!$productionPlan->billOfMaterial) {
+            return ['valid' => true, 'message' => 'No BOM to validate'];
+        }
+
+        $insufficientStock = [];
+        $outOfStock = [];
+
+        foreach ($productionPlan->billOfMaterial->items as $bomItem) {
+            $requiredQty = $bomItem->quantity * $productionPlan->quantity;
+
+            $inventoryStock = \App\Models\InventoryStock::where('product_id', $bomItem->product_id)
+                ->where('warehouse_id', $productionPlan->warehouse_id)
+                ->first();
+
+            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+
+            if ($availableQty <= 0) {
+                $outOfStock[] = "{$bomItem->product->name} (Stock: 0)";
+            } elseif ($availableQty < $requiredQty) {
+                $insufficientStock[] = "{$bomItem->product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            }
+        }
+
+        if (!empty($outOfStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock) . '. Tidak dapat menjadwalkan rencana produksi.'
+            ];
+        }
+
+        if (!empty($insufficientStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock) . '. Tidak dapat menjadwalkan rencana produksi.'
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => 'Stock tersedia untuk semua item'
         ];
     }
 }

@@ -11,6 +11,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
+use App\Models\UnitOfMeasure;
 use App\Services\ProductService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -209,27 +210,33 @@ class ProductResource extends Resource
                             ])
                             ->searchable()
                             ->relationship('uom', 'name')
+                            ->getOptionLabelFromRecordUsing(function (UnitOfMeasure $uom) {
+                                return "{$uom->name} ({$uom->abbreviation})";
+                            })
                             ->required(),
                         Textarea::make('description')
                             ->label('Description')
                             ->nullable(),
-                        // Repeater::make('unitConversions')
-                        //     ->relationship()
-                        //     ->columnSpanFull()
-                        //     ->columns(2)
-                        //     ->label('Konversi Satuan')
-                        //     ->schema([
-                        //         Select::make('uom_id')
-                        //             ->label('Satuan')
-                        //             ->preload()
-                        //             ->searchable()
-                        //             ->relationship('uom', 'name')
-                        //             ->required(),
-                        //         TextInput::make('nilai_konversi')
-                        //             ->label('Nilai Konversi')
-                        //             ->numeric()
-                        //             ->required(),
-                        //     ]),
+                        Repeater::make('unitConversions')
+                            ->relationship()
+                            ->columnSpanFull()
+                            ->columns(2)
+                            ->label('Konversi Satuan')
+                            ->schema([
+                                Select::make('uom_id')
+                                    ->label('Satuan')
+                                    ->preload()
+                                    ->searchable()
+                                    ->relationship('uom', 'name')
+                                    ->getOptionLabelFromRecordUsing(function (UnitOfMeasure $uom) {
+                                        return "{$uom->name} ({$uom->abbreviation})";
+                                    })
+                                    ->required(),
+                                TextInput::make('nilai_konversi')
+                                    ->label('Nilai Konversi')
+                                    ->numeric()
+                                    ->required(),
+                            ]),
 
                         Toggle::make('is_manufacture')
                             ->label('Diproduksi (Barang Jadi)')

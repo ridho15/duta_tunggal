@@ -14,11 +14,16 @@ class ViewProductionPlan extends ViewRecord
 {
     protected static string $resource = ProductionPlanResource::class;
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
-            Actions\DeleteAction::make(),
+            Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('schedule')
                 ->label('Jadwalkan')
                 ->icon('heroicon-o-calendar-days')
@@ -27,6 +32,9 @@ class ViewProductionPlan extends ViewRecord
                     return $this->getRecord()->status === 'draft';
                 })
                 ->requiresConfirmation()
+                ->modalHeading('Jadwalkan Rencana Produksi')
+                ->modalDescription('Apakah Anda yakin ingin menjadwalkan rencana produksi ini? Status akan berubah menjadi SCHEDULED dan MaterialIssue akan dibuat otomatis.')
+                ->modalSubmitActionLabel('Jadwalkan')
                 ->action(function () {
                     $record = $this->getRecord();
 
@@ -40,15 +48,23 @@ class ViewProductionPlan extends ViewRecord
                         return;
                     }
 
+                    // Validate stock availability before scheduling
+                    $stockValidation = \App\Filament\Resources\ProductionPlanResource::validateStockForProductionPlan($record);
+                    if (!$stockValidation['valid']) {
+                        HelperController::sendNotification(
+                            isSuccess: false,
+                            title: "Tidak Dapat Menjadwalkan",
+                            message: $stockValidation['message']
+                        );
+                        return;
+                    }
+
                     try {
                         DB::transaction(function () use ($record) {
                             $record->update(['status' => 'scheduled']);
 
-                            // Refresh fulfillment snapshot so material availability is up to date.
-                            app(ManufacturingService::class)->updateMaterialFulfillment($record);
-
                             HelperController::setLog(
-                                message: 'Production plan dijadwalkan untuk proses selanjutnya.',
+                                message: 'Production plan dijadwalkan dan MaterialIssue dibuat otomatis.',
                                 model: $record
                             );
                         });
@@ -56,7 +72,7 @@ class ViewProductionPlan extends ViewRecord
                         HelperController::sendNotification(
                             isSuccess: true,
                             title: 'Berhasil',
-                            message: 'Rencana produksi berhasil dijadwalkan dan material fulfillment diperbarui.'
+                            message: 'Rencana produksi berhasil dijadwalkan dan MaterialIssue telah dibuat otomatis.'
                         );
                     } catch (\Throwable $exception) {
                         report($exception);

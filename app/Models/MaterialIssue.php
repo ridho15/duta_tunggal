@@ -191,21 +191,38 @@ class MaterialIssue extends Model
     {
         // Handle status transition updates for material fulfillment
         static::updated(function (MaterialIssue $issue) {
-            // Only act when status changed from non-completed to completed
-            if ($issue->status === 'completed' && $issue->getOriginal('status') !== 'completed') {
-                // Refresh material fulfillment snapshot for related production plan
+            // Handle ProductionPlan status update when MaterialIssue is approved
+            if ($issue->status === 'approved' && $issue->getOriginal('status') !== 'approved') {
                 if ($issue->production_plan_id) {
                     try {
-                        app(\App\Services\ManufacturingService::class)
-                            ->updateMaterialFulfillment($issue->productionPlan);
+                        $productionPlan = $issue->productionPlan;
+                        if ($productionPlan && $productionPlan->status === 'scheduled') {
+                            $productionPlan->update(['status' => 'in_progress']);
+                            
+                            Log::info("ProductionPlan {$productionPlan->id} status changed to 'in_progress' due to MaterialIssue {$issue->id} approval");
+                        }
                     } catch (\Throwable $e) {
-                        Log::warning('Failed to update material fulfillment after issue completion', [
+                        Log::error('Failed to update ProductionPlan status after MaterialIssue approval', [
                             'material_issue_id' => $issue->id,
+                            'production_plan_id' => $issue->production_plan_id,
                             'error' => $e->getMessage(),
                         ]);
                     }
                 }
             }
+
+            // Only act when status changed from non-completed to completed
+            if ($issue->status === 'completed' && $issue->getOriginal('status') !== 'completed') {
+                // Material fulfillment is now handled automatically via ProductionPlan status changes
+                // No additional action needed here as ProductionPlan tracks material usage
+                Log::info("MaterialIssue {$issue->id} completed for ProductionPlan {$issue->production_plan_id}");
+            }
+        });
+
+        // Cascade delete items and journal when material issue is deleted
+        static::deleting(function ($materialIssue) {
+            $materialIssue->items()->delete();
+            $materialIssue->journalEntry()->delete();
         });
     }
 

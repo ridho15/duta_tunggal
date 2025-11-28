@@ -5,6 +5,11 @@ namespace App\Services;
 use App\Models\InventoryStock;
 use App\Models\ManufacturingOrder;
 use App\Models\WarehouseConfirmation;
+use App\Models\MaterialIssue;
+use App\Models\MaterialIssueItem;
+use App\Models\ProductionPlan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ManufacturingService
 {
@@ -21,13 +26,14 @@ class ManufacturingService
 
     public function checkStockMaterial($manufacturingOrder)
     {
-        foreach ($manufacturingOrder->manufacturingOrderMaterial as $manufacturingOrderMaterial) {
-            $query = InventoryStock::where('product_id', $manufacturingOrderMaterial->material_id);
-            if ($manufacturingOrderMaterial->warehouse_id) {
-                $query->where('warehouse_id', $manufacturingOrderMaterial->warehouse_id);
+        $items = $manufacturingOrder->items ?? [];
+        foreach ($items as $item) {
+            $query = InventoryStock::where('product_id', $item['product_id']);
+            if (!empty($item['warehouse_id'])) {
+                $query->where('warehouse_id', $item['warehouse_id']);
             }
-            if ($manufacturingOrderMaterial->rak_id) {
-                $query->where('rak_id', $manufacturingOrderMaterial->rak_id);
+            if (!empty($item['rak_id'])) {
+                $query->where('rak_id', $item['rak_id']);
             }
             $inventoryStock = $query->first();
 
@@ -35,8 +41,8 @@ class ManufacturingService
                 return false;
             }
 
-            // Use qty_required as the required amount; if qty_used is set and higher, validate against that
-            $required = max((float) ($manufacturingOrderMaterial->qty_required ?? 0), (float) ($manufacturingOrderMaterial->qty_used ?? 0));
+            // Use quantity as the required amount
+            $required = (float) ($item['quantity'] ?? 0);
             if ($inventoryStock->qty_available < $required) {
                 return false;
             }
@@ -85,22 +91,127 @@ class ManufacturingService
     }
 
     /**
-     * Update material fulfillment data for a production plan
+     * Create MaterialIssue automatically for a ProductionPlan
      */
-    public function updateMaterialFulfillment(\App\Models\ProductionPlan $plan): void
+    public function createMaterialIssueForProductionPlan(ProductionPlan $productionPlan): ?MaterialIssue
     {
-        \App\Models\MaterialFulfillment::updateFulfillmentData($plan);
+        try {
+            // Check if BOM exists
+            if (!$productionPlan->billOfMaterial) {
+                Log::warning("ProductionPlan {$productionPlan->id} has no BOM, skipping MaterialIssue creation");
+                return null;
+            }
+
+            // Check if MaterialIssue already exists for this ProductionPlan
+            $existingIssue = MaterialIssue::where('production_plan_id', $productionPlan->id)
+                ->where('type', 'issue')
+                ->first();
+
+            if ($existingIssue) {
+                Log::info("MaterialIssue already exists for ProductionPlan {$productionPlan->id}");
+                return $existingIssue;
+            }
+
+            // Validate stock availability before creating MaterialIssue
+            $stockValidation = $this->validateStockForProductionPlan($productionPlan);
+            if (!$stockValidation['valid']) {
+                Log::warning("Cannot create MaterialIssue for ProductionPlan {$productionPlan->id}: " . $stockValidation['message']);
+                throw new \Exception($stockValidation['message']);
+            }
+
+            // Create MaterialIssue
+            $materialIssue = MaterialIssue::create([
+                'issue_number' => $this->generateIssueNumber('issue'),
+                'production_plan_id' => $productionPlan->id,
+                'warehouse_id' => $productionPlan->warehouse_id,
+                'issue_date' => now()->toDateString(),
+                'type' => 'issue',
+                'status' => 'draft',
+                'total_cost' => 0,
+                'notes' => 'Auto-generated from Production Plan scheduling',
+                'created_by' => Auth::id() ?? 1, // Default to admin if no auth
+            ]);
+
+            // Create MaterialIssueItems from BOM
+            $totalCost = 0;
+            foreach ($productionPlan->billOfMaterial->items as $bomItem) {
+                $quantity = $bomItem->quantity * $productionPlan->quantity;
+                $costPerUnit = $bomItem->product->cost_price ?? 0;
+                $itemTotalCost = $quantity * $costPerUnit;
+
+                MaterialIssueItem::create([
+                    'material_issue_id' => $materialIssue->id,
+                    'product_id' => $bomItem->product_id,
+                    'uom_id' => $bomItem->uom_id,
+                    'warehouse_id' => $productionPlan->warehouse_id,
+                    'quantity' => $quantity,
+                    'cost_per_unit' => $costPerUnit,
+                    'total_cost' => $itemTotalCost,
+                    'status' => 'draft',
+                    'inventory_coa_id' => $productionPlan->billOfMaterial->work_in_progress_coa_id,
+                ]);
+
+                $totalCost += $itemTotalCost;
+            }
+
+            // Update total cost
+            $materialIssue->update(['total_cost' => $totalCost]);
+
+            Log::info("MaterialIssue {$materialIssue->issue_number} created for ProductionPlan {$productionPlan->id}");
+
+            return $materialIssue;
+
+        } catch (\Exception $e) {
+            Log::error("Failed to create MaterialIssue for ProductionPlan {$productionPlan->id}: " . $e->getMessage());
+            return null;
+        }
     }
 
     /**
-     * Update material fulfillment data for all production plans
+     * Validate stock availability for ProductionPlan BOM items
      */
-    public function updateAllMaterialFulfillments(): void
+    protected function validateStockForProductionPlan(ProductionPlan $productionPlan): array
     {
-        $plans = \App\Models\ProductionPlan::with('billOfMaterial.items')->get();
-
-        foreach ($plans as $plan) {
-            $this->updateMaterialFulfillment($plan);
+        if (!$productionPlan->billOfMaterial) {
+            return ['valid' => true, 'message' => 'No BOM to validate'];
         }
+
+        $insufficientStock = [];
+        $outOfStock = [];
+
+        foreach ($productionPlan->billOfMaterial->items as $bomItem) {
+            $requiredQty = $bomItem->quantity * $productionPlan->quantity;
+
+            $inventoryStock = InventoryStock::where('product_id', $bomItem->product_id)
+                ->where('warehouse_id', $productionPlan->warehouse_id)
+                ->first();
+
+            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+
+            if ($availableQty <= 0) {
+                $outOfStock[] = "{$bomItem->product->name} (Stock: 0)";
+            } elseif ($availableQty < $requiredQty) {
+                $insufficientStock[] = "{$bomItem->product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            }
+        }
+
+        if (!empty($outOfStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock)
+            ];
+        }
+
+        if (!empty($insufficientStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => 'Stock tersedia untuk semua item'
+        ];
     }
 }

@@ -32,11 +32,10 @@ class CreateProductionPlan extends CreateRecord
     {
         if ($this->record->status === 'scheduled') {
             try {
-                app(\App\Services\ManufacturingService::class)->updateMaterialFulfillment($this->record);
                 \App\Http\Controllers\HelperController::sendNotification(
                     isSuccess: true,
                     title: 'Berhasil',
-                    message: 'Rencana produksi dijadwalkan langsung dan material fulfillment diperbarui.'
+                    message: 'Rencana produksi dijadwalkan langsung dan MaterialIssue telah dibuat otomatis.'
                 );
             } catch (\Throwable $e) {
                 report($e);

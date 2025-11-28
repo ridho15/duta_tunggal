@@ -125,6 +125,9 @@ class BillOfMaterialResource extends Resource
                             ->reactive()
                             ->searchable(['name'])
                             ->relationship('uom', 'name')
+                            ->getOptionLabelFromRecordUsing(function (UnitOfMeasure $uom) {
+                                return "{$uom->name} ({$uom->abbreviation})";
+                            })
                             ->validationMessages([
                                 'required' => 'Unit of measure belum dipilih',
                                 'exists' => 'Unit of measure tidak ditemukan !'
@@ -148,6 +151,7 @@ class BillOfMaterialResource extends Resource
                                     ->label('Biaya Overhead')
                                     ->numeric()
                                     ->default(0)
+                                    ->reactive()
                                     ->indonesianMoney()
                                     ->afterStateUpdated(fn ($state, $set, $get) => self::updateTotalCost($set, $get)),
                                 Placeholder::make('material_cost_display')
@@ -161,10 +165,10 @@ class BillOfMaterialResource extends Resource
                                             $quantity = (float) ($item['quantity'] ?? 0);
                                             $materialCost += ($unitPrice * $quantity);
                                         }
-                                        return 'Rp ' . number_format($materialCost, 2, '.', ',');
+                                        return 'Rp ' . number_format($materialCost, 0, ',', '.');
                                     }),
                                 Placeholder::make('total_cost_display')
-                                    ->label('Total Biaya')
+                                    ->label('Total Biayas')
                                     ->reactive()
                                     ->content(function ($get) {
                                         $materialCost = 0;
@@ -176,9 +180,8 @@ class BillOfMaterialResource extends Resource
                                         }
                                         $laborCost = HelperController::parseIndonesianMoney($get('labor_cost'));
                                         $overheadCost = HelperController::parseIndonesianMoney($get('overhead_cost'));
-                                        
                                         $totalCost = $materialCost + $laborCost + $overheadCost;
-                                        return 'Rp ' . number_format($totalCost, 2, ',', '.');
+                                        return 'Rp ' . number_format($totalCost, 0, ',', '.');
                                     }),
                                 Hidden::make('total_cost')
                                     ->dehydrated()
@@ -322,6 +325,9 @@ class BillOfMaterialResource extends Resource
                                     ->relationship('uom', 'name')
                                     ->required()
                                     ->reactive()
+                                    ->getOptionLabelFromRecordUsing(function (UnitOfMeasure $uom) {
+                                        return "{$uom->name} ({$uom->abbreviation})";
+                                    })
                                     ->validationMessages([
                                         'required' => 'Satuan belum dipilih',
                                         'exists' => 'Satuan tidak ditemukan'
@@ -363,11 +369,9 @@ class BillOfMaterialResource extends Resource
                                     ->reactive(),
                                 Textarea::make('note')
                                     ->label('Catatan')
-                                    ->nullable()
-                                    ->columnSpanFull(),
+                                    ->nullable(),
                                 Repeater::make('satuan_konversi')
                                     ->label('Satuan Konversi')
-                                    ->disabled()
                                     ->reactive()
                                     ->columnSpanFull()
                                     ->columns(2)
@@ -473,6 +477,12 @@ class BillOfMaterialResource extends Resource
                     ->boolean(),
                 TextColumn::make('items.product.name')
                     ->label("Material")
+                    ->formatStateUsing(function ($state, $record) {
+                        $materialNames = $record->items->map(function ($item) {
+                            return $item->product->name;
+                        })->toArray();
+                        return implode(', ', $materialNames);
+                    })
                     ->badge(),
                 TextColumn::make('created_at')
                     ->dateTime()

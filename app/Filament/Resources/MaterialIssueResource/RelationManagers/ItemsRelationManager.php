@@ -74,13 +74,6 @@ class ItemsRelationManager extends RelationManager
                     ->sortable(),
                 Tables\Columns\TextColumn::make('uom.name')
                     ->label('Satuan'),
-                Tables\Columns\TextColumn::make('cost_per_unit')
-                    ->label('Harga per Unit')
-                    ->money('IDR'),
-                Tables\Columns\TextColumn::make('total_cost')
-                    ->label('Total')
-                    ->money('IDR')
-                    ->sortable(),
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status Approval')
                     ->colors([
@@ -119,8 +112,6 @@ class ItemsRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\ViewAction::make(),
-                    Tables\Actions\EditAction::make(),
                     Tables\Actions\Action::make('request_approval')
                         ->label('Request Approval')
                         ->icon('heroicon-o-paper-airplane')
@@ -205,7 +196,6 @@ class ItemsRelationManager extends RelationManager
                                 ->success()
                                 ->send();
                         }),
-                    Tables\Actions\DeleteAction::make(),
                 ]),
             ])
             ->bulkActions([
@@ -286,7 +276,6 @@ class ItemsRelationManager extends RelationManager
                                 ->warning()
                                 ->send();
                         }),
-                    Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

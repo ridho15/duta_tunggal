@@ -24,6 +24,7 @@ class ProductionPlan extends Model
         'product_id',
         'quantity',
         'uom_id',
+        'warehouse_id',
         'start_date',
         'end_date',
         'status',
@@ -57,6 +58,11 @@ class ProductionPlan extends Model
         return $this->belongsTo(UnitOfMeasure::class, 'uom_id')->withDefault();
     }
 
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
@@ -70,11 +76,6 @@ class ProductionPlan extends Model
     public function materialIssues()
     {
         return $this->hasMany(MaterialIssue::class, 'production_plan_id');
-    }
-
-    public function materialFulfillments()
-    {
-        return $this->hasMany(MaterialFulfillment::class, 'production_plan_id');
     }
 
     public function finishedGoodsCompletions()
@@ -266,5 +267,59 @@ class ProductionPlan extends Model
                 'can_start_production' => false,
             ];
         }
+    }
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Auto-create MaterialIssue when status changes to scheduled
+        static::updating(function ($productionPlan) {
+            // Check if status is being changed to 'scheduled'
+            if ($productionPlan->isDirty('status') && $productionPlan->status === 'scheduled') {
+                // Only create if it doesn't already exist
+                $existingIssue = \App\Models\MaterialIssue::where('production_plan_id', $productionPlan->id)
+                    ->where('type', 'issue')
+                    ->first();
+
+                if (!$existingIssue) {
+                    $manufacturingService = app(\App\Services\ManufacturingService::class);
+                    try {
+                        $materialIssue = $manufacturingService->createMaterialIssueForProductionPlan($productionPlan);
+
+                        if ($materialIssue) {
+                            Log::info("MaterialIssue {$materialIssue->issue_number} auto-created for ProductionPlan {$productionPlan->id}");
+                        } else {
+                            Log::warning("Failed to auto-create MaterialIssue for ProductionPlan {$productionPlan->id}");
+                            // Prevent status change if MaterialIssue creation failed
+                            $productionPlan->status = $productionPlan->getOriginal('status');
+                        }
+                    } catch (\Exception $e) {
+                        Log::error("Failed to auto-create MaterialIssue for ProductionPlan {$productionPlan->id}: " . $e->getMessage());
+                        // Prevent status change if stock validation failed
+                        $productionPlan->status = $productionPlan->getOriginal('status');
+                        // Re-throw exception to be handled by caller
+                        throw $e;
+                    }
+                }
+            }
+        });
+
+        static::deleting(function ($productionPlan) {
+            // Cascade delete related material issues and their items
+            $productionPlan->materialIssues()->each(function ($materialIssue) {
+                $materialIssue->items()->delete();
+                $materialIssue->delete();
+            });
+
+            // Cascade delete related manufacturing orders if needed
+            $productionPlan->manufacturingOrders()->delete();
+
+            // Cascade delete related finished goods completions
+            $productionPlan->finishedGoodsCompletions()->delete();
+        });
     }
 }

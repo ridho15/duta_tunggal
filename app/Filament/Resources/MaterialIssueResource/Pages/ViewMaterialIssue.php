@@ -16,6 +16,10 @@ class ViewMaterialIssue extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\EditAction::make()
+                ->icon('heroicon-o-pencil')
+                ->visible(fn(MaterialIssue $record) => in_array($record->status, ['draft', 'pending_approval'])),
+            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('request_approval')
                 ->label('Request Approval')
                 ->icon('heroicon-o-paper-airplane')
@@ -25,6 +29,17 @@ class ViewMaterialIssue extends ViewRecord
                 ->modalHeading('Request Approval Material Issue')
                 ->modalDescription('Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
                 ->action(function (MaterialIssue $record) {
+                    // Validate stock before request approval
+                    $stockValidation = $this->validateStockAvailability($record);
+                    if (!$stockValidation['valid']) {
+                        Notification::make()
+                            ->title('Tidak Dapat Request Approval')
+                            ->body($stockValidation['message'])
+                            ->danger()
+                            ->duration(10000)
+                            ->send();
+                        return;
+                    }
                     // Logic untuk request approval - bisa kirim notifikasi ke approver gudang
                     // Untuk sementara, langsung set approved_by ke user yang punya role gudang
                     // Cari approver gudang berdasarkan permission 'approve warehouse'
@@ -94,6 +109,18 @@ class ViewMaterialIssue extends ViewRecord
                 ->modalHeading('Approve Material Issue')
                 ->modalDescription('Setelah di-approve, Material Issue dapat diproses menjadi Completed.')
                 ->action(function (MaterialIssue $record) {
+                    // Validate stock before approval
+                    $stockValidation = $this->validateStockAvailability($record);
+                    if (!$stockValidation['valid']) {
+                        Notification::make()
+                            ->title('Tidak Dapat Menyetujui Material Issue')
+                            ->body($stockValidation['message'])
+                            ->danger()
+                            ->duration(10000)
+                            ->send();
+                        return;
+                    }
+
                     $record->update([
                         'approved_at' => now(),
                         'approved_by' => Auth::id(), // Set Super Admin sebagai approver jika belum ada
@@ -168,6 +195,18 @@ class ViewMaterialIssue extends ViewRecord
                 ->modalHeading('Selesaikan Material Issue')
                 ->modalDescription('Apakah Anda yakin ingin menyelesaikan Material Issue ini? Stock akan dikurangi dan journal entry akan dibuat.')
                 ->action(function (MaterialIssue $record) {
+                    // Validate stock before completion
+                    $stockValidation = $this->validateStockAvailability($record);
+                    if (!$stockValidation['valid']) {
+                        Notification::make()
+                            ->title('Tidak Dapat Menyelesaikan Material Issue')
+                            ->body($stockValidation['message'])
+                            ->danger()
+                            ->duration(10000)
+                            ->send();
+                        return;
+                    }
+
                     $record->update(['status' => MaterialIssue::STATUS_COMPLETED]);
 
                     Notification::make()
@@ -176,6 +215,54 @@ class ViewMaterialIssue extends ViewRecord
                         ->success()
                         ->send();
                 }),
+        ];
+    }
+
+    /**
+     * Validate stock availability for material issue items
+     */
+    protected function validateStockAvailability(MaterialIssue $materialIssue): array
+    {
+        $materialIssue->loadMissing('items.product', 'items.warehouse');
+
+        $insufficientStock = [];
+        $outOfStock = [];
+
+        foreach ($materialIssue->items as $item) {
+            $warehouseId = $item->warehouse_id ?? $materialIssue->warehouse_id;
+            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
+                ->where('warehouse_id', $warehouseId)
+                ->first();
+
+            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $requiredQty = $item->quantity;
+
+            $warehouseName = $item->warehouse ? $item->warehouse->name : ($materialIssue->warehouse ? $materialIssue->warehouse->name : 'N/A');
+
+            if ($availableQty <= 0) {
+                $outOfStock[] = "{$item->product->name} di {$warehouseName} (Stock: 0)";
+            } elseif ($availableQty < $requiredQty) {
+                $insufficientStock[] = "{$item->product->name} di {$warehouseName} (Dibutuhkan: " . number_format($requiredQty, 2) . ", Tersedia: " . number_format($availableQty, 2) . ")";
+            }
+        }
+
+        if (!empty($outOfStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock) . '. Silakan lakukan stock adjustment atau transfer stock terlebih dahulu.'
+            ];
+        }
+
+        if (!empty($insufficientStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock) . '. Silakan sesuaikan quantity atau lakukan stock adjustment terlebih dahulu.'
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => 'Stock tersedia untuk semua item'
         ];
     }
 }

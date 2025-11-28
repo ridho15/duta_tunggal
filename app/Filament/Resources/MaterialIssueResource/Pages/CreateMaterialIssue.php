@@ -151,6 +151,9 @@ class CreateMaterialIssue extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        // Validate stock availability before creating Material Issue
+        $this->validateStockAvailability($data);
+
         if (isset($data['items']) && is_array($data['items'])) {
             $totalCost = 0;
             foreach ($data['items'] as $index => $item) {
@@ -211,5 +214,49 @@ class CreateMaterialIssue extends CreateRecord
         }
 
         return $data;
+    }
+
+    protected function validateStockAvailability(array $data): void
+    {
+        if (!isset($data['items']) || !is_array($data['items']) || empty($data['items'])) {
+            return; // No items to validate
+        }
+
+        $insufficientStock = [];
+        $outOfStock = [];
+        $warehouseId = $data['warehouse_id'] ?? null;
+
+        foreach ($data['items'] as $item) {
+            if (!isset($item['product_id']) || !isset($item['quantity'])) {
+                continue;
+            }
+
+            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item['product_id'])
+                ->where('warehouse_id', $item['warehouse_id'] ?? $warehouseId)
+                ->first();
+
+            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $requiredQty = (float) $item['quantity'];
+
+            $product = \App\Models\Product::find($item['product_id']);
+
+            if ($availableQty <= 0) {
+                $outOfStock[] = "{$product->name} (Stock: 0)";
+            } elseif ($availableQty < $requiredQty) {
+                $insufficientStock[] = "{$product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            }
+        }
+
+        if (!empty($outOfStock)) {
+            throw ValidationException::withMessages([
+                'items' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock)
+            ]);
+        }
+
+        if (!empty($insufficientStock)) {
+            throw ValidationException::withMessages([
+                'items' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
+            ]);
+        }
     }
 }

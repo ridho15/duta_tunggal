@@ -2,7 +2,7 @@
     $fulfillments = $getState();
 @endphp
 
-@if($fulfillments->count() > 0)
+@if($fulfillments && $fulfillments->count() > 0)
     <div class="overflow-x-auto">
         <table class="w-full text-sm text-left">
             <thead class="text-xs text-gray-700 uppercase bg-gray-50">

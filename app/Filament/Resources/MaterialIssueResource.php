@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\MaterialIssueResource\Pages;
 use App\Filament\Resources\MaterialIssueResource\RelationManagers;
 use App\Http\Controllers\HelperController;
+use App\Models\InventoryStock;
 use App\Models\MaterialIssue;
 use App\Models\ManufacturingOrder;
 use App\Models\Product;
@@ -79,7 +80,7 @@ class MaterialIssueResource extends Resource
                             }),
                         Forms\Components\Select::make('production_plan_id')
                             ->label('Rencana Produksi')
-                            ->relationship('productionPlan', 'plan_number')
+                            ->relationship('productionPlan', 'plan_number', fn (Builder $query) => $query->where('status', 'scheduled'))
                             ->searchable()
                             ->preload()
                             ->required(fn ($get) => $get('type') === 'issue')
@@ -98,13 +99,15 @@ class MaterialIssueResource extends Resource
                                                 'quantity' => $bomItem->quantity * $productionPlan->quantity,
                                                 'cost_per_unit' => $bomItem->product->cost_price ?? 0,
                                                 'total_cost' => ($bomItem->quantity * $productionPlan->quantity) * ($bomItem->product->cost_price ?? 0),
-                                                'warehouse_id' => null,
+                                                'warehouse_id' => $productionPlan->warehouse_id, // Auto-fill from ProductionPlan
                                                 'rak_id' => null,
                                                 'notes' => null,
                                                 'inventory_coa_id' => null,
                                             ];
                                         }
                                         $set('items', $items);
+                                        // Auto-fill warehouse from ProductionPlan
+                                        $set('warehouse_id', $productionPlan->warehouse_id);
                                         // Prefer existing MO for this Production Plan if available
                                         $mo = \App\Models\ManufacturingOrder::where('production_plan_id', $productionPlan->id)->latest('id')->first();
                                         if ($mo) {
@@ -146,10 +149,13 @@ class MaterialIssueResource extends Resource
                             ->label('Status')
                             ->options([
                                 'draft' => 'Draft',
+                                'pending_approval' => 'Menunggu Persetujuan',
+                                'approved' => 'Disetujui',
                                 'completed' => 'Selesai',
                             ])
                             ->required()
-                            ->default('draft'),
+                            ->default('draft')
+                            ->disabled(fn ($context) => $context === 'edit'), // Prevent direct status change in edit form
                     ])
                     ->columns(2),
                 
@@ -159,6 +165,19 @@ class MaterialIssueResource extends Resource
                         Forms\Components\Repeater::make('items')
                             ->relationship()
                             ->label('Items')
+                            ->mutateRelationshipDataBeforeFillUsing(function ($data) {
+                                if($data['product_id'] && $data['warehouse_id']) {
+                                    $inventoryStock = InventoryStock::where('product_id', $data['product_id'])
+                                        ->where('warehouse_id', $data['warehouse_id'])
+                                        ->first();
+                                        if($inventoryStock) {
+                                            $data['available_stock_display'] = $inventoryStock->qty_available;
+                                        } else {
+                                            $data['available_stock_display'] = 0;
+                                        }
+                                }
+                                return $data;
+                            })
                             ->schema([
                                 Forms\Components\Select::make('product_id')
                                     ->label('Produk (Bahan Baku)')
@@ -191,28 +210,13 @@ class MaterialIssueResource extends Resource
                                     ->label('Quantity')
                                     ->numeric()
                                     ->required()
+                                    ->readOnly()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get) {
                                         $qty = (float) $get('quantity');
-                                        $cost = (float) $get('cost_per_unit');
+                                        $cost = HelperController::parseIndonesianMoney($get('cost_per_unit') ?? '0');
                                         $set('total_cost', $qty * $cost);
                                     }),
-                                Forms\Components\TextInput::make('cost_per_unit')
-                                    ->label('Harga per Unit')
-                                    ->numeric()
-                                    ->indonesianMoney()
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get) {
-                                        $qty = (float) $get('quantity');
-                                        $cost = (float) $get('cost_per_unit');
-                                        $set('total_cost', $qty * $cost);
-                                    }),
-                                Forms\Components\TextInput::make('total_cost')
-                                    ->label('Total')
-                                    ->numeric()
-                                    ->indonesianMoney()
-                                    ->disabled()
-                                    ->dehydrated(),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
                                     ->relationship('warehouse', 'name')
@@ -260,12 +264,23 @@ class MaterialIssueResource extends Resource
                                     ->reactive()
                                     ->dehydrated(false)
                                     ->default(function ($get) {
-                                        return $get('available_stock_display') ?? '0.00';
+                                        $productId = $get('product_id');
+                                        $warehouseId = $get('warehouse_id');
+
+                                        if ($productId && $warehouseId) {
+                                            $stock = \App\Models\InventoryStock::where('product_id', $productId)
+                                                ->where('warehouse_id', $warehouseId)
+                                                ->first();
+                                            return number_format($stock ? $stock->qty_available : 0, 2);
+                                        }
+
+                                        return '0.00';
                                     })
                                     ->extraInputAttributes(function ($get) {
                                         $productId = $get('product_id');
                                         $warehouseId = $get('warehouse_id');
                                         $quantity = (float) $get('quantity');
+
                                         if ($productId && $warehouseId) {
                                             $stock = \App\Models\InventoryStock::where('product_id', $productId)
                                                 ->where('warehouse_id', $warehouseId)
@@ -320,7 +335,8 @@ class MaterialIssueResource extends Resource
                             ->columns(3)
                             ->collapsible()
                             ->defaultItems(0)
-                            ->addActionLabel('Tambah Item')
+                            ->addable(false)
+                            ->deletable(false)
                             ->reorderable(false),
                     ]),
                 
@@ -429,10 +445,14 @@ class MaterialIssueResource extends Resource
                     ->label('Status')
                     ->colors([
                         'secondary' => 'draft',
-                        'success' => 'completed',
+                        'warning' => 'pending_approval',
+                        'success' => 'approved',
+                        'primary' => 'completed',
                     ])
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'draft' => 'Draft',
+                        'pending_approval' => 'Menunggu Persetujuan',
+                        'approved' => 'Disetujui',
                         'completed' => 'Selesai',
                         default => $state,
                     }),
@@ -466,6 +486,8 @@ class MaterialIssueResource extends Resource
                     ->label('Status')
                     ->options([
                         'draft' => 'Draft',
+                        'pending_approval' => 'Menunggu Persetujuan',
+                        'approved' => 'Disetujui',
                         'completed' => 'Selesai',
                     ]),
                 Tables\Filters\SelectFilter::make('production_plan_id')
@@ -498,8 +520,49 @@ class MaterialIssueResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\ViewAction::make(),
+                    Tables\Actions\ViewAction::make()->color('primary'),
                     Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('approve')
+                        ->label('Setujui')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn (MaterialIssue $record) => in_array($record->status, ['draft', 'pending_approval']))
+                        ->requiresConfirmation()
+                        ->modalHeading('Setujui Material Issue')
+                        ->modalDescription('Apakah Anda yakin ingin menyetujui material issue ini? Status Production Plan akan berubah ke "In Progress".')
+                        ->modalSubmitActionLabel('Ya, Setujui')
+                        ->action(function (MaterialIssue $record) {
+                            // Validate stock availability before approval
+                            $stockValidation = static::validateStockAvailability($record);
+                            if (!$stockValidation['valid']) {
+                                Notification::make()
+                                    ->title('Tidak Dapat Menyetujui Material Issue')
+                                    ->body($stockValidation['message'])
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+
+                            try {
+                                $record->update([
+                                    'status' => 'approved',
+                                    'approved_by' => filament()->auth()->user()->id,
+                                    'approved_at' => now(),
+                                ]);
+                                
+                                Notification::make()
+                                    ->title('Material Issue Berhasil Disetujui')
+                                    ->body('Status Production Plan telah diubah ke "In Progress"')
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Gagal Menyetujui Material Issue')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
                     Tables\Actions\Action::make('generate_journal')
                         ->label('Generate Jurnal')
                         ->icon('heroicon-o-document-text')
@@ -555,6 +618,51 @@ class MaterialIssueResource extends Resource
             'create' => Pages\CreateMaterialIssue::route('/create'),
             'view' => Pages\ViewMaterialIssue::route('/{record}'),
             'edit' => Pages\EditMaterialIssue::route('/{record}/edit'),
+        ];
+    }
+
+    /**
+     * Validate stock availability for material issue items
+     */
+    protected static function validateStockAvailability(MaterialIssue $materialIssue): array
+    {
+        $materialIssue->loadMissing('items.product');
+
+        $insufficientStock = [];
+        $outOfStock = [];
+
+        foreach ($materialIssue->items as $item) {
+            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
+                ->where('warehouse_id', $item->warehouse_id ?? $materialIssue->warehouse_id)
+                ->first();
+
+            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $requiredQty = $item->quantity;
+
+            if ($availableQty <= 0) {
+                $outOfStock[] = "{$item->product->name} (Stock: 0)";
+            } elseif ($availableQty < $requiredQty) {
+                $insufficientStock[] = "{$item->product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            }
+        }
+
+        if (!empty($outOfStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock)
+            ];
+        }
+
+        if (!empty($insufficientStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => 'Stock tersedia untuk semua item'
         ];
     }
 }

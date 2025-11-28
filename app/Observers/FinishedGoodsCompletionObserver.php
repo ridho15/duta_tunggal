@@ -17,6 +17,7 @@ class FinishedGoodsCompletionObserver
         $originalStatus = $completion->getOriginal('status');
         if ($originalStatus !== 'completed' && $completion->status === 'completed') {
             $this->generateJournalForCompletion($completion);
+            $this->updateProductionPlanStatus($completion);
         }
     }
 
@@ -25,9 +26,10 @@ class FinishedGoodsCompletionObserver
      */
     public function created(FinishedGoodsCompletion $completion): void
     {
-        // If created directly as completed, generate journal
+        // If created directly as completed, generate journal and update production plan
         if ($completion->status === 'completed') {
             $this->generateJournalForCompletion($completion);
+            $this->updateProductionPlanStatus($completion);
         }
     }
 
@@ -44,6 +46,26 @@ class FinishedGoodsCompletionObserver
             Log::error('Failed to generate journal for finished goods completion: ' . $e->getMessage(), [
                 'completion_id' => $completion->id,
                 'completion_number' => $completion->completion_number
+            ]);
+        }
+    }
+
+    /**
+     * Update ProductionPlan status to completed when finished goods are completed
+     */
+    protected function updateProductionPlanStatus(FinishedGoodsCompletion $completion): void
+    {
+        try {
+            if ($completion->productionPlan && $completion->productionPlan->status !== 'completed') {
+                $completion->productionPlan->update(['status' => 'completed']);
+                
+                Log::info("ProductionPlan {$completion->productionPlan->id} status changed to 'completed' due to FinishedGoodsCompletion {$completion->id}");
+            }
+        } catch (\Throwable $e) {
+            // Log error but don't break the completion flow
+            Log::error('Failed to update ProductionPlan status after finished goods completion: ' . $e->getMessage(), [
+                'completion_id' => $completion->id,
+                'production_plan_id' => $completion->production_plan_id
             ]);
         }
     }

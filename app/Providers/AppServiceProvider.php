@@ -8,6 +8,7 @@ use App\Models\DepositLog;
 use App\Models\FinishedGoodsCompletion;
 use App\Models\Invoice;
 use App\Models\ManufacturingOrder;
+use App\Models\MaterialFulfillment;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
 use App\Models\Product;
@@ -41,28 +42,7 @@ use App\Observers\AssetObserver;
 use App\Observers\VendorPaymentObserver;
 use App\Observers\PurchaseOrderObserver;
 use App\Observers\PurchaseReceiptObserver;
-use App\Services\CabangService;
-use App\Services\ChartOfAccountService;
-use App\Services\CustomerService;
-use App\Services\DeliveryOrderItemService;
-use App\Services\DeliveryOrderService;
-use App\Services\InvoiceService;
-use App\Services\ManufacturingService;
-use App\Services\OrderRequestService;
-use App\Services\ProductionService;
-use App\Services\ProductService;
-use App\Services\PurchaseOrderService;
-use App\Services\PurchaseReceiptService;
-use App\Services\PurchaseReturnService;
-use App\Services\QualityControlService;
-use App\Services\QuotationService;
-use App\Services\ReturnProductService;
-use App\Services\SalesOrderService;
-use App\Services\SupplierService;
-use App\Services\SuratJalanService;
-use App\Services\WarehouseService;
 use Barryvdh\Debugbar\Facades\Debugbar;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use Filament\Tables\Table;
@@ -217,16 +197,7 @@ class AppServiceProvider extends ServiceProvider
         PurchaseOrder::observe(PurchaseOrderObserver::class);
         Product::observe(ProductObserver::class);
         JournalEntry::observe(JournalEntryObserver::class);
-
-        // Override Filament's database-notifications Livewire component with
-        // our local subclass to ensure it exposes a public `$data` property.
-        // This avoids Livewire trying to set a non-existent `$data` property
-        // on the vendor component when payloads are mapped incorrectly.
         Livewire::component('database-notifications', \App\Livewire\DatabaseNotifications::class);
-        // Filament prefixes some component names (for example when used
-        // inside panels). Register the prefixed name as well so any
-        // Livewire updates targeting the prefixed component are handled
-        // by our wrapper too.
         Livewire::component('filament.livewire.database-notifications', \App\Livewire\DatabaseNotifications::class);
     }
 }
