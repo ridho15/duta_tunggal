@@ -42,6 +42,50 @@ class EditMaterialIssue extends EditRecord
         return $data;
     }
 
+    /**
+     * Validate stock availability for MaterialIssue items
+     */
+    protected function validateStockAvailability(MaterialIssue $record): array
+    {
+        $insufficientStock = [];
+        $outOfStock = [];
+
+        foreach ($record->items as $item) {
+            $requiredQty = $item->quantity;
+
+            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
+                ->where('warehouse_id', $item->warehouse_id)
+                ->first();
+
+            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+
+            if ($availableQty <= 0) {
+                $outOfStock[] = "{$item->product->name} (Stock: 0)";
+            } elseif ($availableQty < $requiredQty) {
+                $insufficientStock[] = "{$item->product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            }
+        }
+
+        if (!empty($outOfStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock)
+            ];
+        }
+
+        if (!empty($insufficientStock)) {
+            return [
+                'valid' => false,
+                'message' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => 'Stock tersedia untuk semua item'
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [

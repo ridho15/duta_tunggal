@@ -44,10 +44,18 @@ class BalanceSheetService
         // ASET (Assets)
         $allAssets = $this->getAccountsByType('Asset', $asOfDate, $cabangId, null, 'all', true); // Get all assets for totals
         $currentAssets = $allAssets->filter(function ($asset) {
-            return $asset->is_current == true || $this->inferCurrentClassification($asset, 'Asset') === true;
+            $isCurrent = $asset->is_current;
+            if ($isCurrent === null) {
+                $isCurrent = $this->inferCurrentClassification($asset, 'Asset');
+            }
+            return (bool) $isCurrent;
         });
         $fixedAssets = $allAssets->filter(function ($asset) {
-            return $asset->is_current == false || $this->inferCurrentClassification($asset, 'Asset') === false;
+            $isCurrent = $asset->is_current;
+            if ($isCurrent === null) {
+                $isCurrent = $this->inferCurrentClassification($asset, 'Asset');
+            }
+            return !(bool) $isCurrent;
         });
         $contraAssets = $this->getAccountsByType('Contra Asset', $asOfDate, $cabangId, null, 'all', true);
         

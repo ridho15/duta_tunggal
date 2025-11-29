@@ -10,6 +10,7 @@ use App\Models\MaterialIssueItem;
 use App\Models\ProductionPlan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Filament\Notifications\Notification;
 
 class ManufacturingService
 {
@@ -26,7 +27,21 @@ class ManufacturingService
 
     public function checkStockMaterial($manufacturingOrder)
     {
-        $items = $manufacturingOrder->items ?? [];
+        $plan = $manufacturingOrder->productionPlan;
+        if (!$plan || !$plan->billOfMaterial) {
+            return false;
+        }
+
+        $items = [];
+        foreach ($plan->billOfMaterial->items as $bomItem) {
+            $items[] = [
+                'product_id' => $bomItem->product_id,
+                'quantity' => $bomItem->quantity * $plan->quantity,
+                'warehouse_id' => null, // Assuming no specific warehouse in BOM, or add if needed
+                'rak_id' => null,
+            ];
+        }
+
         foreach ($items as $item) {
             $query = InventoryStock::where('product_id', $item['product_id']);
             if (!empty($item['warehouse_id'])) {
@@ -112,13 +127,6 @@ class ManufacturingService
                 return $existingIssue;
             }
 
-            // Validate stock availability before creating MaterialIssue
-            $stockValidation = $this->validateStockForProductionPlan($productionPlan);
-            if (!$stockValidation['valid']) {
-                Log::warning("Cannot create MaterialIssue for ProductionPlan {$productionPlan->id}: " . $stockValidation['message']);
-                throw new \Exception($stockValidation['message']);
-            }
-
             // Create MaterialIssue
             $materialIssue = MaterialIssue::create([
                 'issue_number' => $this->generateIssueNumber('issue'),
@@ -139,7 +147,7 @@ class ManufacturingService
                 $costPerUnit = $bomItem->product->cost_price ?? 0;
                 $itemTotalCost = $quantity * $costPerUnit;
 
-                MaterialIssueItem::create([
+                $materialIssueItem = MaterialIssueItem::create([
                     'material_issue_id' => $materialIssue->id,
                     'product_id' => $bomItem->product_id,
                     'uom_id' => $bomItem->uom_id,
@@ -148,9 +156,7 @@ class ManufacturingService
                     'cost_per_unit' => $costPerUnit,
                     'total_cost' => $itemTotalCost,
                     'status' => 'draft',
-                    'inventory_coa_id' => $productionPlan->billOfMaterial->work_in_progress_coa_id,
                 ]);
-
                 $totalCost += $itemTotalCost;
             }
 
@@ -162,7 +168,12 @@ class ManufacturingService
             return $materialIssue;
 
         } catch (\Exception $e) {
-            Log::error("Failed to create MaterialIssue for ProductionPlan {$productionPlan->id}: " . $e->getMessage());
+            Notification::make()
+                ->title('Error Creating Material Issue')
+                ->body('Failed to create Material Issue for Production Plan: ' . $e->getMessage())
+                ->danger()
+                ->send();
+            Log::error("Error creating MaterialIssue for ProductionPlan {$productionPlan->id}: " . $e->getMessage());
             return null;
         }
     }

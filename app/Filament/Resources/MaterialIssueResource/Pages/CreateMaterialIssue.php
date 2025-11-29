@@ -74,7 +74,7 @@ class CreateMaterialIssue extends CreateRecord
 
         // 2) Auto journal if created directly as completed
         /** @var MaterialIssue $mi */
-        if ($mi->status === 'completed') {
+        if ($this->record->status === 'completed') {
             try {
                 $journalService = app(ManufacturingJournalService::class);
                 if ($mi->type === 'issue') {

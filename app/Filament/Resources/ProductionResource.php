@@ -57,10 +57,9 @@ class ProductionResource extends Resource
                         Select::make('manufacturing_order_id')
                             ->label('From Manufacture')
                             ->preload()
+                            ->disabled()
                             ->searchable()
-                            ->relationship('manufacturingOrder', 'mo_number', function (Builder $query) {
-                                $query->where('status', 'in_progress');
-                            })
+                            ->relationship('manufacturingOrder', 'mo_number')
                             ->required(),
                         DatePicker::make('production_date')
                             ->required(),
@@ -78,17 +77,15 @@ class ProductionResource extends Resource
                 TextColumn::make('manufacturingOrder.mo_number')
                     ->label('Manufacture Number')
                     ->searchable(),
-                TextColumn::make('manufacturingOrder.product')
+                TextColumn::make('manufacturingOrder.productionPlan.product')
                     ->label('Product')
                     ->formatStateUsing(function ($state) {
                         return "({$state->sku}) {$state->name}";
                     })
                     ->searchable(query: function (Builder $query, $search) {
-                        $query->whereHas('manufacturingOrder', function ($query) use ($search) {
-                            $query->whereHas('product', function ($query) use ($search) {
-                                $query->where('sku', 'LIKE', '%' . $search . '%')
-                                    ->orWhere('name', 'LIKE', '%' . $search . '%');
-                            });
+                        $query->whereHas('manufacturingOrder.productionPlan.product', function ($query) use ($search) {
+                            $query->where('sku', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
                 TextColumn::make('production_date')

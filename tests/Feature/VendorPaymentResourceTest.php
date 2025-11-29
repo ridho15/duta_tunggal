@@ -518,4 +518,45 @@ class VendorPaymentResourceTest extends TestCase
 
         return $invoice;
     }
+
+    public function test_vendor_payment_infolist_debugging()
+    {
+        // Create test data within the test
+        $supplier = \App\Models\Supplier::first() ?? \App\Models\Supplier::factory()->create();
+        $user = \App\Models\User::first();
+        if (!$user) {
+            $user = \App\Models\User::factory()->create();
+        }
+        $warehouse = \App\Models\Warehouse::first() ?? \App\Models\Warehouse::factory()->create();
+
+        // Create a vendor payment
+        $vendorPayment = \App\Models\VendorPayment::create([
+            'supplier_id' => $supplier->id,
+            'payment_date' => now(),
+            'total_payment' => 1000000,
+            'payment_method' => 'transfer',
+            'selected_invoices' => [1, 2, 3], // This is the array field that might cause issues
+            'invoice_receipts' => ['receipt1', 'receipt2'],
+            'created_by' => $user->id,
+        ]);
+
+        // Authenticate the user
+        $this->actingAs($user);
+
+        // Test the view page using Livewire
+        $component = Livewire::test(\App\Filament\Resources\VendorPaymentResource\Pages\ViewVendorPayment::class, [
+            'record' => $vendorPayment->id,
+        ]);
+
+        // The test will fail with the array to string conversion error if it exists
+        // This will help us identify which field is causing the issue
+        try {
+            $component->assertOk();
+            $this->assertTrue(true, 'Infolist rendered successfully');
+        } catch (\Exception $e) {
+            // If we get the array to string conversion error, this is what we expect
+            // The error message will help us identify which field is problematic
+            $this->fail('Array to string conversion error occurred: ' . $e->getMessage());
+        }
+    }
 }

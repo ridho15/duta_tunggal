@@ -36,6 +36,11 @@ class StockReservationObserver
      */
     public function deleted(StockReservation $stockReservation): void
     {
+        Log::info('StockReservationObserver: deleted event triggered', [
+            'reservation_id' => $stockReservation->id,
+            'product_id' => $stockReservation->product_id,
+            'quantity' => $stockReservation->quantity,
+        ]);
         $this->updateReservedStock($stockReservation, 'decrement');
     }
 
@@ -80,8 +85,10 @@ class StockReservationObserver
 
         if ($operation === 'increment') {
             $inventoryStock->increment('qty_reserved', $qtyToUpdate);
+            $inventoryStock->decrement('qty_available', $qtyToUpdate); // Kurangi qty_available saat reservation dibuat
         } elseif ($operation === 'decrement') {
             $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
+            $inventoryStock->increment('qty_available', $qtyToUpdate); // Tambah kembali qty_available saat reservation dihapus
         }
     }
 }

@@ -64,13 +64,13 @@ class QualityControlManufactureResource extends Resource
                             ->schema([
                                 Select::make('from_model_id')
                                     ->label('From Production')
-                                    ->options(Production::with(['manufacturingOrder.product'])
+                                    ->options(Production::with(['manufacturingOrder.productionPlan.product'])
                                         ->whereDoesntHave('qualityControl')
-                                        ->where('status', 'completed')
+                                        ->whereIn('status', ['finished', 'completed'])
                                         ->get()
                                         ->mapWithKeys(function ($production) {
                                             $mo = $production->manufacturingOrder;
-                                            $product = $mo->product;
+                                            $product = $mo->productionPlan->product;
 
                                             $label = "MO: {$mo->mo_number} - {$product->name} (Qty: {$production->quantity_produced})";
                                             return [$production->id => $label];
@@ -81,7 +81,7 @@ class QualityControlManufactureResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $production = Production::with(['manufacturingOrder'])->find($state);
                                         if ($production) {
-                                            $set('product_id', $production->manufacturingOrder->product_id);
+                                            $set('product_id', $production->manufacturingOrder->productionPlan->product_id);
                                             $set('warehouse_id', $production->warehouse_id);
                                             $set('passed_quantity', $production->quantity_produced);
                                             $set('rejected_quantity', 0);
@@ -114,6 +114,9 @@ class QualityControlManufactureResource extends Resource
                                     ->label('Warehouse')
                                     ->options(Warehouse::pluck('name', 'id'))
                                     ->required()
+                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                                        return "({$warehouse->kode}) {$warehouse->name}";
+                                    })
                                     ->reactive(),
                                 Select::make('rak_id')
                                     ->label('Rak')
@@ -123,6 +126,9 @@ class QualityControlManufactureResource extends Resource
                                             return Rak::where('warehouse_id', $warehouseId)->pluck('name', 'id');
                                         }
                                         return [];
+                                    })
+                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
+                                        return "({$rak->code}) {$rak->name}";
                                     })
                                     ->searchable()
                                     ->preload(),
@@ -281,7 +287,7 @@ class QualityControlManufactureResource extends Resource
                     DeleteAction::make(),
                 ])
                 ->icon('heroicon-m-ellipsis-horizontal'),
-            ])
+                    ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

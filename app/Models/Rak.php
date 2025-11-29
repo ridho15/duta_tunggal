@@ -21,4 +21,9 @@ class Rak extends Model
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
     }
+
+    public function inventoryStock()
+    {
+        return $this->hasMany(InventoryStock::class, 'rak_id');
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
 use App\Services\ManufacturingJournalService;
+use App\Services\StockReservationService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,8 +27,6 @@ class MaterialIssue extends Model
         'created_by',
         'approved_by',
         'approved_at',
-        'wip_coa_id',
-        'inventory_coa_id',
     ];
 
     // Status constants for granular approval workflow
@@ -70,16 +69,6 @@ class MaterialIssue extends Model
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by')->withDefault();
-    }
-
-    public function wipCoa()
-    {
-        return $this->belongsTo(ChartOfAccount::class, 'wip_coa_id')->withDefault();
-    }
-
-    public function inventoryCoa()
-    {
-        return $this->belongsTo(ChartOfAccount::class, 'inventory_coa_id')->withDefault();
     }
 
     public function journalEntry()
@@ -191,31 +180,93 @@ class MaterialIssue extends Model
     {
         // Handle status transition updates for material fulfillment
         static::updated(function (MaterialIssue $issue) {
-            // Handle ProductionPlan status update when MaterialIssue is approved
-            if ($issue->status === 'approved' && $issue->getOriginal('status') !== 'approved') {
+            Log::info('MaterialIssue booted() triggered', [
+                'id' => $issue->id,
+                'status' => $issue->status,
+                'original_status' => $issue->getOriginal('status'),
+            ]);
+            // Handle ProductionPlan status update when MaterialIssue is requested for approval or approved
+            if (($issue->status === 'pending_approval' || $issue->status === 'approved') && $issue->getOriginal('status') !== $issue->status) {
                 if ($issue->production_plan_id) {
                     try {
                         $productionPlan = $issue->productionPlan;
                         if ($productionPlan && $productionPlan->status === 'scheduled') {
                             $productionPlan->update(['status' => 'in_progress']);
                             
-                            Log::info("ProductionPlan {$productionPlan->id} status changed to 'in_progress' due to MaterialIssue {$issue->id} approval");
+                            Log::info("ProductionPlan {$productionPlan->id} status changed to 'in_progress' due to MaterialIssue {$issue->id} status change to {$issue->status}");
                         }
                     } catch (\Throwable $e) {
-                        Log::error('Failed to update ProductionPlan status after MaterialIssue approval', [
+                        Log::error('Failed to update ProductionPlan status after MaterialIssue status change', [
                             'material_issue_id' => $issue->id,
                             'production_plan_id' => $issue->production_plan_id,
                             'error' => $e->getMessage(),
                         ]);
                     }
                 }
+
+                // Set items to pending approval when status changes to pending_approval
+                if ($issue->status === 'pending_approval' && $issue->getOriginal('status') === 'draft') {
+                    $issue->items()->where('status', 'draft')
+                        ->update(['status' => 'pending_approval']);
+                }
             }
 
-            // Only act when status changed from non-completed to completed
+            // Handle stock reservations based on status changes
+            $stockReservationService = app(StockReservationService::class);
+
+            // Reserve stock when approved
+            if ($issue->status === 'approved' && $issue->getOriginal('status') !== 'approved') {
+                try {
+                    $stockReservationService->reserveStockForMaterialIssue($issue);
+                    Log::info("Stock reserved for approved MaterialIssue {$issue->id}");
+
+                    // Set all pending items to approved
+                    $issue->items()->where('status', 'pending_approval')
+                        ->update([
+                            'status' => 'approved',
+                            'approved_by' => $issue->approved_by,
+                            'approved_at' => $issue->approved_at,
+                        ]);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to reserve stock for MaterialIssue', [
+                        'material_issue_id' => $issue->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Release stock reservations when rejected or set back to draft
+            if (($issue->status === 'draft' || $issue->status === 'rejected') &&
+                in_array($issue->getOriginal('status'), ['pending_approval', 'approved'])) {
+                try {
+                    $stockReservationService->releaseStockReservationsForMaterialIssue($issue);
+                    Log::info("Stock reservations released for MaterialIssue {$issue->id} (status: {$issue->status})");
+
+                    // Set all items back to draft
+                    $issue->items()->update(['status' => 'draft']);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to release stock reservations for MaterialIssue', [
+                        'material_issue_id' => $issue->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Consume reserved stock when completed
             if ($issue->status === 'completed' && $issue->getOriginal('status') !== 'completed') {
-                // Material fulfillment is now handled automatically via ProductionPlan status changes
-                // No additional action needed here as ProductionPlan tracks material usage
-                Log::info("MaterialIssue {$issue->id} completed for ProductionPlan {$issue->production_plan_id}");
+                try {
+                    $stockReservationService->consumeReservedStockForMaterialIssue($issue);
+                    Log::info("Reserved stock consumed for completed MaterialIssue {$issue->id}");
+
+                    // Set all approved items to completed
+                    $issue->items()->where('status', 'approved')
+                        ->update(['status' => 'completed']);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to consume reserved stock for MaterialIssue', [
+                        'material_issue_id' => $issue->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         });
 
@@ -223,6 +274,18 @@ class MaterialIssue extends Model
         static::deleting(function ($materialIssue) {
             $materialIssue->items()->delete();
             $materialIssue->journalEntry()->delete();
+
+            // Release stock reservations when material issue is deleted
+            try {
+                $stockReservationService = app(StockReservationService::class);
+                $stockReservationService->releaseStockReservationsForMaterialIssue($materialIssue);
+                Log::info("Stock reservations released for deleted MaterialIssue {$materialIssue->id}");
+            } catch (\Throwable $e) {
+                Log::error('Failed to release stock reservations for deleted MaterialIssue', [
+                    'material_issue_id' => $materialIssue->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         });
     }
 

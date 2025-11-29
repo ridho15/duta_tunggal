@@ -184,6 +184,7 @@ class CompleteSalesFlowFilamentTest extends TestCase
             'delivery_date' => now(),
             'status' => 'approved',
             'created_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         // Attach sale order to delivery order
@@ -217,10 +218,7 @@ class CompleteSalesFlowFilamentTest extends TestCase
 
         $this->assertEquals('posted', $postResult['status']);
 
-        // Manually reduce inventory stock (as per existing test pattern)
-        $inventoryStock->decrement('qty_available', 10);
-
-        // Verify inventory stock reduced
+        // Verify inventory stock reduced (automatically by StockMovementObserver)
         $inventoryStock->refresh();
         $this->assertEquals(10, $inventoryStock->qty_available); // 20 - 10
         $this->assertEquals(0, $inventoryStock->qty_reserved);

@@ -848,8 +848,19 @@ class VendorPaymentResource extends Resource
                         TextEntry::make('selected_invoices')
                             ->label('Jumlah Invoice')
                             ->formatStateUsing(function ($state, $record) {
-                                $count = $record->vendorPaymentDetail->count();
-                                return $count . ' invoice';
+                                $invoiceIds = $record->selected_invoices;
+
+                                // Normalize to array
+                                if (is_string($invoiceIds)) {
+                                    $decoded = json_decode($invoiceIds, true);
+                                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                        $invoiceIds = $decoded;
+                                    } else {
+                                        $invoiceIds = $invoiceIds ? [$invoiceIds] : [];
+                                    }
+                                }
+
+                                return is_array($invoiceIds) ? count($invoiceIds) . ' invoice' . (count($invoiceIds) > 1 ? 's' : '') : '0 invoice';
                             })
                             ->badge()
                             ->color('info')
@@ -1025,7 +1036,7 @@ class VendorPaymentResource extends Resource
                                 TextEntry::make('amount')
                                     ->label('Info Hutang (AP)')
                                     ->formatStateUsing(function ($state, $record) {
-                                        $invoiceIds = $record->selected_invoices;
+                                        $invoiceIds = $record->vendorPayment->selected_invoices;
                                         if (is_string($invoiceIds)) {
                                             $invoiceIds = json_decode($invoiceIds, true) ?? [];
                                         }
@@ -1049,7 +1060,7 @@ class VendorPaymentResource extends Resource
                                 TextEntry::make('amount')
                                     ->label('Sisa Setelah Bayar')
                                     ->formatStateUsing(function ($state, $record) {
-                                        $invoiceIds = $record->selected_invoices;
+                                        $invoiceIds = $record->vendorPayment->selected_invoices;
                                         if (is_string($invoiceIds)) {
                                             $invoiceIds = json_decode($invoiceIds, true) ?? [];
                                         }
@@ -1060,7 +1071,7 @@ class VendorPaymentResource extends Resource
                                     })
                                     ->badge()
                                     ->color(function ($state, $record) {
-                                        $invoiceIds = $record->selected_invoices;
+                                        $invoiceIds = $record->vendorPayment->selected_invoices;
                                         if (is_string($invoiceIds)) {
                                             $invoiceIds = json_decode($invoiceIds, true) ?? [];
                                         }
@@ -1072,7 +1083,7 @@ class VendorPaymentResource extends Resource
                                 TextEntry::make('amount')
                                     ->label('Progress Pembayaran')
                                     ->formatStateUsing(function ($state, $record) {
-                                        $invoiceIds = $record->selected_invoices;
+                                        $invoiceIds = $record->vendorPayment->selected_invoices;
                                         if (is_string($invoiceIds)) {
                                             $invoiceIds = json_decode($invoiceIds, true) ?? [];
                                         }
@@ -1092,9 +1103,20 @@ class VendorPaymentResource extends Resource
                                     })
                                     ->badge()
                                     ->color(function ($state, $record) {
-                                        $ap = \App\Models\AccountPayable::where('invoice_id', $record->invoice_id)->first();
-                                        if ($ap && $ap->total > 0) {
-                                            $percentage = ($ap->paid / $ap->total) * 100;
+                                        $invoiceIds = $record->vendorPayment->selected_invoices;
+                                        if (is_string($invoiceIds)) {
+                                            $invoiceIds = json_decode($invoiceIds, true) ?? [];
+                                        }
+                                        if (empty($invoiceIds)) return 'gray';
+                                        
+                                        $aps = \App\Models\AccountPayable::whereIn('invoice_id', $invoiceIds)->get();
+                                        if ($aps->isEmpty()) return 'gray';
+                                        
+                                        $total = $aps->sum('total');
+                                        $paid = $aps->sum('paid');
+                                        
+                                        if ($total > 0) {
+                                            $percentage = ($paid / $total) * 100;
                                             if ($percentage >= 100) return 'success';
                                             if ($percentage >= 50) return 'warning';
                                             return 'danger';

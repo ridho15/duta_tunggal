@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\CustomerReceipt;
 use App\Models\CustomerReceiptItem;
 use App\Models\Deposit;
 use App\Models\DepositLog;
@@ -23,9 +24,9 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\JournalEntry;
 use App\Observers\CustomerReceiptItemObserver;
+use App\Observers\CustomerReceiptObserver;
 use App\Observers\DepositLogObserser;
 use App\Observers\DepositObserver;
-use App\Observers\FinishedGoodsCompletionObserver;
 use App\Observers\GlobalActivityObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\JournalEntryObserver;
@@ -184,10 +185,10 @@ class AppServiceProvider extends ServiceProvider
         MaterialIssue::observe(MaterialIssueObserver::class);
         MaterialIssueItem::observe(MaterialIssueItemObserver::class);
         Production::observe(ProductionObserver::class);
-        FinishedGoodsCompletion::observe(FinishedGoodsCompletionObserver::class);
         Invoice::observe(InvoiceObserver::class);
         VendorPayment::observe(VendorPaymentObserver::class);
         VendorPaymentDetail::observe(VendorPaymentDetailObserver::class);
+        CustomerReceipt::observe(CustomerReceiptObserver::class);
         CustomerReceiptItem::observe(CustomerReceiptItemObserver::class);
         Deposit::observe(DepositObserver::class);
         DepositLog::observe(DepositLogObserser::class);

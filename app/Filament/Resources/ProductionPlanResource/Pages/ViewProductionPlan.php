@@ -22,8 +22,14 @@ class ViewProductionPlan extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make()->icon('heroicon-o-pencil'),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\EditAction::make()->icon('heroicon-o-pencil')
+            ->visible(function () {
+                return in_array($this->getRecord()->status, ['draft', 'scheduled']);
+            }),
+            Actions\DeleteAction::make()->icon('heroicon-o-trash')
+            ->visible(function () {
+                return $this->getRecord()->status === 'draft';
+            }),
             Actions\Action::make('schedule')
                 ->label('Jadwalkan')
                 ->icon('heroicon-o-calendar-days')
@@ -45,17 +51,6 @@ class ViewProductionPlan extends ViewRecord
                             ->body('Rencana produksi ini tidak berada pada status draft.')
                             ->send();
 
-                        return;
-                    }
-
-                    // Validate stock availability before scheduling
-                    $stockValidation = \App\Filament\Resources\ProductionPlanResource::validateStockForProductionPlan($record);
-                    if (!$stockValidation['valid']) {
-                        HelperController::sendNotification(
-                            isSuccess: false,
-                            title: "Tidak Dapat Menjadwalkan",
-                            message: $stockValidation['message']
-                        );
                         return;
                     }
 

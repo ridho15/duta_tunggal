@@ -3,7 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Production;
-use App\Services\ManufacturingJournalService;
+use App\Services\QualityControlService;
 use Illuminate\Support\Facades\Log;
 
 class ProductionObserver
@@ -16,7 +16,13 @@ class ProductionObserver
         // Check if status changed to 'finished'
         $originalStatus = $production->getOriginal('status');
         if ($originalStatus !== 'finished' && $production->status === 'finished') {
-            $this->generateJournalForProductionCompletion($production);
+            Log::info("ProductionObserver: Production {$production->id} status changed to finished, creating QC...");
+            // Create Quality Control automatically when production is finished
+            $this->createQualityControlForProduction($production);
+            Log::info("ProductionObserver: QC creation completed for production {$production->id}");
+
+            // Journal and stock movement will be created during Quality Control completion
+            // $this->generateJournalForProductionCompletion($production);
             $this->checkAndUpdateProductionPlanCompletion($production);
         }
     }
@@ -28,25 +34,32 @@ class ProductionObserver
     {
         // If created directly as finished, generate journal
         if ($production->status === 'finished') {
-            $this->generateJournalForProductionCompletion($production);
+            // Journal and stock movement will be created during Quality Control completion
+            // $this->generateJournalForProductionCompletion($production);
             $this->checkAndUpdateProductionPlanCompletion($production);
         }
     }
 
     /**
-     * Generate journal entries for production completion
+     * Create Quality Control automatically when production is finished
      */
-    protected function generateJournalForProductionCompletion(Production $production): void
+    protected function createQualityControlForProduction(Production $production): void
     {
         try {
-            $journalService = app(ManufacturingJournalService::class);
-            $journalService->generateJournalForProductionCompletion($production);
-        } catch (\Throwable $e) {
-            // Log error but don't break the update flow
-            Log::error('Failed to generate journal for production completion: ' . $e->getMessage(), [
-                'production_id' => $production->id,
-                'production_number' => $production->production_number
-            ]);
+            // Check if QC already exists for this production
+            $existingQC = $production->qualityControl()->exists();
+            if ($existingQC) {
+                Log::info("QC already exists for production ID: {$production->id}");
+                return;
+            }
+
+            $qcService = app(QualityControlService::class);
+            $qc = $qcService->createQCFromProduction($production);
+
+            Log::info("QC created automatically for production ID: {$production->id}, QC ID: {$qc->id}");
+
+        } catch (\Exception $e) {
+            Log::error("Failed to create QC for production ID: {$production->id}. Error: " . $e->getMessage());
         }
     }
 

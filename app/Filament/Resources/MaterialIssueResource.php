@@ -21,22 +21,25 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
+use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Metadata\Before;
+use Filament\Tables\Enums\BeforeAfterActions;
 
 class MaterialIssueResource extends Resource
 {
     protected static ?string $model = MaterialIssue::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
-    
+
     protected static ?string $navigationGroup = 'Manufacturing Order';
-    
+
     protected static ?string $navigationLabel = 'Pengambilan Bahan Baku';
-    
+
     protected static ?string $modelLabel = 'Pengambilan Bahan Baku';
-    
+
     protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
@@ -55,6 +58,20 @@ class MaterialIssueResource extends Resource
                                 $service = app(ManufacturingService::class);
                                 return $service->generateIssueNumber('issue');
                             })
+                            ->rules(function ($context, $record) {
+                                return [
+                                    'required',
+                                    'string',
+                                    'max:255',
+                                    \Illuminate\Validation\Rule::unique('material_issues', 'issue_number')->ignore($record->id ?? null)
+                                ];
+                            })
+                            ->validationMessages([
+                                'required' => 'Nomor Issue wajib diisi.',
+                                'string' => 'Nomor Issue harus berupa teks.',
+                                'max' => 'Nomor Issue maksimal 255 karakter.',
+                                'unique' => 'Nomor Issue sudah digunakan.',
+                            ])
                             ->suffixAction(
                                 FormAction::make('generate')
                                     ->icon('heroicon-m-arrow-path')
@@ -63,8 +80,7 @@ class MaterialIssueResource extends Resource
                                         $type = $get('type') ?? 'issue';
                                         $set('issue_number', $service->generateIssueNumber($type));
                                     })
-                            )
-                            ->unique(ignoreRecord: true),
+                            ),
                         Forms\Components\Select::make('type')
                             ->label('Tipe')
                             ->options([
@@ -73,6 +89,11 @@ class MaterialIssueResource extends Resource
                             ])
                             ->required()
                             ->default('issue')
+                            ->rules(['required', 'in:issue,return'])
+                            ->validationMessages([
+                                'required' => 'Tipe wajib dipilih.',
+                                'in' => 'Tipe harus salah satu dari: Ambil Barang atau Retur Barang.',
+                            ])
                             ->reactive()
                             ->afterStateUpdated(function ($set, $state) {
                                 $service = app(ManufacturingService::class);
@@ -80,11 +101,16 @@ class MaterialIssueResource extends Resource
                             }),
                         Forms\Components\Select::make('production_plan_id')
                             ->label('Rencana Produksi')
-                            ->relationship('productionPlan', 'plan_number', fn (Builder $query) => $query->where('status', 'scheduled'))
+                            ->relationship('productionPlan', 'plan_number', fn(Builder $query) => $query->where('status', 'scheduled'))
                             ->searchable()
                             ->preload()
-                            ->required(fn ($get) => $get('type') === 'issue')
-                            ->visible(fn ($get) => $get('type') === 'issue')
+                            ->required(fn($get) => $get('type') === 'issue')
+                            ->rules(['required_if:type,issue', 'exists:production_plans,id'])
+                            ->validationMessages([
+                                'required_if' => 'Rencana Produksi wajib dipilih untuk tipe Ambil Barang.',
+                                'exists' => 'Rencana Produksi yang dipilih tidak valid.',
+                            ])
+                            ->visible(fn($get) => $get('type') === 'issue')
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state && $get('type') === 'issue') {
@@ -102,7 +128,6 @@ class MaterialIssueResource extends Resource
                                                 'warehouse_id' => $productionPlan->warehouse_id, // Auto-fill from ProductionPlan
                                                 'rak_id' => null,
                                                 'notes' => null,
-                                                'inventory_coa_id' => null,
                                             ];
                                         }
                                         $set('items', $items);
@@ -126,6 +151,11 @@ class MaterialIssueResource extends Resource
                             ->preload()
                             ->required()
                             ->nullable()
+                            ->rules(['required', 'exists:warehouses,id'])
+                            ->validationMessages([
+                                'required' => 'Gudang wajib dipilih.',
+                                'exists' => 'Gudang yang dipilih tidak valid.',
+                            ])
                             ->getSearchResultsUsing(function (string $search): array {
                                 return \App\Models\Warehouse::where('name', 'like', "%{$search}%")
                                     ->orWhere('kode', 'like', "%{$search}%")
@@ -144,6 +174,12 @@ class MaterialIssueResource extends Resource
                             ->label('Tanggal')
                             ->required()
                             ->default(now())
+                            ->rules(['required', 'date', 'before_or_equal:today'])
+                            ->validationMessages([
+                                'required' => 'Tanggal wajib diisi.',
+                                'date' => 'Tanggal harus berupa format tanggal yang valid.',
+                                'before_or_equal' => 'Tanggal tidak boleh melebihi hari ini.',
+                            ])
                             ->native(false),
                         Forms\Components\Select::make('status')
                             ->label('Status')
@@ -155,10 +191,11 @@ class MaterialIssueResource extends Resource
                             ])
                             ->required()
                             ->default('draft')
-                            ->disabled(fn ($context) => $context === 'edit'), // Prevent direct status change in edit form
+                            ->visible(fn($context) => $context !== 'create')
+                            ->disabled(fn($context) => $context === 'edit'), // Prevent direct status change in edit form
                     ])
                     ->columns(2),
-                
+
                 Forms\Components\Section::make('Detail Bahan')
                     ->description('Bahan baku akan otomatis terisi berdasarkan Formula Produksi yang dipilih. Anda dapat menyesuaikan jumlah yang diambil (misalnya ambil 50% saja dari kebutuhan).')
                     ->schema([
@@ -166,18 +203,24 @@ class MaterialIssueResource extends Resource
                             ->relationship()
                             ->label('Items')
                             ->mutateRelationshipDataBeforeFillUsing(function ($data) {
-                                if($data['product_id'] && $data['warehouse_id']) {
+                                if ($data['product_id'] && $data['warehouse_id']) {
                                     $inventoryStock = InventoryStock::where('product_id', $data['product_id'])
                                         ->where('warehouse_id', $data['warehouse_id'])
                                         ->first();
-                                        if($inventoryStock) {
-                                            $data['available_stock_display'] = $inventoryStock->qty_available;
-                                        } else {
-                                            $data['available_stock_display'] = 0;
-                                        }
+                                    if ($inventoryStock) {
+                                        $data['available_stock_display'] = $inventoryStock->qty_available;
+                                    } else {
+                                        $data['available_stock_display'] = 0;
+                                    }
                                 }
                                 return $data;
                             })
+                            ->rules(['required', 'array', 'min:1'])
+                            ->validationMessages([
+                                'required' => 'Minimal harus ada 1 item bahan baku.',
+                                'array' => 'Items harus berupa array.',
+                                'min' => 'Minimal harus ada 1 item bahan baku.',
+                            ])
                             ->schema([
                                 Forms\Components\Select::make('product_id')
                                     ->label('Produk (Bahan Baku)')
@@ -187,6 +230,11 @@ class MaterialIssueResource extends Resource
                                     ->searchable()
                                     ->preload()
                                     ->required()
+                                    ->rules(['required', 'exists:products,id'])
+                                    ->validationMessages([
+                                        'required' => 'Produk wajib dipilih.',
+                                        'exists' => 'Produk yang dipilih tidak valid.',
+                                    ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $state) {
                                         $product = Product::find($state);
@@ -198,18 +246,30 @@ class MaterialIssueResource extends Resource
                                         // Reset available stock display when product changes
                                         $set('available_stock_display', '0.00');
                                     })
-                                    ->getOptionLabelFromRecordUsing(fn (Product $record) => 
+                                    ->getOptionLabelFromRecordUsing(
+                                        fn(Product $record) =>
                                         "({$record->sku}) {$record->name}"
                                     ),
                                 Forms\Components\Select::make('uom_id')
                                     ->label('Satuan')
                                     ->relationship('uom', 'name')
                                     ->required()
+                                    ->rules(['required', 'exists:unit_of_measures,id'])
+                                    ->validationMessages([
+                                        'required' => 'Satuan wajib dipilih.',
+                                        'exists' => 'Satuan yang dipilih tidak valid.',
+                                    ])
                                     ->preload(),
                                 Forms\Components\TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
                                     ->required()
+                                    ->rules(['required', 'numeric', 'min:0.01'])
+                                    ->validationMessages([
+                                        'required' => 'Quantity wajib diisi.',
+                                        'numeric' => 'Quantity harus berupa angka.',
+                                        'min' => 'Quantity minimal 0.01.',
+                                    ])
                                     ->readOnly()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get) {
@@ -224,6 +284,11 @@ class MaterialIssueResource extends Resource
                                     ->reactive()
                                     ->nullable()
                                     ->required()
+                                    ->rules(['required', 'exists:warehouses,id'])
+                                    ->validationMessages([
+                                        'required' => 'Gudang wajib dipilih.',
+                                        'exists' => 'Gudang yang dipilih tidak valid.',
+                                    ])
                                     ->default(null)
                                     ->options(function (callable $get) {
                                         $productId = $get('product_id');
@@ -231,13 +296,13 @@ class MaterialIssueResource extends Resource
                                             return \App\Models\Warehouse::whereHas('inventoryStock', function ($q) use ($productId) {
                                                 $q->where('product_id', $productId)->whereRaw('qty_available - qty_reserved > 0');
                                             })
-                                            ->orderBy('kode')
-                                            ->limit(50)
-                                            ->get()
-                                            ->mapWithKeys(function ($warehouse) {
-                                                return [$warehouse->id => $warehouse->kode . ' - ' . $warehouse->name];
-                                            })
-                                            ->toArray();
+                                                ->orderBy('kode')
+                                                ->limit(50)
+                                                ->get()
+                                                ->mapWithKeys(function ($warehouse) {
+                                                    return [$warehouse->id => $warehouse->kode . ' - ' . $warehouse->name];
+                                                })
+                                                ->toArray();
                                         }
                                         return [];
                                     })
@@ -258,6 +323,50 @@ class MaterialIssueResource extends Resource
                                             $set('available_stock_display', '0.00');
                                         }
                                     }),
+                                Select::make('rak_id')
+                                    ->label('Rak')
+                                    ->relationship('rak', 'name')
+                                    ->searchable()
+                                    ->nullable()
+                                    ->default(null)
+                                    ->options(function (callable $get) {
+                                        $productId = $get('product_id');
+                                        $warehouseId = $get('warehouse_id');
+                                        
+                                        if ($productId && $warehouseId) {
+                                            // Get racks that have inventory stock for this product in this warehouse
+                                            return \App\Models\Rak::whereHas('inventoryStock', function ($q) use ($productId, $warehouseId) {
+                                                $q->where('product_id', $productId)
+                                                  ->where('warehouse_id', $warehouseId)
+                                                  ->whereRaw('qty_available - qty_reserved > 0');
+                                            })
+                                                ->orderBy('name')
+                                                ->get()
+                                                ->mapWithKeys(function ($rak) {
+                                                    return [$rak->id => $rak->name . ' (' . $rak->code . ')'];
+                                                })
+                                                ->toArray();
+                                        }
+                                        
+                                        if ($warehouseId) {
+                                            // If no product selected, show all racks in the warehouse
+                                            return \App\Models\Rak::where('warehouse_id', $warehouseId)
+                                                ->orderBy('name')
+                                                ->get()
+                                                ->mapWithKeys(function ($rak) {
+                                                    return [$rak->id => $rak->name . ' (' . $rak->code . ')'];
+                                                })
+                                                ->toArray();
+                                        }
+                                        
+                                        return [];
+                                    })
+                                    ->getOptionLabelFromRecordUsing(
+                                        fn(\App\Models\Rak $record): string =>
+                                        $record->name . ' (' . $record->code . ')'
+                                    )
+                                    ->disabled(fn(callable $get) => !$get('warehouse_id'))
+                                    ->helperText('Rak akan tersedia setelah gudang dipilih. Rak dengan stock tersedia akan diprioritaskan jika produk sudah dipilih.'),
                                 Forms\Components\TextInput::make('available_stock_display')
                                     ->label('Stock Tersedia')
                                     ->disabled()
@@ -294,38 +403,7 @@ class MaterialIssueResource extends Resource
                                         }
                                         return ['class' => 'text-gray-500'];
                                     }),
-                                Forms\Components\Select::make('rak_id')
-                                    ->label('Rak')
-                                    ->relationship('rak', 'name')
-                                    ->searchable()
-                                    ->nullable()
-                                    ->default(null),
-                                Forms\Components\Select::make('inventory_coa_id')
-                                    ->label('COA Inventory')
-                                    ->relationship('inventoryCoa', 'name')
-                                    ->searchable()
-                                    ->preload()
-                                    ->nullable()
-                                    ->default(null)
-                                    ->placeholder('Pilih COA Inventory')
-                                    ->getSearchResultsUsing(function (string $search): array {
-                                        return \App\Models\ChartOfAccount::where('type', 'Asset')
-                                            ->where(function ($query) use ($search) {
-                                                $query->where('name', 'like', "%{$search}%")
-                                                      ->orWhere('code', 'like', "%{$search}%");
-                                            })
-                                            ->limit(50)
-                                            ->get()
-                                            ->mapWithKeys(function ($coa) {
-                                                return [$coa->id => $coa->code . ' - ' . $coa->name];
-                                            })
-                                            ->toArray();
-                                    })
-                                    ->getOptionLabelFromRecordUsing(
-                                        fn(\App\Models\ChartOfAccount $record): string =>
-                                        $record->code . ' - ' . $record->name
-                                    )
-                                    ->helperText('COA untuk inventory item ini. Jika tidak dipilih, akan menggunakan COA dari issue atau produk.'),
+
                                 Forms\Components\Textarea::make('notes')
                                     ->label('Catatan')
                                     ->rows(2)
@@ -339,7 +417,7 @@ class MaterialIssueResource extends Resource
                             ->deletable(false)
                             ->reorderable(false),
                     ]),
-                
+
                 Forms\Components\Section::make('Informasi Tambahan')
                     ->schema([
                         Forms\Components\Placeholder::make('total_cost_display')
@@ -378,27 +456,27 @@ class MaterialIssueResource extends Resource
                                 }
                                 return 'Rp 0,00';
                             }),
-                            Forms\Components\Placeholder::make('total_overall_display')
-                                ->label('Total Keseluruhan')
-                                ->content(function ($get) {
-                                    $totalMaterial = 0;
-                                    $items = $get('items') ?? [];
-                                    foreach ($items as $item) {
-                                        $totalMaterial += HelperController::parseIndonesianMoney($item['total_cost'] ?? '0');
+                        Forms\Components\Placeholder::make('total_overall_display')
+                            ->label('Total Keseluruhan')
+                            ->content(function ($get) {
+                                $totalMaterial = 0;
+                                $items = $get('items') ?? [];
+                                foreach ($items as $item) {
+                                    $totalMaterial += HelperController::parseIndonesianMoney($item['total_cost'] ?? '0');
+                                }
+                                $labor = 0;
+                                $overhead = 0;
+                                $productionPlanId = $get('production_plan_id');
+                                if ($productionPlanId) {
+                                    $productionPlan = \App\Models\ProductionPlan::with('billOfMaterial')->find($productionPlanId);
+                                    if ($productionPlan && $productionPlan->billOfMaterial) {
+                                        $labor = $productionPlan->billOfMaterial->labor_cost ?? 0;
+                                        $overhead = $productionPlan->billOfMaterial->overhead_cost ?? 0;
                                     }
-                                    $labor = 0;
-                                    $overhead = 0;
-                                    $productionPlanId = $get('production_plan_id');
-                                    if ($productionPlanId) {
-                                        $productionPlan = \App\Models\ProductionPlan::with('billOfMaterial')->find($productionPlanId);
-                                        if ($productionPlan && $productionPlan->billOfMaterial) {
-                                            $labor = $productionPlan->billOfMaterial->labor_cost ?? 0;
-                                            $overhead = $productionPlan->billOfMaterial->overhead_cost ?? 0;
-                                        }
-                                    }
-                                    $total = $totalMaterial + $labor + $overhead;
-                                    return 'Rp ' . number_format($total, 2, ',', '.');
-                                }),
+                                }
+                                $total = $totalMaterial + $labor + $overhead;
+                                return 'Rp ' . number_format($total, 2, ',', '.');
+                            }),
                         Forms\Components\Hidden::make('total_cost'),
                         Forms\Components\Textarea::make('notes')
                             ->label('Catatan Umum')
@@ -432,7 +510,7 @@ class MaterialIssueResource extends Resource
                         'primary' => 'issue',
                         'warning' => 'return',
                     ])
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'issue' => 'Ambil Barang',
                         'return' => 'Retur Barang',
                         default => $state,
@@ -449,7 +527,7 @@ class MaterialIssueResource extends Resource
                         'success' => 'approved',
                         'primary' => 'completed',
                     ])
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'draft' => 'Draft',
                         'pending_approval' => 'Menunggu Persetujuan',
                         'approved' => 'Disetujui',
@@ -509,11 +587,11 @@ class MaterialIssueResource extends Resource
                         return $query
                             ->when(
                                 $data['from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('issue_date', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('issue_date', '>=', $date),
                             )
                             ->when(
                                 $data['until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('issue_date', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('issue_date', '<=', $date),
                             );
                     }),
                 Tables\Filters\TrashedFilter::make(),
@@ -522,63 +600,214 @@ class MaterialIssueResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make()->color('primary'),
                     Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('request_approval')
+                        ->label('Request Approval')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('warning')
+                        ->visible(fn(MaterialIssue $record) => $record->isDraft() && !$record->approved_by)
+                        ->requiresConfirmation()
+                        ->modalHeading('Request Approval Material Issue')
+                        ->modalDescription('Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
+                        ->action(function (MaterialIssue $record) {
+                            // Validate stock before request approval
+                            $stockValidation = static::validateStockAvailability($record);
+                            if (!$stockValidation['valid']) {
+                                Notification::make()
+                                    ->title('Tidak Dapat Request Approval')
+                                    ->body($stockValidation['message'])
+                                    ->danger()
+                                    ->duration(10000)
+                                    ->send();
+                                return;
+                            }
+                            // Super Admin bisa approve dari semua cabang, user lain harus di cabang yang sama
+                            $currentUser = \Illuminate\Support\Facades\Auth::user();
+                            if ($currentUser && $currentUser->hasRole('Super Admin')) {
+                                // Super Admin bisa approve dari semua cabang
+                                $warehouseApprover = \App\Models\User::whereHas('permissions', function ($query) {
+                                        $query->where('name', 'approve warehouse');
+                                    })
+                                    ->where('cabang_id', $record->warehouse->cabang_id ?? null)
+                                    ->first();
+
+                                // Jika tidak ada di cabang yang sama, ambil Super Admin sebagai approver
+                                if (!$warehouseApprover) {
+                                    $warehouseApprover = $currentUser;
+                                }
+                            } else {
+                                // User biasa harus di cabang yang sama
+                                $warehouseApprover = \App\Models\User::where('cabang_id', $record->warehouse->cabang_id ?? null)
+                                    ->whereHas('permissions', function ($query) {
+                                        $query->where('name', 'approve warehouse');
+                                    })
+                                    ->first();
+                            }
+
+                            if ($warehouseApprover) {
+                                $record->update([
+                                    'approved_by' => $warehouseApprover->id,
+                                    'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+                                    // JANGAN set approved_at di sini, biarkan null sampai di-approve
+                                    // 'approved_at' => now(),
+                                ]);
+
+                                Notification::make()
+                                    ->title('Request Approval Terkirim')
+                                    ->body("Material Issue {$record->issue_number} telah dikirim untuk approval gudang.")
+                                    ->success()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Tidak Ada Approver Gudang')
+                                    ->body('Tidak ditemukan approver gudang untuk cabang ini.')
+                                    ->warning()
+                                    ->send();
+                            }
+                        }),
                     Tables\Actions\Action::make('approve')
-                        ->label('Setujui')
+                        ->label('Approve')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
-                        ->visible(fn (MaterialIssue $record) => in_array($record->status, ['draft', 'pending_approval']))
+                        ->visible(function (MaterialIssue $record) {
+                            $currentUser = \Illuminate\Support\Facades\Auth::user();
+                            if (!$currentUser) return false;
+
+                            // Super Admin can approve all pending approval records
+                            if ($currentUser->hasRole('Super Admin')) {
+                                return $record->isPendingApproval();
+                            }
+
+                            // Users with 'approve warehouse' permission can approve if they are assigned or if no one is assigned
+                            return $record->isPendingApproval() &&
+                                   userHasPermission('approve warehouse') &&
+                                   (!$record->approved_by || $record->approved_by === $currentUser->id);
+                        })
                         ->requiresConfirmation()
-                        ->modalHeading('Setujui Material Issue')
-                        ->modalDescription('Apakah Anda yakin ingin menyetujui material issue ini? Status Production Plan akan berubah ke "In Progress".')
-                        ->modalSubmitActionLabel('Ya, Setujui')
+                        ->modalHeading('Approve Material Issue')
+                        ->modalDescription('Setelah di-approve, Material Issue dapat diproses menjadi Completed.')
                         ->action(function (MaterialIssue $record) {
-                            // Validate stock availability before approval
+                            // Validate stock before approval
                             $stockValidation = static::validateStockAvailability($record);
                             if (!$stockValidation['valid']) {
                                 Notification::make()
                                     ->title('Tidak Dapat Menyetujui Material Issue')
                                     ->body($stockValidation['message'])
                                     ->danger()
+                                    ->duration(10000)
                                     ->send();
                                 return;
                             }
 
-                            try {
-                                $record->update([
-                                    'status' => 'approved',
-                                    'approved_by' => filament()->auth()->user()->id,
-                                    'approved_at' => now(),
-                                ]);
-                                
-                                Notification::make()
-                                    ->title('Material Issue Berhasil Disetujui')
-                                    ->body('Status Production Plan telah diubah ke "In Progress"')
-                                    ->success()
-                                    ->send();
-                            } catch (\Exception $e) {
-                                Notification::make()
-                                    ->title('Gagal Menyetujui Material Issue')
-                                    ->body($e->getMessage())
-                                    ->danger()
-                                    ->send();
+                            $record->update([
+                                'approved_at' => now(),
+                                'approved_by' => \Illuminate\Support\Facades\Auth::id(), // Set Super Admin sebagai approver jika belum ada
+                                'status' => MaterialIssue::STATUS_APPROVED,
+                            ]);
+
+                            Notification::make()
+                                ->title('Material Issue Di-approve')
+                                ->body("Material Issue {$record->issue_number} telah di-approve dan siap untuk diproses.")
+                                ->success()
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('reject')
+                        ->label('Reject')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(function (MaterialIssue $record) {
+                            $currentUser = \Illuminate\Support\Facades\Auth::user();
+                            if (!$currentUser) return false;
+
+                            // Super Admin can reject all pending approval records
+                            if ($currentUser->hasRole('Super Admin')) {
+                                return $record->isPendingApproval();
                             }
+
+                            // Users with 'approve warehouse' permission can reject if they are assigned or if no one is assigned
+                            return $record->isPendingApproval() &&
+                                   userHasPermission('approve warehouse') &&
+                                   (!$record->approved_by || $record->approved_by === $currentUser->id);
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Reject Material Issue')
+                        ->modalDescription('Berikan alasan penolakan:')
+                        ->form([
+                            \Filament\Forms\Components\Textarea::make('rejection_reason')
+                                ->label('Alasan Penolakan')
+                                ->required()
+                                ->maxLength(500),
+                        ])
+                        ->action(function (MaterialIssue $record, array $data) {
+                            $record->update([
+                                'approved_by' => null,
+                                'approved_at' => null,
+                                'status' => MaterialIssue::STATUS_DRAFT,
+                                'notes' => ($record->notes ? $record->notes . "\n\n" : '') . 
+                                          "DITOLAK: {$data['rejection_reason']} - " . now()->format('Y-m-d H:i:s'),
+                            ]);
+
+                            Notification::make()
+                                ->title('Material Issue Ditolak')
+                                ->body("Material Issue {$record->issue_number} telah ditolak.")
+                                ->warning()
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('complete')
+                        ->label('Selesai')
+                        ->icon('heroicon-o-check')
+                        ->color('success')
+                        ->visible(function (MaterialIssue $record) {
+                            $currentUser = \Illuminate\Support\Facades\Auth::user();
+                            if (!$currentUser) return false;
+
+                            // Super Admin can complete all approved records
+                            if ($currentUser->hasRole('Super Admin')) {
+                                return $record->isApproved();
+                            }
+
+                            // Users with 'approve warehouse' permission can complete approved records
+                            return $record->isApproved() && userHasPermission('approve warehouse');
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Selesaikan Material Issue')
+                        ->modalDescription('Apakah Anda yakin ingin menyelesaikan Material Issue ini? Stock akan dikurangi dan journal entry akan dibuat.')
+                        ->action(function (MaterialIssue $record) {
+                            // Validate stock before completion
+                            $stockValidation = static::validateStockAvailability($record);
+                            if (!$stockValidation['valid']) {
+                                Notification::make()
+                                    ->title('Tidak Dapat Menyelesaikan Material Issue')
+                                    ->body($stockValidation['message'])
+                                    ->danger()
+                                    ->duration(10000)
+                                    ->send();
+                                return;
+                            }
+
+                            $record->update(['status' => MaterialIssue::STATUS_COMPLETED]);
+
+                            Notification::make()
+                                ->title('Material Issue Diselesaikan')
+                                ->body("Material Issue {$record->issue_number} telah diselesaikan. Stock dikurangi dan journal entry dibuat.")
+                                ->success()
+                                ->send();
                         }),
                     Tables\Actions\Action::make('generate_journal')
                         ->label('Generate Jurnal')
                         ->icon('heroicon-o-document-text')
                         ->color('success')
-                        ->visible(fn (MaterialIssue $record) => $record->status === 'completed' && !$record->journalEntry()->exists())
+                        ->visible(fn(MaterialIssue $record) => $record->status === 'completed' && !$record->journalEntry()->exists())
                         ->requiresConfirmation()
                         ->action(function (MaterialIssue $record) {
                             try {
                                 $journalService = app(ManufacturingJournalService::class);
-                                
+
                                 if ($record->type === 'issue') {
                                     $journalService->generateJournalForMaterialIssue($record);
                                 } else {
                                     $journalService->generateJournalForMaterialReturn($record);
                                 }
-                                
+
                                 Notification::make()
                                     ->title('Jurnal Berhasil Dibuat')
                                     ->success()
@@ -593,7 +822,7 @@ class MaterialIssueResource extends Resource
                         }),
                     Tables\Actions\DeleteAction::make(),
                 ]),
-            ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

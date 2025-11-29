@@ -24,7 +24,6 @@ class MaterialIssueItem extends Model
         'status',
         'approved_by',
         'approved_at',
-        'inventory_coa_id',
     ];
 
     // Status constants for granular approval workflow

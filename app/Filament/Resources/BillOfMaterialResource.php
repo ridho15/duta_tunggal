@@ -475,13 +475,10 @@ class BillOfMaterialResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->boolean(),
-                TextColumn::make('items.product.name')
+                TextColumn::make('items')
                     ->label("Material")
                     ->formatStateUsing(function ($state, $record) {
-                        $materialNames = $record->items->map(function ($item) {
-                            return $item->product->name;
-                        })->toArray();
-                        return implode(', ', $materialNames);
+                        return $state->product->sku . ' - ' . $state->product->name;
                     })
                     ->badge(),
                 TextColumn::make('created_at')

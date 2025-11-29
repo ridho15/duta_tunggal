@@ -3,13 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductionPlanResource\Pages;
+use App\Http\Controllers\HelperController;
 use App\Models\ProductionPlan;
 use App\Models\SaleOrder;
 use App\Models\BillOfMaterial;
-use App\Models\MaterialFulfillment;
 use App\Models\Warehouse;
 use App\Services\ProductionPlanService;
-use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Placeholder;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Actions\ActionGroup;
@@ -30,6 +32,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ProductionPlanResource extends Resource
@@ -58,7 +61,7 @@ class ProductionPlanResource extends Resource
                                 'required' => 'Nomor rencana tidak boleh kosong',
                                 'unique' => 'Nomor rencana sudah digunakan'
                             ])
-                            ->suffixAction(Action::make('generatePlanNumber')
+                            ->suffixAction(FormAction::make('generatePlanNumber')
                                 ->icon('heroicon-m-arrow-path')
                                 ->tooltip('Generate Nomor Rencana')
                                 ->action(function ($set, $get, $state) {
@@ -278,11 +281,13 @@ class ProductionPlanResource extends Resource
                             ->label('Catatan')
                             ->rows(3)
                             ->columnSpanFull(),
-                        \Filament\Forms\Components\Checkbox::make('auto_schedule')
+                        Checkbox::make('auto_schedule')
                             ->label('Jadwalkan Langsung')
                             ->helperText('Centang untuk langsung mengubah status menjadi SCHEDULED setelah dibuat')
                             ->default(false)
-                            ->reactive(),
+                            ->reactive()
+                            ->visible(fn($context, $record) => $context === 'create' || ($record && $record->status === 'draft'))
+                            ->disabled(fn($record) => $record && $record->status !== 'draft'),
                     ]),
 
                 Placeholder::make('status_info')
@@ -418,7 +423,7 @@ class ProductionPlanResource extends Resource
                         ->color('primary'),
                     EditAction::make()
                         ->color('success'),
-                    Tables\Actions\Action::make('schedule_plan')
+                    Tables\Actions\Action::make('schedule')
                         ->label('Jadwalkan')
                         ->icon('heroicon-o-calendar-days')
                         ->color('warning')
@@ -427,33 +432,100 @@ class ProductionPlanResource extends Resource
                         })
                         ->requiresConfirmation()
                         ->modalHeading('Jadwalkan Rencana Produksi')
-                        ->modalDescription('Apakah Anda yakin ingin menjadwalkan rencana produksi ini? Status akan berubah menjadi SCHEDULED dan MaterialIssue akan dibuat otomatis.')
+                        ->modalDescription(function ($record) {
+                            $bomExists = $record->billOfMaterial !== null;
+                            $description = 'Apakah Anda yakin ingin menjadwalkan rencana produksi ini? Status akan berubah menjadi SCHEDULED';
+
+                            if ($bomExists) {
+                                $description .= ' dan MaterialIssue akan dibuat otomatis dari BOM.';
+                            } else {
+                                $description .= '.
+
+⚠️ PERHATIAN: Tidak ada BOM yang terkait. MaterialIssue tidak akan dibuat otomatis.';
+                            }
+
+                            return $description;
+                        })
                         ->modalSubmitActionLabel('Jadwalkan')
                         ->action(function ($record) {
-                            // Validate stock availability before scheduling
-                            $stockValidation = static::validateStockForProductionPlan($record);
-                            if (!$stockValidation['valid']) {
-                                \App\Http\Controllers\HelperController::sendNotification(
-                                    isSuccess: false,
-                                    title: "Tidak Dapat Menjadwalkan",
-                                    message: $stockValidation['message']
-                                );
+                            if ($record->status !== 'draft') {
+                                Notification::make()
+                                    ->title('Rencana sudah dijadwalkan')
+                                    ->info()
+                                    ->body('Rencana produksi ini tidak berada pada status draft.')
+                                    ->send();
+
+                                return;
+                            }
+
+                            // Validate BOM exists before scheduling
+                            if (!$record->billOfMaterial) {
+                                Notification::make()
+                                    ->title('BOM Tidak Ditemukan')
+                                    ->danger()
+                                    ->body('Tidak dapat menjadwalkan rencana produksi tanpa BOM. Silakan tambahkan BOM terlebih dahulu.')
+                                    ->send();
+
                                 return;
                             }
 
                             try {
-                                $record->update(['status' => 'scheduled']);
+                                DB::transaction(function () use ($record) {
+                                    $record->update(['status' => 'scheduled']);
 
-                                \App\Http\Controllers\HelperController::sendNotification(
-                                    isSuccess: true,
-                                    title: "Berhasil",
-                                    message: "Rencana Produksi {$record->plan_number} berhasil dijadwalkan dan MaterialIssue telah dibuat otomatis."
-                                );
-                            } catch (\Exception $e) {
-                                \App\Http\Controllers\HelperController::sendNotification(
+                                    // Check if MaterialIssue was created by the model event
+                                    $materialIssue = \App\Models\MaterialIssue::where('production_plan_id', $record->id)
+                                        ->where('type', 'issue')
+                                        ->first();
+
+                                    if ($materialIssue) {
+                                        HelperController::setLog(
+                                            message: 'Production plan dijadwalkan dan MaterialIssue dibuat otomatis.',
+                                            model: $record
+                                        );
+
+                                        HelperController::sendNotification(
+                                            isSuccess: true,
+                                            title: 'Berhasil',
+                                            message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis."
+                                        );
+                                    } else {
+                                        // Fallback: try to create MaterialIssue manually if event didn't work
+                                        $manufacturingService = app(\App\Services\ManufacturingService::class);
+                                        $materialIssue = $manufacturingService->createMaterialIssueForProductionPlan($record);
+
+                                        if ($materialIssue) {
+                                            HelperController::setLog(
+                                                message: 'Production plan dijadwalkan dan MaterialIssue dibuat otomatis (fallback).',
+                                                model: $record
+                                            );
+
+                                            HelperController::sendNotification(
+                                                isSuccess: true,
+                                                title: 'Berhasil',
+                                                message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis."
+                                            );
+                                        } else {
+                                            HelperController::setLog(
+                                                message: 'Production plan dijadwalkan tapi MaterialIssue gagal dibuat.',
+                                                model: $record
+                                            );
+
+                                            HelperController::sendNotification(
+                                                isSuccess: false,
+                                                title: 'Berhasil (Dengan Peringatan)',
+                                                message: 'Rencana produksi berhasil dijadwalkan, namun MaterialIssue gagal dibuat otomatis. Silakan buat MaterialIssue secara manual.'
+                                            );
+                                        }
+                                    }
+                                });
+                            } catch (\Throwable $exception) {
+                                report($exception);
+
+                                HelperController::sendNotification(
                                     isSuccess: false,
-                                    title: "Gagal Menjadwalkan",
-                                    message: "Terjadi kesalahan: " . $e->getMessage()
+                                    title: 'Gagal menjadwalkan',
+                                    message: 'Terjadi kesalahan saat menjadwalkan rencana produksi: ' . $exception->getMessage()
                                 );
                             }
                         }),
@@ -470,7 +542,6 @@ class ProductionPlanResource extends Resource
                         ->modalDescription(function ($record) {
                             $moCount = $record->manufacturingOrders()->count();
                             $miCount = $record->materialIssues()->count();
-                            $fgcCount = $record->finishedGoodsCompletions()->count();
 
                             $message = "Apakah Anda yakin ingin membatalkan Production Plan ini?\n\n";
                             $message .= "Status saat ini: " . strtoupper($record->status) . "\n";
@@ -480,9 +551,6 @@ class ProductionPlanResource extends Resource
                             }
                             if ($miCount > 0) {
                                 $message .= "Material Issues yang akan dibatalkan: {$miCount}\n";
-                            }
-                            if ($fgcCount > 0) {
-                                $message .= "Finished Goods Completions yang akan dibatalkan: {$fgcCount}\n";
                             }
 
                             $message .= "\nTindakan ini tidak dapat dibatalkan.";
@@ -500,13 +568,10 @@ class ProductionPlanResource extends Resource
                             // Cancel all related Material Issues
                             $record->materialIssues()->whereIn('status', ['draft', 'pending_approval', 'approved'])->update(['status' => 'rejected']);
 
-                            // Cancel all related Finished Goods Completions
-                            $record->finishedGoodsCompletions()->whereIn('status', ['draft', 'in_progress'])->update(['status' => 'cancelled']);
-
                             \App\Http\Controllers\HelperController::sendNotification(
                                 isSuccess: true,
                                 title: "Production Plan Dibatalkan",
-                                message: "Production Plan {$record->plan_number} telah berhasil dibatalkan beserta semua Manufacturing Order, Material Issue, dan Finished Goods Completion yang terkait."
+                                message: "Production Plan {$record->plan_number} telah berhasil dibatalkan beserta semua Manufacturing Order dan Material Issue yang terkait."
                             );
                         }),
                     Tables\Actions\Action::make('create_mo')
@@ -520,28 +585,28 @@ class ProductionPlanResource extends Resource
                         ->modalHeading('Buat Manufacturing Order')
                         ->modalDescription(function ($record) {
                             // Check material fulfillment before showing modal
-                            $canStart = MaterialFulfillment::canStartProduction($record);
-                            $summary = MaterialFulfillment::getFulfillmentSummary($record);
+                            $canStart = $record->canStartProduction();
+                            $summary = $record->getFulfillmentSummary();
 
                             if (!$canStart) {
                                 return "⚠️ PERHATIAN: Bahan baku belum lengkap!\n\n" .
-                                       "Total bahan: {$summary['total_materials']}\n" .
-                                       "Tersedia penuh: {$summary['fully_available']}\n" .
-                                       "Tersedia sebagian: {$summary['partially_available']}\n" .
-                                       "Tidak tersedia: {$summary['not_available']}\n\n" .
-                                       "Apakah Anda yakin ingin melanjutkan membuat MO?";
+                                    "Total bahan: {$summary['total_materials']}\n" .
+                                    "Tersedia penuh: {$summary['fully_available']}\n" .
+                                    "Tersedia sebagian: {$summary['partially_available']}\n" .
+                                    "Tidak tersedia: {$summary['not_available']}\n\n" .
+                                    "Apakah Anda yakin ingin melanjutkan membuat MO?";
                             }
 
                             return "Semua bahan baku tersedia. Manufacturing Order akan dibuat dengan status Draft.";
                         })
                         ->modalSubmitActionLabel(function ($record) {
-                            $canStart = MaterialFulfillment::canStartProduction($record);
+                            $canStart = $record->canStartProduction();
                             return $canStart ? 'Buat MO' : 'Buat MO (Dengan Risiko)';
                         })
                         ->action(function ($record) {
                             // Check material fulfillment
-                            $canStart = MaterialFulfillment::canStartProduction($record);
-                            $summary = MaterialFulfillment::getFulfillmentSummary($record);
+                            $canStart = $record->canStartProduction();
+                            $summary = $record->getFulfillmentSummary();
 
                             if (!$canStart) {
                                 // Log warning but allow creation
@@ -553,7 +618,7 @@ class ProductionPlanResource extends Resource
 
                             // Create Manufacturing Order from Production Plan
                             $manufacturingService = app(\App\Services\ManufacturingService::class);
-                            
+
                             // Find a suitable warehouse that has stock for the materials
                             $defaultWarehouseId = null;
                             if ($record->billOfMaterial && $record->billOfMaterial->items->count() > 0) {
@@ -565,7 +630,7 @@ class ProductionPlanResource extends Resource
                             } else {
                                 $defaultWarehouseId = 1; // Default to Gudang Utama
                             }
-                            
+
                             $mo = \App\Models\ManufacturingOrder::create([
                                 'mo_number' => $manufacturingService->generateMoNumber(),
                                 'production_plan_id' => $record->id,
@@ -586,7 +651,7 @@ class ProductionPlanResource extends Resource
                                     $materialWarehouse = \App\Models\InventoryStock::where('product_id', $item->product_id)
                                         ->where('qty_available', '>', 0)
                                         ->first();
-                                    
+
                                     \App\Models\ManufacturingOrderMaterial::create([
                                         'manufacturing_order_id' => $mo->id,
                                         'material_id' => $item->product_id,
@@ -639,7 +704,7 @@ class ProductionPlanResource extends Resource
     /**
      * Validate stock availability for ProductionPlan scheduling
      */
-    protected static function validateStockForProductionPlan(ProductionPlan $productionPlan): array
+    public static function validateStockForProductionPlan(ProductionPlan $productionPlan): array
     {
         if (!$productionPlan->billOfMaterial) {
             return ['valid' => true, 'message' => 'No BOM to validate'];

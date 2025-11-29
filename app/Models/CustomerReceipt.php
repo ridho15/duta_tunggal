@@ -24,7 +24,8 @@ class CustomerReceipt extends Model
         'payment_adjustment',
         'payment_method',
         'coa_id',
-        'status' // 'Draft','Partial','Paid'
+        'status', // 'Draft','Partial','Paid'
+        'created_by'
     ];
 
     protected $casts = [
@@ -50,6 +51,16 @@ class CustomerReceipt extends Model
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+    
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
     
     /**

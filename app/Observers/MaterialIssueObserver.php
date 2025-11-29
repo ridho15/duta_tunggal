@@ -7,6 +7,7 @@ use App\Models\ManufacturingOrder;
 use App\Models\MaterialIssueItem;
 use App\Models\ManufacturingOrderMaterial;
 use App\Services\ManufacturingJournalService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class MaterialIssueObserver
@@ -30,28 +31,15 @@ class MaterialIssueObserver
             $this->reserveStock($materialIssue);
         }
 
-        // If status transitioned to completed, release reserved stock
-        if ($originalStatus !== MaterialIssue::STATUS_COMPLETED && $materialIssue->isCompleted()) {
-            $this->releaseReservedStock($materialIssue);
-        }
-
-        // If status transitioned back to draft (rejected), release any reserved stock
-        if ($originalStatus !== MaterialIssue::STATUS_DRAFT && $materialIssue->isDraft()) {
-            $this->releaseReservedStock($materialIssue);
-        }
-
-        // If status transitioned to completed, set all approved items to completed
-        if ($originalStatus !== MaterialIssue::STATUS_COMPLETED && $materialIssue->isCompleted()) {
-            $this->setAllApprovedItemsToCompleted($materialIssue);
-        }
-
         // If status transitioned to completed AND approved, generate journal and update MO usages
         if ($originalStatus !== MaterialIssue::STATUS_COMPLETED && $materialIssue->isCompleted()) {
             // Only process if material issue has been approved
+            $this->setAllApprovedItemsToCompleted($materialIssue);
             if ($materialIssue->approved_by && $materialIssue->approved_at) {
-                $this->generateJournal($materialIssue);
                 $this->createStockMovements($materialIssue);
-                $this->updateMoQtyUsed($materialIssue);
+                $this->generateJournal($materialIssue);
+                // Release reserved stock is now handled by StockReservationService.consumeReservedStockForMaterialIssue
+                // $this->releaseReservedStock($materialIssue);
             }
         }
     }
@@ -68,7 +56,6 @@ class MaterialIssueObserver
         if ($materialIssue->isCompleted()) {
             $this->generateJournal($materialIssue);
             $this->createStockMovements($materialIssue);
-            $this->updateMoQtyUsed($materialIssue);
         }
     }
 
@@ -93,50 +80,6 @@ class MaterialIssueObserver
         }
     }
 
-    protected function updateMoQtyUsed(MaterialIssue $materialIssue): void
-    {
-        // Skip if no MO relationship to avoid unnecessary processing
-        if (!$materialIssue->manufacturing_order_id && !$materialIssue->production_plan_id) {
-            return;
-        }
-
-        // Resolve target MO: prefer explicit manufacturing_order_id, fallback to production_plan_id
-        $mo = null;
-        if ($materialIssue->manufacturing_order_id) {
-            $mo = ManufacturingOrder::select('id', 'production_plan_id')->find($materialIssue->manufacturing_order_id);
-        }
-        if (!$mo && $materialIssue->production_plan_id) {
-            $mo = ManufacturingOrder::select('id', 'production_plan_id')
-                ->where('production_plan_id', $materialIssue->production_plan_id)
-                ->latest('id')
-                ->first();
-        }
-
-        if (!$mo) {
-            return;
-        }
-
-        // Use direct database update to avoid loading large collections into memory
-        // Update qty_used for materials in this MO based on completed issues
-        DB::statement("
-            UPDATE manufacturing_order_materials mom
-            LEFT JOIN (
-                SELECT mii.product_id, SUM(mii.quantity) as total_issued
-                FROM material_issue_items mii
-                INNER JOIN material_issues mi ON mii.material_issue_id = mi.id
-                WHERE mi.type = 'issue'
-                AND mi.status = 'completed'
-                AND (
-                    mi.manufacturing_order_id = ?
-                    OR (mi.manufacturing_order_id IS NULL AND mi.production_plan_id = ?)
-                )
-                GROUP BY mii.product_id
-            ) issued ON mom.material_id = issued.product_id
-            SET mom.qty_used = COALESCE(issued.total_issued, 0)
-            WHERE mom.manufacturing_order_id = ?
-        ", [$mo->id, $mo->production_plan_id, $mo->id]);
-    }
-
     /**
      * Create stock movements based on completed material issues/returns
      */
@@ -157,7 +100,9 @@ class MaterialIssueObserver
                         'quantity' => $item->quantity,
                         'value' => $value,
                         'type' => $materialIssue->type === 'issue' ? 'manufacture_out' : 'manufacture_in',
-                        'date' => $materialIssue->issue_date,
+                        'date' => Carbon::now(),
+                        'reference_id' => $materialIssue->id,
+                        'notes' => $materialIssue->issue_number ?? 'Material Issue',
                         'from_model_type' => MaterialIssue::class,
                         'from_model_id' => $materialIssue->id,
                         'meta' => array_filter([
@@ -225,6 +170,11 @@ class MaterialIssueObserver
     protected function reserveStock(MaterialIssue $materialIssue): void
     {
         try {
+            \Illuminate\Support\Facades\Log::info('MaterialIssueObserver: reserveStock called', [
+                'material_issue_id' => $materialIssue->id,
+                'status' => $materialIssue->status,
+            ]);
+
             $materialIssue->loadMissing('items');
 
             foreach ($materialIssue->items as $item) {
@@ -235,8 +185,19 @@ class MaterialIssueObserver
                     ->first();
 
                 if ($inventoryStock) {
-                    // Add quantity to reserved stock
-                    $inventoryStock->increment('qty_reserved', $item->quantity);
+                    \Illuminate\Support\Facades\Log::info('MaterialIssueObserver: stock reservation handled by StockReservationService', [
+                        'inventory_stock_id' => $inventoryStock->id,
+                        'product_id' => $item->product_id,
+                        'warehouse_id' => $warehouseId,
+                        'quantity' => $item->quantity,
+                        'qty_available_current' => $inventoryStock->qty_available,
+                        'qty_reserved_current' => $inventoryStock->qty_reserved,
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::warning('MaterialIssueObserver: inventory stock not found', [
+                        'product_id' => $item->product_id,
+                        'warehouse_id' => $warehouseId,
+                    ]);
                 }
             }
         } catch (\Throwable $e) {
@@ -248,7 +209,8 @@ class MaterialIssueObserver
     }
 
     /**
-     * Release reserved stock when material issue is completed
+     * Release reserved stock when material issue is completed or rejected
+     * This restores the available stock that was reduced during approval
      */
     protected function releaseReservedStock(MaterialIssue $materialIssue): void
     {
@@ -262,9 +224,36 @@ class MaterialIssueObserver
                     ->where('warehouse_id', $warehouseId)
                     ->first();
 
-                if ($inventoryStock && $inventoryStock->qty_reserved >= $item->quantity) {
-                    // Subtract quantity from reserved stock
-                    $inventoryStock->decrement('qty_reserved', $item->quantity);
+                if ($inventoryStock) {
+                    // Check if we have enough reserved stock to release
+                    if ($inventoryStock->qty_reserved >= $item->quantity) {
+                        // Release reserved stock and restore available stock
+                        $inventoryStock->decrement('qty_reserved', $item->quantity);
+                        $inventoryStock->increment('qty_available', $item->quantity);
+
+                        \Illuminate\Support\Facades\Log::info('Released reserved stock and restored available stock', [
+                            'material_issue_id' => $materialIssue->id,
+                            'product_id' => $item->product_id,
+                            'warehouse_id' => $warehouseId,
+                            'quantity' => $item->quantity,
+                            'new_reserved' => $inventoryStock->qty_reserved,
+                            'new_available' => $inventoryStock->qty_available,
+                        ]);
+                    } else {
+                        \Illuminate\Support\Facades\Log::warning('Insufficient reserved stock to release', [
+                            'material_issue_id' => $materialIssue->id,
+                            'product_id' => $item->product_id,
+                            'warehouse_id' => $warehouseId,
+                            'requested' => $item->quantity,
+                            'available_reserved' => $inventoryStock->qty_reserved,
+                        ]);
+                    }
+                } else {
+                    \Illuminate\Support\Facades\Log::warning('Inventory stock not found for release', [
+                        'material_issue_id' => $materialIssue->id,
+                        'product_id' => $item->product_id,
+                        'warehouse_id' => $warehouseId,
+                    ]);
                 }
             }
         } catch (\Throwable $e) {

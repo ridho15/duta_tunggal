@@ -80,30 +80,8 @@ class InventoryStockObserver
             return;
         }
 
-        // Create journal entry for opening inventory balance
-        $debitEntry = JournalEntry::create([
-            'coa_id' => $inventoryCoa->id,
-            'date' => now(),
-            'reference' => 'INV-OPEN-' . $inventoryStock->id,
-            'description' => 'Opening Inventory Balance - ' . $inventoryStock->product->name,
-            'debit' => $inventoryValue,
-            'credit' => 0,
-            'journal_type' => 'opening_balance',
-            'source_type' => InventoryStock::class,
-            'source_id' => $inventoryStock->id,
-        ]);
-
-        $creditEntry = JournalEntry::create([
-            'coa_id' => $equityCoa->id,
-            'date' => now(),
-            'reference' => 'INV-OPEN-' . $inventoryStock->id,
-            'description' => 'Opening Inventory Balance - ' . $inventoryStock->product->name,
-            'debit' => 0,
-            'credit' => $inventoryValue,
-            'journal_type' => 'opening_balance',
-            'source_type' => InventoryStock::class,
-            'source_id' => $inventoryStock->id,
-        ]);
+        // Opening balance journal entries disabled by user request
+        // Previously created journal entries for opening inventory balance here
     }
 
     /**
@@ -111,24 +89,7 @@ class InventoryStockObserver
      */
     public function updated(InventoryStock $inventoryStock): void
     {
-        // Check if this update was caused by an operational stock movement
-        $recentMovement = StockMovement::where('product_id', $inventoryStock->product_id)
-            ->where('warehouse_id', $inventoryStock->warehouse_id)
-            ->whereIn('type', ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in', 'manufacture_out', 'sales', 'transfer_out', 'adjustment_out'])
-            ->where('created_at', '<=', $inventoryStock->updated_at)
-            ->where('created_at', '>=', Carbon::parse($inventoryStock->updated_at)->subSeconds(10))
-            ->first();
-
-        if ($recentMovement) {
-            // This inventory update was caused by an operational stock movement
-            // Do not create/modify opening balance journals for operational transactions
-            return;
-        }
-
-        // For non-operational updates (e.g. manual adjustments to opening balances),
-        // delete old entries and create new ones
-        $this->deleteJournalEntries($inventoryStock);
-        $this->created($inventoryStock);
+        
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Models\MaterialIssue;
 use App\Models\Production;
+use App\Models\ProductionPlan;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -13,8 +14,8 @@ class ManufacturingJournalService
 {
     /**
      * Generate journal entries for material issue (Pengambilan Bahan Baku)
-     * Dr. 1150 Barang Dalam Proses
-     *     Cr. [product.inventory_coa_id] Persediaan Bahan Baku (product-specific)
+     * Dr. 1140.02 Barang Dalam Proses
+     *     Cr. [inventory_coa_id] Persediaan Bahan Baku (based on actual Material Issue Items)
      */
     public function generateJournalForMaterialIssue(MaterialIssue $materialIssue): void
     {
@@ -22,13 +23,45 @@ class ManufacturingJournalService
             throw new \Exception('Material issue must be of type "issue" and status "completed"');
         }
 
-        // Get work in progress COA with dynamic hierarchy
-        $bdpCoa = ($materialIssue->wip_coa_id && $materialIssue->wipCoa) ? $materialIssue->wipCoa : $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
-        if (!$bdpCoa) {
-            throw new \Exception('Work in progress COA not found. Please set WIP COA in Material Issue or ensure COA with code 1140.02, 1140.03, or 1140 exists.');
+        // Load material issue items with their relationships
+        $materialIssue->loadMissing('items.product', 'items.inventoryCoa');
+
+        // Calculate total cost from actual Material Issue Items (not BOM)
+        $totalCost = $materialIssue->items->sum('total_cost');
+
+        \Illuminate\Support\Facades\Log::info('Material Issue Journal Generation', [
+            'material_issue_id' => $materialIssue->id,
+            'production_plan_id' => $materialIssue->production_plan_id,
+            'total_items' => $materialIssue->items->count(),
+            'total_cost_from_items' => $totalCost,
+            'original_total_cost' => $materialIssue->total_cost,
+        ]);
+
+        // Get work in progress COA - try BOM first, then fallback
+        $bdpCoa = null;
+        if ($materialIssue->productionPlan && $materialIssue->productionPlan->billOfMaterial) {
+            $bom = $materialIssue->productionPlan->billOfMaterial;
+            if ($bom->workInProgressCoa) {
+                $bdpCoa = $bom->workInProgressCoa;
+            }
         }
 
-        $totalCost = $materialIssue->total_cost;
+        if (!$bdpCoa) {
+            // Use specific WIP COA code for consistency
+            $bdpCoa = ChartOfAccount::where('code', '1140.02')->first();
+            if (!$bdpCoa) {
+                $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
+            }
+        }
+
+        if (!$bdpCoa) {
+            \Illuminate\Support\Facades\Log::error('WIP COA not found for material issue', [
+                'material_issue_id' => $materialIssue->id,
+                'production_plan_id' => $materialIssue->production_plan_id,
+                'searched_codes' => ['1140.02', '1140.03', '1140']
+            ]);
+            throw new \Exception('Work in progress COA not found. Please set WIP COA in BOM or ensure COA with code 1140.02, 1140.03, or 1140 exists.');
+        }
 
         DB::transaction(function () use ($materialIssue, $bdpCoa, $totalCost) {
             $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($materialIssue);
@@ -56,17 +89,19 @@ class ManufacturingJournalService
                 'source_id' => $materialIssue->id,
             ]);
 
-            // Credit entries: One for each product using dynamic COA hierarchy
+            // Credit entries: One for each Material Issue Item using actual item costs
             $creditEntries = [];
             foreach ($materialIssue->items as $item) {
-                // COA hierarchy: Item-specific → Issue-specific → Product-specific → Fallback
+                // Use actual cost from Material Issue Item
+                $itemCost = $item->total_cost;
+
+                // COA hierarchy: Item-specific → Product-specific → Fallback
                 $productInventoryCoa = $item->inventory_coa_id && $item->inventoryCoa ? $item->inventoryCoa :
-                                     ($materialIssue->inventory_coa_id && $materialIssue->inventoryCoa ? $materialIssue->inventoryCoa :
                                      ($item->product->inventory_coa_id && $item->product->inventoryCoa ? $item->product->inventoryCoa :
-                                     $this->resolveCoaByCodes(['1140.10', '1140.01', '1140'])));
+                                     $this->resolveCoaByCodes(['1140.10', '1140.01', '1140']));
 
                 if (!$productInventoryCoa) {
-                    throw new \Exception('Inventory COA not found for product: ' . $item->product->name . '. Please set COA in Material Issue Item, Material Issue, Product, or ensure COA with code 1140, 1140.01, or 1140.10 exists.');
+                    throw new \Exception('Inventory COA not found for product: ' . $item->product->name . '. Please set COA in Material Issue Item, Product, or ensure COA with code 1140, 1140.01, or 1140.10 exists.');
                 }
 
                 $creditEntry = JournalEntry::create([
@@ -75,7 +110,7 @@ class ManufacturingJournalService
                     'reference' => $materialIssue->issue_number,
                     'description' => 'Pengambilan bahan baku: ' . $item->product->name . ' untuk produksi - ' . ($materialIssue->productionPlan->plan_number ?? $materialIssue->manufacturingOrder->mo_number ?? 'N/A'),
                     'debit' => 0,
-                    'credit' => $item->total_cost,
+                    'credit' => $itemCost,
                     'journal_type' => 'manufacturing_issue',
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
@@ -89,67 +124,119 @@ class ManufacturingJournalService
 
             \Illuminate\Support\Facades\Log::info('Material Issue Journal Entries Created', [
                 'material_issue_id' => $materialIssue->id,
+                'total_cost_from_items' => $totalCost,
                 'debit_entry_id' => $debitEntry->id,
                 'debit_amount' => $debitEntry->debit,
                 'credit_entries_count' => count($creditEntries),
                 'total_credit_amount' => collect($creditEntries)->sum('credit'),
-                'total_cost' => $totalCost,
+                'cost_breakdown' => $materialIssue->items->map(function ($item) {
+                    return [
+                        'product' => $item->product->name,
+                        'quantity' => $item->quantity,
+                        'cost_per_unit' => $item->cost_per_unit,
+                        'total_cost' => $item->total_cost,
+                    ];
+                })->toArray(),
             ]);
         });
     }
 
     /**
      * Generate journal entries for material return (Retur Bahan Baku)
-     * Dr. 1140.01 Persediaan Bahan Baku
-     *     Cr. 1140.02 Persediaan Barang dalam Proses
+     * Dr. [inventory_coa_id] Persediaan Bahan Baku (based on actual Material Issue Items)
+     *     Cr. 1140.02 Barang Dalam Proses
      */
     public function generateJournalForMaterialReturn(MaterialIssue $materialIssue): void
     {
-        if ($materialIssue->type !== 'return' || $materialIssue->status !== 'completed') {
+        if ($materialIssue->type !== 'return' || !$materialIssue->isCompleted()) {
             throw new \Exception('Material issue must be of type "return" and status "completed"');
         }
 
-        // Get COA with dynamic hierarchy
-        $bdpCoa = $materialIssue->wipCoa ?? $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
+        // Load material issue items with their relationships
+        $materialIssue->loadMissing('items.product', 'items.inventoryCoa');
+
+        // Calculate total cost from actual Material Issue Items
+        $totalCost = $materialIssue->items->sum('total_cost');
+
+        \Illuminate\Support\Facades\Log::info('Material Return Journal Generation', [
+            'material_issue_id' => $materialIssue->id,
+            'production_plan_id' => $materialIssue->production_plan_id,
+            'total_items' => $materialIssue->items->count(),
+            'total_cost_from_items' => $totalCost,
+            'original_total_cost' => $materialIssue->total_cost,
+        ]);
+
+        // Get work in progress COA - try BOM first, then fallback
+        $bdpCoa = null;
+        if ($materialIssue->productionPlan && $materialIssue->productionPlan->billOfMaterial) {
+            $bom = $materialIssue->productionPlan->billOfMaterial;
+            if ($bom->workInProgressCoa) {
+                $bdpCoa = $bom->workInProgressCoa;
+            }
+        }
+
         if (!$bdpCoa) {
-            throw new \Exception('Work in progress COA not found. Please set WIP COA in Material Issue or ensure COA with code 1140.02, 1140.03, or 1140 exists.');
+            // Use specific WIP COA code for consistency
+            $bdpCoa = ChartOfAccount::where('code', '1140.02')->first();
+            if (!$bdpCoa) {
+                $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
+            }
         }
 
-        // For returns, we use the same inventory COA hierarchy but only one entry for all items
-        $inventoryCoa = $materialIssue->inventoryCoa ?? $this->resolveCoaByCodes(['1140.01', '1140.10', '1140']);
-        if (!$inventoryCoa) {
-            throw new \Exception('Inventory COA not found. Please set inventory COA in Material Issue or ensure COA with code 1140.01, 1140.10, or 1140 exists.');
+        if (!$bdpCoa) {
+            \Illuminate\Support\Facades\Log::error('WIP COA not found for material return', [
+                'material_issue_id' => $materialIssue->id,
+                'production_plan_id' => $materialIssue->production_plan_id,
+                'searched_codes' => ['1140.02', '1140.03', '1140']
+            ]);
+            throw new \Exception('Work in progress COA not found. Please set WIP COA in BOM or ensure COA with code 1140.02, 1140.03, or 1140 exists.');
         }
 
-        $totalCost = $materialIssue->total_cost;
-
-        DB::transaction(function () use ($materialIssue, $bdpCoa, $inventoryCoa, $totalCost) {
+        DB::transaction(function () use ($materialIssue, $bdpCoa, $totalCost) {
             $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($materialIssue);
             $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($materialIssue);
             $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($materialIssue);
+
             // Delete existing journal entries for this material issue
             JournalEntry::where('source_type', MaterialIssue::class)
                 ->where('source_id', $materialIssue->id)
                 ->delete();
 
-            // Debit: Persediaan Bahan Baku
-            JournalEntry::create([
-                'coa_id' => $inventoryCoa->id,
-                'date' => $materialIssue->issue_date,
-                'reference' => $materialIssue->issue_number,
-                'description' => 'Retur bahan baku dari produksi - ' . ($materialIssue->productionPlan->plan_number ?? $materialIssue->manufacturingOrder->mo_number ?? 'N/A'),
-                'debit' => $totalCost,
-                'credit' => 0,
-                'journal_type' => 'manufacturing_return',
-                'cabang_id' => $branchId,
-                'department_id' => $departmentId,
-                'project_id' => $projectId,
-                'source_type' => MaterialIssue::class,
-                'source_id' => $materialIssue->id,
-            ]);
+            // Debit entries: One for each Material Issue Item using actual item costs
+            $debitEntries = [];
+            foreach ($materialIssue->items as $item) {
+                // Use actual cost from Material Issue Item
+                $itemCost = $item->total_cost;
 
-            // Credit: Barang Dalam Proses
-            JournalEntry::create([
+                // COA hierarchy: Item-specific → Product-specific → Fallback
+                $productInventoryCoa = $item->inventory_coa_id && $item->inventoryCoa ? $item->inventoryCoa :
+                                     ($item->product->inventory_coa_id && $item->product->inventoryCoa ? $item->product->inventoryCoa :
+                                     $this->resolveCoaByCodes(['1140.10', '1140.01', '1140']));
+
+                if (!$productInventoryCoa) {
+                    throw new \Exception('Inventory COA not found for product: ' . $item->product->name . '. Please set COA in Material Issue Item, Product, or ensure COA with code 1140, 1140.01, or 1140.10 exists.');
+                }
+
+                $debitEntry = JournalEntry::create([
+                    'coa_id' => $productInventoryCoa->id,
+                    'date' => $materialIssue->issue_date,
+                    'reference' => $materialIssue->issue_number,
+                    'description' => 'Retur bahan baku: ' . $item->product->name . ' dari produksi - ' . ($materialIssue->productionPlan->plan_number ?? $materialIssue->manufacturingOrder->mo_number ?? 'N/A'),
+                    'debit' => $itemCost,
+                    'credit' => 0,
+                    'journal_type' => 'manufacturing_return',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
+                    'source_type' => MaterialIssue::class,
+                    'source_id' => $materialIssue->id,
+                ]);
+
+                $debitEntries[] = $debitEntry;
+            }
+
+            // Credit: Barang Dalam Proses (single entry for total)
+            $creditEntry = JournalEntry::create([
                 'coa_id' => $bdpCoa->id,
                 'date' => $materialIssue->issue_date,
                 'reference' => $materialIssue->issue_number,
@@ -162,6 +249,23 @@ class ManufacturingJournalService
                 'project_id' => $projectId,
                 'source_type' => MaterialIssue::class,
                 'source_id' => $materialIssue->id,
+            ]);
+
+            \Illuminate\Support\Facades\Log::info('Material Return Journal Entries Created', [
+                'material_issue_id' => $materialIssue->id,
+                'total_cost_from_items' => $totalCost,
+                'debit_entries_count' => count($debitEntries),
+                'total_debit_amount' => collect($debitEntries)->sum('debit'),
+                'credit_entry_id' => $creditEntry->id,
+                'credit_amount' => $creditEntry->credit,
+                'cost_breakdown' => $materialIssue->items->map(function ($item) {
+                    return [
+                        'product' => $item->product->name,
+                        'quantity' => $item->quantity,
+                        'cost_per_unit' => $item->cost_per_unit,
+                        'total_cost' => $item->total_cost,
+                    ];
+                })->toArray(),
             ]);
         });
     }
@@ -182,6 +286,9 @@ class ManufacturingJournalService
             throw new \Exception('Production does not have a related Manufacturing Order');
         }
 
+        // Load required relationships
+        $manufacturingOrder->load(['productionPlan.product.billOfMaterial', 'productionPlan.billOfMaterial']);
+
         // Total cost to move from BDP to Finished Goods must include:
         // - Raw material issues (type=issue, completed) for this MO
         // - Minus raw material returns (type=return, completed) for this MO
@@ -192,7 +299,7 @@ class ManufacturingJournalService
         }
 
         // Get BOM with COA relationships loaded
-        $bom = $manufacturingOrder->product->billOfMaterial->firstWhere('is_active', true)
+        $bom = $manufacturingOrder->productionPlan->product->billOfMaterial->firstWhere('is_active', true)
             ?? $manufacturingOrder->productionPlan?->billOfMaterial;
 
         if (!$bom) {
@@ -226,7 +333,7 @@ class ManufacturingJournalService
                 'coa_id' => $barangJadiCoa->id,
                 'date' => $production->production_date,
                 'reference' => $production->production_number,
-                'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $manufacturingOrder->product->name . ')',
+                'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $manufacturingOrder->productionPlan->product->name . ')',
                 'debit' => $totalCost,
                 'credit' => 0,
                 'journal_type' => 'manufacturing_completion',
@@ -242,7 +349,7 @@ class ManufacturingJournalService
                 'coa_id' => $bdpCoa->id,
                 'date' => $production->production_date,
                 'reference' => $production->production_number,
-                'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $manufacturingOrder->product->name . ')',
+                'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $manufacturingOrder->productionPlan->product->name . ')',
                 'debit' => 0,
                 'credit' => $totalCost,
                 'journal_type' => 'manufacturing_completion',
@@ -264,11 +371,10 @@ class ManufacturingJournalService
      */
     protected function calculateManufacturingOrderBDPTotal(\App\Models\ManufacturingOrder $mo): float
     {
-        // Get BOM to calculate standard costs
-        $bom = $mo->product->billOfMaterial->firstWhere('is_active', true)
-            ?? $mo->productionPlan?->billOfMaterial;
+        // Get BOM from ProductionPlan
+        $bom = $mo->productionPlan?->billOfMaterial;
 
-        if (!$bom) {
+        if (!$bom || !$bom->is_active) {
             throw new \Exception('No active BOM found for Manufacturing Order: ' . $mo->mo_number);
         }
 
@@ -283,7 +389,7 @@ class ManufacturingJournalService
         $overheadCost = (float) ($bom->overhead_cost ?? 0);
 
         // Standard total cost = (BB + TKL + BOP) × quantity
-        $standardTotalCost = ($materialCost + $laborCost + $overheadCost) * (float) $mo->quantity;
+        $standardTotalCost = ($materialCost + $laborCost + $overheadCost) * (float) $mo->productionPlan->quantity;
 
         // Adjust with actual material issues and returns
         $issuesTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
@@ -298,7 +404,7 @@ class ManufacturingJournalService
 
         // Use actual material cost if available, otherwise use standard
         $actualMaterialCost = $issuesTotal - $returnsTotal;
-        $materialCostToUse = $actualMaterialCost > 0 ? $actualMaterialCost : $materialCost * (float) $mo->quantity;
+        $materialCostToUse = $actualMaterialCost > 0 ? $actualMaterialCost : $materialCost * (float) $mo->productionPlan->quantity;
 
         // Sum labor & overhead allocations posted to BDP and linked to this MO via source_type/source_id
         $bdpCoa = $bom->workInProgressCoa ?? $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
@@ -312,7 +418,7 @@ class ManufacturingJournalService
         }
 
         // Final total = Actual Material Cost + Labor Cost + Overhead Cost + Allocations
-        return max(0, $materialCostToUse + ($laborCost * (float) $mo->quantity) + ($overheadCost * (float) $mo->quantity) + $allocationsTotal);
+        return max(0, $materialCostToUse + ($laborCost * (float) $mo->productionPlan->quantity) + ($overheadCost * (float) $mo->productionPlan->quantity) + $allocationsTotal);
     }
 
     /**
@@ -414,78 +520,6 @@ class ManufacturingJournalService
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
-    }
-
-    /**
-     * Generate journal entries for finished goods completion
-     * Dr. 1140.03 Persediaan Barang Jadi
-     *     Cr. 1140.02 Persediaan Barang dalam Proses
-     */
-    public function createFinishedGoodsCompletionJournal(\App\Models\FinishedGoodsCompletion $completion): void
-    {
-        // Allow posting when status is either 'draft' (before finalize) or 'completed' (observer-driven)
-        if (!in_array($completion->status, ['draft', 'completed'], true)) {
-            throw new \Exception('Completion status must be draft or completed');
-        }
-
-        // Get COA with fallback options
-        $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
-        if (!$bdpCoa) {
-            throw new \Exception('Work in progress COA not found. Please ensure COA with code 1140.02, 1140.03, or 1140 exists.');
-        }
-
-        $barangJadiCoa = $this->resolveCoaByCodes(['1140.03', '1140.02', '1140']);
-        if (!$barangJadiCoa) {
-            throw new \Exception('Finished goods COA not found. Please ensure COA with code 1140.03, 1140.02, or 1140 exists.');
-        }
-
-        $totalCost = $completion->total_cost;
-
-        if ($totalCost <= 0) {
-            throw new \Exception('Total cost must be greater than 0');
-        }
-
-        DB::transaction(function () use ($completion, $bdpCoa, $barangJadiCoa, $totalCost) {
-            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($completion);
-            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($completion);
-            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($completion);
-            // Delete existing journal entries for this completion
-            JournalEntry::where('source_type', \App\Models\FinishedGoodsCompletion::class)
-                ->where('source_id', $completion->id)
-                ->delete();
-
-            // Debit: Persediaan Barang Jadi
-            JournalEntry::create([
-                'coa_id' => $barangJadiCoa->id,
-                'date' => $completion->completion_date,
-                'reference' => $completion->completion_number,
-                'description' => 'Penyelesaian barang jadi - ' . $completion->productionPlan->plan_number . ' (' . $completion->product->name . ')',
-                'debit' => $totalCost,
-                'credit' => 0,
-                'journal_type' => 'finished_goods_completion',
-                'cabang_id' => $branchId,
-                'department_id' => $departmentId,
-                'project_id' => $projectId,
-                'source_type' => \App\Models\FinishedGoodsCompletion::class,
-                'source_id' => $completion->id,
-            ]);
-
-            // Credit: Barang Dalam Proses
-            JournalEntry::create([
-                'coa_id' => $bdpCoa->id,
-                'date' => $completion->completion_date,
-                'reference' => $completion->completion_number,
-                'description' => 'Penyelesaian barang jadi - ' . $completion->productionPlan->plan_number . ' (' . $completion->product->name . ')',
-                'debit' => 0,
-                'credit' => $totalCost,
-                'journal_type' => 'finished_goods_completion',
-                'cabang_id' => $branchId,
-                'department_id' => $departmentId,
-                'project_id' => $projectId,
-                'source_type' => \App\Models\FinishedGoodsCompletion::class,
-                'source_id' => $completion->id,
-            ]);
-        });
     }
 
     /**

@@ -9,7 +9,6 @@ use App\Models\InventoryStock;
 use Illuminate\Support\Facades\Gate;
 use App\Models\ManufacturingOrder;
 use App\Models\Product;
-use App\Models\Rak;
 use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
 use App\Services\ManufacturingService;
@@ -80,35 +79,51 @@ class ManufacturingOrderResource extends Resource
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state) {
                                     $productionPlan = \App\Models\ProductionPlan::with('product', 'billOfMaterial.items.product')->find($state);
-                                    if ($productionPlan && $productionPlan->billOfMaterial) {
-                                        // Auto-load materials from Production Plan's BOM
-                                        $items = [];
-                                        foreach ($productionPlan->billOfMaterial->items as $bomItem) {
-                                            $items[] = [
-                                                'product_id' => $bomItem->product_id,
-                                                'uom_id' => $bomItem->uom_id,
-                                                'quantity' => $bomItem->quantity * $productionPlan->quantity,
-                                                'cost_per_unit' => $bomItem->product->cost_price ?? 0,
-                                                'total_cost' => ($bomItem->quantity * $productionPlan->quantity) * ($bomItem->product->cost_price ?? 0),
-                                                'warehouse_id' => null,
-                                                'rak_id' => null,
-                                                'notes' => null,
-                                            ];
+                                    if ($productionPlan) {
+                                        // Auto-fill start_date and end_date from Production Plan
+                                        if ($productionPlan->start_date) {
+                                            $set('start_date', \Carbon\Carbon::parse($productionPlan->start_date)->format('Y-m-d H:i:s'));
                                         }
-                                        $set('items', $items);
+                                        if ($productionPlan->end_date) {
+                                            $set('end_date', \Carbon\Carbon::parse($productionPlan->end_date)->format('Y-m-d H:i:s'));
+                                        }
+
+                                        // Check if there's a completed Material Issue for this Production Plan
+                                        $materialIssue = \App\Models\MaterialIssue::where('production_plan_id', $productionPlan->id)
+                                            ->where('status', 'completed')
+                                            ->with('items.product')
+                                            ->first();
+
+                                        if ($materialIssue) {
+                                            // Auto-load materials from completed Material Issue
+                                            $items = [];
+                                            foreach ($materialIssue->items as $issueItem) {
+                                                $items[] = [
+                                                    'product_id' => $issueItem->product_id,
+                                                    'uom_id' => $issueItem->uom_id,
+                                                    'quantity' => $issueItem->quantity,
+                                                    'notes' => null,
+                                                ];
+                                            }
+                                            $set('items', $items);
+                                        } elseif ($productionPlan->billOfMaterial) {
+                                            // Fallback to BOM if no completed Material Issue exists
+                                            $items = [];
+                                            foreach ($productionPlan->billOfMaterial->items as $bomItem) {
+                                                $items[] = [
+                                                    'product_id' => $bomItem->product_id,
+                                                    'uom_id' => $bomItem->uom_id,
+                                                    'quantity' => $bomItem->quantity * $productionPlan->quantity,
+                                                    'notes' => null,
+                                                ];
+                                            }
+                                            $set('items', $items);
+                                        }
                                     }
                                 }
                             })
                             ->getOptionLabelFromRecordUsing(function (\App\Models\ProductionPlan $record) {
                                 return $record->plan_number . ' - ' . $record->name . ' (' . $record->product->name . ' - ' . $record->quantity . ' ' . $record->uom->name . ')';
-                            }),
-                        Select::make('rak_id')
-                            ->label('Rak')
-                            ->preload()
-                            ->searchable(['code', 'name'])
-                            ->relationship('rak', 'id')
-                            ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                return "({$rak->code}) {$rak->name}";
                             }),
                         DateTimePicker::make('start_date')
                             ->label('Tanggal Mulai'),
@@ -130,60 +145,32 @@ class ManufacturingOrderResource extends Resource
                                     ->helperText(function ($get) {
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('warehouse_id', $get('warehouse_id'))
-                                            ->when($get('rak_id') != null, function ($query) use ($get) {
-                                                $query->where('rak_id', $get('rak_id'));
-                                            })
                                             ->first();
                                         if ($inventoryStock) {
                                             return "Stock Material : {$inventoryStock->qty_available}";
                                         }
                                         return "Stock Material : 0";
-                                    }),
+                                    })
+                                    ->disabled(), // Disabled since loaded from BOM
                                 Select::make('uom_id')
                                     ->label('Satuan')
+                                    ->options(UnitOfMeasure::all()->mapWithKeys(fn($uom) => [$uom->id => "({$uom->abbreviation}) {$uom->name}"])->toArray())
                                     ->preload()
                                     ->searchable()
                                     ->required()
-                                    ->options(UnitOfMeasure::pluck('name', 'id')),
+                                    ->disabled(), // Disabled since loaded from Material Issue
                                 TextInput::make('quantity')
                                     ->label('Quantity Required (Dibutuhkan)')
                                     ->numeric()
                                     ->required()
-                                    ->default(0),
-                                TextInput::make('cost_per_unit')
-                                    ->label('Cost per Unit')
-                                    ->numeric()
-                                    ->required()
-                                    ->default(0),
-                                TextInput::make('total_cost')
-                                    ->label('Total Cost')
-                                    ->numeric()
-                                    ->required()
-                                    ->default(0),
-                                Select::make('warehouse_id')
-                                    ->label('Gudang')
-                                    ->preload()
-                                    ->searchable()
-                                    ->options(Warehouse::pluck('name', 'id'))
-                                    ->getOptionLabelFromRecordUsing(function ($value) {
-                                        $warehouse = Warehouse::find($value);
-                                        return $warehouse ? "({$warehouse->kode}) {$warehouse->name}" : '';
-                                    }),
-                                Select::make('rak_id')
-                                    ->label('Rak')
-                                    ->preload()
-                                    ->searchable()
-                                    ->options(Rak::pluck('name', 'id'))
-                                    ->getOptionLabelFromRecordUsing(function ($value) {
-                                        $rak = Rak::find($value);
-                                        return $rak ? "({$rak->code}) {$rak->name}" : '';
-                                    }),
+                                    ->disabled(), // Disabled since loaded from BOM
                                 TextInput::make('notes')
                                     ->label('Notes')
                                     ->maxLength(255),
                             ])
                             ->columns(2)
                             ->columnSpanFull()
+                            ->disabled() // Entire repeater disabled, for view only
                     ])
             ]);
     }
@@ -274,16 +261,6 @@ class ManufacturingOrderResource extends Resource
                             $query->where('sku', 'LIKE', '%' . $search . '%')
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
-                    }),
-                TextColumn::make('rak')
-                    ->label('Rak')
-                    ->searchable(query: function (Builder $query, $search) {
-                        $query->whereHas('rak', function ($query) use ($search) {
-                            $query->where('code', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%');
-                        });
-                    })->formatStateUsing(function ($state) {
-                        return "({$state->code}) {$state->name}";
                     }),
                 TextColumn::make('productionPlan.quantity')
                     ->label('Quantity')

@@ -18,29 +18,21 @@ class ManufacturingOrder extends Model
         'status', // draft, in_progress, completed
         'start_date',
         'end_date',
-        'rak_id',
-        'items',
     ];
 
     protected $casts = [
-        'items' => 'array',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
     ];
-
-    public function manufacturingOrderMaterial()
-    {
-        return $this->hasMany(ManufacturingOrderMaterial::class, 'manufacturing_order_id');
-    }
 
     public function production()
     {
         return $this->hasOne(Production::class, 'manufacturing_order_id')->withDefault();
     }
 
-    public function rak()
+    public function productions()
     {
-        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+        return $this->hasMany(Production::class, 'manufacturing_order_id');
     }
 
     public function productionPlan()

@@ -17,22 +17,32 @@ class VendorPaymentObserver
 
     public function updated(VendorPayment $payment)
     {
-        if (strtolower($payment->status ?? '') === 'paid') {
+        // Post journal for both partial and full payments
+        if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
             // Avoid double posting journals: only post if none exist yet
             if (!$payment->journalEntries()->exists()) {
                 $this->ledger->postVendorPayment($payment);
             }
+        }
+        
+        // Update AP status for both partial and paid
+        if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
             $this->updateAccountPayableAndInvoiceStatus($payment);
         }
     }
 
     public function created(VendorPayment $payment)
     {
-        if (strtolower($payment->status ?? '') === 'paid') {
-            // Avoid double posting journals on create as CreateVendorPayment already posts
+        // Post journal for both partial and full payments
+        if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
+            // Avoid double posting journals: only post if none exist yet
             if (!$payment->journalEntries()->exists()) {
                 $this->ledger->postVendorPayment($payment);
             }
+        }
+        
+        // Update AP status for both partial and paid
+        if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
             $this->updateAccountPayableAndInvoiceStatus($payment);
         }
     }

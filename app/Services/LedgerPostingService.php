@@ -513,4 +513,166 @@ class LedgerPostingService
 
         return ChartOfAccount::where('name', 'LIKE', '%UANG MUKA%')->first();
     }
+
+    public function postCustomerReceipt(\App\Models\CustomerReceipt $receipt): array
+    {
+        if (JournalEntry::where('source_type', \App\Models\CustomerReceipt::class)->where('source_id', $receipt->id)->exists()) {
+            return ['status' => 'skipped', 'message' => 'CustomerReceipt already posted to ledger'];
+        }
+
+        $date = $receipt->payment_date ?? Carbon::now()->toDateString();
+        $details = $receipt->customerReceiptItem()->get();
+
+        $total = (float) ($details->sum('amount') ?: $receipt->total_payment);
+
+        if ($total <= 0) {
+            return ['status' => 'skipped', 'message' => 'CustomerReceipt has no amount to post'];
+        }
+
+        // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
+        $piutangCoa = ChartOfAccount::where('code', '1130')->first(); // Piutang Dagang
+        $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', '1112.01')->first();
+
+        $entries = [];
+
+        // Credit Piutang Dagang (reduce receivable)
+        if ($piutangCoa) {
+            $entries[] = JournalEntry::create([
+                'coa_id' => $piutangCoa->id,
+                'date' => $date,
+                'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
+                'description' => 'Customer receipt for receipt id ' . $receipt->id,
+                'debit' => 0,
+                'credit' => $total,
+                'journal_type' => 'receipt',
+                'source_type' => \App\Models\CustomerReceipt::class,
+                'source_id' => $receipt->id,
+            ]);
+        }
+
+        // Debit Cash/Bank
+        $depositDetailsAmount = $details->filter(function ($detail) {
+            return strtolower($detail->method ?? '') === 'deposit';
+        })->sum('amount');
+
+        $paymentMarkedDeposit = strtolower($receipt->payment_method ?? '') === 'deposit';
+        if ($depositDetailsAmount <= 0 && $paymentMarkedDeposit) {
+            $depositDetailsAmount = $total;
+        }
+
+        $depositAmount = (float) min($total, $depositDetailsAmount);
+        $cashBankAmount = (float) max(0, $total - $depositAmount);
+
+        if ($depositAmount > 0) {
+            $depositCoa = $this->resolveDepositCoaForCustomer($receipt);
+            if ($depositCoa) {
+                $entries[] = JournalEntry::create([
+                    'coa_id' => $depositCoa->id,
+                    'date' => $date,
+                    'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
+                    'description' => 'Deposit / Uang Muka usage for receipt id ' . $receipt->id,
+                    'debit' => $depositAmount,
+                    'credit' => 0,
+                    'journal_type' => 'receipt',
+                    'source_type' => \App\Models\CustomerReceipt::class,
+                    'source_id' => $receipt->id,
+                ]);
+            } else {
+                // If deposit account is missing, fall back to bank/cash
+                $cashBankAmount += $depositAmount;
+                $depositAmount = 0;
+            }
+        }
+
+        $nonDepositDetails = $details->filter(function ($detail) {
+            return strtolower($detail->method ?? '') !== 'deposit';
+        });
+
+        if ($nonDepositDetails->isNotEmpty()) {
+            $grouped = $nonDepositDetails->groupBy(function ($detail) {
+                return $detail->coa_id ?? 'default';
+            });
+
+            foreach ($grouped as $coaKey => $group) {
+                $amount = (float) $group->sum('amount');
+                if ($amount <= 0) {
+                    continue;
+                }
+
+                $coa = $coaKey === 'default'
+                    ? $defaultBankCoa
+                    : ChartOfAccount::find($group->first()->coa_id);
+
+                if (!$coa) {
+                    $coa = $defaultBankCoa;
+                }
+
+                if (!$coa) {
+                    Log::error('No COA found for receipt group', [
+                        'coaKey' => $coaKey,
+                        'group' => $group->toArray()
+                    ]);
+                    continue;
+                }
+
+                $entries[] = JournalEntry::create([
+                    'coa_id' => $coa->id,
+                    'date' => $date,
+                    'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
+                    'description' => 'Bank/Cash for receipt id ' . $receipt->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
+                    'debit' => $amount,
+                    'credit' => 0,
+                    'journal_type' => 'receipt',
+                    'source_type' => \App\Models\CustomerReceipt::class,
+                    'source_id' => $receipt->id,
+                ]);
+            }
+        } elseif ($cashBankAmount > 0) {
+            // If no details or all details are deposit, use receipt's coa_id or default bank coa
+            $coa = $defaultBankCoa ?: ($receipt->coa_id ? ChartOfAccount::find($receipt->coa_id) : null);
+            if ($coa) {
+                $entries[] = JournalEntry::create([
+                    'coa_id' => $coa->id,
+                    'date' => $date,
+                    'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
+                    'description' => 'Bank/Cash for receipt id ' . $receipt->id,
+                    'debit' => $cashBankAmount,
+                    'credit' => 0,
+                    'journal_type' => 'receipt',
+                    'source_type' => \App\Models\CustomerReceipt::class,
+                    'source_id' => $receipt->id,
+                ]);
+            } else {
+                Log::error('No COA available for receipt debit entry', [
+                    'receipt_id' => $receipt->id,
+                    'defaultBankCoa_exists' => $defaultBankCoa ? true : false,
+                    'receipt_coa_id' => $receipt->coa_id
+                ]);
+            }
+        }
+
+        return ['status' => 'success', 'message' => 'CustomerReceipt posted to ledger', 'entries' => $entries];
+    }
+
+    private function resolveDepositCoaForCustomer(\App\Models\CustomerReceipt $receipt): ?ChartOfAccount
+    {
+        // Find deposit for this customer
+        $deposit = \App\Models\Deposit::where('from_model_type', \App\Models\Customer::class)
+            ->where('from_model_id', $receipt->customer_id)
+            ->first();
+
+        if ($deposit && $deposit->coa) {
+            return $deposit->coa;
+        }
+
+        $preferredCodes = ['1150.01', '1150.02', '1150'];
+        foreach ($preferredCodes as $code) {
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa) {
+                return $coa;
+            }
+        }
+
+        return ChartOfAccount::where('name', 'LIKE', '%UANG MUKA%')->first();
+    }
 }

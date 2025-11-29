@@ -223,46 +223,7 @@ class ViewMaterialIssue extends ViewRecord
      */
     protected function validateStockAvailability(MaterialIssue $materialIssue): array
     {
-        $materialIssue->loadMissing('items.product', 'items.warehouse');
-
-        $insufficientStock = [];
-        $outOfStock = [];
-
-        foreach ($materialIssue->items as $item) {
-            $warehouseId = $item->warehouse_id ?? $materialIssue->warehouse_id;
-            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $warehouseId)
-                ->first();
-
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
-            $requiredQty = $item->quantity;
-
-            $warehouseName = $item->warehouse ? $item->warehouse->name : ($materialIssue->warehouse ? $materialIssue->warehouse->name : 'N/A');
-
-            if ($availableQty <= 0) {
-                $outOfStock[] = "{$item->product->name} di {$warehouseName} (Stock: 0)";
-            } elseif ($availableQty < $requiredQty) {
-                $insufficientStock[] = "{$item->product->name} di {$warehouseName} (Dibutuhkan: " . number_format($requiredQty, 2) . ", Tersedia: " . number_format($availableQty, 2) . ")";
-            }
-        }
-
-        if (!empty($outOfStock)) {
-            return [
-                'valid' => false,
-                'message' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock) . '. Silakan lakukan stock adjustment atau transfer stock terlebih dahulu.'
-            ];
-        }
-
-        if (!empty($insufficientStock)) {
-            return [
-                'valid' => false,
-                'message' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock) . '. Silakan sesuaikan quantity atau lakukan stock adjustment terlebih dahulu.'
-            ];
-        }
-
-        return [
-            'valid' => true,
-            'message' => 'Stock tersedia untuk semua item'
-        ];
+        $stockReservationService = app(\App\Services\StockReservationService::class);
+        return $stockReservationService->checkStockAvailabilityForMaterialIssue($materialIssue);
     }
 }

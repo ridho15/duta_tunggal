@@ -93,7 +93,7 @@ class StockMovementResource extends Resource
                         TextInput::make('reference_id')
                             ->maxLength(255)
                             ->default(null),
-                        DateTimePicker::make('date')
+                        DatePicker::make('date')
                             ->required(),
                         Textarea::make('notes')
                             ->nullable(),

@@ -78,11 +78,6 @@ class ProductionPlan extends Model
         return $this->hasMany(MaterialIssue::class, 'production_plan_id');
     }
 
-    public function finishedGoodsCompletions()
-    {
-        return $this->hasMany(FinishedGoodsCompletion::class, 'production_plan_id');
-    }
-
     /**
      * Get material requirements from BOM
      */
@@ -294,15 +289,10 @@ class ProductionPlan extends Model
                             Log::info("MaterialIssue {$materialIssue->issue_number} auto-created for ProductionPlan {$productionPlan->id}");
                         } else {
                             Log::warning("Failed to auto-create MaterialIssue for ProductionPlan {$productionPlan->id}");
-                            // Prevent status change if MaterialIssue creation failed
-                            $productionPlan->status = $productionPlan->getOriginal('status');
                         }
                     } catch (\Exception $e) {
                         Log::error("Failed to auto-create MaterialIssue for ProductionPlan {$productionPlan->id}: " . $e->getMessage());
-                        // Prevent status change if stock validation failed
-                        $productionPlan->status = $productionPlan->getOriginal('status');
-                        // Re-throw exception to be handled by caller
-                        throw $e;
+                        // Do not prevent status change, just log the error
                     }
                 }
             }
@@ -318,8 +308,6 @@ class ProductionPlan extends Model
             // Cascade delete related manufacturing orders if needed
             $productionPlan->manufacturingOrders()->delete();
 
-            // Cascade delete related finished goods completions
-            $productionPlan->finishedGoodsCompletions()->delete();
         });
     }
 }

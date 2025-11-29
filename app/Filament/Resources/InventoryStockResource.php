@@ -96,6 +96,9 @@ class InventoryStockResource extends Resource
                             ->relationship('rak', 'name', function ($get, Builder $query) {
                                 $query->where('warehouse_id', $get('warehouse_id'));
                             })
+                            ->getOptionLabelFromRecordUsing(function ($record) {
+                                return "({$record->code}) {$record->name}";
+                            })
                             ->nullable(),
                     ])
             ]);

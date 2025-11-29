@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             UnitOfMeasureSeeder::class,
             CabangSeeder::class, // ✅ TAMBAHKAN: Data cabang untuk multi-cabang
             ChartOfAccountSeeder::class, // ✅ TAMBAHKAN: COA lengkap
+            ManufacturingCoaSeeder::class, // ✅ TAMBAHKAN: COA untuk manufacturing
             MasterDataSeeder::class, // ✅ TAMBAHKAN: Data master lengkap
             
             // Business Entities

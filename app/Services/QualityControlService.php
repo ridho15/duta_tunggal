@@ -36,6 +36,26 @@ class QualityControlService
         return 'QC-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
 
+    public function generateQcManufactureNumber()
+    {
+        $date = now()->format('Ymd');
+
+        // Hitung berapa QC Manufacture pada hari ini
+        $last = QualityControl::where('qc_number', 'like', 'QC-M-' . $date . '-%')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $number = 1;
+
+        if ($last) {
+            // Ambil nomor urut terakhir
+            $lastNumber = intval(substr($last->qc_number, -4));
+            $number = $lastNumber + 1;
+        }
+
+        return 'QC-M-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+    }
+
     /**
      * Create a Quality Control record from a PurchaseReceiptItem.
      * This does not create receipts immediately; when QC is completed, a receipt
@@ -84,6 +104,35 @@ class QualityControlService
             'rak_id' => $data['rak_id'] ?? null,
             'from_model_type' => \App\Models\PurchaseOrderItem::class,
             'from_model_id' => $purchaseOrderItem->id,
+        ]);
+
+        return $qualityControl;
+    }
+
+    /**
+     * Create a Quality Control record from a Production.
+     * This creates QC automatically when production is finished.
+     *
+     * @param \App\Models\Production $production
+     * @return \App\Models\QualityControl
+     */
+    public function createQCFromProduction($production)
+    {
+        $manufacturingOrder = $production->manufacturingOrder;
+        $product = $manufacturingOrder->productionPlan->product;
+
+        $qualityControl = QualityControl::create([
+            'qc_number' => $this->generateQcManufactureNumber(),
+            'passed_quantity' => $production->quantity_produced ?? $manufacturingOrder->productionPlan->quantity,
+            'rejected_quantity' => 0,
+            'status' => 0, // Not processed yet
+            'inspected_by' => Auth::id() ?? 1, // Default to admin user if no auth
+            'warehouse_id' => $production->warehouse_id ?? $manufacturingOrder->productionPlan->warehouse_id,
+            'rak_id' => $production->rak_id ?? null,
+            'product_id' => $product->id,
+            'from_model_type' => \App\Models\Production::class,
+            'from_model_id' => $production->id,
+            'date_send_stock' => Carbon::now(),
         ]);
 
         return $qualityControl;
@@ -143,6 +192,11 @@ class QualityControlService
         // Handle Purchase Receipt and Purchase Order completion based on QC results
         if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
             $this->handlePurchaseReceiptCompletion($qualityControl);
+        }
+
+        // Create journal entries and stock movement for passed QC items from Production
+        if ($qualityControl->from_model_type === 'App\Models\Production' && $qualityControl->passed_quantity > 0) {
+            $this->createJournalEntriesAndStockMovementForProductionQC($qualityControl);
         }
     }
 
@@ -429,6 +483,167 @@ class QualityControlService
                 title: "Purchase Order Completed",
                 message: "Purchase Order {$purchaseOrder->po_number} has been completed. All items have been received and quality controlled."
             );
+        }
+    }
+
+    /**
+     * Calculate total BDP cost for a Manufacturing Order
+     */
+    protected function calculateManufacturingOrderBDPTotal(\App\Models\ManufacturingOrder $mo): float
+    {
+        // Get BOM from ProductionPlan
+        $bom = $mo->productionPlan?->billOfMaterial;
+
+        if (!$bom || !$bom->is_active) {
+            return 0; // Return 0 instead of throwing exception
+        }
+
+        $bom->loadMissing('items.product');
+
+        // Calculate standard costs from BOM
+        $materialCost = $bom->items->sum(function ($item) {
+            return (float) $item->quantity * (float) ($item->product->cost_price ?? 0);
+        });
+
+        $laborCost = (float) ($bom->labor_cost ?? 0);
+        $overheadCost = (float) ($bom->overhead_cost ?? 0);
+
+        // Standard total cost = (BB + TKL + BOP) × quantity
+        $standardTotalCost = ($materialCost + $laborCost + $overheadCost) * (float) $mo->productionPlan->quantity;
+
+        // Adjust with actual material issues and returns
+        $issuesTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+            ->where('status', 'completed')
+            ->where('type', 'issue')
+            ->sum('total_cost');
+
+        $returnsTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+            ->where('status', 'completed')
+            ->where('type', 'return')
+            ->sum('total_cost');
+
+        // Use actual material cost if available, otherwise use standard
+        $actualMaterialCost = $issuesTotal - $returnsTotal;
+        $materialCostToUse = $actualMaterialCost > 0 ? $actualMaterialCost : $materialCost * (float) $mo->productionPlan->quantity;
+
+        // If using actual material cost, don't add labor/overhead again as they should be allocated separately
+        // If using standard cost, include labor and overhead
+        $additionalCosts = $actualMaterialCost > 0 ? 0 : ($laborCost + $overheadCost) * (float) $mo->productionPlan->quantity;
+
+        // Sum labor & overhead allocations posted to BDP and linked to this MO via source_type/source_id
+        $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
+        $allocationsTotal = 0;
+        if ($bdpCoa) {
+            $allocationsTotal = \App\Models\JournalEntry::where('coa_id', $bdpCoa->id)
+                ->where('journal_type', 'manufacturing_allocation')
+                ->where('source_type', \App\Models\ManufacturingOrder::class)
+                ->where('source_id', $mo->id)
+                ->sum('debit');
+        }
+
+        // Final total = Material Cost + Additional Costs + Allocations
+        return max(0, $materialCostToUse + $additionalCosts + $allocationsTotal);
+    }
+
+    /**
+     * Create journal entries and stock movement for production QC completion
+     */
+    public function createJournalEntriesAndStockMovementForProductionQC(QualityControl $qualityControl): void
+    {
+        $production = $qualityControl->fromModel;
+        $manufacturingOrder = $production->manufacturingOrder;
+        $productionPlan = $manufacturingOrder->productionPlan;
+        $product = $qualityControl->product;
+        $passedQuantity = $qualityControl->passed_quantity;
+
+        // Calculate total cost from BDP (Barang Dalam Proses)
+        $totalCost = $this->calculateManufacturingOrderBDPTotal($manufacturingOrder);
+
+        if ($totalCost <= 0 || $passedQuantity <= 0) {
+            return;
+        }
+
+        // Get COA accounts
+        $bom = $productionPlan->billOfMaterial;
+        $bdpCoa = $bom->workInProgressCoa ?? $this->resolveCoaByCodes(['1140.02']); // Barang Dalam Proses
+        $barangJadiCoa = $bom->finishedGoodsCoa ?? $this->resolveCoaByCodes(['1140.03']); // Persediaan Barang Jadi
+
+        if (!$bdpCoa || !$barangJadiCoa) {
+            return;
+        }
+
+        $date = now()->toDateString();
+        $reference = $qualityControl->qc_number;
+
+        // Prevent duplicate posting
+        if (\App\Models\JournalEntry::where('source_type', QualityControl::class)
+            ->where('source_id', $qualityControl->id)
+            ->where('description', 'like', '%Penyelesaian produksi%')
+            ->exists()) {
+            return;
+        }
+
+        // Calculate cost per unit
+        $costPerUnit = $totalCost / $productionPlan->quantity;
+        $amount = round($costPerUnit * $passedQuantity, 2);
+
+        // Create journal entries
+        \App\Models\JournalEntry::create([
+            'coa_id' => $barangJadiCoa->id,
+            'date' => $date,
+            'reference' => $reference,
+            'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $product->name . ')',
+            'debit' => $amount,
+            'credit' => 0,
+            'journal_type' => 'finished_goods_completion',
+            'source_type' => QualityControl::class,
+            'source_id' => $qualityControl->id,
+        ]);
+
+        \App\Models\JournalEntry::create([
+            'coa_id' => $bdpCoa->id,
+            'date' => $date,
+            'reference' => $reference,
+            'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $product->name . ')',
+            'debit' => 0,
+            'credit' => $amount,
+            'journal_type' => 'finished_goods_completion',
+            'source_type' => QualityControl::class,
+            'source_id' => $qualityControl->id,
+        ]);
+
+        // Create stock movement
+        $existingMovement = \App\Models\StockMovement::where('from_model_type', QualityControl::class)
+            ->where('from_model_id', $qualityControl->id)
+            ->first();
+
+        if (!$existingMovement) {
+            $meta = [
+                'source' => 'quality_control_manufacture',
+                'qc_id' => $qualityControl->id,
+                'qc_number' => $qualityControl->qc_number,
+                'production_id' => $production->id,
+                'production_number' => $production->production_number,
+                'manufacturing_order_id' => $manufacturingOrder->id,
+                'mo_number' => $manufacturingOrder->mo_number,
+                'passed_quantity' => $passedQuantity,
+                'rejected_quantity' => $qualityControl->rejected_quantity,
+                'cost_per_unit' => $costPerUnit,
+            ];
+
+            \App\Models\StockMovement::create([
+                'product_id' => $product->id,
+                'warehouse_id' => $qualityControl->warehouse_id,
+                'quantity' => $passedQuantity,
+                'value' => $amount,
+                'type' => 'manufacture_in',
+                'date' => $date,
+                'notes' => 'Stock masuk dari penyelesaian produksi: ' . $qualityControl->qc_number,
+                'meta' => $meta,
+                'rak_id' => $qualityControl->rak_id,
+                'from_model_type' => QualityControl::class,
+                'from_model_id' => $qualityControl->id,
+            ]);
         }
     }
 }
