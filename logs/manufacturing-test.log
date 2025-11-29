@@ -1,6 +1,0 @@
-
-Fatal error: Allowed memory size of 268435456 bytes exhausted (tried to allocate 16384 bytes) in /Users/lrmcorporation/Documents/Website/Duta-Tunggal-ERP/vendor/laravel/framework/src/Illuminate/Database/Connection.php on line 411
-PHP Fatal error:  Allowed memory size of 268435456 bytes exhausted (tried to allocate 16384 bytes) in /Users/lrmcorporation/Documents/Website/Duta-Tunggal-ERP/vendor/laravel/framework/src/Illuminate/Database/Connection.php on line 411
-
-Fatal error: Allowed memory size of 268435456 bytes exhausted (tried to allocate 32768 bytes) in /Users/lrmcorporation/Documents/Website/Duta-Tunggal-ERP/vendor/pestphp/pest/src/Plugins/Actions/CallsTerminable.php on line 1
-PHP Fatal error:  Allowed memory size of 268435456 bytes exhausted (tried to allocate 32768 bytes) in /Users/lrmcorporation/Documents/Website/Duta-Tunggal-ERP/vendor/pestphp/pest/src/Plugins/Actions/CallsTerminable.php on line 1
