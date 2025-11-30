@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Tables\Enums\ActionsPosition;
 
 class PurchaseInvoiceResource extends Resource
 {
@@ -709,12 +710,22 @@ class PurchaseInvoiceResource extends Resource
                     
                 BadgeColumn::make('status')
                     ->label('Status')
+                    ->formatStateUsing(function ($state) {
+                        return match ($state) {
+                            'draft' => 'Draft',
+                            'sent' => 'Terkirim',
+                            'paid' => 'Lunas',
+                            'partially_paid' => 'Dibayar Sebagian',
+                            'overdue' => 'Terlambat',
+                            default => $state,
+                        };
+                    })
                     ->colors([
-                        'secondary' => 'Draft',
-                        'warning' => 'Terkirim',
-                        'success' => 'Lunas',
-                        'primary' => 'Dibayar Sebagian',
-                        'danger' => 'Terlambat',
+                        'secondary' => 'draft',
+                        'warning' => 'sent',
+                        'success' => 'paid',
+                        'primary' => 'partially_paid',
+                        'danger' => 'overdue',
                     ]),
             ])
             ->filters([
@@ -725,8 +736,24 @@ class PurchaseInvoiceResource extends Resource
                     ViewAction::make(),
                     EditAction::make(),
                     DeleteAction::make(),
+                    \Filament\Tables\Actions\Action::make('mark_as_sent')
+                        ->label('Mark as Sent')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('warning')
+                        ->visible(fn ($record) => $record->status !== 'sent')
+                        ->requiresConfirmation()
+                        ->modalHeading('Mark Invoice as Sent')
+                        ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
+                        ->modalSubmitActionLabel('Yes, Mark as Sent')
+                        ->action(function ($record) {
+                            $record->update(['status' => 'sent']);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Invoice marked as sent')
+                                ->success()
+                                ->send();
+                        }),
                 ])
-            ])
+                    ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

@@ -21,6 +21,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Support\Facades\DB;
 
 class AgeingScheduleResource extends Resource
@@ -114,6 +115,10 @@ class AgeingScheduleResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('fromModel.invoice.invoice_number')
+                    ->label('Invoice Number')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('from_model_type')
                     ->label('From')
                     ->formatStateUsing(function ($state) {
@@ -128,7 +133,8 @@ class AgeingScheduleResource extends Resource
                                 # code...
                                 break;
                         }
-                    }),
+                    })
+                    ->searchable(),
                 TextColumn::make('invoice_date')
                     ->date()
                     ->sortable(),
@@ -139,7 +145,8 @@ class AgeingScheduleResource extends Resource
                     ->numeric()
                     ->suffix(' Days')
                     ->sortable(),
-                TextColumn::make('bucket'),
+                TextColumn::make('bucket')
+                    ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -154,7 +161,20 @@ class AgeingScheduleResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('from_model_type')
+                    ->label('Type')
+                    ->options([
+                        'App\Models\AccountPayable' => 'Payable',
+                        'App\Models\AccountReceivable' => 'Receivable',
+                    ]),
+                SelectFilter::make('bucket')
+                    ->label('Bucket')
+                    ->options([
+                        'Current' => 'Current',
+                        '31–60' => '31–60',
+                        '61–90' => '61–90',
+                        '>90' => '>90',
+                    ]),
             ])
             ->actions([
                 ActionGroup::make([

@@ -17,7 +17,6 @@ class VendorPaymentFactory extends Factory
     public function definition(): array
     {
         return [
-            'invoice_id' => \App\Models\Invoice::factory(), // will be overridden when needed
             'supplier_id' => \App\Models\Supplier::factory(), // will be overridden when needed
             'selected_invoices' => [],
             'invoice_receipts' => [],

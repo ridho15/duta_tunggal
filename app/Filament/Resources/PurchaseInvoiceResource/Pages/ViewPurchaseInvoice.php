@@ -14,8 +14,24 @@ class ViewPurchaseInvoice extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
-            Actions\DeleteAction::make(),
+            Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\Action::make('mark_as_sent')
+                ->label('Mark as Sent')
+                ->icon('heroicon-o-paper-airplane')
+                ->color('warning')
+                ->visible(fn ($record) => $record->status !== 'sent')
+                ->requiresConfirmation()
+                ->modalHeading('Mark Invoice as Sent')
+                ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
+                ->modalSubmitActionLabel('Yes, Mark as Sent')
+                ->action(function ($record) {
+                    $record->update(['status' => 'sent']);
+                    \Filament\Notifications\Notification::make()
+                        ->title('Invoice marked as sent')
+                        ->success()
+                        ->send();
+                }),
             Actions\Action::make('print_invoice')
                 ->label('Cetak Invoice')
                 ->color('primary')

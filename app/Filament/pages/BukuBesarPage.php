@@ -20,6 +20,8 @@ class BukuBesarPage extends Page
 
     protected static ?int $navigationSort = 6;
 
+    protected static ?string $slug = 'buku-besar-page';
+
     public $coa_ids = [];
     public $start_date = null;
     public $end_date = null;

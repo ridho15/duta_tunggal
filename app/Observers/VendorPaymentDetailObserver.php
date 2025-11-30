@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\VendorPaymentDetail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Filament\Notifications\Notification;
 
 class VendorPaymentDetailObserver
 {
@@ -46,14 +47,37 @@ class VendorPaymentDetailObserver
                 ->get();
 
             if ($availableDeposits->isEmpty()) {
-                // Prevent payment creation if no deposits are available
-                throw new \Exception("Supplier {$vendorPayment->supplier->name} tidak memiliki deposit yang tersedia untuk pembayaran. Silakan pilih metode pembayaran lain atau buat deposit terlebih dahulu.");
+                // Use notification instead of exception for better UX
+                Notification::make()
+                    ->title('Deposit Tidak Tersedia')
+                    ->body("Supplier {$vendorPayment->supplier->name} tidak memiliki deposit yang tersedia untuk pembayaran. Silakan pilih metode pembayaran lain atau buat deposit terlebih dahulu.")
+                    ->danger()
+                    ->persistent()
+                    ->send();
+
+                // Log for debugging but don't stop the process
+                Log::warning("No available deposits for supplier {$vendorPayment->supplier->name} during payment creation");
+
+                // Skip deposit processing but continue with other logic
+                return;
             }
 
             // Check if total available deposit balance is sufficient
             $totalAvailableDeposit = $availableDeposits->sum('remaining_amount');
             if ($totalAvailableDeposit < $vendorPaymentDetail->amount) {
-                throw new \Exception("Saldo deposit supplier {$vendorPayment->supplier->name} tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($vendorPaymentDetail->amount, 0, ',', '.'));
+                // Use notification instead of exception
+                Notification::make()
+                    ->title('Saldo Deposit Tidak Mencukupi')
+                    ->body("Saldo deposit supplier {$vendorPayment->supplier->name} tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($vendorPaymentDetail->amount, 0, ',', '.'))
+                    ->danger()
+                    ->persistent()
+                    ->send();
+
+                // Log for debugging
+                Log::warning("Insufficient deposit balance for supplier {$vendorPayment->supplier->name}. Available: {$totalAvailableDeposit}, Required: {$vendorPaymentDetail->amount}");
+
+                // Skip deposit processing but continue with other logic
+                return;
             }
 
             // Process deposits if validation passes

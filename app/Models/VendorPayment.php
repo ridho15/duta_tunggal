@@ -84,4 +84,12 @@ class VendorPayment extends Model
     {
         return $this->vendorPaymentDetail()->sum('amount');
     }
+
+    /**
+     * Get reference for journal entries
+     */
+    public function getReferenceAttribute()
+    {
+        return $this->ntpn ?: 'VP-' . $this->id;
+    }
 }

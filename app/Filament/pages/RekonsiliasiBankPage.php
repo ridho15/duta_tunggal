@@ -19,6 +19,7 @@ class RekonsiliasiBankPage extends Page implements HasForms
     protected static ?string $navigationLabel = 'Rekonsiliasi Bank';
     protected static string $view = 'filament.pages.rekonsiliasi-bank-page';
     protected static ?int $navigationSort = 6;
+    protected static ?string $slug = 'rekonsiliasi-bank-page';
 
     public $selectedCoaId = null;
     public $startDate;

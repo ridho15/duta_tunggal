@@ -4,7 +4,6 @@ namespace App\Filament\Resources\VendorPaymentResource\Pages;
 
 use App\Filament\Resources\VendorPaymentResource;
 use Filament\Actions;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListVendorPayments extends ListRecords
@@ -14,8 +13,7 @@ class ListVendorPayments extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
-                ->icon('heroicon-o-plus-circle'),
+            Actions\CreateAction::make()->icon('heroicon-o-plus'),
         ];
     }
 }

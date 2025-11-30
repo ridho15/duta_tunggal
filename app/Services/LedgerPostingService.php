@@ -119,6 +119,7 @@ class LedgerPostingService
 
             // Debit PPN Masukan based on ppn_rate
             $ppnAmount = $invoice->subtotal * ($invoice->ppn_rate ?? 0) / 100;
+            $actualPpnAmount = 0; // Track actual PPN amount that gets posted
             if ($ppnAmount > 0 && $ppnMasukanCoa) {
                 $entries[] = JournalEntry::create([
                     'coa_id' => $ppnMasukanCoa->id,
@@ -131,6 +132,7 @@ class LedgerPostingService
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                 ]);
+                $actualPpnAmount = $ppnAmount;
             }
 
             // Handle other fees from invoice other_fee array
@@ -156,8 +158,8 @@ class LedgerPostingService
                 }
             }
 
-            // Credit Accounts Payable for total amount (subtotal + PPN + other fees)
-            $totalAmount = $subtotal + $ppnAmount + $totalOtherFees;
+            // Credit Accounts Payable for total amount (subtotal + actual PPN + other fees)
+            $totalAmount = $subtotal + $actualPpnAmount + $totalOtherFees;
             if ($totalAmount > 0 && $utangCoa) {
                 \Illuminate\Support\Facades\Log::info('DEBUG: Creating credit entry for accounts payable', [
                     'invoice_id' => $invoice->id,

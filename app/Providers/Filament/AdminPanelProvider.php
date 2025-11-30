@@ -10,8 +10,9 @@ use App\Filament\Pages\ArApManagementPage;
 use App\Filament\Pages\BalanceSheetPage;
 use App\Filament\Pages\BukuBesarPage;
 use App\Filament\Pages\IncomeStatementPage;
-use App\Filament\Pages\RekonsiliasiBankPage;
 use App\Filament\Pages\MyDashboard;
+use App\Filament\Pages\RekonsiliasiBankPage;
+use App\Filament\Resources\JournalEntryResource;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -36,6 +37,9 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Blue,
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->resources([
+                JournalEntryResource::class,
+            ])
             // ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages') // Commented out to avoid Livewire component conflicts
             ->pages([
                 MyDashboard::class,
@@ -68,6 +72,8 @@ class AdminPanelProvider extends PanelProvider
             ->assets([
                 // Custom CSS for sale orders
                 \Filament\Support\Assets\Css::make('custom-sale-order', asset('css/custom-sale-order.css')),
-            ])->databaseNotifications();
+            ])
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s');
     }
 }

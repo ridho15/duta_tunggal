@@ -10,6 +10,23 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Invoice extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
+
+    // Status constants
+    const STATUS_DRAFT = 'draft';
+    const STATUS_SENT = 'sent';
+    const STATUS_PAID = 'paid';
+    const STATUS_PARTIALLY_PAID = 'partially_paid';
+    const STATUS_OVERDUE = 'overdue';
+
+    // Status labels
+    const STATUS_LABELS = [
+        self::STATUS_DRAFT => 'Draft',
+        self::STATUS_SENT => 'Terkirim',
+        self::STATUS_PAID => 'Lunas',
+        self::STATUS_PARTIALLY_PAID => 'Dibayar Sebagian',
+        self::STATUS_OVERDUE => 'Terlambat',
+    ];
+
     protected $table = 'invoices';
     protected $fillable = [
         'invoice_number',
@@ -21,7 +38,7 @@ class Invoice extends Model
         'other_fee',
         'total',
         'due_date',
-        'status', // darft, sent, paid, partially_paid, overdue
+        'status', // draft, sent, paid, partially_paid, overdue
         'ppn_rate',
         'dpp', //Dasar penggunaan pajak,
         'customer_name',
@@ -119,6 +136,16 @@ class Invoice extends Model
         // Otherwise get from relationship
         $customer = $this->customer;
         return $customer ? $customer->phone : '';
+    }
+
+    public function getStatusLabelAttribute()
+    {
+        return self::STATUS_LABELS[$this->status] ?? $this->status;
+    }
+
+    public static function getStatusOptions()
+    {
+        return self::STATUS_LABELS;
     }
 
     protected static function booted()

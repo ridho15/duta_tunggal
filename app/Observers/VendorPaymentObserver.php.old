@@ -52,18 +52,6 @@ class VendorPaymentObserver
         }
     }
 
-    public function deleted(VendorPayment $payment)
-    {
-        // Reverse account payable updates when payment is deleted
-        $this->reverseAccountPayableAndInvoiceStatus($payment);
-
-        // Soft delete related journal entries for data consistency
-        $payment->journalEntries()->delete();
-
-        // Soft delete related vendor payment details
-        $payment->vendorPaymentDetail()->delete();
-    }
-
     public function updateAccountPayableAndInvoiceStatus(VendorPayment $payment)
     {
         // Get all invoices from payment details
@@ -97,10 +85,19 @@ class VendorPaymentObserver
         }
     }
 
+    public function deleted(VendorPayment $payment)
+    {
+        // Reverse account payable updates when payment is deleted
+        $this->reverseAccountPayableAndInvoiceStatus($payment);
+        
+        // Note: Journal entries are kept for audit trail
+        // They can be manually reversed if needed
+    }
+
     public function reverseAccountPayableAndInvoiceStatus(VendorPayment $payment)
     {
-        // Get all invoices from payment details (including soft deleted ones)
-        $paymentDetails = $payment->vendorPaymentDetail()->withTrashed()->get();
+        // Get all invoices from payment details
+        $paymentDetails = $payment->vendorPaymentDetail()->get();
 
         foreach ($paymentDetails as $detail) {
             $invoiceId = $detail->invoice_id;
@@ -111,10 +108,16 @@ class VendorPaymentObserver
             if (!$accountPayable) {
                 continue; // Skip if AP not found
             }
-
-            // Subtract the payment amount directly from paid and add to remaining
-            $newPaid = max(0, $accountPayable->paid - $paidAmount);
-            $newRemaining = $accountPayable->total - $newPaid;
+            
+            // Recalculate paid and remaining after removing this payment
+            $totalPaidForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+                ->whereHas('vendorPayment', function($query) {
+                    $query->whereNull('deleted_at'); // Only count non-deleted payments
+                })
+                ->sum('amount');
+                
+            $newPaid = min($totalPaidForInvoice, $accountPayable->total);
+            $newRemaining = max(0, $accountPayable->total - $newPaid);
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
@@ -123,82 +126,56 @@ class VendorPaymentObserver
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : 'unpaid');
+                $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : $accountPayable->invoice->status);
                 $accountPayable->invoice->save();
             }
         }
     }
 
-    protected function createPaymentDetailsFromSelectedInvoices(VendorPayment $payment)
+    public function deleted(VendorPayment $payment)
     {
-        $selectedInvoices = $payment->selected_invoices;
-        if (!$selectedInvoices) {
-            return;
-        }
+        // Reverse account payable updates when payment is deleted
+        $this->reverseAccountPayableAndInvoiceStatus($payment);
+        
+        // Note: Journal entries are kept for audit trail
+        // They can be manually reversed if needed
+    }
 
-        if (!is_array($selectedInvoices)) {
-            $selectedInvoices = json_decode($selectedInvoices, true) ?? [];
-        }
+    public function reverseAccountPayableAndInvoiceStatus(VendorPayment $payment)
+    {
+        // Get all invoices from payment details
+        $paymentDetails = $payment->vendorPaymentDetail()->get();
 
-        if (empty($selectedInvoices)) {
-            return;
-        }
+        foreach ($paymentDetails as $detail) {
+            $invoiceId = $detail->invoice_id;
+            $paidAmount = $detail->amount;
 
-        // Handle different data formats:
-        // 1. Array of invoice IDs: [1, 2, 3]
-        // 2. Array of objects: [['invoice_id' => 1, 'amount' => 1000], ...]
-        $invoiceIds = [];
-        $hasPaymentDetails = false;
-
-        foreach ($selectedInvoices as $item) {
-            if (is_numeric($item)) {
-                // Format 1: direct invoice ID
-                $invoiceIds[] = (int) $item;
-            } elseif (is_array($item) && isset($item['invoice_id'])) {
-                // Format 2: object with invoice_id
-                $invoiceIds[] = (int) $item['invoice_id'];
-                $hasPaymentDetails = true;
-            } elseif (is_object($item) && isset($item->invoice_id)) {
-                // Format 2: object with invoice_id
-                $invoiceIds[] = (int) $item->invoice_id;
-                $hasPaymentDetails = true;
+            // Update Account Payable - subtract the payment amount
+            $accountPayable = \App\Models\AccountPayable::where('invoice_id', $invoiceId)->first();
+            if (!$accountPayable) {
+                continue; // Skip if AP not found
             }
-        }
+            
+            // Recalculate paid and remaining after removing this payment
+            $totalPaidForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+                ->whereHas('vendorPayment', function($query) {
+                    $query->whereNull('deleted_at'); // Only count non-deleted payments
+                })
+                ->sum('amount');
+                
+            $newPaid = min($totalPaidForInvoice, $accountPayable->total);
+            $newRemaining = max(0, $accountPayable->total - $newPaid);
 
-        $invoiceIds = array_unique($invoiceIds);
+            $accountPayable->paid = $newPaid;
+            $accountPayable->remaining = $newRemaining;
+            $accountPayable->status = $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+            $accountPayable->save();
 
-        if (empty($invoiceIds)) {
-            return;
-        }
-
-        $invoices = \App\Models\Invoice::whereIn('id', $invoiceIds)
-            ->with('accountPayable')
-            ->get();
-
-        // If we already have payment details format, don't create additional details
-        if ($hasPaymentDetails) {
-            return;
-        }
-
-        $totalPayment = $payment->total_payment ?? 0;
-        $remainingPayment = $totalPayment;
-
-        foreach ($invoices as $invoice) {
-            if ($remainingPayment <= 0) break;
-
-            $remainingAmount = $invoice->accountPayable->remaining ?? $invoice->total;
-            $paymentAmount = min($remainingAmount, $remainingPayment);
-
-            \App\Models\VendorPaymentDetail::create([
-                'vendor_payment_id' => $payment->id,
-                'invoice_id' => $invoice->id,
-                'amount' => $paymentAmount,
-                'method' => $payment->payment_method ?? 'Cash',
-                'payment_date' => $payment->payment_date,
-                'coa_id' => $payment->coa_id,
-            ]);
-
-            $remainingPayment -= $paymentAmount;
+            // Sync invoice status with AP
+            if ($accountPayable->invoice) {
+                $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : $accountPayable->invoice->status);
+                $accountPayable->invoice->save();
+            }
         }
     }
 }

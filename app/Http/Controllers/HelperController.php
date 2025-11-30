@@ -185,17 +185,6 @@ class HelperController extends Controller
                 'request',
                 'response'
             ],
-            'manufacturing order item' => [
-                'view any',
-                'view',
-                'create',
-                'update',
-                'delete',
-                'restore',
-                'force-delete',
-                'request',
-                'response'
-            ],
             'quality control' => [
                 'view any',
                 'view',

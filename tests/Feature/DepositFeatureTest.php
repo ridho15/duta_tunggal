@@ -493,4 +493,259 @@ class DepositFeatureTest extends TestCase
         $this->assertCount(2, $customerDeposits);
         $this->assertEquals(5000000, $customerDeposits->sum('remaining_amount'));
     }
+
+    public function test_deposit_deletion_cascades_to_journal_entries()
+    {
+        // Setup
+        $customer = Customer::factory()->create();
+        $coa = \App\Models\ChartOfAccount::factory()->create();
+
+        // Create deposit
+        $deposit = Deposit::factory()->create([
+            'from_model_type' => Customer::class,
+            'from_model_id' => $customer->id,
+            'amount' => 1000000,
+            'used_amount' => 0,
+            'remaining_amount' => 1000000,
+            'coa_id' => $coa->id,
+            'status' => 'active',
+            'created_by' => $this->user->id,
+        ]);
+
+        // Create journal entries for the deposit (simulating what happens in real scenario)
+        $journalEntry1 = JournalEntry::factory()->create([
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'debit' => 1000000,
+            'credit' => 0,
+            'journal_type' => 'deposit',
+        ]);
+
+        $journalEntry2 = JournalEntry::factory()->create([
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'debit' => 0,
+            'credit' => 1000000,
+            'journal_type' => 'deposit',
+        ]);
+
+        // Verify journal entries exist
+        $this->assertDatabaseHas('journal_entries', [
+            'id' => $journalEntry1->id,
+            'deleted_at' => null,
+        ]);
+        $this->assertDatabaseHas('journal_entries', [
+            'id' => $journalEntry2->id,
+            'deleted_at' => null,
+        ]);
+
+        // Delete the deposit
+        $deposit->delete();
+
+        // Verify deposit is soft deleted
+        $this->assertSoftDeleted($deposit);
+
+        // Verify journal entries are also soft deleted
+        $this->assertSoftDeleted($journalEntry1);
+        $this->assertSoftDeleted($journalEntry2);
+
+        // Verify they are not in normal queries
+        $this->assertDatabaseMissing('journal_entries', [
+            'id' => $journalEntry1->id,
+            'deleted_at' => null,
+        ]);
+        $this->assertDatabaseMissing('journal_entries', [
+            'id' => $journalEntry2->id,
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_deposit_restoration_cascades_to_journal_entries()
+    {
+        // Setup
+        $customer = Customer::factory()->create();
+        $coa = \App\Models\ChartOfAccount::factory()->create();
+
+        // Create deposit
+        $deposit = Deposit::factory()->create([
+            'from_model_type' => Customer::class,
+            'from_model_id' => $customer->id,
+            'amount' => 1000000,
+            'used_amount' => 0,
+            'remaining_amount' => 1000000,
+            'coa_id' => $coa->id,
+            'status' => 'active',
+            'created_by' => $this->user->id,
+        ]);
+
+        // Create journal entries for the deposit
+        $journalEntry1 = JournalEntry::factory()->create([
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'debit' => 1000000,
+            'credit' => 0,
+            'journal_type' => 'deposit',
+        ]);
+
+        $journalEntry2 = JournalEntry::factory()->create([
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'debit' => 0,
+            'credit' => 1000000,
+            'journal_type' => 'deposit',
+        ]);
+
+        // Delete the deposit (this should cascade to journal entries)
+        $deposit->delete();
+
+        // Verify both are soft deleted
+        $this->assertSoftDeleted($deposit);
+        $this->assertSoftDeleted($journalEntry1);
+        $this->assertSoftDeleted($journalEntry2);
+
+        // Restore the deposit
+        $deposit->restore();
+
+        // Verify deposit is restored
+        $this->assertDatabaseHas('deposits', [
+            'id' => $deposit->id,
+            'deleted_at' => null,
+        ]);
+
+        // Verify journal entries are also restored
+        $this->assertDatabaseHas('journal_entries', [
+            'id' => $journalEntry1->id,
+            'deleted_at' => null,
+        ]);
+        $this->assertDatabaseHas('journal_entries', [
+            'id' => $journalEntry2->id,
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_deposit_amount_update_adjusts_journal_entries()
+    {
+        // Setup
+        $customer = Customer::factory()->create();
+        $coa = \App\Models\ChartOfAccount::factory()->create();
+
+        // Create deposit
+        $deposit = Deposit::factory()->create([
+            'from_model_type' => Customer::class,
+            'from_model_id' => $customer->id,
+            'amount' => 1000000,
+            'used_amount' => 0,
+            'remaining_amount' => 1000000,
+            'coa_id' => $coa->id,
+            'status' => 'active',
+            'created_by' => $this->user->id,
+        ]);
+
+        // Manually create journal entries as they would be created during deposit creation
+        // For customer deposit: debit kas/bank, credit hutang titipan
+        $journalEntry1 = JournalEntry::create([
+            'coa_id' => $coa->id,
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'reference' => 'DEP-' . $deposit->id,
+            'debit' => 1000000,
+            'credit' => 0,
+            'journal_type' => 'deposit',
+            'date' => now(),
+            'description' => 'Deposit dari customer - ' . $customer->name,
+        ]);
+
+        $journalEntry2 = JournalEntry::create([
+            'coa_id' => 1, // dummy coa for liability
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'reference' => 'DEP-' . $deposit->id,
+            'debit' => 0,
+            'credit' => 1000000,
+            'journal_type' => 'deposit',
+            'date' => now(),
+            'description' => 'Deposit dari customer - ' . $customer->name,
+        ]);
+
+        // Verify initial journal entries
+        $this->assertEquals(1000000, $journalEntry1->fresh()->debit);
+        $this->assertEquals(1000000, $journalEntry2->fresh()->credit);
+
+        // Update deposit amount
+        $deposit->update(['amount' => 2000000]);
+
+        // Verify journal entries are updated
+        $this->assertEquals(2000000, $journalEntry1->fresh()->debit);
+        $this->assertEquals(2000000, $journalEntry2->fresh()->credit);
+
+        // Verify deposit log is created
+        $this->assertDatabaseHas('deposit_logs', [
+            'deposit_id' => $deposit->id,
+            'type' => 'add',
+            'amount' => 1000000, // Difference
+        ]);
+    }
+
+    public function test_supplier_deposit_amount_update_adjusts_journal_entries()
+    {
+        // Setup
+        $supplier = Supplier::factory()->create();
+        $coa = \App\Models\ChartOfAccount::factory()->create();
+
+        // Create deposit
+        $deposit = Deposit::factory()->create([
+            'from_model_type' => Supplier::class,
+            'from_model_id' => $supplier->id,
+            'amount' => 500000,
+            'used_amount' => 0,
+            'remaining_amount' => 500000,
+            'coa_id' => $coa->id,
+            'status' => 'active',
+            'created_by' => $this->user->id,
+        ]);
+
+        // Manually create journal entries as they would be created during deposit creation
+        // For supplier deposit: debit uang muka, credit kas/bank
+        $journalEntry1 = JournalEntry::create([
+            'coa_id' => $coa->id,
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'reference' => 'DEP-' . $deposit->id,
+            'debit' => 500000,
+            'credit' => 0,
+            'journal_type' => 'deposit',
+            'date' => now(),
+            'description' => 'Deposit ke supplier - ' . $supplier->name,
+        ]);
+
+        $journalEntry2 = JournalEntry::create([
+            'coa_id' => 1, // dummy coa for bank
+            'source_type' => Deposit::class,
+            'source_id' => $deposit->id,
+            'reference' => 'DEP-' . $deposit->id,
+            'debit' => 0,
+            'credit' => 500000,
+            'journal_type' => 'deposit',
+            'date' => now(),
+            'description' => 'Pembayaran deposit ke supplier - ' . $supplier->name,
+        ]);
+
+        // Verify initial journal entries
+        $this->assertEquals(500000, $journalEntry1->fresh()->debit);
+        $this->assertEquals(500000, $journalEntry2->fresh()->credit);
+
+        // Update deposit amount
+        $deposit->update(['amount' => 750000]);
+
+        // Verify journal entries are updated
+        $this->assertEquals(750000, $journalEntry1->fresh()->debit);
+        $this->assertEquals(750000, $journalEntry2->fresh()->credit);
+
+        // Verify deposit log is created
+        $this->assertDatabaseHas('deposit_logs', [
+            'deposit_id' => $deposit->id,
+            'type' => 'add',
+            'amount' => 250000, // Difference
+        ]);
+    }
 }

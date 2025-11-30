@@ -13,7 +13,7 @@ class ListPurchaseInvoices extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()->label('Buat Purchase Invoice')->icon('heroicon-o-plus'),
         ];
     }
 }

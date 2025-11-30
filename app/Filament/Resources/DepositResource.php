@@ -69,7 +69,10 @@ class DepositResource extends Resource
                                     ])
                                     ->afterStateUpdated(function ($set) {
                                         $set('from_model_id', null);
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Tipe entitas (Supplier/Customer) harus dipilih.'
+                                    ]),
 
                                 Select::make('from_model_id')
                                     ->label('From')
@@ -88,7 +91,10 @@ class DepositResource extends Resource
                                         }
                                         return [];
                                     })
-                                    ->preload(),
+                                    ->preload()
+                                    ->validationMessages([
+                                        'required' => 'Supplier/Customer harus dipilih.'
+                                    ]),
                             ]),
                     ]),
 
@@ -122,7 +128,12 @@ class DepositResource extends Resource
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $usedAmount = $get('used_amount') ?? 0;
                                 $set('remaining_amount', $state - $usedAmount);
-                            }),
+                            })
+                            ->validationMessages([
+                                'required' => 'Jumlah deposit harus diisi.',
+                                'numeric' => 'Jumlah deposit harus berupa angka.',
+                                'min' => 'Jumlah deposit minimal :min.'
+                            ]),
                     ]),
 
                 Section::make()
@@ -178,7 +189,10 @@ class DepositResource extends Resource
                             })
                             ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
                                 return "({$chartOfAccount->code}) {$chartOfAccount->name}";
-                            }),
+                            })
+                            ->validationMessages([
+                                'required' => 'Chart of Account untuk deposit harus dipilih.'
+                            ]),
 
                         Select::make('payment_coa_id')
                             ->label('Payment COA (Kas/Bank)')
@@ -210,7 +224,10 @@ class DepositResource extends Resource
                             })
                             ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
                                 return "({$chartOfAccount->code}) {$chartOfAccount->name}";
-                            }),
+                            })
+                            ->validationMessages([
+                                'required' => 'Chart of Account untuk pembayaran (Kas/Bank) harus dipilih.'
+                            ]),
                     ]),
 
                 // Hidden fields for backward compatibility
@@ -511,8 +528,15 @@ class DepositResource extends Resource
                                             ->numeric()
                                             ->default(0)
                                             ->required()
+                                            ->rules([
+                                                'required',
+                                                'numeric',
+                                                'min:1'
+                                            ])
                                             ->validationMessages([
-                                                'required' => 'Total tidak boleh kosong'
+                                                'required' => 'Total penambahan saldo tidak boleh kosong',
+                                                'numeric' => 'Total penambahan saldo harus berupa angka',
+                                                'min' => 'Total penambahan saldo minimal :min'
                                             ]),
                                         Textarea::make('note')
                                             ->label('Catatan')
@@ -561,7 +585,9 @@ class DepositResource extends Resource
                                                 'min:1'
                                             ])
                                             ->validationMessages([
-                                                'required' => 'Total tidak boleh kosong'
+                                                'required' => 'Total pengurangan saldo tidak boleh kosong',
+                                                'numeric' => 'Total pengurangan saldo harus berupa angka',
+                                                'min' => 'Total pengurangan saldo minimal :min'
                                             ]),
                                         Textarea::make('note')
                                             ->label('Catatan')
