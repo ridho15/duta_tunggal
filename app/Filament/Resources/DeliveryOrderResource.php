@@ -36,7 +36,6 @@ use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\DateFilter;
 
 class DeliveryOrderResource extends Resource
 {
@@ -450,8 +449,6 @@ class DeliveryOrderResource extends Resource
                         'closed' => 'Closed',
                         'reject' => 'Reject',
                     ]),
-                DateFilter::make('delivery_date')
-                    ->label('Delivery Date'),
                 SelectFilter::make('driver_id')
                     ->relationship('driver', 'name')
                     ->label('Driver')
