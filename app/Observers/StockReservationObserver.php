@@ -13,6 +13,11 @@ class StockReservationObserver
      */
     public function created(StockReservation $stockReservation): void
     {
+        Log::info('StockReservationObserver: created event triggered', [
+            'reservation_id' => $stockReservation->id,
+            'material_issue_id' => $stockReservation->material_issue_id,
+            'quantity' => $stockReservation->quantity,
+        ]);
         $this->updateReservedStock($stockReservation, 'increment');
     }
 

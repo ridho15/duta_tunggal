@@ -44,9 +44,6 @@ class ManufacturingJournalTest extends TestCase
         $user = \App\Models\User::factory()->create();
 
         $mo = ManufacturingOrder::factory()->create([
-            'product_id' => Product::factory()->create(['uom_id' => $uom->id])->id,
-            'warehouse_id' => $warehouse->id,
-            'quantity' => 1,
             'status' => 'in_progress',
         ]);
 
@@ -107,9 +104,6 @@ class ManufacturingJournalTest extends TestCase
         $warehouse = Warehouse::factory()->create();
 
         $mo = ManufacturingOrder::factory()->create([
-            'product_id' => Product::factory()->create(['uom_id' => $uom->id])->id,
-            'warehouse_id' => $warehouse->id,
-            'quantity' => 1,
             'status' => 'in_progress',
         ]);
 

@@ -138,9 +138,11 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\SaleOrder' => 'Sales Order',
                                 'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
                                 'App\\Models\\DeliveryOrder' => 'Delivery Order',
+                                'App\\Models\\MaterialIssue' => 'Material Issue',
                                 'App\\Models\\VendorPayment' => 'Vendor Payment',
                                 'App\\Models\\CustomerReceipt' => 'Customer Receipt',
                                 'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
+                                'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
                                 'App\\Models\\StockTransfer' => 'Stock Transfer',
                                 'App\\Models\\Asset' => 'Asset',
                                 'App\\Models\\Deposit' => 'Deposit',
@@ -170,9 +172,11 @@ class JournalEntryResource extends Resource
                                         'App\\Models\\SaleOrder' => 'so_number',
                                         'App\\Models\\ManufacturingOrder' => 'mo_number',
                                         'App\\Models\\DeliveryOrder' => 'do_number',
+                                        'App\\Models\\MaterialIssue' => 'issue_number',
                                         'App\\Models\\VendorPayment' => 'reference',
-                                        'App\\Models\\CustomerReceipt' => 'reference',
+                                        'App\\Models\\CustomerReceipt' => 'id',
                                         'App\\Models\\CashBankTransaction' => 'reference',
+                                        'App\\Models\\CustomerReceiptItem' => 'id',
                                         'App\\Models\\StockTransfer' => 'transfer_number',
                                         'App\\Models\\Asset' => 'asset_code',
                                         'App\\Models\\Deposit' => 'deposit_number',
@@ -195,6 +199,17 @@ class JournalEntryResource extends Resource
                                         case 'App\\Models\\DeliveryOrder':
                                             $query->where('status', 'approved');
                                             break;
+                                        case 'App\\Models\\MaterialIssue':
+                                            $query->where('status', 'completed');
+                                            break;
+                                        case 'App\\Models\\CustomerReceipt':
+                                            $query->whereIn('status', ['Paid', 'Partial']);
+                                            break;
+                                        case 'App\\Models\\CustomerReceiptItem':
+                                            $query->whereHas('customerReceipt', function($q) {
+                                                $q->whereIn('status', ['Paid', 'Partial']);
+                                            });
+                                            break;
                                     }
 
                                     return $query->pluck($displayField, 'id')
@@ -205,9 +220,11 @@ class JournalEntryResource extends Resource
                                                          'App\\Models\\SaleOrder' => 'SO',
                                                          'App\\Models\\ManufacturingOrder' => 'MO',
                                                          'App\\Models\\DeliveryOrder' => 'DO',
+                                                         'App\\Models\\MaterialIssue' => 'MI',
                                                          'App\\Models\\VendorPayment' => 'VP',
                                                          'App\\Models\\CustomerReceipt' => 'CR',
                                                          'App\\Models\\CashBankTransaction' => 'CBT',
+                                                         'App\\Models\\CustomerReceiptItem' => 'CRI',
                                                          'App\\Models\\StockTransfer' => 'ST',
                                                          'App\\Models\\Asset' => 'ASSET',
                                                          'App\\Models\\Deposit' => 'DEP',
@@ -420,9 +437,11 @@ class JournalEntryResource extends Resource
                         'App\\Models\\SaleOrder' => 'info',
                         'App\\Models\\ManufacturingOrder' => 'warning',
                         'App\\Models\\DeliveryOrder' => 'primary',
+                        'App\\Models\\MaterialIssue' => 'purple',
                         'App\\Models\\VendorPayment' => 'danger',
                         'App\\Models\\CustomerReceipt' => 'success',
                         'App\\Models\\CashBankTransaction' => 'gray',
+                        'App\\Models\\CustomerReceiptItem' => 'secondary',
                         'App\\Models\\StockTransfer' => 'secondary',
                         'App\\Models\\Asset' => 'warning',
                         'App\\Models\\Deposit' => 'primary',
@@ -434,9 +453,11 @@ class JournalEntryResource extends Resource
                             'App\\Models\\SaleOrder' => 'Sales Order',
                             'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
                             'App\\Models\\DeliveryOrder' => 'Delivery Order',
+                            'App\\Models\\MaterialIssue' => 'Material Issue',
                             'App\\Models\\VendorPayment' => 'Vendor Payment',
                             'App\\Models\\CustomerReceipt' => 'Customer Receipt',
                             'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
+                            'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
                             'App\\Models\\StockTransfer' => 'Stock Transfer',
                             'App\\Models\\Asset' => 'Asset',
                             'App\\Models\\Deposit' => 'Deposit',
@@ -461,9 +482,11 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\SaleOrder' => 'so_number',
                                 'App\\Models\\ManufacturingOrder' => 'mo_number',
                                 'App\\Models\\DeliveryOrder' => 'do_number',
+                                'App\\Models\\MaterialIssue' => 'issue_number',
                                 'App\\Models\\VendorPayment' => 'reference',
-                                'App\\Models\\CustomerReceipt' => 'reference',
+                                'App\\Models\\CustomerReceipt' => 'id',
                                 'App\\Models\\CashBankTransaction' => 'reference',
+                                'App\\Models\\CustomerReceiptItem' => 'id',
                                 'App\\Models\\StockTransfer' => 'transfer_number',
                                 'App\\Models\\Asset' => 'asset_code',
                                 'App\\Models\\Deposit' => 'deposit_number',
@@ -482,9 +505,9 @@ class JournalEntryResource extends Resource
                     }),
 
                 Tables\Columns\TextColumn::make('cabang.nama')
-                    ->label('Branch')
-                    ->formatStateUsing(fn ($state, $record) => $record->cabang ? ($record->cabang->code . ' - ' . $record->cabang->nama) : '-')
-                    ->searchable(['cabang.code', 'cabang.nama']),
+                    ->label('Cabang')
+                    ->formatStateUsing(fn ($state, $record) => $record->cabang ? ($record->cabang->kode . ' - ' . $record->cabang->nama) : '-')
+                    ->searchable(['cabang.kode', 'cabang.nama']),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created At')
@@ -504,6 +527,10 @@ class JournalEntryResource extends Resource
                         'payment' => 'Payment',
                         'receipt' => 'Receipt',
                         'manufacturing' => 'Manufacturing',
+                        'manufacturing_issue' => 'Manufacturing Issue',
+                        'manufacturing_return' => 'Manufacturing Return',
+                        'manufacturing_completion' => 'Manufacturing Completion',
+                        'manufacturing_allocation' => 'Manufacturing Allocation',
                         'inventory' => 'Inventory',
                         'adjustment' => 'Adjustment',
                     ]),

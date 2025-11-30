@@ -27,8 +27,15 @@ class StockReservationService
         ]);
 
         DB::transaction(function () use ($materialIssue) {
-            // Delete existing reservations for this material issue
-            StockReservation::where('material_issue_id', $materialIssue->id)->delete();
+            // Check if reservations already exist for this material issue
+            $existingCount = StockReservation::where('material_issue_id', $materialIssue->id)->count();
+            if ($existingCount > 0) {
+                Log::info('Reservations already exist for material issue, skipping creation', [
+                    'material_issue_id' => $materialIssue->id,
+                    'existing_count' => $existingCount,
+                ]);
+                return;
+            }
 
             // Create new reservations for each item
             foreach ($materialIssue->items as $index => $item) {
@@ -131,8 +138,7 @@ class StockReservationService
                     ->first();
 
                 if ($inventoryStock) {
-                    // Increment available stock and decrement reserved stock
-                    $inventoryStock->increment('qty_available', $reservation->quantity);
+                    // Only decrement reserved stock (stock is consumed, not returned to available)
                     $inventoryStock->decrement('qty_reserved', $reservation->quantity);
 
                     Log::info('Manually updated stock for consumed reservation', [

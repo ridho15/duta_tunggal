@@ -146,14 +146,14 @@ class BillOfMaterialResource extends Resource
                                     ->indonesianMoney()
                                     ->default(0)
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($set, $get) => self::updateTotalCost($set, $get)),
+                                    ->afterStateUpdated(fn($set, $get) => self::updateTotalCost($set, $get)),
                                 TextInput::make('overhead_cost')
                                     ->label('Biaya Overhead')
                                     ->numeric()
                                     ->default(0)
                                     ->reactive()
                                     ->indonesianMoney()
-                                    ->afterStateUpdated(fn ($state, $set, $get) => self::updateTotalCost($set, $get)),
+                                    ->afterStateUpdated(fn($state, $set, $get) => self::updateTotalCost($set, $get)),
                                 Placeholder::make('material_cost_display')
                                     ->label('Biaya Material')
                                     ->reactive()
@@ -258,6 +258,19 @@ class BillOfMaterialResource extends Resource
                                 return $action->color('primary')
                                     ->icon('heroicon-o-plus-circle');
                             })
+                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data) {
+                                // Ensure numeric values are stored correctly
+                                if (isset($data['unit_price'])) {
+                                    $data['unit_price'] = HelperController::parseIndonesianMoney($data['unit_price']);
+                                }
+                                if (isset($data['subtotal'])) {
+                                    $data['subtotal'] = HelperController::parseIndonesianMoney($data['subtotal']);
+                                }
+                                if (isset($data['quantity'])) {
+                                    $data['quantity'] = (float) $data['quantity'];
+                                }
+                                return $data;
+                            })
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data) {
                                 $listConversions = [];
                                 $product = Product::find($data['product_id']);
@@ -271,13 +284,13 @@ class BillOfMaterialResource extends Resource
 
                                 // Convert string values to numeric for proper calculations
                                 if (isset($data['unit_price'])) {
-                                    $data['unit_price'] = (float) $data['unit_price'];
+                                    $data['unit_price'] = HelperController::parseIndonesianMoney($data['unit_price']);
                                 }
                                 if (isset($data['quantity'])) {
                                     $data['quantity'] = (float) $data['quantity'];
                                 }
                                 if (isset($data['subtotal'])) {
-                                    $data['subtotal'] = (float) $data['subtotal'];
+                                    $data['subtotal'] = HelperController::parseIndonesianMoney($data['subtotal']);
                                 }
                                 return $data;
                             })
@@ -341,30 +354,30 @@ class BillOfMaterialResource extends Resource
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get) {
-                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+                                        $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
                                         $quantity = (float) ($get('quantity') ?? 0);
-                                        $set('subtotal', $unitPrice * $quantity);
+                                        $set('subtotal', number_format($unitPrice * $quantity, 2, ',', '.'));
                                         self::updateTotalCost($set, $get);
                                     })
                                     ->default(0),
                                 TextInput::make('unit_price')
                                     ->label('Harga per Satuan')
-                                    ->numeric()
+                                    ->string()
                                     ->indonesianMoney()
                                     ->disabled()
                                     ->dehydrated()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get) {
-                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+                                        $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
                                         $quantity = (float) ($get('quantity') ?? 0);
                                         $set('subtotal', $unitPrice * $quantity);
                                         self::updateTotalCost($set, $get);
                                     }),
                                 TextInput::make('subtotal')
                                     ->label('Subtotal')
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->disabled()
+                                    ->string()
                                     ->dehydrated()
                                     ->reactive(),
                                 Textarea::make('note')
@@ -540,13 +553,13 @@ class BillOfMaterialResource extends Resource
         $materialCost = 0;
         $items = $get('items') ?? [];
         foreach ($items as $item) {
-            $unitPrice = (float) ($item['unit_price'] ?? 0);
+            $unitPrice = HelperController::parseIndonesianMoney($item['unit_price']);
             $quantity = (float) ($item['quantity'] ?? 0);
             $materialCost += ($unitPrice * $quantity);
         }
 
-        $laborCost = (float) $get('labor_cost');
-        $overheadCost = (float) $get('overhead_cost');
+        $laborCost = HelperController::parseIndonesianMoney($get('labor_cost'));
+        $overheadCost = HelperController::parseIndonesianMoney($get('overhead_cost'));
         $totalCost = $materialCost + $laborCost + $overheadCost;
 
         $set('total_cost', $totalCost);
@@ -556,7 +569,7 @@ class BillOfMaterialResource extends Resource
     {
         $items = $get('items') ?? [];
         foreach ($items as $index => $item) {
-            $unitPrice = (float) ($item['unit_price'] ?? 0);
+            $unitPrice = HelperController::parseIndonesianMoney($item['unit_price']);
             $quantity = (float) ($item['quantity'] ?? 0);
             $subtotal = $unitPrice * $quantity;
             $items[$index]['subtotal'] = $subtotal;

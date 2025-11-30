@@ -80,4 +80,18 @@ class QualityControl extends Model
     {
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
     }
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($qualityControl) {
+            // Cascade delete related stock movement and return product
+            $qualityControl->stockMovement()->delete();
+            $qualityControl->returnProduct()->delete();
+        });
+    }
 }

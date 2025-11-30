@@ -6,6 +6,7 @@ use App\Filament\Resources\ProductionPlanResource;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class CreateProductionPlan extends CreateRecord
 {
@@ -32,6 +33,13 @@ class CreateProductionPlan extends CreateRecord
     {
         if ($this->record->status === 'scheduled') {
             try {
+                $manufacturingService = app(\App\Services\ManufacturingService::class);
+                $materialIssue = $manufacturingService->createMaterialIssueForProductionPlan($this->record);
+                if ($materialIssue) {
+                    Log::info("MaterialIssue {$materialIssue->issue_number} auto-created for ProductionPlan {$this->record->id}");
+                } else {
+                    Log::warning("Failed to auto-create MaterialIssue for ProductionPlan {$this->record->id}");
+                }
                 \App\Http\Controllers\HelperController::sendNotification(
                     isSuccess: true,
                     title: 'Berhasil',

@@ -48,6 +48,7 @@ use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use Filament\Tables\Table;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TextInput\Mask;
 use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
@@ -84,89 +85,67 @@ class AppServiceProvider extends ServiceProvider
                 ->prefix('Rp')
                 ->placeholder('500.000')
                 ->formatStateUsing(function ($state) {
+                    // Return the numeric value as-is, let Filament handle display formatting
                     if ($state === null || $state === '') {
-                        return '0';
+                        return 0;
                     }
-
-                    // Normalize and parse different possible input formats:
-                    // - "100.000" (thousand separator)
-                    // - "100000.00" (dot as decimal)
-                    // - "100,000.00" or "100.000,00" (mixed separators)
-                    $str = (string) $state;
-                    // Keep only digits, dots and commas
-                    $clean = preg_replace('/[^\d\.,]/', '', $str);
-                    if ($clean === '') {
-                        return '0';
-                    }
-
-                    // If both separators present, assume '.' thousands and ',' decimal
-                    if (strpos($clean, '.') !== false && strpos($clean, ',') !== false) {
-                        $clean = str_replace('.', '', $clean); // remove thousands
-                        $clean = str_replace(',', '.', $clean); // make decimal dot
-                    } elseif (substr_count($clean, '.') > 1) {
-                        // multiple dots -> dots are thousands separators
-                        $clean = str_replace('.', '', $clean);
-                    } elseif (strpos($clean, '.') !== false) {
-                        // single dot: decide if it's thousands (last group length 3)
-                        $parts = explode('.', $clean);
-                        $last = end($parts);
-                        if (strlen($last) === 3) {
-                            // treat dot as thousands separator
-                            $clean = str_replace('.', '', $clean);
-                        }
-                        // otherwise keep dot as decimal separator
-                    } elseif (strpos($clean, ',') !== false) {
-                        // only comma present: decide if it's thousands (group length 3)
-                        $parts = explode(',', $clean);
-                        $last = end($parts);
-                        if (strlen($last) === 3) {
-                            // treat comma as thousands
-                            $clean = str_replace(',', '', $clean);
-                        } else {
-                            // treat comma as decimal separator
-                            $clean = str_replace(',', '.', $clean);
-                        }
-                    }
-
-                    // Parse to float then format as integer rupiah string (no decimals)
-                    $value = (float) $clean;
-                    return number_format((float)$value, 0, ',', '.');
+                    return number_format(round($state, 2), 0, ',', '.');
                 })
                 ->dehydrateStateUsing(function ($state) {
                     if ($state === null || $state === '') {
                         return 0;
                     }
 
+                    // Parse Indonesian money format input from user
                     $str = (string) $state;
+                    // Keep only digits, dots and commas
                     $clean = preg_replace('/[^\d\.,]/', '', $str);
                     if ($clean === '') {
                         return 0;
                     }
 
-                    if (strpos($clean, '.') !== false && strpos($clean, ',') !== false) {
-                        $clean = str_replace('.', '', $clean);
-                        $clean = str_replace(',', '.', $clean);
-                    } elseif (substr_count($clean, '.') > 1) {
-                        $clean = str_replace('.', '', $clean);
-                    } elseif (strpos($clean, '.') !== false) {
-                        $parts = explode('.', $clean);
-                        $last = end($parts);
-                        if (strlen($last) === 3) {
-                            $clean = str_replace('.', '', $clean);
-                        }
-                    } elseif (strpos($clean, ',') !== false) {
-                        $parts = explode(',', $clean);
-                        $last = end($parts);
-                        if (strlen($last) === 3) {
+                    // Simple approach: remove all separators and treat as integer, then divide by 100 if there are decimal places
+                    // This handles both Indonesian (1.000.000) and American (1,000,000.00) formats
+                    $hasComma = strpos($clean, ',') !== false;
+                    $hasDot = strpos($clean, '.') !== false;
+
+                    if ($hasComma && $hasDot) {
+                        // Both present - determine which is decimal separator
+                        // If dot is followed by 1-2 digits and preceded by 3 digits, it's likely decimal
+                        $dotPos = strrpos($clean, '.');
+                        $afterDot = strlen($clean) - $dotPos - 1;
+                        if ($afterDot >= 1 && $afterDot <= 2) {
+                            // Dot is decimal separator, comma is thousands
                             $clean = str_replace(',', '', $clean);
                         } else {
+                            // Assume Indonesian format: dot is thousands, comma is decimal
+                            $clean = str_replace('.', '', $clean);
                             $clean = str_replace(',', '.', $clean);
+                        }
+                    } elseif ($hasDot) {
+                        // Only dots
+                        if (preg_match('/\.\d{1,2}$/', $clean)) {
+                            // Ends with dot followed by 1-3 digits - dot is decimal
+                            // Remove commas if any (shouldn't be there)
+                            $clean = str_replace(',', '', $clean);
+                        } else {
+                            // Dots are thousands separators
+                            $clean = str_replace('.', '', $clean);
+                        }
+                    } elseif ($hasComma) {
+                        // Only commas
+                        if (preg_match('/,\d{1,2}$/', $clean)) {
+                            // Ends with comma followed by 1-3 digits - comma is decimal
+                            $clean = str_replace(',', '.', $clean);
+                        } else {
+                            // Commas are thousands separators
+                            $clean = str_replace(',', '', $clean);
                         }
                     }
 
-                    // Convert to float then round to nearest whole rupiah and return int
+                    // Return the cleaned float value
                     $value = (float) $clean;
-                    return (int) round($value);
+                    return $value;
                 });
                 // ->helperText('Format: 500.000 (gunakan titik sebagai pemisah ribuan)');
         });

@@ -148,20 +148,17 @@ class ProductResource extends Resource
                         TextInput::make('cost_price')
                             ->label('Harga Beli Asli (Rp)')
                             ->required()
-                            ->numeric()
                             ->indonesianMoney()
                             ->default(0),
                         TextInput::make('sell_price')
                             ->label('Harga Jual (Rp)')
                             ->required()
-                            ->numeric()
                             ->indonesianMoney()
                             ->default(0),
                         TextInput::make('biaya')
                             ->label('Biaya (Rp)')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->default(0),
                         TextInput::make('harga_batas')
                             ->label('Harga Batas (%)')

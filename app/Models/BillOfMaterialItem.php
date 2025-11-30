@@ -23,8 +23,8 @@ class BillOfMaterialItem extends Model
 
     protected $casts = [
         'quantity' => 'decimal:2',
-        'unit_price' => 'decimal:2',
-        'subtotal' => 'decimal:2',
+        'unit_price' => 'string',
+        'subtotal' => 'string',
     ];
 
     public function billOfMaterial()

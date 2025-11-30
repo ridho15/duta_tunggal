@@ -683,9 +683,9 @@ class HelperController extends Controller
         } elseif ($hasDot) {
             // Only dots - could be Indonesian thousand separators or decimal
             if (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
-                // Ends with .digits (1-2 digits) - likely decimal part
+                // Ends with .digits (1-3 digits) - likely decimal part
                 $decimal = $matches[1];
-                $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
+                $integer = preg_replace('/\.\d{1,3}$/', '', $cleaned);
                 $integer = str_replace('.', '', $integer);
             } else {
                 // All dots are thousand separators
@@ -701,7 +701,6 @@ class HelperController extends Controller
 
         // Combine back and return as float
         $numeric = (float)($integer . '.' . $decimal);
-
         return $numeric;
     }
 

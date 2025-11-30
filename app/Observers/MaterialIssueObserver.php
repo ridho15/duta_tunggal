@@ -9,6 +9,7 @@ use App\Models\ManufacturingOrderMaterial;
 use App\Services\ManufacturingJournalService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MaterialIssueObserver
 {
@@ -17,6 +18,12 @@ class MaterialIssueObserver
      */
     public function updated(MaterialIssue $materialIssue): void
     {
+        Log::info('MaterialIssueObserver: updated called', [
+            'material_issue_id' => $materialIssue->id,
+            'status' => $materialIssue->status,
+            'original_status' => $materialIssue->getOriginal('status'),
+        ]);
+
         // Always keep total_cost in sync
         // $materialIssue->updateTotalCost(); // Temporarily disabled for testing
 
@@ -36,8 +43,10 @@ class MaterialIssueObserver
             // Only process if material issue has been approved
             $this->setAllApprovedItemsToCompleted($materialIssue);
             if ($materialIssue->approved_by && $materialIssue->approved_at) {
-                $this->createStockMovements($materialIssue);
+                $this->consumeReservedStock($materialIssue);
+                $this->createStockMovements($materialIssue); // Create stock movements for record keeping
                 $this->generateJournal($materialIssue);
+                $this->createManufacturingOrder($materialIssue); // Create Manufacturing Order automatically
                 // Release reserved stock is now handled by StockReservationService.consumeReservedStockForMaterialIssue
                 // $this->releaseReservedStock($materialIssue);
             }
@@ -112,6 +121,7 @@ class MaterialIssueObserver
                             'material_issue_number' => $materialIssue->issue_number ?? null,
                             'production_plan_id' => $materialIssue->production_plan_id,
                             'manufacturing_order_id' => $materialIssue->manufacturing_order_id,
+                            'skip_stock_update' => true, // Flag to prevent double deduction
                         ]),
                     ]);
                 }
@@ -175,6 +185,9 @@ class MaterialIssueObserver
                 'status' => $materialIssue->status,
             ]);
 
+            $service = app(\App\Services\StockReservationService::class);
+            $service->reserveStockForMaterialIssue($materialIssue);
+
             $materialIssue->loadMissing('items');
 
             foreach ($materialIssue->items as $item) {
@@ -185,7 +198,7 @@ class MaterialIssueObserver
                     ->first();
 
                 if ($inventoryStock) {
-                    \Illuminate\Support\Facades\Log::info('MaterialIssueObserver: stock reservation handled by StockReservationService', [
+                    \Illuminate\Support\Facades\Log::info('MaterialIssueObserver: stock reservation completed', [
                         'inventory_stock_id' => $inventoryStock->id,
                         'product_id' => $item->product_id,
                         'warehouse_id' => $warehouseId,
@@ -209,58 +222,101 @@ class MaterialIssueObserver
     }
 
     /**
-     * Release reserved stock when material issue is completed or rejected
-     * This restores the available stock that was reduced during approval
+     * Consume reserved stock when material issue is completed
      */
-    protected function releaseReservedStock(MaterialIssue $materialIssue): void
+    protected function consumeReservedStock(MaterialIssue $materialIssue): void
     {
         try {
-            $materialIssue->loadMissing('items');
-
-            foreach ($materialIssue->items as $item) {
-                $warehouseId = $item->warehouse_id ?? $materialIssue->warehouse_id;
-
-                $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $warehouseId)
-                    ->first();
-
-                if ($inventoryStock) {
-                    // Check if we have enough reserved stock to release
-                    if ($inventoryStock->qty_reserved >= $item->quantity) {
-                        // Release reserved stock and restore available stock
-                        $inventoryStock->decrement('qty_reserved', $item->quantity);
-                        $inventoryStock->increment('qty_available', $item->quantity);
-
-                        \Illuminate\Support\Facades\Log::info('Released reserved stock and restored available stock', [
-                            'material_issue_id' => $materialIssue->id,
-                            'product_id' => $item->product_id,
-                            'warehouse_id' => $warehouseId,
-                            'quantity' => $item->quantity,
-                            'new_reserved' => $inventoryStock->qty_reserved,
-                            'new_available' => $inventoryStock->qty_available,
-                        ]);
-                    } else {
-                        \Illuminate\Support\Facades\Log::warning('Insufficient reserved stock to release', [
-                            'material_issue_id' => $materialIssue->id,
-                            'product_id' => $item->product_id,
-                            'warehouse_id' => $warehouseId,
-                            'requested' => $item->quantity,
-                            'available_reserved' => $inventoryStock->qty_reserved,
-                        ]);
-                    }
-                } else {
-                    \Illuminate\Support\Facades\Log::warning('Inventory stock not found for release', [
-                        'material_issue_id' => $materialIssue->id,
-                        'product_id' => $item->product_id,
-                        'warehouse_id' => $warehouseId,
-                    ]);
-                }
-            }
+            $service = app(\App\Services\StockReservationService::class);
+            $service->consumeReservedStockForMaterialIssue($materialIssue);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to release reserved stock in MaterialIssueObserver', [
+            \Illuminate\Support\Facades\Log::error('Failed to consume reserved stock in MaterialIssueObserver', [
                 'material_issue_id' => $materialIssue->id,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Create Manufacturing Order automatically when Material Issue is completed
+     */
+    protected function createManufacturingOrder(MaterialIssue $materialIssue): void
+    {
+        try {
+            // Only create MO for material issues that have a production plan
+            if (!$materialIssue->production_plan_id) {
+                Log::info('MaterialIssueObserver: No production plan associated, skipping MO creation', [
+                    'material_issue_id' => $materialIssue->id,
+                ]);
+                return;
+            }
+
+            // Check if Manufacturing Order already exists for this Production Plan
+            $existingMO = ManufacturingOrder::where('production_plan_id', $materialIssue->production_plan_id)->first();
+            if ($existingMO) {
+                Log::info('MaterialIssueObserver: Manufacturing Order already exists for Production Plan', [
+                    'material_issue_id' => $materialIssue->id,
+                    'production_plan_id' => $materialIssue->production_plan_id,
+                    'existing_mo_id' => $existingMO->id,
+                    'existing_mo_number' => $existingMO->mo_number,
+                ]);
+                return;
+            }
+
+            // Load production plan with necessary relationships
+            $productionPlan = $materialIssue->productionPlan;
+            if (!$productionPlan) {
+                Log::warning('MaterialIssueObserver: Production Plan not found, skipping MO creation', [
+                    'material_issue_id' => $materialIssue->id,
+                    'production_plan_id' => $materialIssue->production_plan_id,
+                ]);
+                return;
+            }
+
+            // Generate MO number
+            $manufacturingService = app(\App\Services\ManufacturingService::class);
+            $moNumber = $manufacturingService->generateMoNumber();
+
+            // Prepare items from Material Issue
+            $items = [];
+            foreach ($materialIssue->items as $issueItem) {
+                $items[] = [
+                    'product_id' => $issueItem->product_id,
+                    'uom_id' => $issueItem->uom_id,
+                    'quantity' => $issueItem->quantity,
+                    'notes' => null,
+                ];
+            }
+
+            // Create Manufacturing Order
+            $manufacturingOrder = ManufacturingOrder::create([
+                'mo_number' => $moNumber,
+                'production_plan_id' => $materialIssue->production_plan_id,
+                'start_date' => $productionPlan->start_date,
+                'end_date' => $productionPlan->end_date,
+                'status' => 'draft',
+                'items' => $items,
+            ]);
+
+            // Create warehouse confirmation
+            $manufacturingService->createWarehouseConfirmation($manufacturingOrder);
+
+            Log::info('MaterialIssueObserver: Manufacturing Order created successfully', [
+                'material_issue_id' => $materialIssue->id,
+                'production_plan_id' => $materialIssue->production_plan_id,
+                'manufacturing_order_id' => $manufacturingOrder->id,
+                'mo_number' => $manufacturingOrder->mo_number,
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error('MaterialIssueObserver: Failed to create Manufacturing Order', [
+                'material_issue_id' => $materialIssue->id,
+                'production_plan_id' => $materialIssue->production_plan_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Don't throw exception to prevent breaking the Material Issue completion flow
         }
     }
 }

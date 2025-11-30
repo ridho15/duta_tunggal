@@ -7,10 +7,7 @@ use App\Filament\Resources\MaterialIssueResource\RelationManagers;
 use App\Http\Controllers\HelperController;
 use App\Models\InventoryStock;
 use App\Models\MaterialIssue;
-use App\Models\ManufacturingOrder;
 use App\Models\Product;
-use App\Models\Warehouse;
-use App\Models\UnitOfMeasure;
 use App\Services\ManufacturingService;
 use App\Services\ManufacturingJournalService;
 use Filament\Forms;
@@ -23,10 +20,6 @@ use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Validation\ValidationException;
-use PHPUnit\Metadata\Before;
-use Filament\Tables\Enums\BeforeAfterActions;
 
 class MaterialIssueResource extends Resource
 {
@@ -202,6 +195,13 @@ class MaterialIssueResource extends Resource
                         Forms\Components\Repeater::make('items')
                             ->relationship()
                             ->label('Items')
+                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data) {
+                                // Ensure numeric values are stored correctly
+                                if (isset($data['quantity'])) {
+                                    $data['quantity'] = (float) $data['quantity'];
+                                }
+                                return $data;
+                            })
                             ->mutateRelationshipDataBeforeFillUsing(function ($data) {
                                 if ($data['product_id'] && $data['warehouse_id']) {
                                     $inventoryStock = InventoryStock::where('product_id', $data['product_id'])
@@ -277,6 +277,34 @@ class MaterialIssueResource extends Resource
                                         $cost = HelperController::parseIndonesianMoney($get('cost_per_unit') ?? '0');
                                         $set('total_cost', $qty * $cost);
                                     }),
+                                Forms\Components\TextInput::make('cost_per_unit')
+                                    ->label('Cost Price')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(0)
+                                    ->indonesianMoney()
+                                    ->rules(['required', 'numeric', 'min:0'])
+                                    ->validationMessages([
+                                        'required' => 'Cost Price wajib diisi.',
+                                        'numeric' => 'Cost Price harus berupa angka.',
+                                        'min' => 'Cost Price minimal 0.',
+                                    ])
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get) {
+                                        $qty = (float) $get('quantity');
+                                        $cost = HelperController::parseIndonesianMoney($get('cost_per_unit') ?? '0');
+                                        $set('total_cost', $qty * $cost);
+                                    }),
+                                Forms\Components\TextInput::make('total_cost')
+                                    ->label('Subtotal')
+                                    ->disabled()
+                                    ->indonesianMoney()
+                                    ->dehydrated()
+                                    ->rules(['numeric', 'min:0'])
+                                    ->validationMessages([
+                                        'numeric' => 'Subtotal harus berupa angka.',
+                                        'min' => 'Subtotal minimal 0.',
+                                    ]),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
                                     ->relationship('warehouse', 'name')
@@ -294,7 +322,7 @@ class MaterialIssueResource extends Resource
                                         $productId = $get('product_id');
                                         if ($productId) {
                                             return \App\Models\Warehouse::whereHas('inventoryStock', function ($q) use ($productId) {
-                                                $q->where('product_id', $productId)->whereRaw('qty_available - qty_reserved > 0');
+                                                $q->where('product_id', $productId)->whereRaw('qty_available > 0');
                                             })
                                                 ->orderBy('kode')
                                                 ->limit(50)
@@ -332,13 +360,13 @@ class MaterialIssueResource extends Resource
                                     ->options(function (callable $get) {
                                         $productId = $get('product_id');
                                         $warehouseId = $get('warehouse_id');
-                                        
+
                                         if ($productId && $warehouseId) {
                                             // Get racks that have inventory stock for this product in this warehouse
                                             return \App\Models\Rak::whereHas('inventoryStock', function ($q) use ($productId, $warehouseId) {
                                                 $q->where('product_id', $productId)
-                                                  ->where('warehouse_id', $warehouseId)
-                                                  ->whereRaw('qty_available - qty_reserved > 0');
+                                                    ->where('warehouse_id', $warehouseId)
+                                                    ->whereRaw('qty_available - qty_reserved > 0');
                                             })
                                                 ->orderBy('name')
                                                 ->get()
@@ -347,7 +375,7 @@ class MaterialIssueResource extends Resource
                                                 })
                                                 ->toArray();
                                         }
-                                        
+
                                         if ($warehouseId) {
                                             // If no product selected, show all racks in the warehouse
                                             return \App\Models\Rak::where('warehouse_id', $warehouseId)
@@ -358,7 +386,7 @@ class MaterialIssueResource extends Resource
                                                 })
                                                 ->toArray();
                                         }
-                                        
+
                                         return [];
                                     })
                                     ->getOptionLabelFromRecordUsing(
@@ -625,8 +653,8 @@ class MaterialIssueResource extends Resource
                             if ($currentUser && $currentUser->hasRole('Super Admin')) {
                                 // Super Admin bisa approve dari semua cabang
                                 $warehouseApprover = \App\Models\User::whereHas('permissions', function ($query) {
-                                        $query->where('name', 'approve warehouse');
-                                    })
+                                    $query->where('name', 'approve warehouse');
+                                })
                                     ->where('cabang_id', $record->warehouse->cabang_id ?? null)
                                     ->first();
 
@@ -679,8 +707,8 @@ class MaterialIssueResource extends Resource
 
                             // Users with 'approve warehouse' permission can approve if they are assigned or if no one is assigned
                             return $record->isPendingApproval() &&
-                                   userHasPermission('approve warehouse') &&
-                                   (!$record->approved_by || $record->approved_by === $currentUser->id);
+                                userHasPermission('approve warehouse') &&
+                                (!$record->approved_by || $record->approved_by === $currentUser->id);
                         })
                         ->requiresConfirmation()
                         ->modalHeading('Approve Material Issue')
@@ -725,8 +753,8 @@ class MaterialIssueResource extends Resource
 
                             // Users with 'approve warehouse' permission can reject if they are assigned or if no one is assigned
                             return $record->isPendingApproval() &&
-                                   userHasPermission('approve warehouse') &&
-                                   (!$record->approved_by || $record->approved_by === $currentUser->id);
+                                userHasPermission('approve warehouse') &&
+                                (!$record->approved_by || $record->approved_by === $currentUser->id);
                         })
                         ->requiresConfirmation()
                         ->modalHeading('Reject Material Issue')
@@ -742,8 +770,8 @@ class MaterialIssueResource extends Resource
                                 'approved_by' => null,
                                 'approved_at' => null,
                                 'status' => MaterialIssue::STATUS_DRAFT,
-                                'notes' => ($record->notes ? $record->notes . "\n\n" : '') . 
-                                          "DITOLAK: {$data['rejection_reason']} - " . now()->format('Y-m-d H:i:s'),
+                                'notes' => ($record->notes ? $record->notes . "\n\n" : '') .
+                                    "DITOLAK: {$data['rejection_reason']} - " . now()->format('Y-m-d H:i:s'),
                             ]);
 
                             Notification::make()

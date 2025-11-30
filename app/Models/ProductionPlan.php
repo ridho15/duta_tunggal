@@ -78,6 +78,11 @@ class ProductionPlan extends Model
         return $this->hasMany(MaterialIssue::class, 'production_plan_id');
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     /**
      * Get material requirements from BOM
      */
@@ -307,6 +312,9 @@ class ProductionPlan extends Model
 
             // Cascade delete related manufacturing orders if needed
             $productionPlan->manufacturingOrders()->delete();
+
+            // Cascade delete related journal entries
+            $productionPlan->journalEntries()->delete();
 
         });
     }

@@ -255,7 +255,7 @@ class MaterialIssue extends Model
             // Consume reserved stock when completed
             if ($issue->status === 'completed' && $issue->getOriginal('status') !== 'completed') {
                 try {
-                    $stockReservationService->consumeReservedStockForMaterialIssue($issue);
+                    // $stockReservationService->consumeReservedStockForMaterialIssue($issue); // Moved to MaterialIssueObserver
                     Log::info("Reserved stock consumed for completed MaterialIssue {$issue->id}");
 
                     // Set all approved items to completed
@@ -275,16 +275,47 @@ class MaterialIssue extends Model
             $materialIssue->items()->delete();
             $materialIssue->journalEntry()->delete();
 
-            // Release stock reservations when material issue is deleted
+            // Delete related stock movements
             try {
-                $stockReservationService = app(StockReservationService::class);
-                $stockReservationService->releaseStockReservationsForMaterialIssue($materialIssue);
-                Log::info("Stock reservations released for deleted MaterialIssue {$materialIssue->id}");
+                \App\Models\StockMovement::where('from_model_type', MaterialIssue::class)
+                    ->where('from_model_id', $materialIssue->id)
+                    ->delete();
+                Log::info("Stock movements deleted for deleted MaterialIssue {$materialIssue->id}");
             } catch (\Throwable $e) {
-                Log::error('Failed to release stock reservations for deleted MaterialIssue', [
+                Log::error('Failed to delete stock movements for deleted MaterialIssue', [
                     'material_issue_id' => $materialIssue->id,
                     'error' => $e->getMessage(),
                 ]);
+            }
+
+            // Release and delete stock reservations when material issue is deleted
+            try {
+                $stockReservationService = app(StockReservationService::class);
+                $stockReservationService->releaseStockReservationsForMaterialIssue($materialIssue);
+                \App\Models\StockReservation::where('material_issue_id', $materialIssue->id)->delete();
+                Log::info("Stock reservations released and deleted for deleted MaterialIssue {$materialIssue->id}");
+            } catch (\Throwable $e) {
+                Log::error('Failed to release and delete stock reservations for deleted MaterialIssue', [
+                    'material_issue_id' => $materialIssue->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Reset Production Plan status to draft when Material Issue is deleted
+            if ($materialIssue->production_plan_id) {
+                try {
+                    $productionPlan = $materialIssue->productionPlan;
+                    if ($productionPlan && $productionPlan->status !== 'draft') {
+                        $productionPlan->update(['status' => 'draft']);
+                        Log::info("ProductionPlan {$productionPlan->id} status reset to draft after MaterialIssue {$materialIssue->id} deletion");
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Failed to reset ProductionPlan status for deleted MaterialIssue', [
+                        'material_issue_id' => $materialIssue->id,
+                        'production_plan_id' => $materialIssue->production_plan_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         });
     }

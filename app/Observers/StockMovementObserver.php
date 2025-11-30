@@ -28,6 +28,11 @@ class StockMovementObserver
         $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
         $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
 
+        // Skip stock update if flag is set (e.g., for material issue completed movements)
+        if (isset($stockMovement->meta['skip_stock_update']) && $stockMovement->meta['skip_stock_update']) {
+            return;
+        }
+
         if (in_array($stockMovement->type, $inTypes, true)) {
             $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
             $inventoryStock->save();

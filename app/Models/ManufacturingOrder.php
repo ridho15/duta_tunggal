@@ -18,11 +18,13 @@ class ManufacturingOrder extends Model
         'status', // draft, in_progress, completed
         'start_date',
         'end_date',
+        'items',
     ];
 
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'items' => 'array',
     ];
 
     public function production()
@@ -38,6 +40,11 @@ class ManufacturingOrder extends Model
     public function productionPlan()
     {
         return $this->belongsTo(ProductionPlan::class, 'production_plan_id')->withDefault();
+    }
+
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
     }
 
     /**
@@ -86,5 +93,23 @@ class ManufacturingOrder extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($manufacturingOrder) {
+            // Cascade delete related productions
+            $manufacturingOrder->productions()->each(function ($production) {
+                $production->delete();
+            });
+
+            // Cascade delete related journal entries
+            $manufacturingOrder->journalEntries()->delete();
+        });
     }
 }
