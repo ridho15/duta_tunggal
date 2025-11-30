@@ -177,7 +177,5 @@ class AppServiceProvider extends ServiceProvider
         PurchaseOrder::observe(PurchaseOrderObserver::class);
         Product::observe(ProductObserver::class);
         JournalEntry::observe(JournalEntryObserver::class);
-        Livewire::component('database-notifications', \App\Livewire\DatabaseNotifications::class);
-        Livewire::component('filament.livewire.database-notifications', \App\Livewire\DatabaseNotifications::class);
     }
 }
