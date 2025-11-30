@@ -23,6 +23,20 @@ class CreateSaleOrder extends CreateRecord
 
     protected static ?string $title = 'Buat Penjualan';
 
+    public function mount(int $record = null): void
+    {
+        parent::mount($record);
+
+        // Check if quotation_id is passed in the URL
+        $quotationId = request()->query('quotation_id');
+        if ($quotationId) {
+            $this->form->fill([
+                'quotation_id' => $quotationId,
+                'reference_type' => 2, // Refer Quotation
+            ]);
+        }
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Set created_by to current user

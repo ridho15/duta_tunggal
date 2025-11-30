@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Models\CustomerReceipt;
-use App\Models\CustomerReceiptItem;
+use App\Models\DeliveryOrder;
 use App\Models\Deposit;
 use App\Models\DepositLog;
 use App\Models\FinishedGoodsCompletion;
@@ -20,10 +20,10 @@ use App\Models\VendorPaymentDetail;
 use App\Models\VendorPayment;
 use App\Models\VoucherRequest;
 use App\Models\Asset;
-use App\Models\PurchaseOrder;
+use App\Models\SaleOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\JournalEntry;
-use App\Observers\CustomerReceiptItemObserver;
+use App\Observers\DeliveryOrderObserver;
 use App\Observers\CustomerReceiptObserver;
 use App\Observers\DepositLogObserser;
 use App\Observers\DepositObserver;
@@ -41,7 +41,7 @@ use App\Observers\VendorPaymentDetailObserver;
 use App\Observers\VoucherRequestObserver;
 use App\Observers\AssetObserver;
 use App\Observers\VendorPaymentObserver;
-use App\Observers\PurchaseOrderObserver;
+use App\Observers\SaleOrderObserver;
 use App\Observers\PurchaseReceiptObserver;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Foundation\AliasLoader;
@@ -168,13 +168,15 @@ class AppServiceProvider extends ServiceProvider
         VendorPayment::observe(VendorPaymentObserver::class);
         VendorPaymentDetail::observe(VendorPaymentDetailObserver::class);
         CustomerReceipt::observe(CustomerReceiptObserver::class);
-        CustomerReceiptItem::observe(CustomerReceiptItemObserver::class);
+        // CustomerReceiptItem::observe(CustomerReceiptItemObserver::class);
+        DeliveryOrder::observe(DeliveryOrderObserver::class);
         Deposit::observe(DepositObserver::class);
         DepositLog::observe(DepositLogObserser::class);
         VoucherRequest::observe(VoucherRequestObserver::class);
         Asset::observe(AssetObserver::class);
         PurchaseReceipt::observe(PurchaseReceiptObserver::class);
-        PurchaseOrder::observe(PurchaseOrderObserver::class);
+        // PurchaseOrder::observe(PurchaseOrderObserver::class);
+        SaleOrder::observe(SaleOrderObserver::class);
         Product::observe(ProductObserver::class);
         JournalEntry::observe(JournalEntryObserver::class);
     }

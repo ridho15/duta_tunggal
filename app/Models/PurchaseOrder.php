@@ -114,13 +114,25 @@ class PurchaseOrder extends Model
         static::deleting(function ($purchaseOrder) {
             if ($purchaseOrder->isForceDeleting()) {
                 $purchaseOrder->purchaseOrderItem()->forceDelete();
+                $purchaseOrder->purchaseReceipt()->forceDelete();
+                $purchaseOrder->invoice()->forceDelete();
+                $purchaseOrder->purchaseOrderBiaya()->forceDelete();
+                $purchaseOrder->assets()->forceDelete();
             } else {
                 $purchaseOrder->purchaseOrderItem()->delete();
+                $purchaseOrder->purchaseReceipt()->delete();
+                $purchaseOrder->invoice()->delete();
+                $purchaseOrder->purchaseOrderBiaya()->delete();
+                $purchaseOrder->assets()->delete();
             }
         });
 
         static::restoring(function ($purchaseOrder) {
             $purchaseOrder->purchaseOrderItem()->withTrashed()->restore();
+            $purchaseOrder->purchaseReceipt()->withTrashed()->restore();
+            $purchaseOrder->invoice()->withTrashed()->restore();
+            $purchaseOrder->purchaseOrderBiaya()->withTrashed()->restore();
+            $purchaseOrder->assets()->withTrashed()->restore();
         });
     }
 }

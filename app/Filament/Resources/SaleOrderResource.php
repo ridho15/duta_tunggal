@@ -129,7 +129,10 @@ class SaleOrderResource extends Resource
                                 return $get('options_form') == 2;
                             })
                             ->options(Quotation::where('status', 'approve')->select(['id', 'customer_id', 'quotation_number'])->get()->pluck('quotation_number', 'id'))
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Quotation wajib dipilih'
+                            ]),
                         Select::make('sale_order_id')
                             ->label('Sales Order')
                             ->preload()
@@ -160,7 +163,10 @@ class SaleOrderResource extends Resource
                                 $set('saleOrderItem', $items);
                             })
                             ->options(SaleOrder::select(['id', 'so_number', 'customer_id'])->get()->pluck('so_number', 'id'))
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Sales Order wajib dipilih'
+                            ]),
                         Select::make('customer_id')
                             ->required()
                             ->label('Customer')
@@ -204,6 +210,9 @@ class SaleOrderResource extends Resource
                             ->getOptionLabelFromRecordUsing(function (Customer $customer) {
                                 return "({$customer->code}) {$customer->name}";
                             })
+                            ->validationMessages([
+                                'required' => 'Customer wajib dipilih'
+                            ])
                             ->createOptionForm([
                                 Fieldset::make('Form Customer')
                                     ->schema([
@@ -333,19 +342,33 @@ class SaleOrderResource extends Resource
                                 }))
                             ->maxLength(255),
                         DatePicker::make('order_date')
-                            ->required(),
-                        DatePicker::make('delivery_date'),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Tanggal order wajib diisi'
+                            ]),
+                        DatePicker::make('delivery_date')
+                            ->validationMessages([
+                                'date' => 'Format tanggal pengiriman tidak valid'
+                            ]),
                         TextInput::make('shipped_to')
                             ->label('Shipped To')
                             ->reactive()
-                            ->nullable(),
+                            ->nullable()
+                            ->maxLength(255)
+                            ->validationMessages([
+                                'max' => 'Alamat pengiriman maksimal 255 karakter'
+                            ]),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
                             ->required()
                             ->disabled()
                             ->reactive()
                             ->default(0)
-                            ->numeric()
+                            ->indonesianMoney()
+                            ->validationMessages([
+                                'required' => 'Total amount wajib diisi',
+                                'numeric' => 'Total amount harus berupa angka'
+                            ])
                             ->rule(function ($get) {
                                 return function (string $attribute, $value, \Closure $fail) use ($get) {
                                     $customerId = $get('customer_id');
@@ -377,6 +400,9 @@ class SaleOrderResource extends Resource
                             ->columnSpanFull()
                             ->reactive()
                             ->columns(3)
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data) {
+                                return $data;
+                            })
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
                                 return $data;
                             })
@@ -546,7 +572,6 @@ class SaleOrderResource extends Resource
                                     ->default(0),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
-                                    ->numeric()
                                     ->default(0)
                                     ->indonesianMoney()
                                     ->validationMessages([
@@ -562,6 +587,13 @@ class SaleOrderResource extends Resource
                                     ->numeric()
                                     ->default(0)
                                     ->reactive()
+                                    ->validationMessages([
+                                        'numeric' => 'Discount harus berupa angka',
+                                        'min' => 'Discount minimal 0%',
+                                        'max' => 'Discount maksimal 100%'
+                                    ])
+                                    ->minValue(0)
+                                    ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     })
@@ -570,6 +602,13 @@ class SaleOrderResource extends Resource
                                     ->label('Tax')
                                     ->numeric()
                                     ->reactive()
+                                    ->validationMessages([
+                                        'numeric' => 'Tax harus berupa angka',
+                                        'min' => 'Tax minimal 0%',
+                                        'max' => 'Tax maksimal 100%'
+                                    ])
+                                    ->minValue(0)
+                                    ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     })
@@ -580,6 +619,9 @@ class SaleOrderResource extends Resource
                                     ->reactive()
                                     ->readOnly()
                                     ->default(0)
+                                    ->validationMessages([
+                                        'numeric' => 'Subtotal harus berupa angka'
+                                    ])
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
                                             $component->state(HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, $record->tipe_pajak ?? null));
@@ -815,8 +857,16 @@ class SaleOrderResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
-                        ->color('primary'),
-                    DeleteAction::make(),
+                        ->color('primary')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('update sales order') &&
+                                   in_array($record->status, ['draft', 'request_approve', 'approved']);
+                        }),
+                    DeleteAction::make()
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('delete sales order') &&
+                                   in_array($record->status, ['draft', 'request_approve']);
+                        }),
                     Action::make('request_approve')
                         ->label('Request Approve')
                         ->requiresConfirmation()
@@ -836,7 +886,8 @@ class SaleOrderResource extends Resource
                         ->color('danger')
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request sales order') && ($record->status == 'approved' || $record->status == 'draft');
+                            return Auth::user()->hasPermissionTo('request sales order') &&
+                                   in_array($record->status, ['approved', 'confirmed', 'completed']);
                         })
                         ->form(
                             function ($record) {
@@ -925,8 +976,9 @@ class SaleOrderResource extends Resource
                         ->label('Complete')
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
-                        ->visible(function () {
-                            return Auth::user()->hasRole(['Owner', 'Super Admin']);
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('update sales order') &&
+                                   in_array($record->status, ['approved', 'confirmed']);
                         })
                         ->color('success')
                         ->action(function ($record) {
@@ -939,6 +991,10 @@ class SaleOrderResource extends Resource
                         ->label('Saldo Titip Customer')
                         ->icon('heroicon-o-banknotes')
                         ->color('warning')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('update deposit') &&
+                                   in_array($record->status, ['approved', 'confirmed', 'completed']);
+                        })
                         ->form(function ($record) {
                             if ($record->customer->deposit->id == null) {
                                 return [
@@ -1074,6 +1130,9 @@ class SaleOrderResource extends Resource
                         ->icon('heroicon-o-arrow-path-rounded-square')
                         ->label('Sync Total Amount')
                         ->color('primary')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('update sales order');
+                        })
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->updateTotalAmount($record);

@@ -25,8 +25,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
@@ -174,21 +172,36 @@ class QuotationResource extends Resource
                                         TextInput::make('email')
                                             ->email()
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Email tidak boleh kosong',
+                                                'email' => 'Format email tidak valid'
+                                            ])
                                             ->maxLength(255),
                                         TextInput::make('fax')
                                             ->label('Fax')
-                                            ->required(),
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Fax tidak boleh kosong'
+                                            ]),
                                         TextInput::make('tempo_kredit')
                                             ->numeric()
                                             ->label('Tempo Kredit (Hari)')
                                             ->helperText('Hari')
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Tempo kredit tidak boleh kosong',
+                                                'numeric' => 'Tempo kredit harus berupa angka'
+                                            ])
                                             ->default(0),
                                         TextInput::make('kredit_limit')
                                             ->label('Kredit Limit (Rp.)')
                                             ->default(0)
                                             ->required()
                                             ->numeric()
+                                            ->validationMessages([
+                                                'required' => 'Kredit limit tidak boleh kosong',
+                                                'numeric' => 'Kredit limit harus berupa angka'
+                                            ])
                                             ->indonesianMoney(),
                                         Radio::make('tipe_pembayaran')
                                             ->label('Tipe Bayar Customer')
@@ -197,7 +210,11 @@ class QuotationResource extends Resource
                                                 'Bebas' => 'Bebas',
                                                 'COD (Bayar Lunas)' => 'COD (Bayar Lunas)',
                                                 'Kredit' => 'Kredit (Bayar Kredit)'
-                                            ])->required(),
+                                            ])
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Tipe pembayaran wajib dipilih'
+                                            ]),
                                         Radio::make('tipe')
                                             ->label('Tipe Customer')
                                             ->inlineLabel()
@@ -205,7 +222,10 @@ class QuotationResource extends Resource
                                                 'PKP' => 'PKP',
                                                 'PRI' => 'PRI'
                                             ])
-                                            ->required(),
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Tipe customer wajib dipilih'
+                                            ]),
                                         Checkbox::make('isSpecial')
                                             ->label('Spesial (Ya / Tidak)'),
                                         Textarea::make('keterangan')
@@ -238,8 +258,7 @@ class QuotationResource extends Resource
                             ])
                             ->maxSize('5120'),
                         Textarea::make('notes')
-                            ->label('Notes')
-                            ->columnSpanFull(),
+                            ->label('Notes'),
                         Repeater::make('quotationItem')
                             ->relationship()
                             ->columnSpanFull()
@@ -575,7 +594,7 @@ class QuotationResource extends Resource
                         ->label('Approve')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'request_approve');
+                            return Auth::user()->hasPermissionTo('approve quotation') && ($record->status == 'request_approve');
                         })
                         ->color('success')
                         ->requiresConfirmation()
@@ -628,47 +647,14 @@ class QuotationResource extends Resource
                         })
                 ]),
             ]);
-    }
 
-    public static function infolist(Infolist $infolist): Infolist
-    {
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make('Quotation Information')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('quotation_number'),
-                        Infolists\Components\TextEntry::make('customer.name'),
-                        Infolists\Components\TextEntry::make('date')
-                            ->date(),
-                        Infolists\Components\TextEntry::make('valid_until')
-                            ->date(),
-                        Infolists\Components\TextEntry::make('total_amount')
-                            ->money('IDR', 0),
-                        Infolists\Components\TextEntry::make('notes'),
-                    ]),
-                Infolists\Components\Section::make('Quotation Items')
-                    ->schema([
-                        Infolists\Components\RepeatableEntry::make('quotationItem')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('product.name'),
-                                Infolists\Components\TextEntry::make('quantity'),
-                                Infolists\Components\TextEntry::make('unit_price')
-                                    ->money('IDR', 0),
-                                Infolists\Components\TextEntry::make('discount'),
-                                Infolists\Components\TextEntry::make('tax'),
-                                Infolists\Components\TextEntry::make('total_price')
-                                    ->money('IDR', 0),
-                                Infolists\Components\TextEntry::make('notes'),
-                            ])
-                            ->columns(3),
-                    ]),
-            ]);
+        return $table;
     }
 
     public static function getRelations(): array
     {
         return [
-            QuotationItemRelationManager::class
+            //
         ];
     }
 

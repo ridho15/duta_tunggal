@@ -57,6 +57,11 @@ class SaleOrder extends Model
         return $this->belongsTo(Customer::class, 'customer_id')->withDefault();
     }
 
+    public function quotation()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_id')->withDefault();
+    }
+
     public function saleOrderItem()
     {
         return $this->hasMany(SaleOrderItem::class, 'sale_order_id');
@@ -163,13 +168,25 @@ class SaleOrder extends Model
         static::deleting(function ($saleOrder) {
             if ($saleOrder->isForceDeleting()) {
                 $saleOrder->saleOrderItem()->forceDelete();
+                $saleOrder->deliverySalesOrder()->forceDelete();
+                $saleOrder->warehouseConfirmation()->forceDelete();
+                $saleOrder->purchaseOrder()->forceDelete();
+                $saleOrder->depositLog()->forceDelete();
             } else {
                 $saleOrder->saleOrderItem()->delete();
+                $saleOrder->deliverySalesOrder()->delete();
+                $saleOrder->warehouseConfirmation()->delete();
+                $saleOrder->purchaseOrder()->delete();
+                $saleOrder->depositLog()->delete();
             }
         });
 
         static::restoring(function ($saleOrder) {
             $saleOrder->saleOrderItem()->withTrashed()->restore();
+            $saleOrder->deliverySalesOrder()->withTrashed()->restore();
+            $saleOrder->warehouseConfirmation()->withTrashed()->restore();
+            $saleOrder->purchaseOrder()->withTrashed()->restore();
+            $saleOrder->depositLog()->withTrashed()->restore();
         });
     }
 }

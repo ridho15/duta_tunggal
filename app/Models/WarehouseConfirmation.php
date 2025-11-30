@@ -39,4 +39,19 @@ class WarehouseConfirmation extends Model
     {
         return $this->hasMany(WarehouseConfirmationItem::class);
     }
+
+    protected static function booted()
+    {
+        static::deleting(function ($warehouseConfirmation) {
+            if ($warehouseConfirmation->isForceDeleting()) {
+                $warehouseConfirmation->warehouseConfirmationItems()->forceDelete();
+            } else {
+                $warehouseConfirmation->warehouseConfirmationItems()->delete();
+            }
+        });
+
+        static::restoring(function ($warehouseConfirmation) {
+            $warehouseConfirmation->warehouseConfirmationItems()->withTrashed()->restore();
+        });
+    }
 }

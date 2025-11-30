@@ -18,7 +18,6 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -36,8 +35,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\DateFilter;
 
 class DeliveryOrderResource extends Resource
 {
@@ -438,7 +437,31 @@ class DeliveryOrderResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'sent' => 'Sent',
+                        'received' => 'Received',
+                        'supplier' => 'Supplier',
+                        'completed' => 'Completed',
+                        'request_approve' => 'Request Approve',
+                        'approved' => 'Approved',
+                        'request_close' => 'Request Close',
+                        'closed' => 'Closed',
+                        'reject' => 'Reject',
+                    ]),
+                DateFilter::make('delivery_date')
+                    ->label('Delivery Date'),
+                SelectFilter::make('driver_id')
+                    ->relationship('driver', 'name')
+                    ->label('Driver')
+                    ->preload()
+                    ->searchable(),
+                SelectFilter::make('vehicle_id')
+                    ->relationship('vehicle', 'plate')
+                    ->label('Vehicle')
+                    ->preload()
+                    ->searchable(),
             ])
             ->modifyQueryUsing(function (Builder $query) {
                 $user = Auth::user();

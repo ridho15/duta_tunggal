@@ -15,6 +15,7 @@ class StockReservation extends Model
         'quantity',
         'warehouse_id',
         'rak_id',
+        'delivery_order_id',
     ];
 
     public function saleOrder()
@@ -40,5 +41,10 @@ class StockReservation extends Model
     public function rak()
     {
         return $this->belongsTo(Rak::class);
+    }
+
+    public function deliveryOrder()
+    {
+        return $this->belongsTo(DeliveryOrder::class);
     }
 }

@@ -34,11 +34,19 @@ class ViewSaleOrder extends ViewRecord
     {
         return [
             ActionGroup::make([
-                EditAction::make()
-                    ->color('success')
-                    ->icon('heroicon-o-pencil-square'),
+                    EditAction::make()
+                        ->color('success')
+                        ->icon('heroicon-o-pencil-square')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('update sales order') &&
+                                   in_array($record->status, ['draft', 'request_approve', 'approved']);
+                        }),
                 DeleteAction::make()
-                    ->icon('heroicon-o-trash'),
+                    ->icon('heroicon-o-trash')
+                    ->visible(function ($record) {
+                        return Auth::user()->hasPermissionTo('delete sales order') &&
+                               in_array($record->status, ['draft', 'request_approve']);
+                    }),
                 Action::make('request_approve')
                     ->label('Request Approve')
                     ->requiresConfirmation()
@@ -58,7 +66,8 @@ class ViewSaleOrder extends ViewRecord
                     ->color('danger')
                     ->icon('heroicon-o-x-circle')
                     ->visible(function ($record) {
-                        return Auth::user()->hasPermissionTo('request sales order') && ($record->status != 'approved' || $record->status != 'confirmed' || $record->status != 'close' || $record->status != 'canceled' || $record->status == 'draft');
+                        return Auth::user()->hasPermissionTo('request sales order') &&
+                               in_array($record->status, ['approved', 'confirmed', 'completed']);
                     })
                     ->action(function ($record) {
                         $salesOrderService = app(SalesOrderService::class);
@@ -125,7 +134,8 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-check-badge')
                     ->requiresConfirmation()
                     ->visible(function ($record) {
-                        return Auth::user()->hasRole(['Super Admin', 'Owner']) && ($record->status != 'closed' || $record->status != 'reject');
+                        return Auth::user()->hasPermissionTo('update sales order') &&
+                               in_array($record->status, ['approved', 'confirmed']);
                     })
                     ->color('success')
                     ->action(function ($record) {
@@ -138,6 +148,10 @@ class ViewSaleOrder extends ViewRecord
                     ->label('Saldo Titip Customer')
                     ->icon('heroicon-o-banknotes')
                     ->color('warning')
+                    ->visible(function ($record) {
+                        return Auth::user()->hasPermissionTo('update deposit') &&
+                               in_array($record->status, ['approved', 'confirmed', 'completed']);
+                    })
                     ->form(function () {
                         $record = $this->getRecord();
                         if ($record->customer->deposit->id == null) {
@@ -277,6 +291,9 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-arrow-path-rounded-square')
                     ->label('Sync Total Amount')
                     ->color('primary')
+                    ->visible(function ($record) {
+                        return Auth::user()->hasPermissionTo('update sales order');
+                    })
                     ->action(function ($record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->updateTotalAmount($record);

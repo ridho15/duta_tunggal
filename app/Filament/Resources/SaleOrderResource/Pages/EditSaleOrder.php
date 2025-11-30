@@ -6,9 +6,7 @@ use App\Filament\Resources\SaleOrderResource;
 use App\Services\SalesOrderService;
 use App\Services\CreditValidationService;
 use App\Models\Customer;
-use App\Models\InventoryStock;
-use App\Models\Product;
-use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
@@ -25,6 +23,11 @@ class EditSaleOrder extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('view_sale_order')
+                ->label('Lihat Penjualan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->url(fn () => route('filament.admin.resources.sale-orders.view', $this->getRecord())),
             DeleteAction::make()
                 ->icon('heroicon-o-trash'),
         ];
@@ -35,11 +38,11 @@ class EditSaleOrder extends EditRecord
         // Validate credit limit and overdue credits before saving sale order
         if (isset($data['customer_id']) && isset($data['total_amount'])) {
             $customer = Customer::find($data['customer_id']);
-            
+
             if ($customer) {
                 $creditService = app(CreditValidationService::class);
                 $validation = $creditService->canCustomerMakePurchase($customer, (float)$data['total_amount']);
-                
+
                 if (!$validation['can_purchase']) {
                     Notification::make()
                         ->title('Transaksi Tidak Dapat Disimpan')
@@ -47,12 +50,12 @@ class EditSaleOrder extends EditRecord
                         ->danger()
                         ->persistent()
                         ->send();
-                        
+
                     throw ValidationException::withMessages([
                         'customer_id' => implode(' ', $validation['messages'])
                     ]);
                 }
-                
+
                 // Show warnings if any
                 if (!empty($validation['warnings'])) {
                     Notification::make()
@@ -63,8 +66,8 @@ class EditSaleOrder extends EditRecord
                 }
             }
         }
-        
-        
+
+
         return $data;
     }
 
