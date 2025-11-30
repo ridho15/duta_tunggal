@@ -23,6 +23,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Enums\ActionsPosition;
 
 class ProductionResource extends Resource
@@ -116,7 +117,37 @@ class ProductionResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'finished' => 'Finished',
+                    ]),
+                SelectFilter::make('manufacturing_order_id')
+                    ->relationship('manufacturingOrder.productionPlan.product', 'name')
+                    ->label('Product')
+                    ->preload()
+                    ->searchable()
+                    ->getOptionLabelFromRecordUsing(function ($record) {
+                        return "({$record->sku}) {$record->name}";
+                    }),
+                Filter::make('production_date')
+                    ->form([
+                        DatePicker::make('production_date_from')
+                            ->label('Production Date From'),
+                        DatePicker::make('production_date_until')
+                            ->label('Production Date Until'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['production_date_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('production_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['production_date_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('production_date', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 ActionGroup::make([
