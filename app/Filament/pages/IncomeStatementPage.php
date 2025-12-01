@@ -3,20 +3,30 @@
 namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Form;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Section;
+use Filament\Tables\Actions\Action;
 use App\Services\IncomeStatementService;
 use App\Models\Cabang;
+use App\Models\IncomeStatementItem;
 use Filament\Notifications\Notification;
-use App\Exports\GenericViewExport;
-use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
 
-class IncomeStatementPage extends Page
+class IncomeStatementPage extends Page implements HasForms, HasTable
 {
-    protected static string $view = 'filament.pages.income-statement-page';
+    use InteractsWithForms, InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static string $view = 'filament.pages.income-statement-page';
 
     protected static ?string $navigationLabel = 'Laba Rugi';
 
@@ -28,40 +38,104 @@ class IncomeStatementPage extends Page
     public bool $show_comparison = false;
     public ?string $comparison_start_date = null;
     public ?string $comparison_end_date = null;
-    
+
     // Display options
     public bool $show_only_totals = false;
     public bool $show_parent_accounts = true;
     public bool $show_child_accounts = true;
-    public bool $show_zero_balance = false;
-    
-    // Drill-down state
-    public ?int $selected_account_id = null;
-    public bool $show_drill_down = false;
-
-    protected IncomeStatementService $service;
-
-    public function boot(IncomeStatementService $service): void
+    public bool $show_zero_balance = false;    public function mount(): void
     {
-        $this->service = $service;
+        // Default to current year for better data visibility
+        $this->form->fill([
+            'start_date' => request()->query('start', now()->startOfYear()->format('Y-m-d')),
+            'end_date' => request()->query('end', now()->endOfYear()->format('Y-m-d')),
+            'cabang_id' => request()->query('cabang_id'),
+            'show_comparison' => false,
+            'comparison_start_date' => now()->subYear()->startOfYear()->format('Y-m-d'),
+            'comparison_end_date' => now()->subYear()->endOfYear()->format('Y-m-d'),
+            'show_only_totals' => false,
+            'show_parent_accounts' => true,
+            'show_child_accounts' => true,
+            'show_zero_balance' => false,
+        ]);
     }
 
-    public function mount(): void
+    public function form(Form $form): Form
     {
-        // Default to current month
-        $this->start_date = request()->query('start', now()->startOfMonth()->format('Y-m-d'));
-        $this->end_date = request()->query('end', now()->endOfMonth()->format('Y-m-d'));
-        $this->cabang_id = request()->query('cabang_id');
-        
-        // Default comparison to previous month
-        $this->comparison_start_date = now()->subMonth()->startOfMonth()->format('Y-m-d');
-        $this->comparison_end_date = now()->subMonth()->endOfMonth()->format('Y-m-d');
+        return $form
+            ->schema([
+                Section::make('Filter Laporan')
+                    ->schema([
+                        DatePicker::make('start_date')
+                            ->label('Tanggal Mulai')
+                            ->required(),
+                        DatePicker::make('end_date')
+                            ->label('Tanggal Akhir')
+                            ->required(),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::pluck('nama', 'id')->toArray())
+                            ->searchable()
+                            ->preload(),
+                        Toggle::make('show_comparison')
+                            ->label('Tampilkan Perbandingan')
+                            ->live(),
+                        DatePicker::make('comparison_start_date')
+                            ->label('Tanggal Mulai Perbandingan')
+                            ->visible(fn ($get) => $get('show_comparison')),
+                        DatePicker::make('comparison_end_date')
+                            ->label('Tanggal Akhir Perbandingan')
+                            ->visible(fn ($get) => $get('show_comparison')),
+                    ])->columns(2),
+
+                Section::make('Opsi Tampilan')
+                    ->schema([
+                        Toggle::make('show_only_totals')
+                            ->label('Tampilkan Hanya Total'),
+                        Toggle::make('show_parent_accounts')
+                            ->label('Tampilkan Akun Induk'),
+                        Toggle::make('show_child_accounts')
+                            ->label('Tampilkan Akun Anak'),
+                        Toggle::make('show_zero_balance')
+                            ->label('Tampilkan Saldo Nol'),
+                    ])->columns(2),
+            ]);
+    }
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(IncomeStatementItem::query())
+            ->columns([
+                TextColumn::make('account_name')
+                    ->label('Akun'),
+                TextColumn::make('debit')
+                    ->label('Debit')
+                    ->money('IDR'),
+                TextColumn::make('credit')
+                    ->label('Kredit')
+                    ->money('IDR'),
+                TextColumn::make('balance')
+                    ->label('Saldo')
+                    ->money('IDR'),
+            ])
+            ->headerActions([
+                Action::make('generate_report')
+                    ->label('Generate Laporan')
+                    ->icon('heroicon-o-document-chart-bar')
+                    ->action(function () {
+                        $this->generateReport();
+                    }),
+            ])
+            ->paginated(false);
     }
 
     public function generateReport(): void
     {
+        $data = $this->form->getState();
+
         // Validate dates
-        if (!$this->start_date || !$this->end_date) {
+        if (!$data['start_date'] || !$data['end_date']) {
             Notification::make()
                 ->title('Error')
                 ->danger()
@@ -70,7 +144,7 @@ class IncomeStatementPage extends Page
             return;
         }
 
-        if ($this->start_date > $this->end_date) {
+        if ($data['start_date'] > $data['end_date']) {
             Notification::make()
                 ->title('Error')
                 ->danger()
@@ -85,139 +159,70 @@ class IncomeStatementPage extends Page
             ->body('Laporan Laba Rugi telah diperbarui.')
             ->send();
 
-        $this->dispatch('report-updated');
+        // Clear existing data and populate with new data
+        IncomeStatementItem::truncate();
+        $incomeData = $this->getIncomeStatementData();
+        
+        // Process the complex income statement data into flat array
+        $flatData = [];
+        
+        // Helper function to add accounts from a section
+        $addAccounts = function($accounts, $sectionName = '') use (&$flatData) {
+            if ($accounts instanceof \Illuminate\Support\Collection) {
+                foreach ($accounts as $account) {
+                    $flatData[] = [
+                        'account_name' => ($sectionName ? $sectionName . ' - ' : '') . ($account['name'] ?? ''),
+                        'debit' => $account['total_debit'] ?? 0,
+                        'credit' => $account['total_credit'] ?? 0,
+                        'balance' => $account['balance'] ?? 0,
+                    ];
+                }
+            }
+        };
+        
+        // Add accounts from each section
+        if (isset($incomeData['sales_revenue']['accounts'])) {
+            $addAccounts($incomeData['sales_revenue']['accounts'], 'Pendapatan');
+        }
+        if (isset($incomeData['cogs']['accounts'])) {
+            $addAccounts($incomeData['cogs']['accounts'], 'HPP');
+        }
+        if (isset($incomeData['operating_expenses']['accounts'])) {
+            $addAccounts($incomeData['operating_expenses']['accounts'], 'Biaya Operasional');
+        }
+        if (isset($incomeData['other_income']['accounts'])) {
+            $addAccounts($incomeData['other_income']['accounts'], 'Pendapatan Lain');
+        }
+        if (isset($incomeData['other_expense']['accounts'])) {
+            $addAccounts($incomeData['other_expense']['accounts'], 'Biaya Lain');
+        }
+        if (isset($incomeData['tax_expense']['accounts'])) {
+            $addAccounts($incomeData['tax_expense']['accounts'], 'Pajak');
+        }
+        
+        // Save to database
+        foreach ($flatData as $item) {
+            IncomeStatementItem::create([
+                'account_name' => $item['account_name'],
+                'debit' => $item['debit'],
+                'credit' => $item['credit'],
+                'balance' => $item['balance'],
+            ]);
+        }
+
+        // Refresh table data
+        $this->resetTable();
     }
 
     public function getIncomeStatementData(): array
     {
-        return $this->service->generate([
-            'start_date' => $this->start_date,
-            'end_date' => $this->end_date,
-            'cabang_id' => $this->cabang_id,
+        $data = $this->form->getState();
+
+        return app(IncomeStatementService::class)->generate([
+            'start_date' => $data['start_date'] ?? now()->startOfMonth()->format('Y-m-d'),
+            'end_date' => $data['end_date'] ?? now()->endOfMonth()->format('Y-m-d'),
+            'cabang_id' => $data['cabang_id'] ?? null,
         ]);
-    }
-
-    public function getComparisonData(): ?array
-    {
-        if (!$this->show_comparison || !$this->comparison_start_date || !$this->comparison_end_date) {
-            return null;
-        }
-
-        return $this->service->comparePeriods(
-            [
-                'start_date' => $this->start_date,
-                'end_date' => $this->end_date,
-            ],
-            [
-                'start_date' => $this->comparison_start_date,
-                'end_date' => $this->comparison_end_date,
-            ],
-            $this->cabang_id
-        );
-    }
-
-    public function getCabangOptions(): array
-    {
-        return Cabang::query()
-            ->whereNull('deleted_at')
-            ->orderBy('kode')
-            ->get()
-            ->mapWithKeys(fn($c) => [$c->id => $c->kode . ' - ' . $c->nama])
-            ->toArray();
-    }
-
-    public function exportPdf()
-    {
-        try {
-            $data = $this->getIncomeStatementData();
-            $comparison = $this->getComparisonData();
-            $cabangOptions = $this->getCabangOptions();
-            
-            $pdf = Pdf::loadView('filament.exports.income-statement-pdf', [
-                'data' => $data,
-                'comparison' => $comparison,
-                'cabang' => $this->cabang_id ? ($cabangOptions[$this->cabang_id] ?? 'Semua Cabang') : 'Semua Cabang',
-                'start_date' => $this->start_date,
-                'end_date' => $this->end_date,
-            ])
-            ->setPaper('a4', 'portrait');
-            
-            $filename = 'Laporan_Laba_Rugi_' . date('Y-m-d_His') . '.pdf';
-            
-            return response()->streamDownload(function () use ($pdf) {
-                echo $pdf->stream();
-            }, $filename);
-            
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Export PDF Gagal')
-                ->danger()
-                ->body('Terjadi kesalahan: ' . $e->getMessage())
-                ->send();
-        }
-    }
-
-    public function exportExcel()
-    {
-        try {
-            $data = $this->getIncomeStatementData();
-            $comparison = $this->getComparisonData();
-            $cabangOptions = $this->getCabangOptions();
-            
-            $filename = 'Laporan_Laba_Rugi_' . date('Y-m-d_His') . '.xlsx';
-            
-            $view = view('filament.exports.income-statement-excel', [
-                'data' => $data,
-                'comparison' => $comparison,
-                'cabang' => $this->cabang_id ? ($cabangOptions[$this->cabang_id] ?? 'Semua Cabang') : 'Semua Cabang',
-                'start_date' => $this->start_date,
-                'end_date' => $this->end_date,
-            ]);
-            
-            return Excel::download(
-                new GenericViewExport($view),
-                $filename
-            );
-            
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Export Excel Gagal')
-                ->danger()
-                ->body('Terjadi kesalahan: ' . $e->getMessage())
-                ->send();
-        }
-    }
-
-    public function print(): void
-    {
-        $this->dispatch('print-report');
-    }
-    
-    public function showAccountDetails(int $accountId): void
-    {
-        $this->selected_account_id = $accountId;
-        $this->show_drill_down = true;
-        $this->dispatch('open-drill-down-modal');
-    }
-    
-    public function closeDrillDown(): void
-    {
-        $this->show_drill_down = false;
-        $this->selected_account_id = null;
-    }
-    
-    public function getDrillDownData(): ?array
-    {
-        if (!$this->selected_account_id || !$this->show_drill_down) {
-            return null;
-        }
-        
-        return $this->service->getAccountJournalEntries(
-            $this->selected_account_id,
-            $this->start_date,
-            $this->end_date,
-            $this->cabang_id
-        );
     }
 
     public static function shouldRegisterNavigation(): bool

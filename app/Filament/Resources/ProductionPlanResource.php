@@ -30,6 +30,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -415,7 +416,21 @@ class ProductionPlanResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'scheduled' => 'Scheduled',
+                        'in_progress' => 'In Progress',
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
+                    ]),
+                SelectFilter::make('source_type')
+                    ->label('Sumber Produksi')
+                    ->options([
+                        'sale_order' => 'Dari Pesanan Penjualan',
+                        'manual' => 'Input Manual',
+                    ]),
             ])
             ->actions([
                 ActionGroup::make([

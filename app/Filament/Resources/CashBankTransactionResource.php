@@ -29,6 +29,7 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
 
 class CashBankTransactionResource extends Resource
@@ -260,16 +261,17 @@ class CashBankTransactionResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('number')->label('No.'),
-                TextColumn::make('date')->date('d/m/Y')->label('Tanggal'),
-                TextColumn::make('type')->badge()->label('Tipe'),
+                TextColumn::make('number')->label('No.')->searchable()->sortable(),
+                TextColumn::make('date')->date('d/m/Y')->label('Tanggal')->sortable(),
+                TextColumn::make('type')->badge()->label('Tipe')->searchable(),
                 TextColumn::make('voucherRequest.number')
                     ->label('No. Voucher')
                     ->placeholder('-')
-                    ->formatStateUsing(fn ($state, $record) => $record->voucherRequest ? $record->voucherRequest->number : '-'),
-                TextColumn::make('accountCoa.code')->label('Akun Kas/Bank')->formatStateUsing(fn ($state, $record) => $record->accountCoa->code . ' - ' . $record->accountCoa->name),
-                TextColumn::make('offsetCoa.code')->label('Lawan Akun')->formatStateUsing(fn ($state, $record) => $record->offsetCoa->code . ' - ' . $record->offsetCoa->name),
-                TextColumn::make('amount')->money('IDR')->label('Jumlah'),
+                    ->formatStateUsing(fn ($state, $record) => $record->voucherRequest ? $record->voucherRequest->number : '-')
+                    ->searchable(),
+                TextColumn::make('accountCoa.code')->label('Akun Kas/Bank')->formatStateUsing(fn ($state, $record) => $record->accountCoa->code . ' - ' . $record->accountCoa->name)->searchable(),
+                TextColumn::make('offsetCoa.code')->label('Lawan Akun')->formatStateUsing(fn ($state, $record) => $record->offsetCoa->code . ' - ' . $record->offsetCoa->name)->searchable(),
+                TextColumn::make('amount')->money('IDR')->label('Jumlah')->sortable(),
                 TextColumn::make('transactionDetails')
                     ->label('Rincian Akun Anak')
                     ->formatStateUsing(function ($record) {
@@ -288,7 +290,24 @@ class CashBankTransactionResource extends Resource
                     ->wrap()
                     ->limit(50),
             ])
-            ->filters([])
+            ->filters([
+                SelectFilter::make('type')
+                    ->label('Tipe Transaksi')
+                    ->options([
+                        'debit' => 'Debit',
+                        'credit' => 'Credit',
+                    ]),
+                SelectFilter::make('account_coa_id')
+                    ->label('Akun Kas/Bank')
+                    ->relationship('accountCoa', 'name')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('offset_coa_id')
+                    ->label('Lawan Akun')
+                    ->relationship('offsetCoa', 'name')
+                    ->searchable()
+                    ->preload(),
+            ])
             ->headerActions([
                 \Filament\Tables\Actions\Action::make('switch_to_transfer')
                     ->label('Transfer Kas & Bank')

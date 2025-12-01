@@ -22,6 +22,7 @@ use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class CashBankTransferResource extends Resource
@@ -122,6 +123,25 @@ class CashBankTransferResource extends Resource
                     ->toggleable(),
                 BadgeColumn::make('status')->label('Status')
                     ->colors(['secondary' => 'draft', 'success' => 'posted', 'info' => 'reconciled']),
+            ])
+            ->filters([
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'posted' => 'Posted',
+                        'reconciled' => 'Reconciled',
+                    ]),
+                SelectFilter::make('from_coa_id')
+                    ->label('Dari COA')
+                    ->relationship('fromCoa', 'name')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('to_coa_id')
+                    ->label('Ke COA')
+                    ->relationship('toCoa', 'name')
+                    ->searchable()
+                    ->preload(),
             ])
             ->headerActions([
                 \Filament\Tables\Actions\Action::make('switch_to_transaction')

@@ -18,9 +18,10 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Filament\Tables\Enums\ActionsPosition;
 
 class InventoryStockResource extends Resource
 {
@@ -155,7 +156,16 @@ class InventoryStockResource extends Resource
                     ->sortable(),
             ])
             ->filters([
-                //
+                SelectFilter::make('warehouse_id')
+                    ->label('Gudang')
+                    ->relationship('warehouse', 'name')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('rak_id')
+                    ->label('Rak')
+                    ->relationship('rak', 'name')
+                    ->searchable()
+                    ->preload(),
             ])
             ->actions([
                 ActionGroup::make([

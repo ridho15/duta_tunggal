@@ -28,11 +28,12 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
-use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class ReturnProductResource extends Resource
 {
@@ -280,7 +281,17 @@ class ReturnProductResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'approved' => 'Approved',
+                    ]),
+                SelectFilter::make('warehouse_id')
+                    ->label('Gudang')
+                    ->relationship('warehouse', 'name')
+                    ->searchable()
+                    ->preload(),
             ])
             ->actions([
                 ActionGroup::make([

@@ -27,6 +27,8 @@ use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
@@ -495,7 +497,62 @@ class SalesInvoiceResource extends Resource
                     ]),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'sent' => 'Terkirim',
+                        'paid' => 'Lunas',
+                        'partially_paid' => 'Dibayar Sebagian',
+                        'overdue' => 'Terlambat',
+                    ]),
+                SelectFilter::make('customer_name')
+                    ->label('Customer')
+                    ->options(function () {
+                        return Invoice::whereNotNull('customer_name')
+                            ->distinct()
+                            ->pluck('customer_name', 'customer_name')
+                            ->toArray();
+                    })
+                    ->searchable(),
+                Filter::make('invoice_date')
+                    ->label('Tanggal Invoice')
+                    ->form([
+                        DatePicker::make('invoice_date_from')
+                            ->label('Dari Tanggal'),
+                        DatePicker::make('invoice_date_until')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['invoice_date_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('invoice_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['invoice_date_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('invoice_date', '<=', $date),
+                            );
+                    }),
+                Filter::make('due_date')
+                    ->label('Jatuh Tempo')
+                    ->form([
+                        DatePicker::make('due_date_from')
+                            ->label('Dari Tanggal'),
+                        DatePicker::make('due_date_until')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['due_date_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('due_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['due_date_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('due_date', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
                 ActionGroup::make([

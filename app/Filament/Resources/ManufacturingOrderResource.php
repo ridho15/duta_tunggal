@@ -28,11 +28,12 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
-use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class ManufacturingOrderResource extends Resource
 {
@@ -307,7 +308,13 @@ class ManufacturingOrderResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'in_progress' => 'In Progress',
+                        'completed' => 'Completed',
+                    ]),
             ])
             ->actions([
                 ActionGroup::make([

@@ -11,7 +11,6 @@ use App\Filament\Pages\BalanceSheetPage;
 use App\Filament\Pages\BukuBesarPage;
 use App\Filament\Pages\IncomeStatementPage;
 use App\Filament\Pages\MyDashboard;
-use App\Filament\Pages\RekonsiliasiBankPage;
 use App\Filament\Resources\JournalEntryResource;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -47,7 +46,6 @@ class AdminPanelProvider extends PanelProvider
                 BalanceSheetPage::class,
                 BukuBesarPage::class,
                 IncomeStatementPage::class,
-                RekonsiliasiBankPage::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([

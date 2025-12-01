@@ -37,9 +37,10 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Filament\Tables\Enums\ActionsPosition;
 
 class CustomerReceiptResource extends Resource
 {
@@ -497,7 +498,26 @@ class CustomerReceiptResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('customer_id')
+                    ->label('Customer')
+                    ->relationship('customer', 'name')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('payment_method')
+                    ->label('Metode Pembayaran')
+                    ->options([
+                        'Cash' => 'Cash',
+                        'Bank Transfer' => 'Bank Transfer',
+                        'Credit' => 'Credit',
+                        'Deposit' => 'Deposit',
+                    ]),
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'Draft' => 'Draft',
+                        'Partial' => 'Partial',
+                        'Paid' => 'Paid',
+                    ]),
             ])
             ->actions([
                 ActionGroup::make([

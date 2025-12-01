@@ -15,6 +15,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters;
+use Illuminate\Database\Eloquent\Builder;
 
 class BankReconciliationResource extends Resource
 {
@@ -119,13 +120,18 @@ class BankReconciliationResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('coa.code')->label('Akun Bank')->formatStateUsing(fn ($state, $record) => $record->coa->code . ' - ' . $record->coa->name),
+                TextColumn::make('coa.code')->label('Akun Bank')->formatStateUsing(fn ($state, $record) => $record->coa->code . ' - ' . $record->coa->name)->searchable(query: function (Builder $query, $search) {
+                    $query->whereHas('coa', function ($query) use ($search) {
+                        $query->where('code', 'LIKE', '%' . $search . '%')
+                            ->orWhere('name', 'LIKE', '%' . $search . '%');
+                    });
+                }),
                 TextColumn::make('period_start')->date('d/m/Y')->label('Mulai'),
                 TextColumn::make('period_end')->date('d/m/Y')->label('Selesai'),
                 TextColumn::make('statement_ending_balance')->money('IDR')->label('Saldo Rek Koran'),
                 TextColumn::make('book_balance')->money('IDR')->label('Saldo Buku'),
                 TextColumn::make('difference')->money('IDR')->label('Selisih')->color(fn ($state) => $state != 0 ? 'danger' : 'success'),
-                TextColumn::make('status')->badge()->colors(['secondary' => 'open', 'success' => 'closed']),
+                TextColumn::make('status')->badge()->colors(['secondary' => 'open', 'success' => 'closed'])->searchable(),
             ])
             ->filters([
                 Filters\SelectFilter::make('coa_id')->label('Akun Bank')
