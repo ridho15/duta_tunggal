@@ -43,7 +43,7 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                     $this->redirect($this->getResource()::getUrl('view', ['record' => $record]));
                 })
-                ->visible(fn () => strtolower($this->record->status) === 'request'),
+                ->visible(fn() => strtolower($this->record->status) === 'request'),
         ];
     }
 
@@ -55,13 +55,15 @@ class ViewWarehouseConfirmation extends ViewRecord
                     ->schema([
                         Infolists\Components\TextEntry::make('confirmation_type')
                             ->label('Confirmation Type')
-                            ->formatStateUsing(fn (string $state): string => match ($state) {
-                                'sales_order' => 'Sales Order Confirmation',
-                                'manufacturing_order' => 'Manufacturing Order Confirmation',
-                                default => ucfirst($state),
+                            ->formatStateUsing(function ($state) {
+                                return match ($state) {
+                                    'sales_order' => 'Sales Order Confirmation',
+                                    'manufacturing_order' => 'Manufacturing Order Confirmation',
+                                    default => ucfirst($state),
+                                };
                             })
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
+                            ->color(fn(string $state): string => match ($state) {
                                 'sales_order' => 'success',
                                 'manufacturing_order' => 'info',
                                 default => 'gray',
@@ -69,7 +71,7 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                         Infolists\Components\TextEntry::make('status')
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
+                            ->color(fn(string $state): string => match ($state) {
                                 'confirmed' => 'success',
                                 'partial_confirmed' => 'warning',
                                 'rejected' => 'danger',
@@ -106,7 +108,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->label('Delivery Date')
                             ->date()
                             ->placeholder('Not set')
-                            ->visible(fn ($record) => $record->sale_order_id !== null),
+                            ->visible(fn($record) => $record->sale_order_id !== null),
 
                         Infolists\Components\TextEntry::make('saleOrder.total_amount')
                             ->label('Total Amount')
@@ -115,7 +117,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                         Infolists\Components\TextEntry::make('saleOrder.status')
                             ->label('SO Status')
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
+                            ->color(fn(string $state): string => match ($state) {
                                 'confirmed' => 'success',
                                 'partial_confirmed' => 'warning',
                                 'rejected' => 'danger',
@@ -127,7 +129,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                             }),
                     ])
                     ->columns(3)
-                    ->visible(fn ($record) => $record->sale_order_id !== null),
+                    ->visible(fn($record) => $record->sale_order_id !== null),
 
                 Infolists\Components\Section::make('Manufacturing Order Information')
                     ->schema([
@@ -143,7 +145,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->date(),
                     ])
                     ->columns(3)
-                    ->visible(fn ($record) => $record->manufacturing_order_id !== null),
+                    ->visible(fn($record) => $record->manufacturing_order_id !== null),
 
                 Infolists\Components\Section::make('Sales Order Items')
                     ->schema([
@@ -206,7 +208,7 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                                 Infolists\Components\TextEntry::make('status')
                                     ->badge()
-                                    ->color(fn (string $state): string => match ($state) {
+                                    ->color(fn(string $state): string => match ($state) {
                                         'confirmed' => 'success',
                                         'partial_confirmed' => 'warning',
                                         'rejected' => 'danger',
@@ -247,11 +249,11 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                                             $this->redirect($this->getResource()::getUrl('view', ['record' => $warehouseConfirmation]));
                                         })
-                                        ->visible(fn ($record) => strtolower($record->status) === 'request'),
+                                        ->visible(fn($record) => strtolower($record->status) === 'request'),
                                 ]),
                             ])
                             ->columns(9)
-                            ->visible(fn ($record) => $record->warehouseConfirmationItems->count() > 0),
+                            ->visible(fn($record) => $record->warehouseConfirmationItems->count() > 0),
                     ])
                     ->columns(1),
             ]);

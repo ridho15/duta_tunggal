@@ -17,6 +17,7 @@ class WarehouseConfirmation extends Model
     protected $fillable = [
         'sale_order_id',
         'manufacturing_order_id',
+        'confirmation_type',
         'note',
         'status', // Confirmed / Rejected / Request
         'confirmed_by',

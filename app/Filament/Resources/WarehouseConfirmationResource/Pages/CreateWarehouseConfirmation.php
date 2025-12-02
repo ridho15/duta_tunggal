@@ -24,6 +24,7 @@ class CreateWarehouseConfirmation extends CreateRecord
 
             // Return basic data for warehouse confirmation record
             return [
+                'confirmation_type' => $data['confirmation_type'],
                 'sale_order_id' => $data['sale_order_id'],
                 'notes' => $data['notes'] ?? null,
                 'status' => 'request', // Start with request status
@@ -31,6 +32,7 @@ class CreateWarehouseConfirmation extends CreateRecord
         } else {
             // Handle Manufacturing Order confirmation (existing logic)
             return [
+                'confirmation_type' => $data['confirmation_type'],
                 'manufacturing_order_id' => $data['manufacturing_order_id'],
                 'notes' => $data['notes'] ?? null,
                 'status' => 'confirmed',

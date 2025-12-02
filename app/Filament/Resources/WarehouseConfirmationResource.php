@@ -176,6 +176,12 @@ class WarehouseConfirmationResource extends Resource
                                         } elseif ($state == 0) {
                                             $set('status', 'rejected');
                                         }
+
+                                        // Update SaleOrderItem quantity
+                                        $saleOrderItemId = $get('sale_order_item_id');
+                                        if ($saleOrderItemId) {
+                                            SaleOrderItem::where('id', $saleOrderItemId)->update(['quantity' => $state]);
+                                        }
                                     }),
 
                                 Select::make('warehouse_id')
@@ -288,8 +294,8 @@ class WarehouseConfirmationResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
-                    ViewAction::make(),
-                    EditAction::make(),
+                    ViewAction::make()->color('primary'),
+                    EditAction::make()->color('success'),
                     Action::make('confirm')
                         ->label('Confirm Warehouse')
                         ->icon('heroicon-o-check-badge')
