@@ -33,6 +33,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ReturnProductResource extends Resource
@@ -63,7 +64,14 @@ class ReturnProductResource extends Resource
                                     $set('return_number', $returnProductService->generateReturnNumber());
                                 }))
                             ->unique(ignoreRecord: true)
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->validationMessages([
+                                'required' => 'Nomor return wajib diisi.',
+                                'unique' => 'Nomor return sudah digunakan, silakan generate nomor baru.',
+                                'max' => 'Nomor return maksimal 255 karakter.',
+                                'regex' => 'Format nomor return tidak valid. Gunakan format: RN-YYYYMMDD-XXXX',
+                            ])
+                            ->regex('/^RN-\d{8}-\d{4}$/'),
                         Radio::make('from_model_type')
                             ->label('From Order')
                             ->inlineLabel()
@@ -74,7 +82,10 @@ class ReturnProductResource extends Resource
                                     'App\Models\PurchaseReceipt' => 'Purchase Receipt',
                                 ];
                             })
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Tipe order sumber wajib dipilih.',
+                            ]),
                         Select::make('from_model_id')
                             ->label(function ($set, $get) {
                                 return 'From Order';
@@ -92,17 +103,37 @@ class ReturnProductResource extends Resource
                                 }
                                 return [];
                             })
-                            ->preload(),
+                            ->preload()
+                            ->validationMessages([
+                                'required' => 'Order sumber wajib dipilih.',
+                            ]),
                         Select::make('warehouse_id')
                             ->label('Gudang')
                             ->searchable()
                             ->preload()
                             ->relationship('warehouse', 'name')
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Gudang tujuan retur wajib dipilih.',
+                            ]),
                         Textarea::make('reason')
                             ->label('Reason')
                             ->string()
                             ->nullable(),
+                        Radio::make('return_action')
+                            ->label('Return Action')
+                            ->inlineLabel()
+                            ->options([
+                                'reduce_quantity_only' => 'Reduce Quantity Only (Allow Partial DO)',
+                                'close_do_partial' => 'Close DO Partial (Force Complete DO)',
+                                'close_so_complete' => 'Close SO Complete (Force Complete SO)',
+                            ])
+                            ->default('reduce_quantity_only')
+                            ->helperText('Choose what happens after return approval. "Reduce Quantity Only" keeps DO open for remaining items. "Close DO Partial" forces DO completion. "Close SO Complete" forces SO completion.')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Aksi retur wajib dipilih.',
+                            ]),
                         Repeater::make('returnProductItem')
                             ->columnSpanFull()
                             ->defaultItems(0)
@@ -132,7 +163,10 @@ class ReturnProductResource extends Resource
 
                                         return '';
                                     })
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Tipe item sumber wajib dipilih.',
+                                    ]),
                                 Select::make('from_item_model_id')
                                     ->label('From Item Model')
                                     ->preload()
@@ -174,7 +208,10 @@ class ReturnProductResource extends Resource
                                             $set('max_quantity', $fromModelItem->quantity);
                                             $set('quantity', $fromModelItem->quantity);
                                         }
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Item produk yang akan diretur wajib dipilih.',
+                                    ]),
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->searchable()
@@ -196,7 +233,14 @@ class ReturnProductResource extends Resource
                                             HelperController::sendNotification(isSuccess: false, title: "Information", message: "Quantity yang kamu masukkan lebih besar dari sumber order");
                                         }
                                     })
-                                    ->default(0),
+                                    ->default(0)
+                                    ->required()
+                                    ->minValue(1)
+                                    ->validationMessages([
+                                        'required' => 'Quantity retur wajib diisi.',
+                                        'numeric' => 'Quantity harus berupa angka.',
+                                        'min' => 'Quantity minimal 1.',
+                                    ]),
                                 Select::make('rak_id')
                                     ->label('Rak')
                                     ->preload()
@@ -204,7 +248,10 @@ class ReturnProductResource extends Resource
                                     ->relationship('rak', 'name', function ($get, Builder $query) {
                                         $query->where('warehouse_id', $get('../../warehouse_id'));
                                     })
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Rak penyimpanan wajib dipilih.',
+                                    ]),
                                 Radio::make('condition')
                                     ->label('Condition')
                                     ->options([
@@ -212,14 +259,71 @@ class ReturnProductResource extends Resource
                                         'damage' => "Damage",
                                         'repair' => "Repair"
                                     ])->inline()
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Kondisi produk retur wajib dipilih.',
+                                    ]),
                                 Textarea::make('note')
                                     ->label('Note')
                                     ->string()
                                     ->nullable()
                             ])
                     ])
-            ]);
+            ])
+            ->rules([
+                'returnProductItem' => 'required|array|min:1',
+                'returnProductItem.*.from_item_model_type' => 'required',
+                'returnProductItem.*.from_item_model_id' => 'required',
+                'returnProductItem.*.product_id' => 'required',
+                'returnProductItem.*.quantity' => 'required|numeric|min:1',
+                'returnProductItem.*.rak_id' => 'required',
+                'returnProductItem.*.condition' => 'required',
+                function ($get) {
+                    $items = $get('returnProductItem') ?? [];
+                    foreach ($items as $index => $item) {
+                        $quantity = $item['quantity'] ?? 0;
+                        $maxQuantity = $item['max_quantity'] ?? 0;
+                        
+                        if ($quantity > $maxQuantity && $maxQuantity > 0) {
+                            return [
+                                "returnProductItem.{$index}.quantity" => "Quantity retur tidak boleh melebihi quantity tersedia ({$maxQuantity})."
+                            ];
+                        }
+                    }
+                    return [];
+                }
+            ])
+            ->validationMessages([
+                'returnProductItem.required' => 'Minimal satu item produk retur wajib ditambahkan.',
+                'returnProductItem.min' => 'Minimal satu item produk retur wajib ditambahkan.',
+                'returnProductItem.*.from_item_model_type.required' => 'Tipe item sumber wajib dipilih untuk setiap item.',
+                'returnProductItem.*.from_item_model_id.required' => 'Item produk wajib dipilih untuk setiap item.',
+                'returnProductItem.*.product_id.required' => 'Produk wajib dipilih untuk setiap item.',
+                'returnProductItem.*.quantity.required' => 'Quantity wajib diisi untuk setiap item.',
+                'returnProductItem.*.quantity.numeric' => 'Quantity harus berupa angka untuk setiap item.',
+                'returnProductItem.*.quantity.min' => 'Quantity minimal 1 untuk setiap item.',
+                'returnProductItem.*.rak_id.required' => 'Rak penyimpanan wajib dipilih untuk setiap item.',
+                'returnProductItem.*.condition.required' => 'Kondisi produk wajib dipilih untuk setiap item.',
+            ])
+            ->afterValidation(function ($state, $set) {
+                // Additional validation: Ensure warehouse is selected before items
+                if (empty($state['warehouse_id'])) {
+                    HelperController::sendNotification(
+                        isSuccess: false, 
+                        title: "Validation Error", 
+                        message: "Silakan pilih gudang terlebih dahulu sebelum menambah item retur."
+                    );
+                }
+                
+                // Additional validation: Ensure from_model is selected before items
+                if (empty($state['from_model_type']) || empty($state['from_model_id'])) {
+                    HelperController::sendNotification(
+                        isSuccess: false, 
+                        title: "Validation Error", 
+                        message: "Silakan pilih order sumber terlebih dahulu sebelum menambah item retur."
+                    );
+                }
+            });
     }
 
     public static function table(Table $table): Table
@@ -260,6 +364,33 @@ class ReturnProductResource extends Resource
                         };
                     })
                     ->badge(),
+                TextColumn::make('return_action')
+                    ->label('Return Action')
+                    ->formatStateUsing(function ($state) {
+                        return match ($state) {
+                            'reduce_quantity_only' => 'Reduce Qty Only',
+                            'close_do_partial' => 'Close DO Partial',
+                            'close_so_complete' => 'Close SO Complete',
+                            default => 'Auto Close'
+                        };
+                    })
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'reduce_quantity_only' => 'warning',
+                            'close_do_partial' => 'info',
+                            'close_so_complete' => 'danger',
+                            default => 'gray'
+                        };
+                    })
+                    ->badge()
+                    ->tooltip(function ($state) {
+                        return match ($state) {
+                            'reduce_quantity_only' => 'Only reduce quantity, keep DO open for remaining items',
+                            'close_do_partial' => 'Force close DO regardless of remaining quantity',
+                            'close_so_complete' => 'Force close both DO and SO',
+                            default => 'Auto close when all quantities returned'
+                        };
+                    }),
                 TextColumn::make('returnProductItem')
                     ->label('Product')
                     ->formatStateUsing(function ($state) {
@@ -267,6 +398,38 @@ class ReturnProductResource extends Resource
                     })
                     ->searchable()
                     ->badge(),
+                TextColumn::make('returnProductItem')
+                    ->label('Gudang & Rak')
+                    ->formatStateUsing(function ($record) {
+                        $items = $record->returnProductItem;
+                        $warehouseRakInfo = [];
+
+                        foreach ($items as $item) {
+                            $warehouseName = $item->rak->warehouse->name ?? 'Unknown';
+                            $rakName = $item->rak->name ?? 'Unknown';
+                            $warehouseRakInfo[] = "{$warehouseName} - {$rakName}";
+                        }
+
+                        return implode(', ', array_unique($warehouseRakInfo));
+                    })
+                    ->tooltip(function ($record) {
+                        $items = $record->returnProductItem;
+                        $details = [];
+
+                        foreach ($items as $item) {
+                            $productName = $item->product->name;
+                            $warehouseName = $item->rak->warehouse->name ?? 'Unknown';
+                            $rakName = $item->rak->name ?? 'Unknown';
+                            $quantity = $item->quantity;
+                            $condition = $item->condition ?? 'Unknown';
+
+                            $details[] = "{$productName}: {$quantity} pcs ({$condition}) - {$warehouseName} > {$rakName}";
+                        }
+
+                        return implode("\n", $details);
+                    })
+                    ->badge()
+                    ->color('info'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -302,6 +465,38 @@ class ReturnProductResource extends Resource
                     DeleteAction::make()
                         ->visible(function ($record) {
                             return $record->status == 'draft' || Auth::user()->hasRole('Super Admin');
+                        })
+                        ->requiresConfirmation(function ($action, $record) {
+                            if ($record->status == 'approved') {
+                                $action->modalHeading('Hapus Return Product Approved')
+                                       ->modalDescription("⚠️ PERHATIAN: Return product ini sudah diapprove dan mungkin telah mempengaruhi quantity order.\n\n" .
+                                                        "Menghapus return product yang sudah diapprove dapat menyebabkan:\n" .
+                                                        "- Quantity order menjadi tidak akurat\n" .
+                                                        "- Stock movement records menjadi invalid\n\n" .
+                                                        "Pastikan Anda memahami konsekuensinya sebelum melanjutkan.")
+                                       ->modalSubmitActionLabel('Ya, Hapus Saja');
+                            } else {
+                                $action->modalHeading('Hapus Return Product Draft')
+                                       ->modalDescription("Apakah Anda yakin ingin menghapus return product draft ini?\n\nData yang dihapus tidak dapat dikembalikan.")
+                                       ->modalSubmitActionLabel('Ya, Hapus');
+                            }
+                        })
+                        ->before(function ($record) {
+                            if ($record->status == 'approved') {
+                                // Log the deletion of approved return for audit trail
+                                Log::warning("Approved return product deleted", [
+                                    'return_number' => $record->return_number,
+                                    'deleted_by' => Auth::id(),
+                                    'warehouse' => $record->warehouse->name ?? 'Unknown',
+                                    'item_count' => $record->returnProductItem->count(),
+                                    'total_quantity' => $record->returnProductItem->sum('quantity')
+                                ]);
+                            }
+                        })
+                        ->successNotificationTitle(function ($record) {
+                            return $record->status == 'approved' 
+                                ? "Return product approved berhasil dihapus (dengan risiko)" 
+                                : "Return product draft berhasil dihapus";
                         }),
                     Action::make('approve')
                         ->label('Approve')
@@ -310,11 +505,63 @@ class ReturnProductResource extends Resource
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('approve return product') && $record->status == 'draft';
                         })
-                        ->requiresConfirmation()
+                        ->requiresConfirmation(function ($action, $record) {
+                            $itemCount = $record->returnProductItem->count();
+                            $totalQuantity = $record->returnProductItem->sum('quantity');
+                            
+                            $action->modalHeading('Approve Return Product')
+                                   ->modalDescription("Apakah Anda yakin ingin menyetujui return product ini?\n\n" .
+                                                    "Detail Return:\n" .
+                                                    "- Nomor: {$record->return_number}\n" .
+                                                    "- Jumlah Item: {$itemCount}\n" .
+                                                    "- Total Quantity: {$totalQuantity}\n" .
+                                                    "- Aksi: " . match($record->return_action) {
+                                                        'reduce_quantity_only' => 'Hanya kurangi quantity',
+                                                        'close_do_partial' => 'Tutup DO paksa',
+                                                        'close_so_complete' => 'Tutup SO paksa',
+                                                        default => 'Auto close'
+                                                    } . "\n\n" .
+                                                    "⚠️ Pastikan semua data sudah benar sebelum approve.")
+                                   ->modalSubmitActionLabel('Ya, Approve Return');
+                        })
                         ->action(function ($record) {
-                            $returnProductService = app(ReturnProductService::class);
-                            $returnProductService->updateQuantityFromModel($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Berhasil mengubah status return product");
+                            // Additional validation before approve
+                            if ($record->returnProductItem->isEmpty()) {
+                                HelperController::sendNotification(
+                                    isSuccess: false, 
+                                    title: "Approval Failed", 
+                                    message: "Tidak dapat approve return product tanpa item. Silakan tambahkan minimal satu item retur."
+                                );
+                                return;
+                            }
+                            
+                            // Check if warehouse has available space (basic validation)
+                            $warehouse = $record->warehouse;
+                            if (!$warehouse) {
+                                HelperController::sendNotification(
+                                    isSuccess: false, 
+                                    title: "Approval Failed", 
+                                    message: "Gudang tidak valid atau tidak ditemukan."
+                                );
+                                return;
+                            }
+                            
+                            try {
+                                $returnProductService = app(ReturnProductService::class);
+                                $returnProductService->updateQuantityFromModel($record);
+                                
+                                HelperController::sendNotification(
+                                    isSuccess: true, 
+                                    title: "Return Product Approved", 
+                                    message: "Return product {$record->return_number} berhasil diapprove. Quantity telah diperbarui sesuai aksi retur yang dipilih."
+                                );
+                            } catch (\Exception $e) {
+                                HelperController::sendNotification(
+                                    isSuccess: false, 
+                                    title: "Approval Failed", 
+                                    message: "Terjadi kesalahan saat approve return product: " . $e->getMessage()
+                                );
+                            }
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)

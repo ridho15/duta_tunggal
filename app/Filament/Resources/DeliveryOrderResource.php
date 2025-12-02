@@ -515,6 +515,24 @@ class DeliveryOrderResource extends Resource
                         };
                     })
                     ->badge(),
+                TextColumn::make('surat_jalan_status')
+                    ->label('Surat Jalan')
+                    ->formatStateUsing(function ($record) {
+                        return $record->suratJalan()->exists() ? 'Ada' : 'Belum Ada';
+                    })
+                    ->color(function ($record) {
+                        return $record->suratJalan()->exists() ? 'success' : 'warning';
+                    })
+                    ->badge()
+                    ->tooltip(function ($record) {
+                        if ($record->suratJalan()->exists()) {
+                            $suratJalan = $record->suratJalan()->first();
+                            if ($suratJalan) {
+                                return "Surat Jalan: {$suratJalan->sj_number}\nStatus: {$suratJalan->status}";
+                            }
+                        }
+                        return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
+                    }),
                 TextColumn::make('salesOrders.so_number')
                     ->label('Sales Orders')
                     ->badge()
@@ -625,7 +643,9 @@ class DeliveryOrderResource extends Resource
                         ->color('success')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response delivery order') && ($record->status == 'request_approve');
+                            return Auth::user()->hasPermissionTo('response delivery order') &&
+                                   $record->status == 'request_approve' &&
+                                   $record->suratJalan()->exists();
                         })
                         ->form([
                             Textarea::make('comments')
@@ -634,18 +654,15 @@ class DeliveryOrderResource extends Resource
                                 ->nullable()
                         ])
                         ->action(function ($record, array $data) {
-                            $deliveryOrderService = app(DeliveryOrderService::class);
-                            $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
-                            
-                            // DeliveryOrderApprovalLog::create([
-                            //     'delivery_order_id' => $record->id,
-                            //     'user_id' => Auth::id(),
-                            //     'action' => 'approved',
-                            //     'comments' => $data['comments'] ?? null,
-                            //     'approved_at' => now(),
-                            // ]);
-                            
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve Delivery Order");
+                            try {
+                                $deliveryOrderService = app(DeliveryOrderService::class);
+                                $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
+
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve Delivery Order");
+                            } catch (\Exception $e) {
+                                HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
+                                throw $e;
+                            }
                         }),
                     Action::make('closed')
                         ->label('Close')

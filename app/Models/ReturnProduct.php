@@ -18,6 +18,7 @@ class ReturnProduct extends Model
         'warehouse_id',
         'status', // draft / approve
         'reason',
+        'return_action', // reduce_quantity_only, close_do_partial, close_so_complete
     ];
 
     public function warehouse()

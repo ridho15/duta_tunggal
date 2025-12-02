@@ -31,6 +31,11 @@ class DeliveryOrderService
 
     public function updateStatus($deliveryOrder, $status, $comments = null, $action = null)
     {
+        // Validate that delivery order cannot be approved without surat jalan
+        if ($status === 'approved' && !$deliveryOrder->suratJalan()->exists()) {
+            throw new \Exception('Delivery Order tidak dapat di-approve karena belum ada Surat Jalan yang terkait.');
+        }
+
         $deliveryOrder->update([
             'status' => $status
         ]);
@@ -43,9 +48,7 @@ class DeliveryOrderService
         DeliveryOrderLog::create([
             'delivery_order_id' => $delivery_order_id,
             'status' => $status,
-            'confirmed_by' => Auth::user()->id,
-            'comments' => $comments,
-            'action' => $action,
+            'confirmed_by' => Auth::user()?->id ?? 13, // Fallback to user ID 13 if not authenticated
         ]);
     }
 

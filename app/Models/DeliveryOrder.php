@@ -44,7 +44,7 @@ class DeliveryOrder extends Model
 
     public function suratJalan()
     {
-        return $this->hasOne(SuratJalan::class, 'delivery_order_id')->withDefault();
+        return $this->belongsToMany(SuratJalan::class, 'surat_jalan_delivery_orders', 'delivery_order_id', 'surat_jalan_id')->withTimestamps();
     }
 
     public function deliverySalesOrder()
@@ -59,6 +59,11 @@ class DeliveryOrder extends Model
 
     public function returnProduct(){
         return $this->morphOne(ReturnProduct::class, 'from_model')->withDefault();
+    }
+
+    public function stockMovement()
+    {
+        return $this->morphOne(StockMovement::class, 'from_model')->withDefault();
     }
 
     public function approvalLogs()
