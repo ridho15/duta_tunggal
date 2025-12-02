@@ -19,6 +19,8 @@ class DeliveryOrder extends Model
         'warehouse_id',
         'status', // 'draft', 'sent', 'received', 'supplier', 'completed', 'request_approve', 'approved', 'request_close', 'closed', 'reject'
         'notes',
+        'additional_cost',
+        'additional_cost_description',
         'created_by',
     ];
 

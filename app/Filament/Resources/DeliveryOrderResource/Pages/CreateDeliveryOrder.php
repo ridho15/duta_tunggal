@@ -16,7 +16,7 @@ class CreateDeliveryOrder extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Validate warehouse confirmation for all selected sales orders
-        $salesOrderIds = $data['sales_order_id'] ?? [];
+        $salesOrderIds = $data['salesOrders'] ?? [];
         if (!empty($salesOrderIds)) {
             foreach ($salesOrderIds as $salesOrderId) {
                 $salesOrder = \App\Models\SaleOrder::find($salesOrderId);
@@ -42,7 +42,7 @@ class CreateDeliveryOrder extends CreateRecord
 
         // Additional validation before creating
         app(DeliveryOrderItemService::class)->validateItemsForSalesOrder(
-            (int) ($data['sales_order_id'] ?? 0),
+            (int) ($data['salesOrders'] ?? 0),
             $data['deliveryOrderItem'] ?? []
         );
 

@@ -143,6 +143,17 @@ class Invoice extends Model
         return self::STATUS_LABELS[$this->status] ?? $this->status;
     }
 
+    public function getDeliveryOrdersDisplayAttribute()
+    {
+        if (is_array($this->delivery_orders) && !empty($this->delivery_orders)) {
+            $doNumbers = \App\Models\DeliveryOrder::whereIn('id', $this->delivery_orders)
+                ->pluck('do_number')
+                ->join(', ');
+            return $doNumbers ?: 'Has ' . count($this->delivery_orders) . ' delivery order(s)';
+        }
+        return 'None';
+    }
+
     public static function getStatusOptions()
     {
         return self::STATUS_LABELS;

@@ -64,6 +64,28 @@ class ViewDeliveryOrder extends ViewRecord
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'reject', comments: $data['comments'], action: 'rejected');
                     \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Delivery Order");
                 }),
+            Actions\Action::make('sent')
+                ->label('Mark as Sent')
+                ->requiresConfirmation()
+                ->modalHeading('Mark Delivery Order as Sent')
+                ->modalDescription('Are you sure you want to mark this delivery order as sent? This will create journal entries for goods delivery.')
+                ->modalSubmitActionLabel('Yes, Mark as Sent')
+                ->color('info')
+                ->icon('heroicon-o-paper-airplane')
+                ->visible(function ($record) {
+                    return Auth::user()->hasPermissionTo('response delivery order') &&
+                           $record->status == 'approved';
+                })
+                ->action(function ($record) {
+                    try {
+                        $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
+                        $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'sent');
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Success", message: "Delivery Order marked as sent successfully");
+                    } catch (\Exception $e) {
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
+                        throw $e;
+                    }
+                }),
             Action::make('surat_jalan_status')
                 ->label(function ($record) {
                     return $record->suratJalan()->exists() ? 'Surat Jalan: Ada' : 'Surat Jalan: Belum Ada';
@@ -77,8 +99,10 @@ class ViewDeliveryOrder extends ViewRecord
                 ->disabled()
                 ->tooltip(function ($record) {
                     if ($record->suratJalan()->exists()) {
-                        $suratJalan = $record->suratJalan;
-                        return "Surat Jalan: {$suratJalan->sj_number} - Status: {$suratJalan->status}";
+                        $suratJalan = $record->suratJalan()->where('status', 1)->first() ?? $record->suratJalan()->first();
+                        if ($suratJalan) {
+                            return "Surat Jalan: {$suratJalan->sj_number} - Status: {$suratJalan->status}";
+                        }
                     }
                     return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
                 }),

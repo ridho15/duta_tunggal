@@ -181,20 +181,6 @@ class DeliveryOrderResource extends Resource
                         Textarea::make('notes')
                             ->label('Notes')
                             ->nullable(),
-                        TextInput::make('additional_cost')
-                            ->label('Biaya Tambahan')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->default(0)
-                            ->minValue(0)
-                            ->step(0.01)
-                            ->helperText('Biaya tambahan seperti ongkos kirim, asuransi, dll.')
-                            ->nullable(),
-                        Textarea::make('additional_cost_description')
-                            ->label('Deskripsi Biaya Tambahan')
-                            ->nullable()
-                            ->rows(3)
-                            ->helperText('Jelaskan detail biaya tambahan yang dikenakan'),
 
                         // Section untuk memilih item dari sales order
                         Fieldset::make('Pilih Barang untuk Dikirim')
@@ -285,10 +271,8 @@ class DeliveryOrderResource extends Resource
                                         return 'Item';
                                     })
                             ])
-                            ->visible(function ($get, $context) {
-                                // Only show selected_items when creating new delivery order
-                                // When editing, hide this section and use deliveryOrderItem repeater instead
-                                return $context !== 'edit' && (!empty($get('salesOrders')) || !empty($get('selected_items')));
+                            ->visible(function ($get) {
+                                return !empty($get('salesOrders'));
                             }),
                         Repeater::make('deliveryOrderItem')
                             ->relationship()
@@ -324,8 +308,13 @@ class DeliveryOrderResource extends Resource
                                                         $fail("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) tidak boleh lebih besar dari quantity sale order item ({$saleOrderItem->quantity}).");
                                                         return;
                                                     }
-
-                                                    // Note: Validasi remaining quantity dihapus - tetap bisa disimpan meskipun melebihi sisa quantity
+                                                    
+                                                    // Validasi 2: Quantity delivery item tidak boleh melebihi remaining quantity
+                                                    if ($deliveryItem['quantity'] > $saleOrderItem->remaining_quantity) {
+                                                        $productName = $saleOrderItem->product->name ?? "Unknown Product";
+                                                        $fail("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).");
+                                                        return;
+                                                    }
                                                 }
                                             }
                                         }
@@ -350,7 +339,7 @@ class DeliveryOrderResource extends Resource
                                         '0' => 'None',
                                         '1' => 'From Receipt Item',
                                         '2' => 'From Sales Order Item'
-                                    ])->default(function ($get, $set) {
+                                    ->default(function ($get, $set) {
                                         $listSalesOrderId = $get('../../salesOrders');
                                         if (count($listSalesOrderId) > 0) {
                                             $set('options_from', 2);
@@ -474,7 +463,7 @@ class DeliveryOrderResource extends Resource
                                                 $delivered = $saleOrderItem->delivered_quantity;
                                                 $total = $saleOrderItem->quantity;
                                                 
-                                                return "Total SO: {$total} | Sudah dikirim: {$delivered} | Sisa: {$remaining} | Max yang bisa dikirim: {$remaining}";
+                                                return "Total SO: {$total} | Sudah dikirim: {$delivered} | Sisa: {$remaining} | Max: {$total}";
                                             }
                                         }
                                         
@@ -484,10 +473,7 @@ class DeliveryOrderResource extends Resource
                                     ->label('Reason')
                                     ->nullable()
                             ])
-                            ->visible(function ($get, $context) {
-                                // Show deliveryOrderItem repeater when editing or when selected_items is not available
-                                return $context === 'edit' || empty($get('selected_items'));
-                            })
+                            ->hidden() // Hide the old repeater, we use selected_items now
                     ])
             ]);
     }
@@ -532,20 +518,20 @@ class DeliveryOrderResource extends Resource
                 TextColumn::make('surat_jalan_status')
                     ->label('Surat Jalan')
                     ->formatStateUsing(function ($record) {
-                        return $record->suratJalan()->exists() ? 'Ada' : 'Belum Ada';
+                        return $record->suratJalan()->where('status', 1)->exists() ? 'Terbit' : 'Belum Terbit';
                     })
                     ->color(function ($record) {
-                        return $record->suratJalan()->exists() ? 'success' : 'warning';
+                        return $record->suratJalan()->where('status', 1)->exists() ? 'success' : 'warning';
                     })
                     ->badge()
                     ->tooltip(function ($record) {
-                        if ($record->suratJalan()->exists()) {
-                            $suratJalan = $record->suratJalan()->first();
+                        if ($record->suratJalan()->where('status', 1)->exists()) {
+                            $suratJalan = $record->suratJalan()->where('status', 1)->first();
                             if ($suratJalan) {
-                                return "Surat Jalan: {$suratJalan->sj_number}\nStatus: {$suratJalan->status}";
+                                return "Surat Jalan: {$suratJalan->sj_number}\nStatus: Terbit";
                             }
                         }
-                        return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
+                        return 'Delivery Order belum memiliki Surat Jalan yang terbit. Surat Jalan yang terbit diperlukan sebelum approval.';
                     }),
                 TextColumn::make('salesOrders.so_number')
                     ->label('Sales Orders')
@@ -659,7 +645,7 @@ class DeliveryOrderResource extends Resource
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response delivery order') &&
                                    $record->status == 'request_approve' &&
-                                   $record->suratJalan()->exists();
+                                   $record->suratJalan()->where('status', 1)->exists();
                         })
                         ->form([
                             Textarea::make('comments')
@@ -733,17 +719,20 @@ class DeliveryOrderResource extends Resource
 
                         }),
                     Action::make('checker_edit_quantity')
-                        ->label('Checker Edit Qty')
+                        ->label('Edit Quantity')
                         ->color('warning')
                         ->icon('heroicon-o-pencil-square')
                         ->visible(function ($record) {
-                            // Hanya tampil untuk status approved dan user dengan role checker atau admin
-                            return ($record->status == 'approved' || $record->status == 'confirmed') &&
+                            // Tampil untuk status sebelum approved dan user dengan role checker atau admin
+                            return in_array($record->status, ['draft', 'request_approve', 'confirmed']) &&
                                    Auth::user()->hasRole(['Checker', 'Super Admin', 'Owner', 'Admin']);
                         })
                         ->form(function ($record) {
+                            // Load necessary relationships
+                            $record->load(['deliveryOrderItem.product']);
+                            
                             return [
-                                Fieldset::make('Edit Quantity untuk Checker')
+                                Fieldset::make('Edit Quantity')
                                     ->schema([
                                         Repeater::make('delivery_items')
                                             ->label('Delivery Order Items')
@@ -765,21 +754,7 @@ class DeliveryOrderResource extends Resource
                                                     ->numeric()
                                                     ->required()
                                                     ->minValue(0)
-                                                    ->default(function ($get, $set, $state, $record, $component) {
-                                                        $itemData = $component->getState();
-                                                        return $itemData['current_quantity'] ?? 0;
-                                                    })
-                                                    ->afterStateUpdated(function ($state, $set, $get) {
-                                                        $originalQty = $get('original_quantity');
-                                                        if ($state > $originalQty) {
-                                                            $set('new_quantity', $originalQty);
-                                                            \Filament\Notifications\Notification::make()
-                                                                ->title('Quantity Validation')
-                                                                ->body("Quantity tidak boleh melebihi quantity asli: {$originalQty}")
-                                                                ->warning()
-                                                                ->send();
-                                                        }
-                                                    }),
+                                                    ->default(0),
                                             ])
                                             ->columns(4)
                                             ->defaultItems(0)
@@ -796,8 +771,12 @@ class DeliveryOrderResource extends Resource
                                     ->state(function ($record) {
                                         $items = [];
                                         foreach ($record->deliveryOrderItem as $item) {
+                                            $product = $item->product;
+                                            if (!$product) {
+                                                continue; // Skip if product not found
+                                            }
                                             $items[] = [
-                                                'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
+                                                'product_name' => $product->name . ' (' . $product->sku . ')',
                                                 'original_quantity' => $item->quantity, // Quantity asli dari sale order item
                                                 'current_quantity' => $item->quantity, // Quantity saat ini di delivery order
                                                 'new_quantity' => $item->quantity, // Default sama dengan current
@@ -807,13 +786,20 @@ class DeliveryOrderResource extends Resource
                                         return ['delivery_items' => $items];
                                     }),
                                 Textarea::make('checker_notes')
-                                    ->label('Catatan Checker')
+                                    ->label('Catatan')
                                     ->placeholder('Berikan alasan perubahan quantity...')
                                     ->nullable(),
                             ];
                         })
                         ->action(function ($record, array $data) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
+
+                            // Validate quantities before updating
+                            foreach ($data['delivery_items'] as $itemData) {
+                                if ($itemData['new_quantity'] > $itemData['original_quantity']) {
+                                    throw new \Exception("Quantity untuk {$itemData['product_name']} tidak boleh melebihi quantity asli: {$itemData['original_quantity']}");
+                                }
+                            }
 
                             // Update quantity untuk setiap item yang diubah
                             foreach ($data['delivery_items'] as $itemData) {
@@ -824,20 +810,59 @@ class DeliveryOrderResource extends Resource
                                     ]);
 
                                     // Log perubahan quantity
+                                    $actionType = in_array($record->status, ['draft', 'request_approve', 'confirmed']) 
+                                        ? 'quantity_updated_before_approval' 
+                                        : 'quantity_updated_by_checker';
                                     \App\Models\DeliveryOrderLog::create([
                                         'delivery_order_id' => $record->id,
-                                        'action' => 'quantity_updated_by_checker',
+                                        'action' => $actionType,
                                         'comments' => 'Old: ' . $itemData['current_quantity'] . ', New: ' . $itemData['new_quantity'] . '. ' . ($data['checker_notes'] ?? ''),
                                         'user_id' => Auth::id(),
                                     ]);
                                 }
                             }
 
+                            $contextMessage = in_array($record->status, ['draft', 'request_approve', 'confirmed']) 
+                                ? "Quantity delivery order telah diperbarui sebelum approval"
+                                : "Quantity delivery order telah diperbarui oleh checker";
+
                             HelperController::sendNotification(
                                 isSuccess: true,
                                 title: "Quantity Updated",
-                                message: "Quantity delivery order telah diperbarui oleh checker"
+                                message: $contextMessage
                             );
+                        }),
+                    Action::make('sent')
+                        ->label('Mark as Sent')
+                        ->icon('heroicon-o-truck')
+                        ->requiresConfirmation()
+                        ->modalHeading('Mark Delivery Order as Sent')
+                        ->modalDescription('This will mark the delivery order as sent and release stock reservations. Make sure the goods have been shipped.')
+                        ->modalSubmitActionLabel('Yes, Mark as Sent')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('response delivery order') &&
+                                   in_array($record->status, ['approved']) &&
+                                   $record->driver_id &&
+                                   $record->vehicle_id;
+                        })
+                        ->color('info')
+                        ->action(function ($record) {
+                            try {
+                                $deliveryOrderService = app(DeliveryOrderService::class);
+                                $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'sent', action: 'sent');
+                                HelperController::sendNotification(
+                                    isSuccess: true,
+                                    title: "Information",
+                                    message: "Delivery Order marked as sent and stock reservations released"
+                                );
+                            } catch (\Exception $e) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: "Error",
+                                    message: $e->getMessage()
+                                );
+                                throw $e;
+                            }
                         }),
                     Action::make('completed')
                         ->label('Complete')

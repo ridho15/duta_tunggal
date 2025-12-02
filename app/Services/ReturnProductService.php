@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReturnProduct;
+use Illuminate\Support\Facades\Log;
 
 class ReturnProductService
 {
@@ -100,9 +101,20 @@ class ReturnProductService
         if ($fromModel instanceof \App\Models\DeliveryOrder) {
             foreach ($fromModel->salesOrders as $saleOrder) {
                 if (in_array($saleOrder->status, ['confirmed', 'approved'])) {
+                    // Instead of direct 'completed', use 'request_close' for approval workflow
                     $saleOrder->update([
-                        'status' => 'completed',
-                        'reason_close' => 'Force closed due to return action (RN: ' . $returnProduct->return_number . ')'
+                        'status' => 'request_close',
+                        'request_close_by' => $returnProduct->created_by,
+                        'request_close_at' => now(),
+                        'reason_close' => 'Force close requested due to return action (RN: ' . $returnProduct->return_number . ')'
+                    ]);
+
+                    // Log the request close action
+                    Log::info('SO close requested due to return action', [
+                        'so_number' => $saleOrder->so_number,
+                        'return_number' => $returnProduct->return_number,
+                        'requested_by' => $returnProduct->created_by,
+                        'reason' => 'Return action: close_so_complete'
                     ]);
                 }
             }

@@ -131,10 +131,20 @@ class DeliveryOrderService
      */
     public function postDeliveryOrder(DeliveryOrder $deliveryOrder): array
     {
-        // prevent duplicate posting
-        if (JournalEntry::where('source_type', DeliveryOrder::class)->where('source_id', $deliveryOrder->id)->exists()) {
-            return ['status' => 'skipped', 'message' => 'Delivery order already posted to ledger'];
+        // Check if stock movements already exist for this delivery order
+        $existingStockMovements = \App\Models\StockMovement::where('from_model_type', \App\Models\DeliveryOrderItem::class)
+            ->whereHas('fromModel', function($query) use ($deliveryOrder) {
+                $query->where('delivery_order_id', $deliveryOrder->id);
+            })
+            ->where('type', 'sales')
+            ->exists();
+
+        if ($existingStockMovements) {
+            return ['status' => 'skipped', 'message' => 'Delivery order stock movements already created'];
         }
+
+        // Release stock reservations first before validation
+        $this->releaseStockReservations($deliveryOrder);
 
         // Validate stock availability before posting
         $stockValidation = $this->validateStockAvailability($deliveryOrder);
@@ -146,95 +156,7 @@ class DeliveryOrderService
             ];
         }
 
-        $deliveryOrder->loadMissing([
-            'deliveryOrderItem.product.inventoryCoa',
-            'deliveryOrderItem.product.goodsDeliveryCoa',
-            'salesOrders',
-        ]);
-
         $date = $deliveryOrder->delivery_date ?? Carbon::now()->toDateString();
-
-        // Build journal entries for cost-of-goods-sold (goods delivery) and inventory credit
-        $defaultInventoryCoa = $this->resolveCoaByCodes(['1140.10', '1140.01']);
-        $defaultGoodsDeliveryCoa = $this->resolveCoaByCodes(['1140.20', '1180.10']);
-
-        $debitTotals = [];
-        $creditTotals = [];
-
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            $qtyDelivered = max(0, $item->quantity ?? 0);
-            if ($qtyDelivered <= 0) {
-                continue;
-            }
-
-            $product = $item->product;
-            $costPerUnit = $product?->cost_price ?? 0;
-            if ($costPerUnit <= 0) {
-                continue;
-            }
-
-            $lineAmount = round($qtyDelivered * $costPerUnit, 2);
-            if ($lineAmount <= 0) {
-                continue;
-            }
-
-            $inventoryCoa = $product?->inventoryCoa?->exists ? $product->inventoryCoa : $defaultInventoryCoa;
-            $goodsDeliveryCoa = $product?->goodsDeliveryCoa?->exists ? $product->goodsDeliveryCoa : $defaultGoodsDeliveryCoa;
-
-            if (! $inventoryCoa || ! $goodsDeliveryCoa) {
-                continue;
-            }
-
-            $debitTotals[$goodsDeliveryCoa->id]['coa'] = $goodsDeliveryCoa;
-            $debitTotals[$goodsDeliveryCoa->id]['amount'] = ($debitTotals[$goodsDeliveryCoa->id]['amount'] ?? 0) + $lineAmount;
-
-            $creditTotals[$inventoryCoa->id]['coa'] = $inventoryCoa;
-            $creditTotals[$inventoryCoa->id]['amount'] = ($creditTotals[$inventoryCoa->id]['amount'] ?? 0) + $lineAmount;
-        }
-
-        if (empty($debitTotals) || empty($creditTotals)) {
-            // nothing to post, continue with stock movements only
-            $entries = [];
-        } else {
-            $plannedEntries = [];
-
-            foreach ($debitTotals as $debitData) {
-                $plannedEntries[] = [
-                    'coa_id' => $debitData['coa']->id,
-                    'date' => $date,
-                    'reference' => $deliveryOrder->do_number,
-                    'description' => 'Delivery Order - Goods in transit for ' . $deliveryOrder->do_number,
-                    'debit' => round($debitData['amount'], 2),
-                    'credit' => 0,
-                    'journal_type' => 'sales',
-                    'source_type' => DeliveryOrder::class,
-                    'source_id' => $deliveryOrder->id,
-                ];
-            }
-
-            foreach ($creditTotals as $creditData) {
-                $plannedEntries[] = [
-                    'coa_id' => $creditData['coa']->id,
-                    'date' => $date,
-                    'reference' => $deliveryOrder->do_number,
-                    'description' => 'Delivery Order - Inventory reduction for ' . $deliveryOrder->do_number,
-                    'debit' => 0,
-                    'credit' => round($creditData['amount'], 2),
-                    'journal_type' => 'sales',
-                    'source_type' => DeliveryOrder::class,
-                    'source_id' => $deliveryOrder->id,
-                ];
-            }
-
-            if (! $this->validateJournalBalance($plannedEntries)) {
-                return ['status' => 'error', 'message' => 'Journal entries are not balanced'];
-            }
-
-            $entries = [];
-            foreach ($plannedEntries as $data) {
-                $entries[] = JournalEntry::create($data);
-            }
-        }
 
         // Create stock movements for physical inventory reduction
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
@@ -267,10 +189,7 @@ class DeliveryOrderService
             );
         }
 
-        // Release stock reservations for delivered items
-        $this->releaseStockReservations($deliveryOrder);
-
-        return ['status' => 'posted', 'entries' => []]; // Return empty entries array
+        return ['status' => 'posted'];
     }
 
     /**

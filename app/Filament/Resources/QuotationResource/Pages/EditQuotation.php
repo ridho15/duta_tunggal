@@ -6,6 +6,7 @@ use App\Filament\Resources\QuotationResource;
 use App\Services\QuotationService;
 use Filament\Actions;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditQuotation extends EditRecord
@@ -14,6 +15,7 @@ class EditQuotation extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
             DeleteAction::make()
                 ->icon('heroicon-o-trash'),
         ];

@@ -64,13 +64,13 @@ class DeliveryOrderItemService
 
             $available = $this->calculateAvailableQuantity($saleOrderItem, $currentDeliveryOrderId);
 
-            if ($quantity > $available) {
-                $productName = $saleOrderItem->product->name ?? 'produk';
-
-                throw ValidationException::withMessages([
-                    "deliveryOrderItem.{$index}.quantity" => "Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$available}).",
-                ]);
-            }
+            // Note: Validasi remaining quantity dihapus - tetap bisa disimpan meskipun melebihi sisa quantity
+            // if ($quantity > $available) {
+            //     $productName = $saleOrderItem->product->name ?? 'produk';
+            //     throw ValidationException::withMessages([
+            //         "deliveryOrderItem.{$index}.quantity" => "Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$available}).",
+            //     ]);
+            // }
         }
     }
 

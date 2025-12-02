@@ -16,7 +16,20 @@ class InvoiceItem extends Model
         'product_id',
         'quantity',
         'price',
-        'total'
+        'discount',
+        'tax_rate',
+        'tax_amount',
+        'subtotal',
+        'total',
+    ];
+    protected $casts = [
+        'quantity' => 'decimal:2',
+        'price' => 'decimal:2',
+        'discount' => 'decimal:2',
+        'tax_rate' => 'decimal:2',
+        'tax_amount' => 'decimal:2',
+        'subtotal' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     public function invoice()

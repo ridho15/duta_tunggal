@@ -88,7 +88,8 @@ class SuratJalanResource extends Resource
                             ->preload()
                             ->required()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query) {
-                                $query->whereIn('status', ['approved', 'completed']);
+                                $query->whereDoesntHave('suratJalan')
+                                      ->whereIn('status', ['draft', 'request_approve', 'sent', 'received']);
                             })
                             ->multiple()
                             ->validationMessages([

@@ -12,6 +12,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\RepeatableEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Model;
 
 class ViewSalesInvoice extends ViewRecord
 {
@@ -37,12 +38,13 @@ class ViewSalesInvoice extends ViewRecord
                                     ->label('Status')
                                     ->badge()
                                     ->color(fn (string $state): string => match ($state) {
-                                        'draft' => 'secondary',
+                                        'draft' => 'gray',
+                                        'unpaid' => 'gray',
                                         'sent' => 'warning',
                                         'paid' => 'success',
                                         'partially_paid' => 'primary',
                                         'overdue' => 'danger',
-                                        default => 'secondary',
+                                        default => 'gray',
                                     }),
                             ]),
                     ]),
@@ -51,9 +53,9 @@ class ViewSalesInvoice extends ViewRecord
                     ->schema([
                         Grid::make(2)
                             ->schema([
-                                TextEntry::make('customer_name')
+                                TextEntry::make('customer_name_display')
                                     ->label('Customer Name'),
-                                TextEntry::make('customer_phone')
+                                TextEntry::make('customer_phone_display')
                                     ->label('Customer Phone'),
                             ]),
                     ]),
@@ -65,12 +67,12 @@ class ViewSalesInvoice extends ViewRecord
                                 TextEntry::make('dpp')
                                     ->label('DPP')
                                     ->money('IDR'),
-                                TextEntry::make('other_fee')
+                                TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
                                     ->money('IDR'),
                                 TextEntry::make('tax')
-                                    ->label('Tax (%)')
-                                    ->suffix('%'),
+                                    ->label('PPN Amount')
+                                    ->money('IDR'),
                                 TextEntry::make('ppn_rate')
                                     ->label('PPN Rate (%)')
                                     ->suffix('%'),
@@ -100,17 +102,8 @@ class ViewSalesInvoice extends ViewRecord
                                     ->label('SO Number')
                                     ->visible(fn ($record) => $record->from_model_type === 'App\Models\SaleOrder'),
                             ]),
-                        TextEntry::make('delivery_orders')
-                            ->label('Delivery Orders')
-                            ->formatStateUsing(function ($state, $record) {
-                                if (!$state || !is_array($state)) return 'None';
-                                
-                                $doNumbers = \App\Models\DeliveryOrder::whereIn('id', $state)
-                                    ->pluck('do_number')
-                                    ->join(', ');
-                                    
-                                return $doNumbers ?: 'None';
-                            }),
+                        TextEntry::make('delivery_orders_display')
+                            ->label('Delivery Orders'),
                     ]),
 
                 Section::make('Invoice Items')

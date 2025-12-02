@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ReturnProductResource\Pages;
 
 use App\Filament\Resources\ReturnProductResource;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -14,7 +15,10 @@ class ViewReturnProduct extends ViewRecord
     {
         return [
             EditAction::make()
-                ->icon('heroicon-o-pencil-square')
+                ->icon('heroicon-o-pencil-square'),
+                DeleteAction::make()
+                ->icon('heroicon-o-trash')
+                ->color('danger'),
         ];
     }
 }

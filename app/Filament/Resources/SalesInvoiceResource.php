@@ -624,7 +624,14 @@ class SalesInvoiceResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->where('from_model_type', 'App\Models\SaleOrder');
+        return parent::getEloquentQuery()
+            ->where('from_model_type', 'App\Models\SaleOrder')
+            ->with([
+                'invoiceItem.product',
+                'fromModel',
+                'accountReceivable',
+                'accountPayable'
+            ]);
     }
 
     public static function getRelations(): array

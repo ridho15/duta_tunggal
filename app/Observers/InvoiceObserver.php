@@ -90,57 +90,92 @@ class InvoiceObserver
         $arCoa = $invoice->arCoa ?? \App\Models\ChartOfAccount::where('code', '1120')->first(); // Accounts Receivable
         $revenueCoa = $invoice->revenueCoa ?? \App\Models\ChartOfAccount::where('code', '4000')->first(); // Revenue/Sales
         $ppnKeluaranCoa = $invoice->ppnKeluaranCoa ?? \App\Models\ChartOfAccount::where('code', '2120.06')->first(); // PPn Keluaran
+        $discountCoa = \App\Models\ChartOfAccount::where('code', '4100.01')->first(); // Sales Discount
         $biayaPengirimanCoa = $invoice->biayaPengirimanCoa ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first(); // Biaya Pengiriman
 
         if (!$arCoa || !$revenueCoa) {
             return; // Skip if essential COAs not found
         }
 
-        $subtotal = (float) $invoice->subtotal;
-        $tax = (float) $invoice->tax;
+        $invoice->loadMissing('invoiceItem.product');
+
+        // Calculate totals from invoice items for detailed breakdown
+        $totalRevenue = 0;
+        $totalTax = 0;
+        $totalDiscount = 0;
         $otherFeeTotal = $invoice->getOtherFeeTotalAttribute();
 
-        // DEBIT: Accounts Receivable (customer owes money)
+        // DEBIT: Accounts Receivable (customer owes money) - total amount
+        $grandTotal = $invoice->invoiceItem->sum('total') + $otherFeeTotal;
+
+        // DEBIT: Accounts Receivable (customer owes money) - total amount
+        $grandTotal = $invoice->invoiceItem->sum('total') + $otherFeeTotal;
         \App\Models\JournalEntry::create([
             'coa_id' => $arCoa->id,
             'date' => $date,
             'reference' => $invoice->invoice_number,
             'description' => 'Sales Invoice - Accounts Receivable',
-            'debit' => $subtotal + $tax + $otherFeeTotal,
+            'debit' => $grandTotal,
             'credit' => 0,
             'journal_type' => 'sales',
             'source_type' => Invoice::class,
             'source_id' => $invoice->id,
         ]);
 
-        // CREDIT: Revenue/Sales (income from sales)
-        if ($subtotal > 0) {
-            \App\Models\JournalEntry::create([
-                'coa_id' => $revenueCoa->id,
-                'date' => $date,
-                'reference' => $invoice->invoice_number,
-                'description' => 'Sales Invoice - Revenue',
-                'debit' => 0,
-                'credit' => $subtotal,
-                'journal_type' => 'sales',
-                'source_type' => Invoice::class,
-                'source_id' => $invoice->id,
-            ]);
-        }
+        // Create detailed CREDIT entries for each invoice item
+        foreach ($invoice->invoiceItem as $item) {
+            $productName = $item->product->name ?? 'Unknown Product';
+            $subtotal = (float) $item->subtotal; // Revenue after discount
+            $taxAmount = (float) $item->tax_amount;
+            $discountAmount = (float) $item->discount * (float) $item->quantity;
 
-        // CREDIT: PPn Keluaran (output VAT)
-        if ($tax > 0 && $ppnKeluaranCoa) {
-            \App\Models\JournalEntry::create([
-                'coa_id' => $ppnKeluaranCoa->id,
-                'date' => $date,
-                'reference' => $invoice->invoice_number,
-                'description' => 'Sales Invoice - PPn Keluaran',
-                'debit' => 0,
-                'credit' => $tax,
-                'journal_type' => 'sales',
-                'source_type' => Invoice::class,
-                'source_id' => $invoice->id,
-            ]);
+            // CREDIT: Revenue/Sales for this item
+            if ($subtotal > 0) {
+                \App\Models\JournalEntry::create([
+                    'coa_id' => $revenueCoa->id,
+                    'date' => $date,
+                    'reference' => $invoice->invoice_number,
+                    'description' => "Sales Invoice - Revenue: {$productName}",
+                    'debit' => 0,
+                    'credit' => $subtotal,
+                    'journal_type' => 'sales',
+                    'source_type' => Invoice::class,
+                    'source_id' => $invoice->id,
+                ]);
+                $totalRevenue += $subtotal;
+            }
+
+            // DEBIT: Sales Discount for this item (if any)
+            if ($discountAmount > 0 && $discountCoa) {
+                \App\Models\JournalEntry::create([
+                    'coa_id' => $discountCoa->id,
+                    'date' => $date,
+                    'reference' => $invoice->invoice_number,
+                    'description' => "Sales Invoice - Discount: {$productName}",
+                    'debit' => $discountAmount,
+                    'credit' => 0,
+                    'journal_type' => 'sales',
+                    'source_type' => Invoice::class,
+                    'source_id' => $invoice->id,
+                ]);
+                $totalDiscount += $discountAmount;
+            }
+
+            // CREDIT: PPn Keluaran for this item (if any)
+            if ($taxAmount > 0 && $ppnKeluaranCoa) {
+                \App\Models\JournalEntry::create([
+                    'coa_id' => $ppnKeluaranCoa->id,
+                    'date' => $date,
+                    'reference' => $invoice->invoice_number,
+                    'description' => "Sales Invoice - PPn Keluaran: {$productName}",
+                    'debit' => 0,
+                    'credit' => $taxAmount,
+                    'journal_type' => 'sales',
+                    'source_type' => Invoice::class,
+                    'source_id' => $invoice->id,
+                ]);
+                $totalTax += $taxAmount;
+            }
         }
 
         // CREDIT: Biaya Pengiriman (shipping/other costs)
@@ -157,6 +192,15 @@ class InvoiceObserver
                 'source_id' => $invoice->id,
             ]);
         }
+
+        Log::info('Sales invoice journal entries created', [
+            'invoice_id' => $invoice->id,
+            'total_revenue' => $totalRevenue,
+            'total_tax' => $totalTax,
+            'total_discount' => $totalDiscount,
+            'other_fees' => $otherFeeTotal,
+            'grand_total' => $grandTotal,
+        ]);
 
         $this->postCostOfSalesEntries($invoice, $date);
     }

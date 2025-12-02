@@ -42,7 +42,7 @@ class SaleOrderObserver
         ]);
 
         // Load relationships
-        $saleOrder->loadMissing('saleOrderItem.product');
+        $saleOrder->loadMissing('saleOrderItem.product', 'deliveryOrder');
 
         // Cek apakah sudah ada invoice untuk sale order ini
         $existingInvoice = Invoice::where('from_model_type', SaleOrder::class)
@@ -68,15 +68,32 @@ class SaleOrderObserver
             $invoiceItems[] = [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
-                'unit_price' => $item->unit_price,
+                'price' => $item->unit_price,
                 'discount' => $item->discount,
-                'tax' => $item->tax,
-                'subtotal' => $lineSubtotal + $lineTax,
-                'notes' => $item->notes,
+                'tax_rate' => $item->tax,
+                'tax_amount' => $lineTax,
+                'subtotal' => $lineSubtotal,
+                'total' => $lineSubtotal + $lineTax,
             ];
         }
 
-        $total = $subtotal + $tax;
+        // Hitung biaya tambahan dari delivery orders yang terkait
+        $additionalCosts = 0;
+        $otherFees = [];
+
+        foreach ($saleOrder->deliveryOrder as $deliveryOrder) {
+            if ($deliveryOrder->additional_cost > 0) {
+                $additionalCosts += $deliveryOrder->additional_cost;
+                $otherFees[] = [
+                    'amount' => $deliveryOrder->additional_cost,
+                    'description' => $deliveryOrder->additional_cost_description ?: 'Biaya pengiriman DO ' . $deliveryOrder->do_number,
+                    'type' => 'delivery_cost',
+                    'reference' => $deliveryOrder->do_number,
+                ];
+            }
+        }
+
+        $total = $subtotal + $tax + $additionalCosts;
 
         // Buat invoice
         $invoice = Invoice::create([
@@ -89,6 +106,8 @@ class SaleOrderObserver
             'subtotal' => $subtotal,
             'tax' => $tax,
             'total' => $total,
+            'other_fee' => $otherFees, // Tambahkan biaya tambahan dari delivery orders
+            'delivery_orders' => $saleOrder->deliveryOrder->pluck('id')->toArray(), // Tambahkan delivery order IDs
             'status' => 'unpaid', // Atau sesuai logic
             'notes' => 'Auto-generated from completed Sale Order ' . $saleOrder->so_number,
         ]);
@@ -103,6 +122,11 @@ class SaleOrderObserver
         Log::info('Invoice created successfully', [
             'invoice_id' => $invoice->id,
             'invoice_number' => $invoice->invoice_number,
+            'subtotal' => $subtotal,
+            'tax' => $tax,
+            'additional_costs' => $additionalCosts,
+            'total' => $total,
+            'delivery_orders_count' => $saleOrder->deliveryOrder->count(),
         ]);
     }
 

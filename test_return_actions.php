@@ -37,6 +37,17 @@ $saleOrder = \App\Models\SaleOrder::create([
     'total' => 1000
 ]);
 
+// Create sufficient stock for the product
+\App\Models\InventoryStock::updateOrCreate(
+    ['product_id' => 1, 'warehouse_id' => 1],
+    [
+        'rak_id' => 1,
+        'qty_available' => 20, // More than needed
+        'qty_reserved' => 0,
+        'qty_on_hand' => 20
+    ]
+);
+
 $saleOrder->update(['status' => 'approved']);
 $saleOrder->refresh();
 
@@ -183,7 +194,7 @@ echo '================================================' . PHP_EOL;
 // - SO should be completed (closed by last return)
 
 $finalExpectedDoStatus = 'completed'; // Last return closes DO
-$finalExpectedSoStatus = 'completed'; // Last return closes SO
+$finalExpectedSoStatus = 'request_close'; // Last return requests SO close (needs approval)
 
 $actualDoStatus = $deliveryOrder->status;
 $actualSoStatus = $saleOrder->status;
@@ -220,7 +231,7 @@ if ($allTestsPassed) {
     echo '✅ RETURN PRODUCT ACTIONS WORKING PERFECTLY:' . PHP_EOL;
     echo '   • ✅ Reduce Quantity Only: Keeps DO/SO open' . PHP_EOL;
     echo '   • ✅ Close DO Partial: Forces DO completion' . PHP_EOL;
-    echo '   • ✅ Close SO Complete: Forces both DO and SO completion' . PHP_EOL;
+    echo '   • ✅ Close SO Complete: Forces DO completion and requests SO close' . PHP_EOL;
     echo PHP_EOL;
     echo '🚀 Return Product with flexible close options is ready!' . PHP_EOL;
 } else {

@@ -53,10 +53,11 @@ class WarehouseConfirmation extends Model
             // If warehouse confirmation is created with confirmed status, update sale order immediately
             if ($warehouseConfirmation->status === 'confirmed' && $warehouseConfirmation->saleOrder) {
                 $warehouseConfirmation->saleOrder->update([
+                    'status' => 'confirmed',
                     'warehouse_confirmed_at' => now()
                 ]);
 
-                Log::info('Sale Order warehouse_confirmed_at updated after warehouse confirmation auto-approval', [
+                Log::info('Sale Order status and warehouse_confirmed_at updated after warehouse confirmation auto-approval', [
                     'sale_order_id' => $warehouseConfirmation->sale_order_id,
                     'warehouse_confirmation_id' => $warehouseConfirmation->id
                 ]);
@@ -80,10 +81,11 @@ class WarehouseConfirmation extends Model
                 // Update sale order warehouse_confirmed_at if this is a sales order confirmation
                 if ($warehouseConfirmation->saleOrder) {
                     $warehouseConfirmation->saleOrder->update([
+                        'status' => 'confirmed',
                         'warehouse_confirmed_at' => now()
                     ]);
 
-                    Log::info('Sale Order warehouse_confirmed_at updated after warehouse confirmation approval', [
+                    Log::info('Sale Order status and warehouse_confirmed_at updated after warehouse confirmation approval', [
                         'sale_order_id' => $warehouseConfirmation->sale_order_id,
                         'warehouse_confirmation_id' => $warehouseConfirmation->id
                     ]);

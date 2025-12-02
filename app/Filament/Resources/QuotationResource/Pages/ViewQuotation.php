@@ -26,6 +26,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ViewQuotation extends ViewRecord
 {
@@ -117,7 +118,22 @@ class ViewQuotation extends ViewRecord
                     ->icon('heroicon-o-plus')
                     ->color('success')
                     ->visible(function ($record) {
-                        return $record->status == 'approve' && Auth::user()->hasPermissionTo('create sales order');
+                        $user = Auth::user();
+                        $hasPermission = $user && $user->hasPermissionTo('create sales order');
+                        $isApproved = $record->status == 'approve';
+                        
+                        Log::debug('ViewQuotation: create_sale_order visibility check', [
+                            'quotation_id' => $record->id,
+                            'quotation_number' => $record->quotation_number,
+                            'status' => $record->status,
+                            'is_approved' => $isApproved,
+                            'user_id' => $user ? $user->id : null,
+                            'user_name' => $user ? $user->name : null,
+                            'has_permission' => $hasPermission,
+                            'visible' => $isApproved && $hasPermission
+                        ]);
+                        
+                        return $isApproved && $hasPermission;
                     })
                     ->form([
                         Section::make('Informasi Quotation')

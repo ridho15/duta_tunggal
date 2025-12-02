@@ -69,9 +69,7 @@ class ReturnProductResource extends Resource
                                 'required' => 'Nomor return wajib diisi.',
                                 'unique' => 'Nomor return sudah digunakan, silakan generate nomor baru.',
                                 'max' => 'Nomor return maksimal 255 karakter.',
-                                'regex' => 'Format nomor return tidak valid. Gunakan format: RN-YYYYMMDD-XXXX',
-                            ])
-                            ->regex('/^RN-\d{8}-\d{4}$/'),
+                            ]),
                         Radio::make('from_model_type')
                             ->label('From Order')
                             ->inlineLabel()
@@ -269,61 +267,7 @@ class ReturnProductResource extends Resource
                                     ->nullable()
                             ])
                     ])
-            ])
-            ->rules([
-                'returnProductItem' => 'required|array|min:1',
-                'returnProductItem.*.from_item_model_type' => 'required',
-                'returnProductItem.*.from_item_model_id' => 'required',
-                'returnProductItem.*.product_id' => 'required',
-                'returnProductItem.*.quantity' => 'required|numeric|min:1',
-                'returnProductItem.*.rak_id' => 'required',
-                'returnProductItem.*.condition' => 'required',
-                function ($get) {
-                    $items = $get('returnProductItem') ?? [];
-                    foreach ($items as $index => $item) {
-                        $quantity = $item['quantity'] ?? 0;
-                        $maxQuantity = $item['max_quantity'] ?? 0;
-                        
-                        if ($quantity > $maxQuantity && $maxQuantity > 0) {
-                            return [
-                                "returnProductItem.{$index}.quantity" => "Quantity retur tidak boleh melebihi quantity tersedia ({$maxQuantity})."
-                            ];
-                        }
-                    }
-                    return [];
-                }
-            ])
-            ->validationMessages([
-                'returnProductItem.required' => 'Minimal satu item produk retur wajib ditambahkan.',
-                'returnProductItem.min' => 'Minimal satu item produk retur wajib ditambahkan.',
-                'returnProductItem.*.from_item_model_type.required' => 'Tipe item sumber wajib dipilih untuk setiap item.',
-                'returnProductItem.*.from_item_model_id.required' => 'Item produk wajib dipilih untuk setiap item.',
-                'returnProductItem.*.product_id.required' => 'Produk wajib dipilih untuk setiap item.',
-                'returnProductItem.*.quantity.required' => 'Quantity wajib diisi untuk setiap item.',
-                'returnProductItem.*.quantity.numeric' => 'Quantity harus berupa angka untuk setiap item.',
-                'returnProductItem.*.quantity.min' => 'Quantity minimal 1 untuk setiap item.',
-                'returnProductItem.*.rak_id.required' => 'Rak penyimpanan wajib dipilih untuk setiap item.',
-                'returnProductItem.*.condition.required' => 'Kondisi produk wajib dipilih untuk setiap item.',
-            ])
-            ->afterValidation(function ($state, $set) {
-                // Additional validation: Ensure warehouse is selected before items
-                if (empty($state['warehouse_id'])) {
-                    HelperController::sendNotification(
-                        isSuccess: false, 
-                        title: "Validation Error", 
-                        message: "Silakan pilih gudang terlebih dahulu sebelum menambah item retur."
-                    );
-                }
-                
-                // Additional validation: Ensure from_model is selected before items
-                if (empty($state['from_model_type']) || empty($state['from_model_id'])) {
-                    HelperController::sendNotification(
-                        isSuccess: false, 
-                        title: "Validation Error", 
-                        message: "Silakan pilih order sumber terlebih dahulu sebelum menambah item retur."
-                    );
-                }
-            });
+            ]);
     }
 
     public static function table(Table $table): Table
