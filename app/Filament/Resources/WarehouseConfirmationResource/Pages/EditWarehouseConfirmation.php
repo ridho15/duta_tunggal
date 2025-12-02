@@ -4,6 +4,7 @@ namespace App\Filament\Resources\WarehouseConfirmationResource\Pages;
 
 use App\Filament\Resources\WarehouseConfirmationResource;
 use Filament\Actions;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditWarehouseConfirmation extends EditRecord
@@ -13,8 +14,14 @@ class EditWarehouseConfirmation extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            ViewAction::make()->icon('heroicon-o-eye')->label('View')->color('primary'),
+           Actions\DeleteAction::make()->icon('heroicon-o-trash'),
         ];
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return $data;
     }
 
     protected function mutateFormDataBeforeFill(array $data): array

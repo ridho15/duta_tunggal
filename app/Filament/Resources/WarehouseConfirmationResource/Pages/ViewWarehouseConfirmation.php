@@ -71,13 +71,16 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                         Infolists\Components\TextEntry::make('status')
                             ->badge()
-                            ->color(fn(string $state): string => match ($state) {
-                                'confirmed' => 'success',
-                                'partial_confirmed' => 'warning',
-                                'rejected' => 'danger',
-                                'request' => 'info',
-                                default => 'gray',
+                            ->color(function($state){
+                                return match (strtolower($state)) {
+                                    'confirmed' => 'success',
+                                    'partial_confirmed' => 'warning',
+                                    'rejected' => 'danger',
+                                    'request' => 'info',
+                                    default => 'gray',
+                                };
                             }),
+                           
 
                         Infolists\Components\TextEntry::make('user.name')
                             ->label('Confirmed By'),
@@ -86,8 +89,11 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->label('Confirmed At')
                             ->dateTime(),
 
-                        Infolists\Components\TextEntry::make('notes')
+                        Infolists\Components\TextEntry::make('note')
                             ->label('Notes')
+                            ->formatStateUsing(function ($state) {
+                                return $state;
+                            })
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
@@ -117,7 +123,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                         Infolists\Components\TextEntry::make('saleOrder.status')
                             ->label('SO Status')
                             ->badge()
-                            ->color(fn(string $state): string => match ($state) {
+                            ->color(fn(string $state): string => match (strtolower($state)) {
                                 'confirmed' => 'success',
                                 'partial_confirmed' => 'warning',
                                 'rejected' => 'danger',
@@ -152,8 +158,11 @@ class ViewWarehouseConfirmation extends ViewRecord
                         Infolists\Components\RepeatableEntry::make('saleOrder.saleOrderItem')
                             ->label('')
                             ->schema([
-                                Infolists\Components\TextEntry::make('product.name')
+                                Infolists\Components\TextEntry::make('product')
                                     ->label('Product')
+                                    ->formatStateUsing(function ($state) {
+                                        return "(" . $state['sku'] . ") " . $state['name'];
+                                    })
                                     ->columnSpan(2),
 
                                 Infolists\Components\TextEntry::make('quantity')
@@ -171,8 +180,11 @@ class ViewWarehouseConfirmation extends ViewRecord
                                         return $record->unit_price * $record->quantity;
                                     }),
 
-                                Infolists\Components\TextEntry::make('warehouse.name')
-                                    ->label('Warehouse')
+                                Infolists\Components\TextEntry::make('warehouse')
+                                    ->label('Gudang')
+                                    ->formatStateUsing(function ($state) {
+                                        return "(" . $state['kode'] . ") " . $state['name'];
+                                    })
                                     ->columnSpan(2),
 
                                 Infolists\Components\TextEntry::make('rak.name')
@@ -187,8 +199,11 @@ class ViewWarehouseConfirmation extends ViewRecord
                         Infolists\Components\RepeatableEntry::make('warehouseConfirmationItems')
                             ->label('Warehouse Confirmation Items')
                             ->schema([
-                                Infolists\Components\TextEntry::make('saleOrderItem.product.name')
+                                Infolists\Components\TextEntry::make('saleOrderItem.product')
                                     ->label('Product')
+                                    ->formatStateUsing(function ($state) {
+                                        return "(" . $state['sku'] . ") " . $state['name'];
+                                    })
                                     ->columnSpan(2),
 
                                 Infolists\Components\TextEntry::make('requested_qty')
@@ -199,8 +214,11 @@ class ViewWarehouseConfirmation extends ViewRecord
                                     ->label('Confirmed Qty')
                                     ->numeric(),
 
-                                Infolists\Components\TextEntry::make('warehouse.name')
-                                    ->label('Warehouse')
+                                Infolists\Components\TextEntry::make('warehouse')
+                                    ->formatStateUsing(function ($state) {
+                                        return "(" . $state['kode'] . ") " . $state['name'];
+                                    })
+                                    ->label('Gudang')
                                     ->columnSpan(2),
 
                                 Infolists\Components\TextEntry::make('rak.name')
@@ -208,7 +226,7 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                                 Infolists\Components\TextEntry::make('status')
                                     ->badge()
-                                    ->color(fn(string $state): string => match ($state) {
+                                    ->color(fn(string $state): string => match (strtolower($state)) {
                                         'confirmed' => 'success',
                                         'partial_confirmed' => 'warning',
                                         'rejected' => 'danger',

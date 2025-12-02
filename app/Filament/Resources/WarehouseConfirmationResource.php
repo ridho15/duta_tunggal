@@ -154,8 +154,7 @@ class WarehouseConfirmationResource extends Resource
                             ->schema([
                                 TextInput::make('product_name')
                                     ->label('Product')
-                                    ->disabled()
-                                    ->columnSpan(2),
+                                    ->disabled(),
 
                                 TextInput::make('requested_qty')
                                     ->label('Requested Qty')
@@ -221,13 +220,13 @@ class WarehouseConfirmationResource extends Resource
                                     ->default('request')
                                     ->required(),
                             ])
-                            ->columns(6)
+                            ->columns(3)
                             ->defaultItems(0)
                             ->visible(function ($get) {
                                 return $get('confirmation_type') === 'sales_order';
                             }),
 
-                        Textarea::make('notes')
+                        Textarea::make('note')
                             ->label('Notes')
                             ->nullable(),
                     ])
