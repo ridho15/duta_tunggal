@@ -209,7 +209,7 @@ class WarehouseConfirmationResource extends Resource
                                         return [];
                                     }),
 
-                                Select::make('status')
+                                Radio::make('status')
                                     ->label('Item Status')
                                     ->options([
                                         'request' => 'Request',
