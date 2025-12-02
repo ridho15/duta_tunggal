@@ -6,6 +6,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
@@ -889,6 +890,23 @@ class HelperController extends Controller
      *
      * @return string
      */
+    public static function generateUniqueCode(string $table, string $column, string $prefix, int $digits = 4): string
+    {
+        // Find the latest record with the given prefix
+        $latest = DB::table($table)->where($column, 'like', $prefix . '%')
+            ->orderBy($column, 'desc')
+            ->first();
+
+        if ($latest) {
+            $lastNumber = (int) substr($latest->$column, strlen($prefix));
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, $digits, '0', STR_PAD_LEFT);
+    }
+
     public static function generateRequestNumber(): string
     {
         $date = now()->format('Ymd');

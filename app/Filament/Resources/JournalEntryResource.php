@@ -165,6 +165,7 @@ class JournalEntryResource extends Resource
                                 try {
                                     $modelClass = $sourceType;
                                     if (!class_exists($modelClass)) return [];
+                                    if (!is_subclass_of($modelClass, \Illuminate\Database\Eloquent\Model::class)) return [];
 
                                     // Get appropriate display field based on model
                                     $displayField = match($modelClass) {
