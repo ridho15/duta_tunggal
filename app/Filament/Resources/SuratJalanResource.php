@@ -14,6 +14,8 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
@@ -22,6 +24,7 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -79,14 +82,32 @@ class SuratJalanResource extends Resource
                             ])
                             ->helperText('Tanggal surat jalan dibuat')
                             ->required(),
-                        Select::make('delivery_order_id')
+                        Select::make('deliveryOrder')
                             ->label('Delivery Order')
                             ->searchable()
                             ->preload()
+                            ->required()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query) {
                                 $query->whereIn('status', ['approved', 'completed']);
                             })
                             ->multiple()
+                            ->validationMessages([
+                                'required' => 'Delivery Order harus dipilih'
+                            ]),
+                        FileUpload::make('document_path')
+                            ->label('Upload Document')
+                            ->directory('surat-jalan-documents')
+                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                            ->maxSize(5120) // 5MB
+                            ->helperText('Upload dokumen surat jalan (PDF, JPG, PNG, max 5MB)')
+                            ->validationMessages([
+                                'acceptedFileTypes' => 'File harus berupa PDF, JPG, atau PNG',
+                                'maxSize' => 'Ukuran file maksimal 5MB'
+                            ]),
+                        Hidden::make('status')
+                            ->default(0), // 0 = Draft, 1 = Terbit
+                        Hidden::make('created_by')
+                            ->default(fn () => Auth::id())
                     ])
             ]);
     }
@@ -167,6 +188,15 @@ class SuratJalanResource extends Resource
                 IconColumn::make('status')
                     ->label('Terbit')
                     ->boolean(),
+                TextColumn::make('document_path')
+                    ->label('Document')
+                    ->getStateUsing(function (SuratJalan $record): string {
+                        return $record->document_path ? 'Ada' : 'Tidak Ada';
+                    })
+                    ->badge()
+                    ->color(function (SuratJalan $record): string {
+                        return $record->document_path ? 'success' : 'danger';
+                    }),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -264,8 +294,19 @@ class SuratJalanResource extends Resource
             ->actions([
                 ActionGroup::make([
                     EditAction::make()
+                        ->modal()
                         ->color('success'),
                     DeleteAction::make(),
+                    Action::make('download_document')
+                        ->label('Download Document')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('info')
+                        ->visible(function ($record) {
+                            return !empty($record->document_path);
+                        })
+                        ->action(function ($record) {
+                            return response()->download(storage_path('app/public/' . $record->document_path));
+                        }),
                     Action::make('download_surat_jalan')
                         ->label('Download Surat')
                         ->icon('heroicon-o-clipboard-document-check')
@@ -316,8 +357,6 @@ class SuratJalanResource extends Resource
     {
         return [
             'index' => Pages\ListSuratJalans::route('/'),
-            'create' => Pages\CreateSuratJalan::route('/create'),
-            'edit' => Pages\EditSuratJalan::route('/{record}/edit'),
         ];
     }
 }

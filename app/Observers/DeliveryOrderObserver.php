@@ -53,10 +53,19 @@ class DeliveryOrderObserver
             }
 
             // Buat stock reservation untuk memindahkan available ke reserved
+            $warehouseId = $deliveryOrder->warehouse_id ?? $item->warehouse_id;
+            if (!$warehouseId) {
+                Log::error('DeliveryOrderObserver: warehouse_id is null for delivery order item', [
+                    'delivery_order_id' => $deliveryOrder->id,
+                    'item_id' => $item->id,
+                    'product_id' => $item->product_id,
+                ]);
+                throw new \Exception('Warehouse ID is required for stock reservation');
+            }
             StockReservation::create([
                 'sale_order_id' => $item->saleOrderItem->sale_order_id ?? null,
                 'product_id' => $item->product_id,
-                'warehouse_id' => $deliveryOrder->warehouse_id,
+                'warehouse_id' => $warehouseId,
                 'rak_id' => $item->rak_id,
                 'quantity' => $quantity,
                 'delivery_order_id' => $deliveryOrder->id,
@@ -65,7 +74,7 @@ class DeliveryOrderObserver
             // Buat stock movement untuk log
             $this->productService->createStockMovement(
                 product_id: $item->product_id,
-                warehouse_id: $deliveryOrder->warehouse_id,
+                warehouse_id: $warehouseId,
                 quantity: $quantity,
                 type: 'delivery_approved',
                 date: $deliveryOrder->delivery_date ?? now()->toDateString(),

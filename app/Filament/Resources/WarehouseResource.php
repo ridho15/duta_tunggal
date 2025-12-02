@@ -63,7 +63,8 @@ class WarehouseResource extends Resource
                                 }))
                             ->validationMessages([
                                 'required' => 'Kode Gudang wajib diisi',
-                                'unique' => 'Kode gudang sudah digunakan'
+                                'unique' => 'Kode gudang sudah digunakan',
+                                'max' => 'Kode gudang terlalu panjang'
                             ])
                             ->required(),
                         TextInput::make('name')
@@ -110,7 +111,8 @@ class WarehouseResource extends Resource
                             ->label('Telepon')
                             ->validationMessages([
                                 'required' => 'Nomor Telepon tidak boleh kosong',
-                                'regex' => 'Nomor Telepon tidak valid !'
+                                'regex' => 'Nomor Telepon tidak valid !',
+                                'max' => 'Nomor telepon terlalu panjang'
                             ])
                             ->helperText('Contoh : 07512345678')
                             ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])

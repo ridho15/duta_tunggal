@@ -48,7 +48,8 @@ class VehicleResource extends Resource
                             ->unique(ignoreRecord: true)
                             ->validationMessages([
                                 'required' => 'Plat nomor tidak boleh kosong',
-                                'unique' => 'Plat nomor sudah terdaftar'
+                                'unique' => 'Plat nomor sudah terdaftar',
+                                'max' => 'Plat nomor terlalu panjang'
                             ])
                             ->maxLength(255),
                         Select::make('type')
@@ -72,6 +73,10 @@ class VehicleResource extends Resource
                             ->label('Kapasitas')
                             ->placeholder('Contoh: 5 Ton, 1000 kg, 20 m³')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Kapasitas tidak boleh kosong',
+                                'max' => 'Kapasitas terlalu panjang'
+                            ])
                             ->maxLength(255),
                     ])
             ]);
@@ -163,9 +168,9 @@ class VehicleResource extends Resource
     {
         return [
             'index' => Pages\ListVehicles::route('/'),
-            'create' => Pages\CreateVehicle::route('/create'),
             'view' => ViewVehicle::route('/{record}'),
-            'edit' => Pages\EditVehicle::route('/{record}/edit'),
+            // 'create' => Pages\CreateVehicle::route('/create'),
+            // 'edit' => Pages\EditVehicle::route('/{record}/edit'),
         ];
     }
 }

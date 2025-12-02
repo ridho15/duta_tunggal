@@ -409,7 +409,7 @@ class ViewQuotation extends ViewRecord
                     ->modalSubmitActionLabel('Buat Sales Order')
                     ->modalCancelActionLabel('Batal')
                     ->slideOver()
-            ])
+            ])->button()
         ];
     }
 }

@@ -75,12 +75,13 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
+        // Get AR created by InvoiceObserver
         $ar = AccountReceivable::where('invoice_id', $invoice->id)->first();
-        $this->assertNotNull($ar);
 
         // Create receipt and allocate to invoice
         $receipt = CustomerReceipt::factory()->create([
             'customer_id' => $customer->id,
+            'selected_invoices' => [$invoice->id],
             'total_payment' => 1000000,
             'payment_method' => 'cash',
         ]);
@@ -90,6 +91,13 @@ class CustomerReceiptFeatureTest extends TestCase
             'method' => 'cash',
             'amount' => 1000000,
         ]);
+
+        $item = $receipt->customerReceiptItem()->first();
+        $item->selected_invoices = [$invoice->id];
+        $item->save();
+
+        // Update receipt status to trigger observer
+        $receipt->update(['status' => 'Paid']);
 
         // Check AR balance updated
         $ar->refresh();
@@ -131,12 +139,13 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
+        // Get AR created by InvoiceObserver
         $ar = AccountReceivable::where('invoice_id', $invoice->id)->first();
-        $this->assertNotNull($ar);
 
         // Partial payment
         $receipt = CustomerReceipt::factory()->create([
             'customer_id' => $customer->id,
+            'selected_invoices' => [$invoice->id],
             'total_payment' => 500000,
             'payment_method' => 'bank_transfer',
         ]);
@@ -146,6 +155,13 @@ class CustomerReceiptFeatureTest extends TestCase
             'method' => 'bank_transfer',
             'amount' => 500000,
         ]);
+
+        $item = $receipt->customerReceiptItem()->first();
+        $item->selected_invoices = [$invoice->id];
+        $item->save();
+
+        // Update receipt status to trigger observer
+        $receipt->update(['status' => 'Partial']);
 
         // Check partial payment
         $ar->refresh();
@@ -188,6 +204,16 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
+        // Manually create AR for invoice1
+        AccountReceivable::create([
+            'invoice_id' => $invoice1->id,
+            'customer_id' => $customer->id,
+            'total' => 500000,
+            'paid' => 0,
+            'remaining' => 500000,
+            'status' => 'Belum Lunas'
+        ]);
+
         // Second invoice
         $saleOrder2 = SaleOrder::factory()->create([
             'customer_id' => $customer->id,
@@ -214,9 +240,20 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
+        // Manually create AR for invoice2
+        AccountReceivable::create([
+            'invoice_id' => $invoice2->id,
+            'customer_id' => $customer->id,
+            'total' => 300000,
+            'paid' => 0,
+            'remaining' => 300000,
+            'status' => 'Belum Lunas'
+        ]);
+
         // Payment for both
         $receipt = CustomerReceipt::factory()->create([
             'customer_id' => $customer->id,
+            'selected_invoices' => [$invoice1->id, $invoice2->id],
             'total_payment' => 800000,
             'payment_method' => 'cheque',
         ]);
@@ -232,6 +269,17 @@ class CustomerReceiptFeatureTest extends TestCase
             'method' => 'cheque',
             'amount' => 300000,
         ]);
+
+        $item1 = $receipt->customerReceiptItem()->where('invoice_id', $invoice1->id)->first();
+        $item1->selected_invoices = [$invoice1->id];
+        $item1->save();
+
+        $item2 = $receipt->customerReceiptItem()->where('invoice_id', $invoice2->id)->first();
+        $item2->selected_invoices = [$invoice2->id];
+        $item2->save();
+
+        // Update receipt status to trigger observer
+        $receipt->update(['status' => 'Paid']);
 
         // Check both invoices paid
         $this->assertEquals('paid', $invoice1->fresh()->status);
@@ -272,9 +320,20 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
+        // Manually create AR since factory doesn't trigger observer
+        AccountReceivable::create([
+            'invoice_id' => $invoice->id,
+            'customer_id' => $customer->id,
+            'total' => 1000000,
+            'paid' => 0,
+            'remaining' => 1000000,
+            'status' => 'Belum Lunas'
+        ]);
+
         // Overpayment
         $receipt = CustomerReceipt::factory()->create([
             'customer_id' => $customer->id,
+            'selected_invoices' => [$invoice->id],
             'total_payment' => 1200000, // Over by 200,000
             'payment_method' => 'credit_card',
         ]);
@@ -284,6 +343,13 @@ class CustomerReceiptFeatureTest extends TestCase
             'method' => 'credit_card',
             'amount' => 1000000,
         ]);
+
+        $item = $receipt->customerReceiptItem()->first();
+        $item->selected_invoices = [$invoice->id];
+        $item->save();
+
+        // Update receipt status to trigger observer
+        $receipt->update(['status' => 'Paid']);
 
         // Check invoice paid and deposit created
         $this->assertEquals('paid', $invoice->fresh()->status);

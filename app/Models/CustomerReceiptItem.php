@@ -18,6 +18,11 @@ class CustomerReceiptItem extends Model
         'amount',
         'coa_id',
         'payment_date',
+        'selected_invoices',
+    ];
+
+    protected $casts = [
+        'selected_invoices' => 'array',
     ];
 
     public function customerReceipt()

@@ -38,15 +38,25 @@ class DriverResource extends Resource
                     ->schema([
                         TextInput::make('name')
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->validationMessages([
+                                'required' => 'Nama driver tidak boleh kosong',
+                                'max' => 'Nama driver terlalu panjang'
+                            ]),
                         TextInput::make('phone')
                             ->tel()->tel() // HTML input type "tel"
                             ->rules(['regex:/^08[0-9]{8,12}$/'])
                             ->maxLength(15)
-                            ->default(null),
+                            ->default(null)
+                            ->validationMessages([
+                                'regex' => 'Nomor telepon tidak valid (harus dimulai dengan 08)'
+                            ]),
                         TextInput::make('license')
                             ->maxLength(255)
-                            ->default(null),
+                            ->default(null)
+                            ->validationMessages([
+                                'max' => 'Nomor SIM terlalu panjang'
+                            ]),
                     ])
             ]);
     }

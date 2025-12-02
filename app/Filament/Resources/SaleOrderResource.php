@@ -619,9 +619,7 @@ class SaleOrderResource extends Resource
                                     ->reactive()
                                     ->readOnly()
                                     ->default(0)
-                                    ->validationMessages([
-                                        'numeric' => 'Subtotal harus berupa angka'
-                                    ])
+                                    ->indonesianMoney()
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
                                             $component->state(HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, $record->tipe_pajak ?? null));
@@ -970,6 +968,23 @@ class SaleOrderResource extends Resource
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
                             }, 'Sale_Order_' . $record->so_number . '.pdf');
+                        }),
+
+                    Action::make('print_kwitansi')
+                        ->label('Cetak Kwitansi')
+                        ->color('success')
+                        ->visible(function ($record) {
+                            return $record->status == 'approved' || $record->status == 'completed' || $record->status == 'confirmed' || $record->status == 'received';
+                        })
+                        ->icon('heroicon-o-printer')
+                        ->action(function ($record) {
+                            $pdf = Pdf::loadView('pdf.kwitansi-sales-order', [
+                                'saleOrder' => $record
+                            ])->setPaper('A4', 'potrait');
+
+                            return response()->streamDownload(function () use ($pdf) {
+                                echo $pdf->stream();
+                            }, 'Kwitansi_' . $record->so_number . '.pdf');
                         }),
 
                     Action::make('completed')

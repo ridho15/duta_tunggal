@@ -53,10 +53,18 @@ class ChartOfAccountResource extends Resource
                             $chartOfAccountService = app(ChartOfAccountService::class);
                             $set('code', $chartOfAccountService->generateCode());
                         }))
+                    ->validationMessages([
+                        'required' => 'Kode akun tidak boleh kosong',
+                        'max' => 'Kode akun terlalu panjang'
+                    ])
                     ->maxLength(255),
                 TextInput::make('name')
                     ->label('Name')
                     ->required()
+                    ->validationMessages([
+                        'required' => 'Nama akun tidak boleh kosong',
+                        'max' => 'Nama akun terlalu panjang'
+                    ])
                     ->maxLength(255),
                 Select::make('type')
                     ->label('Tipe')
@@ -70,6 +78,9 @@ class ChartOfAccountResource extends Resource
                             'Contra Asset' => 'Contra Asset',
                         ];
                     })
+                    ->validationMessages([
+                        'required' => 'Tipe akun harus dipilih'
+                    ])
                     ->required(),
                 Select::make('parent_id')
                     ->label('Induk Akun')
@@ -95,22 +106,31 @@ class ChartOfAccountResource extends Resource
                     ->numeric()
                     ->default(0)
                     ->indonesianMoney()
+                    ->validationMessages([
+                        'numeric' => 'Saldo awal harus berupa angka',
+                        'max' => 'Saldo awal terlalu panjang'
+                    ])
                     ->maxLength(255),
                 TextInput::make('debit')
                     ->label('Debit')
                     ->numeric()
                     ->default(0)
                     ->indonesianMoney()
+                    ->validationMessages([
+                        'numeric' => 'Debit harus berupa angka',
+                        'max' => 'Debit terlalu panjang'
+                    ])
                     ->maxLength(255),
                 TextInput::make('credit')
                     ->label('Kredit')
-                    ->numeric()
                     ->default(0)
                     ->indonesianMoney()
+                    ->validationMessages([
+                        'max' => 'Kredit terlalu panjang'
+                    ])
                     ->maxLength(255),
                 TextInput::make('ending_balance')
                     ->label('Saldo Akhir')
-                    ->numeric()
                     ->default(0)
                     ->indonesianMoney()
                     ->disabled()

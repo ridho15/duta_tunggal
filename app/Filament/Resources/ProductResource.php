@@ -76,7 +76,7 @@ class ProductResource extends Resource
         'sales' => '4100.10',
         'sales_return' => '4120.10',
         'sales_discount' => '4110.10',
-    'goods_delivery' => '1140.20',
+        'goods_delivery' => '1140.20',
         'cogs' => '5100.10',
         'purchase_return' => '5120.10',
         'unbilled_purchase' => '2190.10',
@@ -115,7 +115,11 @@ class ProductResource extends Resource
                         TextInput::make('name')
                             ->required()
                             ->label('Nama Produk')
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->validationMessages([
+                                'required' => 'Nama produk tidak boleh kosong',
+                                'max' => 'Nama produk terlalu panjang'
+                            ]),
                         Select::make('cabang_id')
                             ->label('Cabang')
                             ->preload()
@@ -124,7 +128,11 @@ class ProductResource extends Resource
                             ->relationship('cabang', 'nama')
                             ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
                                 return "({$cabang->kode}) {$cabang->nama}";
-                            }),
+                            })
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Cabang harus dipilih'
+                            ]),
                         Select::make('supplier_id')
                             ->label('Supplier')
                             ->preload()
@@ -143,32 +151,53 @@ class ProductResource extends Resource
                                 $query->where('cabang_id', $get('cabang_id'));
                             })
                             ->preload()
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Kategori produk harus dipilih'
+                            ]),
 
                         TextInput::make('cost_price')
                             ->label('Harga Beli Asli (Rp)')
                             ->required()
                             ->indonesianMoney()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'required' => 'Harga beli tidak boleh kosong',
+                                'numeric' => 'Harga beli harus berupa angka'
+                            ]),
                         TextInput::make('sell_price')
                             ->label('Harga Jual (Rp)')
                             ->required()
                             ->indonesianMoney()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'required' => 'Harga jual tidak boleh kosong',
+                                'numeric' => 'Harga jual harus berupa angka'
+                            ]),
                         TextInput::make('biaya')
                             ->label('Biaya (Rp)')
                             ->required()
                             ->indonesianMoney()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'required' => 'Biaya tidak boleh kosong',
+                                'numeric' => 'Biaya harus berupa angka'
+                            ]),
                         TextInput::make('harga_batas')
                             ->label('Harga Batas (%)')
                             ->numeric()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'numeric' => 'Harga batas harus berupa angka'
+                            ]),
                         TextInput::make('item_value')
                             ->label('Item Value (Rp)')
                             ->numeric()
                             ->indonesianMoney()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'numeric' => 'Item value harus berupa angka'
+                            ]),
                         Radio::make('tipe_pajak')
                             ->inlineLabel()
                             ->label('Tipe Pajak Produk')
@@ -177,19 +206,32 @@ class ProductResource extends Resource
                                 'Inklusif' => 'Inklusif',
                                 'Eksklusif' => 'Eksklusif',
                             ])
-                            ->default('Inklusif'),
+                            ->default('Inklusif')
+                            ->validationMessages([
+                                'required' => 'Tipe pajak harus dipilih'
+                            ])
+                            ->required(),
                         TextInput::make('pajak')
                             ->label('Pajak (%)')
                             ->numeric()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'numeric' => 'Pajak harus berupa angka'
+                            ]),
                         TextInput::make('jumlah_kelipatan_gudang_besar')
                             ->label('Jumlah Kelipatan di Gudang Besar')
                             ->numeric()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'numeric' => 'Jumlah kelipatan gudang besar harus berupa angka'
+                            ]),
                         TextInput::make('jumlah_jual_kategori_banyak')
                             ->label('Jumlah Jual Kategori Banyak')
                             ->numeric()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'numeric' => 'Jumlah jual kategori banyak harus berupa angka'
+                            ]),
                         TextInput::make('kode_merk')
                             ->required()
                             ->validationMessages([
@@ -228,11 +270,18 @@ class ProductResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function (UnitOfMeasure $uom) {
                                         return "{$uom->name} ({$uom->abbreviation})";
                                     })
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Satuan konversi harus dipilih'
+                                    ]),
                                 TextInput::make('nilai_konversi')
                                     ->label('Nilai Konversi')
                                     ->numeric()
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Nilai konversi tidak boleh kosong',
+                                        'numeric' => 'Nilai konversi harus berupa angka'
+                                    ]),
                             ]),
 
                         Toggle::make('is_manufacture')
@@ -281,8 +330,8 @@ class ProductResource extends Resource
                         Select::make('inventory_coa_id')
                             ->label('Persediaan')
                             ->helperText('Akun untuk mencatat persediaan produk ini.')
-                            ->options(fn () => self::getCoaOptions('Asset'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['inventory'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Asset'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['inventory'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable()
@@ -290,64 +339,64 @@ class ProductResource extends Resource
                         Select::make('sales_coa_id')
                             ->label('Penjualan')
                             ->helperText('Akun penjualan ketika produk dijual.')
-                            ->options(fn () => self::getCoaOptions('Revenue'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Revenue'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('sales_return_coa_id')
                             ->label('Retur Penjualan')
                             ->helperText('Akun yang digunakan saat retur penjualan produk.')
-                            ->options(fn () => self::getCoaOptions('Revenue'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales_return'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Revenue'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales_return'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('sales_discount_coa_id')
                             ->label('Diskon Penjualan')
                             ->helperText('Akun untuk diskon penjualan produk.')
-                            ->options(fn () => self::getCoaOptions('Revenue'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales_discount'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Revenue'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales_discount'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('goods_delivery_coa_id')
                             ->label('Barang Terkirim')
                             ->helperText('Akun penampung barang terkirim yang belum diterima pelanggan.')
-                            ->options(fn () => self::getCoaOptions('Asset'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['goods_delivery'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Asset'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['goods_delivery'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('cogs_coa_id')
                             ->label('Beban Pokok Penjualan')
                             ->helperText('Akun beban pokok untuk produk ini.')
-                            ->options(fn () => self::getCoaOptions('Expense'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['cogs'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Expense'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['cogs'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('purchase_return_coa_id')
                             ->label('Retur Pembelian')
                             ->helperText('Akun ketika terjadi retur pembelian produk.')
-                            ->options(fn () => self::getCoaOptions('Expense'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['purchase_return'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Expense'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['purchase_return'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('unbilled_purchase_coa_id')
                             ->label('Pembelian Belum Tertagih')
                             ->helperText('Akun kewajiban ketika barang sudah diterima namun belum ditagih.')
-                            ->options(fn () => self::getCoaOptions('Liability'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['unbilled_purchase'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Liability'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['unbilled_purchase'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('temporary_procurement_coa_id')
                             ->label('Pos Sementara Pengadaan')
                             ->helperText('Akun posisi sementara untuk produk selama proses pengadaan. Akan di-zero ketika pengadaan selesai.')
-                            ->options(fn () => self::getCoaOptions('Asset'))
-                            ->default(fn () => self::getCoaIdByCode(self::$defaultProductAccountCodes['temporary_procurement'] ?? null))
+                            ->options(fn() => self::getCoaOptions('Asset'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['temporary_procurement'] ?? null))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -374,7 +423,7 @@ class ProductResource extends Resource
 
             self::$coaOptionsCache[$cacheKey] = $query
                 ->get()
-                ->mapWithKeys(fn (ChartOfAccount $coa) => [$coa->id => "{$coa->code} - {$coa->name}"])
+                ->mapWithKeys(fn(ChartOfAccount $coa) => [$coa->id => "{$coa->code} - {$coa->name}"])
                 ->toArray();
         }
 
@@ -500,31 +549,31 @@ class ProductResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('salesCoaDisplay')
                     ->label('Akun Penjualan')
-                    ->formatStateUsing(fn ($state, Product $record) => self::formatCoa($record->salesCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->salesCoa))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('salesReturnCoaDisplay')
                     ->label('Akun Retur Penjualan')
-                    ->formatStateUsing(fn ($state, Product $record) => self::formatCoa($record->salesReturnCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->salesReturnCoa))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('salesDiscountCoaDisplay')
                     ->label('Akun Diskon Penjualan')
-                    ->formatStateUsing(fn ($state, Product $record) => self::formatCoa($record->salesDiscountCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->salesDiscountCoa))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('goodsDeliveryCoaDisplay')
                     ->label('Akun Barang Terkirim')
-                    ->formatStateUsing(fn ($state, Product $record) => self::formatCoa($record->goodsDeliveryCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->goodsDeliveryCoa))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cogsCoaDisplay')
                     ->label('Akun Beban Pokok')
-                    ->formatStateUsing(fn ($state, Product $record) => self::formatCoa($record->cogsCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->cogsCoa))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('purchaseReturnCoaDisplay')
                     ->label('Akun Retur Pembelian')
-                    ->formatStateUsing(fn ($state, Product $record) => self::formatCoa($record->purchaseReturnCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->purchaseReturnCoa))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('unbilledPurchaseCoaDisplay')
                     ->label('Akun Pembelian Belum Tertagih')
-                    ->formatStateUsing(fn ($state, Product $record) => self::formatCoa($record->unbilledPurchaseCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->unbilledPurchaseCoa))
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->label('Status')

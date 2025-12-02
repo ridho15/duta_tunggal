@@ -113,22 +113,38 @@ class CustomerResource extends Resource
                         TextInput::make('email')
                             ->email()
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->validationMessages([
+                                'required' => 'Email tidak boleh kosong',
+                                'email' => 'Format email tidak valid',
+                                'max' => 'Email terlalu panjang'
+                            ]),
                         TextInput::make('fax')
                             ->label('Fax')
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Fax tidak boleh kosong'
+                            ]),
                         TextInput::make('tempo_kredit')
                             ->numeric()
                             ->label('Tempo Kredit (Hari)')
                             ->helperText('Hari')
                             ->required()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'required' => 'Tempo kredit tidak boleh kosong',
+                                'numeric' => 'Tempo kredit harus berupa angka'
+                            ]),
                         TextInput::make('kredit_limit')
                             ->label('Kredit Limit (Rp.)')
                             ->default(0)
                             ->required()
                             ->numeric()
-                            ->indonesianMoney(),
+                            ->indonesianMoney()
+                            ->validationMessages([
+                                'required' => 'Kredit limit tidak boleh kosong',
+                                'numeric' => 'Kredit limit harus berupa angka'
+                            ]),
                         Radio::make('tipe_pembayaran')
                             ->label('Tipe Bayar Customer')
                             ->inlineLabel()
@@ -136,7 +152,11 @@ class CustomerResource extends Resource
                                 'Bebas' => 'Bebas',
                                 'COD (Bayar Lunas)' => 'COD (Bayar Lunas)',
                                 'Kredit' => 'Kredit (Bayar Kredit)'
-                            ])->required(),
+                            ])
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Tipe pembayaran harus dipilih'
+                            ]),
                         Radio::make('tipe')
                             ->label('Tipe Customer')
                             ->inlineLabel()
@@ -144,12 +164,19 @@ class CustomerResource extends Resource
                                 'PKP' => 'PKP',
                                 'PRI' => 'PRI'
                             ])
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Tipe customer harus dipilih'
+                            ]),
                         Checkbox::make('isSpecial')
                             ->label('Spesial (Ya / Tidak)'),
                         Textarea::make('keterangan')
                             ->label('Keterangan')
-                            ->nullable(),
+                            ->nullable()
+                            ->validationMessages([
+                                'max' => 'Keterangan terlalu panjang'
+                            ])
+                            ->maxLength(1000),
                     ])
             ]);
     }

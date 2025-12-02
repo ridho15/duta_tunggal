@@ -19,6 +19,7 @@ class Asset extends Model
         'purchase_cost',
         'salvage_value',
         'useful_life_years',
+        'depreciation_method',
         'asset_coa_id',
         'accumulated_depreciation_coa_id',
         'depreciation_expense_coa_id',
@@ -99,13 +100,74 @@ class Asset extends Model
         return ($this->accumulated_depreciation / $this->purchase_cost) * 100;
     }
 
+    // Quality Control Accessors
+    public function getQualityControlAttribute()
+    {
+        return $this->purchaseOrderItem->qualityControl ?? null;
+    }
+
+    public function getHasPassedQcAttribute()
+    {
+        $qc = $this->quality_control;
+        return $qc && $qc->passed_quantity > 0 && $qc->status == true;
+    }
+
+    public function getQcStatusAttribute()
+    {
+        $qc = $this->quality_control;
+        if (!$qc) {
+            return 'Tidak ada QC';
+        }
+        
+        if ($qc->status == true || $qc->status == 1) {
+            return 'Sudah diproses';
+        } else {
+            return 'Belum diproses';
+        }
+    }
+
     // Calculate depreciation
     public function calculateDepreciation()
     {
-        // Rumus: (Biaya Aset - Nilai Sisa) / Umur Manfaat
         $depreciableAmount = $this->purchase_cost - $this->salvage_value;
-        $this->annual_depreciation = $depreciableAmount / $this->useful_life_years;
-        $this->monthly_depreciation = $this->annual_depreciation / 12;
+        $annualDepreciation = 0;
+        
+        switch ($this->depreciation_method) {
+            case 'straight_line':
+                // Metode Garis Lurus: (Biaya Aset - Nilai Sisa) / Umur Manfaat
+                $annualDepreciation = $depreciableAmount / $this->useful_life_years;
+                break;
+                
+            case 'declining_balance':
+                // Metode Saldo Menurun Ganda: 2 × (1 ÷ masa manfaat) × nilai buku awal
+                $depreciationRate = (1 / $this->useful_life_years) * 2; // 2x tarif garis lurus
+                $annualDepreciation = $this->purchase_cost * $depreciationRate;
+                
+                // Pastikan tidak melebihi nilai yang dapat disusutkan
+                $maxDepreciable = $this->purchase_cost - $this->salvage_value;
+                $annualDepreciation = min($annualDepreciation, $maxDepreciable);
+                break;
+                
+            case 'sum_of_years_digits':
+                // Metode Jumlah Digit Tahun: (Biaya disusutkan) × (sisa masa manfaat ÷ jumlah digit tahun)
+                // Untuk model, hitung untuk tahun pertama (sisa masa manfaat = umur manfaat)
+                $sumOfYears = ($this->useful_life_years * ($this->useful_life_years + 1)) / 2; // n(n+1)/2
+                $remainingYears = $this->useful_life_years; // Tahun pertama
+                $annualDepreciation = $depreciableAmount * ($remainingYears / $sumOfYears);
+                break;
+                
+            case 'units_of_production':
+                // Metode Unit Produksi: akan diimplementasi nanti
+                $annualDepreciation = $depreciableAmount / $this->useful_life_years; // placeholder
+                break;
+                
+            default:
+                $annualDepreciation = $depreciableAmount / $this->useful_life_years;
+                break;
+        }
+        
+        $this->annual_depreciation = $annualDepreciation;
+        $this->monthly_depreciation = $annualDepreciation / 12;
         $this->book_value = $this->purchase_cost - $this->accumulated_depreciation;
         $this->save();
     }

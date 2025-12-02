@@ -497,6 +497,12 @@ class QualityControlWorkflowTest extends TestCase
             'inspected_by' => $this->user->id,
         ]);
 
+        // Update QC with passed quantity before completion
+        $qualityControl->update([
+            'passed_quantity' => 10, // All items passed QC
+            'rejected_quantity' => 0,
+        ]);
+
         $service->completeQualityControl($qualityControl->fresh(), []);
 
         // Verify initial stock movement

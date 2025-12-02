@@ -52,7 +52,8 @@ class ProductCategoryResource extends Resource
                             ->ignore($record?->id ?? null);
                     })
                     ->validationMessages([
-                        'requried' => "Kode Kategori tidak boleh kosong",
+                        'required' => "Kode Kategori tidak boleh kosong",
+                        'max' => 'Kode kategori terlalu panjang',
                         'unique' => 'Kode Kategori sudah digunakan'
                     ])
                     ->required(),
@@ -61,10 +62,16 @@ class ProductCategoryResource extends Resource
                     ->preload()
                     ->searchable()
                     ->relationship('cabang', 'nama')
+                    ->validationMessages([
+                        'required' => 'Cabang harus dipilih'
+                    ])
                     ->required(),
                 TextInput::make('kenaikan_harga')
                     ->label('Kenaikan Harga (%)')
                     ->numeric()
+                    ->validationMessages([
+                        'numeric' => 'Kenaikan harga harus berupa angka'
+                    ])
                     ->default(0),
             ]);
     }

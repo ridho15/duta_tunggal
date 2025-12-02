@@ -66,6 +66,9 @@ class PurchaseInvoiceResource extends Resource
                                     ->preload()
                                     ->reactive()
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Supplier harus dipilih'
+                                    ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_purchase_order', null);
                                         $set('selected_purchase_receipts', []);
@@ -139,6 +142,10 @@ class PurchaseInvoiceResource extends Resource
                                 TextInput::make('invoice_number')
                                     ->label('Invoice Number')
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Nomor invoice tidak boleh kosong',
+                                        'max' => 'Nomor invoice terlalu panjang'
+                                    ])
                                     ->suffixAction(
                                         Action::make('generate')
                                             ->icon('heroicon-m-arrow-path')
@@ -153,6 +160,9 @@ class PurchaseInvoiceResource extends Resource
                                 DatePicker::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Tanggal invoice harus diisi'
+                                    ])
                                     ->default(now())
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
@@ -174,6 +184,9 @@ class PurchaseInvoiceResource extends Resource
                                 DatePicker::make('due_date')
                                     ->label('Due Date')
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Tanggal jatuh tempo harus diisi'
+                                    ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if ($state) {
@@ -330,23 +343,38 @@ class PurchaseInvoiceResource extends Resource
                                             }))
                                             ->searchable()
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Produk harus dipilih'
+                                            ])
                                             ->disabled(),
                                         TextInput::make('quantity')
                                             ->label('Qty')
                                             ->numeric()
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Qty tidak boleh kosong',
+                                                'numeric' => 'Qty harus berupa angka'
+                                            ])
                                             ->disabled(),
                                         TextInput::make('price')
                                             ->label('Harga')
                                             ->indonesianMoney()
                                             ->numeric()
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Harga tidak boleh kosong',
+                                                'numeric' => 'Harga harus berupa angka'
+                                            ])
                                             ->disabled(),
                                         TextInput::make('total')
                                             ->label('Total')
                                             ->indonesianMoney()
                                             ->numeric()
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Total tidak boleh kosong',
+                                                'numeric' => 'Total harus berupa angka'
+                                            ])
                                             ->disabled(),
                                     ])
                                     ->columns(4)
@@ -364,12 +392,19 @@ class PurchaseInvoiceResource extends Resource
                                         TextInput::make('name')
                                             ->label('Nama Biaya')
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Nama biaya tidak boleh kosong'
+                                            ])
                                             ->default('Biaya Lain'),
                                         TextInput::make('amount')
                                             ->label('Jumlah')
                                             ->indonesianMoney()
                                             ->numeric()
                                             ->required()
+                                            ->validationMessages([
+                                                'required' => 'Jumlah tidak boleh kosong',
+                                                'numeric' => 'Jumlah harus berupa angka'
+                                            ])
                                             ->default(0)
                                             ->reactive(),
                                     ])
@@ -396,11 +431,17 @@ class PurchaseInvoiceResource extends Resource
                                     ->label('DPP')
                                     ->indonesianMoney()
                                     ->numeric()
+                                    ->validationMessages([
+                                        'numeric' => 'DPP harus berupa angka'
+                                    ])
                                     ->readonly(),
                                     
                                 TextInput::make('tax')
                                     ->label('Tax (%)')
                                     ->numeric()
+                                    ->validationMessages([
+                                        'numeric' => 'Tax harus berupa angka'
+                                    ])
                                     ->suffix('%')
                                     ->default(0)
                                     ->reactive()
@@ -417,6 +458,9 @@ class PurchaseInvoiceResource extends Resource
                                 TextInput::make('ppn_rate')
                                     ->label('PPN Rate (%)')
                                     ->numeric()
+                                    ->validationMessages([
+                                        'numeric' => 'PPN rate harus berupa angka'
+                                    ])
                                     ->suffix('%')
                                     ->default(function () {
                                         $taxSetting = \App\Models\TaxSetting::where('status', true)
@@ -445,6 +489,9 @@ class PurchaseInvoiceResource extends Resource
                                     ->label('')
                                     ->indonesianMoney()
                                     ->numeric()
+                                    ->validationMessages([
+                                        'numeric' => 'Total harus berupa angka'
+                                    ])
                                     ->readonly()
                                     ->extraAttributes(['class' => 'text-lg font-bold']),
                             ]),
@@ -462,7 +509,10 @@ class PurchaseInvoiceResource extends Resource
                                         'overdue' => 'Overdue',
                                     ])
                                     ->default('paid')
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Status harus dipilih'
+                                    ]),
                             ]),
 
                         // COA Selection
@@ -478,6 +528,9 @@ class PurchaseInvoiceResource extends Resource
                                     ->searchable(['code', 'name'])
                                     ->preload()
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'COA hutang supplier harus dipilih'
+                                    ])
                                     ->default(function () {
                                         return \App\Models\ChartOfAccount::where('code', '2110')->first()?->id;
                                     }),
@@ -532,12 +585,19 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 TextInput::make('nama_biaya')
                                     ->label('Nama Biaya')
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Nama biaya tidak boleh kosong'
+                                    ]),
                                 TextInput::make('total')
                                     ->label('Total')
                                     ->indonesianMoney()
                                     ->numeric()
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Total tidak boleh kosong',
+                                        'numeric' => 'Total harus berupa angka'
+                                    ]),
                             ])
                             ->columns(2)
                             ->defaultItems(0)

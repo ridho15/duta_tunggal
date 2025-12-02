@@ -22,6 +22,12 @@ class AccountReceivable extends Model
         'created_by'
     ];
 
+    protected $casts = [
+        'total' => 'decimal:2',
+        'paid' => 'decimal:2',
+        'remaining' => 'decimal:2',
+    ];
+
     public function invoice()
     {
         return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();

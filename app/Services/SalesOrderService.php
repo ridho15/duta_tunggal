@@ -16,7 +16,7 @@ class SalesOrderService
     {
         $total_amount = 0;
         foreach ($salesOrder->saleOrderItem as $item) {
-            $total_amount += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax);
+            $total_amount += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, 'Inklusif');
         }
 
         return $salesOrder->update([
@@ -276,10 +276,14 @@ class SalesOrderService
         }
 
         // Create delivery order
+        $warehouseId = $deliveryData['warehouse_id'] ?? $saleOrder->warehouseConfirmation->warehouseConfirmationItems->first()->warehouse_id ?? null;
+        if (!$warehouseId) {
+            throw new \Exception('Warehouse ID is required to create delivery order');
+        }
         $deliveryOrder = $saleOrder->deliveryOrder()->create([
             'do_number' => $this->generateDoNumber(),
             'delivery_date' => $deliveryData['delivery_date'],
-            'warehouse_id' => $deliveryData['warehouse_id'],
+            'warehouse_id' => $warehouseId,
             'driver_id' => 1, // Default driver for testing
             'vehicle_id' => 1, // Default vehicle for testing
             'status' => 'draft',

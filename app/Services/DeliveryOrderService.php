@@ -29,21 +29,23 @@ class DeliveryOrderService
         $this->productService = app(ProductService::class);
     }
 
-    public function updateStatus($deliveryOrder, $status)
+    public function updateStatus($deliveryOrder, $status, $comments = null, $action = null)
     {
         $deliveryOrder->update([
             'status' => $status
         ]);
 
-        $this->createLog(delivery_order_id: $deliveryOrder->id, status: $status);
+        $this->createLog(delivery_order_id: $deliveryOrder->id, status: $status, comments: $comments, action: $action);
     }
 
-    public function createLog($delivery_order_id, $status)
+    public function createLog($delivery_order_id, $status, $comments = null, $action = null)
     {
         DeliveryOrderLog::create([
             'delivery_order_id' => $delivery_order_id,
             'status' => $status,
             'confirmed_by' => Auth::user()->id,
+            'comments' => $comments,
+            'action' => $action,
         ]);
     }
 

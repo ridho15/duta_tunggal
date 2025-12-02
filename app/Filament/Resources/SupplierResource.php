@@ -59,7 +59,8 @@ class SupplierResource extends Resource
                             ->label('Nama Perusahaan')
                             ->string()
                             ->validationMessages([
-                                'required' => 'Nama perusahaan tidak boleh kosong'
+                                'required' => 'Nama perusahaan tidak boleh kosong',
+                                'max' => 'Nama perusahaan terlalu panjang'
                             ])
                             ->maxLength(255)
                             ->required(),
@@ -67,7 +68,8 @@ class SupplierResource extends Resource
                             ->required()
                             ->label('Nama Supplier')
                             ->validationMessages([
-                                'required' => 'Nama tidak boleh kosong'
+                                'required' => 'Nama tidak boleh kosong',
+                                'max' => 'Nama terlalu panjang'
                             ])
                             ->maxLength(255),
                         TextInput::make('kontak_person')
@@ -78,13 +80,15 @@ class SupplierResource extends Resource
                             ->label('NPWP')
                             ->required()
                             ->validationMessages([
-                                'required' => 'NPWP tidak boleh kosong'
+                                'required' => 'NPWP tidak boleh kosong',
+                                'max' => 'NPWP terlalu panjang'
                             ])->maxLength(255),
                         TextInput::make('address')
                             ->required()
                             ->label('Alamat')
                             ->validationMessages([
-                                'required' => 'Alamat tidak boleh kosong'
+                                'required' => 'Alamat tidak boleh kosong',
+                                'max' => 'Alamat terlalu panjang'
                             ])
                             ->maxLength(255),
                         TextInput::make('phone')
@@ -92,7 +96,8 @@ class SupplierResource extends Resource
                             ->label('Telepon')
                             ->validationMessages([
                                 'required' => 'Nomor Telepon tidak boleh kosong',
-                                'regex' => 'Nomor Telepon tidak valid !'
+                                'regex' => 'Nomor Telepon tidak valid !',
+                                'max' => 'Nomor telepon terlalu panjang'
                             ])
                             ->helperText('Contoh : 07512345678')
                             ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
@@ -103,7 +108,8 @@ class SupplierResource extends Resource
                             ->label('Handphone')
                             ->validationMessages([
                                 'required' => 'Nomor Handphone tidak boleh kosong',
-                                'regex' => 'Nomor handphone tidak valid !'
+                                'regex' => 'Nomor handphone tidak valid !',
+                                'max' => 'Nomor handphone terlalu panjang'
                             ])
                             ->helperText('Contoh : 081234567890')
                             ->rules(['regex:/^08[1-9][0-9]{7,10}$/'])
@@ -113,7 +119,8 @@ class SupplierResource extends Resource
                             ->email()
                             ->validationMessages([
                                 'required' => 'Email tidak boleh kosong',
-                                'email' => 'Email tidak valid !'
+                                'email' => 'Email tidak valid !',
+                                'max' => 'Email terlalu panjang'
                             ])
                             ->required()
                             ->maxLength(255),

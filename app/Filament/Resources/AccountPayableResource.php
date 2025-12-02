@@ -68,7 +68,7 @@ class AccountPayableResource extends Resource
                             ->preload()
                             ->reactive()
                             ->validationMessages([
-                                'required' => 'Supplier belum dpilih'
+                                'required' => 'Supplier belum dipilih'
                             ])
                             ->searchable(['name', 'code'])
                             ->required()
@@ -80,6 +80,10 @@ class AccountPayableResource extends Resource
                             ->required()
                             ->indonesianMoney()
                             ->numeric()
+                            ->validationMessages([
+                                'required' => 'Total tidak boleh kosong',
+                                'numeric' => 'Total harus berupa angka'
+                            ])
                             ->readonly()
                             ->reactive()
                             ->dehydrateStateUsing(function ($state) {
@@ -110,6 +114,10 @@ class AccountPayableResource extends Resource
                             ->required()
                             ->indonesianMoney()
                             ->numeric()
+                            ->validationMessages([
+                                'required' => 'Jumlah pembayaran tidak boleh kosong',
+                                'numeric' => 'Jumlah pembayaran harus berupa angka'
+                            ])
                             ->default(0.00)
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
@@ -121,6 +129,10 @@ class AccountPayableResource extends Resource
                             ->required()
                             ->indonesianMoney()
                             ->numeric()
+                            ->validationMessages([
+                                'required' => 'Sisa pembayaran tidak boleh kosong',
+                                'numeric' => 'Sisa pembayaran harus berupa angka'
+                            ])
                             ->reactive()
                             ->helperText('Sisa pembayaran akan terisi otomatis berdasarkan total invoice'),
                         Radio::make('status')
@@ -131,6 +143,9 @@ class AccountPayableResource extends Resource
                             ])
                             ->default('Belum Lunas')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Status pembayaran harus dipilih'
+                            ])
                             ->inline()
                     ])
             ]);

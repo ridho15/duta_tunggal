@@ -13,36 +13,7 @@ class CustomerReceiptItemObserver
 {
     public function created(CustomerReceiptItem $customerReceiptItem): void
     {
-        // Use invoice_id from customer_receipt_item if available, otherwise use from customer_receipt
-        $invoiceId = $customerReceiptItem->invoice_id ?? $customerReceiptItem->customerReceipt->invoice_id;
-        $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
         $customerReceipt = $customerReceiptItem->customerReceipt;
-        
-        // Update account receivable
-        if ($accountReceivable) {
-            $accountReceivable->paid = $accountReceivable->paid + $customerReceiptItem->amount;
-            $accountReceivable->remaining = $accountReceivable->remaining - $customerReceiptItem->amount;
-            $accountReceivable->save();
-        }
-        
-        // Update status based on remaining amount
-        if ($accountReceivable && $accountReceivable->remaining == 0) {
-            $accountReceivable->invoice->update([
-                'status' => 'paid'
-            ]);
-
-            $accountReceivable->update([
-                'status' => 'Lunas'
-            ]);
-
-            if ($accountReceivable->ageingSchedule) {
-                $accountReceivable->ageingSchedule->delete();
-            }
-        } elseif ($accountReceivable && $accountReceivable->paid > 0 && $accountReceivable->total > $accountReceivable->remaining) {
-            $accountReceivable->invoice->update([
-                'status' => 'partially_paid'
-            ]);
-        }
         
         // Update customer receipt status based on all selected invoices
         $this->updateCustomerReceiptStatus($customerReceipt);

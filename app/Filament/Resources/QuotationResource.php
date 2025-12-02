@@ -242,7 +242,6 @@ class QuotationResource extends Resource
                             ->required(),
                         DatePicker::make('valid_until'),
                         TextInput::make('total_amount')
-                            ->numeric()
                             ->readOnly()
                             ->indonesianMoney()
                             ->default(0),

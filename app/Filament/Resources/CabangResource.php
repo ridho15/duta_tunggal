@@ -26,8 +26,9 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\ColorColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 
 class CabangResource extends Resource
 {
@@ -95,7 +96,10 @@ class CabangResource extends Resource
                         TextInput::make('kenaikan_harga')
                             ->label('Kenaikan Harga (%)')
                             ->numeric()
-                            ->default(0),
+                            ->default(0)
+                            ->validationMessages([
+                                'numeric' => 'Kenaikan harga harus berupa angka'
+                            ]),
                         ColorPicker::make('warna_background')
                             ->label('Warna Background')
                             ->required()
@@ -123,22 +127,43 @@ class CabangResource extends Resource
                             ->maxLength(50),
                         TextInput::make('kode_invoice_non_pajak')
                             ->label('Kode Invoice Non Pajak')
-                            ->maxLength(50),
+                            ->maxLength(50)
+                            ->validationMessages([
+                                'max' => 'Kode invoice non pajak terlalu panjang'
+                            ]),
                         TextInput::make('kode_invoice_pajak_walkin')
                             ->label('Kode Invoice Pajak (Customer Walk-in)')
-                            ->maxLength(50),
+                            ->maxLength(50)
+                            ->validationMessages([
+                                'max' => 'Kode invoice pajak walk-in terlalu panjang'
+                            ]),
                         TextInput::make('nama_kwitansi')
                             ->label('Nama di Kwitansi')
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->validationMessages([
+                                'max' => 'Nama kwitansi terlalu panjang'
+                            ]),
                         TextInput::make('label_invoice_pajak')
                             ->label('Label Invoice Pajak')
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->validationMessages([
+                                'max' => 'Label invoice pajak terlalu panjang'
+                            ]),
                         TextInput::make('label_invoice_non_pajak')
                             ->label('Label Invoice Non Pajak')
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->validationMessages([
+                                'max' => 'Label invoice non pajak terlalu panjang'
+                            ]),
                         FileUpload::make('logo_invoice_non_pajak')
                             ->label('Logo Invoice Non Pajak')
-                            ->directory('logo-invoice-non-pajak'),
+                            ->directory('logo-invoice-non-pajak')
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/gif'])
+                            ->maxSize(2048) // 2MB
+                            ->validationMessages([
+                                'acceptedFileTypes' => 'Logo harus berupa gambar (JPG, PNG, GIF)',
+                                'maxSize' => 'Ukuran logo maksimal 2MB'
+                            ]),
                         Toggle::make('lihat_stok_cabang_lain')
                             ->label('Bisa Lihat Stok Cabang Lain saat Penjualan'),
                         Checkbox::make('status')
@@ -188,7 +213,19 @@ class CabangResource extends Resource
                     ->searchable(),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        true => 'Aktif',
+                        false => 'Tidak Aktif',
+                    ])
+                    ->label('Status'),
+                SelectFilter::make('tipe_penjualan')
+                    ->options([
+                        'Semua' => 'Semua',
+                        'Pajak' => 'Pajak',
+                        'Non Pajak' => 'Non Pajak',
+                    ])
+                    ->label('Tipe Penjualan'),
             ])
             ->actions([
                 ActionGroup::make([

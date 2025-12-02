@@ -42,12 +42,15 @@ class CurrencyResource extends Resource
                             ->label('Mata Uang')
                             ->required()
                             ->validationMessages([
-                                'requried' => 'Mata uang tidak boleh osong'
+                                'required' => 'Mata uang tidak boleh kosong'
                             ])
                             ->maxLength(255),
                         TextInput::make('symbol')
                             ->maxLength(255)
-                            ->default(null),
+                            ->default(null)
+                            ->validationMessages([
+                                'max' => 'Simbol terlalu panjang'
+                            ]),
                         TextInput::make('code')
                             ->label('Kode')
                             ->validationMessages([
@@ -58,7 +61,8 @@ class CurrencyResource extends Resource
                             ->label('Nilai')
                             ->required()
                             ->validationMessages([
-                                'required' => "Nilai tidak boleh kosong"
+                                'required' => "Nilai tidak boleh kosong",
+                                'numeric' => 'Nilai harus berupa angka'
                             ])
                             ->indonesianMoney()
                             ->numeric()

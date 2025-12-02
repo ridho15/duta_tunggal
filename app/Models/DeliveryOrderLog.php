@@ -14,6 +14,12 @@ class DeliveryOrderLog extends Model
         'delivery_order_id',
         'status',
         'confirmed_by',
+        'comments',
+        'action',
+        'old_value',
+        'new_value',
+        'notes',
+        'user_id',
     ];
 
     public function deliveryOrder()

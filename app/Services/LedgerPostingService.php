@@ -532,7 +532,7 @@ class LedgerPostingService
         }
 
         // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
-        $piutangCoa = ChartOfAccount::where('code', '1130')->first(); // Piutang Dagang
+        $piutangCoa = ChartOfAccount::where('code', '1120')->first(); // Piutang Dagang
         $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', '1112.01')->first();
 
         $entries = [];

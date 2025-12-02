@@ -6,6 +6,8 @@ use App\Models\SaleOrder;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
 use App\Models\InvoiceItem;
+use App\Models\WarehouseConfirmation;
+use App\Models\WarehouseConfirmationItem;
 use Illuminate\Support\Facades\Log;
 
 class SaleOrderObserver
@@ -17,6 +19,11 @@ class SaleOrderObserver
     {
         $originalStatus = $saleOrder->getOriginal('status');
         $newStatus = $saleOrder->status;
+
+        // Jika status berubah ke 'approved', buat warehouse confirmation otomatis
+        if ($originalStatus !== 'approved' && $newStatus === 'approved') {
+            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
+        }
 
         // Jika status berubah ke 'completed', buat invoice otomatis
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
@@ -96,6 +103,72 @@ class SaleOrderObserver
         Log::info('Invoice created successfully', [
             'invoice_id' => $invoice->id,
             'invoice_number' => $invoice->invoice_number,
+        ]);
+    }
+
+    /**
+     * Create warehouse confirmation automatically when Sale Order is approved
+     */
+    protected function createWarehouseConfirmationForApprovedSaleOrder(SaleOrder $saleOrder): void
+    {
+        Log::info('SaleOrderObserver: Creating warehouse confirmation for approved sale order', [
+            'sale_order_id' => $saleOrder->id,
+            'so_number' => $saleOrder->so_number,
+        ]);
+
+        // Load relationships
+        $saleOrder->loadMissing('saleOrderItem.product');
+
+        // Cek apakah sudah ada warehouse confirmation untuk sale order ini
+        $existingWC = WarehouseConfirmation::where('sale_order_id', $saleOrder->id)->first();
+
+        if ($existingWC) {
+            Log::info('Warehouse confirmation already exists for sale order', ['wc_id' => $existingWC->id]);
+            return;
+        }
+
+        // Hanya buat warehouse confirmation untuk tipe pengiriman 'Kirim Langsung'
+        if ($saleOrder->tipe_pengiriman !== 'Kirim Langsung') {
+            Log::info('Skipping warehouse confirmation creation - not "Kirim Langsung" type', [
+                'tipe_pengiriman' => $saleOrder->tipe_pengiriman
+            ]);
+            return;
+        }
+
+        // Buat warehouse confirmation dengan status 'request'
+        $warehouseConfirmation = WarehouseConfirmation::create([
+            'sale_order_id' => $saleOrder->id,
+            'confirmation_type' => 'sales_order',
+            'status' => 'request', // Status default: request
+            'note' => 'Auto-generated from approved Sale Order ' . $saleOrder->so_number,
+        ]);
+
+        // Buat warehouse confirmation items
+        foreach ($saleOrder->saleOrderItem as $item) {
+            // Skip item yang tidak memiliki warehouse_id
+            if (!$item->warehouse_id) {
+                Log::warning('Skipping warehouse confirmation item - no warehouse_id', [
+                    'sale_order_item_id' => $item->id,
+                    'product_name' => $item->product->name ?? 'Unknown'
+                ]);
+                continue;
+            }
+
+            WarehouseConfirmationItem::create([
+                'warehouse_confirmation_id' => $warehouseConfirmation->id,
+                'sale_order_item_id' => $item->id,
+                'product_name' => $item->product->name ?? 'Unknown Product',
+                'requested_qty' => $item->quantity,
+                'confirmed_qty' => $item->quantity, // Default to full quantity
+                'warehouse_id' => $item->warehouse_id,
+                'rak_id' => $item->rak_id, // Now nullable
+                'status' => 'request'
+            ]);
+        }
+
+        Log::info('Warehouse confirmation created successfully', [
+            'wc_id' => $warehouseConfirmation->id,
+            'sale_order_id' => $saleOrder->id,
         ]);
     }
 }
