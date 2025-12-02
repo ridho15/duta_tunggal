@@ -99,7 +99,7 @@ class WarehouseConfirmationResource extends Resource
                                           $q->whereDoesntHave('warehouseConfirmation');
                                           // In edit context, also allow the current SO if it exists
                                           if (request()->route('record')) {
-                                              $wc = \App\Models\WarehouseConfirmation::find(request()->route('record'));
+                                              $wc = WarehouseConfirmation::find(request()->route('record'));
                                               if ($wc && $wc->sale_order_id) {
                                                   $q->orWhere('id', $wc->sale_order_id);
                                               }

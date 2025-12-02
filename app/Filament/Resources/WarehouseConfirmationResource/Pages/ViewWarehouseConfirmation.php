@@ -6,6 +6,8 @@ use App\Filament\Resources\WarehouseConfirmationResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Illuminate\Support\Facades\Auth;
 
@@ -51,9 +53,9 @@ class ViewWarehouseConfirmation extends ViewRecord
     {
         return $infolist
             ->schema([
-                Infolists\Components\Section::make('Warehouse Confirmation Details')
+                Section::make('Warehouse Confirmation Details')
                     ->schema([
-                        Infolists\Components\TextEntry::make('confirmation_type')
+                        TextEntry::make('confirmation_type')
                             ->label('Confirmation Type')
                             ->formatStateUsing(function ($state) {
                                 return match ($state) {

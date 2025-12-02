@@ -21,9 +21,10 @@ class SaleOrderObserver
         $newStatus = $saleOrder->status;
 
         // Jika status berubah ke 'approved', buat warehouse confirmation otomatis
-        if ($originalStatus !== 'approved' && $newStatus === 'approved') {
-            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
-        }
+        // Commented out to allow manual creation of warehouse confirmation
+        // if ($originalStatus !== 'approved' && $newStatus === 'approved') {
+        //     $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
+        // }
 
         // Jika status berubah ke 'completed', buat invoice otomatis
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
