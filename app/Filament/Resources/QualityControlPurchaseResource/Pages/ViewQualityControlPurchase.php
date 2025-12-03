@@ -31,9 +31,16 @@ class ViewQualityControlPurchase extends ViewRecord
             Action::make('Complete')
                 ->color('success')
                 ->label('Complete')
-                ->requiresConfirmation()
+                ->requiresConfirmation(function ($record) {
+                    return [
+                        'title' => 'Konfirmasi Complete QC',
+                        'description' => "Passed: {$record->passed_quantity}, Rejected: {$record->rejected_quantity}. Apakah Anda yakin ingin menyelesaikan QC ini?",
+                        'submitLabel' => 'Ya, Selesaikan QC',
+                    ];
+                })
                 ->hidden(function ($record) {
-                    return $record->status == 1;
+                    // Sembunyikan action jika status sudah complete atau passed_quantity = 0
+                    return $record->status == 1 || $record->passed_quantity == 0;
                 })
                 ->icon('heroicon-o-check-badge')
                 ->form(function ($record) {
@@ -84,8 +91,23 @@ class ViewQualityControlPurchase extends ViewRecord
                     $qualityControlService = app(QualityControlService::class);
                     $qualityControlService->completeQualityControl($record, $data);
                     HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed");
-                    $qualityControlService->checkPenerimaanBarang($record);
+                    
+                    // Only check PO completion for QC from PurchaseReceiptItem, not PurchaseOrderItem
+                    if ($record->from_model_type === 'App\Models\PurchaseReceiptItem') {
+                        $qualityControlService->checkPenerimaanBarang($record);
+                    }
                 })
         ];
+    }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // Populate product information fields
+        $data['product_name'] = $this->record->product->name ?? '';
+        $data['sku'] = $this->record->product->sku ?? '';
+        $data['quantity_received'] = $this->record->fromModel->qty_accepted ?? 0;
+        $data['uom'] = $this->record->product->uom->name ?? '';
+        
+        return $data;
     }
 }

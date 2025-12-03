@@ -20,7 +20,7 @@ class BalanceSheetPage extends Page
 
     protected static ?string $navigationLabel = 'Neraca';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 4;
 
     public ?string $as_of_date = null;
     public ?int $cabang_id = null;

@@ -6,6 +6,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Log;
 
 class DeliveryOrderItem extends Model
 {
@@ -47,6 +48,28 @@ class DeliveryOrderItem extends Model
 
     protected static function booted()
     {
+        static::created(function ($deliveryOrderItem) {
+            // Update delivered_quantity when delivery order item is created
+            if ($deliveryOrderItem->sale_order_item_id) {
+                $saleOrderItem = $deliveryOrderItem->saleOrderItem;
+                if ($saleOrderItem) {
+                    // Only update if delivery order is in final status
+                    $deliveryOrder = $deliveryOrderItem->deliveryOrder;
+                    if ($deliveryOrder && in_array($deliveryOrder->status, ['sent', 'received', 'completed'])) {
+                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                            ->whereHas('deliveryOrder', function ($query) {
+                                $query->whereIn('status', ['sent', 'received', 'completed']);
+                            })
+                            ->sum('quantity');
+
+                        $saleOrderItem->update([
+                            'delivered_quantity' => $totalDelivered
+                        ]);
+                    }
+                }
+            }
+        });
+
         static::saving(function ($deliveryOrderItem) {
             // Validate quantity doesn't exceed remaining quantity from sales order
             if ($deliveryOrderItem->sale_order_item_id) {
@@ -54,12 +77,12 @@ class DeliveryOrderItem extends Model
                 $currentDeliveredQty = $saleOrderItem->deliveryOrderItems()
                     ->where('id', '!=', $deliveryOrderItem->id) // Exclude current item if updating
                     ->whereHas('deliveryOrder', function ($query) {
-                        $query->whereNotIn('status', ['cancelled', 'rejected']);
+                        $query->whereIn('status', ['sent', 'received', 'completed']); // Only count actually delivered orders
                     })
                     ->sum('quantity');
-                
+
                 $remainingQty = $saleOrderItem->quantity - $currentDeliveredQty;
-                
+
                 if ($deliveryOrderItem->quantity > $remainingQty) {
                     throw new \Exception("Quantity ({$deliveryOrderItem->quantity}) melebihi sisa quantity yang tersedia ({$remainingQty}) untuk sales order item ini.");
                 }

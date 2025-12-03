@@ -72,7 +72,7 @@ class PurchaseOrderResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Pembelian';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -134,6 +134,9 @@ class PurchaseOrderResource extends Resource
                                             if ($orderRequest) {
                                                 $set('supplier_id', $orderRequest->supplier_id);
                                                 $set('warehouse_id', $orderRequest->warehouse_id);
+                                                if($orderRequest->supplier) {
+                                                    $set('tempo_hutang', $orderRequest->supplier->tempo_hutang);
+                                                }
                                                 foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
                                                     $subtotal = ((int)$orderRequestItem->quantity * (int) $orderRequestItem->unit_price) - (int) $orderRequestItem->discount + (int) $orderRequestItem->tax;
                                                     array_push($items, [
@@ -841,6 +844,51 @@ class PurchaseOrderResource extends Resource
                     ->label('Total Amount')
                     ->money('IDR')
                     ->sortable(),
+                TextColumn::make('remaining_qty_status')
+                    ->label('Status Penerimaan')
+                    ->formatStateUsing(function ($record) {
+                        $totalItems = $record->purchaseOrderItem->count();
+                        $completedItems = $record->purchaseOrderItem->filter(function ($item) {
+                            return $item->remaining_quantity <= 0;
+                        })->count();
+
+                        $itemsWithReceipts = $record->purchaseOrderItem->filter(function ($item) {
+                            return $item->purchaseReceiptItem()->sum('qty_accepted') > 0;
+                        })->count();
+
+                        if ($totalItems === 0) return 'No Items';
+                        if ($completedItems === $totalItems) return 'Semua Diterima';
+                        if ($completedItems > 0) return 'Sebagian (' . $completedItems . '/' . $totalItems . ')';
+                        if ($itemsWithReceipts > 0) return 'Sebagian Diterima';
+                        return 'Belum Diterima';
+                    })
+                    ->color(function ($record) {
+                        $totalItems = $record->purchaseOrderItem->count();
+                        $completedItems = $record->purchaseOrderItem->filter(function ($item) {
+                            return $item->remaining_quantity <= 0;
+                        })->count();
+
+                        $itemsWithReceipts = $record->purchaseOrderItem->filter(function ($item) {
+                            return $item->purchaseReceiptItem()->sum('qty_accepted') > 0;
+                        })->count();
+
+                        if ($totalItems === 0) return 'gray';
+                        if ($completedItems === $totalItems) return 'success';
+                        if ($completedItems > 0) return 'info';
+                        if ($itemsWithReceipts > 0) return 'warning';
+                        return 'danger';
+                    })
+                    ->badge()
+                    ->tooltip(function ($record) {
+                        $details = $record->purchaseOrderItem->map(function ($item) {
+                            $remaining = $item->remaining_quantity;
+                            $total = $item->quantity;
+                            $received = $item->total_received;
+                            return "{$item->product->name}: {$received}/{$total} (sisa: {$remaining})";
+                        })->join("\n");
+
+                        return "Detail Penerimaan:\n" . $details;
+                    }),
                 TextColumn::make('purchaseOrderItem.product.name')
                     ->label('Product')
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -892,6 +940,20 @@ class PurchaseOrderResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Purchase Order</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Purchase Order (PO) adalah instruksi pembelian resmi ke supplier.</li>' .
+                            '<li><strong>Membuat PO:</strong> PO dapat dibuat dari Order Request atau Sales Order, atau dibuat manual lewat tombol Create PO.</li>' .
+                            '<li><strong>QC & Penerimaan:</strong> Setelah barang diterima, buat Purchase Receipt dan kirim item ke Quality Control jika diperlukan. Stok hanya bertambah setelah QC disetujui atau receipt selesai sesuai alur.</li>' .
+                            '<li><strong>Dampak Status Completed:</strong> PO berstatus <em>completed</em> menandakan semua barang telah diterima; selanjutnya proses invoice dan pembayaran dapat dilanjutkan.</li>' .
+                            '<li><strong>Catatan:</strong> Beberapa tindakan (approve, close) memerlukan hak akses tertentu.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ))
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status PO')
@@ -1131,38 +1193,37 @@ class PurchaseOrderResource extends Resource
                                 'close_reason' => $data['close_reason']
                             ]);
                         }),
-                    Action::make('create_qc')
-                        ->label('Buat QC (Pre-Receipt)')
+                    Action::make('create_receipt_remaining')
+                        ->label('Buat Penerimaan Sisa')
                         ->icon('heroicon-o-archive-box-arrow-down')
                         ->color('info')
                         ->visible(function ($record) {
-                            return $record->status == 'approved' && !$record->purchaseOrderItem->pluck('qualityControl')->filter()->isNotEmpty();
+                            // Show only if PO is approved/partially_received, has remaining items, AND already has some receipts
+                            if ($record->status !== 'approved' && $record->status !== 'partially_received') {
+                                return false;
+                            }
+
+                            // Must have remaining quantity > 0
+                            $hasRemaining = $record->purchaseOrderItem->contains(function ($item) {
+                                return $item->remaining_quantity > 0;
+                            });
+
+                            // Must have at least one item that already has receipts (partial receipt scenario)
+                            $hasAnyReceipts = $record->purchaseOrderItem->contains(function ($item) {
+                                return $item->purchaseReceiptItem()->exists();
+                            });
+
+                            return $hasRemaining && $hasAnyReceipts;
                         })
                         ->requiresConfirmation()
-                        ->modalHeading('Buat Quality Control Pre-Receipt')
-                        ->modalDescription('QC ini akan dibuat berdasarkan spesifikasi di Purchase Order. Barang belum perlu diterima terlebih dahulu.')
-                        ->modalSubmitActionLabel('Buat QC')
+                        ->modalHeading('Buat Penerimaan untuk Barang Sisa')
+                        ->modalDescription('Akan membuat penerimaan baru untuk item yang masih memiliki quantity tersisa.')
+                        ->modalSubmitActionLabel('Buat Penerimaan')
                         ->action(function ($record) {
-                            $qualityControlService = app(QualityControlService::class);
-                            
-                            foreach ($record->purchaseOrderItem as $poItem) {
-                                // Skip if QC already exists for this item
-                                if ($poItem->qualityControl) {
-                                    continue;
-                                }
-                                
-                                $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
-                                    'inspected_by' => Auth::id(),
-                                    'passed_quantity' => $poItem->quantity, // Assume all pass initially
-                                    'rejected_quantity' => 0,
-                                ]);
-                            }
-                            
-                            HelperController::sendNotification(
-                                isSuccess: true, 
-                                title: "QC Berhasil Dibuat", 
-                                message: "Quality Control pre-receipt telah dibuat untuk semua item di PO " . $record->po_number
-                            );
+                            // Redirect to create purchase receipt page with pre-selected PO
+                            return redirect()->route('filament.admin.resources.purchase-receipts.create', [
+                                'purchase_order_id' => $record->id
+                            ]);
                         }),
                     Action::make('cetak_pdf')
                         ->label('Cetak PDF')

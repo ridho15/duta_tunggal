@@ -67,9 +67,16 @@ class QualityControlService
      */
     public function createQCFromPurchaseReceiptItem($purchaseReceiptItem, $data)
     {
+        // Validate passed_quantity doesn't exceed qty_accepted (or qty_received if qty_accepted is 0)
+        $passedQuantity = $data['passed_quantity'] ?? $purchaseReceiptItem->qty_accepted;
+        $maxAllowed = $purchaseReceiptItem->qty_accepted > 0 ? $purchaseReceiptItem->qty_accepted : $purchaseReceiptItem->qty_received;
+        if ($passedQuantity > $maxAllowed) {
+            throw new \Exception("QC passed quantity ({$passedQuantity}) cannot exceed accepted quantity ({$maxAllowed}) in purchase receipt.");
+        }
+
         $qualityControl = QualityControl::create([
             'qc_number' => $this->generateQcNumber(),
-            'passed_quantity' => $data['passed_quantity'] ?? 0, // Start with 0, will be determined by QC inspection
+            'passed_quantity' => $passedQuantity,
             'rejected_quantity' => $data['rejected_quantity'] ?? 0,
             'status' => 0,
             'inspected_by' => $data['inspected_by'] ?? null,
@@ -79,6 +86,9 @@ class QualityControlService
             'from_model_type' => \App\Models\PurchaseReceiptItem::class,
             'from_model_id' => $purchaseReceiptItem->id,
         ]);
+
+        // Update the purchase receipt item to mark it as sent to QC
+        $purchaseReceiptItem->update(['is_sent' => 1]);
 
         return $qualityControl;
     }
@@ -93,9 +103,15 @@ class QualityControlService
      */
     public function createQCFromPurchaseOrderItem($purchaseOrderItem, $data)
     {
+        // Validate passed_quantity doesn't exceed ordered quantity
+        $passedQuantity = $data['passed_quantity'] ?? $purchaseOrderItem->quantity;
+        if ($passedQuantity > $purchaseOrderItem->quantity) {
+            throw new \Exception("QC passed quantity ({$passedQuantity}) cannot exceed ordered quantity ({$purchaseOrderItem->quantity}) in purchase order.");
+        }
+
         $qualityControl = QualityControl::create([
             'qc_number' => $this->generateQcNumber(),
-            'passed_quantity' => $data['passed_quantity'] ?? $purchaseOrderItem->quantity,
+            'passed_quantity' => $passedQuantity,
             'rejected_quantity' => $data['rejected_quantity'] ?? 0,
             'status' => 0,
             'inspected_by' => $data['inspected_by'] ?? null,
@@ -141,6 +157,14 @@ class QualityControlService
     public function completeQualityControl($qualityControl, $data)
     {
         $productService = app(ProductService::class);
+
+        // Validate QC passed quantity against receipt quantity for PurchaseReceiptItem
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
+            $purchaseReceiptItem = $qualityControl->fromModel;
+            if ($purchaseReceiptItem && $qualityControl->passed_quantity > $purchaseReceiptItem->qty_received) {
+                throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed received quantity ({$purchaseReceiptItem->qty_received}) in purchase receipt.");
+            }
+        }
 
         if ($qualityControl->rejected_quantity > 0) {
             $returnProductService = app(ReturnProductService::class);
@@ -348,6 +372,8 @@ class QualityControlService
 
     public function checkPenerimaanBarang($qualityControl)
     {
+        Log::info('checkPenerimaanBarang: CALLED for QC ' . $qualityControl->id . ' from_model_type=' . $qualityControl->from_model_type);
+        
         // Find the purchase order that this quality control belongs to
         $purchaseOrder = null;
 
@@ -357,10 +383,10 @@ class QualityControlService
                 $purchaseOrder = $purchaseReceiptItem->purchaseOrderItem->purchaseOrder;
             }
         } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
-            $purchaseOrderItem = $qualityControl->fromModel;
-            if ($purchaseOrderItem) {
-                $purchaseOrder = $purchaseOrderItem->purchaseOrder;
-            }
+            // QC from PO item should NOT complete the PO - it only validates quality before receipt creation
+            // PO completion happens when receipts are posted, not when QC from PO item is completed
+            Log::info('checkPenerimaanBarang: SKIPPING for QC from PurchaseOrderItem - PO completion happens via receipt posting');
+            return;
         }
 
         if (!$purchaseOrder) {
@@ -371,17 +397,6 @@ class QualityControlService
         // Load relationships
         $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem']);
 
-        // Force refresh the quality control relationship to ensure we have the latest status
-        foreach ($purchaseOrder->purchaseOrderItem as $purchaseOrderItem) {
-            foreach ($purchaseOrderItem->purchaseReceiptItem as $purchaseReceiptItem) {
-                // Query QC directly from database based on the relationship
-                $qc = QualityControl::where('from_model_type', 'App\Models\PurchaseReceiptItem')
-                    ->where('from_model_id', $purchaseReceiptItem->id)
-                    ->first();
-                $purchaseReceiptItem->qualityControl = $qc;
-            }
-        }
-
         Log::info('checkPenerimaanBarang: Loaded PO relationships for PO ' . $purchaseOrder->id);
         Log::info('checkPenerimaanBarang: PO has ' . $purchaseOrder->purchaseOrderItem->count() . ' items');
 
@@ -390,9 +405,10 @@ class QualityControlService
 
         foreach ($purchaseOrder->purchaseOrderItem as $purchaseOrderItem) {
             $totalQuantityDibutuhkan += $purchaseOrderItem->quantity;
+
+            // Only count posted receipts as "received" - QC from PO items don't count toward PO completion
             foreach ($purchaseOrderItem->purchaseReceiptItem as $purchaseReceiptItem) {
-                Log::info('checkPenerimaanBarang: Checking receipt item ' . $purchaseReceiptItem->id . ', is_sent=' . $purchaseReceiptItem->is_sent . ', qty_accepted=' . $purchaseReceiptItem->qty_accepted . ', has_qc=' . ($purchaseReceiptItem->qualityControl ? 'yes' : 'no') . ', qc_status=' . ($purchaseReceiptItem->qualityControl ? $purchaseReceiptItem->qualityControl->status : 'none') . ', qc_id=' . ($purchaseReceiptItem->qualityControl ? $purchaseReceiptItem->qualityControl->id : 'none'));
-                if ($purchaseReceiptItem->is_sent && $purchaseReceiptItem->qualityControl && $purchaseReceiptItem->qualityControl->status == 1) {
+                if ($purchaseReceiptItem->purchaseReceipt && $purchaseReceiptItem->purchaseReceipt->status === 'completed') {
                     $totalQuantityYangDiterima += $purchaseReceiptItem->qty_accepted;
                 }
             }
@@ -483,6 +499,12 @@ class QualityControlService
                 title: "Purchase Order Completed",
                 message: "Purchase Order {$purchaseOrder->po_number} has been completed. All items have been received and quality controlled."
             );
+        } elseif ($totalReceived > 0) {
+            // Set purchase order to partially_received if some items received but not all
+            if ($purchaseOrder->status === 'approved') {
+                $purchaseOrder->update(['status' => 'partially_received']);
+                Log::info("Set Purchase Order {$purchaseOrder->id} to partially_received");
+            }
         }
     }
 

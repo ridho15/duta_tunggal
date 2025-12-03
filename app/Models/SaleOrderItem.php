@@ -16,6 +16,7 @@ class SaleOrderItem extends Model
         'sale_order_id',
         'product_id',
         'quantity',
+        'delivered_quantity',
         'unit_price',
         'discount',
         'tax',
@@ -56,21 +57,6 @@ class SaleOrderItem extends Model
 
     public function getRemainingQuantityAttribute()
     {
-        $deliveredQuantity = $this->deliveryOrderItems()
-            ->whereHas('deliveryOrder', function ($query) {
-                $query->whereNotIn('status', ['cancelled', 'rejected']);
-            })
-            ->sum('quantity');
-        
-        return $this->quantity - $deliveredQuantity;
-    }
-
-    public function getDeliveredQuantityAttribute()
-    {
-        return $this->deliveryOrderItems()
-            ->whereHas('deliveryOrder', function ($query) {
-                $query->whereNotIn('status', ['cancelled', 'rejected']);
-            })
-            ->sum('quantity');
+        return $this->quantity - $this->delivered_quantity;
     }
 }

@@ -81,24 +81,13 @@ class LedgerPostingService
 
         // For purchase invoices: Simplified journal entry format
         if ($isPurchaseInvoice) {
-            \Illuminate\Support\Facades\Log::info('DEBUG: Processing purchase invoice', [
-                'invoice_id' => $invoice->id,
-                'from_model_type' => $invoice->from_model_type,
-                'PurchaseOrder_class' => PurchaseOrder::class,
-                'is_purchase_invoice' => $isPurchaseInvoice
-            ]);
-            // Debit Unbilled Purchase for subtotal
-            if ($subtotal > 0 && $unbilledPurchaseCoa) {
-                \Illuminate\Support\Facades\Log::info('DEBUG: Creating debit entry for unbilled purchase', [
-                    'invoice_id' => $invoice->id,
-                    'subtotal' => $subtotal,
-                    'unbilledPurchaseCoa_id' => $unbilledPurchaseCoa->id
-                ]);
+            // Debit Accounts Payable for subtotal
+            if ($subtotal > 0 && $utangCoa) {
                 $debitEntry = JournalEntry::create([
-                    'coa_id' => $unbilledPurchaseCoa->id,
+                    'coa_id' => $utangCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
-                    'description' => 'Purchase invoice - unbilled purchase for ' . $invoice->invoice_number,
+                    'description' => 'Purchase invoice - accounts payable for ' . $invoice->invoice_number,
                     'debit' => $subtotal,
                     'credit' => 0,
                     'journal_type' => 'purchase',
@@ -106,14 +95,10 @@ class LedgerPostingService
                     'source_id' => $invoice->id,
                 ]);
                 $entries[] = $debitEntry;
-                \Illuminate\Support\Facades\Log::info('DEBUG: Debit entry created successfully', [
-                    'entry_id' => $debitEntry->id,
-                    'debit_amount' => $debitEntry->debit
-                ]);
             } else {
-                \Illuminate\Support\Facades\Log::info('DEBUG: Skipping debit entry for unbilled purchase', [
+                \Illuminate\Support\Facades\Log::info('DEBUG: Skipping debit entry for accounts payable', [
                     'subtotal' => $subtotal,
-                    'unbilledPurchaseCoa_exists' => $unbilledPurchaseCoa ? true : false
+                    'utangCoa_exists' => $utangCoa ? true : false
                 ]);
             }
 
@@ -158,19 +143,14 @@ class LedgerPostingService
                 }
             }
 
-            // Credit Accounts Payable for total amount (subtotal + actual PPN + other fees)
+            // Credit Unbilled Purchase for total amount (subtotal + actual PPN + other fees)
             $totalAmount = $subtotal + $actualPpnAmount + $totalOtherFees;
-            if ($totalAmount > 0 && $utangCoa) {
-                \Illuminate\Support\Facades\Log::info('DEBUG: Creating credit entry for accounts payable', [
-                    'invoice_id' => $invoice->id,
-                    'totalAmount' => $totalAmount,
-                    'utangCoa_id' => $utangCoa->id
-                ]);
+            if ($totalAmount > 0 && $unbilledPurchaseCoa) {
                 $creditEntry = JournalEntry::create([
-                    'coa_id' => $utangCoa->id,
+                    'coa_id' => $unbilledPurchaseCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
-                    'description' => 'Accounts Payable for ' . $invoice->invoice_number,
+                    'description' => 'Unbilled Purchase for ' . $invoice->invoice_number,
                     'debit' => 0,
                     'credit' => $totalAmount,
                     'journal_type' => 'purchase',
@@ -178,14 +158,10 @@ class LedgerPostingService
                     'source_id' => $invoice->id,
                 ]);
                 $entries[] = $creditEntry;
-                \Illuminate\Support\Facades\Log::info('DEBUG: Credit entry created successfully', [
-                    'entry_id' => $creditEntry->id,
-                    'credit_amount' => $creditEntry->credit
-                ]);
             } else {
-                \Illuminate\Support\Facades\Log::info('DEBUG: Skipping credit entry for accounts payable', [
+                \Illuminate\Support\Facades\Log::info('DEBUG: Skipping credit entry for unbilled purchase', [
                     'totalAmount' => $totalAmount,
-                    'utangCoa_exists' => $utangCoa ? true : false
+                    'unbilledPurchaseCoa_exists' => $unbilledPurchaseCoa ? true : false
                 ]);
             }
         }

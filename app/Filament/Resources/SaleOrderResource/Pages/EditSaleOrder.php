@@ -71,6 +71,19 @@ class EditSaleOrder extends EditRecord
         return $data;
     }
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // Set shipped_to to customer address if it's empty
+        if (empty($data['shipped_to']) && isset($data['customer_id'])) {
+            $customer = Customer::find($data['customer_id']);
+            if ($customer && $customer->address) {
+                $data['shipped_to'] = $customer->address;
+            }
+        }
+
+        return $data;
+    }
+
     protected function afterSave()
     {
         $salesOrderService = new SalesOrderService;

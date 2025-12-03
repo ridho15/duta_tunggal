@@ -76,6 +76,9 @@ class ManufacturingOrderResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Rencana Produksi harus dipilih'
+                            ])
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state) {
@@ -138,6 +141,9 @@ class ManufacturingOrderResource extends Resource
                                     ->preload()
                                     ->searchable()
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Material harus dipilih'
+                                    ])
                                     ->options(Product::where('is_raw_material', true)->pluck('name', 'id'))
                                     ->getOptionLabelFromRecordUsing(function ($value) {
                                         $product = Product::find($value);
@@ -159,11 +165,18 @@ class ManufacturingOrderResource extends Resource
                                     ->preload()
                                     ->searchable()
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Satuan harus dipilih'
+                                    ])
                                     ->disabled(), // Disabled since loaded from Material Issue
                                 TextInput::make('quantity')
                                     ->label('Quantity Required (Dibutuhkan)')
                                     ->numeric()
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Quantity wajib diisi',
+                                        'numeric' => 'Quantity harus berupa angka'
+                                    ])
                                     ->disabled(), // Disabled since loaded from BOM
                                 TextInput::make('notes')
                                     ->label('Notes')

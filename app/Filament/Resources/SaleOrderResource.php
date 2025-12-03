@@ -65,8 +65,8 @@ class SaleOrderResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Penjualan';
 
-    // Ensure Penjualan group appears first
-    protected static ?int $navigationSort = 1;
+    // Ensure Penjualan group appears after Pembelian
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -111,12 +111,13 @@ class SaleOrderResource extends Resource
                                         array_push($items, [
                                             'product_id' => $item->product_id,
                                             'quantity' => $item->quantity,
-                                            'unit_price' => (int) $item->unit_price,
+                                            'unit_price' => HelperController::parseIndonesianMoney($item->unit_price),
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
                                             'notes' => $item->notes,
                                             'warehouse_id' => $item->warehouse_id,
-                                            'subtotal' => $item->quantity * ($item->unit_price + $item->tax - $item->discount)
+                                            'subtotal' => $item->quantity * ($item->unit_price + $item->tax - $item->discount),
+                                            'rak_id' => $item->rak_id
                                         ]);
                                     }
                                     $set('total_amount', $quotation->total_amount);
@@ -494,20 +495,11 @@ class SaleOrderResource extends Resource
                                         return "⚠️ Tidak ada stock di gudang ini";
                                     }),
                                 Select::make('rak_id')
-                                    ->label('Rak')
-                                    ->preload()
-                                    ->reactive()
-                                    ->searchable(['name', 'code'])
-                                    ->relationship('rak', 'name', function (Builder $query, $get) {
-                                        return $query->where('warehouse_id', $get('warehouse_id'));
-                                    })
-                                    ->nullable()
-                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return "({$rak->code}) {$rak->name}";
-                                    })
-                                    ->helperText(function ($get) {
+                                    ->label(function ($get) {
+                                        $baseLabel = 'Rak';
+                                        
                                         if (!$get('product_id') || !$get('warehouse_id') || !$get('rak_id')) {
-                                            return $get('rak_id') ? null : 'Rak bersifat opsional';
+                                            return $baseLabel;
                                         }
 
                                         $rakStock = InventoryStock::where('product_id', $get('product_id'))
@@ -515,58 +507,209 @@ class SaleOrderResource extends Resource
                                             ->where('rak_id', $get('rak_id'))
                                             ->sum('qty_available');
 
-                                        if ($rakStock > 0) {
-                                            return "🗃️ Stock di rak ini: " . number_format($rakStock, 0, ',', '.');
+                                        if ($rakStock <= 0) {
+                                            return $baseLabel . ' 🚨 STOCK HABIS';
+                                        } elseif ($rakStock < 10) {
+                                            return $baseLabel . ' ⚠️ STOCK SEDIKIT (' . $rakStock . ')';
+                                        } else {
+                                            return $baseLabel . ' ✅ (' . number_format($rakStock, 0, ',', '.') . ')';
+                                        }
+                                    })
+                                    ->preload()
+                                    ->reactive()
+                                    ->searchable(['name', 'code'])
+                                    ->relationship('rak', 'name', function (Builder $query, $get) {
+                                        if (!$get('product_id') || !$get('warehouse_id')) {
+                                            return $query->where('warehouse_id', $get('warehouse_id') ?? 0);
                                         }
 
-                                        return "⚠️ Tidak ada stock di rak ini";
+                                        // Only show racks that have inventory stock for the selected product and warehouse
+                                        return $query->where('warehouse_id', $get('warehouse_id'))
+                                                    ->whereHas('inventoryStocks', function (Builder $q) use ($get) {
+                                                        $q->where('product_id', $get('product_id'))
+                                                          ->where('qty_available', '>', 0);
+                                                    });
+                                    })
+                                    ->nullable()
+                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
+                                        return "({$rak->code}) {$rak->name}";
+                                    })
+                                    ->helperText(function ($get) {
+                                        if (!$get('product_id') || !$get('warehouse_id')) {
+                                            return 'Pilih produk dan gudang terlebih dahulu';
+                                        }
+
+                                        // Check if there are any racks with stock for this product in this warehouse
+                                        $availableRacks = InventoryStock::where('product_id', $get('product_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->where('qty_available', '>', 0)
+                                            ->whereNotNull('rak_id')
+                                            ->count();
+
+                                        if ($availableRacks == 0) {
+                                            return "❌ TIDAK ADA RAK DENGAN STOCK PRODUK INI DI GUDANG INI";
+                                        }
+
+                                        if (!$get('rak_id')) {
+                                            return "📦 {$availableRacks} rak tersedia dengan stock produk ini";
+                                        }
+
+                                        $rakStock = InventoryStock::where('product_id', $get('product_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->where('rak_id', $get('rak_id'))
+                                            ->sum('qty_available');
+
+                                        if ($rakStock <= 0) {
+                                            return "🚨 STOCK HABIS - Rak ini tidak memiliki stock produk ini";
+                                        }
+
+                                        if ($rakStock < 10) {
+                                            return "⚠️ STOCK SEDIKIT - Tersedia: " . number_format($rakStock, 0, ',', '.') . " (kurang dari 10)";
+                                        }
+
+                                        return "✅ Stock di rak ini: " . number_format($rakStock, 0, ',', '.');
                                     }),
                                 TextInput::make('quantity')
-                                    ->label('Quantity')
+                                    ->label(function ($get) {
+                                        $baseLabel = 'Quantity';
+                                        
+                                        if (!$get('product_id') || !$get('warehouse_id') || !$get('rak_id')) {
+                                            return $baseLabel;
+                                        }
+
+                                        $rakStock = InventoryStock::where('product_id', $get('product_id'))
+                                            ->where('warehouse_id', $get('warehouse_id'))
+                                            ->where('rak_id', $get('rak_id'))
+                                            ->sum('qty_available');
+
+                                        $currentQuantity = (float) ($get('quantity') ?? 0);
+                                        
+                                        if ($rakStock <= 0) {
+                                            return $baseLabel . ' 🚨 STOCK HABIS';
+                                        } elseif ($currentQuantity > $rakStock) {
+                                            return $baseLabel . ' ❌ MELEBIHI STOCK (' . number_format($rakStock, 0, ',', '.') . ')';
+                                        } elseif ($rakStock < 10) {
+                                            return $baseLabel . ' ⚠️ STOCK SEDIKIT (' . number_format($rakStock, 0, ',', '.') . ')';
+                                        } else {
+                                            return $baseLabel . ' ✅ (' . number_format($rakStock, 0, ',', '.') . ')';
+                                        }
+                                    })
                                     ->numeric()
                                     ->reactive()
                                     ->validationMessages([
                                         'required' => 'Quantity harus diisi',
                                         'numeric' => 'Quantity tidak valid !'
                                     ])
+                                    ->rules([
+                                        function ($get) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                if (!$value || $value <= 0) {
+                                                    return; // Skip validation if quantity is empty or zero
+                                                }
+
+                                                $productId = $get('product_id');
+                                                $warehouseId = $get('warehouse_id');
+                                                $rakId = $get('rak_id');
+
+                                                if (!$productId || !$warehouseId) {
+                                                    $fail('Pilih produk dan gudang terlebih dahulu');
+                                                    return;
+                                                }
+
+                                                // If rak is selected, check stock at rak level
+                                                if ($rakId) {
+                                                    $availableStock = InventoryStock::where('product_id', $productId)
+                                                        ->where('warehouse_id', $warehouseId)
+                                                        ->where('rak_id', $rakId)
+                                                        ->sum('qty_available');
+                                                } else {
+                                                    // If no rak selected, check total warehouse stock (including null rak_id)
+                                                    $availableStock = InventoryStock::where('product_id', $productId)
+                                                        ->where('warehouse_id', $warehouseId)
+                                                        ->sum('qty_available');
+                                                }
+
+                                                if ($availableStock < $value) {
+                                                    $stockLocation = $rakId ? 'rak ini' : 'gudang ini';
+                                                    $fail("Stock tidak mencukupi! Tersedia di {$stockLocation}: " . number_format($availableStock, 0, ',', '.') . " | Diminta: " . number_format($value, 0, ',', '.'));
+                                                }
+                                            };
+                                        }
+                                    ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $state, $get('tax'), $get('tipe_pajak') ?? null));
+                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                    })
+                                    ->suffix(function ($get) {
+                                        if (!$get('product_id') || !$get('warehouse_id')) {
+                                            return null;
+                                        }
+
+                                        $rakId = $get('rak_id');
+                                        if ($rakId) {
+                                            // Show rak-level stock
+                                            $stock = InventoryStock::where('product_id', $get('product_id'))
+                                                ->where('warehouse_id', $get('warehouse_id'))
+                                                ->where('rak_id', $rakId)
+                                                ->sum('qty_available');
+                                            $level = 'Rak';
+                                        } else {
+                                            // Show warehouse-level stock
+                                            $stock = InventoryStock::where('product_id', $get('product_id'))
+                                                ->where('warehouse_id', $get('warehouse_id'))
+                                                ->sum('qty_available');
+                                            $level = 'Gudang';
+                                        }
+
+                                        if ($stock <= 0) {
+                                            return '🚨 HABIS';
+                                        } elseif ($stock < 10) {
+                                            return '⚠️ ' . $stock;
+                                        } else {
+                                            return '✅ ' . number_format($stock, 0, ',', '.');
+                                        }
                                     })
                                     ->helperText(function ($get) {
-                                        if (!$get('product_id')) {
-                                            return 'Pilih produk terlebih dahulu untuk melihat stock';
+                                        $productId = $get('product_id');
+                                        $warehouseId = $get('warehouse_id');
+                                        $rakId = $get('rak_id');
+                                        $quantity = (float) ($get('quantity') ?? 0);
+
+                                        if (!$productId || !$warehouseId) {
+                                            return 'Pilih produk dan gudang terlebih dahulu';
                                         }
 
-                                        $inventoryStock = InventoryStock::where(function ($query) use ($get) {
-                                            if ($get('warehouse_id') && $get('rak_id')) {
-                                                return $query->where('warehouse_id', $get('warehouse_id'))
-                                                            ->where('rak_id', $get('rak_id'));
-                                            } elseif ($get('warehouse_id')) {
-                                                return $query->where('warehouse_id', $get('warehouse_id'));
-                                            } elseif ($get('rak_id')) {
-                                                return $query->where('rak_id', $get('rak_id'));
+                                        if (!$rakId) {
+                                            // Show warehouse-level stock when no rak is selected
+                                            $warehouseStock = InventoryStock::where('product_id', $productId)
+                                                ->where('warehouse_id', $warehouseId)
+                                                ->sum('qty_available');
+
+                                            if ($quantity <= 0) {
+                                                return "Stock gudang: " . number_format($warehouseStock, 0, ',', '.') . " | Pilih rak untuk stock detail";
                                             }
-                                            return $query;
-                                        })
-                                        ->where('product_id', $get('product_id'))->first();
 
-                                        if (!$inventoryStock) {
-                                            return '⚠️ Tidak ada stock tersedia di lokasi ini';
-                                        }
-
-                                        $availableStock = $inventoryStock->qty_available;
-                                        $currentQuantity = (float) ($get('quantity') ?? 0);
-
-                                        if ($currentQuantity > 0) {
-                                            if ($availableStock < $currentQuantity) {
-                                                return "❌ Stock tidak mencukupi! Tersedia: " . number_format($availableStock, 0, ',', '.') . " | Diminta: " . number_format($currentQuantity, 0, ',', '.');
-                                            } else {
-                                                $remaining = $availableStock - $currentQuantity;
-                                                return "✅ Stock tersedia: " . number_format($availableStock, 0, ',', '.') . " | Sisa setelah order: " . number_format($remaining, 0, ',', '.');
+                                            if ($quantity > $warehouseStock) {
+                                                return "❌ QUANTITY MELEBIHI STOCK GUDANG - Tersedia: " . number_format($warehouseStock, 0, ',', '.') . " | Diminta: " . number_format($quantity, 0, ',', '.');
                                             }
-                                        } else {
-                                            return "📦 Stock tersedia: " . number_format($availableStock, 0, ',', '.');
+
+                                            return "✅ Quantity OK (Gudang) - Tersedia: " . number_format($warehouseStock, 0, ',', '.') . " | Diminta: " . number_format($quantity, 0, ',', '.');
                                         }
+
+                                        // Show rak-level stock when rak is selected
+                                        $rakStock = InventoryStock::where('product_id', $productId)
+                                            ->where('warehouse_id', $warehouseId)
+                                            ->where('rak_id', $rakId)
+                                            ->sum('qty_available');
+
+                                        if ($quantity <= 0) {
+                                            return "Stock rak: " . number_format($rakStock, 0, ',', '.') . " | Masukkan quantity untuk validasi";
+                                        }
+
+                                        if ($quantity > $rakStock) {
+                                            return "❌ QUANTITY MELEBIHI STOCK RAK - Tersedia: " . number_format($rakStock, 0, ',', '.') . " | Diminta: " . number_format($quantity, 0, ',', '.');
+                                        }
+
+                                        return "✅ Quantity OK (Rak) - Tersedia: " . number_format($rakStock, 0, ',', '.') . " | Diminta: " . number_format($quantity, 0, ',', '.');
                                     })
                                     ->required()
                                     ->default(0),
@@ -580,7 +723,7 @@ class SaleOrderResource extends Resource
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $state, $get('tipe_pajak') ?? null));
+                                        $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     }),
                                 TextInput::make('discount')
                                     ->label('Discount')
@@ -673,8 +816,24 @@ class SaleOrderResource extends Resource
                                     })
                                     
                             ])
-                    ])
-            ]);
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                // Calculate total amount whenever repeater items change
+                                $totalAmount = 0;
+                                if (is_array($state)) {
+                                    foreach ($state as $item) {
+                                        $totalAmount += HelperController::hitungSubtotal(
+                                            $item['quantity'] ?? 0,
+                                            HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                            $item['discount'] ?? 0,
+                                            $item['tax'] ?? 0,
+                                            $item['tipe_pajak'] ?? null
+                                        );
+                                    }
+                                }
+                                $set('total_amount', $totalAmount);
+                            })
+            ])
+        ]);
     }
 
 
@@ -1160,7 +1319,22 @@ class SaleOrderResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Sale Order</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Sale Order adalah pesanan penjualan yang dibuat dari Quotation atau langsung, memerlukan approval sebelum diproses.</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved → Confirmed → Received → Completed. Atau bisa Request Close → Closed.</li>' .
+                            '<li><strong>Validasi:</strong> <em>Status Stok</em> menunjukkan apakah stok cukup. <em>Credit Limit</em> customer dicek saat approve.</li>' .
+                            '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Request Close</em> (approved+), <em>Close</em> (request_close), <em>PDF/Kwitansi</em> (approved+), <em>Create PO</em> (untuk drop ship), <em>Sync Total</em> (update amount).</li>' .
+                            '<li><strong>Permissions:</strong> <em>request sales order</em> untuk request actions, <em>response sales order</em> untuk approve/reject/close.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan inventory, accounting, dan bisa generate Purchase Order untuk drop shipping.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

@@ -211,6 +211,25 @@ class DeliveryOrderObserver
             // Hapus reservation, yang akan trigger observer untuk mengembalikan qty_available
             $reservation->delete();
         }
+
+        // Update delivered_quantity untuk semua sale order items yang terkait
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            if ($item->sale_order_item_id) {
+                $saleOrderItem = $item->saleOrderItem;
+                if ($saleOrderItem) {
+                    // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
+                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                        ->whereHas('deliveryOrder', function ($query) {
+                            $query->whereIn('status', ['sent', 'received', 'completed']);
+                        })
+                        ->sum('quantity');
+
+                    $saleOrderItem->update([
+                        'delivered_quantity' => $totalDelivered
+                    ]);
+                }
+            }
+        }
     }
 
     /**
@@ -278,6 +297,25 @@ class DeliveryOrderObserver
                     'status' => 'completed',
                     'completed_at' => now()
                 ]);
+            }
+        }
+
+        // Update delivered_quantity untuk semua sale order items yang terkait
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            if ($item->sale_order_item_id) {
+                $saleOrderItem = $item->saleOrderItem;
+                if ($saleOrderItem) {
+                    // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
+                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                        ->whereHas('deliveryOrder', function ($query) {
+                            $query->whereIn('status', ['sent', 'received', 'completed']);
+                        })
+                        ->sum('quantity');
+
+                    $saleOrderItem->update([
+                        'delivered_quantity' => $totalDelivered
+                    ]);
+                }
             }
         }
     }

@@ -42,6 +42,10 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -55,7 +59,7 @@ class QuotationResource extends Resource
     // Keep resource label, but group renamed to include english hint
     protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
     public static function form(Form $form): Form
     {
         return $form
@@ -448,6 +452,11 @@ class QuotationResource extends Resource
                 TextColumn::make('po_file_path')
                     ->searchable(),
 
+                TextColumn::make('notes')
+                    ->label('Notes')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->wrap(),
+
                 TextColumn::make('quotationItem.product.name')
                     ->label('Product')
                     ->searchable()
@@ -494,7 +503,54 @@ class QuotationResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('customer')
+                    ->label('Customer')
+                    ->searchable()
+                    ->preload()
+                    ->relationship('customer', 'name')
+                    ->getOptionLabelFromRecordUsing(function (Customer $customer) {
+                        return "({$customer->code}) {$customer->name}";
+                    }),
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'request_approve' => 'Request Approve',
+                        'approve' => 'Approved',
+                        'reject' => 'Rejected',
+                    ])
+                    ->default(null),
+                Filter::make('date')
+                    ->form([
+                        DatePicker::make('date_from')
+                            ->label('Tanggal Dari'),
+                        DatePicker::make('date_until')
+                            ->label('Tanggal Sampai'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['date_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('date', '>=', $date),
+                            )
+                            ->when(
+                                $data['date_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('date', '<=', $date),
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+
+                        if ($data['date_from'] ?? null) {
+                            $indicators['date_from'] = 'Tanggal dari ' . Carbon::parse($data['date_from'])->toFormattedDateString();
+                        }
+
+                        if ($data['date_until'] ?? null) {
+                            $indicators['date_until'] = 'Tanggal sampai ' . Carbon::parse($data['date_until'])->toFormattedDateString();
+                        }
+
+                        return $indicators;
+                    }),
             ])
             ->actions([
                 ActionGroup::make([
@@ -912,7 +968,22 @@ class QuotationResource extends Resource
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil diupdate");
                         })
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Quotation</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Quotation adalah penawaran harga kepada customer yang perlu disetujui sebelum menjadi Sales Order.</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved/Rejected. Hanya quotation approved yang bisa dijadikan Sales Order.</li>' .
+                            '<li><strong>Validitas:</strong> Perhatikan tanggal <em>Valid Until</em> - quotation expired tidak bisa digunakan.</li>' .
+                            '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Sync Total</em> (update amount), <em>Create Sale Order</em> (approved only).</li>' .
+                            '<li><strong>PO File:</strong> Upload file Purchase Order customer sebagai referensi (opsional).</li>' .
+                            '<li><strong>Integration:</strong> Quotation approved otomatis bisa dikonversi menjadi Sales Order dengan semua detail item.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
 
         return $table;
     }

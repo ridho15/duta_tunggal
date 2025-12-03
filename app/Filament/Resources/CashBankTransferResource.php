@@ -31,7 +31,7 @@ class CashBankTransferResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
     protected static ?string $navigationGroup = 'Finance - Pembayaran';
     protected static ?string $modelLabel = 'Transfer Kas & Bank';
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 5;
 
     public static function shouldRegisterNavigation(): bool
     {

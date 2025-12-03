@@ -70,13 +70,8 @@ class PurchaseReceiptItem extends Model
 
     protected static function booted()
     {
-        // Automatically calculate qty_rejected when saving
-        static::saving(function ($purchaseReceiptItem) {
-            $qtyReceived = (float) ($purchaseReceiptItem->qty_received ?? 0);
-            $qtyAccepted = (float) ($purchaseReceiptItem->qty_accepted ?? 0);
-            
-            // Calculate qty_rejected automatically
-            $purchaseReceiptItem->qty_rejected = max(0, $qtyReceived - $qtyAccepted);
-        });
+        // Untuk partial receipt, qty_rejected tidak dihitung otomatis
+        // User harus mengisi qty_rejected secara manual
+        // Jika qty_rejected tidak diisi, maka dianggap 0 (tidak ada yang ditolak)
     }
 }

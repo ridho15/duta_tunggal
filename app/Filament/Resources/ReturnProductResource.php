@@ -44,7 +44,7 @@ class ReturnProductResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 6;
 
     public static function form(Form $form): Form
     {

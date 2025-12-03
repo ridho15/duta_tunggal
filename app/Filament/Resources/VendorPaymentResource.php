@@ -37,7 +37,7 @@ class VendorPaymentResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance - Pembayaran';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {

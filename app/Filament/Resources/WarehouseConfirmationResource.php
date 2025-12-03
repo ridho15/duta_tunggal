@@ -40,7 +40,7 @@ class WarehouseConfirmationResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 6;
 
     protected static ?string $label = 'Warehouse Confirmations';
 
@@ -85,6 +85,9 @@ class WarehouseConfirmationResource extends Resource
                             ])
                             ->default('sales_order')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Tipe konfirmasi harus dipilih'
+                            ])
                             ->reactive(),
 
                         // Sales Order Section
@@ -113,6 +116,9 @@ class WarehouseConfirmationResource extends Resource
                                 return $get('confirmation_type') === 'sales_order';
                             })
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Sales Order harus dipilih'
+                            ])
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state) {
@@ -145,7 +151,10 @@ class WarehouseConfirmationResource extends Resource
                             ->visible(function ($get) {
                                 return $get('confirmation_type') === 'manufacturing_order';
                             })
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Manufacturing Order harus dipilih'
+                            ]),
 
                         // Confirmation Items for Sales Order
                         Repeater::make('confirmation_items')
@@ -165,6 +174,10 @@ class WarehouseConfirmationResource extends Resource
                                     ->label('Confirmed Qty')
                                     ->numeric()
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Jumlah konfirmasi wajib diisi',
+                                        'numeric' => 'Jumlah konfirmasi harus berupa angka'
+                                    ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $requestedQty = $get('requested_qty') ?? 0;
@@ -191,7 +204,10 @@ class WarehouseConfirmationResource extends Resource
                                             return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
                                     })
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Warehouse harus dipilih'
+                                    ]),
 
                                 Select::make('rak_id')
                                     ->label('Rak')
@@ -218,7 +234,10 @@ class WarehouseConfirmationResource extends Resource
                                         'rejected' => 'Rejected'
                                     ])
                                     ->default('request')
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Status item harus dipilih'
+                                    ]),
                             ])
                             ->columns(3)
                             ->defaultItems(0)

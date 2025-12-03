@@ -7,6 +7,7 @@ use App\Models\QualityControl;
 use App\Services\QualityControlService;
 use App\Services\PurchaseReceiptService;
 use App\Http\Controllers\HelperController;
+use App\Filament\Resources\QualityControlPurchaseResource;
 use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
@@ -168,9 +169,12 @@ class PurchaseReceiptItemRelationManager extends RelationManager
 
                             \Filament\Notifications\Notification::make()
                                 ->title('Berhasil dikirim ke QC')
-                                ->body('Item berhasil dikirim ke Quality Control.')
+                                ->body('Item berhasil dikirim ke Quality Control. QC Number: ' . $qc->qc_number)
                                 ->success()
                                 ->send();
+
+                            // Redirect to QC edit page
+                            return redirect()->to(QualityControlPurchaseResource::getUrl('edit', ['record' => $qc->id]));
                         })
                         ->visible(function ($record) {
                             return !$record->qualityControl()->exists() && $record->qty_received > 0;

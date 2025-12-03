@@ -45,7 +45,7 @@ class SuratJalanResource extends Resource
 
     protected static ?string $navigationGroup = 'Delivery Order';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -344,7 +344,22 @@ class SuratJalanResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Surat Jalan</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order dalam satu perjalanan.</li>' .
+                            '<li><strong>Status:</strong> <em>Draft</em> (belum terbit) dan <em>Terbit</em> (sudah resmi). Hanya Surat Jalan terbit yang dapat digunakan untuk pengiriman.</li>' .
+                            '<li><strong>Actions:</strong> <em>Edit</em> (draft only), <em>Delete</em> (draft only), <em>Download Document</em> (jika ada file), <em>Download Surat</em> (PDF terbit), <em>Terbitkan</em> (ubah ke status terbit).</li>' .
+                            '<li><strong>Grouping:</strong> Satu Surat Jalan dapat mencakup multiple Delivery Order untuk efisiensi pengiriman ke customer yang sama.</li>' .
+                            '<li><strong>Persyaratan Terbit:</strong> Surat Jalan hanya dapat diterbitkan oleh user dengan permission <em>response surat jalan</em>.</li>' .
+                            '<li><strong>PDF:</strong> Download PDF Surat Jalan tersedia setelah status terbit untuk keperluan pengiriman.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

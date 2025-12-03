@@ -45,7 +45,7 @@ class OrderRequestResource extends Resource
     // Part of the Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -220,6 +220,20 @@ class OrderRequestResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Order Request</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Order Request adalah permintaan pembelian internal yang dapat di-approve menjadi Purchase Order.</li>' .
+                            '<li><strong>Cara Approve:</strong> Gunakan tombol <em>Approve</em> pada baris request. Saat approve, Anda dapat memilih untuk membuat Purchase Order secara langsung.</li>' .
+                            '<li><strong>Create PO:</strong> Tombol <em>Create Purchase Order</em> memungkinkan pembuatan PO manual dari request yang telah di-approve.</li>' .
+                            '<li><strong>Dampak:</strong> Setelah disetujui, request berubah status menjadi <em>approved</em> dan siap diteruskan ke proses pembelian.</li>' .
+                            '<li><strong>Catatan:</strong> Akses tombol approve/create PO bergantung pada hak akses pengguna.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ))
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')

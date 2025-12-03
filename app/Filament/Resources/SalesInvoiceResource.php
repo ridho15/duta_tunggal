@@ -41,7 +41,7 @@ class SalesInvoiceResource extends Resource
     protected static ?string $modelLabel = 'Invoice Penjualan';
     protected static ?string $pluralModelLabel = 'Invoice Penjualan';
     protected static ?string $navigationGroup = 'Finance - Penjualan';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {

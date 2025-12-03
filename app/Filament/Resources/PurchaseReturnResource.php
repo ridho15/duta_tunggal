@@ -37,7 +37,7 @@ class PurchaseReturnResource extends Resource
     // Group updated to the standardized Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -159,6 +159,19 @@ class PurchaseReturnResource extends Resource
                     ->label('Created By')
                     ->searchable()
             ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Retur Pembelian</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Retur Pembelian digunakan untuk mengembalikan barang ke supplier atau membatalkan penerimaan yang tidak sesuai.</li>' .
+                            '<li><strong>Mekanisme:</strong> Biasanya dibuat dari Purchase Receipt; pastikan pilih item yang benar agar stok dan jurnal akuntansi diproses sesuai alur.</li>' .
+                            '<li><strong>QC & Stok:</strong> Jika barang sudah masuk inventory setelah QC atau receipt selesai, retur akan mengurangi stok dan membuat jurnal terkait. Jika belum masuk stok (mis. masih proses QC), perilaku retur mengikuti status QC dan policy retur.</li>' .
+                            '<li><strong>Catatan:</strong> Beberapa retur memerlukan approval; periksa hak akses dan prosedur sebelum submit.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ))
             ->filters([
                 //
             ])

@@ -135,4 +135,22 @@ class PurchaseOrder extends Model
             $purchaseOrder->assets()->withTrashed()->restore();
         });
     }
+
+    public function getRemainingQtyStatusAttribute()
+    {
+        $totalItems = $this->purchaseOrderItem->count();
+        $completedItems = $this->purchaseOrderItem->filter(function ($item) {
+            return $item->remaining_quantity <= 0;
+        })->count();
+
+        $itemsWithReceipts = $this->purchaseOrderItem->filter(function ($item) {
+            return $item->purchaseReceiptItem()->sum('qty_accepted') > 0;
+        })->count();
+
+        if ($totalItems === 0) return 'No Items';
+        if ($completedItems === $totalItems) return 'Semua Diterima';
+        if ($completedItems > 0) return 'Sebagian (' . $completedItems . '/' . $totalItems . ')';
+        if ($itemsWithReceipts > 0) return 'Sebagian Diterima';
+        return 'Belum Diterima';
+    }
 }

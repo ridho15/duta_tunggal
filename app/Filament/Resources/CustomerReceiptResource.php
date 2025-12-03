@@ -50,7 +50,7 @@ class CustomerReceiptResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance - Pembayaran';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {

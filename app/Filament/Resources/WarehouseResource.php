@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\WarehouseResource\Pages;
 use App\Filament\Resources\WarehouseResource\Pages\ViewWarehouse;
+use App\Filament\Resources\WarehouseResource\RelationManagers;
 use App\Models\Cabang;
 use App\Models\Warehouse;
 use App\Services\WarehouseService;
@@ -189,7 +190,7 @@ class WarehouseResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\RakRelationManager::class,
         ];
     }
 

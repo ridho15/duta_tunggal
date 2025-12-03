@@ -54,6 +54,23 @@ class PurchaseOrderItem extends Model
         return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
+    /**
+     * Get the remaining quantity that can still be received
+     */
+    public function getRemainingQuantityAttribute()
+    {
+        $totalAccepted = $this->purchaseReceiptItem()->sum('qty_accepted');
+        return max(0, $this->quantity - $totalAccepted);
+    }
+
+    /**
+     * Get the total quantity already received
+     */
+    public function getTotalReceivedAttribute()
+    {
+        return $this->purchaseReceiptItem()->sum('qty_accepted');
+    }
+
     public function getQuantityAttribute($value)
     {
         if (is_null($value)) {

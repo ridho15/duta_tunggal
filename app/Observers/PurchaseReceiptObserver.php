@@ -4,6 +4,8 @@ namespace App\Observers;
 
 use App\Models\PurchaseReceipt;
 use App\Services\PurchaseReceiptService;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseReceiptObserver
 {
@@ -28,27 +30,35 @@ class PurchaseReceiptObserver
             return;
         }
 
-        $receipts = $purchaseOrder->purchaseReceipt;
+        // Load items with receipts
+        $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem']);
 
-        // Check statuses
-        $hasDraft = $receipts->contains('status', 'draft');
-        $hasPartial = $receipts->contains('status', 'partial');
-        $allCompleted = $receipts->every(function ($receipt) {
-            return $receipt->status === 'completed';
-        });
+        $totalOrdered = $purchaseOrder->purchaseOrderItem->sum('quantity');
+        $totalAccepted = 0;
+
+        foreach ($purchaseOrder->purchaseOrderItem as $poItem) {
+            $totalAccepted += $poItem->purchaseReceiptItem->sum('qty_accepted');
+        }
+
+        Log::info("Observer Check PO {$purchaseOrder->id}: Ordered={$totalOrdered}, Accepted={$totalAccepted}");
 
         $newStatus = 'approved'; // default
 
-        if ($allCompleted) {
+        if ($totalAccepted >= $totalOrdered) {
             $newStatus = 'completed';
-        } elseif ($hasPartial) {
+        } elseif ($totalAccepted > 0) {
             $newStatus = 'partially_received';
-        } elseif ($hasDraft) {
-            $newStatus = 'approved';
         }
 
+        Log::info("New Status: {$newStatus}, Current: {$purchaseOrder->status}");
+
         if ($purchaseOrder->status !== $newStatus) {
-            $purchaseOrder->update(['status' => $newStatus]);
+            $purchaseOrder->update([
+                'status' => $newStatus,
+                'completed_by' => $newStatus === 'completed' ? Auth::id() : null,
+                'completed_at' => $newStatus === 'completed' ? now() : null,
+            ]);
+            Log::info("Updated PO {$purchaseOrder->id} to {$newStatus}");
         }
     }
 }

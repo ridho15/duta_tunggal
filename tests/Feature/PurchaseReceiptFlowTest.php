@@ -24,6 +24,7 @@ use App\Services\PurchaseReceiptService;
 use App\Services\QualityControlService;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class PurchaseReceiptFlowTest extends TestCase
@@ -477,7 +478,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'inspected_by' => $this->user->id,
         ]);
 
-        $qualityControl->update(['notes' => 'All goods accepted']);
+        $qualityControl->update(['notes' => 'All goods accepted', 'passed_quantity' => 5]);
         $qualityControlService->completeQualityControl($qualityControl->fresh(), [
             'item_condition' => 'good',
         ]);
@@ -543,10 +544,18 @@ class PurchaseReceiptFlowTest extends TestCase
             'inspected_by' => $this->user->id,
         ]);
 
-        $qualityControl->update(['notes' => 'Procurement QC complete']);
+        $qualityControl->update(['notes' => 'Procurement QC complete', 'passed_quantity' => 10]);
         $qualityControlService->completeQualityControl($qualityControl->fresh(), [
             'item_condition' => 'good',
         ]);
+
+        // Debug: Check if stock movement was created
+        $stockMovement = \App\Models\StockMovement::where('from_model_type', \App\Models\QualityControl::class)
+            ->where('from_model_id', $qualityControl->id)
+            ->first();
+        $this->assertNotNull($stockMovement, 'Stock movement should be created after QC completion');
+        $this->assertEquals('purchase_in', $stockMovement->type);
+        $this->assertEquals(10.0, (float) $stockMovement->quantity);
 
         $inventoryStock = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
@@ -698,7 +707,9 @@ class PurchaseReceiptFlowTest extends TestCase
         $this->assertNotNull($qcRecord->qc_number);
 
         // 4. COMPLETE QC - This should NOT create receipt automatically in the new flow
+        Log::info('BEFORE QC completion - PO status: ' . $purchaseOrder->status);
         $qualityControlService->completeQualityControl($qcRecord, []);
+        Log::info('AFTER QC completion - PO status: ' . $purchaseOrder->fresh()->status);
 
         // Verify NO receipt was created automatically
         $this->assertDatabaseCount('purchase_receipts', 0);
@@ -756,9 +767,9 @@ class PurchaseReceiptFlowTest extends TestCase
         // NOTE: Journal entries are no longer created automatically in the new manual workflow
         // They would need to be created manually through accounting processes
 
-        // 7. VERIFY PO STATUS REMAINS APPROVED (since receipt is created manually and not through QC completion)
+        // 7. VERIFY PO STATUS IS COMPLETED (since receipt is posted, goods are received)
         $purchaseOrder->refresh();
-        $this->assertEquals('approved', $purchaseOrder->status);
+        $this->assertEquals('completed', $purchaseOrder->status);
 
         // 8. VERIFY RECEIPT STATUS WAS UPDATED
         $purchaseReceipt->refresh();
@@ -999,6 +1010,309 @@ class PurchaseReceiptFlowTest extends TestCase
             'return_product_id' => $returnProduct->id,
             'product_id' => $this->product->id,
             'quantity' => 2, // rejected quantity
+        ]);
+    }
+
+    /** @test */
+    public function qc_deletion_reverts_purchase_receipt_item_sent_status()
+    {
+        // 1. Create purchase order and receipt
+        $purchaseOrder = PurchaseOrder::create([
+            'po_number' => 'PO-TEST-001',
+            'supplier_id' => $this->supplier->id,
+            'warehouse_id' => $this->warehouse->id,
+            'currency_id' => $this->currency->id,
+            'status' => 'approved',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(7),
+            'tempo_hutang' => $this->supplier->tempo_hutang,
+            'total_amount' => 1000,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 100,
+            'total_amount' => 1000,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $purchaseReceipt = PurchaseReceipt::create([
+            'receipt_number' => 'REC-TEST-001',
+            'purchase_order_id' => $purchaseOrder->id,
+            'supplier_id' => $this->supplier->id,
+            'warehouse_id' => $this->warehouse->id,
+            'receipt_date' => now(),
+            'received_by' => $this->user->id,
+            'currency_id' => $this->currency->id,
+            'status' => 'draft',
+        ]);
+
+        $receiptItem = PurchaseReceiptItem::create([
+            'purchase_receipt_id' => $purchaseReceipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 10,
+            'qty_accepted' => 10,
+            'warehouse_id' => $this->warehouse->id,
+            'is_sent' => 0, // Initially not sent to QC
+        ]);
+
+        // 2. Send to QC using the service
+        /** @var QualityControlService $qualityControlService */
+        $qualityControlService = app(QualityControlService::class);
+        $qc = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        // 3. Verify is_sent is set to 1
+        $receiptItem->refresh();
+        $this->assertEquals(1, $receiptItem->is_sent);
+
+        // 4. Delete the QC
+        $qc->delete();
+
+        // 5. Verify is_sent is reverted to 0
+        $receiptItem->refresh();
+        $this->assertEquals(0, $receiptItem->is_sent);
+    }
+
+    /** @test */
+    public function qc_passed_quantity_greater_than_receipt_qty_accepted_fails_validation()
+    {
+        // Test scenario: QC passed quantity > receipt qty_accepted should FAIL
+        // This simulates a case where QC tries to pass more items than received in receipt
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 15, // Order 15 items
+            'unit_price' => 10000,
+            'discount' => 0,
+            'tax' => 0,
+        ]);
+
+        $purchaseReceipt = PurchaseReceipt::factory()->create([
+            'receipt_number' => 'RN-20251101-0004',
+            'purchase_order_id' => $purchaseOrder->id,
+            'receipt_date' => now(),
+            'received_by' => $this->user->id,
+            'status' => 'draft',
+            'currency_id' => $this->currency->id,
+            'other_cost' => 0,
+        ]);
+
+        // Receipt accepts only 10 items (conservative acceptance)
+        $receiptItem = PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $purchaseReceipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 10, // Received only 10 items
+            'qty_accepted' => 10, // Accepted 10 items
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'is_sent' => true,
+        ]);
+
+        /** @var QualityControlService $qualityControlService */
+        $qualityControlService = app(QualityControlService::class);
+        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+            'inspected_by' => $this->user->id,
+        ]);
+
+        // Try to set QC passed quantity to 12 (more than received quantity of 10)
+        // This should FAIL with validation error
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('QC passed quantity (12) cannot exceed available quantity (10.00) in purchase receipt.');
+
+        $qualityControl->update([
+            'notes' => 'Trying to pass more items than received - should fail',
+            'passed_quantity' => 12, // Trying to pass 12 items (more than received)
+            'rejected_quantity' => 0
+        ]);
+
+        $qualityControlService->completeQualityControl($qualityControl->fresh(), [
+            'item_condition' => 'good',
+        ]);
+    }
+
+    /** @test */
+    public function qc_passed_quantity_less_than_receipt_qty_accepted_handles_partial_acceptance()
+    {
+        // Test scenario: QC passed quantity < receipt qty_accepted
+        // This simulates a case where QC rejects some items that were initially accepted in receipt
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 15, // Order 15 items
+            'unit_price' => 10000,
+            'discount' => 0,
+            'tax' => 0,
+        ]);
+
+        $purchaseReceipt = PurchaseReceipt::factory()->create([
+            'receipt_number' => 'RN-20251101-0005',
+            'purchase_order_id' => $purchaseOrder->id,
+            'receipt_date' => now(),
+            'received_by' => $this->user->id,
+            'status' => 'draft',
+            'currency_id' => $this->currency->id,
+            'other_cost' => 0,
+        ]);
+
+        // Receipt initially accepts all 15 items (optimistic acceptance)
+        $receiptItem = PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $purchaseReceipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 15, // Received 15 items
+            'qty_accepted' => 15, // Initially accepted all 15
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'is_sent' => true,
+        ]);
+
+        /** @var QualityControlService $qualityControlService */
+        $qualityControlService = app(QualityControlService::class);
+        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+            'inspected_by' => $this->user->id,
+        ]);
+
+        // QC finds that only 8 items actually pass inspection (stricter QC than initial acceptance)
+        $qualityControl->update([
+            'notes' => 'QC rejected more items than initially accepted',
+            'passed_quantity' => 8, // QC passes only 8 items
+            'rejected_quantity' => 7
+        ]);
+
+        $qualityControlService->completeQualityControl($qualityControl->fresh(), [
+            'item_condition' => 'good',
+        ]);
+
+        // Verify QC completion updates qty_accepted on receipt item to match QC result
+        $receiptItem->refresh();
+        $this->assertEquals(8, $receiptItem->qty_accepted, 'Receipt item qty_accepted should be updated to match QC passed quantity (8), not remain at initial acceptance (15)');
+
+        // Verify journal entries are created for the QC passed quantity (8 items)
+        $journalEntries = JournalEntry::where('source_type', \App\Models\QualityControl::class)
+            ->where('source_id', $qualityControl->id)
+            ->get();
+
+        $this->assertCount(2, $journalEntries, 'Should create 2 journal entries for QC inventory posting');
+
+        // Verify debit entry (inventory increase) for 8 items
+        $debitEntry = $journalEntries->first(fn ($entry) => (float) $entry->debit > 0);
+        $this->assertNotNull($debitEntry);
+        $this->assertEquals(80000.0, (float) $debitEntry->debit, 'Debit should be for 8 items * 10000 = 80000');
+        $this->assertEquals('QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number, $debitEntry->description);
+
+        // Verify credit entry (temporary procurement) for 8 items
+        $creditEntry = $journalEntries->first(fn ($entry) => (float) $entry->credit > 0);
+        $this->assertNotNull($creditEntry);
+        $this->assertEquals(80000.0, (float) $creditEntry->credit, 'Credit should be for 8 items * 10000 = 80000');
+
+        // Verify stock movement is created for passed quantity
+        $stockMovement = StockMovement::where('from_model_type', \App\Models\QualityControl::class)
+            ->where('from_model_id', $qualityControl->id)
+            ->first();
+
+        $this->assertNotNull($stockMovement, 'Stock movement should be created');
+        $this->assertEquals('purchase_in', $stockMovement->type);
+        $this->assertEquals(8.0, (float) $stockMovement->quantity, 'Stock movement should be for 8 passed items');
+        $this->assertEquals($this->product->id, $stockMovement->product_id);
+        $this->assertEquals($this->warehouse->id, $stockMovement->warehouse_id);
+
+        // Verify inventory stock is updated for 8 items
+        $inventoryStock = InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
+
+        $this->assertNotNull($inventoryStock);
+        $this->assertEquals(8.0, (float) $inventoryStock->qty_available, 'Inventory should reflect 8 items');
+
+        // Verify purchase order is NOT completed (only 8 of 15 items received)
+        $purchaseOrder->refresh();
+        $this->assertEquals('approved', $purchaseOrder->status, 'PO should not be completed as only 8 of 15 items are received');
+
+        // Verify purchase receipt is NOT completed
+        $purchaseReceipt->refresh();
+        $this->assertEquals('draft', $purchaseReceipt->status, 'Receipt should not be completed as QC passed quantity (8) < ordered quantity (15)');
+    }
+
+    /** @test */
+    public function qc_total_inspected_greater_than_receipt_qty_received_fails_validation()
+    {
+        // Test scenario: QC total inspected (passed + rejected) > receipt qty_received should FAIL
+        // This simulates a case where QC tries to inspect more items than physically received
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 15, // Order 15 items
+            'unit_price' => 10000,
+            'discount' => 0,
+            'tax' => 0,
+        ]);
+
+        $purchaseReceipt = PurchaseReceipt::factory()->create([
+            'receipt_number' => 'RN-20251101-0005',
+            'purchase_order_id' => $purchaseOrder->id,
+            'receipt_date' => now(),
+            'received_by' => $this->user->id,
+            'status' => 'draft',
+            'currency_id' => $this->currency->id,
+            'other_cost' => 0,
+        ]);
+
+        // Receipt accepts only 10 items
+        $receiptItem = PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $purchaseReceipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 10, // Received only 10 items
+            'qty_accepted' => 10, // Accepted 10 items
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'is_sent' => true,
+        ]);
+
+        /** @var QualityControlService $qualityControlService */
+        $qualityControlService = app(QualityControlService::class);
+
+        // Try to create QC with total inspected = 12 (passed 8 + rejected 4 = 12 > received 10)
+        // This should FAIL with validation error
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('QC total inspected quantity (12) cannot exceed available quantity (10.00) in purchase receipt.');
+
+        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+            'inspected_by' => $this->user->id,
+            'passed_quantity' => 8, // Trying to pass 8 items
+            'rejected_quantity' => 4, // Trying to reject 4 items
+            // Total inspected = 12 > qty_received = 10 - should fail
         ]);
     }
 }

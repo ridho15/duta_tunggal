@@ -81,17 +81,14 @@ class QualityControl extends Model
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
     }
 
-    /**
-     * Boot the model.
-     */
-    protected static function boot()
+    public function purchaseReceipt()
     {
-        parent::boot();
-
-        static::deleting(function ($qualityControl) {
-            // Cascade delete related stock movement and return product
-            $qualityControl->stockMovement()->delete();
-            $qualityControl->returnProduct()->delete();
-        });
+        // Jika fromModel adalah PurchaseReceiptItem, kembalikan purchaseReceipt-nya
+        if ($this->fromModel instanceof PurchaseReceiptItem) {
+            return $this->fromModel->purchaseReceipt();
+        }
+        
+        // Jika tidak, kembalikan null atau default
+        return null;
     }
 }

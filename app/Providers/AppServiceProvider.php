@@ -14,6 +14,7 @@ use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
 use App\Models\Product;
 use App\Models\Production;
+use App\Models\QualityControl;
 use App\Models\StockMovement;
 use App\Models\StockReservation;
 use App\Models\VendorPaymentDetail;
@@ -30,6 +31,7 @@ use App\Observers\DepositObserver;
 use App\Observers\GlobalActivityObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\JournalEntryObserver;
+use App\Observers\QualityControlObserver;
 use App\Observers\ManufacturingOrder as ObserversManufacturingOrder;
 use App\Observers\MaterialIssueObserver;
 use App\Observers\MaterialIssueItemObserver;
@@ -179,5 +181,6 @@ class AppServiceProvider extends ServiceProvider
         SaleOrder::observe(SaleOrderObserver::class);
         Product::observe(ProductObserver::class);
         JournalEntry::observe(JournalEntryObserver::class);
+        QualityControl::observe(QualityControlObserver::class);
     }
 }

@@ -139,7 +139,6 @@ class CustomerResource extends Resource
                             ->label('Kredit Limit (Rp.)')
                             ->default(0)
                             ->required()
-                            ->numeric()
                             ->indonesianMoney()
                             ->validationMessages([
                                 'required' => 'Kredit limit tidak boleh kosong',

@@ -31,7 +31,7 @@ class ArApManagementPage extends Page implements HasTable
 
     protected static ?string $navigationLabel = 'AR & AP Management';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 4;
 
     // Add this to make sure it's accessible
     protected static ?string $slug = 'ar-ap-management';

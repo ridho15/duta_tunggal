@@ -7,7 +7,6 @@ use App\Filament\Resources\PurchaseReceiptResource\Pages\ViewPurchaseReceipt;
 use App\Filament\Resources\PurchaseReceiptResource\RelationManagers\PurchaseReceiptItemRelationManager;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
-use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceipt;
 use App\Models\Rak;
 use App\Models\Warehouse;
@@ -48,7 +47,7 @@ class PurchaseReceiptResource extends Resource
     // Group label updated to indicate Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -82,8 +81,12 @@ class PurchaseReceiptResource extends Resource
                             ->preload()
                             ->searchable()
                             ->reactive()
+                            ->validationMessages([
+                                'required' => 'Kode pembelian belum dipilih',
+                                'exists' => 'Kode pembelian tidak tersedia'
+                            ])
                             ->options(function () {
-                                return \App\Models\PurchaseOrder::where('status', 'approved')
+                                return \App\Models\PurchaseOrder::whereIn('status', ['approved', 'partially_received'])
                                     ->get()
                                     ->map(function ($po) {
                                         return [
@@ -102,10 +105,11 @@ class PurchaseReceiptResource extends Resource
                                 $set('currency_id', $currency_id);
                                 $listPurchaseOrderItem = \App\Models\PurchaseOrderItem::where('purchase_order_id', $state)->get();
                                 foreach ($listPurchaseOrderItem as $purchaseOrderItem) {
+                                    $remainingQty = $purchaseOrderItem->remaining_quantity;
                                     $items[] = [
                                         'product_id' => $purchaseOrderItem->product_id,
                                         'purchase_order_item_id' => $purchaseOrderItem->id,
-                                        'qty_received' => $purchaseOrderItem->quantity,
+                                        'qty_received' => $remainingQty, // Set to remaining quantity instead of full quantity
                                         'qty_accepted' => 0,
                                         'qty_rejected' => 0,
                                         'reason_rejected' => null,
@@ -133,6 +137,10 @@ class PurchaseReceiptResource extends Resource
                             })
                             ->required(),
                         DateTimePicker::make('receipt_date')
+                            ->validationMessages([
+                                'required' => 'Tanggal penerimaan belum dipilih',
+                                'date' => 'Format tanggal tidak valid'
+                            ])
                             ->required(),
                         Select::make('received_by')
                             ->label('Received By')
@@ -251,6 +259,12 @@ class PurchaseReceiptResource extends Resource
                                 FileUpload::make('photo_url')
                                     ->image()
                                     ->maxSize(2048)
+                                    ->validationMessages([
+                                        'required' => 'Photo wajib diupload',
+                                        'image' => 'File harus berupa gambar',
+                                        'max' => 'Ukuran file maksimal 2MB',
+                                        'acceptedFileTypes' => 'Format file harus JPG, PNG, atau format gambar lainnya'
+                                    ])
                                     ->required()
                             ]),
                         Repeater::make('purchaseReceiptItem')
@@ -270,6 +284,10 @@ class PurchaseReceiptResource extends Resource
                                     ->preload()
                                     ->required()
                                     ->searchable()
+                                    ->validationMessages([
+                                        'required' => 'Produk belum dipilih',
+                                        'exists' => 'Produk tidak tersedia'
+                                    ])
                                     ->relationship('product', 'name', function ($get, Builder $query) {
                                         $purchaseOrderId = $get('../../purchase_order_id');
                                         return $query->whereHas('purchaseOrderItem', function (Builder $query) use ($purchaseOrderId) {
@@ -309,57 +327,115 @@ class PurchaseReceiptResource extends Resource
                                 TextInput::make('qty_received')
                                     ->label('Quantity Received')
                                     ->numeric()
-                                    ->helperText("Quantity yang datang")
+                                    ->helperText(function ($get) {
+                                        $poItemId = $get('purchase_order_item_id');
+                                        if ($poItemId) {
+                                            $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
+                                            if ($poItem) {
+                                                $remaining = $poItem->remaining_quantity;
+                                                $total = $poItem->quantity;
+                                                $received = $poItem->total_received;
+                                                return "Quantity yang datang (Maksimal: {$remaining}, Total PO: {$total}, Sudah diterima: {$received})";
+                                            }
+                                        }
+                                        return "Quantity yang datang";
+                                    })
                                     ->required()
                                     ->validationMessages([
-                                        'required' => 'Quantity diterima tidak boleh kosong.minimal 0',
-                                        'numeric' => 'Quantity diterima tidak valid !'
+                                        'required' => 'Quantity diterima tidak boleh kosong',
+                                        'numeric' => 'Quantity diterima tidak valid !',
+                                        'min' => 'Quantity diterima minimal 0',
+                                        'max' => 'Quantity diterima melebihi sisa quantity PO'
                                     ])
+                                    ->rules(function ($get) {
+                                        $poItemId = $get('purchase_order_item_id');
+                                        if ($poItemId) {
+                                            $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
+                                            if ($poItem) {
+                                                $remaining = $poItem->remaining_quantity;
+                                                return ['max:' . $remaining, 'min:0'];
+                                            }
+                                        }
+                                        return ['min:0'];
+                                    })
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, $set, $get) {
+                                        // Untuk partial receipt, jangan otomatis hitung qty_rejected
+                                        // Biarkan user mengisi qty_accepted dan qty_rejected secara manual
                                         $qtyReceived = (float) ($state ?? 0);
                                         $qtyAccepted = (float) ($get('qty_accepted') ?? 0);
-                                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
-                                        $set('qty_rejected', $qtyRejected);
-                                    })
-                                    ->default(0),
-                                TextInput::make('qty_accepted')
-                                    ->label('Quantity Accepted')
-                                    ->numeric()
-                                    ->validationMessages([
-                                        'required' => 'Quantity diambil tidak boleh kosong.minimal 0',
-                                        'numeric' => 'Quantity diambil tidak valid !'
-                                    ])
-                                    ->default(0)
-                                    ->helperText("Quantity yang di ambil")
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, $set, $get, $component) {
-                                        $qtyReceived = (float) ($get('qty_received') ?? 0);
-                                        $qtyAccepted = (float) ($state ?? 0);
-                                        
-                                        // Validation: qty_accepted cannot exceed qty_received
+
+                                        // Validasi: qty_accepted tidak boleh melebihi qty_received
                                         if ($qtyAccepted > $qtyReceived) {
-                                            $component->state($qtyReceived);
+                                            $set('qty_accepted', $qtyReceived);
                                             $qtyAccepted = $qtyReceived;
-                                            
+
                                             \Filament\Notifications\Notification::make()
                                                 ->title('Peringatan')
                                                 ->body("Quantity Accepted tidak boleh melebihi Quantity Received ({$qtyReceived})")
                                                 ->warning()
                                                 ->send();
                                         }
-                                        
-                                        $qtyRejected = max(0, $qtyReceived - $qtyAccepted);
-                                        $set('qty_rejected', $qtyRejected);
+                                    })
+                                    ->default(0),
+                                TextInput::make('qty_accepted')
+                                    ->label('Quantity Accepted')
+                                    ->numeric()
+                                    ->validationMessages([
+                                        'required' => 'Quantity diambil tidak boleh kosong',
+                                        'numeric' => 'Quantity diambil tidak valid !',
+                                        'min' => 'Quantity diambil minimal 0'
+                                    ])
+                                    ->default(0)
+                                    ->helperText("Quantity yang diterima/disetujui (bisa kurang dari qty_received untuk partial receipt)")
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, $set, $get, $component) {
+                                        $qtyReceived = (float) ($get('qty_received') ?? 0);
+                                        $qtyAccepted = (float) ($state ?? 0);
+
+                                        // Validation: qty_accepted cannot exceed qty_received
+                                        if ($qtyAccepted > $qtyReceived) {
+                                            $component->state($qtyReceived);
+                                            $qtyAccepted = $qtyReceived;
+
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Peringatan')
+                                                ->body("Quantity Accepted tidak boleh melebihi Quantity Received ({$qtyReceived})")
+                                                ->warning()
+                                                ->send();
+                                        }
+
+                                        // Untuk partial receipt, jangan otomatis hitung qty_rejected
+                                        // Biarkan user mengatur qty_accepted dan qty_rejected secara manual
                                     })
                                     ->required(),
                                 TextInput::make('qty_rejected')
                                     ->label('Quantity Rejected')
                                     ->numeric()
-                                    ->helperText("Quantity yang ditolak (otomatis dihitung)")
-                                    ->disabled()
-                                    ->dehydrated(true)
-                                    ->default(0),
+                                    ->helperText("Quantity yang ditolak (harus diisi manual, tidak otomatis dihitung)")
+                                    ->validationMessages([
+                                        'numeric' => 'Quantity ditolak tidak valid !',
+                                        'min' => 'Quantity ditolak minimal 0'
+                                    ])
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, $set, $get) {
+                                        $qtyReceived = (float) ($get('qty_received') ?? 0);
+                                        $qtyAccepted = (float) ($get('qty_accepted') ?? 0);
+                                        $qtyRejected = (float) ($state ?? 0);
+
+                                        // Validasi: total qty_accepted + qty_rejected tidak boleh melebihi qty_received
+                                        if ($qtyAccepted + $qtyRejected > $qtyReceived) {
+                                            $maxRejected = $qtyReceived - $qtyAccepted;
+                                            $set('qty_rejected', max(0, $maxRejected));
+
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Peringatan')
+                                                ->body("Total Accepted + Rejected tidak boleh melebihi Quantity Received ({$qtyReceived})")
+                                                ->warning()
+                                                ->send();
+                                        }
+                                    }),
                                 Textarea::make('reason_rejected')
                                     ->label('Reason Rejected')
                                     ->string()
@@ -373,6 +449,12 @@ class PurchaseReceiptResource extends Resource
                                             ->image()
                                             ->acceptedFileTypes(['image/*'])
                                             ->maxSize(1024)
+                                            ->validationMessages([
+                                                'required' => 'Photo wajib diupload',
+                                                'image' => 'File harus berupa gambar',
+                                                'max' => 'Ukuran file maksimal 1MB',
+                                                'acceptedFileTypes' => 'Format file harus JPG, PNG, atau format gambar lainnya'
+                                            ])
                                             ->required(),
                                     ]),
                             ]),
@@ -409,6 +491,59 @@ class PurchaseReceiptResource extends Resource
                         return $record->purchaseReceiptBiaya->sum('total');
                     })
                     ->sortable(),
+                TextColumn::make('qc_status')
+                    ->label('QC Status')
+                    ->getStateUsing(function ($record) {
+                        $totalItems = $record->purchaseReceiptItem()->count();
+                        $sentItems = $record->purchaseReceiptItem()->where('is_sent', true)->count();
+
+                        if ($totalItems === 0) {
+                            return 'Tidak ada item';
+                        }
+
+                        return "{$sentItems}/{$totalItems} item dikirim ke QC";
+                    })
+                    ->badge()
+                    ->color(function ($state) {
+                        if (str_contains($state, 'Tidak ada item')) {
+                            return 'gray';
+                        }
+
+                        $parts = explode('/', $state);
+                        if (count($parts) === 2) {
+                            $sent = (int) $parts[0];
+                            $total = (int) $parts[1];
+
+                            if ($sent === $total && $total > 0) {
+                                return 'success'; // All items sent to QC
+                            } elseif ($sent > 0) {
+                                return 'warning'; // Some items sent to QC
+                            }
+                        }
+
+                        return 'danger'; // No items sent to QC
+                    })
+                    ->tooltip(function ($state) {
+                        if (str_contains($state, 'Tidak ada item')) {
+                            return 'Purchase receipt ini belum memiliki item';
+                        }
+
+                        $parts = explode('/', $state);
+                        if (count($parts) === 2) {
+                            $sent = (int) $parts[0];
+                            $total = (int) $parts[1];
+
+                            if ($sent === $total && $total > 0) {
+                                return 'Semua item telah dikirim ke Quality Control';
+                            } elseif ($sent > 0) {
+                                return 'Beberapa item telah dikirim ke Quality Control';
+                            } else {
+                                return 'Belum ada item yang dikirim ke Quality Control';
+                            }
+                        }
+
+                        return '';
+                    }),
                 SelectColumn::make('status')
                     ->options(function () {
                         return [
@@ -416,6 +551,18 @@ class PurchaseReceiptResource extends Resource
                             'partial' => 'Partial',
                             'completed' => 'Completed'
                         ];
+                    })
+                    ->tooltip(function ($state) {
+                        switch ($state) {
+                            case 'draft':
+                                return 'Status Draft: Belum ada item yang dikirim ke Quality Control. Purchase receipt masih dalam proses penerimaan barang.';
+                            case 'partial':
+                                return 'Status Partial: Beberapa item telah dikirim ke Quality Control. Purchase receipt dalam proses quality control parsial.';
+                            case 'completed':
+                                return 'Status Completed: Semua item telah dikirim ke Quality Control. Purchase receipt telah selesai dan siap untuk proses selanjutnya seperti pembuatan invoice dan pembayaran.';
+                            default:
+                                return '';
+                        }
                     }),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -430,6 +577,19 @@ class PurchaseReceiptResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Quality Control</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>QC Status</strong>: Menampilkan jumlah item yang dikirim ke QC (Terkirim / Total).</li>' .
+                            '<li><strong>Cara kirim ke QC</strong>: Buka halaman detail Purchase Receipt dan gunakan tombol "Send to QC" pada item yang ingin diuji.</li>' .
+                            '<li><strong>Status "Completed"</strong>: Semua item telah dikirim ke QC. Setelah QC disetujui, barang akan ditambahkan ke inventory dan Anda dapat melanjutkan dengan pembuatan invoice serta pembayaran.</li>' .
+                            '<li><strong>Catatan</strong>: Stok hanya akan dimasukkan ke inventory setelah QC disetujui; pengiriman ke QC tidak otomatis menambah stok.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ))
             ->filters([
                 //
             ])

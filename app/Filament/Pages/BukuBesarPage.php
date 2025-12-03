@@ -18,7 +18,7 @@ class BukuBesarPage extends Page
 
     protected static ?string $navigationLabel = 'Buku Besar';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $slug = 'buku-besar-page';
 

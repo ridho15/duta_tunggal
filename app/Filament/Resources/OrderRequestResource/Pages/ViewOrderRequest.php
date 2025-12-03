@@ -28,7 +28,8 @@ class ViewOrderRequest extends ViewRecord
         return [
             EditAction::make()
                 ->icon('heroicon-o-pencil-square'),
-            DeleteAction::make(),
+            DeleteAction::make()->icon('heroicon-o-trash')
+                ->color('danger'),
             Action::make('reject')
                 ->label('Reject')
                 ->color('danger')

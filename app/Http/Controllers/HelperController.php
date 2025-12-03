@@ -707,21 +707,9 @@ class HelperController extends Controller
 
     public static function hitungSubtotal($quantity, $unit_price, $discount, $tax, $taxType = null)
     {
-        Log::debug('[hitungSubtotal] raw inputs', [
-            'quantity' => $quantity,
-            'unit_price_raw' => $unit_price,
-            'discount' => $discount,
-            'tax' => $tax,
-            'taxType' => $taxType,
-        ]);
-
         // Normalize unit price if passed as formatted string (contains dot thousand separators)
         if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
             $parsed = self::parseIndonesianMoney($unit_price);
-            Log::debug('[hitungSubtotal] parsed unit_price from string', [
-                'original' => $unit_price,
-                'parsed' => $parsed,
-            ]);
             $unit_price = $parsed;
         }
 
@@ -737,28 +725,12 @@ class HelperController extends Controller
             $service = \App\Services\TaxService::class;
             $result = $service::compute($afterDiscount, $rate, $taxType);
             $final = round($result['total'], 2);
-            Log::debug('[hitungSubtotal] tax service result', [
-                'subtotal' => $subtotal,
-                'discountAmount' => $discountAmount,
-                'afterDiscount' => $afterDiscount,
-                'rate' => $rate,
-                'final' => $final,
-            ]);
             return $final;
         } catch (\Throwable $e) {
             // Fallback: previous behavior (exclusive)
             $tax_amount = $afterDiscount * $rate / 100.0;
             $total = $afterDiscount + $tax_amount;
             $final = round($total, 2);
-            Log::debug('[hitungSubtotal] fallback tax calc', [
-                'subtotal' => $subtotal,
-                'discountAmount' => $discountAmount,
-                'afterDiscount' => $afterDiscount,
-                'rate' => $rate,
-                'tax_amount' => $tax_amount,
-                'final' => $final,
-                'error' => $e->getMessage(),
-            ]);
             return $final;
         }
     }

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PurchaseReceiptResource\Pages;
 
 use App\Filament\Resources\PurchaseReceiptResource;
 use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -15,7 +16,8 @@ class ViewPurchaseReceipt extends ViewRecord
     {
         return [
             EditAction::make()
-                ->icon('heroicon-o-pencil-square')
+                ->icon('heroicon-o-pencil-square'),
+                DeleteAction::make()->icon('heroicon-o-trash')
         ];
     }
 }

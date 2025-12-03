@@ -47,8 +47,8 @@ class DeliveryOrderResource extends Resource
 
     protected static ?string $navigationGroup = 'Delivery Order';
 
-    // Position Delivery Order as the 5th group
-    protected static ?int $navigationSort = 5;
+    // Position Delivery Order after Penjualan groups
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {
@@ -741,95 +741,132 @@ class DeliveryOrderResource extends Resource
                             return ($record->status == 'approved' || $record->status == 'confirmed') &&
                                    Auth::user()->hasRole(['Checker', 'Super Admin', 'Owner', 'Admin']);
                         })
-                        ->form(function ($record) {
-                            return [
-                                Fieldset::make('Edit Quantity untuk Checker')
-                                    ->schema([
-                                        Repeater::make('delivery_items')
-                                            ->label('Delivery Order Items')
-                                            ->schema([
-                                                TextInput::make('product_name')
-                                                    ->label('Product')
-                                                    ->disabled()
-                                                    ->columnSpan(2),
-                                                TextInput::make('original_quantity')
-                                                    ->label('Qty Asli')
-                                                    ->disabled()
-                                                    ->numeric(),
-                                                TextInput::make('current_quantity')
-                                                    ->label('Qty Saat Ini')
-                                                    ->disabled()
-                                                    ->numeric(),
-                                                TextInput::make('new_quantity')
-                                                    ->label('Qty Baru')
-                                                    ->numeric()
-                                                    ->required()
-                                                    ->minValue(0)
-                                                    ->default(function ($get, $set, $state, $record, $component) {
-                                                        $itemData = $component->getState();
-                                                        return $itemData['current_quantity'] ?? 0;
-                                                    })
-                                                    ->afterStateUpdated(function ($state, $set, $get) {
-                                                        $originalQty = $get('original_quantity');
-                                                        if ($state > $originalQty) {
-                                                            $set('new_quantity', $originalQty);
-                                                            \Filament\Notifications\Notification::make()
-                                                                ->title('Quantity Validation')
-                                                                ->body("Quantity tidak boleh melebihi quantity asli: {$originalQty}")
-                                                                ->warning()
-                                                                ->send();
-                                                        }
-                                                    }),
-                                            ])
-                                            ->columns(4)
-                                            ->defaultItems(0)
-                                            ->itemLabel(function ($state) {
-                                                return $state['product_name'] ?? 'Item';
-                                            })
-                                            ->mutateDehydratedStateUsing(function ($state) {
+                        ->form([
+                            Fieldset::make('Edit Quantity untuk Checker')
+                                ->schema([
+                                    Repeater::make('delivery_items')
+                                        ->label('Delivery Order Items')
+                                        ->schema([
+                                            TextInput::make('product_name')
+                                                ->label('Product')
+                                                ->disabled()
+                                                ->columnSpan(2),
+                                            TextInput::make('original_quantity')
+                                                ->label('Qty Asli')
+                                                ->disabled()
+                                                ->numeric(),
+                                            TextInput::make('current_quantity')
+                                                ->label('Qty Saat Ini')
+                                                ->disabled()
+                                                ->numeric(),
+                                            TextInput::make('new_quantity')
+                                                ->label('Qty Baru')
+                                                ->numeric()
+                                                ->required()
+                                                ->minValue(0)
+                                                ->default(function ($get) {
+                                                    return $get('current_quantity') ?? 0;
+                                                })
+                                                ->afterStateUpdated(function ($state, $set, $get) {
+                                                    $originalQty = $get('original_quantity');
+                                                    if ($state > $originalQty) {
+                                                        $set('new_quantity', $originalQty);
+                                                        \Filament\Notifications\Notification::make()
+                                                            ->title('Quantity Validation')
+                                                            ->body("Quantity tidak boleh melebihi quantity asli: {$originalQty}")
+                                                            ->warning()
+                                                            ->send();
+                                                    }
+                                                }),
+                                        ])
+                                        ->columns(2)
+                                        ->columnSpanFull()
+                                        ->defaultItems(0)
+                                        ->itemLabel('Delivery Item')
+                                        ->addable(false)
+                                        ->deletable(false)
+                                        ->mutateDehydratedStateUsing(function ($state) {
+                                            // Pastikan semua item memiliki key yang diperlukan
+                                            return collect($state)->map(function ($item) {
+                                                return [
+                                                    'product_name' => $item['product_name'] ?? '',
+                                                    'original_quantity' => $item['original_quantity'] ?? 0,
+                                                    'current_quantity' => $item['current_quantity'] ?? 0,
+                                                    'new_quantity' => $item['new_quantity'] ?? 0,
+                                                    'delivery_order_item_id' => $item['delivery_order_item_id'] ?? null,
+                                                ];
+                                            })->filter(function ($item) {
                                                 // Filter hanya item yang diubah quantity-nya
-                                                return collect($state)->filter(function ($item) {
-                                                    return ($item['new_quantity'] ?? 0) != ($item['current_quantity'] ?? 0);
-                                                })->values()->toArray();
-                                            })
-                                    ])
-                                    ->state(function ($record) {
-                                        $items = [];
-                                        foreach ($record->deliveryOrderItem as $item) {
-                                            $items[] = [
-                                                'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
-                                                'original_quantity' => $item->quantity, // Quantity asli dari sale order item
-                                                'current_quantity' => $item->quantity, // Quantity saat ini di delivery order
-                                                'new_quantity' => $item->quantity, // Default sama dengan current
-                                                'delivery_order_item_id' => $item->id,
-                                            ];
-                                        }
-                                        return ['delivery_items' => $items];
-                                    }),
-                                Textarea::make('checker_notes')
-                                    ->label('Catatan Checker')
-                                    ->placeholder('Berikan alasan perubahan quantity...')
-                                    ->nullable(),
-                            ];
-                        })
+                                                return ($item['new_quantity'] ?? 0) != ($item['current_quantity'] ?? 0);
+                                            })->values()->toArray();
+                                        })
+                                        ->default(function ($record) {
+                                            $items = [];
+                                            foreach ($record->deliveryOrderItem as $item) {
+                                                $items[] = [
+                                                    'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
+                                                    'original_quantity' => $item->quantity, // Quantity asli dari sale order item
+                                                    'current_quantity' => $item->quantity, // Quantity saat ini di delivery order
+                                                    'new_quantity' => $item->quantity, // Default sama dengan current
+                                                    'delivery_order_item_id' => $item->id,
+                                                ];
+                                            }
+                                            return $items;
+                                        }),
+                                    Textarea::make('checker_notes')
+                                        ->label('Catatan Checker')
+                                        ->placeholder('Berikan alasan perubahan quantity...')
+                                        ->nullable(),
+                                ])
+                        ])
                         ->action(function ($record, array $data) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
 
-                            // Update quantity untuk setiap item yang diubah
-                            foreach ($data['delivery_items'] as $itemData) {
-                                $deliveryItem = $record->deliveryOrderItem()->find($itemData['delivery_order_item_id']);
-                                if ($deliveryItem && $itemData['new_quantity'] != $itemData['current_quantity']) {
-                                    $deliveryItem->update([
-                                        'quantity' => $itemData['new_quantity']
-                                    ]);
+                            // Pastikan delivery_items ada dan merupakan array
+                            $deliveryItems = $data['delivery_items'] ?? [];
 
-                                    // Log perubahan quantity
-                                    \App\Models\DeliveryOrderLog::create([
-                                        'delivery_order_id' => $record->id,
-                                        'action' => 'quantity_updated_by_checker',
-                                        'comments' => 'Old: ' . $itemData['current_quantity'] . ', New: ' . $itemData['new_quantity'] . '. ' . ($data['checker_notes'] ?? ''),
-                                        'user_id' => Auth::id(),
-                                    ]);
+                            // Update quantity untuk setiap item yang diubah
+                            foreach ($deliveryItems as $itemData) {
+                                // Pastikan semua key yang diperlukan ada
+                                $deliveryOrderItemId = $itemData['delivery_order_item_id'] ?? null;
+                                $newQuantity = $itemData['new_quantity'] ?? 0;
+                                $currentQuantity = $itemData['current_quantity'] ?? 0;
+
+                                if ($deliveryOrderItemId && $newQuantity != $currentQuantity) {
+                                    $deliveryItem = $record->deliveryOrderItem()->find($deliveryOrderItemId);
+                                    if ($deliveryItem) {
+                                        $deliveryItem->update([
+                                            'quantity' => $newQuantity
+                                        ]);
+
+                                        // Update delivered_quantity di sale order item
+                                        if ($deliveryItem->sale_order_item_id) {
+                                            $saleOrderItem = $deliveryItem->saleOrderItem;
+                                            if ($saleOrderItem) {
+                                                // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
+                                                $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                                                    ->whereHas('deliveryOrder', function ($query) {
+                                                        $query->whereIn('status', ['sent', 'received', 'completed']);
+                                                    })
+                                                    ->sum('quantity');
+
+                                                $saleOrderItem->update([
+                                                    'delivered_quantity' => $totalDelivered
+                                                ]);
+                                            }
+                                        }
+
+                                        // Log perubahan quantity
+                                        \App\Models\DeliveryOrderLog::create([
+                                            'delivery_order_id' => $record->id,
+                                            'action' => 'quantity_updated_by_checker',
+                                            'comments' => 'Old: ' . $currentQuantity . ', New: ' . $newQuantity . '. ' . ($data['checker_notes'] ?? ''),
+                                            'user_id' => Auth::id(),
+                                            'old_value' => (string)$currentQuantity,
+                                            'new_value' => (string)$newQuantity,
+                                            'notes' => $data['checker_notes'] ?? null,
+                                        ]);
+                                    }
                                 }
                             }
 
@@ -866,7 +903,22 @@ class DeliveryOrderResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Delivery Order</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Delivery Order adalah dokumen pengiriman barang dari penjualan yang perlu disetujui sebelum dikirim.</li>' .
+                            '<li><strong>Flow Approval:</strong> Draft → Request Approve → Approved → Sent → Received → Completed. Gunakan tombol <em>Request Approve</em> untuk memulai proses approval.</li>' .
+                            '<li><strong>Surat Jalan:</strong> Wajib memiliki Surat Jalan sebelum approval. Status Surat Jalan ditampilkan di kolom khusus.</li>' .
+                            '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Mark as Sent</em> (approved), <em>Complete</em> (received).</li>' .
+                            '<li><strong>Checker Edit:</strong> User dengan role Checker dapat mengedit quantity setelah approved untuk penyesuaian aktual.</li>' .
+                            '<li><strong>PDF:</strong> Download PDF tersedia setelah status approved atau completed.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

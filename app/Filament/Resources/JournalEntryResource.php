@@ -30,7 +30,7 @@ class JournalEntryResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance - Akuntansi';
 
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {

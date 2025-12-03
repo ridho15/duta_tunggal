@@ -31,8 +31,8 @@ class InventoryStockResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    // Position Gudang as the 3rd group
-    protected static ?int $navigationSort = 3;
+    // Position Gudang as the 6th group
+    protected static ?int $navigationSort = 6;
 
     public static function form(Form $form): Form
     {
@@ -62,11 +62,33 @@ class InventoryStockResource extends Resource
                                 'exists' => 'Gudang tidak tersedia'
                             ])
                             ->reactive()
-                            ->relationship('warehouse', 'id')
+                            ->relationship('warehouse', 'id', function (Builder $query) {
+                                $query->where('status', true);
+                            })
                             ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                 return "({$warehouse->kode}) {$warehouse->name}";
                             })
-                            ->required(),
+                            ->required()
+                            ->rules([
+                                function () {
+                                    return function (string $attribute, $value, \Closure $fail) {
+                                        $productId = request()->input('product_id');
+                                        $warehouseId = $value;
+                                        $rakId = request()->input('rak_id');
+
+                                        if ($productId && $warehouseId && $rakId) {
+                                            $existing = InventoryStock::where('product_id', $productId)
+                                                ->where('warehouse_id', $warehouseId)
+                                                ->where('rak_id', $rakId)
+                                                ->exists();
+
+                                            if ($existing) {
+                                                $fail('Stok inventory untuk kombinasi produk, gudang, dan rak ini sudah ada. Gunakan fitur edit untuk mengubah data yang sudah ada.');
+                                            }
+                                        }
+                                    };
+                                }
+                            ]),
                         TextInput::make('qty_available')
                             ->required()
                             ->numeric()
@@ -158,7 +180,9 @@ class InventoryStockResource extends Resource
             ->filters([
                 SelectFilter::make('warehouse_id')
                     ->label('Gudang')
-                    ->relationship('warehouse', 'name')
+                    ->relationship('warehouse', 'name', function (Builder $query) {
+                        $query->where('status', true);
+                    })
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('rak_id')
@@ -197,9 +221,9 @@ class InventoryStockResource extends Resource
     {
         return [
             'index' => Pages\ListInventoryStocks::route('/'),
-            // 'create' => Pages\CreateInventoryStock::route('/create'),
+            'create' => Pages\CreateInventoryStock::route('/create'),
             'view' => ViewInventoryStock::route('/{record}'),
-            // 'edit' => Pages\EditInventoryStock::route('/{record}/edit'),
+            'edit' => Pages\EditInventoryStock::route('/{record}/edit'),
         ];
     }
 }
