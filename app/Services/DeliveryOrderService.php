@@ -10,6 +10,7 @@ use App\Models\StockReservation;
 use App\Models\InventoryStock;
 use App\Services\ProductService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
 
@@ -58,20 +59,25 @@ class DeliveryOrderService
     {
         $date = now()->format('Ymd');
 
-        // Hitung berapa PO pada hari ini
-        $last = DeliveryOrder::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        // Gunakan database transaction untuk menghindari race condition
+        return DB::transaction(function () use ($date) {
+            // Lock table untuk mencegah race condition
+            $last = DB::table('delivery_orders')
+                ->whereDate('created_at', now()->toDateString())
+                ->orderBy('id', 'desc')
+                ->lockForUpdate()
+                ->first();
 
-        $number = 1;
+            $number = 1;
 
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->do_number, -4));
-            $number = $lastNumber + 1;
-        }
+            if ($last) {
+                // Ambil nomor urut terakhir
+                $lastNumber = intval(substr($last->do_number, -4));
+                $number = $lastNumber + 1;
+            }
 
-        return 'DO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+            return 'DO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        });
     }
 
     /**
@@ -132,10 +138,9 @@ class DeliveryOrderService
     public function postDeliveryOrder(DeliveryOrder $deliveryOrder): array
     {
         // Check if stock movements already exist for this delivery order
+        $deliveryOrderItemIds = $deliveryOrder->deliveryOrderItem()->pluck('id');
         $existingStockMovements = \App\Models\StockMovement::where('from_model_type', \App\Models\DeliveryOrderItem::class)
-            ->whereHas('fromModel', function($query) use ($deliveryOrder) {
-                $query->where('delivery_order_id', $deliveryOrder->id);
-            })
+            ->whereIn('from_model_id', $deliveryOrderItemIds)
             ->where('type', 'sales')
             ->exists();
 

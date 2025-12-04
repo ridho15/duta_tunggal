@@ -95,6 +95,7 @@ class JournalEntryAggregationService
                 $groupedData[$parentKey]['children'][$childKey]['entries'][] = [
                     'id' => $entry->id,
                     'date' => $entry->date,
+                    'created_at' => $entry->created_at,
                     'reference' => $entry->reference,
                     'description' => $entry->description,
                     'debit' => $entry->debit,
@@ -112,6 +113,7 @@ class JournalEntryAggregationService
                 $groupedData[$parentKey]['entries'][] = [
                     'id' => $entry->id,
                     'date' => $entry->date,
+                    'created_at' => $entry->created_at,
                     'reference' => $entry->reference,
                     'description' => $entry->description,
                     'debit' => $entry->debit,

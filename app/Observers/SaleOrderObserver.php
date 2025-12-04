@@ -42,7 +42,7 @@ class SaleOrderObserver
         ]);
 
         // Load relationships
-        $saleOrder->loadMissing('saleOrderItem.product', 'deliveryOrder');
+        $saleOrder->loadMissing('saleOrderItem.product', 'deliveryOrder', 'customer');
 
         // Cek apakah sudah ada invoice untuk sale order ini
         $existingInvoice = Invoice::where('from_model_type', SaleOrder::class)
@@ -95,12 +95,23 @@ class SaleOrderObserver
 
         $total = $subtotal + $tax + $additionalCosts;
 
-        // Buat invoice
-        $invoice = Invoice::create([
+        // Load customer data
+        $saleOrder->load('customer');
+
+        Log::info('SaleOrderObserver: Customer data before invoice creation', [
+            'sale_order_id' => $saleOrder->id,
+            'customer_exists' => $saleOrder->customer ? true : false,
+            'customer_name' => $saleOrder->customer?->name,
+            'customer_phone' => $saleOrder->customer?->phone,
+            'customer_object' => $saleOrder->customer,
+        ]);
+
+        $invoiceData = [
             'invoice_number' => 'INV-' . $saleOrder->so_number . '-' . now()->format('YmdHis'),
             'from_model_type' => SaleOrder::class,
             'from_model_id' => $saleOrder->id,
-            'customer_id' => $saleOrder->customer_id,
+            'customer_name' => $saleOrder->customer?->name,
+            'customer_phone' => $saleOrder->customer?->phone,
             'invoice_date' => now()->toDateString(),
             'due_date' => now()->addDays(30)->toDateString(), // Default 30 hari
             'subtotal' => $subtotal,
@@ -110,6 +121,27 @@ class SaleOrderObserver
             'delivery_orders' => $saleOrder->deliveryOrder->pluck('id')->toArray(), // Tambahkan delivery order IDs
             'status' => 'unpaid', // Atau sesuai logic
             'notes' => 'Auto-generated from completed Sale Order ' . $saleOrder->so_number,
+        ];
+
+        Log::info('SaleOrderObserver: Invoice data to be created', $invoiceData);
+
+        // Buat invoice
+        $invoice = new Invoice($invoiceData);
+        $invoice->save();
+
+        Log::info('SaleOrderObserver: Invoice created, checking saved data', [
+            'invoice_id' => $invoice->id,
+            'saved_customer_name' => $invoice->customer_name,
+            'saved_customer_phone' => $invoice->customer_phone,
+            'fresh_from_db' => Invoice::find($invoice->id)->only(['customer_name', 'customer_phone']),
+        ]);
+
+        // Force refresh and check again
+        $invoice->refresh();
+        Log::info('SaleOrderObserver: After refresh', [
+            'invoice_id' => $invoice->id,
+            'refreshed_customer_name' => $invoice->customer_name,
+            'refreshed_customer_phone' => $invoice->customer_phone,
         ]);
 
         // Buat invoice items

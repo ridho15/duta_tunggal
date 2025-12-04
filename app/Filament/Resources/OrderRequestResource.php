@@ -35,6 +35,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class OrderRequestResource extends Resource
 {
@@ -122,6 +123,12 @@ class OrderRequestResource extends Resource
                             ->columns(3)
                             ->hint('Pilih supplier terlebih dahulu sebelum menambah item')
                             ->disabled(fn(callable $get) => !$get('supplier_id'))
+                            ->minItems(1)
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Order request harus memiliki setidaknya satu item produk.',
+                                'min' => 'Order request harus memiliki setidaknya satu item produk.',
+                            ])
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
@@ -464,5 +471,29 @@ class OrderRequestResource extends Resource
             'view' => ViewOrderRequest::route('/{record}'),
             'edit' => Pages\EditOrderRequest::route('/{record}/edit'),
         ];
+    }
+
+    protected static function mutateFormDataBeforeCreate(array $data): array
+    {
+        // Ensure orderRequestItem is not empty
+        if (empty($data['orderRequestItem']) || count($data['orderRequestItem']) === 0) {
+            throw ValidationException::withMessages([
+                'orderRequestItem' => 'Order request harus memiliki setidaknya satu item produk.'
+            ]);
+        }
+
+        return $data;
+    }
+
+    protected static function mutateFormDataBeforeSave(array $data): array
+    {
+        // Ensure orderRequestItem is not empty
+        if (empty($data['orderRequestItem']) || count($data['orderRequestItem']) === 0) {
+            throw ValidationException::withMessages([
+                'orderRequestItem' => 'Order request harus memiliki setidaknya satu item produk.'
+            ]);
+        }
+
+        return $data;
     }
 }

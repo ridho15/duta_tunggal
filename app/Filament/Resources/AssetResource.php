@@ -532,7 +532,9 @@ class AssetResource extends Resource
                         'warning' => 'Belum diproses',
                         'gray' => 'Tidak ada QC',
                     ])
-                    ->formatStateUsing(fn (string $state): string => $state),
+                    ->formatStateUsing(function($state){
+                        return $state ?: 'Tidak ada QC';
+                    }),
                 
                 Tables\Columns\TextColumn::make('product.name')
                     ->label('Product Master')

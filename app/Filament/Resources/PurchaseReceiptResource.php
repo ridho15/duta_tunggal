@@ -332,32 +332,20 @@ class PurchaseReceiptResource extends Resource
                                         if ($poItemId) {
                                             $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
                                             if ($poItem) {
-                                                $remaining = $poItem->remaining_quantity;
                                                 $total = $poItem->quantity;
                                                 $received = $poItem->total_received;
-                                                return "Quantity yang datang (Maksimal: {$remaining}, Total PO: {$total}, Sudah diterima: {$received})";
+                                                return "Quantity yang datang dari supplier (Total PO: {$total}, Sudah diterima sebelumnya: {$received})";
                                             }
                                         }
-                                        return "Quantity yang datang";
+                                        return "Quantity yang datang dari supplier";
                                     })
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Quantity diterima tidak boleh kosong',
                                         'numeric' => 'Quantity diterima tidak valid !',
-                                        'min' => 'Quantity diterima minimal 0',
-                                        'max' => 'Quantity diterima melebihi sisa quantity PO'
+                                        'min' => 'Quantity diterima minimal 0'
                                     ])
-                                    ->rules(function ($get) {
-                                        $poItemId = $get('purchase_order_item_id');
-                                        if ($poItemId) {
-                                            $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
-                                            if ($poItem) {
-                                                $remaining = $poItem->remaining_quantity;
-                                                return ['max:' . $remaining, 'min:0'];
-                                            }
-                                        }
-                                        return ['min:0'];
-                                    })
+                                    ->rules(['min:0'])
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, $set, $get) {
                                         // Untuk partial receipt, jangan otomatis hitung qty_rejected
@@ -365,7 +353,7 @@ class PurchaseReceiptResource extends Resource
                                         $qtyReceived = (float) ($state ?? 0);
                                         $qtyAccepted = (float) ($get('qty_accepted') ?? 0);
 
-                                        // Validasi: qty_accepted tidak boleh melebihi qty_received
+                                        // Validation: qty_accepted tidak boleh melebihi qty_received
                                         if ($qtyAccepted > $qtyReceived) {
                                             $set('qty_accepted', $qtyReceived);
                                             $qtyAccepted = $qtyReceived;
@@ -376,18 +364,53 @@ class PurchaseReceiptResource extends Resource
                                                 ->warning()
                                                 ->send();
                                         }
+
+                                        // Validation: qty_accepted tidak boleh melebihi quantity PO
+                                        $poItemId = $get('purchase_order_item_id');
+                                        if ($poItemId) {
+                                            $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
+                                            if ($poItem && $qtyAccepted > $poItem->quantity) {
+                                                $set('qty_accepted', $poItem->quantity);
+                                                \Filament\Notifications\Notification::make()
+                                                    ->title('Peringatan')
+                                                    ->body("Quantity Accepted tidak boleh melebihi Quantity PO ({$poItem->quantity})")
+                                                    ->warning()
+                                                    ->send();
+                                            }
+                                        }
                                     })
                                     ->default(0),
                                 TextInput::make('qty_accepted')
                                     ->label('Quantity Accepted')
                                     ->numeric()
+                                    ->helperText(function ($get) {
+                                        $poItemId = $get('purchase_order_item_id');
+                                        if ($poItemId) {
+                                            $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
+                                            if ($poItem) {
+                                                $remaining = $poItem->remaining_quantity;
+                                                $total = $poItem->quantity;
+                                                return "Quantity yang diterima/disetujui (Maksimal: {$total}, Sisa PO: {$remaining})";
+                                            }
+                                        }
+                                        return "Quantity yang diterima/disetujui";
+                                    })
                                     ->validationMessages([
                                         'required' => 'Quantity diambil tidak boleh kosong',
                                         'numeric' => 'Quantity diambil tidak valid !',
-                                        'min' => 'Quantity diambil minimal 0'
+                                        'min' => 'Quantity diambil minimal 0',
+                                        'max' => 'Quantity diterima melebihi quantity PO'
                                     ])
-                                    ->default(0)
-                                    ->helperText("Quantity yang diterima/disetujui (bisa kurang dari qty_received untuk partial receipt)")
+                                    ->rules(function ($get) {
+                                        $poItemId = $get('purchase_order_item_id');
+                                        if ($poItemId) {
+                                            $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
+                                            if ($poItem) {
+                                                return ['max:' . $poItem->quantity, 'min:0'];
+                                            }
+                                        }
+                                        return ['min:0'];
+                                    })
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, $set, $get, $component) {
                                         $qtyReceived = (float) ($get('qty_received') ?? 0);
@@ -403,6 +426,20 @@ class PurchaseReceiptResource extends Resource
                                                 ->body("Quantity Accepted tidak boleh melebihi Quantity Received ({$qtyReceived})")
                                                 ->warning()
                                                 ->send();
+                                        }
+
+                                        // Validation: qty_accepted tidak boleh melebihi quantity PO
+                                        $poItemId = $get('purchase_order_item_id');
+                                        if ($poItemId) {
+                                            $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
+                                            if ($poItem && $qtyAccepted > $poItem->quantity) {
+                                                $component->state($poItem->quantity);
+                                                \Filament\Notifications\Notification::make()
+                                                    ->title('Peringatan')
+                                                    ->body("Quantity Accepted tidak boleh melebihi Quantity PO ({$poItem->quantity})")
+                                                    ->warning()
+                                                    ->send();
+                                            }
                                         }
 
                                         // Untuk partial receipt, jangan otomatis hitung qty_rejected

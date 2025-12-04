@@ -20,7 +20,7 @@ class ViewPurchaseInvoice extends ViewRecord
                 ->label('Mark as Sent')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('warning')
-                ->visible(fn ($record) => $record->status !== 'sent')
+                ->visible(fn ($record) => $record->status === 'draft')
                 ->requiresConfirmation()
                 ->modalHeading('Mark Invoice as Sent')
                 ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')

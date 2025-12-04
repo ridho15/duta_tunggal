@@ -1129,30 +1129,14 @@ class SaleOrderResource extends Resource
                             }, 'Sale_Order_' . $record->so_number . '.pdf');
                         }),
 
-                    Action::make('print_kwitansi')
-                        ->label('Cetak Kwitansi')
-                        ->color('success')
-                        ->visible(function ($record) {
-                            return $record->status == 'approved' || $record->status == 'completed' || $record->status == 'confirmed' || $record->status == 'received';
-                        })
-                        ->icon('heroicon-o-printer')
-                        ->action(function ($record) {
-                            $pdf = Pdf::loadView('pdf.kwitansi-sales-order', [
-                                'saleOrder' => $record
-                            ])->setPaper('A4', 'potrait');
-
-                            return response()->streamDownload(function () use ($pdf) {
-                                echo $pdf->stream();
-                            }, 'Kwitansi_' . $record->so_number . '.pdf');
-                        }),
-
                     Action::make('completed')
                         ->label('Complete')
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('update sales order') &&
-                                   in_array($record->status, ['approved', 'confirmed']);
+                                   in_array($record->status, ['approved', 'confirmed']) &&
+                                   $record->deliveryOrder()->where('status', 'completed')->exists();
                         })
                         ->color('success')
                         ->action(function ($record) {

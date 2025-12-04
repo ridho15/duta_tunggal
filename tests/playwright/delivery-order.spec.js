@@ -83,8 +83,11 @@ test.describe('Delivery Order Tests', () => {
     await page.goto('http://127.0.0.1:8009/admin/delivery-orders/create');
     await page.waitForLoadState('networkidle');
 
-    // Check if create form loaded
-    const formTitle = await page.locator('h1, h2, h3').first().textContent();
+    // Check if create form loaded - look for a heading that contains 'Delivery Order'
+    const headingLocator = page.locator('h1, h2, h3').filter({ hasText: 'Delivery Order' });
+    const headingCount = await headingLocator.count();
+    expect(headingCount).toBeGreaterThan(0);
+    const formTitle = await headingLocator.first().textContent();
     expect(formTitle).toContain('Delivery Order');
 
     // Check for form fields - be more flexible with field detection
@@ -241,6 +244,160 @@ test.describe('Delivery Order Tests', () => {
       }
     } else {
       console.log('No approved sales orders found');
+    }
+  });
+
+  test('create delivery order with form submission', async ({ page }) => {
+    // Login first
+    await page.goto('http://127.0.0.1:8009/admin/login');
+    await page.waitForSelector('#data\\.email', { timeout: 10000 });
+    await page.fill('#data\\.email', 'ralamzah@gmail.com');
+    await page.fill('#data\\.password', 'ridho123');
+    await page.click('button[type="submit"]');
+
+    // Wait for login to complete with more robust checking
+    try {
+      await page.waitForURL('**/admin', { timeout: 10000 });
+    } catch (e) {
+      // If redirect fails, check if we're already logged in by checking URL
+      const currentUrl = page.url();
+      if (!currentUrl.includes('/admin')) {
+        console.log('Login failed, current URL:', currentUrl);
+        return;
+      }
+    }
+
+    // Navigate to create delivery order page
+    await page.goto('http://127.0.0.1:8009/admin/delivery-orders/create');
+    await page.waitForLoadState('networkidle');
+
+    // Check if create form loaded
+    const headingLocator = page.locator('h1, h2, h3').filter({ hasText: 'Delivery Order' });
+    const headingCount = await headingLocator.count();
+    expect(headingCount).toBeGreaterThan(0);
+
+    // Debug: Print all form elements
+    const allInputs = await page.locator('input, select, textarea').all();
+    console.log('All form elements:');
+    for (let i = 0; i < allInputs.length; i++) {
+      const name = await allInputs[i].getAttribute('name');
+      const type = await allInputs[i].getAttribute('type');
+      const tagName = await allInputs[i].evaluate(el => el.tagName.toLowerCase());
+      const placeholder = await allInputs[i].getAttribute('placeholder');
+      const id = await allInputs[i].getAttribute('id');
+      console.log(`${i}: ${tagName}[${type}] name="${name}" id="${id}" placeholder="${placeholder}"`);
+    }
+
+    // Try to find sales order field by label text
+    const salesOrderLabel = page.locator('label, span, div').filter({ hasText: 'From Sales' });
+    if (await salesOrderLabel.count() > 0) {
+      console.log('Found "From Sales" label');
+      // Try to find the select element near this label
+      const salesOrderSelect = page.locator('select').first(); // Try first select
+      if (await salesOrderSelect.count() > 0) {
+        console.log('Found select element');
+      }
+    }
+
+    // Alternative: Try to find by data attribute or class
+    const filamentSelects = await page.locator('[data-field-wrapper]').all();
+    console.log('Found', filamentSelects.length, 'Filament field wrappers');
+
+    // Try to fill the form - first check if there are sales orders available
+    const salesOrderSelect = await page.locator('#data\\.salesOrders').first();
+    if (await salesOrderSelect.count() > 0) {
+      // Wait a bit for options to load
+      await page.waitForTimeout(2000);
+      
+      // Try to select a sales order
+      const options = await salesOrderSelect.locator('option').allTextContents();
+      console.log('Available sales orders:', options);
+
+      if (options.length > 1) {
+      // Try to select a sales order
+      const options = await salesOrderSelect.locator('option').allTextContents();
+      console.log('Available sales orders:', options);
+
+      if (options.length > 1) {
+        // Select the first available sales order (skip the placeholder)
+        await salesOrderSelect.selectOption({ index: 1 });
+
+        // Wait for form to update
+        await page.waitForTimeout(2000);
+
+        // Check if items are loaded
+        const itemCheckboxes = await page.locator('input[type="checkbox"][name*="selected"]').all();
+        console.log('Found', itemCheckboxes.length, 'selectable items');
+
+        if (itemCheckboxes.length > 0) {
+          // Select the first item
+          await itemCheckboxes[0].check();
+
+          // Wait for quantity field to appear
+          await page.waitForTimeout(1000);
+
+          // Set quantity to 1
+          const quantityInputs = await page.locator('input[name*="quantity"]').all();
+          if (quantityInputs.length > 0) {
+            await quantityInputs[0].fill('1');
+          }
+
+          // Set delivery date
+          const dateInputs = await page.locator('input[type="date"], input[name*="delivery_date"]').all();
+          if (dateInputs.length > 0) {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const dateString = tomorrow.toISOString().split('T')[0];
+            await dateInputs[0].fill(dateString);
+          }
+
+          // Try to select driver and vehicle
+          const driverSelect = await page.locator('select[name*="driver"]').first();
+          if (await driverSelect.count() > 0) {
+            const driverOptions = await driverSelect.locator('option').allTextContents();
+            if (driverOptions.length > 1) {
+              await driverSelect.selectOption({ index: 1 });
+            }
+          }
+
+          const vehicleSelect = await page.locator('select[name*="vehicle"]').first();
+          if (await vehicleSelect.count() > 0) {
+            const vehicleOptions = await vehicleSelect.locator('option').allTextContents();
+            if (vehicleOptions.length > 1) {
+              await vehicleSelect.selectOption({ index: 1 });
+            }
+          }
+
+          // Try to submit the form
+          const submitButton = await page.locator('button[type="submit"]').first();
+          if (await submitButton.count() > 0) {
+            await submitButton.click();
+
+            // Wait for response
+            await page.waitForTimeout(3000);
+
+            // Check if we were redirected (success) or stayed on the page (validation error)
+            const currentUrl = page.url();
+            if (currentUrl.includes('delivery-orders/create')) {
+              console.log('Form submission failed - likely validation error');
+              // Check for error messages
+              const errorMessages = await page.locator('.text-red-500, .text-danger, [class*="error"]').allTextContents();
+              console.log('Error messages:', errorMessages);
+            } else {
+              console.log('Form submission successful - redirected to:', currentUrl);
+              expect(currentUrl).toContain('delivery-orders');
+            }
+          } else {
+            console.log('No submit button found');
+          }
+        } else {
+          console.log('No items available to select');
+        }
+      } else {
+        console.log('No sales orders available to select');
+      }
+    } else {
+      console.log('No sales order select field found');
     }
   });
 

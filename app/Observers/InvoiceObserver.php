@@ -20,6 +20,13 @@ class InvoiceObserver
 
     public function created(Invoice $invoice)
     {
+        Log::info('InvoiceObserver: created method called', [
+            'invoice_id' => $invoice->id,
+            'customer_name_before' => $invoice->customer_name,
+            'customer_phone_before' => $invoice->customer_phone,
+            'from_model_type' => $invoice->from_model_type,
+        ]);
+
         // Create AP or AR depending on source
         if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder') {
             // Create Account Payable
@@ -71,6 +78,15 @@ class InvoiceObserver
 
     public function updated(Invoice $invoice)
     {
+        Log::info('InvoiceObserver: updated method called', [
+            'invoice_id' => $invoice->id,
+            'customer_name_before' => $invoice->getOriginal('customer_name'),
+            'customer_name_after' => $invoice->customer_name,
+            'customer_phone_before' => $invoice->getOriginal('customer_phone'),
+            'customer_phone_after' => $invoice->customer_phone,
+            'changed_attributes' => $invoice->getChanges(),
+        ]);
+
         // When invoice status becomes 'paid', post to ledger
         if (strtolower($invoice->status) === 'paid') {
             $this->ledger->postInvoice($invoice);

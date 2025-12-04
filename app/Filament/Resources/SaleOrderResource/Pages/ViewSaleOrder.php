@@ -135,7 +135,8 @@ class ViewSaleOrder extends ViewRecord
                     ->requiresConfirmation()
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('update sales order') &&
-                               in_array($record->status, ['approved', 'confirmed']);
+                               in_array($record->status, ['approved', 'confirmed']) &&
+                               $record->deliveryOrder()->where('status', 'completed')->exists();
                     })
                     ->color('success')
                     ->action(function ($record) {

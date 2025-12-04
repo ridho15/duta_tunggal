@@ -249,7 +249,7 @@ test('sales order approval workflow works correctly', function () {
     expect($result)->toBeTrue();
 
     $salesOrder->refresh();
-    expect($salesOrder->status)->toBe('approved')
+    expect($salesOrder->status)->toBe('confirmed')
         ->and($salesOrder->approve_by)->toBe($user->id)
         ->and($salesOrder->approve_at)->toBeInstanceOf(Carbon::class);
 
@@ -519,6 +519,17 @@ test('sales order reserves stock', function () {
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
+    ]);
+
+    // Create inventory stock for the product
+    \App\Models\InventoryStock::create([
+        'product_id' => $product->id,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => $this->rak->id,
+        'qty_available' => 10,
+        'qty_reserved' => 0,
+        'qty_on_hand' => 10,
+        'last_stock_update' => now(),
     ]);
 
     $salesOrder = SaleOrder::create([

@@ -7,6 +7,8 @@ use App\Models\JournalEntry;
 use App\Services\JournalEntryAggregationService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -53,6 +55,9 @@ class JournalEntryResource extends Resource
                             ])
                             ->default('MANUAL')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Tipe referensi harus dipilih.',
+                            ])
                             ->live()
                             ->afterStateUpdated(function ($state, callable $set) {
                                 // Generate next number for this prefix
@@ -70,6 +75,10 @@ class JournalEntryResource extends Resource
                             ->default('001')
                             ->maxLength(10)
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Nomor referensi harus diisi.',
+                                'max' => 'Nomor referensi maksimal 10 karakter.',
+                            ])
                             ->live()
                             ->afterStateUpdated(function ($state, callable $get, callable $set) {
                                 $prefix = $get('reference_prefix');
@@ -108,6 +117,9 @@ class JournalEntryResource extends Resource
                         Forms\Components\DatePicker::make('date')
                             ->label('Date')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Tanggal journal entry harus diisi.',
+                            ])
                             ->default(now())
                             ->columnSpan(1),
 
@@ -127,6 +139,9 @@ class JournalEntryResource extends Resource
                             ])
                             ->default('manual')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Tipe journal harus dipilih.',
+                            ])
                             ->live()
                             ->columnSpan(1),
 
@@ -252,7 +267,11 @@ class JournalEntryResource extends Resource
                         Forms\Components\Textarea::make('description')
                             ->label('Description')
                             ->maxLength(500)
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Deskripsi journal entry harus diisi.',
+                                'max' => 'Deskripsi maksimal 500 karakter.',
+                            ]),
 
                         // Journal Entries Repeater - must have at least 2 entries and balance
                         Forms\Components\Repeater::make('journal_entries')
@@ -265,6 +284,9 @@ class JournalEntryResource extends Resource
                                     ->preload()
                                     ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->code} - {$record->name}")
                                     ->required()
+                                    ->validationMessages([
+                                        'required' => 'Chart of Account harus dipilih.',
+                                    ])
                                     ->columnSpan(2),
 
                                 Forms\Components\TextInput::make('debit')
@@ -273,6 +295,10 @@ class JournalEntryResource extends Resource
                                     ->default(0)
                                     ->required()
                                     ->indonesianMoney()
+                                    ->validationMessages([
+                                        'required' => 'Jumlah debit harus diisi.',
+                                        'numeric' => 'Jumlah debit harus berupa angka.',
+                                    ])
                                     ->live()
                                     ->afterStateUpdated(function ($state, callable $get, callable $set, $context) {
                                         if ($context === 'create' && $state > 0) {
@@ -287,6 +313,10 @@ class JournalEntryResource extends Resource
                                     ->default(0)
                                     ->required()
                                     ->indonesianMoney()
+                                    ->validationMessages([
+                                        'required' => 'Jumlah credit harus diisi.',
+                                        'numeric' => 'Jumlah credit harus berupa angka.',
+                                    ])
                                     ->live()
                                     ->afterStateUpdated(function ($state, callable $get, callable $set, $context) {
                                         if ($context === 'create' && $state > 0) {
@@ -303,6 +333,9 @@ class JournalEntryResource extends Resource
                             ->columns(6)
                             ->defaultItems(2)
                             ->minItems(2)
+                            ->validationMessages([
+                                'minItems' => 'Minimal 2 baris journal entry diperlukan.',
+                            ])
                             ->addActionLabel('Add Journal Line')
                             ->collapsible()
                             ->itemLabel(fn (array $state): ?string => $state['coa_id'] ? \App\Models\ChartOfAccount::find($state['coa_id'])?->name : 'New Line')
@@ -383,6 +416,96 @@ class JournalEntryResource extends Resource
                                 },
                             ])
                             ->columnSpanFull(),
+                    ])
+                    ->columns(2),
+            ]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Journal Entry Information')
+                    ->schema([
+                        Infolists\Components\Grid::make(2)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('reference')
+                                    ->label('Reference')
+                                    ->copyable()
+                                    ->copyMessage('Reference copied')
+                                    ->copyMessageDuration(1500),
+
+                                Infolists\Components\TextEntry::make('date')
+                                    ->label('Date')
+                                    ->dateTime('d F Y'),
+
+                                Infolists\Components\TextEntry::make('coa.name')
+                                    ->label('Chart of Account')
+                                    ->placeholder('N/A'),
+
+                                Infolists\Components\TextEntry::make('coa.code')
+                                    ->label('COA Code')
+                                    ->placeholder('N/A'),
+
+                                Infolists\Components\TextEntry::make('journal_type')
+                                    ->label('Journal Type')
+                                    ->badge()
+                                    ->color(fn (string $state): string => match ($state) {
+                                        'sales' => 'success',
+                                        'purchase' => 'warning',
+                                        'depreciation' => 'info',
+                                        'manual' => 'gray',
+                                        default => 'gray',
+                                    }),
+
+                                Infolists\Components\TextEntry::make('cabang.nama')
+                                    ->label('Branch')
+                                    ->placeholder('N/A'),
+
+                                Infolists\Components\TextEntry::make('debit')
+                                    ->label('Debit')
+                                    ->money('IDR')
+                                    ->color('success'),
+
+                                Infolists\Components\TextEntry::make('credit')
+                                    ->label('Credit')
+                                    ->money('IDR')
+                                    ->color('danger'),
+                            ]),
+
+                        Infolists\Components\TextEntry::make('description')
+                            ->label('Description')
+                            ->columnSpanFull()
+                            ->placeholder('No description'),
+
+                        Infolists\Components\Section::make('Source Information')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('source_type')
+                                    ->label('Source Type')
+                                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                                        'App\\Models\\PurchaseOrder' => 'Purchase Order',
+                                        'App\\Models\\SaleOrder' => 'Sales Order',
+                                        'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
+                                        'App\\Models\\DeliveryOrder' => 'Delivery Order',
+                                        'App\\Models\\MaterialIssue' => 'Material Issue',
+                                        'App\\Models\\VendorPayment' => 'Vendor Payment',
+                                        'App\\Models\\CustomerReceipt' => 'Customer Receipt',
+                                        'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
+                                        'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
+                                        'App\\Models\\StockTransfer' => 'Stock Transfer',
+                                        'App\\Models\\Asset' => 'Asset',
+                                        'App\\Models\\Deposit' => 'Deposit',
+                                        default => $state,
+                                    })
+                                    ->placeholder('Manual Entry'),
+
+                                Infolists\Components\TextEntry::make('source_id')
+                                    ->label('Source ID')
+                                    ->placeholder('N/A'),
+                            ])
+                            ->columns(2)
+                            ->collapsible()
+                            ->collapsed(),
                     ])
                     ->columns(2),
             ]);
@@ -647,9 +770,9 @@ class JournalEntryResource extends Resource
         return [
             'index' => Pages\ListJournalEntries::route('/'),
             'create' => Pages\CreateJournalEntry::route('/create'),
+            'grouped' => Pages\GroupedJournalEntries::route('/grouped'),
             'view' => Pages\ViewJournalEntry::route('/{record}'),
             'edit' => Pages\EditJournalEntry::route('/{record}/edit'),
-            'grouped' => Pages\GroupedJournalEntries::route('/grouped'),
         ];
     }
 }
