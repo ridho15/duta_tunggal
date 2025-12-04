@@ -686,6 +686,44 @@ class JournalEntryResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('view_source')
+                    ->label('Lihat Detail Source')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->visible(fn ($record) => !empty($record->source_type) && !empty($record->source_id))
+                    ->action(function ($record) {
+                        $sourceType = $record->source_type;
+                        $sourceId = $record->source_id;
+
+                        if (!$sourceType || !$sourceId) {
+                            return;
+                        }
+
+                        try {
+                            // Map source_type to resource URL
+                            $url = match($sourceType) {
+                                'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $sourceId),
+                                'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $sourceId),
+                                'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $sourceId),
+                                'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $sourceId),
+                                'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
+                                default => null
+                            };
+
+                            if ($url) {
+                                return redirect($url);
+                            }
+                        } catch (\Exception $e) {
+                            // Route not found, show notification instead
+                        }
+
+                        // Fallback: show notification with source info
+                        \Filament\Notifications\Notification::make()
+                            ->title('Source Detail')
+                            ->body("Source type: {$sourceType}, ID: {$sourceId}")
+                            ->info()
+                            ->send();
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -765,14 +803,17 @@ class JournalEntryResource extends Resource
         return $data;
     }
 
-    public static function getPages(): array
+    protected static function getInvoiceViewUrl($invoice)
     {
-        return [
-            'index' => Pages\ListJournalEntries::route('/'),
-            'create' => Pages\CreateJournalEntry::route('/create'),
-            'grouped' => Pages\GroupedJournalEntries::route('/grouped'),
-            'view' => Pages\ViewJournalEntry::route('/{record}'),
-            'edit' => Pages\EditJournalEntry::route('/{record}/edit'),
-        ];
+        if (!$invoice) return null;
+
+        // Determine if it's sales or purchase invoice based on from_model_type
+        if ($invoice->from_model_type === 'App\\Models\\SaleOrder') {
+            return route('filament.admin.resources.sales-invoices.view', $invoice->id);
+        } elseif ($invoice->from_model_type === 'App\\Models\\PurchaseOrder') {
+            return route('filament.admin.resources.purchase-invoices.view', $invoice->id);
+        }
+
+        return null;
     }
 }
