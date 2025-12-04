@@ -107,7 +107,6 @@ class ViewQualityControlPurchase extends ViewRecord
         $data['sku'] = $this->record->product->sku ?? '';
         $data['quantity_received'] = $this->record->fromModel->qty_accepted ?? 0;
         $data['uom'] = $this->record->product->uom->name ?? '';
-        
         return $data;
     }
 }

@@ -229,8 +229,13 @@ class PurchaseInvoiceResource extends Resource
                                             $total = $receipt->purchaseReceiptItem->sum(function ($item) {
                                                 $purchaseOrderItem = $item->purchaseOrderItem;
                                                 if ($purchaseOrderItem) {
-                                                    $price = $purchaseOrderItem->unit_price + $purchaseOrderItem->tax - $purchaseOrderItem->discount;
-                                                    return $price * $item->qty_accepted;
+                                                    // Calculate price after discount and tax (both are percentages)
+                                                    $subtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
+                                                    $discountAmount = $subtotal * ($purchaseOrderItem->discount / 100);
+                                                    $afterDiscount = $subtotal - $discountAmount;
+                                                    $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
+                                                    $finalPrice = $afterDiscount + $taxAmount;
+                                                    return $finalPrice;
                                                 }
                                                 return 0;
                                             }) + $receipt->purchaseReceiptBiaya->sum('total');
@@ -287,8 +292,13 @@ class PurchaseInvoiceResource extends Resource
                                                     ->first();
                                                 
                                                 if ($purchaseOrderItem) {
-                                                    $price = $purchaseOrderItem->unit_price + $purchaseOrderItem->tax - $purchaseOrderItem->discount;
-                                                    $total = $price * $item->qty_accepted;
+                                                    // Calculate price after discount and tax (both are percentages)
+                                                    $subtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
+                                                    $discountAmount = $subtotal * ($purchaseOrderItem->discount / 100);
+                                                    $afterDiscount = $subtotal - $discountAmount;
+                                                    $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
+                                                    $price = $afterDiscount + $taxAmount;
+                                                    $total = $price;
                                                     
                                                     $items[] = [
                                                         'product_id' => $item->product_id,

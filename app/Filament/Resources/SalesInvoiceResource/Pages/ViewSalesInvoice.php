@@ -133,8 +133,8 @@ class ViewSalesInvoice extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
-            Actions\DeleteAction::make(),
+            Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('print_invoice')
                 ->label('Cetak Invoice')
                 ->color('primary')
