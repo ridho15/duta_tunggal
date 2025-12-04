@@ -11,10 +11,12 @@ use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Filament\Tables\Grouping;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Actions\ActionGroup;
 
 class JournalEntryResource extends Resource
 {
@@ -684,7 +686,8 @@ class JournalEntryResource extends Resource
                     ->relationship('cabang', 'nama'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
+                ActionGroup::make([
+                    Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\Action::make('view_source')
                     ->label('Lihat Detail Source')
@@ -724,7 +727,8 @@ class JournalEntryResource extends Resource
                             ->info()
                             ->send();
                     }),
-            ])
+                ])
+                ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -815,5 +819,16 @@ class JournalEntryResource extends Resource
         }
 
         return null;
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListJournalEntries::route('/'),
+            'create' => Pages\CreateJournalEntry::route('/create'),
+            'view' => Pages\ViewJournalEntry::route('/{record}'),
+            'edit' => Pages\EditJournalEntry::route('/{record}/edit'),
+            'grouped' => Pages\GroupedJournalEntries::route('/grouped'),
+        ];
     }
 }
