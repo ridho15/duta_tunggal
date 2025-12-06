@@ -104,9 +104,13 @@ class OrderRequestResource extends Resource
                                         return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                     });
                             })
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Gudang wajib dipilih.',
+                            ]),
                         Select::make('cabang_id')
                             ->label('Cabang')
+                            ->searchable()
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
@@ -129,7 +133,10 @@ class OrderRequestResource extends Resource
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
                                 return !($user && is_array($manageType) && in_array('all', $manageType));
-                            }),
+                            })
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih.',
+                            ]),
                         Select::make('supplier_id')
                             ->label('Supplier')
                             ->reactive()
@@ -153,9 +160,15 @@ class OrderRequestResource extends Resource
                                         return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
                                     });
                             })
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Supplier wajib dipilih.',
+                            ]),
                         DatePicker::make('request_date')
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Tanggal request wajib diisi.',
+                            ]),
                         Textarea::make('note')
                             ->label('Note')
                             ->nullable(),
@@ -203,12 +216,21 @@ class OrderRequestResource extends Resource
                                                 return [$product->id => "({$product->sku}) {$product->name}"];
                                             });
                                     })
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Produk wajib dipilih.',
+                                    ]),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
                                     ->default(0)
-                                    ->required(),
+                                    ->required()
+                                    ->minValue(0.01)
+                                    ->validationMessages([
+                                        'required' => 'Quantity wajib diisi.',
+                                        'numeric' => 'Quantity harus berupa angka.',
+                                        'min' => 'Quantity minimal 0.01.',
+                                    ]),
                                 Textarea::make('note')
                                     ->nullable()
                                     ->label('Note')
@@ -385,7 +407,10 @@ class OrderRequestResource extends Resource
                                         });
                                 })
                                 ->default(fn ($record) => $record->supplier_id)
-                                ->required(),
+                                ->required()
+                                ->validationMessages([
+                                    'required' => 'Supplier wajib dipilih.',
+                                ]),
                             TextInput::make('po_number')
                                 ->label('PO Number')
                                 ->string()
@@ -397,10 +422,17 @@ class OrderRequestResource extends Resource
                                         ->action(function ($set) {
                                             $set('po_number', HelperController::generatePoNumber());
                                         })
-                                ),
+                                )
+                                ->validationMessages([
+                                    'required' => 'Nomor PO wajib diisi.',
+                                    'max' => 'Nomor PO maksimal 255 karakter.',
+                                ]),
                             DatePicker::make('order_date')
                                 ->label('Order Date')
-                                ->required(),
+                                ->required()
+                                ->validationMessages([
+                                    'required' => 'Tanggal order wajib diisi.',
+                                ]),
                             DatePicker::make('expected_date')
                                 ->label('Expected Date')
                                 ->nullable(),
@@ -454,7 +486,10 @@ class OrderRequestResource extends Resource
                                         });
                                 })
                                 ->default(fn ($record) => $record->supplier_id)
-                                ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order')),
+                                ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order'))
+                                ->validationMessages([
+                                    'required' => 'Supplier wajib dipilih.',
+                                ]),
                             TextInput::make('po_number')
                                 ->label('PO Number')
                                 ->string()
@@ -466,10 +501,17 @@ class OrderRequestResource extends Resource
                                         ->action(function ($set) {
                                             $set('po_number', HelperController::generatePoNumber());
                                         })
-                                ),
+                                )
+                                ->validationMessages([
+                                    'required' => 'Nomor PO wajib diisi.',
+                                    'max' => 'Nomor PO maksimal 255 karakter.',
+                                ]),
                             DatePicker::make('order_date')
                                 ->label('Order Date')
-                                ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order')),
+                                ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order'))
+                                ->validationMessages([
+                                    'required' => 'Tanggal order wajib diisi.',
+                                ]),
                             DatePicker::make('expected_date')
                                 ->label('Expected Date')
                                 ->nullable(),
