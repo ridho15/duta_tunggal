@@ -105,6 +105,31 @@ class OrderRequestResource extends Resource
                                     });
                             })
                             ->required(),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                if ($user && is_array($manageType) && in_array('all', $manageType)) {
+                                    return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                        return [$cabang->id => $cabang->name];
+                                    });
+                                } else {
+                                    return \App\Models\Cabang::where('id', $user?->cabang_id)->get()->mapWithKeys(function ($cabang) {
+                                        return [$cabang->id => $cabang->name];
+                                    });
+                                }
+                            })
+                            ->default(function () {
+                                $user = Auth::user();
+                                return $user?->cabang_id;
+                            })
+                            ->required()
+                            ->disabled(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                return !($user && is_array($manageType) && in_array('all', $manageType));
+                            }),
                         Select::make('supplier_id')
                             ->label('Supplier')
                             ->reactive()
@@ -505,6 +530,12 @@ class OrderRequestResource extends Resource
             throw ValidationException::withMessages([
                 'orderRequestItem' => 'Order request harus memiliki setidaknya satu item produk.'
             ]);
+        }
+
+        // Set cabang_id if not provided
+        if (empty($data['cabang_id'])) {
+            $user = Auth::user();
+            $data['cabang_id'] = $user?->cabang_id;
         }
 
         return $data;
