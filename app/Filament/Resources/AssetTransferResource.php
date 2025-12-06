@@ -55,6 +55,23 @@ class AssetTransferResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->rules([
+                                'required',
+                                function () {
+                                    return function (string $attribute, $value, \Closure $fail) {
+                                        $existingTransfer = \App\Models\AssetTransfer::where('asset_id', $value)
+                                            ->whereIn('status', ['pending', 'approved'])
+                                            ->exists();
+                                        
+                                        if ($existingTransfer) {
+                                            $fail('Aset ini sedang dalam proses transfer dan belum selesai.');
+                                        }
+                                    };
+                                },
+                            ])
+                            ->validationMessages([
+                                'required' => 'Asset wajib dipilih.',
+                            ])
                             ->getOptionLabelFromRecordUsing(function ($record) {
                                 return "{$record->name} - {$record->cabang->nama}";
                             })
@@ -90,21 +107,67 @@ class AssetTransferResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->rules([
+                                'required',
+                                function () {
+                                    return function (string $attribute, $value, \Closure $fail) {
+                                        $fromCabangId = request()->input('from_cabang_id');
+                                        if ($fromCabangId && $value == $fromCabangId) {
+                                            $fail('Cabang tujuan harus berbeda dengan cabang asal.');
+                                        }
+                                    };
+                                },
+                            ])
+                            ->validationMessages([
+                                'required' => 'Cabang tujuan wajib dipilih.',
+                            ])
                             ->getOptionLabelFromRecordUsing(function ($record) {
                                 return "({$record->kode}) {$record->nama}";
                             }),
                         Forms\Components\DatePicker::make('transfer_date')
                             ->label('Transfer Date')
                             ->required()
+                            ->rules([
+                                'required',
+                                'date',
+                                'after_or_equal:today',
+                            ])
+                            ->validationMessages([
+                                'required' => 'Tanggal transfer wajib diisi.',
+                                'date' => 'Format tanggal tidak valid.',
+                                'after_or_equal' => 'Tanggal transfer tidak boleh di masa lalu.',
+                            ])
                             ->default(now()),
                         Forms\Components\Textarea::make('reason')
                             ->label('Reason')
                             ->rows(3)
-                            ->required(),
+                            ->required()
+                            ->rules([
+                                'required',
+                                'string',
+                                'min:10',
+                                'max:1000',
+                            ])
+                            ->validationMessages([
+                                'required' => 'Alasan transfer wajib diisi.',
+                                'min' => 'Alasan transfer minimal 10 karakter.',
+                                'max' => 'Alasan transfer maksimal 1000 karakter.',
+                            ]),
                         Forms\Components\FileUpload::make('transfer_document')
                             ->label('Supporting Document')
                             ->directory('asset-transfers')
-                            ->acceptedFileTypes(['application/pdf', 'image/*']),
+                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/gif'])
+                            ->maxSize(5120) // 5MB
+                            ->rules([
+                                'nullable',
+                                'file',
+                                'mimes:pdf,jpeg,png,gif',
+                                'max:5120', // 5MB in KB
+                            ])
+                            ->validationMessages([
+                                'mimes' => 'Dokumen pendukung harus berupa file PDF atau gambar (JPEG, PNG, GIF).',
+                                'max' => 'Ukuran file maksimal 5MB.',
+                            ]),
                     ])->columns(2),
             ]);
     }
@@ -194,7 +257,18 @@ class AssetTransferResource extends Resource
                         ->form([
                             Forms\Components\Textarea::make('cancel_reason')
                                 ->label('Cancel Reason')
-                                ->required(),
+                                ->required()
+                                ->rules([
+                                    'required',
+                                    'string',
+                                    'min:10',
+                                    'max:500',
+                                ])
+                                ->validationMessages([
+                                    'required' => 'Alasan pembatalan wajib diisi.',
+                                    'min' => 'Alasan pembatalan minimal 10 karakter.',
+                                    'max' => 'Alasan pembatalan maksimal 500 karakter.',
+                                ]),
                         ])
                         ->action(function ($record, array $data) {
                             $transferService = app(\App\Services\AssetTransferService::class);

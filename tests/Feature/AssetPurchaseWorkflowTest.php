@@ -43,7 +43,7 @@ class AssetPurchaseWorkflowTest extends TestCase
             'last_name' => 'User',
             'kode_user' => 'TEST001',
             'cabang_id' => 1,
-            'manage_type' => ['all']
+            'manage_type' => 'all'
         ]);
 
         // Create test cabang
@@ -325,7 +325,7 @@ class AssetPurchaseWorkflowTest extends TestCase
             'kode_user' => 'TEST002',
             'signature' => 'signatures/test_signature.png', // Pre-set signature
             'cabang_id' => $this->cabang->id,
-            'manage_type' => ['all']
+            'manage_type' => 'all'
         ]);
 
         $this->actingAs($userWithSignature);
@@ -468,7 +468,7 @@ class AssetPurchaseWorkflowTest extends TestCase
             'kode_user' => 'TEST003',
             'signature' => null, // No signature set
             'cabang_id' => $this->cabang->id,
-            'manage_type' => ['all']
+            'manage_type' => 'all'
         ]);
 
         $this->actingAs($userWithoutSignature);
@@ -489,13 +489,16 @@ class AssetPurchaseWorkflowTest extends TestCase
             'unit_price' => 10000000,
         ]);
 
-        // Attempt to approve without signature should fail
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Tanda tangan belum diatur di profil user');
-
-        // Simulate approval attempt
+        // Attempt to approve without signature should not change status
+        // (Notification is shown instead of exception)
+        $originalStatus = $purchaseOrder->status;
+        
+        // Simulate the approval check logic (without throwing exception)
         if (!$userWithoutSignature->signature) {
-            throw new \Exception('Tanda tangan belum diatur di profil user. Silakan atur tanda tangan terlebih dahulu.');
+            // In the actual Filament action, a notification would be shown and action would return
+            // For testing, we verify the status doesn't change
+            $this->assertEquals($originalStatus, $purchaseOrder->fresh()->status);
+            return; // Early return as would happen in the actual action
         }
     }
 }

@@ -30,7 +30,8 @@ class Supplier extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope(new CabangScope);
+        // Removed CabangScope - suppliers are global entities that can serve multiple branches
+        // static::addGlobalScope(new CabangScope);
     }
 
     public function purchaseOrder()

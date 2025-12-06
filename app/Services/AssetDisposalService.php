@@ -57,7 +57,7 @@ class AssetDisposalService
     /**
      * Post journal entries for asset disposal
      */
-    private function postDisposalJournalEntries(Asset $asset, AssetDisposal $disposal): void
+    public function postDisposalJournalEntries(Asset $asset, AssetDisposal $disposal): void
     {
         // Remove asset from balance sheet
         // Debit: Accumulated Depreciation

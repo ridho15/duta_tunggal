@@ -38,6 +38,33 @@ class AssetDisposalResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->rules([
+                                'required',
+                                function () {
+                                    return function (string $attribute, $value, \Closure $fail) {
+                                        $asset = \App\Models\Asset::find($value);
+                                        if (!$asset) {
+                                            $fail('Asset tidak ditemukan.');
+                                            return;
+                                        }
+                                        
+                                        if ($asset->status !== 'active') {
+                                            $fail('Hanya asset dengan status aktif yang dapat didisposal.');
+                                        }
+                                        
+                                        $existingDisposal = \App\Models\AssetDisposal::where('asset_id', $value)
+                                            ->whereIn('status', ['pending', 'approved', 'completed'])
+                                            ->exists();
+                                        
+                                        if ($existingDisposal) {
+                                            $fail('Asset ini sudah memiliki disposal yang sedang diproses.');
+                                        }
+                                    };
+                                },
+                            ])
+                            ->validationMessages([
+                                'required' => 'Asset wajib dipilih.',
+                            ])
                             ->getOptionLabelFromRecordUsing(function ($record) {
                                 return "{$record->name} (Book Value: Rp " . number_format($record->book_value, 0, ',', '.') . ")";
                             })
@@ -56,6 +83,16 @@ class AssetDisposalResource extends Resource
                         Forms\Components\DatePicker::make('disposal_date')
                             ->label('Disposal Date')
                             ->required()
+                            ->rules([
+                                'required',
+                                'date',
+                                'after_or_equal:today',
+                            ])
+                            ->validationMessages([
+                                'required' => 'Tanggal disposal wajib diisi.',
+                                'date' => 'Format tanggal tidak valid.',
+                                'after_or_equal' => 'Tanggal disposal tidak boleh di masa lalu.',
+                            ])
                             ->default(now()),
                         Forms\Components\Select::make('disposal_type')
                             ->label('Disposal Type')
@@ -66,20 +103,72 @@ class AssetDisposalResource extends Resource
                                 'theft' => 'Theft/Loss',
                                 'other' => 'Other',
                             ])
-                            ->required(),
+                            ->required()
+                            ->rules([
+                                'required',
+                                'in:sale,scrap,donation,theft,other',
+                            ])
+                            ->validationMessages([
+                                'required' => 'Tipe disposal wajib dipilih.',
+                                'in' => 'Tipe disposal tidak valid.',
+                            ]),
                         Forms\Components\TextInput::make('sale_price')
                             ->label('Sale Price')
                             ->numeric()
                             ->prefix('Rp')
+                            ->rules([
+                                function () {
+                                    return function (string $attribute, $value, \Closure $fail) {
+                                        $disposalType = request()->input('disposal_type');
+                                        if ($disposalType === 'sale') {
+                                            if (empty($value)) {
+                                                $fail('Harga jual wajib diisi untuk disposal tipe Sale.');
+                                                return;
+                                            }
+                                            if (!is_numeric($value)) {
+                                                $fail('Harga jual harus berupa angka.');
+                                                return;
+                                            }
+                                            if ($value <= 0) {
+                                                $fail('Harga jual harus lebih besar dari 0.');
+                                            }
+                                        }
+                                    };
+                                },
+                            ])
+                            ->validationMessages([
+                                'numeric' => 'Harga jual harus berupa angka.',
+                            ])
                             ->visible(fn ($get) => $get('disposal_type') === 'sale')
                             ->required(fn ($get) => $get('disposal_type') === 'sale'),
                         Forms\Components\Textarea::make('notes')
                             ->label('Notes')
-                            ->rows(3),
+                            ->rows(3)
+                            ->rules([
+                                'nullable',
+                                'string',
+                                'min:10',
+                                'max:1000',
+                            ])
+                            ->validationMessages([
+                                'min' => 'Catatan minimal 10 karakter.',
+                                'max' => 'Catatan maksimal 1000 karakter.',
+                            ]),
                         Forms\Components\FileUpload::make('disposal_document')
                             ->label('Supporting Document')
                             ->directory('asset-disposals')
-                            ->acceptedFileTypes(['application/pdf', 'image/*']),
+                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/gif'])
+                            ->maxSize(5120) // 5MB
+                            ->rules([
+                                'nullable',
+                                'file',
+                                'mimes:pdf,jpeg,png,gif',
+                                'max:5120', // 5MB in KB
+                            ])
+                            ->validationMessages([
+                                'mimes' => 'Dokumen pendukung harus berupa file PDF atau gambar (JPEG, PNG, GIF).',
+                                'max' => 'Ukuran file maksimal 5MB.',
+                            ]),
                     ])->columns(2),
             ]);
     }
@@ -171,13 +260,7 @@ class AssetDisposalResource extends Resource
 
                         // Post journal entries
                         $disposalService = app(\App\Services\AssetDisposalService::class);
-                        $disposalService->createDisposal($record->asset, [
-                            'disposal_date' => $record->disposal_date,
-                            'disposal_type' => $record->disposal_type,
-                            'sale_price' => $record->sale_price,
-                            'notes' => $record->notes,
-                            'disposal_document' => $record->disposal_document,
-                        ]);
+                        $disposalService->postDisposalJournalEntries($record->asset, $record);
 
                         \Filament\Notifications\Notification::make()
                             ->title('Asset disposal berhasil diproses')

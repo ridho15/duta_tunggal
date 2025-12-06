@@ -86,6 +86,7 @@ class PurchaseReceiptResource extends Resource
                             ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
                             ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->required()
+                            ->searchable()
                             ->helperText('Pilih cabang untuk purchase receipt ini'),
                         Select::make('purchase_order_id')
                             ->label('Kode Pembelian')

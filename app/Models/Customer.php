@@ -33,7 +33,8 @@ class Customer extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope(new CabangScope);
+        // Removed CabangScope - customers are global entities that can buy from multiple branches
+        // static::addGlobalScope(new CabangScope);
     }
 
     public function sales()

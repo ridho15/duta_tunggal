@@ -71,46 +71,14 @@ class OrderRequestResource extends Resource
                                         $set('request_number', HelperController::generateRequestNumber());
                                     })
                             ),
-                        Select::make('warehouse_id')
-                            ->label('Gudang')
-                            ->options(function () {
-                                $user = Auth::user();
-                                $manageType = $user?->manage_type ?? [];
-                                if ($user && is_array($manageType) && in_array('all', $manageType)) {
-                                    return Warehouse::all()->mapWithKeys(function ($warehouse) {
-                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                    });
-                                } else {
-                                    return Warehouse::where('cabang_id', $user?->cabang_id)->get()->mapWithKeys(function ($warehouse) {
-                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                    });
-                                }
-                            })
-                            ->preload()
-                            ->searchable()
-                            ->getSearchResultsUsing(function (string $search) {
-                                $user = Auth::user();
-                                $manageType = $user?->manage_type ?? [];
-                                $query = Warehouse::where('name', 'like', "%{$search}%")
-                                    ->orWhere('kode', 'like', "%{$search}%");
-                                
-                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
-                                    $query->where('cabang_id', $user?->cabang_id);
-                                }
-                                
-                                return $query->limit(50)
-                                    ->get()
-                                    ->mapWithKeys(function ($warehouse) {
-                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                    });
-                            })
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Gudang wajib dipilih.',
-                            ]),
                         Select::make('cabang_id')
                             ->label('Cabang')
                             ->searchable()
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, callable $set) {
+                                // Reset warehouse when cabang changes
+                                $set('warehouse_id', null);
+                            })
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
@@ -126,7 +94,12 @@ class OrderRequestResource extends Resource
                             })
                             ->default(function () {
                                 $user = Auth::user();
-                                return $user?->cabang_id;
+                                $manageType = $user?->manage_type ?? [];
+                                if ($user && is_array($manageType) && in_array('all', $manageType)) {
+                                    return null; // Let user choose
+                                } else {
+                                    return $user?->cabang_id;
+                                }
                             })
                             ->required()
                             ->disabled(function () {
@@ -136,6 +109,38 @@ class OrderRequestResource extends Resource
                             })
                             ->validationMessages([
                                 'required' => 'Cabang wajib dipilih.',
+                            ]),
+                        Select::make('warehouse_id')
+                            ->label('Gudang')
+                            ->options(function (callable $get) {
+                                $cabangId = $get('cabang_id');
+                                if ($cabangId) {
+                                    return Warehouse::where('cabang_id', $cabangId)->get()->mapWithKeys(function ($warehouse) {
+                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                    });
+                                }
+                                return [];
+                            })
+                            ->preload()
+                            ->searchable()
+                            ->getSearchResultsUsing(function (string $search, callable $get) {
+                                $cabangId = $get('cabang_id');
+                                $query = Warehouse::where('name', 'like', "%{$search}%")
+                                    ->orWhere('kode', 'like', "%{$search}%");
+                                
+                                if ($cabangId) {
+                                    $query->where('cabang_id', $cabangId);
+                                }
+                                
+                                return $query->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(function ($warehouse) {
+                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                    });
+                            })
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Gudang wajib dipilih.',
                             ]),
                         Select::make('supplier_id')
                             ->label('Supplier')
@@ -392,12 +397,13 @@ class OrderRequestResource extends Resource
                                 ->label('Supplier')
                                 ->preload()
                                 ->searchable()
-                                ->options(function () {
+                                ->default(fn ($record) => $record->supplier_id)
+                                ->options(function ($record) {
                                     return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
                                         return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
                                     });
                                 })
-                                ->getSearchResultsUsing(function (string $search) {
+                                ->getSearchResultsUsing(function (string $search, $record) {
                                     return Supplier::where('name', 'like', "%{$search}%")
                                         ->orWhere('code', 'like', "%{$search}%")
                                         ->limit(50)
@@ -406,7 +412,6 @@ class OrderRequestResource extends Resource
                                             return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
                                         });
                                 })
-                                ->default(fn ($record) => $record->supplier_id)
                                 ->required()
                                 ->validationMessages([
                                     'required' => 'Supplier wajib dipilih.',
@@ -471,12 +476,13 @@ class OrderRequestResource extends Resource
                                 ->label('Supplier')
                                 ->preload()
                                 ->searchable()
-                                ->options(function () {
+                                ->default(fn ($record) => $record->supplier_id)
+                                ->options(function ($record) {
                                     return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
                                         return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
                                     });
                                 })
-                                ->getSearchResultsUsing(function (string $search) {
+                                ->getSearchResultsUsing(function (string $search, $record) {
                                     return Supplier::where('name', 'like', "%{$search}%")
                                         ->orWhere('code', 'like', "%{$search}%")
                                         ->limit(50)
@@ -485,7 +491,6 @@ class OrderRequestResource extends Resource
                                             return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
                                         });
                                 })
-                                ->default(fn ($record) => $record->supplier_id)
                                 ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order'))
                                 ->validationMessages([
                                     'required' => 'Supplier wajib dipilih.',

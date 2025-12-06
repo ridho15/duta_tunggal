@@ -14,8 +14,10 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -72,7 +74,12 @@ class ViewPurchaseOrder extends ViewRecord
                         // Check if user has signature set
                         $user = Auth::user();
                         if (!$user->signature) {
-                            throw new \Exception('Tanda tangan belum diatur di profil user. Silakan atur tanda tangan terlebih dahulu.');
+                            Notification::make()
+                                ->title('Tanda Tangan Belum Diatur')
+                                ->body('Tanda tangan belum diatur di profil user. Silakan atur tanda tangan terlebih dahulu.')
+                                ->danger()
+                                ->send();
+                            return;
                         }
 
                         DB::transaction(function () use ($record, $data, $user) {

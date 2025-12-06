@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseInvoiceResource\Pages;
+use App\Http\Controllers\HelperController;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Product;
@@ -420,7 +421,13 @@ class PurchaseInvoiceResource extends Resource
                                                 'required' => 'Harga tidak boleh kosong',
                                                 'numeric' => 'Harga harus berupa angka'
                                             ])
-                                            ->disabled(),
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($set, $get, $state) {
+                                                $quantity = $get('quantity') ?? 0;
+                                                $price = HelperController::parseIndonesianMoney($state ?? 0);
+                                                $total = $quantity * $price;
+                                                $set('total', $total);
+                                            }),
                                         TextInput::make('total')
                                             ->label('Total')
                                             ->indonesianMoney()
@@ -435,7 +442,39 @@ class PurchaseInvoiceResource extends Resource
                                     ->columns(4)
                                     ->disableItemCreation()
                                     ->disableItemDeletion()
-                                    ->disableItemMovement(),
+                                    ->disableItemMovement()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        // Recalculate subtotal when invoice items change
+                                        $subtotal = 0;
+                                        if (is_array($state)) {
+                                            foreach ($state as $item) {
+                                                $quantity = $item['quantity'] ?? 0;
+                                                $price = HelperController::parseIndonesianMoney($item['price'] ?? 0);
+                                                $itemTotal = $quantity * $price;
+                                                $subtotal += $itemTotal;
+                                            }
+                                        }
+                                        $set('subtotal', $subtotal);
+                                        $set('dpp', $subtotal);
+                                        
+                                        // Recalculate total with other fees
+                                        $otherFees = $get('other_fees') ?? [];
+                                        $manualOtherFeeTotal = collect($otherFees)->sum('amount');
+                                        $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
+                                        $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
+                                        $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
+                                        
+                                        $tax = $get('tax') ?? 0;
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $set('total', $finalTotal);
+                                        
+                                        // Update tax and PPN amount displays
+                                        $taxAmount = $subtotal * $tax / 100;
+                                        $set('tax_amount', $taxAmount);
+                                        $ppnAmount = $subtotal * $ppnRate / 100;
+                                        $set('ppn_amount', $ppnAmount);
+                                    }),
                             ]),
 
                         // Biaya Lain Section

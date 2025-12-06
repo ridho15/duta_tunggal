@@ -56,6 +56,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Filament\Notifications\Notification;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\DB;
 use Saade\FilamentAutograph\Forms\Components\SignaturePad as ComponentsSignaturePad;
@@ -1183,7 +1184,12 @@ class PurchaseOrderResource extends Resource
                                 // Check if user has signature set
                                 $user = Auth::user();
                                 if (!$user->signature) {
-                                    throw new \Exception('Tanda tangan belum diatur di profil user. Silakan atur tanda tangan terlebih dahulu.');
+                                    Notification::make()
+                                        ->title('Tanda Tangan Belum Diatur')
+                                        ->body('Tanda tangan belum diatur di profil user. Silakan atur tanda tangan terlebih dahulu.')
+                                        ->danger()
+                                        ->send();
+                                    return;
                                 }
 
                                 DB::transaction(function () use ($record, $data, $user) {
