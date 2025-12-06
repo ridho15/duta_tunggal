@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use App\Models\Driver;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -26,6 +27,7 @@ class DeliveryOrderFactory extends Factory
             'notes' => $this->faker->sentence(),
             'warehouse_id' => \App\Models\Warehouse::factory(),
             'status' => 'draft',
+            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? 1,
         ];
     }
 }

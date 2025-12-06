@@ -116,7 +116,7 @@ class SaleOrderResource extends Resource
                                             'tax' => $item->tax,
                                             'notes' => $item->notes,
                                             'warehouse_id' => $item->warehouse_id,
-                                            'subtotal' => $item->quantity * ($item->unit_price + $item->tax - $item->discount),
+                                            'subtotal' => HelperController::hitungSubtotal($item->quantity, HelperController::parseIndonesianMoney($item->unit_price), $item->discount, $item->tax, null),
                                             'rak_id' => $item->rak_id
                                         ]);
                                     }
@@ -325,6 +325,32 @@ class SaleOrderResource extends Resource
                                             ->nullable(),
                                     ]),
                             ]),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                        ->get()
+                                        ->mapWithKeys(function ($cabang) {
+                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                        });
+                                }
+                                
+                                return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                });
+                            })
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih'
+                            ]),
                         TextInput::make('so_number')
                             ->label('SO Number')
                             ->required()
@@ -464,21 +490,47 @@ class SaleOrderResource extends Resource
                                     }),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
-                                    ->searchable(['name', 'kode'])
+                                    ->options(function ($get) {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+                                        $query = Warehouse::whereHas('inventoryStock', function (Builder $query) use ($get) {
+                                            $query->where('product_id', $get('product_id'));
+                                        });
+                                        
+                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                            $query->where('cabang_id', $user?->cabang_id);
+                                        }
+                                        
+                                        return $query->get()->mapWithKeys(function ($warehouse) {
+                                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                        });
+                                    })
+                                    ->searchable()
+                                    ->getSearchResultsUsing(function (string $search, $get) {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+                                        $query = Warehouse::whereHas('inventoryStock', function (Builder $query) use ($get) {
+                                            $query->where('product_id', $get('product_id'));
+                                        })
+                                        ->where(function ($q) use ($search) {
+                                            $q->where('name', 'like', "%{$search}%")
+                                              ->orWhere('kode', 'like', "%{$search}%");
+                                        });
+                                        
+                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                            $query->where('cabang_id', $user?->cabang_id);
+                                        }
+                                        
+                                        return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                        });
+                                    })
                                     ->preload()
                                     ->reactive()
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Gudang belum dipilih'
                                     ])
-                                    ->relationship('warehouse', 'name', function (Builder $query, $get) {
-                                        $query->whereHas('inventoryStock', function (Builder $query) use ($get) {
-                                            $query->where('product_id', $get('product_id'));
-                                        });
-                                    })
-                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                        return "({$warehouse->kode}) {$warehouse->name}";
-                                    })
                                     ->helperText(function ($get) {
                                         if (!$get('product_id') || !$get('warehouse_id')) {
                                             return null;
@@ -525,7 +577,7 @@ class SaleOrderResource extends Resource
 
                                         // Only show racks that have inventory stock for the selected product and warehouse
                                         return $query->where('warehouse_id', $get('warehouse_id'))
-                                                    ->whereHas('inventoryStocks', function (Builder $q) use ($get) {
+                                                    ->whereHas('inventoryStock', function (Builder $q) use ($get) {
                                                         $q->where('product_id', $get('product_id'))
                                                           ->where('qty_available', '>', 0);
                                                     });

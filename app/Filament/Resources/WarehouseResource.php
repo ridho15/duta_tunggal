@@ -31,6 +31,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class WarehouseResource extends Resource
 {
@@ -39,6 +40,8 @@ class WarehouseResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-home-modern';
 
     protected static ?string $navigationGroup = 'Master Data';
+
+    protected static ?string $navigationLabel = 'Gudang';
 
     protected static ?string $modelLabel = 'Gudang';
 
@@ -78,16 +81,17 @@ class WarehouseResource extends Resource
                             ->required(),
                         Select::make('cabang_id')
                             ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
                             ->preload()
+                            ->searchable()
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->validationMessages([
                                 'exists' => 'Cabang tidak tersedia',
                                 'required' => "Cabang wajib dipilih"
                             ])
-                            ->searchable(['kode', 'nama'])
-                            ->relationship('cabang', 'nama')
-                            ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
-                                return "({$cabang->kode}) {$cabang->nama}";
-                            })
                             ->required(),
                         Radio::make('tipe')
                             ->label('Tipe')

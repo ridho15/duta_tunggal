@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,8 @@ class PurchaseReceipt extends Model
         'notes',
         'currency_id',
         'other_cost',
-        'status' // draft, partial, completed
+        'status', // draft, partial, completed
+        'cabang_id'
     ];
 
     public function purchaseOrder()
@@ -81,6 +83,8 @@ class PurchaseReceipt extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope);
+
         // Removed automatic stock movement processing for pre-QC items
         // Stock movement should be done manually after QC approval
 
@@ -101,5 +105,10 @@ class PurchaseReceipt extends Model
             $purchaseReceipt->purchaseReceiptPhoto()->withTrashed()->restore();
             $purchaseReceipt->purchaseReceiptBiaya()->withTrashed()->restore();
         });
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

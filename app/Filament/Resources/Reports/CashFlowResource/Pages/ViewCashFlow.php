@@ -70,7 +70,11 @@ class ViewCashFlow extends Page
                         ->statePath('method'),
                     Select::make('branchIds')
                         ->label('Cabang')
-                        ->options(fn () => Cabang::orderBy('nama')->pluck('nama', 'id'))
+                        ->options(function () {
+                            return Cabang::orderBy('nama')->get()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            });
+                        })
                         ->multiple()
                         ->searchable()
                         ->helperText('Kosongkan bila ingin menampilkan semua cabang')

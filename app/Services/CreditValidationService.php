@@ -116,7 +116,8 @@ class CreditValidationService
 
     public function getOverdueInvoices(Customer $customer)
     {
-        return Invoice::join('sale_orders', function ($join) use ($customer) {
+        return Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
+            ->join('sale_orders', function ($join) use ($customer) {
                 $join->on('invoices.from_model_id', '=', 'sale_orders.id')
                      ->where('sale_orders.customer_id', '=', $customer->id);
             })

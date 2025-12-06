@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -81,5 +82,15 @@ class CashBankTransaction extends Model
             ->sum('voucher_amount_used');
 
         return $this->voucherRequest->amount - $totalUsed;
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

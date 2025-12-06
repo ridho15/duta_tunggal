@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,8 @@ class PurchaseOrder extends Model
         'close_reason',
         'date_approved',
         'approved_by',
+        'approval_signature',
+        'approval_signed_at',
         'warehouse_id',
         'tempo_hutang', // hari
         'note',
@@ -37,7 +40,18 @@ class PurchaseOrder extends Model
         'refer_model_id',
         'is_import',
         'ppn_option',
+        'cabang_id'
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'order_date' => 'date',
+            'expected_date' => 'date',
+            'date_approved' => 'date',
+            'approval_signed_at' => 'datetime',
+        ];
+    }
 
     public function purchaseOrderCurrency()
     {
@@ -111,6 +125,8 @@ class PurchaseOrder extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope());
+
         static::deleting(function ($purchaseOrder) {
             if ($purchaseOrder->isForceDeleting()) {
                 $purchaseOrder->purchaseOrderItem()->forceDelete();
@@ -152,5 +168,10 @@ class PurchaseOrder extends Model
         if ($completedItems > 0) return 'Sebagian (' . $completedItems . '/' . $totalItems . ')';
         if ($itemsWithReceipts > 0) return 'Sebagian Diterima';
         return 'Belum Diterima';
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

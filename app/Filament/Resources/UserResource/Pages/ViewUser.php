@@ -21,7 +21,7 @@ class ViewUser extends ViewRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $data['manage_type'] = explode(',', $data['manage_type']);
+        // $data['manage_type'] is already an array due to accessor
         return $data;
     }
 }

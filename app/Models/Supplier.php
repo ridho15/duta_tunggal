@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,8 +24,14 @@ class Supplier extends Model
         'npwp',
         'tempo_hutang', // hari,
         'kontak_person',
-        'keterangan'
+        'keterangan',
+        'cabang_id'
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+    }
 
     public function purchaseOrder()
     {
@@ -39,5 +46,10 @@ class Supplier extends Model
     public function deposit()
     {
         return $this->morphOne(Deposit::class, 'from_model')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

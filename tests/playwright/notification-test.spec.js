@@ -118,14 +118,16 @@ test.describe('Notification Tests', () => {
       console.log('✅ Notification icon is visible');
 
       // Check if there's a badge with notification count
-      const badge = notificationIcon.locator('[data-badge], .badge, .fi-badge, span').first();
+      const badge = notificationIcon.locator('span:not([class]), [class*="badge"], .fi-badge, span').filter({ hasText: /\d+/ }).first();
       const badgeExists = await badge.count() > 0;
 
       if (badgeExists) {
         console.log('✅ Notification badge found');
         const badgeText = await badge.textContent();
-        console.log(`📊 Badge text: ${badgeText}`);
-        expect(parseInt(badgeText || '0')).toBeGreaterThan(0);
+        console.log(`📊 Badge text: "${badgeText}"`);
+        const badgeNumber = parseInt(badgeText.trim());
+        console.log(`🔢 Parsed badge number: ${badgeNumber}`);
+        expect(badgeNumber).toBeGreaterThan(0);
       } else {
         console.log('⚠️  No notification badge found');
       }

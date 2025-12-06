@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -162,8 +163,15 @@ class Product extends Model
         return $this->hasMany(BillOfMaterialItem::class, 'product_id');
     }
 
+    public function assets()
+    {
+        return $this->hasMany(Asset::class, 'product_id');
+    }
+
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope);
+        
         static::deleting(function ($product) {
             if ($product->isForceDeleting()) {
                 $product->purchaseOrderItem()->forceDelete();

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -55,6 +56,7 @@ class Invoice extends Model
         'ar_coa_id',
         'ppn_keluaran_coa_id',
         'biaya_pengiriman_coa_id',
+        'cabang_id'
     ];
 
     protected $casts = [
@@ -161,6 +163,8 @@ class Invoice extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope());
+
         static::deleting(function ($invoice) {
             if ($invoice->isForceDeleting()) {
                 $invoice->invoiceItem()->forceDelete();
@@ -213,5 +217,10 @@ class Invoice extends Model
     public function biayaPengirimanCoa()
     {
         return $this->belongsTo(\App\Models\ChartOfAccount::class, 'biaya_pengiriman_coa_id');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();
     }
 }

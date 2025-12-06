@@ -42,6 +42,7 @@ class CashBankDemoSeeder extends Seeder
                 'description' => 'Seed transfer A ke B',
                 'reference' => 'SEED-TRF',
                 'status' => 'draft',
+                'cabang_id' => 1, // Default to first cabang
             ];
 
             [$transfer, $created] = $this->firstOrCreateWithFlag(CashBankTransfer::class, ['reference' => $transferAttrs['reference']], $transferAttrs);

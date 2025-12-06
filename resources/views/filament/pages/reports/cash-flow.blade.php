@@ -4,7 +4,7 @@
 
         @php($report = $this->getReportData())
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="p-4 border rounded shadow-sm">
                 <div class="text-sm text-gray-500">Periode</div>
                 <div class="text-lg font-semibold">
@@ -88,7 +88,7 @@
                                                                 <div class="font-semibold">Masuk</div>
                                                                 <ul class="list-disc list-inside">
                                                                     @foreach($breakdown['inflow'] as $coa)
-                                                                        <li>{{ $coa['coa_code'] }} &mdash; {{ $coa['coa_name'] }} (Rp {{ number_format($coa['total'], 2, ',', '.') }})</li>
+                                                                        <li>{{ $coa['coa_code'] }} &mdash; {{ $coa['coa_name'] }} (Rp {{ number_format($coa['amount'] ?? 0, 2, ',', '.') }})</li>
                                                                     @endforeach
                                                                 </ul>
                                                             </div>
@@ -98,7 +98,7 @@
                                                                 <div class="font-semibold">Keluar</div>
                                                                 <ul class="list-disc list-inside">
                                                                     @foreach($breakdown['outflow'] as $coa)
-                                                                        <li>{{ $coa['coa_code'] }} &mdash; {{ $coa['coa_name'] }} (Rp {{ number_format($coa['total'], 2, ',', '.') }})</li>
+                                                                        <li>{{ $coa['coa_code'] }} &mdash; {{ $coa['coa_name'] }} (Rp {{ number_format($coa['amount'] ?? 0, 2, ',', '.') }})</li>
                                                                     @endforeach
                                                                 </ul>
                                                             </div>

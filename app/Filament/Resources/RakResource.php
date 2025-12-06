@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\RakResource\Pages;
 use App\Models\Rak;
+use App\Models\Warehouse;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -14,6 +15,8 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class RakResource extends Resource
 {
@@ -38,9 +41,23 @@ class RakResource extends Resource
                     ->maxLength(255),
                 Select::make('warehouse_id')
                     ->label('Gudang')
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        if ($user && is_array($manageType) && in_array('all', $manageType)) {
+                            // User dengan akses semua bisa lihat semua warehouse
+                            return Warehouse::all()->mapWithKeys(function ($warehouse) {
+                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                            });
+                        } else {
+                            // User biasa hanya lihat warehouse di cabang mereka
+                            return Warehouse::where('cabang_id', $user?->cabang_id)->get()->mapWithKeys(function ($warehouse) {
+                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                            });
+                        }
+                    })
                     ->searchable()
                     ->preload()
-                    ->relationship('warehouse', 'name')
                     ->required()
             ]);
     }
@@ -67,9 +84,17 @@ class RakResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('warehouse.name')
+                TextColumn::make('warehouse')
                     ->label('Gudang')
-                    ->searchable(),
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('warehouse', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
             ])
             ->filters([
                 //

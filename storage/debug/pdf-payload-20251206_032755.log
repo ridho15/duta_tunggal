@@ -1,0 +1,573 @@
+PAYLOAD DUMP - {
+    "time": "2025-12-06 03:27:55",
+    "report_sample": {
+        "period": {
+            "start": "2025-12-01",
+            "end": "2025-12-31"
+        },
+        "method": "direct",
+        "sections": [
+            {
+                "key": "operating",
+                "label": "Aktivitas Operasi",
+                "items": [
+                    {
+                        "key": "cash_receipts_from_sales",
+                        "label": "Penerimaan Kas dari Penjualan",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Penjualan",
+                                "Customer Receipt"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "detail": []
+                        }
+                    },
+                    {
+                        "key": "non_operating_income",
+                        "label": "Pendapatan Luar Usaha & Beban atas Pendapatan",
+                        "amount": 7200000,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [
+                                    {
+                                        "coa_code": "7000.04",
+                                        "coa_name": "Pendapatan Luar Usaha Lainnya",
+                                        "amount": 7200000
+                                    }
+                                ],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "selling_expenses",
+                        "label": "Biaya Penjualan",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Biaya Penjualan",
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "insurance_expenses",
+                        "label": "Biaya Asuransi",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "rent_expenses",
+                        "label": "Biaya Sewa",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "lgat_expenses",
+                        "label": "Biaya LGAT",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "office_supplies_expenses",
+                        "label": "Biaya Perlengkapan Kantor",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank",
+                                "Aset"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "office_needs_expenses",
+                        "label": "Biaya Keperluan Kantor",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "special_services_expenses",
+                        "label": "Biaya Jasa Khusus",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    },
+                    {
+                        "key": "general_admin_expenses",
+                        "label": "Biaya Administrasi Umum",
+                        "amount": -2250000,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": [
+                                    {
+                                        "coa_code": "6280.05",
+                                        "coa_name": "Biaya Administrasi Umum Lainnya",
+                                        "amount": 2250000
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "key": "non_operating_expenses",
+                        "label": "Biaya Diluar Usaha",
+                        "amount": -185000,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": [
+                                    {
+                                        "coa_code": "8000.01",
+                                        "coa_name": "Biaya Administrasi Bank",
+                                        "amount": 185000
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "total": 4765000
+            },
+            {
+                "key": "investing",
+                "label": "Aktivitas Investasi",
+                "items": [
+                    {
+                        "key": "asset_operations",
+                        "label": "Operasi Aset",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank",
+                                "Aset"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    }
+                ],
+                "total": 0
+            },
+            {
+                "key": "financing",
+                "label": "Aktivitas Pendanaan",
+                "items": [
+                    {
+                        "key": "liability_operations",
+                        "label": "Operasi Liabilitas",
+                        "amount": 0,
+                        "metadata": {
+                            "sources": [
+                                "Buku Kas & Bank",
+                                "Penjualan",
+                                "Biaya Lain-lain Belum Terbayar"
+                            ],
+                            "period": {
+                                "start": "2025-12-01",
+                                "end": "2025-12-31"
+                            },
+                            "breakdown": {
+                                "inflow": [],
+                                "outflow": []
+                            }
+                        }
+                    }
+                ],
+                "total": 0
+            }
+        ],
+        "net_change": 4765000,
+        "opening_balance": 233030000,
+        "closing_balance": 237795000
+    },
+    "branch_names": []
+}
+HTML_SAMPLE:
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            margin: 1in;
+        }
+
+        body {
+            font-family: 'DejaVu Sans', sans-serif;
+            font-size: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+
+<body>
+    <table>
+        <tr>
+            <td colspan="3"><strong>Laporan Arus Kas (Metode Langsung)</strong></td>
+        </tr>
+        <tr>
+            <td>Periode</td>
+            <td colspan="2">2025-12-01 s.d. 2025-12-31</td>
+        </tr>
+                <tr>
+            <td>Saldo Awal</td>
+            <td colspan="2">233.030.000,00</td>
+        </tr>
+        <tr>
+            <td>Kenaikan / Penurunan Bersih</td>
+            <td colspan="2">4.765.000,00</td>
+        </tr>
+        <tr>
+            <td>Saldo Akhir</td>
+            <td colspan="2">237.795.000,00</td>
+        </tr>
+    </table>
+
+            <table style="margin-top: 20px;">
+            <thead>
+                <tr>
+                    <th colspan="3" style="text-align: left;">Aktivitas Operasi</th>
+                </tr>
+                <tr>
+                    <th style="text-align: left;">Deskripsi</th>
+                    <th style="text-align: left;">Sumber</th>
+                    <th style="text-align: right;">Jumlah</th>
+                </tr>
+            </thead>
+            <tbody>
+                                    <tr>
+                        <td>Penerimaan Kas dari Penjualan</td>
+                        <td>
+                                                            Penjualan, Customer Receipt
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Pendapatan Luar Usaha &amp; Beban atas Pendapatan</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">7.200.000,00</td>
+                    </tr>
+                                                                                    <tr>
+                            <td colspan="3">
+                                <strong>Rincian COA</strong>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Jenis</th>
+                                            <th>COA</th>
+                                            <th style="text-align: right;">Jumlah</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                                                                    <tr>
+                                                <td>Masuk</td>
+                                                <td>7000.04 - Pendapatan Luar Usaha Lainnya</td>
+                                                <td style="text-align: right;">
+                                                    7.200.000,00</td>
+                                            </tr>
+                                                                                                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                                                        <tr>
+                        <td>Biaya Penjualan</td>
+                        <td>
+                                                            Biaya Penjualan, Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Biaya Asuransi</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Biaya Sewa</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Biaya LGAT</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Biaya Perlengkapan Kantor</td>
+                        <td>
+                                                            Buku Kas &amp; Bank, Aset
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Biaya Keperluan Kantor</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Biaya Jasa Khusus</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                                <tr>
+                        <td>Biaya Administrasi Umum</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">-2.250.000,00</td>
+                    </tr>
+                                                                                    <tr>
+                            <td colspan="3">
+                                <strong>Rincian COA</strong>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Jenis</th>
+                                            <th>COA</th>
+                                            <th style="text-align: right;">Jumlah</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                                                                                                            <tr>
+                                                <td>Keluar</td>
+                                                <td>6280.05 - Biaya Administrasi Umum Lainnya</td>
+                                                <td style="text-align: right;">
+                                                    2.250.000,00</td>
+                                            </tr>
+                                                                            </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                                                        <tr>
+                        <td>Biaya Diluar Usaha</td>
+                        <td>
+                                                            Buku Kas &amp; Bank
+                                                    </td>
+                        <td style="text-align: right;">-185.000,00</td>
+                    </tr>
+                                                                                    <tr>
+                            <td colspan="3">
+                                <strong>Rincian COA</strong>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Jenis</th>
+                                            <th>COA</th>
+                                            <th style="text-align: right;">Jumlah</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                                                                                                            <tr>
+                                                <td>Keluar</td>
+                                                <td>8000.01 - Biaya Administrasi Bank</td>
+                                                <td style="text-align: right;">
+                                                    185.000,00</td>
+                                            </tr>
+                                                                            </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                                                </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2" style="text-align: right;">Total Aktivitas Operasi</th>
+                    <th style="text-align: right;">4.765.000,00</th>
+                </tr>
+            </tfoot>
+        </table>
+            <table style="margin-top: 20px;">
+            <thead>
+                <tr>
+                    <th colspan="3" style="text-align: left;">Aktivitas Investasi</th>
+                </tr>
+                <tr>
+                    <th style="text-align: left;">Deskripsi</th>
+                    <th style="text-align: left;">Sumber</th>
+                    <th style="text-align: right;">Jumlah</th>
+                </tr>
+            </thead>
+            <tbody>
+                                    <tr>
+                        <td>Operasi Aset</td>
+                        <td>
+                                                            Buku Kas &amp; Bank, Aset
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                        </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2" style="text-align: right;">Total Aktivitas Investasi</th>
+                    <th style="text-align: right;">0,00</th>
+                </tr>
+            </tfoot>
+        </table>
+            <table style="margin-top: 20px;">
+            <thead>
+                <tr>
+                    <th colspan="3" style="text-align: left;">Aktivitas Pendanaan</th>
+                </tr>
+                <tr>
+                    <th style="text-align: left;">Deskripsi</th>
+                    <th style="text-align: left;">Sumber</th>
+                    <th style="text-align: right;">Jumlah</th>
+                </tr>
+            </thead>
+            <tbody>
+                                    <tr>
+                        <td>Operasi Liabilitas</td>
+                        <td>
+                                                            Buku Kas &amp; Bank, Penjualan, Biaya Lain-lain Belum Terbayar
+                                                    </td>
+                        <td style="text-align: right;">0,00</td>
+                    </tr>
+                                                                                        </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2" style="text-align: right;">Total Aktivitas Pendanaan</th>
+                    <th style="text-align: right;">0,00</th>
+                </tr>
+            </tfoot>
+        </table>
+    
+</body>
+
+</html>
+
+HEX_SAMPLE:
+3c 21 44 4f 43 54 59 50 45 20 68 74 6d 6c 3e 0a 3c 68 74 6d 6c 3e 0a 0a 3c 68 65 61 64 3e 0a 20 20 20 20 3c 6d 65 74 61 20 63 68 61 72 73 65 74 3d 22 55 54 46 2d 38 22 3e 0a 20 20 20 20 3c 73 74 79 6c 65 3e 0a 20 20 20 20 20 20 20 20 40 70 61 67 65 20 7b 0a 20 20 20 20 20 20 20 20 20 20 20 20 6d 61 72 67 69 6e 3a 20 31 69 6e 3b 0a 20 20 20 20 20 20 20 20 7d 0a 0a 20 20 20 20 20 20 20 20 62 6f 64 79 20 7b 0a 20 20 20 20 20 20 20 20 20 20 20 20 66 6f 6e 74 2d 66 61 6d 69 6c 79 3a 20 27 44 65 6a 61 56 75 20 53 61 6e 73 27 2c 20 73 61 6e 73 2d 73 65 72 69 66 3b 0a 20 20 20 20 20 20 20 20 20 20 20 20 66 6f 6e 74 2d 73 69 7a 65 3a 20 31 32 70 78 3b 0a 20 20 20 20 20 20 20 20 7d 0a 0a 20 20 20 20 20 20 20 20 74 61 62 6c 65 20 7b 0a 20 20 20 20 20 20 20 20 20 20 20 20 77 69 64 74 68 3a 20 31 30 30 25 3b 0a 20 20 20 20 20 20 20 20 20 20 20 20 62 6f 72 64 65 72 2d 63 6f 6c 6c 61 70 73 65 3a 20 63 6f 6c 6c 61 70 73 65 3b 0a 20 20 20 20 20 20 20 20 20 20 20 20 6d 61 72 67 69 6e 2d 62 6f 74 74 6f 6d 3a 20 32 30 70 78 3b 0a 20 20 20 20 20 20 20 20 7d 0a 0a 20 20 20 20 20 20 20 20 74 68 2c 0a 20 20 20 20 20 20 20 20 74 64 20 7b 0a 20 20 20 20 20 20 20 20 20 20 20 20 62 6f 72 64 65 72 3a 20 31 70 

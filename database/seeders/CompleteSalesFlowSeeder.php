@@ -13,6 +13,7 @@ use App\Models\DeliveryOrderItem;
 use App\Models\DeliverySalesOrder;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\Cabang;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -103,6 +104,7 @@ class CompleteSalesFlowSeeder extends Seeder
             'shipped_to' => $customer->address ?? 'Customer Address',
             'tipe_pengiriman' => 'Kirim Langsung',
             'created_by' => $user->id ?? 1,
+            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? 1,
         ]);
 
         // Add Sale Order Items (copy from quotation)
@@ -127,6 +129,7 @@ class CompleteSalesFlowSeeder extends Seeder
             'status' => 'approved',
             'notes' => 'Approved delivery order for sale order ' . $saleOrder->so_number,
             'created_by' => $user->id ?? 1,
+            'cabang_id' => $saleOrder->cabang_id, // Use same cabang as sale order
         ]);
 
         // Add Delivery Order Items (from sale order items)

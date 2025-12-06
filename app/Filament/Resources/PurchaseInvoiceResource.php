@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
+use App\Models\Cabang;
 use App\Services\InvoiceService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -18,6 +19,7 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DatePicker;
+use Illuminate\Support\Facades\Auth;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Repeater;
@@ -77,6 +79,20 @@ class PurchaseInvoiceResource extends Resource
                                         $set('subtotal', 0);
                                         $set('total', 0);
                                     }),
+                                    
+                                Select::make('cabang_id')
+                                    ->label('Cabang')
+                                    ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                    }))
+                                    ->searchable()
+                                    ->preload()
+                                    ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                                    ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Cabang harus dipilih'
+                                    ]),
                                     
                                 Select::make('selected_purchase_order')
                                     ->label('PO')
@@ -857,6 +873,18 @@ class PurchaseInvoiceResource extends Resource
                     ->label('Nomor Invoice')
                     ->searchable()
                     ->sortable(),
+                    
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                     
                 TextColumn::make('supplier_name')
                     ->label('Supplier')

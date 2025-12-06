@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\VehicleResource\RelationManagers\DeliveryOrderRelationManager;
 use App\Filament\Resources\VehicleResource\Pages;
 use App\Filament\Resources\VehicleResource\Pages\ViewVehicle;
+use App\Models\Cabang;
 use App\Models\Vehicle;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -18,9 +19,11 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\Auth;
 
 class VehicleResource extends Resource
 {
@@ -78,6 +81,19 @@ class VehicleResource extends Resource
                                 'max' => 'Kapasitas terlalu panjang'
                             ])
                             ->maxLength(255),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->validationMessages([
+                                'required' => 'Cabang harus dipilih',
+                            ]),
                     ])
             ]);
     }
@@ -112,6 +128,17 @@ class VehicleResource extends Resource
                     ->label('Kapasitas')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

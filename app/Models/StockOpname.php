@@ -51,7 +51,7 @@ class StockOpname extends Model
 
     public function stockMovements()
     {
-        return $this->morphMany(StockMovement::class, 'fromModel');
+        return $this->morphMany(StockMovement::class, 'fromModel', 'from_model_type', 'from_model_id');
     }
 
     /**

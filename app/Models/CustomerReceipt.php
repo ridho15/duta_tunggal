@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +26,8 @@ class CustomerReceipt extends Model
         'payment_method',
         'coa_id',
         'status', // 'Draft','Partial','Paid'
-        'created_by'
+        'created_by',
+        'cabang_id'
     ];
 
     protected $casts = [
@@ -79,5 +81,15 @@ class CustomerReceipt extends Model
     public function getCalculatedTotalAttribute()
     {
         return $this->customerReceiptItem()->sum('amount');
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

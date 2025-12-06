@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\AccountReceivableResource\Pages;
+use App\Models\Cabang;
 use App\Models\AccountReceivable;
 use App\Models\Customer;
 use App\Models\Invoice;
@@ -21,6 +22,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -40,6 +42,16 @@ class AccountReceivableResource extends Resource
             ->schema([
                 Fieldset::make('Account Receivable')
                     ->schema([
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->default(function () {
+                                return Auth::user()->cabang_id;
+                            })
+                            ->required()
+                            ->helperText('Pilih cabang untuk account receivable ini'),
                         Select::make('invoice_id')
                             ->required()
                             ->preload()

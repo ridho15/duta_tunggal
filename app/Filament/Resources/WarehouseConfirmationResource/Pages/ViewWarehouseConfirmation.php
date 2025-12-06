@@ -20,11 +20,11 @@ class ViewWarehouseConfirmation extends ViewRecord
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil')->label('Edit Confirmation'),
             Actions\Action::make('confirm')
-                ->label('Confirm Warehouse')
+                ->label('Konfirmasi Gudang')
                 ->icon('heroicon-o-check-badge')
                 ->color('success')
                 ->requiresConfirmation()
-                ->modalHeading('Confirm Warehouse')
+                ->modalHeading('Konfirmasi Gudang')
                 ->modalDescription('This will confirm the warehouse confirmation and update the sales order status.')
                 ->action(function () {
                     $record = $this->record;
@@ -199,7 +199,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                     ->schema([
                         // Show warehouse confirmation items
                         Infolists\Components\RepeatableEntry::make('warehouseConfirmationItems')
-                            ->label('Warehouse Confirmation Items')
+                            ->label('Item Konfirmasi Gudang')
                             ->schema([
                                 Infolists\Components\TextEntry::make('saleOrderItem.product')
                                     ->label('Product')

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use App\Models\Customer;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -49,6 +50,7 @@ class SaleOrderFactory extends Factory
             'reject_at'            => now(),
             'reason_close'         => $this->faker->optional()->sentence(),
             'tipe_pengiriman'      => $this->faker->randomElement(['Ambil Sendiri', 'Kirim Langsung']),
+            'cabang_id'            => Cabang::inRandomOrder()->first()->id ?? 1,
         ];
     }
 }

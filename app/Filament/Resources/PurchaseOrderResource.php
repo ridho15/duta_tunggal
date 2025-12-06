@@ -58,6 +58,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\DB;
+use Saade\FilamentAutograph\Forms\Components\SignaturePad as ComponentsSignaturePad;
 
 class PurchaseOrderResource extends Resource
 {
@@ -119,7 +120,8 @@ class PurchaseOrderResource extends Resource
                                         if ($get('refer_model_type') == 'App\Models\SaleOrder') {
                                             $saleOrder = SaleOrder::find($state);
                                             foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
-                                                $subtotal = ((int)$saleOrderItem->quantity * (int) $saleOrderItem->unit_price) - (int) $saleOrderItem->discount + (int) $saleOrderItem->tax;
+                                                // Calculate subtotal using HelperController for consistency
+                                                $subtotal = HelperController::hitungSubtotal($saleOrderItem->quantity, $saleOrderItem->unit_price, $saleOrderItem->discount, $saleOrderItem->tax, null);
                                                 array_push($items, [
                                                     'product_id' => $saleOrderItem->product_id,
                                                     'quantity' => $saleOrderItem->quantity,
@@ -138,7 +140,8 @@ class PurchaseOrderResource extends Resource
                                                     $set('tempo_hutang', $orderRequest->supplier->tempo_hutang);
                                                 }
                                                 foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
-                                                    $subtotal = ((int)$orderRequestItem->quantity * (int) $orderRequestItem->unit_price) - (int) $orderRequestItem->discount + (int) $orderRequestItem->tax;
+                                                    // Calculate subtotal using HelperController for consistency
+                                                    $subtotal = HelperController::hitungSubtotal($orderRequestItem->quantity, $orderRequestItem->unit_price, $orderRequestItem->discount, $orderRequestItem->tax, null);
                                                     array_push($items, [
                                                         'product_id' => $orderRequestItem->product_id,
                                                         'quantity' => $orderRequestItem->quantity,
@@ -175,6 +178,32 @@ class PurchaseOrderResource extends Resource
                                 }
                             })
                             ->required(),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                        ->get()
+                                        ->mapWithKeys(function ($cabang) {
+                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                        });
+                                }
+                                
+                                return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                });
+                            })
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih'
+                            ]),
                         TextInput::make('po_number')
                             ->required()
                             ->reactive()
@@ -203,18 +232,42 @@ class PurchaseOrderResource extends Resource
                             ->label('Tanggal Diharapkan'),
                         Select::make('warehouse_id')
                             ->label('Gudang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', 1)->orderBy('name');
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->preload()
-                            ->searchable(['name', 'kode'])
+                            ->searchable()
+                            ->getSearchResultsUsing(function (string $search) {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', 1)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                          ->orWhere('kode', 'like', "%{$search}%");
+                                    });
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->required()
                             ->validationMessages([
                                 'required' => 'Gudang belum dipilih',
-                            ])
-                            ->relationship('warehouse', 'nama', function(Builder $query) {
-                                return $query->orderBy('name')->where('status', 1);
-                            })
-                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                return "({$warehouse->kode}) {$warehouse->name}";
-                            }),
+                            ]),
                         Toggle::make('is_import')
                             ->label('Pembelian Import?')
                             ->helperText('Aktifkan untuk menandai pembelian impor sehingga pajak impor dicatat saat pembayaran')
@@ -749,6 +802,17 @@ class PurchaseOrderResource extends Resource
                     })->formatStateUsing(function ($state) {
                         return "({$state->code}) {$state->name}";
                     }),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->searchable(),
@@ -1084,6 +1148,31 @@ class PurchaseOrderResource extends Resource
                                             return ChartOfAccount::where('type', 'Expense')->orderBy('code')->get()->mapWithKeys(fn($coa) => [$coa->id => "({$coa->code}) {$coa->name}"]);
                                         })->searchable()->required(),
                                     ])->columns(1),
+                                    Fieldset::make('Approval Confirmation')->schema([
+                                        Placeholder::make('signature_preview')
+                                            ->label('Tanda Tangan yang Akan Digunakan')
+                                            ->content(function () {
+                                                $user = Auth::user();
+                                                if ($user && $user->signature) {
+                                                    return new \Illuminate\Support\HtmlString(
+                                                        '<div class="text-center p-4 border rounded-lg bg-gray-50">' .
+                                                        '<p class="text-sm text-gray-600 mb-2">Tanda tangan dari akun user akan digunakan:</p>' .
+                                                        '<img src="' . asset('storage/' . $user->signature) . '" alt="User Signature" class="max-h-16 mx-auto border">' .
+                                                        '</div>'
+                                                    );
+                                                }
+                                                return new \Illuminate\Support\HtmlString(
+                                                    '<div class="text-center p-4 border rounded-lg bg-red-50 text-red-600">' .
+                                                    '<p class="font-medium">Tanda tangan belum diatur</p>' .
+                                                    '<p class="text-sm">Silakan atur tanda tangan di profil user terlebih dahulu</p>' .
+                                                    '</div>'
+                                                );
+                                            }),
+                                        Checkbox::make('confirm_approval')
+                                            ->label('Saya menyetujui pembelian asset ini')
+                                            ->required()
+                                            ->accepted(),
+                                    ]),
                                 ];
                             }
 
@@ -1091,18 +1180,29 @@ class PurchaseOrderResource extends Resource
                         })
                         ->action(function (array $data, $record) {
                             if ($record->status == 'request_approval') {
-                                DB::transaction(function () use ($record, $data) {
+                                // Check if user has signature set
+                                $user = Auth::user();
+                                if (!$user->signature) {
+                                    throw new \Exception('Tanda tangan belum diatur di profil user. Silakan atur tanda tangan terlebih dahulu.');
+                                }
+
+                                DB::transaction(function () use ($record, $data, $user) {
+                                    // Use user's pre-set signature
+                                    $signaturePath = $user->signature;
+
                                     $status = $record->is_asset ? 'completed' : 'approved';
                                     $record->update([
                                         'status' => $status,
                                         'date_approved' => Carbon::now(),
-                                        'approved_by' => Auth::user()->id,
+                                        'approved_by' => $user->id,
+                                        'approval_signature' => $signaturePath,
+                                        'approval_signed_at' => Carbon::now(),
                                     ]);
 
                                     if ($record->is_asset) {
                                         $record->update([
                                             'completed_at' => Carbon::now(),
-                                            'completed_by' => Auth::user()->id,
+                                            'completed_by' => $user->id,
                                         ]);
                                         foreach ($record->purchaseOrderItem as $item) {
                                             $total = \App\Http\Controllers\HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);

@@ -60,9 +60,10 @@ class SaleOrderObserver
         $invoiceItems = [];
 
         foreach ($saleOrder->saleOrderItem as $item) {
-            $lineSubtotal = $item->quantity * ($item->unit_price - $item->discount);
-            $lineTax = $lineSubtotal * ($item->tax / 100);
-            $subtotal += $lineSubtotal;
+            // Calculate subtotal using HelperController for consistency
+            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? null);
+            $lineTax = $item->tax > 0 ? $lineSubtotal * ($item->tax / 100) / (1 + $item->tax / 100) : 0; // Extract tax from total
+            $subtotalBeforeTax = $lineSubtotal / (1 + $item->tax / 100);
             $tax += $lineTax;
 
             $invoiceItems[] = [
@@ -72,8 +73,8 @@ class SaleOrderObserver
                 'discount' => $item->discount,
                 'tax_rate' => $item->tax,
                 'tax_amount' => $lineTax,
-                'subtotal' => $lineSubtotal,
-                'total' => $lineSubtotal + $lineTax,
+                'subtotal' => $subtotalBeforeTax,
+                'total' => $lineSubtotal,
             ];
         }
 

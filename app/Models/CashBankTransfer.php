@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,8 @@ class CashBankTransfer extends Model
         'description', 
         'reference', 
         'attachment_path', 
-        'status'
+        'status',
+        'cabang_id'
     ];
 
     protected $casts = [
@@ -44,5 +46,15 @@ class CashBankTransfer extends Model
     public function otherCostsCoa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'other_costs_coa_id');
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

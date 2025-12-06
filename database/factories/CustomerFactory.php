@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -32,7 +33,8 @@ class CustomerFactory extends Factory
             'tipe_pembayaran'   => $this->faker->randomElement(['Bebas','COD (Bayar Lunas)','Kredit']),
             'nik_npwp'          => $this->faker->numerify('################'),
             'keterangan'        => $this->faker->optional()->sentence(),
-            'isSpecial'         => $this->faker->boolean(50)
+            'isSpecial'         => $this->faker->boolean(50),
+            'cabang_id'         => Cabang::inRandomOrder()->first()->id ?? 1,
         ];
     }
 }

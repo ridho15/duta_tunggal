@@ -69,18 +69,29 @@ class ViewPurchaseOrder extends ViewRecord
                 })
                 ->action(function (array $data, $record) {
                     if ($record->status == 'request_approval') {
-                        DB::transaction(function () use ($record, $data) {
+                        // Check if user has signature set
+                        $user = Auth::user();
+                        if (!$user->signature) {
+                            throw new \Exception('Tanda tangan belum diatur di profil user. Silakan atur tanda tangan terlebih dahulu.');
+                        }
+
+                        DB::transaction(function () use ($record, $data, $user) {
+                            // Use user's pre-set signature
+                            $signaturePath = $user->signature;
+
                             $status = $record->is_asset ? 'completed' : 'approved';
                             $record->update([
                                 'status' => $status,
                                 'date_approved' => Carbon::now(),
-                                'approved_by' => Auth::user()->id,
+                                'approved_by' => $user->id,
+                                'approval_signature' => $signaturePath,
+                                'approval_signed_at' => Carbon::now(),
                             ]);
 
                             if ($record->is_asset) {
                                 $record->update([
                                     'completed_at' => Carbon::now(),
-                                    'completed_by' => Auth::user()->id,
+                                    'completed_by' => $user->id,
                                 ]);
                                 foreach ($record->purchaseOrderItem as $item) {
                                     $total = \App\Http\Controllers\HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);

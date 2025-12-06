@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,7 +28,13 @@ class Customer extends Model
         'tipe_pembayaran', //'Bebas','COD (Bayar Lunas)','Kredit'
         'nik_npwp', // NIK / NPWP,
         'keterangan',
+        'cabang_id',
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+    }
 
     public function sales()
     {
@@ -72,5 +79,10 @@ class Customer extends Model
             'id', // Local key on customers table
             'id' // Local key on sale_orders table
         )->where('invoices.from_model_type', 'App\Models\SaleOrder');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

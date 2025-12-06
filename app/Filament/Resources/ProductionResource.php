@@ -181,7 +181,27 @@ class ProductionResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Produksi (Production)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Production adalah record aktual dari proses produksi yang telah selesai, mencatat hasil produksi dari Manufacturing Order.</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Production Number</em> (nomor produksi unik), <em>Manufacturing Order</em> (referensi MO), <em>Product</em> (produk yang diproduksi), <em>Production Date</em> (tanggal produksi).</li>' .
+                            '<li><strong>Status:</strong> <em>Draft</em> (belum selesai) atau <em>Finished</em> (sudah selesai). Status otomatis diubah saat production selesai.</li>' .
+                            '<li><strong>Auto-Generation:</strong> Production record dibuat otomatis saat Manufacturing Order diselesaikan. Nomor produksi otomatis dibuat dengan format yang unik.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Manufacturing Order</em> (sumber produksi), <em>Production Plan</em> (rencana produksi), dan <em>Inventory</em> (penambahan stock produk jadi).</li>' .
+                            '<li><strong>Actions:</strong> <em>Finish Production</em> (menandai produksi selesai), <em>View Details</em> (lihat detail produksi), <em>Delete</em> (hapus record produksi).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any production</em>, <em>create production</em>, <em>update production</em>, <em>delete production</em>, <em>restore production</em>, <em>force-delete production</em>.</li>' .
+                            '<li><strong>Stock Impact:</strong> Saat production finished, stock produk jadi otomatis bertambah di inventory sesuai dengan quantity yang diproduksi.</li>' .
+                            '<li><strong>Reporting:</strong> Menyediakan data untuk tracking produksi, cost analysis, dan performance monitoring manufacturing.</li>' .
+                            '<li><strong>Workflow:</strong> Production Plan → Manufacturing Order → Production (hasil akhir) → Inventory Update.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

@@ -46,7 +46,16 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // 'manage_type' => 'array', // Removed to handle manually
         ];
+    }
+
+    public function getManageTypeAttribute($value)
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        return explode(',', $value ?? '');
     }
 
     public function initials(): string

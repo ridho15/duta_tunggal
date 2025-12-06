@@ -6,10 +6,12 @@ use App\Filament\Resources\SupplierResource\Pages;
 use App\Filament\Resources\SupplierResource\Pages\ViewSupplier;
 use App\Filament\Resources\SupplierResource\RelationManagers\PurchaseOrderRelationManager;
 use App\Filament\Resources\SupplierResource\RelationManagers\ProductsRelationManager;
+use App\Models\Cabang;
 use App\Models\Supplier;
 use App\Services\SupplierService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -23,6 +25,8 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class SupplierResource extends Resource
 {
@@ -40,6 +44,19 @@ class SupplierResource extends Resource
             ->schema([
                 Fieldset::make('Form Supplier')
                     ->schema([
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->validationMessages([
+                                'required' => 'Cabang harus dipilih',
+                            ]),
                         TextInput::make('code')
                             ->label('Kode Supplier')
                             ->reactive()
@@ -159,6 +176,18 @@ class SupplierResource extends Resource
                 TextColumn::make('code')
                     ->label('Kode Supplier')
                     ->searchable(),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    })
+                    ->sortable(),
                 TextColumn::make('perusahaan')
                     ->label('Nama Perusahaan')
                     ->searchable(),

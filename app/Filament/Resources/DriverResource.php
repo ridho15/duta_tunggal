@@ -5,8 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\DriverResource\Pages;
 use App\Filament\Resources\DriverResource\Pages\ViewDriver;
 use App\Filament\Resources\DriverResource\RelationManagers\DeliveryOrderRelationManager;
+use App\Models\Cabang;
 use App\Models\Driver;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -18,7 +20,9 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\Auth;
 
 class DriverResource extends Resource
 {
@@ -57,6 +61,19 @@ class DriverResource extends Resource
                             ->validationMessages([
                                 'max' => 'Nomor SIM terlalu panjang'
                             ]),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->validationMessages([
+                                'required' => 'Cabang harus dipilih',
+                            ]),
                     ])
             ]);
     }
@@ -71,6 +88,17 @@ class DriverResource extends Resource
                     ->searchable(),
                 TextColumn::make('license')
                     ->searchable(),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -114,9 +142,9 @@ class DriverResource extends Resource
     {
         return [
             'index' => Pages\ListDrivers::route('/'),
-            'create' => Pages\CreateDriver::route('/create'),
-            'view' => ViewDriver::route('/{record}'),
-            'edit' => Pages\EditDriver::route('/{record}/edit'),
+            // 'create' => Pages\CreateDriver::route('/create'),
+            // 'view' => ViewDriver::route('/{record}'),
+            // 'edit' => Pages\EditDriver::route('/{record}/edit'),
         ];
     }
 }

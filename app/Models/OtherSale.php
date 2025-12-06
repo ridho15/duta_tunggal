@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -67,5 +68,10 @@ class OtherSale extends Model
     public function hasPostedJournals()
     {
         return $this->journalEntries()->exists();
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
     }
 }

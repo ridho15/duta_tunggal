@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,8 @@ class AccountReceivable extends Model
         'paid',
         'remaining',
         'status', //Lunas / Belum Lunas
-        'created_by'
+        'created_by',
+        'cabang_id'
     ];
 
     protected $casts = [
@@ -46,5 +48,15 @@ class AccountReceivable extends Model
     public function ageingSchedule()
     {
         return $this->morphOne(AgeingSchedule::class, 'from_model')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
     }
 }

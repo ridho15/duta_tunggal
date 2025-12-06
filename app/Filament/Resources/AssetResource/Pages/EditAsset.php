@@ -17,4 +17,10 @@ class EditAsset extends EditRecord
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
         ];
     }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        dd($data);
+        return $data;
+    }
 }

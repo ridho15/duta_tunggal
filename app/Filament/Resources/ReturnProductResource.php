@@ -34,6 +34,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class ReturnProductResource extends Resource
@@ -107,9 +108,38 @@ class ReturnProductResource extends Resource
                             ]),
                         Select::make('warehouse_id')
                             ->label('Gudang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = \App\Models\Warehouse::where('status', 1);
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->searchable()
                             ->preload()
-                            ->relationship('warehouse', 'name')
+                            ->getSearchResultsUsing(function (string $search) {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = \App\Models\Warehouse::where('status', 1)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                          ->orWhere('kode', 'like', "%{$search}%");
+                                    });
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->required()
                             ->validationMessages([
                                 'required' => 'Gudang tujuan retur wajib dipilih.',
@@ -293,8 +323,11 @@ class ReturnProductResource extends Resource
 
                         return '-';
                     }),
-                TextColumn::make('warehouse.name')
+                TextColumn::make('warehouse')
                     ->label('Gudang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    })
                     ->searchable(),
                 TextColumn::make('status')
                     ->formatStateUsing(function ($state) {
@@ -509,7 +542,97 @@ class ReturnProductResource extends Resource
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([]);
+            ->bulkActions([])
+            ->description(new HtmlString('
+                <details style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #dee2e6;">
+                    <summary style="cursor: pointer; font-weight: bold; color: #495057; font-size: 14px;">
+                        📦 Panduan Manajemen Return Produk
+                    </summary>
+                    <div style="margin-top: 12px; color: #495057; font-size: 13px; line-height: 1.5;">
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #dc3545;">🎯 Tujuan & Fungsi:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li>Mengelola return produk dari berbagai sumber (sales order, purchase receipt, quality control)</li>
+                                <li>Menangani berbagai skenario return dengan penyesuaian inventory yang tepat</li>
+                                <li>Mempertahankan audit trail untuk semua transaksi return</li>
+                                <li>Mendukung manajemen gudang dengan rekonsiliasi stok yang proper</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #28a745;">🔄 Jenis Return & Sumber:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><strong>Dari Delivery Order:</strong> Return pelanggan dari pengiriman yang telah selesai</li>
+                                <li><strong>Dari Purchase Receipt:</strong> Return vendor untuk barang yang diterima</li>
+                                <li><strong>Dari Quality Control:</strong> Produk yang ditolak selama inspeksi QC</li>
+                                <li><strong>Nomor Return:</strong> Identifier unik yang di-generate otomatis untuk tracking</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #007bff;">⚙️ Aksi Return:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><strong>Reduce Quantity Only:</strong> Hanya kurangi inventory, biarkan order tetap terbuka</li>
+                                <li><strong>Close DO Partial:</strong> Paksa tutup delivery order terlepas dari quantity tersisa</li>
+                                <li><strong>Close SO Complete:</strong> Paksa tutup delivery order dan sales order</li>
+                                <li><strong>Auto Close:</strong> Otomatis tutup order ketika semua quantity sudah di-return</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #ffc107;">📊 Alur Status:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><strong>Draft:</strong> Return dibuat, dapat diedit/dihapus</li>
+                                <li><strong>Approved:</strong> Return diproses, inventory diperbarui, order disesuaikan</li>
+                                <li><strong>Kode Warna:</strong> Abu-abu=Draft, Hijau=Approved</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #17a2b8;">🔗 Integrasi & Dependensi:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><strong>Manajemen Inventory:</strong> Memperbarui level stok dan lokasi gudang</li>
+                                <li><strong>Sales Order:</strong> Dapat menutup atau menutup sebagian sales order</li>
+                                <li><strong>Delivery Order:</strong> Menyesuaikan quantity dan status delivery order</li>
+                                <li><strong>Purchase Receipt:</strong> Menangani skenario return vendor</li>
+                                <li><strong>Quality Control:</strong> Memproses produk yang ditolak dari QC</li>
+                                <li><strong>Gudang & Rak:</strong> Mengelola penempatan produk di gudang</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #6c757d;">🔐 Permission & Aksi:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><strong>Create:</strong> User dapat membuat entri return produk</li>
+                                <li><strong>Edit:</strong> Return draft dapat dimodifikasi</li>
+                                <li><strong>Approve:</strong> Membutuhkan permission "approve return product"</li>
+                                <li><strong>Delete:</strong> Return draft atau Super Admin dapat menghapus return yang sudah approved</li>
+                                <li><strong>View:</strong> Semua user dapat melihat detail return produk</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #fd7e14;">📈 Reporting & Audit:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><strong>Audit Trail:</strong> Mencatat semua approval dan penghapusan return</li>
+                                <li><strong>Pergerakan Stok:</strong> Melacak perubahan inventory dari return</li>
+                                <li><strong>Dampak Order:</strong> Mencatat efek pada sales/purchase order</li>
+                                <li><strong>Notifikasi:</strong> Notifikasi sukses/gagal untuk semua aksi</li>
+                            </ul>
+                        </div>
+
+                        <div style="background: #fff3cd; padding: 8px; border-radius: 4px; border-left: 4px solid #ffc107;">
+                            <strong style="color: #856404;">⚠️ Catatan Penting:</strong>
+                            <ul style="margin: 4px 0; padding-left: 20px; color: #856404;">
+                                <li>Return yang sudah approved tidak dapat diedit - buat return baru jika diperlukan</li>
+                                <li>Menghapus return yang sudah approved dapat menyebabkan inkonsistensi inventory</li>
+                                <li>Pastikan gudang memiliki ruang sebelum menyetujui return</li>
+                                <li>Aksi return memiliki dampak berbeda pada lifecycle order</li>
+                            </ul>
+                        </div>
+                    </div>
+                </details>
+            '));
     }
 
     public static function getRelations(): array

@@ -29,8 +29,10 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
+use Filament\Tables\Actions\ActionGroup;
 
 class CashBankTransactionResource extends Resource
 {
@@ -148,15 +150,15 @@ class CashBankTransactionResource extends Resource
                             ])
                             ->default('single_use')
                             ->required()
-                            ->visible(fn (callable $get) => $get('voucher_request_id') || $get('voucher_number'))
+                            ->visible(fn(callable $get) => $get('voucher_request_id') || $get('voucher_number'))
                             ->columnSpan(6),
                         TextInput::make('voucher_amount_used')
                             ->label('Jumlah Voucher yang Digunakan')
                             ->numeric()
                             ->minValue(0.01)
-                            ->visible(fn (callable $get) => $get('voucher_request_id') || $get('voucher_number'))
+                            ->visible(fn(callable $get) => $get('voucher_request_id') || $get('voucher_number'))
                             ->columnSpan(6)
-                            ->default(fn (callable $get) => $get('amount'))
+                            ->default(fn(callable $get) => $get('amount'))
                             ->rules([
                                 function (callable $get) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -186,7 +188,7 @@ class CashBankTransactionResource extends Resource
                             ]),
                     ]),
                 ])
-                ->visible(fn (callable $get) => true) // Always show but fields inside are conditionally visible
+                ->visible(fn(callable $get) => true) // Always show but fields inside are conditionally visible
                 ->collapsible(),
             Section::make('Rincian Pembayaran ke Akun Anak')
                 ->schema([
@@ -247,13 +249,13 @@ class CashBankTransactionResource extends Resource
                         ->defaultItems(0)
                         ->addActionLabel('Tambah Rincian')
                         ->collapsible()
-                        ->itemLabel(fn (array $state): ?string => ChartOfAccount::find($state['chart_of_account_id'] ?? null)?->name ?? 'Rincian Baru')
+                        ->itemLabel(fn(array $state): ?string => ChartOfAccount::find($state['chart_of_account_id'] ?? null)?->name ?? 'Rincian Baru')
                         ->afterStateUpdated(function ($state, callable $set) {
                             $total = collect($state ?? [])->sum('amount');
                             $mainAmount = $set('../../amount', $total);
                         }),
                 ])
-                ->visible(fn (callable $get) => $get('account_coa_id') && ChartOfAccount::find($get('account_coa_id')) && str_starts_with(ChartOfAccount::find($get('account_coa_id'))->code, '1112'))
+                ->visible(fn(callable $get) => $get('account_coa_id') && ChartOfAccount::find($get('account_coa_id')) && str_starts_with(ChartOfAccount::find($get('account_coa_id'))->code, '1112'))
         ]);
     }
 
@@ -267,10 +269,10 @@ class CashBankTransactionResource extends Resource
                 TextColumn::make('voucherRequest.number')
                     ->label('No. Voucher')
                     ->placeholder('-')
-                    ->formatStateUsing(fn ($state, $record) => $record->voucherRequest ? $record->voucherRequest->number : '-')
+                    ->formatStateUsing(fn($state, $record) => $record->voucherRequest ? $record->voucherRequest->number : '-')
                     ->searchable(),
-                TextColumn::make('accountCoa.code')->label('Akun Kas/Bank')->formatStateUsing(fn ($state, $record) => $record->accountCoa->code . ' - ' . $record->accountCoa->name)->searchable(),
-                TextColumn::make('offsetCoa.code')->label('Lawan Akun')->formatStateUsing(fn ($state, $record) => $record->offsetCoa->code . ' - ' . $record->offsetCoa->name)->searchable(),
+                TextColumn::make('accountCoa.code')->label('Akun Kas/Bank')->formatStateUsing(fn($state, $record) => $record->accountCoa->code . ' - ' . $record->accountCoa->name)->searchable(),
+                TextColumn::make('offsetCoa.code')->label('Lawan Akun')->formatStateUsing(fn($state, $record) => $record->offsetCoa->code . ' - ' . $record->offsetCoa->name)->searchable(),
                 TextColumn::make('amount')->money('IDR')->label('Jumlah')->sortable(),
                 TextColumn::make('transactionDetails')
                     ->label('Rincian Akun Anak')
@@ -308,54 +310,69 @@ class CashBankTransactionResource extends Resource
                     ->searchable()
                     ->preload(),
             ])
-            ->headerActions([
-                \Filament\Tables\Actions\Action::make('switch_to_transfer')
-                    ->label('Transfer Kas & Bank')
-                    ->icon('heroicon-o-arrows-right-left')
-                    ->color('primary')
-                    ->url(fn() => \App\Filament\Resources\CashBankTransferResource::getUrl('index'))
-                    ->tooltip('Beralih ke menu Transfer Kas & Bank'),
-            ])
             ->actions([
-                EditAction::make(),
-                TableAction::make('post_to_journal')
-                    ->label('Posting ke Jurnal')
-                    ->icon('heroicon-o-document-check')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalHeading('Posting ke Jurnal')
-                    ->modalDescription('Apakah Anda yakin ingin memposting transaksi ini ke jurnal?')
-                    ->modalSubmitActionLabel('Ya, Posting')
-                    ->action(function (CashBankTransaction $record) {
-                        try {
-                            app(\App\Services\CashBankService::class)->postTransaction($record);
-                            Notification::make()
-                                ->title('Berhasil diposting ke jurnal')
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Gagal posting ke jurnal')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                TableAction::make('view_voucher_request')
-                    ->label('Lihat Voucher Request')
-                    ->icon('heroicon-o-document-text')
-                    ->color('info')
-                    ->url(fn (CashBankTransaction $record) => route('filament.admin.resources.voucher-requests.view', $record->voucher_request_id))
-                    ->visible(fn (CashBankTransaction $record) => !is_null($record->voucher_request_id)),
-                TableAction::make('view_reconciliation')->label('Lihat Rekonsiliasi Bank')->icon('heroicon-o-eye')
-                    ->url(fn ($record) => '/bank-reconciliations?tableFilters[coa_id][value]=' . ($record->accountCoa && str_starts_with($record->accountCoa->code, '111') ? $record->accountCoa->id : ''))
-                    ->visible(fn ($record) => $record->accountCoa && str_starts_with($record->accountCoa->code, '111')),
-            ])
+                ActionGroup::make([
+                    EditAction::make(),
+                    TableAction::make('post_to_journal')
+                        ->label('Posting ke Jurnal')
+                        ->icon('heroicon-o-document-check')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Posting ke Jurnal')
+                        ->modalDescription('Apakah Anda yakin ingin memposting transaksi ini ke jurnal?')
+                        ->modalSubmitActionLabel('Ya, Posting')
+                        ->action(function (CashBankTransaction $record) {
+                            try {
+                                app(\App\Services\CashBankService::class)->postTransaction($record);
+                                Notification::make()
+                                    ->title('Berhasil diposting ke jurnal')
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Gagal posting ke jurnal')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+                    TableAction::make('view_voucher_request')
+                        ->label('Lihat Voucher Request')
+                        ->icon('heroicon-o-document-text')
+                        ->color('info')
+                        ->url(fn(CashBankTransaction $record) => route('filament.admin.resources.voucher-requests.view', $record->voucher_request_id))
+                        ->visible(fn(CashBankTransaction $record) => !is_null($record->voucher_request_id)),
+                    TableAction::make('view_reconciliation')->label('Lihat Rekonsiliasi Bank')->icon('heroicon-o-eye')
+                        ->url(fn($record) => '/bank-reconciliations?tableFilters[coa_id][value]=' . ($record->accountCoa && str_starts_with($record->accountCoa->code, '111') ? $record->accountCoa->id : ''))
+                        ->visible(fn($record) => $record->accountCoa && str_starts_with($record->accountCoa->code, '111')),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Transaksi Kas & Bank</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Transaksi Kas & Bank adalah record semua transaksi yang terjadi pada rekening kas dan bank perusahaan, baik penerimaan maupun pengeluaran dana.</li>' .
+                    '<li><strong>Tipe Transaksi:</strong> <em>Debit</em> (penerimaan dana ke rekening kas/bank) atau <em>Credit</em> (pengeluaran dana dari rekening kas/bank).</li>' .
+                    '<li><strong>Komponen Utama:</strong> <em>Number</em> (nomor bukti transaksi), <em>Date</em> (tanggal transaksi), <em>Account COA</em> (rekening kas/bank), <em>Offset COA</em> (lawan rekening), <em>Amount</em> (nominal transaksi).</li>' .
+                    '<li><strong>Transaction Details:</strong> Rincian akun anak yang terlibat dalam transaksi, termasuk NTPN untuk transaksi perpajakan. Mendukung multiple account details dalam satu transaksi.</li>' .
+                    '<li><strong>Voucher Integration:</strong> Terintegrasi dengan Voucher Request - transaksi dapat dibuat dari voucher yang telah disetujui. Menampilkan nomor voucher sebagai referensi.</li>' .
+                    '<li><strong>Validasi:</strong> <em>COA Validation</em> - memastikan rekening kas/bank valid. <em>Balance Check</em> - verifikasi saldo rekening untuk transaksi credit. <em>Amount Validation</em> - memastikan amount positif.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan <em>Voucher Request</em> (sumber transaksi), <em>Chart of Account</em> (rekening), <em>Journal Entry</em> (otomatis buat jurnal), <em>Bank Reconciliation</em> (rekonsiliasi bank), dan <em>Cash Flow</em> (laporan arus kas).</li>' .
+                    '<li><strong>Actions:</strong> <em>View/Edit</em> (lihat/ubah transaksi), <em>Delete</em> (hapus transaksi), <em>View Reconciliation</em> (lihat rekonsiliasi bank untuk rekening bank), <em>View Voucher</em> (lihat voucher request terkait).</li>' .
+                    '<li><strong>Permissions:</strong> <em>view any cash bank transaction</em>, <em>create cash bank transaction</em>, <em>update cash bank transaction</em>, <em>delete cash bank transaction</em>, <em>restore cash bank transaction</em>, <em>force-delete cash bank transaction</em>.</li>' .
+                    '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit/credit sesuai tipe transaksi. Transaction details akan membuat multiple journal lines.</li>' .
+                    '<li><strong>Reporting:</strong> Menyediakan data untuk cash flow statement, bank reconciliation, petty cash management, dan financial position tracking.</li>' .
+                    '</ul>' .
+                    '</div>' .
+                    '</details>'
+            ));
     }
 
     public static function getRelations(): array

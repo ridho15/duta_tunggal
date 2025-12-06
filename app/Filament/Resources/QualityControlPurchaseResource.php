@@ -199,7 +199,7 @@ class QualityControlPurchaseResource extends Resource
                                 \Filament\Forms\Components\Hidden::make('product_id')
                                     ->dehydrated(true),
                                 Select::make('warehouse_id')
-                                    ->label('Warehouse')
+                                    ->label('Gudang')
                                     ->options(Warehouse::all()->mapWithKeys(function ($warehouse) {
                                         return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                     }))
@@ -430,13 +430,20 @@ class QualityControlPurchaseResource extends Resource
             ])
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Quality Control (Purchase)</summary>' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Quality Control Purchase (QC Pembelian)</summary>' .
                     '<div class="mt-2 text-sm">' .
                         '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Daftar Quality Control yang dibuat dari Purchase Receipt Item.</li>' .
-                            '<li><strong>Proses QC:</strong> Gunakan tombol <em>Process QC</em> untuk menyetujui QC. Setelah diproses, barang yang lulus akan dikirim ke stock, sedangkan yang ditolak akan dibuatkan return product.</li>' .
-                            '<li><strong>Dampak:</strong> Setelah QC diproses, stok akan ditambahkan ke inventory untuk jumlah yang <em>passed</em>; rejected akan membuat Return Product.</li>' .
-                            '<li><strong>Catatan:</strong> Tombol <em>Process QC</em> hanya tersedia untuk QC yang belum diproses.</li>' .
+                            '<li><strong>Apa ini:</strong> Quality Control Purchase adalah proses inspeksi kualitas barang yang diterima dari supplier melalui Purchase Receipt.</li>' .
+                            '<li><strong>Sumber:</strong> Dibuat otomatis dari <em>Purchase Receipt Item</em> saat barang diterima. Setiap item dalam receipt akan memiliki QC terpisah.</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>QC Number</em> (nomor QC unik), <em>Purchase Receipt</em> (referensi penerimaan), <em>Product</em> (produk yang diinspeksi), <em>Inspected By</em> (petugas QC).</li>' .
+                            '<li><strong>Quantity Control:</strong> <em>Passed Quantity</em> (jumlah lulus QC), <em>Rejected Quantity</em> (jumlah ditolak), <em>Total Quantity</em> (dari purchase receipt).</li>' .
+                            '<li><strong>Status Flow:</strong> <em>Belum diproses</em> (menunggu inspeksi) → <em>Sudah diproses</em> (QC selesai, stock updated).</li>' .
+                            '<li><strong>Validasi:</strong> <em>Quantity Check</em> - total passed + rejected harus sama dengan quantity receipt. <em>Stock Validation</em> - memastikan stock tersedia untuk update.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Purchase Receipt</em> (sumber), <em>Purchase Order</em> (referensi PO), <em>Inventory</em> (update stock), dan <em>Return Product</em> (untuk rejected items).</li>' .
+                            '<li><strong>Actions:</strong> <em>Process QC</em> (proses inspeksi - hanya untuk status belum diproses), <em>View/Edit</em> (lihat detail QC), <em>Delete</em> (hapus QC record).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any quality control purchase</em>, <em>create quality control purchase</em>, <em>update quality control purchase</em>, <em>delete quality control purchase</em>, <em>restore quality control purchase</em>, <em>force-delete quality control purchase</em>.</li>' .
+                            '<li><strong>Stock Impact:</strong> <em>Passed items</em> → stock bertambah di inventory. <em>Rejected items</em> → otomatis membuat Return Product untuk dikembalikan ke supplier.</li>' .
+                            '<li><strong>Reporting:</strong> Menyediakan data untuk quality metrics, supplier performance, dan inventory accuracy tracking.</li>' .
                         '</ul>' .
                     '</div>' .
                 '</details>'
@@ -448,8 +455,10 @@ class QualityControlPurchaseResource extends Resource
                         1 => 'Sudah diproses',
                     ]),
                 SelectFilter::make('warehouse_id')
-                    ->label('Warehouse')
-                    ->options(Warehouse::pluck('name', 'id')),
+                    ->label('Gudang')
+                    ->options(Warehouse::all()->mapWithKeys(function ($warehouse) {
+                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                    })),
                 Filter::make('created_at')
                     ->form([
                         DatePicker::make('created_from'),

@@ -128,6 +128,60 @@ class HelperController extends Controller
                 'restore',
                 'force-delete'
             ],
+            'asset' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'asset depreciation' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'asset disposal' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'asset transfer' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'cash bank account' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'cash bank transaction detail' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
             'currency' => [
                 'view any',
                 'view',
@@ -167,6 +221,33 @@ class HelperController extends Controller
                 'response'
             ],
             'delivery order item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'delivery order approval log' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'delivery order log' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'delivery sales order' => [
                 'view any',
                 'view',
                 'create',
@@ -568,6 +649,24 @@ class HelperController extends Controller
                 'delete',
                 'restore',
                 'force-delete',
+            ],
+            'invoice item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
+            ],
+            'journal entry' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete'
             ],
             'voucher request' => [
                 'view any',

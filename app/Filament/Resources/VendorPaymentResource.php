@@ -762,7 +762,28 @@ class VendorPaymentResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Vendor Payment (Pembayaran Vendor/Supplier)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Vendor Payment adalah record pembayaran kepada vendor/supplier untuk melunasi invoice pembelian yang telah diterima.</li>' .
+                            '<li><strong>Metode Pembayaran:</strong> <em>Cash</em> (tunai), <em>Bank Transfer</em> (transfer bank), <em>Check</em> (cek), <em>Giro</em> (bilyet giro), atau <em>Other</em> (metode lainnya).</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Supplier</em> (vendor penerima pembayaran), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), <em>Payment Method</em> (metode pembayaran).</li>' .
+                            '<li><strong>Multiple Invoices:</strong> Satu vendor payment dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
+                            '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
+                            '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Supplier Match</em> - invoice harus milik supplier yang sama.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Purchase Invoice</em> (pelunasan), <em>Account Payable</em> (pengurangan hutang), <em>Journal Entry</em> (otomatis buat jurnal), <em>Cash/Bank Account</em> (pengurangan saldo), dan <em>Deposit</em> (untuk overpayment).</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail payment), <em>Edit</em> (ubah payment), <em>Delete</em> (hapus payment), <em>Print Payment</em> (cetak bukti pembayaran), <em>Generate Journal</em> (buat jurnal entry).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any vendor payment</em>, <em>create vendor payment</em>, <em>update vendor payment</em>, <em>delete vendor payment</em>, <em>restore vendor payment</em>, <em>force-delete vendor payment</em>.</li>' .
+                            '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Account Payable dan credit Cash/Bank Account. Overpayment akan dicatat sebagai vendor deposit.</li>' .
+                            '<li><strong>Reporting:</strong> Menyediakan data untuk accounts payable aging, cash disbursement journal, dan vendor payment history tracking.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

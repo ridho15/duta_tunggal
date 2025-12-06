@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,11 +15,22 @@ class Driver extends Model
     protected $fillable = [
         'name',
         'phone',
-        'license'
+        'license',
+        'cabang_id'
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+    }
 
     public function deliveryOrder()
     {
         return $this->hasMany(DeliveryOrder::class, 'driver_id');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

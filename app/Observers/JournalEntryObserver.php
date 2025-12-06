@@ -5,6 +5,8 @@ namespace App\Observers;
 use App\Models\JournalEntry;
 use App\Models\User;
 use App\Notifications\JournalEntryCreated;
+use App\Notifications\JournalEntryUpdated;
+use App\Notifications\JournalEntryDeleted;
 use Filament\Notifications\Notification;
 use Filament\Notifications\Actions\Action;
 use Illuminate\Support\Facades\Auth;
@@ -29,8 +31,30 @@ class JournalEntryObserver
         ]);
     }
 
+    public function updated(JournalEntry $entry): void
+    {
+        // Send notification only to the currently authenticated user
+        $currentUser = Auth::user();
+        if ($currentUser) {
+            $currentUser->notify(new JournalEntryUpdated($entry));
+        }
+
+        // Log the notification for audit
+        Log::info('Journal Entry updated notification sent', [
+            'journal_entry_id' => $entry->id,
+            'reference' => $entry->reference,
+            'current_user_id' => $currentUser ? $currentUser->id : null,
+        ]);
+    }
+
     public function deleted(JournalEntry $entry): void
     {
+        // Send notification only to the currently authenticated user
+        $currentUser = Auth::user();
+        if ($currentUser) {
+            $currentUser->notify(new JournalEntryDeleted($entry));
+        }
+
         // Log the deletion for audit purposes
         Log::info('Journal Entry deleted', [
             'journal_entry_id' => $entry->id,
@@ -90,6 +114,10 @@ class JournalEntryObserver
 
             case 'App\Models\CashBankTransaction':
                 $this->reverseCashBankTransactionData($entry);
+                break;
+
+            case 'App\Models\CashBankTransfer':
+                $this->reverseCashBankTransferData($entry);
                 break;
 
             default:
@@ -188,6 +216,31 @@ class JournalEntryObserver
             Log::info('Cash/Bank transaction journal entries reversed', [
                 'transaction_id' => $transaction->id,
                 'transaction_number' => $transaction->transaction_number ?? 'N/A',
+            ]);
+        }
+    }
+
+    protected function reverseCashBankTransferData(JournalEntry $entry): void
+    {
+        // Handle cash/bank transfer related cleanup
+        $transfer = $entry->source;
+        if ($transfer && $transfer->exists) {
+            // If transfer is posted and all journal entries are deleted, reset status to draft
+            $remainingEntries = JournalEntry::where('source_type', 'App\Models\CashBankTransfer')
+                ->where('source_id', $transfer->id)
+                ->count();
+
+            if ($remainingEntries === 0 && $transfer->status === 'posted') {
+                $transfer->update(['status' => 'draft']);
+                Log::info('Cash/Bank transfer status reset to draft due to journal deletion', [
+                    'transfer_id' => $transfer->id,
+                    'transfer_number' => $transfer->number,
+                ]);
+            }
+
+            Log::info('Cash/Bank transfer journal entries reversed', [
+                'transfer_id' => $transfer->id,
+                'transfer_number' => $transfer->number,
             ]);
         }
     }

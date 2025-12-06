@@ -53,6 +53,6 @@ class StockTransferItem extends Model
 
     public function stockMovement()
     {
-        return $this->morphOne(StockMovement::class, 'from_model')->withDefault();
+        return $this->morphMany(StockMovement::class, 'from_model');
     }
 }

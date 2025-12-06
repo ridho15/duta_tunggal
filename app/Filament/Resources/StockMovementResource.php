@@ -21,10 +21,12 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class StockMovementResource extends Resource
 {
@@ -53,12 +55,38 @@ class StockMovementResource extends Resource
                             ->required(),
                         Select::make('warehouse_id')
                             ->label('Gudang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', 1);
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->searchable()
                             ->preload()
                             ->reactive()
-                            ->relationship('warehouse', 'name')
-                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                return "({$warehouse->kode}) {$warehouse->name}";
+                            ->getSearchResultsUsing(function (string $search) {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', 1)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                          ->orWhere('kode', 'like', "%{$search}%");
+                                    });
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
                             })
                             ->required(),
                         Select::make('rak_id')
@@ -246,12 +274,27 @@ class StockMovementResource extends Resource
             ->actions([
                 ViewAction::make()
                     ->color('primary')
-            ])
+            ], position:ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Stock Movement</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Stock Movement adalah log pergerakan stok yang mencatat semua aktivitas masuk/keluar inventory secara otomatis dari berbagai transaksi.</li>' .
+                            '<li><strong>Tipe Movement:</strong> <em>Purchase In</em> (pembelian), <em>Sales</em> (penjualan), <em>Transfer In/Out</em> (pemindahan antar gudang), <em>Manufacture In/Out</em> (produksi), <em>Adjustment In/Out</em> (penyesuaian stok).</li>' .
+                            '<li><strong>Tracking:</strong> Setiap movement tercatat dengan produk, gudang, rak, quantity, tanggal, dan reference ke transaksi asal.</li>' .
+                            '<li><strong>Read-Only:</strong> Data movement bersifat read-only karena di-generate otomatis dari transaksi sebenarnya.</li>' .
+                            '<li><strong>Reporting:</strong> Digunakan untuk audit trail inventory, stock history, dan analisis pergerakan stok per periode.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan semua modul transaksi (Sales, Purchase, Manufacturing, Transfer, Adjustment).</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

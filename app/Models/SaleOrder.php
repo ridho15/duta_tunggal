@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\InventoryStock;
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -48,7 +49,8 @@ class SaleOrder extends Model
         'reason_close',
         'tipe_pengiriman', // Ambil Sendiri, Kirim Langsung
         'created_by',
-        'warehouse_confirmed_at'
+        'warehouse_confirmed_at',
+        'cabang_id'
     ];
 
 
@@ -165,6 +167,8 @@ class SaleOrder extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope());
+
         static::deleting(function ($saleOrder) {
             if ($saleOrder->isForceDeleting()) {
                 $saleOrder->saleOrderItem()->forceDelete();
@@ -188,5 +192,10 @@ class SaleOrder extends Model
             $saleOrder->purchaseOrder()->withTrashed()->restore();
             $saleOrder->depositLog()->withTrashed()->restore();
         });
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

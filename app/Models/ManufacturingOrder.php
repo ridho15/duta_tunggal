@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,7 @@ class ManufacturingOrder extends Model
         'start_date',
         'end_date',
         'items',
+        'cabang_id'
     ];
 
     protected $casts = [
@@ -98,9 +100,9 @@ class ManufacturingOrder extends Model
     /**
      * Boot the model.
      */
-    protected static function boot()
+    protected static function booted()
     {
-        parent::boot();
+        static::addGlobalScope(new CabangScope);
 
         static::deleting(function ($manufacturingOrder) {
             // Cascade delete related productions
@@ -111,5 +113,10 @@ class ManufacturingOrder extends Model
             // Cascade delete related journal entries
             $manufacturingOrder->journalEntries()->delete();
         });
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

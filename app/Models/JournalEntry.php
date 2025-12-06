@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -50,5 +51,10 @@ class JournalEntry extends Model
     public function cabang()
     {
         return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
     }
 }

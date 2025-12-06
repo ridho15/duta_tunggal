@@ -30,6 +30,8 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
 
     protected static ?string $navigationLabel = 'Laba Rugi';
 
+    protected static ?string $navigationGroup = 'Finance';
+
     protected static ?int $navigationSort = 6;
 
     public ?string $start_date = null;

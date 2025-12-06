@@ -19,6 +19,7 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\ShowJournalEntriesForInvoice::class,
         \App\Console\Commands\ShowJournalEntriesForPayment::class,
         \App\Console\Commands\ListRecommendedCoa::class,
+        \App\Console\Commands\GenerateMonthlyDepreciation::class,
     ];
 
     /**
@@ -26,7 +27,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // No scheduled depreciation - manual calculation only
     }
 
     /**

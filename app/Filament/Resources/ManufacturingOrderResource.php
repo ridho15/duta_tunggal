@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ManufacturingOrderResource\Pages;
 use App\Filament\Resources\ManufacturingOrderResource\Pages\ViewManufacturingOrder;
 use App\Http\Controllers\HelperController;
+use App\Models\Cabang;
 use App\Models\InventoryStock;
 use Illuminate\Support\Facades\Gate;
 use App\Models\ManufacturingOrder;
@@ -68,6 +69,15 @@ class ManufacturingOrderResource extends Resource
                                     $set('mo_number', $manufacturingOrderService->generateMoNumber());
                                 }))
                             ->maxLength(255),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->required()
+                            ->helperText('Pilih cabang untuk manufacturing order ini'),
                         Select::make('production_plan_id')
                             ->label('Rencana Produksi')
                             ->relationship('productionPlan', 'plan_number', function (Builder $query) {
@@ -374,7 +384,24 @@ class ManufacturingOrderResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Manufacturing Order (MO)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Manufacturing Order (MO) adalah instruksi produksi yang dibuat dari Production Plan, mengatur proses manufaktur produk berdasarkan Bill of Material (BOM).</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → In Progress → Completed. MO dibuat otomatis dari Production Plan yang disetujui.</li>' .
+                            '<li><strong>Validasi:</strong> <em>Stock Check</em> otomatis dilakukan sebelum memulai produksi. Sistem akan memverifikasi ketersediaan bahan baku dari BOM.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Production Plan</em> (sumber), <em>Bill of Material</em> (resep), dan <em>Production</em> (pelaksanaan produksi).</li>' .
+                            '<li><strong>Actions:</strong> <em>Start Production</em> (draft → in_progress, hanya jika stock cukup), <em>View Production</em> (lihat detail produksi), <em>Complete</em> (selesai produksi).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any manufacturing order</em>, <em>create manufacturing order</em>, <em>update manufacturing order</em>, <em>request manufacturing order</em> (untuk start production), <em>response manufacturing order</em> (untuk approval).</li>' .
+                            '<li><strong>Material Management:</strong> Sistem otomatis mengurangi stock bahan baku saat produksi dimulai dan menambah stock produk jadi saat selesai.</li>' .
+                            '<li><strong>Costing:</strong> Biaya produksi dihitung berdasarkan BOM yang digunakan, termasuk material cost, labor cost, dan overhead cost.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

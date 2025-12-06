@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -40,6 +41,7 @@ class PurchaseOrderFactory extends Factory
             'refer_model_id' => null,
             'is_import' => false,
             'ppn_option' => 'standard',
+            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? 1,
         ];
     }
 }

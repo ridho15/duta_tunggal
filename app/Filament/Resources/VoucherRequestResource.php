@@ -94,12 +94,14 @@ class VoucherRequestResource extends Resource
 
                                 Select::make('cabang_id')
                                     ->label('Cabang')
-                                    ->relationship('cabang', 'nama')
-                                    ->getOptionLabelFromRecordUsing(fn(?Cabang $record): string => $record ? ($record->kode . ' - ' . $record->nama) : '')
+                                    ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                    }))
                                     ->searchable()
                                     ->preload()
+                                    ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                                    ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                                     ->nullable()
-                                    ->default(fn () => Auth::user()?->cabang_id)
                                     ->helperText('Opsional: pilih cabang terkait'),
 
                                 Forms\Components\Select::make('status')
@@ -275,7 +277,7 @@ class VoucherRequestResource extends Resource
                     ->color('info')
                     ->alignCenter(),
 
-                Tables\Columns\TextColumn::make('cabang.nama')
+                Tables\Columns\TextColumn::make('cabang')
                     ->label('Cabang')
                     ->searchable()
                     ->sortable()
@@ -357,7 +359,22 @@ class VoucherRequestResource extends Resource
 
                 Tables\Filters\SelectFilter::make('cabang_id')
                     ->label('Cabang')
-                    ->relationship('cabang', 'nama')
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                ->get()
+                                ->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                });
+                        }
+                        
+                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                        });
+                    })
                     ->searchable()
                     ->preload(),
 

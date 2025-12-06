@@ -15,7 +15,9 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 class ProductCategoryResource extends Resource
 {
@@ -59,9 +61,13 @@ class ProductCategoryResource extends Resource
                     ->required(),
                 Select::make('cabang_id')
                     ->label('Cabang')
+                    ->options(\App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                    }))
                     ->preload()
                     ->searchable()
-                    ->relationship('cabang', 'nama')
+                    ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                    ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                     ->validationMessages([
                         'required' => 'Cabang harus dipilih'
                     ])
@@ -88,10 +94,18 @@ class ProductCategoryResource extends Resource
                     ->label('Nama Kategori')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('cabang.nama')
+                TextColumn::make('cabang')
                     ->label('Cabang')
-                    ->sortable()
-                    ->searchable(),
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    })
+                    ->sortable(),
                 TextColumn::make('kenaikan_harga')
                     ->label('Kenaikan Harga (%)')
                     ->suffix('%'),

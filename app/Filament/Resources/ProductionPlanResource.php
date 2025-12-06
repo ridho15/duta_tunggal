@@ -33,6 +33,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -251,9 +252,38 @@ class ProductionPlanResource extends Resource
 
                         Select::make('warehouse_id')
                             ->label('Gudang Produksi')
-                            ->relationship('warehouse', 'name')
-                            ->searchable()
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', true);
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->preload()
+                            ->searchable()
+                            ->getSearchResultsUsing(function (string $search) {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', true)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                          ->orWhere('kode', 'like', "%{$search}%");
+                                    });
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->required()
                             ->validationMessages([
                                 'required' => 'Gudang produksi harus dipilih'
@@ -696,7 +726,27 @@ class ProductionPlanResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Rencana Produksi (Production Plan)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Production Plan adalah rencana produksi yang dibuat berdasarkan pesanan penjualan atau secara manual untuk mengatur jadwal dan jumlah produksi.</li>' .
+                            '<li><strong>Sumber:</strong> <em>Sale Order</em> (dari pesanan penjualan) atau <em>Manual</em> (dibuat langsung untuk keperluan internal).</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Bill of Material (BOM)</em> (daftar bahan baku), <em>Quantity</em> (jumlah produksi), <em>Schedule</em> (jadwal produksi), <em>Warehouse</em> (gudang tujuan).</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → Scheduled → In Progress → Completed. Status otomatis berubah berdasarkan progress Manufacturing Order.</li>' .
+                            '<li><strong>Validasi:</strong> <em>BOM Validation</em> - memastikan BOM tersedia dan valid. <em>Stock Check</em> - verifikasi ketersediaan bahan baku. <em>Schedule Validation</em> - mencegah konflik jadwal.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Sale Order</em> (sumber pesanan), <em>Bill of Material</em> (resep produksi), <em>Manufacturing Order</em> (pelaksanaan produksi), dan <em>Material Issue</em> (pengambilan bahan).</li>' .
+                            '<li><strong>Actions:</strong> <em>Create Manufacturing Order</em> (membuat MO dari plan), <em>Schedule</em> (atur jadwal produksi), <em>Cancel</em> (batalkan plan), <em>View Progress</em> (lihat progress produksi).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any production plan</em>, <em>create production plan</em>, <em>update production plan</em>, <em>delete production plan</em>, <em>restore production plan</em>, <em>force-delete production plan</em>.</li>' .
+                            '<li><strong>Auto-Generation:</strong> Nomor plan otomatis dibuat dengan format PP-YYYYMMDD-XXX. Manufacturing Order dan Material Issue dapat dibuat otomatis dari plan ini.</li>' .
+                            '<li><strong>Reporting:</strong> Tracking progress produksi real-time, cost calculation otomatis, dan integration dengan inventory management.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

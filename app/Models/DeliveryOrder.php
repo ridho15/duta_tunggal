@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class DeliveryOrder extends Model
         'additional_cost',
         'additional_cost_description',
         'created_by',
+        'cabang_id'
     ];
 
     public function driver()
@@ -92,6 +94,8 @@ class DeliveryOrder extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope);
+
         static::deleting(function ($deliveryOrder) {
             if ($deliveryOrder->isForceDeleting()) {
                 $deliveryOrder->deliveryOrderItem()->forceDelete();
@@ -103,5 +107,10 @@ class DeliveryOrder extends Model
         static::restoring(function ($deliveryOrder) {
             $deliveryOrder->deliveryOrderItem()->withTrashed()->restore();
         });
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 }

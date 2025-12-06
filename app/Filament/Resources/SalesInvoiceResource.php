@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\SaleOrder;
 use App\Models\DeliveryOrder;
 use App\Models\Customer;
+use App\Models\Cabang;
 use App\Services\InvoiceService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Section;
+use Illuminate\Support\Facades\Auth;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Actions\Action;
@@ -75,6 +77,20 @@ class SalesInvoiceResource extends Resource
                                         $set('other_fees', []);
                                         $set('dpp', 0);
                                     }),
+                                    
+                                Select::make('cabang_id')
+                                    ->label('Cabang')
+                                    ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                    }))
+                                    ->searchable()
+                                    ->preload()
+                                    ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                                    ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Cabang harus dipilih'
+                                    ]),
                                     
                                 Select::make('selected_sale_order')
                                     ->label('SO (Sales Order)')

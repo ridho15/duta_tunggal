@@ -16,6 +16,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Grouping;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Actions\ActionGroup;
 
 class JournalEntryResource extends Resource
@@ -261,7 +262,24 @@ class JournalEntryResource extends Resource
 
                         Forms\Components\Select::make('cabang_id')
                             ->label('Branch')
-                            ->relationship('cabang', 'nama')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                        ->get()
+                                        ->mapWithKeys(function ($cabang) {
+                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                        });
+                                }
+                                
+                                return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                });
+                            })
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->kode} - {$record->nama}")
                             ->searchable(['kode', 'nama'])
                             ->preload(),
@@ -460,8 +478,9 @@ class JournalEntryResource extends Resource
                                         default => 'gray',
                                     }),
 
-                                Infolists\Components\TextEntry::make('cabang.nama')
+                                Infolists\Components\TextEntry::make('cabang')
                                     ->label('Branch')
+                                    ->formatStateUsing(fn ($state) => $state ? "({$state->kode}) {$state->nama}" : '-')
                                     ->placeholder('N/A'),
 
                                 Infolists\Components\TextEntry::make('debit')
@@ -630,10 +649,15 @@ class JournalEntryResource extends Resource
                         return $query;
                     }),
 
-                Tables\Columns\TextColumn::make('cabang.nama')
+                Tables\Columns\TextColumn::make('cabang')
                     ->label('Cabang')
                     ->formatStateUsing(fn ($state, $record) => $record->cabang ? ($record->cabang->kode . ' - ' . $record->cabang->nama) : '-')
-                    ->searchable(['cabang.kode', 'cabang.nama']),
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created At')
@@ -682,8 +706,23 @@ class JournalEntryResource extends Resource
 
                 Tables\Filters\SelectFilter::make('cabang_id')
                     ->label('Branch')
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                ->get()
+                                ->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                });
+                        }
+                        
+                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                        });
+                    })
                     ->searchable()
-                    ->relationship('cabang', 'nama'),
             ])
             ->actions([
                 ActionGroup::make([
@@ -826,9 +865,9 @@ class JournalEntryResource extends Resource
         return [
             'index' => Pages\ListJournalEntries::route('/'),
             'create' => Pages\CreateJournalEntry::route('/create'),
+            'grouped' => Pages\GroupedJournalEntries::route('/grouped'),
             'view' => Pages\ViewJournalEntry::route('/{record}'),
             'edit' => Pages\EditJournalEntry::route('/{record}/edit'),
-            'grouped' => Pages\GroupedJournalEntries::route('/grouped'),
         ];
     }
 }

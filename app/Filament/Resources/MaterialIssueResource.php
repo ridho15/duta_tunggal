@@ -20,6 +20,7 @@ use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class MaterialIssueResource extends Resource
 {
@@ -139,9 +140,38 @@ class MaterialIssueResource extends Resource
                             }),
                         Forms\Components\Select::make('warehouse_id')
                             ->label('Gudang')
-                            ->relationship('warehouse', 'name')
-                            ->searchable('kode', 'name')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = \App\Models\Warehouse::where('status', true);
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->preload()
+                            ->searchable()
+                            ->getSearchResultsUsing(function (string $search) {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = \App\Models\Warehouse::where('status', true)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                          ->orWhere('kode', 'like', "%{$search}%");
+                                    });
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->required()
                             ->nullable()
                             ->rules(['required', 'exists:warehouses,id'])
@@ -149,16 +179,6 @@ class MaterialIssueResource extends Resource
                                 'required' => 'Gudang wajib dipilih.',
                                 'exists' => 'Gudang yang dipilih tidak valid.',
                             ])
-                            ->getSearchResultsUsing(function (string $search): array {
-                                return \App\Models\Warehouse::where('name', 'like', "%{$search}%")
-                                    ->orWhere('kode', 'like', "%{$search}%")
-                                    ->limit(50)
-                                    ->get()
-                                    ->mapWithKeys(function ($warehouse) {
-                                        return [$warehouse->id => $warehouse->kode . ' - ' . $warehouse->name];
-                                    })
-                                    ->toArray();
-                            })
                             ->getOptionLabelFromRecordUsing(
                                 fn(\App\Models\Warehouse $record): string =>
                                 $record->kode . ' - ' . $record->name
@@ -858,7 +878,25 @@ class MaterialIssueResource extends Resource
                     Tables\Actions\ForceDeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Pengambilan Bahan Baku (Material Issue)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Material Issue adalah proses pengambilan bahan baku dari gudang untuk keperluan produksi, baik untuk issue (pengambilan) maupun return (pengembalian).</li>' .
+                            '<li><strong>Tipe:</strong> <em>Issue</em> (pengambilan bahan untuk produksi), <em>Return</em> (pengembalian bahan yang tidak terpakai).</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → Pending Approval → Approved → Completed. Membutuhkan approval sebelum bahan dapat diambil.</li>' .
+                            '<li><strong>Validasi:</strong> <em>Stock Check</em> otomatis - sistem memverifikasi ketersediaan stock di gudang sebelum approval. <em>Cost Calculation</em> otomatis berdasarkan harga pokok.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Production Plan</em> (dibuat otomatis), <em>Manufacturing Order</em> (proses produksi), dan <em>Inventory</em> (pengurangan stock).</li>' .
+                            '<li><strong>Actions:</strong> <em>Request Approval</em> (draft → pending), <em>Approve/Reject</em> (pending → approved/rejected), <em>Complete</em> (approved → completed, stock berkurang), <em>Generate Journal</em> (untuk akuntansi).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any material issue</em>, <em>create material issue</em>, <em>update material issue</em>, <em>delete material issue</em>, <em>restore material issue</em>, <em>force-delete material issue</em>.</li>' .
+                            '<li><strong>Stock Management:</strong> Stock bahan baku otomatis berkurang saat completed. Sistem mencegah pengambilan jika stock tidak mencukupi.</li>' .
+                            '<li><strong>Accounting:</strong> Journal entry otomatis dibuat untuk mencatat pengeluaran bahan baku ke Work in Progress (WIP).</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

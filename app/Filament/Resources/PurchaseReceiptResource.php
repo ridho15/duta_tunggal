@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PurchaseReceiptResource\Pages;
 use App\Filament\Resources\PurchaseReceiptResource\Pages\ViewPurchaseReceipt;
 use App\Filament\Resources\PurchaseReceiptResource\RelationManagers\PurchaseReceiptItemRelationManager;
+use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
 use App\Models\PurchaseReceipt;
@@ -36,6 +37,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class PurchaseReceiptResource extends Resource
@@ -76,6 +78,15 @@ class PurchaseReceiptResource extends Resource
                                     ->ignore($record?->id ?? null);
                             })
                             ->required(),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->required()
+                            ->helperText('Pilih cabang untuk purchase receipt ini'),
                         Select::make('purchase_order_id')
                             ->label('Kode Pembelian')
                             ->preload()
@@ -300,18 +311,44 @@ class PurchaseReceiptResource extends Resource
                                     }),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
+                                    ->options(function () {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+                                        $query = Warehouse::where('status', 1);
+                                        
+                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                            $query->where('cabang_id', $user?->cabang_id);
+                                        }
+                                        
+                                        return $query->get()->mapWithKeys(function ($warehouse) {
+                                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                        });
+                                    })
                                     ->preload()
                                     ->reactive()
                                     ->required()
                                     ->searchable()
+                                    ->getSearchResultsUsing(function (string $search) {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+                                        $query = Warehouse::where('status', 1)
+                                            ->where(function ($q) use ($search) {
+                                                $q->where('name', 'like', "%{$search}%")
+                                                  ->orWhere('kode', 'like', "%{$search}%");
+                                            });
+                                        
+                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                            $query->where('cabang_id', $user?->cabang_id);
+                                        }
+                                        
+                                        return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                        });
+                                    })
                                     ->validationMessages([
                                         'required' => 'Gudang belum dipilih',
                                         'exists' => 'Gudang tidak tersedia'
-                                    ])
-                                    ->relationship('warehouse', 'name')
-                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                        return "({$warehouse->kode}) {$warehouse->name}";
-                                    }),
+                                    ]),
                                 Select::make('rak_id')
                                     ->label('Rak (Optional)')
                                     ->preload()
@@ -507,6 +544,17 @@ class PurchaseReceiptResource extends Resource
                 TextColumn::make('receipt_number')
                     ->label('Receipt Number')
                     ->searchable(),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('purchaseOrder.po_number')
                     ->label('PO Number')
                     ->searchable(),

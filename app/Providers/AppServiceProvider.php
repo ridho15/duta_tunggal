@@ -24,6 +24,7 @@ use App\Models\Asset;
 use App\Models\SaleOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\JournalEntry;
+use App\Models\CashBankTransfer;
 use App\Observers\DeliveryOrderObserver;
 use App\Observers\CustomerReceiptObserver;
 use App\Observers\DepositLogObserser;
@@ -45,6 +46,7 @@ use App\Observers\AssetObserver;
 use App\Observers\VendorPaymentObserver;
 use App\Observers\SaleOrderObserver;
 use App\Observers\PurchaseReceiptObserver;
+use App\Observers\CashBankTransferObserver;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
@@ -182,5 +184,6 @@ class AppServiceProvider extends ServiceProvider
         Product::observe(ProductObserver::class);
         JournalEntry::observe(JournalEntryObserver::class);
         QualityControl::observe(QualityControlObserver::class);
+        CashBankTransfer::observe(CashBankTransferObserver::class);
     }
 }

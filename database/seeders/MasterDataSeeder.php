@@ -115,7 +115,8 @@ class MasterDataSeeder extends Seeder
                 'tipe' => 'PKP',
                 'tempo_kredit' => 30,
                 'kredit_limit' => 50000000,
-                'tipe_pembayaran' => 'Kredit'
+                'tipe_pembayaran' => 'Kredit',
+                'cabang_id' => 1
             ],
             [
                 'name' => 'CV Sukses Makmur',
@@ -130,7 +131,8 @@ class MasterDataSeeder extends Seeder
                 'tipe' => 'PKP',
                 'tempo_kredit' => 15,
                 'kredit_limit' => 25000000,
-                'tipe_pembayaran' => 'Kredit'
+                'tipe_pembayaran' => 'Kredit',
+                'cabang_id' => 1
             ],
             [
                 'name' => 'Budi Santoso',
@@ -145,12 +147,13 @@ class MasterDataSeeder extends Seeder
                 'tipe' => 'PRI',
                 'tempo_kredit' => 0,
                 'kredit_limit' => 5000000,
-                'tipe_pembayaran' => 'COD (Bayar Lunas)'
+                'tipe_pembayaran' => 'COD (Bayar Lunas)',
+                'cabang_id' => 1
             ],
         ];
 
         foreach ($customers as $customerData) {
-            Customer::firstOrCreate(['email' => $customerData['email']], $customerData);
+            Customer::updateOrCreate(['email' => $customerData['email']], $customerData);
         }
 
         // Create suppliers
@@ -166,7 +169,8 @@ class MasterDataSeeder extends Seeder
                 'address' => 'Jl. Supplier No. 1, Jakarta',
                 'perusahaan' => 'PT Supplier Utama',
                 'tempo_hutang' => 30,
-                'kontak_person' => 'Andi Wijaya'
+                'kontak_person' => 'Andi Wijaya',
+                'cabang_id' => 1
             ],
             [
                 'name' => 'CV Distributor Jaya',
@@ -179,12 +183,13 @@ class MasterDataSeeder extends Seeder
                 'address' => 'Jl. Distributor No. 2, Surabaya',
                 'perusahaan' => 'CV Distributor Jaya',
                 'tempo_hutang' => 45,
-                'kontak_person' => 'Sari Indah'
+                'kontak_person' => 'Sari Indah',
+                'cabang_id' => 1
             ],
         ];
 
         foreach ($suppliers as $supplierData) {
-            Supplier::firstOrCreate(['email' => $supplierData['email']], $supplierData);
+            Supplier::updateOrCreate(['email' => $supplierData['email']], $supplierData);
         }
 
         // Create product categories

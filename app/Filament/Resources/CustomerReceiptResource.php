@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CustomerReceiptResource\Pages;
 use App\Filament\Resources\CustomerReceiptResource\Pages\ViewCustomerReceipt;
 use App\Http\Controllers\HelperController;
+use App\Models\Cabang;
 use App\Models\AccountReceivable;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
@@ -41,6 +42,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class CustomerReceiptResource extends Resource
 {
@@ -88,6 +90,22 @@ class CustomerReceiptResource extends Resource
                                     ->label('Payment Date')
                                     ->required()
                                     ->default(now()),
+                                Select::make('cabang_id')
+                                    ->label('Cabang')
+                                    ->searchable()
+                                    ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                    }))
+                                    ->visible(function () {
+                                        $manageType = Auth::user()?->manage_type ?? [];
+                                        return in_array('all', is_array($manageType) ? $manageType : [$manageType]);
+                                    })
+                                    ->default(function () {
+                                        $manageType = Auth::user()?->manage_type ?? [];
+                                        return in_array('all', is_array($manageType) ? $manageType : [$manageType]) ? null : Auth::user()?->cabang_id;
+                                    })
+                                    ->required()
+                                    ->helperText('Pilih cabang untuk customer receipt ini'),
                             ]),
 
                         // Invoice Selection Section
@@ -136,7 +154,8 @@ class CustomerReceiptResource extends Resource
                                         
                                         // Query invoices that are from SaleOrder for this customer
                                         // Use join instead of whereHas to avoid polymorphic relation issues
-                                        $invoicesQuery = Invoice::where('invoices.from_model_type', 'App\Models\SaleOrder')
+                                        $invoicesQuery = Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
+                                            ->where('invoices.from_model_type', 'App\Models\SaleOrder')
                                             ->join('sale_orders', function($join) use ($customerId) {
                                                 $join->on('invoices.from_model_id', '=', 'sale_orders.id')
                                                      ->where('sale_orders.customer_id', '=', $customerId)
@@ -533,7 +552,27 @@ class CustomerReceiptResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Customer Receipt (Penerimaan Pembayaran Pelanggan)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Customer Receipt adalah record penerimaan pembayaran dari pelanggan untuk melunasi invoice penjualan yang telah diterbitkan.</li>' .
+                            '<li><strong>Metode Pembayaran:</strong> <em>Cash</em> (tunai), <em>Bank Transfer</em> (transfer bank), <em>Check</em> (cek), <em>Giro</em> (bilyet giro), atau <em>Other</em> (metode lainnya).</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Customer</em> (pelanggan pembayar), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), <em>Payment Method</em> (metode pembayaran).</li>' .
+                            '<li><strong>Multiple Invoices:</strong> Satu customer receipt dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
+                            '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
+                            '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Customer Match</em> - invoice harus milik customer yang sama.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Invoice</em> (pelunasan), <em>Account Receivable</em> (pengurangan piutang), <em>Journal Entry</em> (otomatis buat jurnal), <em>Cash/Bank Account</em> (penambahan saldo), dan <em>Deposit</em> (untuk overpayment).</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail receipt), <em>Edit</em> (ubah receipt), <em>Delete</em> (hapus receipt), <em>Print Receipt</em> (cetak bukti pembayaran), <em>Generate Journal</em> (buat jurnal entry).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any customer receipt</em>, <em>create customer receipt</em>, <em>update customer receipt</em>, <em>delete customer receipt</em>, <em>restore customer receipt</em>, <em>force-delete customer receipt</em>.</li>' .
+                            '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Cash/Bank Account dan credit Account Receivable. Overpayment akan dicatat sebagai customer deposit.</li>' .
+                            '<li><strong>Reporting:</strong> Menyediakan data untuk accounts receivable aging, cash receipt journal, dan customer payment history tracking.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function infolist(Infolist $infolist): Infolist

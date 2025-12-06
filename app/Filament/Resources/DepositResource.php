@@ -633,7 +633,28 @@ class DepositResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Deposit (Uang Muka)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Deposit adalah record uang muka yang diberikan kepada customer (uang muka penjualan) atau diterima dari supplier (uang muka pembelian) untuk mengamankan transaksi.</li>' .
+                            '<li><strong>Tipe Deposit:</strong> <em>Customer Deposit</em> (uang muka dari customer untuk penjualan) atau <em>Supplier Deposit</em> (uang muka ke supplier untuk pembelian).</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Deposit Number</em> (nomor deposit unik), <em>From Model</em> (customer/supplier), <em>COA</em> (rekening deposit), <em>Payment COA</em> (rekening pembayaran), <em>Amount</em> (nominal deposit), <em>Balance</em> (saldo tersisa).</li>' .
+                            '<li><strong>Deposit Balance:</strong> Sistem melacak saldo deposit yang tersisa. Balance berkurang saat deposit digunakan untuk pembayaran invoice atau dikembalikan.</li>' .
+                            '<li><strong>Auto-Generation:</strong> Nomor deposit otomatis dibuat dengan format DEP-YYYYMMDD-XXX. COA deposit otomatis ditentukan berdasarkan tipe (customer/supplier).</li>' .
+                            '<li><strong>Validasi:</strong> <em>Model Validation</em> - memastikan customer/supplier valid. <em>COA Validation</em> - rekening deposit sesuai tipe. <em>Amount Validation</em> - amount positif dan tidak melebihi limit.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Customer Receipt</em> (penggunaan deposit customer), <em>Vendor Payment</em> (penggunaan deposit supplier), <em>Journal Entry</em> (otomatis buat jurnal), <em>Chart of Account</em> (rekening), dan <em>Deposit Log</em> (riwayat perubahan).</li>' .
+                            '<li><strong>Actions:</strong> <em>Add Balance</em> (tambah saldo deposit), <em>Reduce Balance</em> (kurangi saldo deposit), <em>View</em> (lihat detail), <em>Edit</em> (ubah deposit), <em>Delete</em> (hapus deposit), <em>View Logs</em> (lihat riwayat perubahan).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any deposit</em>, <em>create deposit</em>, <em>update deposit</em>, <em>delete deposit</em>, <em>restore deposit</em>, <em>force-delete deposit</em>.</li>' .
+                            '<li><strong>Journal Impact:</strong> <em>Add Balance</em> → Debit Uang Muka, Credit Kas/Bank. <em>Reduce Balance</em> → Debit Kas/Bank, Credit Uang Muka. <em>Usage in Payment</em> → otomatis adjust saat digunakan.</li>' .
+                            '<li><strong>Reporting:</strong> Menyediakan data untuk advance payment tracking, customer/supplier balance monitoring, dan cash flow forecasting.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

@@ -34,6 +34,7 @@ use Illuminate\Support\Str;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
@@ -71,17 +72,33 @@ class OrderRequestResource extends Resource
                                     })
                             ),
                         Select::make('warehouse_id')
-                            ->label('Warehouse')
+                            ->label('Gudang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                if ($user && is_array($manageType) && in_array('all', $manageType)) {
+                                    return Warehouse::all()->mapWithKeys(function ($warehouse) {
+                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                    });
+                                } else {
+                                    return Warehouse::where('cabang_id', $user?->cabang_id)->get()->mapWithKeys(function ($warehouse) {
+                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                    });
+                                }
+                            })
                             ->preload()
                             ->searchable()
-                            ->relationship('warehouse', 'name')
-                            ->getOptionLabelFromRecordUsing(function ($record) {
-                                return "({$record->kode}) {$record->name}";
-                            })
                             ->getSearchResultsUsing(function (string $search) {
-                                return Warehouse::where('name', 'like', "%{$search}%")
-                                    ->orWhere('kode', 'like', "%{$search}%")
-                                    ->limit(50)
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('name', 'like', "%{$search}%")
+                                    ->orWhere('kode', 'like', "%{$search}%");
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->limit(50)
                                     ->get()
                                     ->mapWithKeys(function ($warehouse) {
                                         return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
@@ -181,9 +198,17 @@ class OrderRequestResource extends Resource
             ->columns([
                 TextColumn::make('request_number')
                     ->searchable(),
-                TextColumn::make('warehouse.name')
-                    ->label('Warehouse')
-                    ->searchable(),
+                TextColumn::make('warehouse')
+                    ->label('Gudang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('warehouse', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('supplier.name')
                     ->label('Supplier')
                     ->searchable()
@@ -259,7 +284,7 @@ class OrderRequestResource extends Resource
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('warehouse_id')
-                    ->label('Warehouse')
+                    ->label('Gudang')
                     ->relationship('warehouse', 'name')
                     ->getOptionLabelFromRecordUsing(function ($record) {
                         return "({$record->kode}) {$record->name}";

@@ -33,6 +33,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Support\Facades\Auth;
 
 class BillOfMaterialResource extends Resource
 {
@@ -76,17 +77,19 @@ class BillOfMaterialResource extends Resource
                             ->maxLength(255),
                         Select::make('cabang_id')
                             ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
                             ->required()
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->validationMessages([
                                 'required' => 'Cabang belum dipilih',
                                 'exists' => 'Cabang tidak ditemukan !'
-                            ])->reactive()
-                            ->relationship('cabang', 'nama')
-                            ->searchable(['nama', 'kode'])
-                            ->preload()
-                            ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
-                                return "({$cabang->kode}) {$cabang->nama}";
-                            }),
+                            ])
+                            ->reactive(),
                         Select::make('product_id')
                             ->required()
                             ->label('Product')
@@ -511,12 +514,24 @@ class BillOfMaterialResource extends Resource
             ->filters([
                 SelectFilter::make('cabang_id')
                     ->label('Cabang')
-                    ->relationship('cabang', 'nama')
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                ->get()
+                                ->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                });
+                        }
+                        
+                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                            return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                        });
+                    })
                     ->searchable()
-                    ->preload()
-                    ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
-                        return "({$cabang->kode}) {$cabang->nama}";
-                    }),
+                    ->preload(),
                 SelectFilter::make('product_id')
                     ->label('Product')
                     ->relationship('product', 'name')
@@ -545,7 +560,24 @@ class BillOfMaterialResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Bill of Material (BOM)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Bill of Material (BOM) adalah daftar bahan baku dan komponen yang diperlukan untuk memproduksi satu unit produk jadi, termasuk biaya produksi.</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Material Items</em> (bahan baku), <em>Biaya Tenaga Kerja</em> (TKL), <em>Biaya Overhead</em> (BOP), dan <em>COA Akuntansi</em> untuk persediaan.</li>' .
+                            '<li><strong>Validasi:</strong> Produk harus bertipe manufacture, material harus bertipe raw material. Unit konversi otomatis terdeteksi dari produk.</li>' .
+                            '<li><strong>Perhitungan Biaya:</strong> <em>Material Cost</em> = jumlah bahan × harga satuan, <em>Total Cost</em> = Material + TKL + BOP. Biaya tersimpan untuk costing produksi.</li>' .
+                            '<li><strong>COA Integration:</strong> <em>Finished Goods COA</em> untuk persediaan barang jadi, <em>Work in Progress COA</em> untuk barang dalam proses produksi.</li>' .
+                            '<li><strong>Actions:</strong> <em>Create/Edit</em> BOM, <em>Generate Code</em> otomatis, <em>View Production Plans</em> yang menggunakan BOM ini.</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any bill of material</em>, <em>create bill of material</em>, <em>update bill of material</em>, <em>delete bill of material</em>.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan Production Plans, Manufacturing Orders, dan sistem costing untuk perhitungan harga pokok produksi.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     protected static function updateTotalCost(callable $set, callable $get): void

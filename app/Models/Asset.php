@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +33,7 @@ class Asset extends Model
         'product_id',
         'purchase_order_id',
         'purchase_order_item_id',
+        'cabang_id',
     ];
 
     protected $casts = [
@@ -44,6 +46,11 @@ class Asset extends Model
         'accumulated_depreciation' => 'decimal:2',
         'book_value' => 'decimal:2',
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+    }
 
     // Relationships
     public function assetCoa()
@@ -66,6 +73,26 @@ class Asset extends Model
         return $this->hasMany(AssetDepreciation::class);
     }
 
+    public function disposals()
+    {
+        return $this->hasMany(AssetDisposal::class);
+    }
+
+    public function latestDisposal()
+    {
+        return $this->hasOne(AssetDisposal::class)->latestOfMany();
+    }
+
+    public function transfers()
+    {
+        return $this->hasMany(AssetTransfer::class);
+    }
+
+    public function latestTransfer()
+    {
+        return $this->hasOne(AssetTransfer::class)->latestOfMany();
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
@@ -79,6 +106,11 @@ class Asset extends Model
     public function purchaseOrderItem()
     {
         return $this->belongsTo(PurchaseOrderItem::class, 'purchase_order_item_id')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();
     }
 
     // Calculated Properties

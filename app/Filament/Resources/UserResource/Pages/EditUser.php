@@ -5,6 +5,7 @@ namespace App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource;
 use App\Http\Controllers\HelperController;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditUser extends EditRecord
@@ -14,6 +15,7 @@ class EditUser extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
             DeleteAction::make()
                 ->icon('heroicon-o-trash'),
         ];
@@ -21,7 +23,7 @@ class EditUser extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $data['manage_type'] = explode(',', $data['manage_type']);
+        // $data['manage_type'] is already an array due to accessor
         return $data;
     }
 

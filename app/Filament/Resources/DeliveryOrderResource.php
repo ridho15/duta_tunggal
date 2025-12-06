@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\DeliveryOrderResource\Pages;
 use App\Filament\Resources\DeliveryOrderResource\Pages\ViewDeliveryOrder;
 use App\Http\Controllers\HelperController;
+use App\Models\Cabang;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderApprovalLog;
 use App\Models\Product;
@@ -77,6 +78,15 @@ class DeliveryOrderResource extends Resource
                                 'unique' => 'DO number sudah digunakan'
                             ])
                             ->unique(ignoreRecord: true),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->required()
+                            ->helperText('Pilih cabang untuk delivery order ini'),
                         Select::make('salesOrders')
                             ->label('From Sales')
                             ->statePath('salesOrders') // Explicit state path

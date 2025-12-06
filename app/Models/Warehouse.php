@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,6 +45,8 @@ class Warehouse extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope);
+
         static::deleting(function ($warehouse) {
             if ($warehouse->isForceDeleting()) {
                 $warehouse->rak()->forceDelete();

@@ -197,6 +197,9 @@ class UserResource extends Resource
                     ->label('Nama Belakang')
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('email')
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('roles.name')
                     ->label('Level')
                     ->sortable(),

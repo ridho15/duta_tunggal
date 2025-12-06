@@ -42,9 +42,9 @@ class WarehouseConfirmationResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
-    protected static ?string $label = 'Warehouse Confirmations';
+    protected static ?string $label = 'Konfirmasi Gudang';
 
-    protected static ?string $pluralLabel = 'Warehouse Confirmations';
+    protected static ?string $pluralLabel = 'Konfirmasi Gudang';
 
     public static function canViewAny(): bool
     {
@@ -197,7 +197,7 @@ class WarehouseConfirmationResource extends Resource
                                     }),
 
                                 Select::make('warehouse_id')
-                                    ->label('Warehouse')
+                                    ->label('Gudang')
                                     ->searchable('name', 'kode')
                                     ->options(function () {
                                         return Warehouse::all()->mapWithKeys(function ($warehouse) {
@@ -315,11 +315,11 @@ class WarehouseConfirmationResource extends Resource
                     ViewAction::make()->color('primary'),
                     EditAction::make()->color('success'),
                     Action::make('confirm')
-                        ->label('Confirm Warehouse')
+                        ->label('Konfirmasi Gudang')
                         ->icon('heroicon-o-check-badge')
                         ->color('success')
                         ->requiresConfirmation()
-                        ->modalHeading('Confirm Warehouse')
+                        ->modalHeading('Konfirmasi Gudang')
                         ->modalDescription('This will confirm the warehouse confirmation and update the sales order status.')
                         ->action(function (WarehouseConfirmation $record) {
                             // Update warehouse confirmation status
@@ -345,7 +345,23 @@ class WarehouseConfirmationResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Konfirmasi Gudang</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Konfirmasi Gudang adalah proses validasi dari warehouse terhadap Sales Order atau Manufacturing Order sebelum eksekusi.</li>' .
+                            '<li><strong>Status Flow:</strong> Request → Confirmed/Partial Confirmed/Rejected. Gudang memberikan konfirmasi kesiapan stok dan logistik.</li>' .
+                            '<li><strong>Related Orders:</strong> Terkait dengan Sales Order (untuk pengiriman) atau Manufacturing Order (untuk produksi internal).</li>' .
+                            '<li><strong>Actions:</strong> <em>Konfirmasi Gudang</em> untuk approve request, dengan opsi confirmed, partial confirmed, atau rejected.</li>' .
+                            '<li><strong>Tracking:</strong> Mencatat siapa yang mengkonfirmasi (Confirmed By) dan kapan dikonfirmasi (Confirmed At).</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan Sales Order management, Manufacturing Order, dan inventory availability checking.</li>' .
+                            '<li><strong>Notes:</strong> Field notes digunakan untuk memberikan informasi tambahan atau alasan penolakan konfirmasi.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     protected static function mutateFormDataBeforeSave(array $data): array

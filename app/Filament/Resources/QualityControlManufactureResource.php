@@ -293,7 +293,27 @@ class QualityControlManufactureResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Quality Control Manufacture (QC Produksi)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Quality Control Manufacture adalah proses inspeksi kualitas produk yang telah selesai diproduksi dari Manufacturing Order.</li>' .
+                            '<li><strong>Sumber:</strong> Dibuat otomatis dari <em>Production</em> record saat Manufacturing Order diselesaikan. Setiap production akan memiliki QC terpisah.</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>QC Number</em> (nomor QC unik), <em>Manufacturing Order</em> (referensi MO), <em>Product</em> (produk yang diinspeksi), <em>Inspected By</em> (petugas QC).</li>' .
+                            '<li><strong>Quantity Control:</strong> <em>Passed Quantity</em> (jumlah lulus QC), <em>Rejected Quantity</em> (jumlah ditolak), <em>Total Quantity</em> (dari production).</li>' .
+                            '<li><strong>Status Flow:</strong> <em>Belum diproses</em> (menunggu inspeksi) → <em>Sudah diproses</em> (QC selesai, stock updated).</li>' .
+                            '<li><strong>Validasi:</strong> <em>Quantity Check</em> - total passed + rejected harus sama dengan quantity production. <em>Stock Validation</em> - memastikan stock dapat diupdate.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Production</em> (sumber), <em>Manufacturing Order</em> (proses produksi), <em>Production Plan</em> (rencana), dan <em>Inventory</em> (update stock).</li>' .
+                            '<li><strong>Actions:</strong> <em>Process QC</em> (proses inspeksi - hanya untuk status belum diproses), <em>View/Edit</em> (lihat detail QC), <em>Delete</em> (hapus QC record).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any quality control manufacture</em>, <em>create quality control manufacture</em>, <em>update quality control manufacture</em>, <em>delete quality control manufacture</em>, <em>restore quality control manufacture</em>, <em>force-delete quality control manufacture</em>.</li>' .
+                            '<li><strong>Stock Impact:</strong> <em>Passed items</em> → stock produk jadi bertambah di inventory. <em>Rejected items</em> → tidak mempengaruhi stock (produk cacat tidak masuk inventory).</li>' .
+                            '<li><strong>Reporting:</strong> Menyediakan data untuk quality metrics produksi, production efficiency, dan product quality tracking.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

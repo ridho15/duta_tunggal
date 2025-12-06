@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -30,6 +31,7 @@ class SupplierFactory extends Factory
             'tempo_hutang'   => $this->faker->randomElement([0, 15, 30, 45, 60]),
             'kontak_person'  => $this->faker->name(),
             'keterangan'     => $this->faker->optional()->sentence(),
+            'cabang_id'      => Cabang::inRandomOrder()->first()->id ?? 1,
         ];
     }
 }

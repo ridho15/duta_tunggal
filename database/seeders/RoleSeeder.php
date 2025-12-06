@@ -157,25 +157,25 @@ class RoleSeeder extends Seeder
         // Role -> resource mapping: each role gets ALL permissions for the listed resources
         $roleResourceMap = [
             'Admin' => [
-                'user', 'role', 'permission', 'currency', 'chart of account', 'tax setting', 'cabang'
+                'user', 'role', 'permission', 'currency', 'chart of account', 'tax setting', 'cabang', 'asset', 'journal entry'
             ],
             'Finance Manager' => [
-                'account payable', 'account receivable', 'vendor payment', 'vendor payment detail', 'customer receipt', 'customer receipt item', 'invoice', 'deposit', 'deposit log', 'ageing schedule', 'voucher request'
+                'account payable', 'account receivable', 'vendor payment', 'vendor payment detail', 'customer receipt', 'customer receipt item', 'invoice', 'invoice item', 'deposit', 'deposit log', 'ageing schedule', 'voucher request', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
             ],
             'Admin Keuangan' => [
-                'account payable', 'vendor payment', 'deposit', 'invoice', 'voucher request'
+                'account payable', 'vendor payment', 'deposit', 'invoice', 'invoice item', 'voucher request', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
             ],
             'Accounting' => [
-                'chart of account', 'account payable', 'account receivable', 'deposit', 'invoice', 'ageing schedule'
+                'chart of account', 'account payable', 'account receivable', 'deposit', 'invoice', 'invoice item', 'ageing schedule', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
             ],
             'Purchasing' => [
                 'purchase order', 'purchase order item', 'purchase receipt', 'purchase receipt item', 'purchase order biaya', 'purchase order currency', 'purchase return'
             ],
             'Purchasing Manager' => [
-                'purchase order', 'purchase order item', 'purchase receipt', 'vendor payment', 'purchase return', 'purchase order biaya'
+                'purchase order', 'purchase order item', 'purchase receipt', 'vendor payment', 'purchase return', 'purchase order biaya', 'asset'
             ],
             'Inventory Manager' => [
-                'warehouse', 'warehouse confirmation', 'inventory stock', 'stock movement', 'stock transfer', 'stock transfer item', 'product', 'product category', 'rak', 'unit of measure', 'product unit conversion', 'quality control'
+                'warehouse', 'warehouse confirmation', 'inventory stock', 'stock movement', 'stock transfer', 'stock transfer item', 'product', 'product category', 'rak', 'unit of measure', 'product unit conversion', 'quality control', 'asset transfer'
             ],
             'Admin Inventory' => [
                 'warehouse', 'inventory stock', 'stock movement', 'product'

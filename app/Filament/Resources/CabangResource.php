@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CabangResource\Pages;
 use App\Filament\Resources\CabangResource\Pages\ViewCabang;
 use App\Models\Cabang;
+use App\Models\Warehouse;
 use App\Services\CabangService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
@@ -29,6 +30,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CabangResource extends Resource
 {
@@ -206,11 +208,19 @@ class CabangResource extends Resource
                 IconColumn::make('status')
                     ->label('Status')
                     ->boolean(),
-                TextColumn::make('warehouse.name')
+                TextColumn::make('warehouse')
                     ->label('Gudang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->name}";
+                    })
                     ->badge()
                     ->toggleable(isToggledHiddenByDefault: true)
-                    ->searchable(),
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('warehouse', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
             ])
             ->filters([
                 SelectFilter::make('status')

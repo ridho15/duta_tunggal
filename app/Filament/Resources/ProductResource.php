@@ -40,6 +40,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Forms\Components\Grid;
+use Illuminate\Support\Facades\Auth;
 
 class ProductResource extends Resource
 {
@@ -122,13 +123,14 @@ class ProductResource extends Resource
                             ]),
                         Select::make('cabang_id')
                             ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
                             ->preload()
                             ->searchable()
                             ->reactive()
-                            ->relationship('cabang', 'nama')
-                            ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
-                                return "({$cabang->kode}) {$cabang->nama}";
-                            })
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->required()
                             ->validationMessages([
                                 'required' => 'Cabang harus dipilih'
@@ -800,8 +802,11 @@ class ProductResource extends Resource
                                     ->schema([
                                         Select::make('cabang_id')
                                             ->label('Cabang')
+                                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                            }))
                                             ->preload()
-                                            ->searchable(['kode', 'nama'])
+                                            ->searchable()
                                             ->required()
                                             ->reactive()
                                             ->disabled()
@@ -810,10 +815,6 @@ class ProductResource extends Resource
                                             ])
                                             ->default(function ($record) {
                                                 return $record->cabang_id;
-                                            })
-                                            ->relationship('cabang', 'kode')
-                                            ->getOptionLabelFromRecordUsing(function (Cabang $cabang) {
-                                                return "({$cabang->kode}) {$cabang->nama}";
                                             }),
                                         Select::make('product_id')
                                             ->label('Product')

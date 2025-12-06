@@ -320,7 +320,23 @@ class StockTransferResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Stock Transfer</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Stock Transfer adalah proses pemindahan stok inventory dari satu gudang ke gudang lainnya dalam perusahaan.</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → Request → Approved/Reject. Transfer harus melalui approval workflow sebelum dieksekusi.</li>' .
+                            '<li><strong>Warehouse Selection:</strong> Pilih gudang asal (From) dan gudang tujuan (To) untuk transfer stok antar lokasi.</li>' .
+                            '<li><strong>Items Transfer:</strong> Pilih produk, quantity, dan rak tujuan untuk setiap item yang akan ditransfer.</li>' .
+                            '<li><strong>Actions:</strong> <em>Request Transfer</em> (draft), <em>Approve/Reject</em> (request). Setiap transfer memerlukan approval dari authorized user.</li>' .
+                            '<li><strong>Permissions:</strong> <em>request stock transfer</em> untuk membuat request, <em>response stock transfer</em> untuk approve/reject.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan inventory management, stock movement tracking, dan warehouse management.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

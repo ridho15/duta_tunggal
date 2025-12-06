@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 
 class OtherSaleResource extends Resource
 {
@@ -78,9 +79,13 @@ class OtherSaleResource extends Resource
 
                         Forms\Components\Select::make('cabang_id')
                             ->label('Cabang')
-                            ->relationship('cabang', 'nama')
+                            ->options(\App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
                             ->searchable()
                             ->preload()
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->required(),
                     ])
                     ->columns(2),
@@ -169,9 +174,17 @@ class OtherSaleResource extends Resource
                         default => 'gray',
                     }),
 
-                Tables\Columns\TextColumn::make('cabang.nama')
+                Tables\Columns\TextColumn::make('cabang')
                     ->label('Cabang')
-                    ->searchable(),
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('type')
@@ -191,7 +204,22 @@ class OtherSaleResource extends Resource
 
                 Tables\Filters\SelectFilter::make('cabang_id')
                     ->label('Cabang')
-                    ->relationship('cabang', 'nama'),
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                ->get()
+                                ->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                });
+                        }
+                        
+                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                        });
+                    })
             ])
             ->actions([
                 Tables\Actions\Action::make('post_journal')

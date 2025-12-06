@@ -22,6 +22,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class InventoryStockResource extends Resource
 {
@@ -55,19 +56,43 @@ class InventoryStockResource extends Resource
                             ->required(),
                         Select::make('warehouse_id')
                             ->label('Gudang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', true);
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->preload()
-                            ->searchable(['kode', 'name'])
+                            ->searchable()
+                            ->getSearchResultsUsing(function (string $search) {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                $query = Warehouse::where('status', true)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                          ->orWhere('kode', 'like', "%{$search}%");
+                                    });
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    $query->where('cabang_id', $user?->cabang_id);
+                                }
+                                
+                                return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
+                            })
                             ->validationMessages([
                                 'required' => 'Gudang belum dipilih',
                                 'exists' => 'Gudang tidak tersedia'
                             ])
                             ->reactive()
-                            ->relationship('warehouse', 'id', function (Builder $query) {
-                                $query->where('status', true);
-                            })
-                            ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                return "({$warehouse->kode}) {$warehouse->name}";
-                            })
                             ->required()
                             ->rules([
                                 function () {
@@ -202,7 +227,28 @@ class InventoryStockResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Inventory Stock (Stok Inventory)</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Inventory Stock adalah record stok produk yang tersedia di setiap gudang dan rak, melacak quantity available, reserved, dan minimum stock level.</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Product</em> (produk yang di-stock), <em>Warehouse</em> (gudang penyimpanan), <em>Rak</em> (lokasi spesifik dalam gudang), <em>Qty Available</em> (stok tersedia), <em>Qty Reserved</em> (stok dipesan), <em>Qty Min</em> (minimum stock).</li>' .
+                            '<li><strong>Stock Management:</strong> <em>Qty Available</em> = total stock yang bisa digunakan. <em>Qty Reserved</em> = stock yang sudah dipesan tapi belum dikirim. <em>Qty Min</em> = batas minimum stock untuk trigger reorder.</li>' .
+                            '<li><strong>Stock Location:</strong> Setiap produk dapat disimpan di multiple warehouse dan rak. Sistem melacak lokasi spesifik untuk memudahkan picking dan putaway.</li>' .
+                            '<li><strong>Auto-Update:</strong> Stock otomatis bertambah dari Purchase Receipt (pembelian) dan berkurang dari Material Issue (produksi) atau Delivery Order (penjualan).</li>' .
+                            '<li><strong>Validasi:</strong> <em>Stock Check</em> - mencegah pengeluaran stock jika tidak mencukupi. <em>Negative Stock Prevention</em> - sistem tidak mengizinkan stock negatif. <em>Reservation Management</em> - stock yang di-reserve tidak bisa digunakan untuk transaksi lain.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Purchase Receipt</em> (penambahan stock), <em>Delivery Order</em> (pengurangan stock), <em>Material Issue</em> (penggunaan bahan baku), <em>Stock Movement</em> (transfer antar gudang), dan <em>Stock Adjustment</em> (penyesuaian stock).</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail stock), <em>Edit</em> (ubah informasi stock), <em>Delete</em> (hapus record stock), <em>Stock Movement</em> (transfer ke gudang lain), <em>Stock Adjustment</em> (sesuaikan quantity).</li>' .
+                            '<li><strong>Permissions:</strong> <em>view any inventory stock</em>, <em>create inventory stock</em>, <em>update inventory stock</em>, <em>delete inventory stock</em>, <em>restore inventory stock</em>, <em>force-delete inventory stock</em>.</li>' .
+                            '<li><strong>Reporting:</strong> Menyediakan data untuk stock valuation, slow moving items, stock aging, ABC analysis, dan inventory turnover ratio.</li>' .
+                            '<li><strong>Alerts:</strong> Sistem dapat memberikan warning ketika stock mendekati minimum level atau ada stock yang expired/overdue.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

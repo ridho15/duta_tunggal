@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\SalesRelationManager;
+use App\Models\Cabang;
 use App\Models\Customer;
 use App\Services\CustomerService;
 use App\Services\CreditValidationService;
@@ -12,6 +13,7 @@ use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -26,6 +28,8 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Builder;
 
 class CustomerResource extends Resource
 {
@@ -44,6 +48,19 @@ class CustomerResource extends Resource
             ->schema([
                 Fieldset::make('Form Customer')
                     ->schema([
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->validationMessages([
+                                'required' => 'Cabang harus dipilih',
+                            ]),
                         TextInput::make('code')
                             ->label('Kode Customer')
                             ->required()
@@ -188,6 +205,18 @@ class CustomerResource extends Resource
                     ->searchable()
                     ->label('Kode Customer')
                     ->label('Code'),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    })
+                    ->sortable(),
                 TextColumn::make('name')
                     ->label('Nama Customer')
                     ->searchable(),
