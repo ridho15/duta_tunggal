@@ -20,6 +20,12 @@ class InvoiceArFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(\Database\Seeders\CabangSeeder::class);
+    }
+
     public function test_can_generate_invoice_from_confirmed_delivery_order()
     {
         // Setup data

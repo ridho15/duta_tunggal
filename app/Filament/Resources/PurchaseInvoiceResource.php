@@ -256,7 +256,6 @@ class PurchaseInvoiceResource extends Resource
                                                 }
                                                 return 0;
                                             }) + $receipt->purchaseReceiptBiaya->sum('total');
-                                            
                                             $label = "{$receipt->receipt_number} - Rp. " . number_format($total, 0, ',', '.');
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
@@ -310,9 +309,10 @@ class PurchaseInvoiceResource extends Resource
                                                 
                                                 if ($purchaseOrderItem) {
                                                     // Calculate price after discount and tax (both are percentages)
-                                                    $subtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
-                                                    $discountAmount = $subtotal * ($purchaseOrderItem->discount / 100);
-                                                    $afterDiscount = $subtotal - $discountAmount;
+                                                    // Use local variable to avoid double accumulation bug
+                                                    $itemSubtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
+                                                    $discountAmount = $itemSubtotal * ($purchaseOrderItem->discount / 100);
+                                                    $afterDiscount = $itemSubtotal - $discountAmount;
                                                     $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
                                                     $price = $afterDiscount + $taxAmount;
                                                     $total = $price;
@@ -324,17 +324,24 @@ class PurchaseInvoiceResource extends Resource
                                                         'total' => $total
                                                     ];
                                                     
-                                                    $subtotal += $total;
+                                                    $subtotal += $total; // Only accumulate grand total
                                                 }
                                             }
                                             
                                             // Add biaya lainnya from purchase receipt
                                             foreach ($receipt->purchaseReceiptBiaya as $biaya) {
-                                                $receiptBiayaItems[] = [
-                                                    'receipt_id' => $receipt->id,
-                                                    'nama_biaya' => $biaya->nama_biaya,
-                                                    'total' => $biaya->total,
-                                                ];
+                                                // Check if biaya should be included in DPP (untuk_pembelian = 1 means Pajak)
+                                                if ($biaya->untuk_pembelian == 1) {
+                                                    // Biaya Pajak - include in DPP (subtotal)
+                                                    $subtotal += $biaya->total;
+                                                } else {
+                                                    // Biaya Non Pajak - add to receiptBiayaItems (not in DPP)
+                                                    $receiptBiayaItems[] = [
+                                                        'receipt_id' => $receipt->id,
+                                                        'nama_biaya' => $biaya->nama_biaya,
+                                                        'total' => $biaya->total,
+                                                    ];
+                                                }
                                             }
                                         }
                                         
@@ -354,11 +361,14 @@ class PurchaseInvoiceResource extends Resource
                                             $hasBiaya = collect($updatedBiaya)->contains('receipt_id', $receipt->id);
                                             if (!$hasBiaya) {
                                                 foreach ($receipt->purchaseReceiptBiaya as $biaya) {
-                                                    $updatedBiaya[] = [
-                                                        'receipt_id' => $receipt->id,
-                                                        'nama_biaya' => $biaya->nama_biaya,
-                                                        'total' => $biaya->total,
-                                                    ];
+                                                    // Only add Non-Pajak biaya to receiptBiayaItems (Pajak biaya already added to subtotal above)
+                                                    if ($biaya->untuk_pembelian != 1) {
+                                                        $updatedBiaya[] = [
+                                                            'receipt_id' => $receipt->id,
+                                                            'nama_biaya' => $biaya->nama_biaya,
+                                                            'total' => $biaya->total,
+                                                        ];
+                                                    }
                                                 }
                                             }
                                         }
@@ -444,7 +454,9 @@ class PurchaseInvoiceResource extends Resource
                                     ->disableItemDeletion()
                                     ->disableItemMovement()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        // Recalculate subtotal when invoice items change
+                                        // Recalculate subtotal when invoice items change (manual editing)
+                                        // Note: DPP is also calculated in selected_purchase_receipts callback
+                                        // This callback allows manual override of calculated values
                                         $subtotal = 0;
                                         if (is_array($state)) {
                                             foreach ($state as $item) {
@@ -456,7 +468,6 @@ class PurchaseInvoiceResource extends Resource
                                         }
                                         $set('subtotal', $subtotal);
                                         $set('dpp', $subtotal);
-                                        
                                         // Recalculate total with other fees
                                         $otherFees = $get('other_fees') ?? [];
                                         $manualOtherFeeTotal = collect($otherFees)->sum('amount');
@@ -533,7 +544,7 @@ class PurchaseInvoiceResource extends Resource
                             ->columns(3)
                             ->schema([
                                 TextInput::make('dpp')
-                                    ->label('DPP')
+                                    ->label('Dasar Pengenaan Pajak')
                                     ->indonesianMoney()
                                     ->numeric()
                                     ->validationMessages([
@@ -893,7 +904,9 @@ class PurchaseInvoiceResource extends Resource
         return $query->with([
             'fromModel.purchaseOrderItem.purchaseReceiptItem',
             'fromModel.supplier',
+            'fromModel.purchaseOrderBiaya',
             'invoiceItem.product',
+            'cabang',
             'accountsPayableCoa',
             'ppnMasukanCoa',
             'inventoryCoa',
@@ -1000,7 +1013,23 @@ class PurchaseInvoiceResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('invoice_date', 'desc');
+            ->defaultSort('invoice_date', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Invoice Pembelian</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Invoice Pembelian adalah faktur dari supplier untuk pembelian barang/jasa, digunakan untuk mencatat hutang dan memproses pembayaran.</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → Sent. Invoice dikirim setelah dibuat dan dapat diedit sebelum dikirim.</li>' .
+                            '<li><strong>Validasi:</strong> Subtotal, Tax, PPN dihitung otomatis berdasarkan item. Total invoice digunakan untuk Account Payable.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah invoice), <em>Delete</em> (hapus), <em>Mark as Sent</em> (ubah status ke sent).</li>' .
+                            '<li><strong>Filters:</strong> Supplier, Status, Date Range, Amount Range, dll.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan invoice dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan Purchase Order, Purchase Receipt, dan menghasilkan Account Payable.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function mutateFormDataBeforeFill(array $data): array

@@ -422,7 +422,23 @@ class AccountReceivableResource extends Resource
                 ])->button()
                     ->label('Action')
             ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([]);
+            ->bulkActions([])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Account Receivable</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Account Receivable adalah catatan piutang perusahaan dari customer berdasarkan invoice penjualan yang belum dibayar.</li>' .
+                            '<li><strong>Status:</strong> <em>Belum Lunas</em> (outstanding), <em>Lunas</em> (paid). Hanya menampilkan yang belum lunas secara default.</li>' .
+                            '<li><strong>Validasi:</strong> Total, Paid, dan Remaining dihitung otomatis. Status pembayaran diperbarui berdasarkan penerimaan pembayaran.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah pembayaran), <em>Delete</em> (hapus record).</li>' .
+                            '<li><strong>Grouping:</strong> Berdasarkan Customer, Status Pembayaran, dan Status Overdue (Current, Overdue, dll.).</li>' .
+                            '<li><strong>Filters:</strong> Customer, Status, Amount Range, Outstanding Only, Overdue, Date Range, dll.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan AR dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

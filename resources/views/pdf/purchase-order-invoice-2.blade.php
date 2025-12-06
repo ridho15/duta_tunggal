@@ -127,38 +127,57 @@
     <div class="header clearfix">
         <div class="company-info">
             <h2>PT.DUTA TUNGGAL</h2>
-            <p>Alamat Perusahaan<br>
-                Kota Perusahaan<br>
-                Telp: Phone Perusahaan<br>
-                Email: email@perusahaan.com</p>
+            <p>Jl. Raya Bogor KM 36, Cibinong, Bogor<br>
+                Cibinong, Jawa Barat 16911<br>
+                Telp: (021) 875-1234<br>
+                Email: info@dutatunggal.com</p>
+            @if($invoice->cabang)
+            <p style="margin-top: 10px; font-size: 11px; color: #666;">
+                <strong>Cabang: {{ $invoice->cabang->nama }}</strong><br>
+                {{ $invoice->cabang->alamat ?? '' }}
+            </p>
+            @endif
         </div>
         <div class="invoice-title">
-            <h1>INVOICE</h1>
+            <h1>INVOICE PEMBELIAN</h1>
+            <p><strong>No. Invoice:</strong> {{ $invoice->invoice_number }}</p>
+            <p><strong>Tanggal:</strong> {{ \Carbon\Carbon::parse($invoice->invoice_date)->locale('id')->format('d M Y') }}</p>
         </div>
     </div>
 
     <div class="invoice-details clearfix">
         <div class="customer-info">
-            <h3>Tagihan Kepada:</h3>
-            <p><strong>{{ $invoice->fromModel->supplier->name }}</strong><br>
-                {{ $invoice->fromModel->supplier->perusahaan }}
+            <h3>Supplier:</h3>
+            <p><strong>{{ $invoice->supplier_name ?? $invoice->fromModel->supplier->name }}</strong><br>
+                @if($invoice->fromModel->supplier->perusahaan)
+                {{ $invoice->fromModel->supplier->perusahaan }}<br>
+                @endif
                 {{ $invoice->fromModel->supplier->address }}<br>
+                @if($invoice->fromModel->supplier->phone)
                 Telp: {{ $invoice->fromModel->supplier->phone }}<br>
-                Email: {{ $invoice->fromModel->supplier->email }}</p>
+                @endif
+                @if($invoice->fromModel->supplier->email)
+                Email: {{ $invoice->fromModel->supplier->email }}
+                @endif
+            </p>
         </div>
         <div class="invoice-info">
             <table>
                 <tr>
-                    <td><strong>No. Invoice:</strong></td>
-                    <td>{{ $invoice->invoice_number }}</td>
+                    <td><strong>No. PO:</strong></td>
+                    <td>{{ $invoice->fromModel->po_number ?? 'N/A' }}</td>
                 </tr>
                 <tr>
                     <td><strong>Tanggal Invoice:</strong></td>
-                    <td>{{ Carbon\Carbon::parse($invoice->invoice_date)->locale('id')->format('D, d M Y') }}</td>
+                    <td>{{ \Carbon\Carbon::parse($invoice->invoice_date)->locale('id')->format('d M Y') }}</td>
                 </tr>
                 <tr>
                     <td><strong>Jatuh Tempo:</strong></td>
-                    <td>{{ Carbon\Carbon::parse($invoice->due_date)->locale('id')->format('D, d M Y') }}</td>
+                    <td>{{ \Carbon\Carbon::parse($invoice->due_date)->locale('id')->format('d M Y') }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Status:</strong></td>
+                    <td>{{ ucfirst($invoice->status) }}</td>
                 </tr>
             </table>
         </div>
@@ -177,9 +196,9 @@
         <tbody>
             @foreach($invoice->invoiceItem as $item)
             <tr>
-                <td class="text-left">{{ $item->product->sku }}</td>
-                <td class="text-left">{{ $item->product->name }}</td>
-                <td class="text-center">{{ $item->quantity }}</td>
+                <td class="text-left">{{ $item->product->sku ?? 'N/A' }}</td>
+                <td class="text-left">{{ $item->product->name ?? 'N/A' }}</td>
+                <td class="text-center">{{ number_format($item->quantity, 2, ',', '.') }}</td>
                 <td class="text-right rupiah">Rp {{ number_format($item->price, 0, ',', '.') }}</td>
                 <td class="text-right rupiah">Rp {{ number_format($item->total, 0, ',', '.') }}</td>
             </tr>
@@ -187,42 +206,105 @@
         </tbody>
     </table>
 
+    {{-- Purchase Receipts Information --}}
+    @if($invoice->purchase_receipts && is_array($invoice->purchase_receipts) && count($invoice->purchase_receipts) > 0)
+    <div style="margin: 20px 0; clear: both;">
+        <h4 style="margin-bottom: 10px; color: #333;">Purchase Receipts Terkait:</h4>
+        <div style="font-size: 11px; color: #666;">
+            @php
+                $receipts = \App\Models\PurchaseReceipt::whereIn('id', $invoice->purchase_receipts)->get();
+            @endphp
+            @foreach($receipts as $receipt)
+            <div style="margin-bottom: 5px;">
+                • {{ $receipt->receipt_number }} - {{ \Carbon\Carbon::parse($receipt->receipt_date)->format('d/m/Y') }}
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     <div class="totals-section">
         <table class="totals-table">
             <tr>
                 <td>Subtotal:</td>
                 <td class="text-right rupiah">Rp {{ number_format($invoice->subtotal, 0, ',', '.') }}</td>
             </tr>
+            
+            {{-- Biaya lain dari invoice --}}
+            @if($invoice->other_fee && is_array($invoice->other_fee))
+                @foreach($invoice->other_fee as $fee)
+                <tr>
+                    <td>{{ $fee['name'] ?? 'Biaya Lain' }}:</td>
+                    <td class="text-right rupiah">Rp {{ number_format($fee['amount'] ?? 0, 0, ',', '.') }}</td>
+                </tr>
+                @endforeach
+            @endif
+            
+            {{-- Biaya dari Purchase Receipts --}}
+            @if($invoice->purchase_receipts && is_array($invoice->purchase_receipts))
+                @php
+                    $receiptBiayas = \App\Models\PurchaseReceiptBiaya::whereHas('purchaseReceipt', function($query) use ($invoice) {
+                        $query->whereIn('id', $invoice->purchase_receipts);
+                    })->get();
+                @endphp
+                @foreach($receiptBiayas as $biaya)
+                <tr>
+                    <td>{{ $biaya->nama_biaya }}:</td>
+                    <td class="text-right rupiah">Rp {{ number_format($biaya->total, 0, ',', '.') }}</td>
+                </tr>
+                @endforeach
+            @endif
+            
+            {{-- PPN --}}
+            @if($invoice->ppn_rate > 0)
             <tr>
-                <td>PPN :</td>
-                <td class="text-right rupiah">Rp {{ number_format($invoice->tax, 0, ',', '.') }}</td>
+                <td>DPP:</td>
+                <td class="text-right rupiah">Rp {{ number_format($invoice->dpp ?? $invoice->subtotal, 0, ',', '.') }}</td>
             </tr>
-            @foreach($invoice->fromModel->purchaseOrderBiaya as $biaya)
-            @if ($biaya->masuk_invoice == 1)
             <tr>
-                <td>{{ $biaya->nama_biaya }}:</td>
-                <td class="text-right rupiah">Rp {{ number_format($biaya->total, 0, ',', '.') }}</td>
+                <td>PPN {{ $invoice->ppn_rate }}%:</td>
+                <td class="text-right rupiah">Rp {{ number_format($invoice->ppn_amount ?? (($invoice->dpp ?? $invoice->subtotal) * $invoice->ppn_rate / 100), 0, ',', '.') }}</td>
             </tr>
             @endif
-            @endforeach
+            
+            {{-- Tax tambahan jika ada --}}
+            @if($invoice->tax > 0)
+            <tr>
+                <td>Tax ({{ $invoice->tax }}%):</td>
+                <td class="text-right rupiah">Rp {{ number_format($invoice->tax_amount ?? ($invoice->subtotal * $invoice->tax / 100), 0, ',', '.') }}</td>
+            </tr>
+            @endif
+            
             <tr class="total-row">
                 <td><strong>TOTAL:</strong></td>
-                <td class="text-right rupiah"><strong>Rp {{ number_format($invoice->total, 0, ',', '.')
-                        }}</strong></td>
+                <td class="text-right rupiah"><strong>Rp {{ number_format($invoice->total, 0, ',', '.') }}</strong></td>
             </tr>
         </table>
     </div>
 
     <div class="footer">
-        <p><strong>Syarat dan Ketentuan:</strong></p>
-        <p>1. Pembayaran paling lambat pada tanggal jatuh tempo<br>
-            2. Pembayaran dapat dilakukan melalui transfer bank<br>
-            3. Barang yang sudah dibeli tidak dapat dikembalikan<br>
-            4. Untuk pertanyaan hubungi -</p>
-
-        <p style="margin-top: 30px;">
-            <strong>Terima kasih atas kepercayaan Anda!</strong>
-        </p>
+        <div style="text-align: left; margin-bottom: 20px;">
+            <p><strong>Catatan:</strong></p>
+            <p style="font-size: 11px; line-height: 1.5;">
+                • Invoice ini dibuat berdasarkan Purchase Order No: {{ $invoice->fromModel->po_number ?? 'N/A' }}<br>
+                • Pembayaran mohon ditransfer ke rekening:<br>
+                  &nbsp;&nbsp;&nbsp;BCA: 123-456-7890 a/n PT. DUTA TUNGGAL<br>
+                  &nbsp;&nbsp;&nbsp;BRI: 098-765-4321 a/n PT. DUTA TUNGGAL<br>
+                • Pembayaran dianggap sah setelah diterima konfirmasi dari pihak kami
+            </p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <p><strong>Terima kasih atas kepercayaan Anda berbisnis dengan kami!</strong></p>
+            <p style="margin-top: 20px;">
+                Hormat kami,<br>
+                <strong>PT. DUTA TUNGGAL</strong>
+            </p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; font-size: 10px; color: #666;">
+            <p>Invoice ini dicetak otomatis dari sistem pada {{ \Carbon\Carbon::now()->format('d M Y H:i:s') }}</p>
+        </div>
     </div>
 </body>
 

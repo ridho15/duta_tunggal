@@ -1,164 +1,167 @@
 <x-filament-panels::page>
     @php($report = $this->getReportData())
 
-    <div class="space-y-6">
-        <!-- Custom Periode Filter Form (manual override, non-Filament) -->
-        <form method="GET" class="mb-4 flex flex-wrap gap-2 items-end">
-            <div>
-                <label for="start" class="block text-xs font-medium text-gray-700 dark:text-gray-200">Tanggal Mulai</label>
-                <input type="date" id="start" name="start" value="{{ request('start', \Carbon\Carbon::parse($report['period']['start'])->format('Y-m-d')) }}" class="filament-input rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-700" />
-            </div>
-            <div>
-                <label for="end" class="block text-xs font-medium text-gray-700 dark:text-gray-200">Tanggal Selesai</label>
-                <input type="date" id="end" name="end" value="{{ request('end', \Carbon\Carbon::parse($report['period']['end'])->format('Y-m-d')) }}" class="filament-input rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-700" />
-            </div>
-            <button type="submit" style="background: linear-gradient(to right, #2563eb, #1d4ed8);" class="inline-flex items-center px-6 py-2.5 hover:shadow-md transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-white font-medium text-sm rounded-lg shadow-sm">
-                <x-heroicon-o-magnifying-glass class="w-4 h-4 mr-2" />
-                Terapkan Filter
-            </button>
-            <button wire:click="exportExcel" style="background: linear-gradient(to right, #16a34a, #15803d);" class="inline-flex items-center px-6 py-2.5 hover:shadow-md transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-white font-medium text-sm rounded-lg shadow-sm">
-                <x-heroicon-o-document-arrow-down class="w-4 h-4 mr-2" />
-                Export Excel
-            </button>
-        </form>
+    <div style="margin: 0 auto; max-width: 1200px; padding: 20px;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="font-size: 28px; font-weight: bold; color: #1f2937; margin-bottom: 10px;">Laporan Mutasi Barang Per Gudang</h1>
+            <p style="font-size: 16px; color: #6b7280;">Detail pergerakan stock barang per gudang dalam periode tertentu</p>
+        </div>
 
-        <!-- Header Section -->
-        <x-filament::section>
-            <x-slot name="heading">
-                Laporan Mutasi Barang Per Gudang
-            </x-slot>
-            <x-slot name="description">
-                Detail pergerakan stock barang per gudang dalam periode tertentu
-            </x-slot>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-blue-50 dark:bg-blue-950/50 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-blue-600 dark:text-blue-400">Periode</div>
-                    <div class="text-lg font-semibold text-blue-900 dark:text-blue-100">
-                        {{ \Carbon\Carbon::parse($report['period']['start'])->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($report['period']['end'])->format('d/m/Y') }}
-                    </div>
+        <!-- Filter Form -->
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+            <form method="GET" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: end;">
+                <div>
+                    <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 5px;">Tanggal Mulai</label>
+                    <input type="date" name="start" value="{{ request('start', \Carbon\Carbon::parse($report['period']['start'])->format('Y-m-d')) }}" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" />
                 </div>
-
-                <div class="bg-green-50 dark:bg-green-950/50 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-green-600 dark:text-green-400">Total Gudang</div>
-                    <div class="text-lg font-semibold text-green-900 dark:text-green-100">
-                        {{ count($report['warehouseData']) }} gudang
-                    </div>
+                <div>
+                    <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 5px;">Tanggal Selesai</label>
+                    <input type="date" name="end" value="{{ request('end', \Carbon\Carbon::parse($report['period']['end'])->format('Y-m-d')) }}" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" />
                 </div>
+                <button type="submit" style="background: #2563eb; color: white; padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s;">
+                    <svg style="width: 16px; height: 16px; display: inline; margin-right: 8px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    Terapkan Filter
+                </button>
+                <button wire:click="exportExcel" style="background: #16a34a; color: white; padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s;">
+                    <svg style="width: 16px; height: 16px; display: inline; margin-right: 8px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Export Excel
+                </button>
+            </form>
+        </div>
 
-                <div class="bg-purple-50 dark:bg-purple-950/50 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-purple-600 dark:text-purple-400">Total Transaksi</div>
-                    <div class="text-lg font-semibold text-purple-900 dark:text-purple-100">
-                        {{ number_format($report['totals']['total_movements']) }}
-                    </div>
-                </div>
-
-                <div class="bg-orange-50 dark:bg-orange-950/50 p-4 rounded-lg">
-                    <div class="text-sm font-medium text-orange-600 dark:text-orange-400">Net Quantity</div>
-                    <div class="text-lg font-semibold text-orange-900 dark:text-orange-100">
-                        {{ number_format($report['totals']['total_qty_in'] - $report['totals']['total_qty_out'], 2) }}
-                    </div>
+        <!-- Summary Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+            <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 20px; text-align: center;">
+                <div style="font-size: 14px; font-weight: 500; color: #2563eb; margin-bottom: 10px;">Periode</div>
+                <div style="font-size: 18px; font-weight: 600; color: #1e40af;">
+                    {{ \Carbon\Carbon::parse($report['period']['start'])->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($report['period']['end'])->format('d/m/Y') }}
                 </div>
             </div>
-        </x-filament::section>
+            <div style="background: #f0fdf4; border: 1px solid #dcfce7; border-radius: 8px; padding: 20px; text-align: center;">
+                <div style="font-size: 14px; font-weight: 500; color: #16a34a; margin-bottom: 10px;">Total Gudang</div>
+                <div style="font-size: 18px; font-weight: 600; color: #166534;">
+                    {{ count($report['warehouseData']) }} gudang
+                </div>
+            </div>
+            <div style="background: #faf5ff; border: 1px solid #f3e8ff; border-radius: 8px; padding: 20px; text-align: center;">
+                <div style="font-size: 14px; font-weight: 500; color: #9333ea; margin-bottom: 10px;">Total Transaksi</div>
+                <div style="font-size: 18px; font-weight: 600; color: #7c2d12;">
+                    {{ number_format($report['totals']['total_movements']) }}
+                </div>
+            </div>
+            <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 20px; text-align: center;">
+                <div style="font-size: 14px; font-weight: 500; color: #ea580c; margin-bottom: 10px;">Net Quantity</div>
+                <div style="font-size: 18px; font-weight: 600; color: #9a3412;">
+                    {{ number_format($report['totals']['total_qty_in'] - $report['totals']['total_qty_out'], 2) }}
+                </div>
+            </div>
+        </div>
 
-        <!-- Warehouse Data -->
         @if(empty($report['warehouseData']))
-            <x-filament::section>
-                <div class="text-center py-8">
-                    <x-heroicon-o-exclamation-triangle class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Tidak ada data mutasi</h3>
-                    <p class="text-gray-500 dark:text-gray-400">Tidak ditemukan transaksi stock movement dalam periode yang dipilih.</p>
-                </div>
-            </x-filament::section>
+            <div style="text-align: center; padding: 60px 20px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+                <svg style="width: 48px; height: 48px; color: #9ca3af; margin: 0 auto 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <h3 style="font-size: 20px; font-weight: 500; color: #111827; margin-bottom: 10px;">Tidak ada data mutasi</h3>
+                <p style="font-size: 16px; color: #6b7280;">Tidak ditemukan transaksi stock movement dalam periode yang dipilih.</p>
+            </div>
         @else
             @foreach($report['warehouseData'] as $warehouse)
-                <x-filament::section>
-                    <x-slot name="heading">
-                        Gudang: {{ $warehouse['warehouse_name'] }}
-                        @if($warehouse['warehouse_code'])
-                            <span class="text-sm text-gray-500 dark:text-gray-400">({{ $warehouse['warehouse_code'] }})</span>
-                        @endif
-                    </x-slot>
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 30px; overflow: hidden;">
+                    <div style="background: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: 20px;">
+                        <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin: 0;">
+                            Gudang: {{ $warehouse['warehouse_name'] }}
+                            @if($warehouse['warehouse_code'])
+                                <span style="font-size: 14px; color: #6b7280;">({{ $warehouse['warehouse_code'] }})</span>
+                            @endif
+                        </h2>
+                    </div>
 
                     <!-- Warehouse Summary -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div class="text-center">
-                            <div class="text-sm font-medium text-gray-600 dark:text-gray-400">Qty Masuk</div>
-                            <div class="text-lg font-semibold text-green-600">{{ number_format($warehouse['summary']['qty_in'], 2) }}</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm font-medium text-gray-600 dark:text-gray-400">Qty Keluar</div>
-                            <div class="text-lg font-semibold text-red-600">{{ number_format($warehouse['summary']['qty_out'], 2) }}</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm font-medium text-gray-600 dark:text-gray-400">Net Qty</div>
-                            <div class="text-lg font-semibold {{ $warehouse['summary']['net_qty'] >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                                {{ number_format($warehouse['summary']['net_qty'], 2) }}
+                    <div style="padding: 20px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 5px;">Qty Masuk</div>
+                                <div style="font-size: 18px; font-weight: 600; color: #16a34a;">{{ number_format($warehouse['summary']['qty_in'], 2) }}</div>
                             </div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Transaksi</div>
-                            <div class="text-lg font-semibold text-blue-600">{{ count($warehouse['movements']) }}</div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 5px;">Qty Keluar</div>
+                                <div style="font-size: 18px; font-weight: 600; color: #dc2626;">{{ number_format($warehouse['summary']['qty_out'], 2) }}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 5px;">Net Qty</div>
+                                <div style="font-size: 18px; font-weight: 600; color: {{ $warehouse['summary']['net_qty'] >= 0 ? '#16a34a' : '#dc2626' }};">
+                                    {{ number_format($warehouse['summary']['net_qty'], 2) }}
+                                </div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 5px;">Total Transaksi</div>
+                                <div style="font-size: 18px; font-weight: 600; color: #2563eb;">{{ count($warehouse['movements']) }}</div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Movements Table -->
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <thead style="background: #f9fafb;">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3">Tanggal</th>
-                                    <th scope="col" class="px-6 py-3">Produk</th>
-                                    <th scope="col" class="px-6 py-3">Tipe</th>
-                                    <th scope="col" class="px-6 py-3">Qty Masuk</th>
-                                    <th scope="col" class="px-6 py-3">Qty Keluar</th>
-                                    <th scope="col" class="px-6 py-3">Nilai</th>
-                                    <th scope="col" class="px-6 py-3">Referensi</th>
-                                    <th scope="col" class="px-6 py-3">Rak</th>
-                                    <th scope="col" class="px-6 py-3">Catatan</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Tanggal</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Produk</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Tipe</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Qty Masuk</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Qty Keluar</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Nilai</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Referensi</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Rak</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Catatan</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($warehouse['movements'] as $movement)
-                                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: background 0.2s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">
+                                        <td style="padding: 12px 16px; font-weight: 500; color: #111827;">
                                             {{ \Carbon\Carbon::parse($movement['date'])->format('d/m/Y') }}
                                         </td>
-                                        <td class="px-6 py-4">
-                                            <div class="font-medium">{{ $movement['product_name'] }}</div>
+                                        <td style="padding: 12px 16px;">
+                                            <div style="font-weight: 500; color: #111827;">{{ $movement['product_name'] }}</div>
                                             @if($movement['product_sku'])
-                                                <div class="text-xs text-gray-500">{{ $movement['product_sku'] }}</div>
+                                                <div style="font-size: 12px; color: #6b7280;">{{ $movement['product_sku'] }}</div>
                                             @endif
                                         </td>
-                                        <td class="px-6 py-4">
-                                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                        <td style="padding: 12px 16px;">
+                                            <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;
                                                 @if(str_contains($movement['type'], 'Masuk'))
-                                                    bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
+                                                    background: #dcfce7; color: #166534;
                                                 @elseif(str_contains($movement['type'], 'Keluar'))
-                                                    bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300
+                                                    background: #fee2e2; color: #991b1b;
                                                 @else
-                                                    bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300
+                                                    background: #dbeafe; color: #1e40af;
                                                 @endif">
                                                 {{ $movement['type'] }}
                                             </span>
                                         </td>
-                                        <td class="px-6 py-4 text-green-600 font-medium">
+                                        <td style="padding: 12px 16px; font-weight: 500; color: #16a34a;">
                                             {{ $movement['qty_in'] > 0 ? number_format($movement['qty_in'], 2) : '-' }}
                                         </td>
-                                        <td class="px-6 py-4 text-red-600 font-medium">
+                                        <td style="padding: 12px 16px; font-weight: 500; color: #dc2626;">
                                             {{ $movement['qty_out'] > 0 ? number_format($movement['qty_out'], 2) : '-' }}
                                         </td>
-                                        <td class="px-6 py-4">
+                                        <td style="padding: 12px 16px; color: #374151;">
                                             {{ $movement['value'] ? 'Rp ' . number_format($movement['value'], 0) : '-' }}
                                         </td>
-                                        <td class="px-6 py-4 text-gray-500">
+                                        <td style="padding: 12px 16px; color: #6b7280;">
                                             {{ $movement['reference'] ?: '-' }}
                                         </td>
-                                        <td class="px-6 py-4 text-gray-500">
+                                        <td style="padding: 12px 16px; color: #6b7280;">
                                             {{ $movement['rak_name'] ?: '-' }}
                                         </td>
-                                        <td class="px-6 py-4 text-gray-500 max-w-xs truncate" title="{{ $movement['notes'] }}">
+                                        <td style="padding: 12px 16px; color: #6b7280; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="{{ $movement['notes'] }}">
                                             {{ $movement['notes'] ?: '-' }}
                                         </td>
                                     </tr>
@@ -166,42 +169,39 @@
                             </tbody>
                         </table>
                     </div>
-                </x-filament::section>
+                </div>
             @endforeach
 
             <!-- Grand Total Summary -->
-            <x-filament::section>
-                <x-slot name="heading">
-                    Ringkasan Total Keseluruhan
-                </x-slot>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="bg-green-50 dark:bg-green-950/50 p-4 rounded-lg text-center">
-                        <div class="text-sm font-medium text-green-600 dark:text-green-400">Total Qty Masuk</div>
-                        <div class="text-xl font-bold text-green-900 dark:text-green-100">
+            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin-bottom: 20px; text-align: center;">Ringkasan Total Keseluruhan</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                    <div style="background: #f0fdf4; border: 1px solid #dcfce7; border-radius: 8px; padding: 20px; text-align: center;">
+                        <div style="font-size: 14px; font-weight: 500; color: #166534; margin-bottom: 10px;">Total Qty Masuk</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #166534;">
                             {{ number_format($report['totals']['total_qty_in'], 2) }}
                         </div>
                     </div>
-                    <div class="bg-red-50 dark:bg-red-950/50 p-4 rounded-lg text-center">
-                        <div class="text-sm font-medium text-red-600 dark:text-red-400">Total Qty Keluar</div>
-                        <div class="text-xl font-bold text-red-900 dark:text-red-100">
+                    <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; text-align: center;">
+                        <div style="font-size: 14px; font-weight: 500; color: #991b1b; margin-bottom: 10px;">Total Qty Keluar</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #991b1b;">
                             {{ number_format($report['totals']['total_qty_out'], 2) }}
                         </div>
                     </div>
-                    <div class="bg-blue-50 dark:bg-blue-950/50 p-4 rounded-lg text-center">
-                        <div class="text-sm font-medium text-blue-600 dark:text-blue-400">Net Quantity</div>
-                        <div class="text-xl font-bold text-blue-900 dark:text-blue-100">
+                    <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 20px; text-align: center;">
+                        <div style="font-size: 14px; font-weight: 500; color: #1e40af; margin-bottom: 10px;">Net Quantity</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #1e40af;">
                             {{ number_format($report['totals']['total_qty_in'] - $report['totals']['total_qty_out'], 2) }}
                         </div>
                     </div>
-                    <div class="bg-purple-50 dark:bg-purple-950/50 p-4 rounded-lg text-center">
-                        <div class="text-sm font-medium text-purple-600 dark:text-purple-400">Total Transaksi</div>
-                        <div class="text-xl font-bold text-purple-900 dark:text-purple-100">
+                    <div style="background: #faf5ff; border: 1px solid #f3e8ff; border-radius: 8px; padding: 20px; text-align: center;">
+                        <div style="font-size: 14px; font-weight: 500; color: #7c2d12; margin-bottom: 10px;">Total Transaksi</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #7c2d12;">
                             {{ number_format($report['totals']['total_movements']) }}
                         </div>
                     </div>
                 </div>
-            </x-filament::section>
+            </div>
         @endif
     </div>
 </x-filament-panels::page>

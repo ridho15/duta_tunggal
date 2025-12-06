@@ -15,6 +15,13 @@ use App\Models\JournalEntry;
 use Illuminate\Support\Carbon;
 
 it('end-to-end sales flow: stock reduces, invoice and payment post to ledger', function () {
+    // Seed Cabang for customer factory
+    $cabang = \App\Models\Cabang::create([
+        'kode' => 'MAIN',
+        'nama' => 'Main Branch',
+        'alamat' => 'Jl. Main 123',
+        'telepon' => '021123456'
+    ]);
     // Seed minimal data assumptions (factories should create necessary relationships)
     // Create a product with cost_price and COAs
     $product = Product::factory()->create([

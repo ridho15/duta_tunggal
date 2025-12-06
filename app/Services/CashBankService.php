@@ -152,6 +152,11 @@ class CashBankService
 
     private function createEntry(int $coaId, object $source, float $debit, float $credit, string $type, string $description = null): JournalEntry
     {
+        // Resolve branch from source
+        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($source);
+        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($source);
+        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($source);
+
         return JournalEntry::create([
             'coa_id' => $coaId,
             'date' => ($source->date ?? now())->toDateString(),
@@ -160,6 +165,9 @@ class CashBankService
             'debit' => $debit,
             'credit' => $credit,
             'journal_type' => $type,
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => get_class($source),
             'source_id' => $source->id,
         ]);

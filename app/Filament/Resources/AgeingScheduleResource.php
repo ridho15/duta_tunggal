@@ -22,6 +22,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class AgeingScheduleResource extends Resource
@@ -186,7 +188,23 @@ class AgeingScheduleResource extends Resource
                 ])->button()
                     ->label('Action')
             ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([]);
+            ->bulkActions([])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Ageing Schedule</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Ageing Schedule adalah laporan umur hutang/piutang yang mengelompokkan invoice berdasarkan periode overdue untuk analisis kredit dan koleksi.</li>' .
+                            '<li><strong>Kategori:</strong> <em>Current</em> (belum jatuh tempo), <em>31–60</em> (overdue 31-60 hari), <em>61–90</em> (overdue 61-90 hari), <em>>90</em> (overdue >90 hari).</li>' .
+                            '<li><strong>Validasi:</strong> Berdasarkan due date invoice, menampilkan outstanding amount dan days overdue.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail invoice), <em>Edit</em> (ubah jika diperlukan), <em>Delete</em> (hapus record).</li>' .
+                            '<li><strong>Filters:</strong> Supplier/Customer, Ageing Category, Date Range, dll.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan data dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                            '<li><strong>Tujuan:</strong> Membantu manajemen dalam memantau dan mengelola risiko kredit serta proses koleksi.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array
@@ -194,6 +212,20 @@ class AgeingScheduleResource extends Resource
         return [
             //
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHasMorph('fromModel', [AccountPayable::class, AccountReceivable::class], function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
     }
 
     public static function getPages(): array

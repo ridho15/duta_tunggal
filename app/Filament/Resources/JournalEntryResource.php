@@ -17,6 +17,7 @@ use Filament\Tables\Grouping;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Filament\Tables\Actions\ActionGroup;
 
 class JournalEntryResource extends Resource
@@ -36,6 +37,11 @@ class JournalEntryResource extends Resource
     protected static ?string $navigationGroup = 'Finance - Akuntansi';
 
     protected static ?int $navigationSort = 4;
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with(['source', 'coa']);
+    }
 
     public static function form(Form $form): Form
     {
@@ -503,26 +509,233 @@ class JournalEntryResource extends Resource
                             ->schema([
                                 Infolists\Components\TextEntry::make('source_type')
                                     ->label('Source Type')
-                                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                                        'App\\Models\\PurchaseOrder' => 'Purchase Order',
-                                        'App\\Models\\SaleOrder' => 'Sales Order',
-                                        'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
-                                        'App\\Models\\DeliveryOrder' => 'Delivery Order',
-                                        'App\\Models\\MaterialIssue' => 'Material Issue',
-                                        'App\\Models\\VendorPayment' => 'Vendor Payment',
-                                        'App\\Models\\CustomerReceipt' => 'Customer Receipt',
-                                        'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
-                                        'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
-                                        'App\\Models\\StockTransfer' => 'Stock Transfer',
-                                        'App\\Models\\Asset' => 'Asset',
-                                        'App\\Models\\Deposit' => 'Deposit',
-                                        default => $state,
+                                    ->formatStateUsing(function ($record) {
+                                        if (!$record->source_type) return 'Manual Entry';
+
+                                        // Special handling for Quality Control to differentiate Manufacture vs Purchase
+                                        if ($record->source_type === 'App\\Models\\QualityControl' && $record->source) {
+                                            if ($record->source->from_model_type === 'App\\Models\\Production') {
+                                                return 'QC Manufacture';
+                                            } elseif ($record->source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                                                return 'QC Purchase';
+                                            }
+                                        }
+
+                                        return match ($record->source_type) {
+                                            'App\\Models\\PurchaseOrder' => 'Purchase Order',
+                                            'App\\Models\\SaleOrder' => 'Sales Order',
+                                            'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
+                                            'App\\Models\\DeliveryOrder' => 'Delivery Order',
+                                            'App\\Models\\MaterialIssue' => 'Material Issue',
+                                            'App\\Models\\VendorPayment' => 'Vendor Payment',
+                                            'App\\Models\\CustomerReceipt' => 'Customer Receipt',
+                                            'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
+                                            'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
+                                            'App\\Models\\StockTransfer' => 'Stock Transfer',
+                                            'App\\Models\\Asset' => 'Asset',
+                                            'App\\Models\\Deposit' => 'Deposit',
+                                            'App\\Models\\Production' => 'Production',
+                                            'App\\Models\\QualityControl' => 'Quality Control',
+                                            default => $record->source_type,
+                                        };
+                                    })
+                                    ->badge()
+                                    ->color(function ($record) {
+                                        if (!$record->source_type) return 'primary';
+
+                                        // Special handling for Quality Control to differentiate Manufacture vs Purchase
+                                        if ($record->source_type === 'App\\Models\\QualityControl' && $record->source) {
+                                            if ($record->source->from_model_type === 'App\\Models\\Production') {
+                                                return 'warning'; // Manufacture
+                                            } elseif ($record->source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                                                return 'purple'; // Purchase
+                                            }
+                                        }
+
+                                        return 'primary'; // Default color for other types
                                     })
                                     ->placeholder('Manual Entry'),
 
                                 Infolists\Components\TextEntry::make('source_id')
-                                    ->label('Source ID')
+                                    ->label('Source Number')
+                                    ->formatStateUsing(function ($record) {
+                                        if (!$record->source_type || !$record->source_id) {
+                                            return 'Manual Entry';
+                                        }
+
+                                        $source = $record->source;
+                                        if (!$source) {
+                                            return 'Source not found';
+                                        }
+
+                                        // Get source number based on type
+                                        switch ($record->source_type) {
+                                            case 'App\\Models\\PurchaseOrder':
+                                                return $source->po_number ?: 'N/A';
+                                            case 'App\\Models\\SaleOrder':
+                                                return $source->so_number ?: 'N/A';
+                                            case 'App\\Models\\ManufacturingOrder':
+                                                return $source->mo_number ?: 'N/A';
+                                            case 'App\\Models\\DeliveryOrder':
+                                                return $source->do_number ?: 'N/A';
+                                            case 'App\\Models\\MaterialIssue':
+                                                return $source->issue_number ?: 'N/A';
+                                            case 'App\\Models\\VendorPayment':
+                                                return $source->payment_number ?: 'N/A';
+                                            case 'App\\Models\\CustomerReceipt':
+                                                return $source->receipt_number ?: 'N/A';
+                                            case 'App\\Models\\CashBankTransaction':
+                                                return $source->transaction_number ?: 'N/A';
+                                            case 'App\\Models\\StockTransfer':
+                                                return $source->transfer_number ?: 'N/A';
+                                            case 'App\\Models\\Asset':
+                                                return $source->asset_number ?: 'N/A';
+                                            case 'App\\Models\\Deposit':
+                                                return $source->deposit_number ?: 'N/A';
+                                            case 'App\\Models\\Production':
+                                                return $source->production_number ?: 'N/A';
+                                            case 'App\\Models\\QualityControl':
+                                                $qcNumber = $source->qc_number ?: 'N/A';
+                                                if ($source->from_model_type === 'App\\Models\\Production') {
+                                                    return "MFG-{$qcNumber}"; // Manufacture QC
+                                                } elseif ($source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                                                    return "PUR-{$qcNumber}"; // Purchase QC
+                                                }
+                                                return $qcNumber; // Fallback
+                                            default:
+                                                return 'N/A';
+                                        }
+                                    })
                                     ->placeholder('N/A'),
+
+                                Infolists\Components\TextEntry::make('source_id')
+                                    ->label('Source Details')
+                                    ->formatStateUsing(function ($record) {
+                                        if (!$record->source_type || !$record->source_id) {
+                                            return 'Manual Entry';
+                                        }
+
+                                        $source = $record->source;
+                                        if (!$source) {
+                                            return 'Source not found';
+                                        }
+
+                                        // Get source information based on type
+                                        switch ($record->source_type) {
+                                            case 'App\\Models\\PurchaseOrder':
+                                                $supplierName = $source->supplier ? $source->supplier->name : 'N/A';
+                                                return "PO: {$source->po_number} - {$supplierName}";
+                                            case 'App\\Models\\SaleOrder':
+                                                $customerName = $source->customer ? $source->customer->name : 'N/A';
+                                                return "SO: {$source->so_number} - {$customerName}";
+                                            case 'App\\Models\\ManufacturingOrder':
+                                                $productName = $source->product ? $source->product->name : 'N/A';
+                                                return "MO: {$source->mo_number} - {$productName}";
+                                            case 'App\\Models\\DeliveryOrder':
+                                                $customerName = $source->customer ? $source->customer->name : 'N/A';
+                                                return "DO: {$source->do_number} - {$customerName}";
+                                            case 'App\\Models\\MaterialIssue':
+                                                $moNumber = $source->manufacturingOrder ? $source->manufacturingOrder->mo_number : 'N/A';
+                                                return "MI: {$source->issue_number} - {$moNumber}";
+                                            case 'App\\Models\\VendorPayment':
+                                                $supplierName = $source->supplier ? $source->supplier->name : 'N/A';
+                                                return "VP: {$source->payment_number} - {$supplierName}";
+                                            case 'App\\Models\\CustomerReceipt':
+                                                $customerName = $source->customer ? $source->customer->name : 'N/A';
+                                                return "CR: {$source->receipt_number} - {$customerName}";
+                                            case 'App\\Models\\CashBankTransaction':
+                                                $description = $source->description ?: 'N/A';
+                                                return "CBT: {$source->transaction_number} - {$description}";
+                                            case 'App\\Models\\StockTransfer':
+                                                $fromWarehouse = $source->from_warehouse ? $source->from_warehouse->name : 'N/A';
+                                                $toWarehouse = $source->to_warehouse ? $source->to_warehouse->name : 'N/A';
+                                                return "ST: {$source->transfer_number} - {$fromWarehouse} to {$toWarehouse}";
+                                            case 'App\\Models\\Asset':
+                                                return "Asset: {$source->asset_number} - {$source->name}";
+                                            case 'App\\Models\\Deposit':
+                                                $customerName = $source->customer ? $source->customer->name : 'N/A';
+                                                return "Deposit: {$source->deposit_number} - {$customerName}";
+                                            case 'App\\Models\\Production':
+                                                $productName = $source->manufacturingOrder && $source->manufacturingOrder->product
+                                                    ? $source->manufacturingOrder->product->name : 'N/A';
+                                                return "Production: {$source->production_number} - {$productName}";
+                                            case 'App\\Models\\QualityControl':
+                                                $qcNumber = $source->qc_number ?: 'N/A';
+                                                $productName = $source->product ? $source->product->name : 'N/A';
+                                                $qcType = '';
+                                                if ($source->from_model_type === 'App\\Models\\Production') {
+                                                    $qcType = 'Manufacture';
+                                                } elseif ($source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                                                    $qcType = 'Purchase';
+                                                }
+                                                return "QC {$qcType}: {$qcNumber} - {$productName}";
+                                            default:
+                                                return 'Unknown Source';
+                                        }
+                                    })
+                                    ->placeholder('N/A')
+                                    ->columnSpanFull(),
+
+                                Infolists\Components\Actions::make([
+                                    Infolists\Components\Actions\Action::make('view_source')
+                                        ->label('View Source Data')
+                                        ->icon('heroicon-o-eye')
+                                        ->color('primary')
+                                        ->url(function ($record) {
+                                            if (!$record->source_type || !$record->source_id) {
+                                                return null;
+                                            }
+
+                                            // Generate URL based on source type using named routes
+                                            try {
+                                                return match($record->source_type) {
+                                                    'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
+                                                    'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->source_id),
+                                                    'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->source_id),
+                                                    'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $record->source_id),
+                                                    'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $record->source_id),
+                                                    'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $record->source_id),
+                                                    'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $record->source_id),
+                                                    'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $record->source_id),
+                                                    'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
+                                                    'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
+                                                    'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
+                                                    default => null,
+                                                };
+                                            } catch (\Exception $e) {
+                                                // Route not found, return null to hide the action
+                                                return null;
+                                            }
+                                        })
+                                        ->openUrlInNewTab()
+                                        ->visible(function ($record) {
+                                            if (!$record->source_type || !$record->source_id) {
+                                                return false;
+                                            }
+
+                                            // Check if route exists for this source type
+                                            try {
+                                                $url = match($record->source_type) {
+                                                    'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
+                                                    'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->source_id),
+                                                    'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->source_id),
+                                                    'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $record->source_id),
+                                                    'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $record->source_id),
+                                                    'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $record->source_id),
+                                                    'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $record->source_id),
+                                                    'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $record->source_id),
+                                                    'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
+                                                    'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
+                                                    'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
+                                                    default => null,
+                                                };
+                                                return $url !== null;
+                                            } catch (\Exception $e) {
+                                                return false;
+                                            }
+                                        }),
+                                ])
+                                ->columnSpanFull(),
                             ])
                             ->columns(2)
                             ->collapsible()
@@ -577,23 +790,67 @@ class JournalEntryResource extends Resource
                 Tables\Columns\TextColumn::make('source_type')
                     ->label('Source Type')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'App\\Models\\PurchaseOrder' => 'success',
-                        'App\\Models\\SaleOrder' => 'info',
-                        'App\\Models\\ManufacturingOrder' => 'warning',
-                        'App\\Models\\DeliveryOrder' => 'primary',
-                        'App\\Models\\MaterialIssue' => 'purple',
-                        'App\\Models\\VendorPayment' => 'danger',
-                        'App\\Models\\CustomerReceipt' => 'success',
-                        'App\\Models\\CashBankTransaction' => 'gray',
-                        'App\\Models\\CustomerReceiptItem' => 'secondary',
-                        'App\\Models\\StockTransfer' => 'secondary',
-                        'App\\Models\\Asset' => 'warning',
-                        'App\\Models\\Deposit' => 'primary',
-                        default => 'gray',
+                    ->color(function ($record) {
+                        if (!$record->source_type) return 'gray';
+
+                        // Special handling for Quality Control to differentiate Manufacture vs Purchase
+                        if ($record->source_type === 'App\\Models\\QualityControl' && $record->source) {
+                            if ($record->source->from_model_type === 'App\\Models\\Production') {
+                                return 'warning'; // Manufacture
+                            } elseif ($record->source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                                return 'purple'; // Purchase
+                            }
+                        }
+
+                        // Special handling for Invoice to differentiate Purchase vs Sales
+                        if ($record->source_type === 'App\\Models\\Invoice' && $record->source) {
+                            if ($record->source->from_model_type === 'App\\Models\\PurchaseOrder') {
+                                return 'success'; // Purchase Invoice
+                            } elseif ($record->source->from_model_type === 'App\\Models\\SaleOrder') {
+                                return 'info'; // Sales Invoice
+                            }
+                        }
+
+                        return match ($record->source_type) {
+                            'App\\Models\\PurchaseOrder' => 'success',
+                            'App\\Models\\SaleOrder' => 'info',
+                            'App\\Models\\ManufacturingOrder' => 'warning',
+                            'App\\Models\\DeliveryOrder' => 'primary',
+                            'App\\Models\\MaterialIssue' => 'purple',
+                            'App\\Models\\VendorPayment' => 'danger',
+                            'App\\Models\\CustomerReceipt' => 'success',
+                            'App\\Models\\CashBankTransaction' => 'gray',
+                            'App\\Models\\CustomerReceiptItem' => 'secondary',
+                            'App\\Models\\StockTransfer' => 'secondary',
+                            'App\\Models\\Asset' => 'warning',
+                            'App\\Models\\Deposit' => 'primary',
+                            default => 'gray',
+                        };
                     })
-                    ->formatStateUsing(function ($state) {
-                        return match($state) {
+                    ->formatStateUsing(function ($record) {
+                        if (!$record->source_type) return '-';
+                        // if($record->id == 13){
+                        //     dd($record->source_type, $record->source->from_model_type, $record->id);
+                        // }
+                        // Special handling for Quality Control to differentiate Manufacture vs Purchase
+                        if ($record->source_type === 'App\\Models\\QualityControl' && $record->source) {
+                            if ($record->source->from_model_type === 'App\\Models\\Production') {
+                                return 'QC Manufacture';
+                            } elseif ($record->source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                                return 'QC Purchase';
+                            }
+                        }
+
+                        // Special handling for Invoice to differentiate Purchase vs Sales
+                        if ($record->source_type === 'App\\Models\\Invoice' && $record->source) {
+                            if ($record->source->from_model_type === 'App\\Models\\PurchaseOrder') {
+                                return 'Purchase Invoice';
+                            } elseif ($record->source->from_model_type === 'App\\Models\\SaleOrder') {
+                                return 'Sales Invoice';
+                            }
+                        }
+
+                        return match($record->source_type) {
                             'App\\Models\\PurchaseOrder' => 'Purchase Order',
                             'App\\Models\\SaleOrder' => 'Sales Order',
                             'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
@@ -601,13 +858,16 @@ class JournalEntryResource extends Resource
                             'App\\Models\\MaterialIssue' => 'Material Issue',
                             'App\\Models\\VendorPayment' => 'Vendor Payment',
                             'App\\Models\\CustomerReceipt' => 'Customer Receipt',
+                            'App\\Models\\PurchaseReceipt' => 'Purchase Receipt',
+                            'App\\Models\\PurchaseReceiptItem' => 'Purchase Receipt Item',
                             'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
                             'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
                             'App\\Models\\StockTransfer' => 'Stock Transfer',
                             'App\\Models\\Asset' => 'Asset',
                             'App\\Models\\Deposit' => 'Deposit',
+                            'App\\Models\\QualityControl' => 'Quality Control',
                             null => '-',
-                            default => $state
+                            default => $record->source_type
                         };
                     })
                     ->placeholder('-')
@@ -622,6 +882,17 @@ class JournalEntryResource extends Resource
                             $model = $record->source;
                             if (!$model) return '-';
 
+                            // Special handling for Quality Control to differentiate Manufacture vs Purchase
+                            if ($record->source_type === 'App\\Models\\QualityControl') {
+                                $qcNumber = $model->qc_number ?: 'N/A';
+                                if ($model->from_model_type === 'App\\Models\\Production') {
+                                    return "MFG-{$qcNumber}"; // Manufacture QC
+                                } elseif ($model->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                                    return "PUR-{$qcNumber}"; // Purchase QC
+                                }
+                                return $qcNumber; // Fallback
+                            }
+
                             $displayField = match($record->source_type) {
                                 'App\\Models\\PurchaseOrder' => 'po_number',
                                 'App\\Models\\SaleOrder' => 'so_number',
@@ -630,11 +901,14 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\MaterialIssue' => 'issue_number',
                                 'App\\Models\\VendorPayment' => 'reference',
                                 'App\\Models\\CustomerReceipt' => 'id',
+                                'App\\Models\\PurchaseReceipt' => 'receipt_number',
+                                'App\\Models\\PurchaseReceiptItem' => 'id',
                                 'App\\Models\\CashBankTransaction' => 'reference',
                                 'App\\Models\\CustomerReceiptItem' => 'id',
                                 'App\\Models\\StockTransfer' => 'transfer_number',
                                 'App\\Models\\Asset' => 'asset_code',
                                 'App\\Models\\Deposit' => 'deposit_number',
+                                'App\\Models\\Invoice' => 'invoice_number',
                                 default => 'id'
                             };
 
@@ -748,6 +1022,7 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $sourceId),
                                 'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $sourceId),
                                 'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $sourceId),
+                                'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
                                 'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
                                 default => null
                             };
@@ -782,7 +1057,23 @@ class JournalEntryResource extends Resource
                     ->label('Date')
                     ->date()
                     ->collapsible(),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Journal Entry</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Journal Entry adalah pencatatan transaksi keuangan dalam sistem akuntansi ganda, mencatat debit dan kredit pada akun yang relevan.</li>' .
+                            '<li><strong>Validasi:</strong> Setiap entri harus balance (total debit = total kredit). Terkait dengan COA (Chart of Account) dan dapat memiliki reference ke transaksi lain.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah entri), <em>Delete</em> (hapus), <em>Go to Source</em> (ke transaksi asal).</li>' .
+                            '<li><strong>Grouping:</strong> Berdasarkan Reference dan Date.</li>' .
+                            '<li><strong>Filters:</strong> COA, Date Range, Amount Range, Reference, dll.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan entri dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan berbagai modul seperti penjualan, pembelian, inventory, dll. untuk otomatisasi pencatatan.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array
@@ -869,5 +1160,31 @@ class JournalEntryResource extends Resource
             'view' => Pages\ViewJournalEntry::route('/{record}'),
             'edit' => Pages\EditJournalEntry::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Get the appropriate view URL for Quality Control based on its from_model_type
+     */
+    protected static function getQualityControlViewUrl($qualityControl): ?string
+    {
+        if (!$qualityControl) {
+            return null;
+        }
+
+        try {
+            // Check the from_model_type to determine which resource to use
+            if ($qualityControl->from_model_type === 'App\\Models\\Production') {
+                // Quality Control Manufacture
+                return route('filament.admin.resources.quality-control-manufactures.view', $qualityControl->id);
+            } elseif ($qualityControl->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
+                // Quality Control Purchase
+                return route('filament.admin.resources.quality-control-purchases.view', $qualityControl->id);
+            }
+
+            // Fallback to manufacture if type is unknown
+            return route('filament.admin.resources.quality-control-manufactures.view', $qualityControl->id);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

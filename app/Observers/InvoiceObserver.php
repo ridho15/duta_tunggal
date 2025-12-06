@@ -93,6 +93,22 @@ class InvoiceObserver
         }
     }
 
+    public function deleting(Invoice $invoice)
+    {
+        // Hapus account payable dan account receivable ketika invoice dihapus
+        if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder') {
+            $accountPayable = AccountPayable::where('invoice_id', $invoice->id)->first();
+            if ($accountPayable) {
+                $accountPayable->delete(); // Ini akan trigger deleting di AccountPayable yang menghapus ageing schedule
+            }
+        } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+            $accountReceivable = AccountReceivable::where('invoice_id', $invoice->id)->first();
+            if ($accountReceivable) {
+                $accountReceivable->delete(); // Asumsikan AccountReceivable juga punya logic serupa
+            }
+        }
+    }
+
     protected function postSalesInvoice(Invoice $invoice)
     {
         // Prevent duplicate posting

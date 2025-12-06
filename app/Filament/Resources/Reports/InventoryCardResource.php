@@ -7,6 +7,7 @@ use App\Models\StockMovement;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class InventoryCardResource extends Resource
 {
@@ -30,6 +31,14 @@ class InventoryCardResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->whereHas('warehouse', function (Builder $query) {
+            // Cabang filtering akan diterapkan melalui global scope di Warehouse model
+            // yang sudah memiliki CabangScope
+        });
     }
 
     public static function getPages(): array

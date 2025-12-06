@@ -194,6 +194,11 @@ class SaleOrder extends Model
         });
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();

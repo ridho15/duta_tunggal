@@ -6,6 +6,7 @@ use App\Filament\Resources\Reports\InventoryCardResource;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
+use App\Models\Cabang;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -26,6 +27,8 @@ class ViewInventoryCard extends Page
     public array $productIds = [];
 
     public array $warehouseIds = [];
+
+    public array $cabangIds = [];
 
     private const IN_TYPES = [
         'purchase_in',
@@ -55,6 +58,26 @@ class ViewInventoryCard extends Page
                         ->label('Tanggal Selesai')
                         ->default(now()->endOfMonth())
                         ->reactive(),
+                    Select::make('cabangIds')
+                        ->label('Cabang')
+                        ->options(function () {
+                            return Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            });
+                        })
+                        ->multiple()
+                        ->searchable()
+                        ->preload()
+                        ->getSearchResultsUsing(function (string $search) {
+                            return Cabang::where('nama', 'like', "%{$search}%")
+                                ->orWhere('kode', 'like', "%{$search}%")
+                                ->limit(50)
+                                ->get()
+                                ->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                });
+                        })
+                        ->helperText('Kosongkan bila ingin menampilkan semua cabang'),
                     Select::make('productIds')
                         ->label('Produk')
                         ->options(fn () => Product::query()->orderBy('name')->pluck('name', 'id'))
@@ -83,16 +106,14 @@ class ViewInventoryCard extends Page
 
         $productIds = array_filter($this->productIds);
         $warehouseIds = array_filter($this->warehouseIds);
+        $cabangIds = array_filter($this->cabangIds);
 
-        $productIds = array_filter($this->productIds);
-        $warehouseIds = array_filter($this->warehouseIds);
-
-        $openingData = $this->buildAggregateQuery($productIds, $warehouseIds)
+        $openingData = $this->buildAggregateQuery($productIds, $warehouseIds, $cabangIds)
             ->where('date', '<', $start->toDateTimeString())
             ->get()
             ->keyBy(fn ($row) => $row->product_id . '-' . $row->warehouse_id);
 
-        $periodData = $this->buildAggregateQuery($productIds, $warehouseIds)
+        $periodData = $this->buildAggregateQuery($productIds, $warehouseIds, $cabangIds)
             ->whereBetween('date', [$start->toDateTimeString(), $end->toDateTimeString()])
             ->get()
             ->keyBy(fn ($row) => $row->product_id . '-' . $row->warehouse_id);
@@ -200,7 +221,7 @@ class ViewInventoryCard extends Page
         ];
     }
 
-    protected function buildAggregateQuery(array $productIds, array $warehouseIds): Builder
+    protected function buildAggregateQuery(array $productIds, array $warehouseIds, array $cabangIds = []): Builder
     {
         $inList = "'" . implode("','", self::IN_TYPES) . "'";
         $outList = "'" . implode("','", self::OUT_TYPES) . "'";
@@ -221,6 +242,12 @@ class ViewInventoryCard extends Page
 
         if (!empty($warehouseIds)) {
             $query->whereIn('warehouse_id', $warehouseIds);
+        }
+
+        if (!empty($cabangIds)) {
+            $query->whereHas('warehouse', function (Builder $builder) use ($cabangIds) {
+                $builder->whereIn('cabang_id', $cabangIds);
+            });
         }
 
         return $query;
@@ -249,6 +276,20 @@ class ViewInventoryCard extends Page
             ->whereIn('id', array_filter($this->warehouseIds))
             ->orderBy('name')
             ->pluck('name')
+            ->toArray();
+    }
+
+    public function getSelectedCabangNames(): array
+    {
+        if (empty($this->cabangIds)) {
+            return [];
+        }
+
+        return Cabang::query()
+            ->whereIn('id', array_filter($this->cabangIds))
+            ->orderBy('nama')
+            ->get()
+            ->map(fn ($cabang) => "({$cabang->kode}) {$cabang->nama}")
             ->toArray();
     }
 }

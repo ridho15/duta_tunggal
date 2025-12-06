@@ -30,7 +30,7 @@ class AccountPayable extends Model
 
     public function invoice()
     {
-        return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();
+        return $this->belongsTo(Invoice::class, 'invoice_id')->withTrashed()->withDefault();
     }
 
     public function supplier()
@@ -51,5 +51,27 @@ class AccountPayable extends Model
     public function vendorPaymentDetails()
     {
         return $this->hasMany(VendorPaymentDetail::class, 'invoice_id', 'invoice_id');
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($accountPayable) {
+            // Hapus ageing schedule ketika account payable dihapus
+            if ($accountPayable->ageingSchedule) {
+                \Illuminate\Support\Facades\Log::info('Deleting ageing schedule for AccountPayable ID: ' . $accountPayable->id);
+                $accountPayable->ageingSchedule->delete();
+            }
+        });
+
+        static::updated(function ($accountPayable) {
+            // Hapus ageing schedule ketika account payable lunas
+            if ($accountPayable->status === 'Lunas' && $accountPayable->wasChanged('status')) {
+                if ($accountPayable->ageingSchedule) {
+                    $accountPayable->ageingSchedule->delete();
+                }
+            }
+        });
     }
 }

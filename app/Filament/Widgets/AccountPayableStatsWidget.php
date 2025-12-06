@@ -17,7 +17,9 @@ class AccountPayableStatsWidget extends StatsOverviewWidget
         $tableFilters = $livewire->tableFilters ?? [];
         
         // Build query with current filters
-        $query = AccountPayable::query();
+        $query = AccountPayable::query()
+            ->where('status', '!=', 'Lunas') // Exclude PAID records from ageing schedule
+            ->whereNull('deleted_at'); // Exclude soft deleted records
         
         if (!empty($tableFilters)) {
             // Apply supplier filter
@@ -96,7 +98,6 @@ class AccountPayableStatsWidget extends StatsOverviewWidget
                 })->where('status', 'Belum Lunas');
             }
         }
-        
         // Calculate totals based on filtered data
         $totals = $query->selectRaw('
             SUM(total) as total_amount,

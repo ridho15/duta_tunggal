@@ -259,7 +259,23 @@ class OtherSaleResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Other Sale</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Other Sale adalah penjualan lainnya yang tidak melalui proses Sale Order standar, seperti penjualan langsung atau penjualan non-inventory.</li>' .
+                            '<li><strong>Status Flow:</strong> Dibuat langsung, dapat diedit atau dihapus. Termasuk opsi untuk reverse journal entries jika diperlukan.</li>' .
+                            '<li><strong>Validasi:</strong> Subtotal, Tax, PPN dihitung otomatis berdasarkan item. Terintegrasi dengan accounting untuk journal entries.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah penjualan), <em>Delete</em> (hapus), <em>Reverse Journal</em> (balikkan entri jurnal).</li>' .
+                            '<li><strong>Filters:</strong> Customer, Date Range, Amount Range, dll.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan penjualan dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan accounting untuk journal entries dan mungkin menghasilkan Account Receivable.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array

@@ -635,7 +635,23 @@ class SalesInvoiceResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('invoice_date', 'desc');
+            ->defaultSort('invoice_date', 'desc')
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Sales Invoice</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Sales Invoice adalah faktur penjualan kepada customer berdasarkan Sale Order yang telah disetujui, digunakan untuk mencatat pendapatan dan memproses penerimaan pembayaran.</li>' .
+                            '<li><strong>Status Flow:</strong> Dibuat dari Sale Order yang confirmed, dapat diedit sebelum dikirim.</li>' .
+                            '<li><strong>Validasi:</strong> Subtotal, Tax, PPN dihitung otomatis berdasarkan item. Total invoice digunakan untuk Account Receivable.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah invoice), <em>Delete</em> (hapus).</li>' .
+                            '<li><strong>Filters:</strong> Customer, Status, Date Range, Amount Range, Due Date Range, dll.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan invoice dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan Sale Order dan menghasilkan Account Receivable.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getEloquentQuery(): Builder

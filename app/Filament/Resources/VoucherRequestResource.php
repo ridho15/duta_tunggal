@@ -557,7 +557,23 @@ class VoucherRequestResource extends Resource
                     Tables\Actions\ForceDeleteBulkAction::make(),
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Voucher Request</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Voucher Request adalah pengajuan untuk pengeluaran atau penerimaan uang yang memerlukan approval sebelum diproses menjadi transaksi kas/bank.</li>' .
+                            '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved → Paid/Cleared. Atau bisa Request Cancel → Cancelled.</li>' .
+                            '<li><strong>Validasi:</strong> Amount, COA, dan detail lainnya. Approval diperlukan sebelum dapat dibayarkan.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah jika draft), <em>Delete</em> (hapus), <em>View Cash Bank Transactions</em> (lihat transaksi terkait).</li>' .
+                            '<li><strong>Filters:</strong> Status, Date Range, Amount Range, COA, dll.</li>' .
+                            '<li><strong>Permissions:</strong> <em>request voucher</em> untuk membuat request, <em>response voucher</em> untuk approve/reject.</li>' .
+                            '<li><strong>Integration:</strong> Terintegrasi dengan Cash Bank Transactions dan Journal Entries untuk pencatatan keuangan.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array
@@ -578,10 +594,17 @@ class VoucherRequestResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->where('cabang_id', $user->cabang_id);
+        }
+
+        return $query;
     }
     
     public static function getNavigationBadge(): ?string

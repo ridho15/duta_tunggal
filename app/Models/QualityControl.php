@@ -81,6 +81,11 @@ class QualityControl extends Model
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     public function purchaseReceipt()
     {
         // Jika fromModel adalah PurchaseReceiptItem, kembalikan purchaseReceipt-nya

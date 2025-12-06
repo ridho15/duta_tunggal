@@ -16,6 +16,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class BankReconciliationResource extends Resource
 {
@@ -141,7 +142,37 @@ class BankReconciliationResource extends Resource
             ->actions([
                 ViewAction::make(),
                 EditAction::make(),
-            ]);
+            ])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Rekonsiliasi Bank</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Rekonsiliasi Bank adalah proses mencocokkan saldo buku perusahaan dengan saldo rekening koran untuk memastikan akurasi catatan keuangan.</li>' .
+                            '<li><strong>Status:</strong> <em>Open</em> (sedang direkonsiliasi), <em>Closed</em> (sudah selesai). Selisih menunjukkan perbedaan yang perlu diselidiki.</li>' .
+                            '<li><strong>Validasi:</strong> Pilih akun bank, periode, dan saldo akhir rekening koran. Sistem akan menghitung saldo buku dan selisih.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah rekonsiliasi), <em>Create</em> (buat rekonsiliasi baru).</li>' .
+                            '<li><strong>Filters:</strong> Akun Bank.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan rekonsiliasi dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                            '<li><strong>Tujuan:</strong> Mengidentifikasi transaksi yang belum tercatat atau kesalahan pencatatan untuk memastikan laporan keuangan akurat.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('journalEntries', function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
     }
 
     public static function getPages(): array

@@ -37,6 +37,7 @@ class QualityControlWorkflowTest extends TestCase
         parent::setUp();
 
         $this->seed(ChartOfAccountSeeder::class);
+        $this->seed(\Database\Seeders\CabangSeeder::class);
 
         Carbon::setTestNow(now());
 

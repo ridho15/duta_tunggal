@@ -37,6 +37,14 @@ class ViewPurchaseInvoice extends ViewRecord
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
                 ->action(function ($record) {
+                    // Load necessary relationships for PDF
+                    $record->load([
+                        'fromModel.supplier',
+                        'fromModel.purchaseOrderBiaya',
+                        'invoiceItem.product',
+                        'cabang'
+                    ]);
+                    
                     $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
                         'invoice' => $record
                     ])->setPaper('A4', 'portrait');

@@ -23,6 +23,7 @@ class ViewProfitAndLoss extends Page
 
     public ?string $startDate = null;
     public ?string $endDate = null;
+    public ?string $cabang_id = null;
     public ?array $branches = [];
     public ?bool $compare = false;
     public ?string $compareStartDate = null;
@@ -36,8 +37,9 @@ class ViewProfitAndLoss extends Page
                 ->schema([
                     DatePicker::make('startDate')->label('Start Date')->default(now()->startOfMonth())->reactive(),
                     DatePicker::make('endDate')->label('End Date')->default(now()->endOfMonth())->reactive(),
-                    Select::make('branches')->label('Branch')
-                        ->options([])->multiple()->searchable(),
+                    Select::make('cabang_id')->label('Cabang')
+                        ->options(\App\Models\Cabang::query()->pluck('nama','id'))
+                        ->searchable(),
                     Forms\Components\Toggle::make('compare')->label('Bandingkan Periode')->reactive(),
                     DatePicker::make('compareStartDate')->label('Compare Start')->visible(fn(Get $get) => $get('compare') === true),
                     DatePicker::make('compareEndDate')->label('Compare End')->visible(fn(Get $get) => $get('compare') === true),
@@ -81,18 +83,16 @@ class ViewProfitAndLoss extends Page
         $ids = $accounts->pluck('id');
         // For revenue (credit normal), use credit - debit; for expense (debit normal), use debit - credit
         $type = optional($accounts->first())->type;
-        if ($type === 'Revenue') {
-            return (float) JournalEntry::whereIn('coa_id', $ids)
-                ->whereBetween('date', [$start, $end])
-                ->sum('credit') - (float) JournalEntry::whereIn('coa_id', $ids)
-                ->whereBetween('date', [$start, $end])
-                ->sum('debit');
+        $query = JournalEntry::whereIn('coa_id', $ids)->whereBetween('date', [$start, $end]);
+        
+        if (!empty($this->cabang_id)) {
+            $query->where('cabang_id', $this->cabang_id);
         }
-        return (float) JournalEntry::whereIn('coa_id', $ids)
-            ->whereBetween('date', [$start, $end])
-            ->sum('debit') - (float) JournalEntry::whereIn('coa_id', $ids)
-            ->whereBetween('date', [$start, $end])
-            ->sum('credit');
+        
+        if ($type === 'Revenue') {
+            return (float) (clone $query)->sum('credit') - (float) (clone $query)->sum('debit');
+        }
+        return (float) (clone $query)->sum('debit') - (float) (clone $query)->sum('credit');
     }
 
     protected function getCogs($start, $end): float

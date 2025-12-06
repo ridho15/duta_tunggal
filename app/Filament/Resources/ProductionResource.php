@@ -22,6 +22,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
@@ -209,6 +210,20 @@ class ProductionResource extends Resource
         return [
             //
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('manufacturingOrder', function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
     }
 
     public static function getPages(): array

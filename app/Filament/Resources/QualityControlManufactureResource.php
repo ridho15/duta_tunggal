@@ -37,6 +37,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Enums\ActionsPosition;
 
 class QualityControlManufactureResource extends Resource
@@ -335,6 +336,15 @@ class QualityControlManufactureResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->where('from_model_type', 'App\Models\Production');
+        $query = parent::getEloquentQuery()->where('from_model_type', 'App\Models\Production');
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('fromModel.manufacturingOrder', function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
     }
 }

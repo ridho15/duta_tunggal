@@ -33,6 +33,9 @@ beforeEach(function () {
         ]);
     }
 
+    // Seed Cabang
+    $this->seed(\Database\Seeders\CabangSeeder::class);
+
     // Use existing data or create if not exists
     $this->currency = Currency::where('code', 'IDR')->first() ?? Currency::first();
     if (!$this->currency) {

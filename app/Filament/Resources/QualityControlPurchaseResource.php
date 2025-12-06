@@ -31,6 +31,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
+use Illuminate\Support\Facades\Auth;
 
 class QualityControlPurchaseResource extends Resource
 {
@@ -531,7 +532,7 @@ class QualityControlPurchaseResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->where('from_model_type', 'App\Models\PurchaseReceiptItem')
             ->with([
                 'product.uom',
@@ -540,5 +541,14 @@ class QualityControlPurchaseResource extends Resource
                 'warehouse',
                 'rak'
             ]);
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('warehouse', function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
     }
 }

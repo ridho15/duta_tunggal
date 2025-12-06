@@ -55,6 +55,27 @@ class AccountReceivable extends Model
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($accountReceivable) {
+            // Hapus ageing schedule ketika account receivable dihapus
+            if ($accountReceivable->ageingSchedule) {
+                $accountReceivable->ageingSchedule->delete();
+            }
+        });
+
+        static::updated(function ($accountReceivable) {
+            // Hapus ageing schedule ketika account receivable lunas
+            if ($accountReceivable->status === 'Lunas' && $accountReceivable->wasChanged('status')) {
+                if ($accountReceivable->ageingSchedule) {
+                    $accountReceivable->ageingSchedule->delete();
+                }
+            }
+        });
+    }
+
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);

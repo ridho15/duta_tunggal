@@ -46,9 +46,23 @@ class ViewHpp extends Page
                         ->reactive(),
                     Select::make('branchIds')
                         ->label('Cabang')
-                        ->options(fn () => Cabang::orderBy('nama')->pluck('nama', 'id'))
+                        ->options(function () {
+                            return Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            });
+                        })
                         ->multiple()
                         ->searchable()
+                        ->preload()
+                        ->getSearchResultsUsing(function (string $search) {
+                            return Cabang::where('nama', 'like', "%{$search}%")
+                                ->orWhere('kode', 'like', "%{$search}%")
+                                ->limit(50)
+                                ->get()
+                                ->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                });
+                        })
                         ->helperText('Kosongkan bila ingin menampilkan semua cabang'),
                 ]),
         ];

@@ -20,6 +20,12 @@ class CustomerReceiptFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(\Database\Seeders\CabangSeeder::class);
+    }
+
     public function test_can_create_customer_receipt_with_cash_payment()
     {
         // Setup

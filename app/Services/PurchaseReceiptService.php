@@ -199,17 +199,25 @@ class PurchaseReceiptService
         }
         $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
 
+        // Resolve branch from source
+        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
+        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
+        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
+
         $entries = [];
 
         // Debit inventory account
         $entries[] = JournalEntry::create([
             'coa_id' => $inventoryCoa->id,
             'date' => $date,
-            'reference' => $item->purchaseReceipt->receipt_number,
+            'reference' => 'PRI-' . $item->id,
             'description' => 'Debit inventory for receipt item ' . $item->id,
             'debit' => round($amount, 2),
             'credit' => 0,
             'journal_type' => 'inventory',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
         ]);
@@ -219,11 +227,14 @@ class PurchaseReceiptService
         $entries[] = JournalEntry::create([
             'coa_id' => $temporaryProcurementCoa->id,
             'date' => $date,
-            'reference' => $item->purchaseReceipt->receipt_number,
+            'reference' => 'PRI-' . $item->id,
             'description' => 'Inventory Posting - Credit temporary procurement for receipt item ' . $item->id,
             'debit' => 0,
             'credit' => round($amount, 2),
             'journal_type' => 'inventory',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
         ]);
@@ -323,17 +334,25 @@ class PurchaseReceiptService
 
         $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
 
+        // Resolve branch from source
+        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
+        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
+        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
+
         $entries = [];
 
         // Debit return/expense account
         $entries[] = JournalEntry::create([
             'coa_id' => $returnCoa->id,
             'date' => $date,
-            'reference' => $item->purchaseReceipt->receipt_number,
+            'reference' => 'PRI-' . $item->id,
             'description' => 'Return Product - ' . $returnReason . ' for receipt item ' . $item->id,
             'debit' => round($amount, 2),
             'credit' => 0,
             'journal_type' => 'return',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
         ]);
@@ -342,11 +361,14 @@ class PurchaseReceiptService
         $entries[] = JournalEntry::create([
             'coa_id' => $temporaryProcurementCoa->id,
             'date' => $date,
-            'reference' => $item->purchaseReceipt->receipt_number,
+            'reference' => 'PRI-' . $item->id,
             'description' => 'Return Product - Credit temporary procurement for receipt item ' . $item->id,
             'debit' => 0,
             'credit' => round($amount, 2),
             'journal_type' => 'return',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
         ]);
@@ -392,6 +414,11 @@ class PurchaseReceiptService
         // Create transaction ID for this operation
         $transactionId = Str::uuid();
 
+        // Resolve branch from source
+        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($receipt);
+        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($receipt);
+        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($receipt);
+
         // Create reversing entries:
         // 1. Credit the temporary procurement account (reverse the original debit)
         $entries[] = [
@@ -402,8 +429,12 @@ class PurchaseReceiptService
             'description' => 'Zero out temporary procurement positions - ' . $receipt->receipt_number,
             'transaction_id' => $transactionId,
             'journal_type' => 'inventory',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceipt::class,
             'source_id' => $receipt->id,
+            'reference' => 'PR-' . $receipt->id,
         ];
 
         // 2. Debit the unbilled purchase account (reverse the original credit)
@@ -419,8 +450,12 @@ class PurchaseReceiptService
             'description' => 'Zero out temporary procurement positions - ' . $receipt->receipt_number,
             'transaction_id' => $transactionId,
             'journal_type' => 'inventory',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceipt::class,
             'source_id' => $receipt->id,
+            'reference' => 'PR-' . $receipt->id,
         ];
 
         if (! $this->validateJournalBalance($entries)) {
@@ -498,15 +533,23 @@ class PurchaseReceiptService
         // Create transaction ID for double-entry bookkeeping
         $transactionId = (string) Str::uuid();
 
+        // Resolve branch from source
+        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
+        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
+        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
+
         // Debit temporary procurement position
         $debitEntry = JournalEntry::create([
             'coa_id' => $temporaryProcurementCoa->id,
             'date' => $date,
-            'reference' => $item->purchaseReceipt->receipt_number,
+            'reference' => 'PRI-' . $item->id,
             'description' => 'Temporary Procurement Entry - From QC: ' . $product->name . ' (' . $qtyAccepted . ' ' . $product->unit . ')',
             'debit' => round($amount, 2),
             'credit' => 0,
             'journal_type' => 'procurement',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
             'transaction_id' => $transactionId,
@@ -516,11 +559,14 @@ class PurchaseReceiptService
         $creditEntry = JournalEntry::create([
             'coa_id' => $unbilledPurchaseCoa->id,
             'date' => $date,
-            'reference' => $item->purchaseReceipt->receipt_number,
+            'reference' => 'PRI-' . $item->id,
             'description' => 'Temporary Procurement Entry - From QC: ' . $product->name . ' (' . $qtyAccepted . ' ' . $product->unit . ')',
             'debit' => 0,
             'credit' => round($amount, 2),
             'journal_type' => 'procurement',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
             'transaction_id' => $transactionId,

@@ -126,7 +126,9 @@ class ViewBalanceSheet extends Page
     protected function calculateBalanceForCoa(ChartOfAccount $coa, Carbon $asOf): float
     {
         $query = JournalEntry::where('coa_id', $coa->id)->where('date', '<=', $asOf);
-        if (!empty($this->branches)) {
+        if (!empty($this->cabang_id)) {
+            $query->where('cabang_id', $this->cabang_id);
+        } elseif (!empty($this->branches)) {
             $query->whereIn('cabang_id', $this->branches);
         }
         $debit = (float) (clone $query)->sum('debit');
@@ -214,7 +216,10 @@ class ViewBalanceSheet extends Page
         $expense = ChartOfAccount::where('type', 'Expense')->pluck('id');
         $revQ = JournalEntry::whereIn('coa_id', $revenue)->where('date', '<=', $asOf);
         $expQ = JournalEntry::whereIn('coa_id', $expense)->where('date', '<=', $asOf);
-        if (!empty($this->branches)) {
+        if (!empty($this->cabang_id)) {
+            $revQ->where('cabang_id', $this->cabang_id);
+            $expQ->where('cabang_id', $this->cabang_id);
+        } elseif (!empty($this->branches)) {
             $revQ->whereIn('cabang_id', $this->branches);
             $expQ->whereIn('cabang_id', $this->branches);
         }

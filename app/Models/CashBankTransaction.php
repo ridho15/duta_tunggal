@@ -89,6 +89,11 @@ class CashBankTransaction extends Model
         static::addGlobalScope(new CabangScope);
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();

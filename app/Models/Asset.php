@@ -108,6 +108,11 @@ class Asset extends Model
         return $this->belongsTo(PurchaseOrderItem::class, 'purchase_order_item_id')->withDefault();
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     public function cabang()
     {
         return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();

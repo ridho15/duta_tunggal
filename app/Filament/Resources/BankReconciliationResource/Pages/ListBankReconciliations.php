@@ -13,7 +13,7 @@ class ListBankReconciliations extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make()->label('Buat Rekonsiliasi'),
+            Actions\CreateAction::make()->label('Buat Rekonsiliasi')->icon('heroicon-o-plus-circle'),
         ];
     }
 

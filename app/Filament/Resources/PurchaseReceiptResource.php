@@ -98,7 +98,7 @@ class PurchaseReceiptResource extends Resource
                                 'exists' => 'Kode pembelian tidak tersedia'
                             ])
                             ->options(function () {
-                                return \App\Models\PurchaseOrder::whereIn('status', ['approved', 'partially_received'])
+                                return \App\Models\PurchaseOrder::whereIn('status', ['approved', 'partially_received', 'completed'])
                                     ->get()
                                     ->map(function ($po) {
                                         return [
@@ -111,6 +111,14 @@ class PurchaseReceiptResource extends Resource
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $items = [];
                                 $purchaseOrder = \App\Models\PurchaseOrder::with('purchaseOrderCurrency')->find($state);
+                                
+                                if (!$purchaseOrder) {
+                                    // Handle case when purchase order is not found
+                                    $set('currency_id', 7); // Default to IDR
+                                    $set('purchaseReceiptItem', []);
+                                    return;
+                                }
+                                
                                 $warehouse_id = $purchaseOrder->warehouse_id ?? null;
                                 $rak_id = $purchaseOrder->rak_id ?? null;
                                 $currency_id = $purchaseOrder->purchaseOrderCurrency->first()->currency_id ?? 7; // Default to IDR if none

@@ -8,6 +8,7 @@ use App\Models\ProductionPlan;
 use App\Models\SaleOrder;
 use App\Models\BillOfMaterial;
 use App\Models\Warehouse;
+use App\Models\ManufacturingOrderMaterial;
 use App\Services\ProductionPlanService;
 use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Forms\Components\Checkbox;
@@ -697,7 +698,7 @@ class ProductionPlanResource extends Resource
                                         ->where('qty_available', '>', 0)
                                         ->first();
 
-                                    \App\Models\ManufacturingOrderMaterial::create([
+                                    ManufacturingOrderMaterial::create([
                                         'manufacturing_order_id' => $mo->id,
                                         'material_id' => $item->product_id,
                                         'qty_required' => $item->quantity * $record->quantity,
@@ -754,6 +755,20 @@ class ProductionPlanResource extends Resource
         return [
             //
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('billOfMaterial', function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
     }
 
     public static function getPages(): array

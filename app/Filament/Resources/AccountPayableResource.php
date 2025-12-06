@@ -25,6 +25,7 @@ use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use App\Filament\Resources\AccountPayableResource\RelationManagers;
 
 class AccountPayableResource extends Resource
@@ -155,20 +156,24 @@ class AccountPayableResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                // Join invoices to allow computed grouping & sorting by overdue status
-                $query->leftJoin('invoices', 'account_payables.invoice_id', '=', 'invoices.id')
+                // Join invoices to allow computed grouping & sorting by overdue status (including soft deleted)
+                $query->leftJoin('invoices', function ($join) {
+                    $join->on('account_payables.invoice_id', '=', 'invoices.id');
+                })
+                    ->where('account_payables.status', '!=', 'Lunas') // Exclude PAID records from ageing schedule
+                    ->whereNull('account_payables.deleted_at') // Exclude soft deleted AP records from ageing schedule
                     ->select('account_payables.*')
                     ->addSelect(
                         DB::raw("CASE 
-                            WHEN account_payables.status = 'Lunas' THEN 'PAID'
-                            WHEN invoices.due_date < CURDATE() AND DATEDIFF(CURDATE(), invoices.due_date) > 60 THEN 'OVERDUE 60+ Days'
-                            WHEN invoices.due_date < CURDATE() AND DATEDIFF(CURDATE(), invoices.due_date) > 30 THEN 'OVERDUE 30+ Days'
-                            WHEN invoices.due_date < CURDATE() THEN 'OVERDUE'
+                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL AND DATEDIFF(CURDATE(), invoices.due_date) > 60 THEN 'OVERDUE 60+ Days'
+                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL AND DATEDIFF(CURDATE(), invoices.due_date) > 30 THEN 'OVERDUE 30+ Days'
+                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL THEN 'OVERDUE'
+                            WHEN invoices.deleted_at IS NOT NULL THEN 'DELETED INVOICE'
                             ELSE 'CURRENT'
                         END AS overdue_group")
                     );
-                // Eager load required relations still
-                return $query->with(['invoice.fromModel']);
+                // Eager load required relations
+                return $query->with(['invoice', 'invoice.fromModel']);
             })
             ->columns([
                 TextColumn::make('invoice.invoice_number')
@@ -176,7 +181,16 @@ class AccountPayableResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->copyable()
-                    ->tooltip('Click to copy'),
+                    ->tooltip('Click to copy')
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($record->overdue_group === 'DELETED INVOICE') {
+                            return $state . ' 🗑️ (DELETED)';
+                        }
+                        return $state;
+                    })
+                    ->color(function ($record) {
+                        return $record->overdue_group === 'DELETED INVOICE' ? 'danger' : 'gray';
+                    }),
                     
                 TextColumn::make('supplier')
                     ->formatStateUsing(function ($state) {
@@ -194,17 +208,32 @@ class AccountPayableResource extends Resource
                 TextColumn::make('invoice.invoice_date')
                     ->label('Invoice Date')
                     ->date('M j, Y')
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($record->overdue_group === 'DELETED INVOICE') {
+                            return $state . ' 🗑️';
+                        }
+                        return $state;
+                    }),
                     
                 TextColumn::make('invoice.due_date')
                     ->label('Due Date')
                     ->date('M j, Y')
                     ->sortable()
                     ->color(function ($record) {
-                        if ($record->invoice->due_date < now() && $record->status === 'Belum Lunas') {
+                        if ($record->overdue_group === 'DELETED INVOICE') {
+                            return 'danger';
+                        }
+                        if ($record->invoice && $record->invoice->due_date < now() && $record->status === 'Belum Lunas') {
                             return 'danger';
                         }
                         return 'gray';
+                    })
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($record->overdue_group === 'DELETED INVOICE') {
+                            return $state . ' 🗑️ (DELETED)';
+                        }
+                        return $state;
                     }),
                     
                 TextColumn::make('total')
@@ -215,7 +244,7 @@ class AccountPayableResource extends Resource
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
                             ->money('IDR')
-                            ->label('Total AP')
+                            ->label('Total Outstanding')
                     ]),
                     
                 TextColumn::make('paid')
@@ -244,12 +273,16 @@ class AccountPayableResource extends Resource
                 TextColumn::make('days_overdue')
                     ->label('Days Overdue')
                     ->getStateUsing(function ($record) {
-                        if ($record->status === 'Belum Lunas' && $record->invoice->due_date < now()) {
+                        if ($record->overdue_group === 'DELETED INVOICE') {
+                            return 'DELETED';
+                        }
+                        if ($record->status === 'Belum Lunas' && $record->invoice && $record->invoice->due_date < now()) {
                             return now()->diffInDays($record->invoice->due_date);
                         }
                         return 0;
                     })
-                    ->color(function ($state) {
+                    ->color(function ($state, $record) {
+                        if ($state === 'DELETED') return 'danger';
                         if ($state > 30) return 'danger';
                         if ($state > 0) return 'warning';
                         return 'success';
@@ -281,6 +314,9 @@ class AccountPayableResource extends Resource
                 TextColumn::make('invoice.fromModel.createdBy.name')
                     ->label('PO Created By')
                     ->getStateUsing(function ($record) {
+                        if ($record->overdue_group === 'DELETED INVOICE') {
+                            return 'DELETED INVOICE';
+                        }
                         return $record->invoice->fromModel?->createdBy?->name ?? 'System';
                     })
                     ->sortable(query: function (Builder $query, string $direction): Builder {
@@ -325,15 +361,17 @@ class AccountPayableResource extends Resource
                     ->label('Overdue Status')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        if ($record->status === 'Lunas') return '✅ PAID';
+                        if ($record->overdue_group === 'DELETED INVOICE') {
+                            return '🗑️ DELETED INVOICE';
+                        }
                         
-                        $daysOverdue = $record->invoice->due_date < now() 
-                            ? now()->diffInDays($record->invoice->due_date) 
-                            : 0;
-                            
-                        if ($daysOverdue > 60) return '🚨 OVERDUE 60+ Days';
-                        if ($daysOverdue > 30) return '⚠️ OVERDUE 30+ Days';
-                        if ($daysOverdue > 0) return '⏰ OVERDUE';
+                        // Since we exclude 'Lunas' records, overdue_group will never be 'PAID'
+                        if ($record->invoice && $record->invoice->due_date < now()) {
+                            $daysOverdue = now()->diffInDays($record->invoice->due_date);
+                            if ($daysOverdue > 60) return '🚨 OVERDUE 60+ Days';
+                            if ($daysOverdue > 30) return '⚠️ OVERDUE 30+ Days';
+                            if ($daysOverdue > 0) return '⏰ OVERDUE';
+                        }
                         return '💚 CURRENT';
                     })
                     ->collapsible(),
@@ -524,7 +562,23 @@ class AccountPayableResource extends Resource
                     DeleteAction::make(),
                 ])
             ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([]);
+            ->bulkActions([])
+            ->description(new \Illuminate\Support\HtmlString(
+                '<details class="mb-4">' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Account Payable</summary>' .
+                    '<div class="mt-2 text-sm">' .
+                        '<ul class="list-disc pl-5">' .
+                            '<li><strong>Apa ini:</strong> Account Payable adalah catatan hutang perusahaan kepada supplier berdasarkan invoice pembelian yang belum dibayar.</li>' .
+                            '<li><strong>Status:</strong> <em>Belum Lunas</em> (outstanding), <em>Lunas</em> (paid). Hanya menampilkan yang belum lunas secara default.</li>' .
+                            '<li><strong>Validasi:</strong> Total, Paid, dan Remaining dihitung otomatis. Status pembayaran diperbarui berdasarkan pembayaran.</li>' .
+                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah pembayaran), <em>Delete</em> (hapus record).</li>' .
+                            '<li><strong>Grouping:</strong> Berdasarkan Supplier, Status Pembayaran, dan Status Overdue (Current, Overdue, dll.).</li>' .
+                            '<li><strong>Filters:</strong> Supplier, Status, Amount Range, Outstanding Only, Overdue, Date Range, dll.</li>' .
+                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan AP dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                        '</ul>' .
+                    '</div>' .
+                '</details>'
+            ));
     }
 
     public static function getRelations(): array
@@ -536,7 +590,16 @@ class AccountPayableResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->orderBy('created_at', 'DESC');
+        $query = parent::getEloquentQuery()->where('account_payables.status', '!=', 'Lunas')->orderBy('account_payables.created_at', 'DESC');
+
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('invoice', function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
     }
 
     public static function getPages(): array

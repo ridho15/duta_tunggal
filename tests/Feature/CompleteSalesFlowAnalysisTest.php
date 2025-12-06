@@ -47,6 +47,7 @@ class CompleteSalesFlowAnalysisTest extends TestCase
         parent::setUp();
 
         $this->seed(ChartOfAccountSeeder::class);
+        $this->seed(CabangSeeder::class);
 
         // Create test data
         $this->user = User::factory()->create();

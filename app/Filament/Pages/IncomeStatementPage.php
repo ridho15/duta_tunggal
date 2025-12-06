@@ -76,9 +76,22 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
                             ->required(),
                         Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(Cabang::pluck('nama', 'id')->toArray())
+                            ->options(function () {
+                                return Cabang::all()->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                });
+                            })
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->getSearchResultsUsing(function (string $search) {
+                                return Cabang::where('nama', 'like', "%{$search}%")
+                                    ->orWhere('kode', 'like', "%{$search}%")
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(function ($cabang) {
+                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                    });
+                            }),
                         Toggle::make('show_comparison')
                             ->label('Tampilkan Perbandingan')
                             ->live(),

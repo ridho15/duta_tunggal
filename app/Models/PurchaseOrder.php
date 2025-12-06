@@ -98,6 +98,11 @@ class PurchaseOrder extends Model
         return $this->belongsTo(User::class, 'completed_by')->withDefault();
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();

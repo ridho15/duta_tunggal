@@ -60,6 +60,11 @@ class AssetService
             }
 
             // Create journal entries
+            // Resolve branch from source
+            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($asset);
+            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($asset);
+            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($asset);
+
             // Debit: Fixed Asset
             JournalEntry::create([
                 'date' => $asset->purchase_date,
@@ -67,6 +72,9 @@ class AssetService
                 'debit' => $asset->purchase_cost,
                 'credit' => 0,
                 'description' => $description,
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
                 'source_type' => 'App\Models\Asset',
                 'source_id' => $asset->id,
                 'created_by' => Auth::id(),
@@ -79,6 +87,9 @@ class AssetService
                 'debit' => 0,
                 'credit' => $asset->purchase_cost,
                 'description' => $description,
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
                 'source_type' => 'App\Models\Asset',
                 'source_id' => $asset->id,
                 'created_by' => Auth::id(),
@@ -104,6 +115,11 @@ class AssetService
 
             $description = 'Depreciation expense for ' . $asset->name . ' - ' . $period;
 
+            // Resolve branch from source
+            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($asset);
+            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($asset);
+            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($asset);
+
             // Debit: Depreciation Expense
             JournalEntry::create([
                 'date' => now(),
@@ -111,6 +127,9 @@ class AssetService
                 'debit' => $depreciationAmount,
                 'credit' => 0,
                 'description' => $description,
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
                 'source_type' => 'App\Models\Asset',
                 'source_id' => $asset->id,
                 'created_by' => Auth::id(),
@@ -123,6 +142,9 @@ class AssetService
                 'debit' => 0,
                 'credit' => $depreciationAmount,
                 'description' => $description,
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
                 'source_type' => 'App\Models\Asset',
                 'source_id' => $asset->id,
                 'created_by' => Auth::id(),

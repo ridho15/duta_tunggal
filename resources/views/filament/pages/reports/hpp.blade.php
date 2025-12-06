@@ -9,7 +9,7 @@
         @php($overhead = $report['overhead'])
         @php($wip = $report['wip'])
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="p-4 border rounded shadow-sm">
                 <div class="text-sm text-gray-500">Periode</div>
                 <div class="text-lg font-semibold">

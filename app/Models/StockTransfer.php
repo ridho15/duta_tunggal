@@ -35,6 +35,11 @@ class StockTransfer extends Model
         return $this->hasMany(StockTransferItem::class, 'stock_transfer_id');
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     protected static function booted()
     {
         static::deleting(function ($stockTransfer) {

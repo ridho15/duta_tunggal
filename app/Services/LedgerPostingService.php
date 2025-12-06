@@ -67,6 +67,11 @@ class LedgerPostingService
 
         $entries = [];
 
+        // Resolve branch from source
+        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($invoice);
+        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($invoice);
+        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($invoice);
+
         // For purchase invoices, inventory recognition now happens through QC approval
         // So we skip creating inventory debit entries here
         $isPurchaseInvoice = $invoice->from_model_type === PurchaseOrder::class;
@@ -91,6 +96,9 @@ class LedgerPostingService
                     'debit' => $subtotal,
                     'credit' => 0,
                     'journal_type' => 'purchase',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                 ]);
@@ -114,6 +122,9 @@ class LedgerPostingService
                     'debit' => $ppnAmount,
                     'credit' => 0,
                     'journal_type' => 'purchase',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                 ]);
@@ -135,6 +146,9 @@ class LedgerPostingService
                             'debit' => $feeAmount,
                             'credit' => 0,
                             'journal_type' => 'purchase',
+                            'cabang_id' => $branchId,
+                            'department_id' => $departmentId,
+                            'project_id' => $projectId,
                             'source_type' => Invoice::class,
                             'source_id' => $invoice->id,
                         ]);
@@ -154,6 +168,9 @@ class LedgerPostingService
                     'debit' => 0,
                     'credit' => $totalAmount,
                     'journal_type' => 'purchase',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                 ]);
@@ -298,6 +315,11 @@ class LedgerPostingService
 
         $entries = [];
 
+        // Resolve branch from source
+        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($payment);
+        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($payment);
+        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($payment);
+
         if ($utangCoa) {
             $entries[] = JournalEntry::create([
                 'coa_id' => $utangCoa->id,
@@ -307,6 +329,9 @@ class LedgerPostingService
                 'debit' => $total,
                 'credit' => 0,
                 'journal_type' => 'payment',
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
                 'source_type' => VendorPayment::class,
                 'source_id' => $payment->id,
             ]);
@@ -335,6 +360,9 @@ class LedgerPostingService
                     'debit' => 0,
                     'credit' => $depositAmount,
                     'journal_type' => 'payment',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
                 ]);
@@ -384,6 +412,9 @@ class LedgerPostingService
                     'debit' => 0,
                     'credit' => $amount,
                     'journal_type' => 'payment',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
                 ]);
@@ -400,6 +431,9 @@ class LedgerPostingService
                     'debit' => 0,
                     'credit' => $cashBankAmount,
                     'journal_type' => 'payment',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
                 ]);
@@ -446,6 +480,9 @@ class LedgerPostingService
                     'debit' => $amount,
                     'credit' => 0,
                     'journal_type' => 'payment',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
                 ]);
@@ -458,6 +495,9 @@ class LedgerPostingService
                     'debit' => 0,
                     'credit' => $amount,
                     'journal_type' => 'payment',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
                 ]);

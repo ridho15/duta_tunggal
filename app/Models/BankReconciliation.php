@@ -44,4 +44,21 @@ class BankReconciliation extends Model
                 $query->where('debit', '>', 0)->orWhere('credit', '>', 0);
             });
     }
+
+    public function getBookBalanceAttribute()
+    {
+        // Calculate book balance: sum of debits - credits for reconciled entries in the period
+        $entries = $this->journalEntries()
+            ->whereBetween('date', [$this->period_start, $this->period_end])
+            ->get();
+
+        $debit = $entries->sum('debit');
+        $credit = $entries->sum('credit');
+        return $debit - $credit;
+    }
+
+    public function getDifferenceAttribute()
+    {
+        return $this->statement_ending_balance - $this->book_balance;
+    }
 }
