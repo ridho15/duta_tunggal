@@ -112,11 +112,11 @@ class OrderRequestResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 if ($user && is_array($manageType) && in_array('all', $manageType)) {
                                     return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
-                                        return [$cabang->id => $cabang->name];
+                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     });
                                 } else {
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)->get()->mapWithKeys(function ($cabang) {
-                                        return [$cabang->id => $cabang->name];
+                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     });
                                 }
                             })
