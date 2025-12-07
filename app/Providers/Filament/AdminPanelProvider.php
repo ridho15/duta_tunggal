@@ -13,6 +13,7 @@ use App\Filament\Pages\IncomeStatementPage;
 use App\Filament\Pages\MyDashboard;
 use App\Filament\Resources\JournalEntryResource;
 use App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries;
+use App\Filament\Widgets\AssetStatsWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -51,6 +52,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
+                \App\Filament\Widgets\AssetStatsWidget::class,
                 // AccountWidget::class, // Commented out - widget doesn't exist
                 // Widgets\FilamentInfoWidget::class,
             ])

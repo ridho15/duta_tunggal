@@ -12,8 +12,8 @@ class SaldoStatsOverview extends BaseWidget
 {
     protected function getStats(): array
     {
-        $kasCoaId = ChartOfAccount::where('code', '1-1001')->value('id');
-        $bankCoaId = ChartOfAccount::where('code', '1-1002')->value('id');
+        $kasCoaId = ChartOfAccount::where('code', '1-1000')->value('id');
+        $bankCoaId = ChartOfAccount::where('code', '1-1100')->value('id');
 
         // Hitung saldo dari jurnal (debit - kredit) berdasarkan coa_id
         $saldoKas = JournalEntry::where('coa_id', $kasCoaId)

@@ -15,6 +15,15 @@ class AssetObserver
     }
 
     /**
+     * Handle the Asset "deleting" event.
+     */
+    public function deleting(Asset $asset): void
+    {
+        // Soft delete related journal entries when asset is deleted
+        $asset->journalEntries()->delete();
+    }
+
+    /**
      * Handle the Asset "updating" event.
      */
     public function updating(Asset $asset): void
@@ -22,6 +31,11 @@ class AssetObserver
         // Only recalculate if relevant fields changed
         if ($asset->isDirty(['purchase_cost', 'salvage_value', 'useful_life_years'])) {
             $this->calculateDepreciation($asset);
+            
+            // Update related journal entries if asset cost changed
+            if ($asset->isDirty('purchase_cost')) {
+                $this->updateAcquisitionJournals($asset);
+            }
         }
     }
 
@@ -42,5 +56,25 @@ class AssetObserver
         
         // Calculate initial book value
         $asset->book_value = $asset->purchase_cost - ($asset->accumulated_depreciation ?? 0);
+    }
+
+    /**
+     * Update acquisition journal entries when asset cost changes
+     */
+    protected function updateAcquisitionJournals(Asset $asset): void
+    {
+        $acquisitionEntries = $asset->journalEntries()
+            ->where('description', 'like', '%Asset acquisition%')
+            ->get();
+
+        foreach ($acquisitionEntries as $entry) {
+            if ($entry->debit > 0) {
+                // Update debit entry (asset account)
+                $entry->update(['debit' => $asset->purchase_cost]);
+            } elseif ($entry->credit > 0) {
+                // Update credit entry (accounts payable/cash)
+                $entry->update(['credit' => $asset->purchase_cost]);
+            }
+        }
     }
 }

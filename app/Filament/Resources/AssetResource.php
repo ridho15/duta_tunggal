@@ -583,10 +583,11 @@ class AssetResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('cabang.nama')
+                Tables\Columns\TextColumn::make('cabang')
                     ->label('Cabang')
                     ->searchable()
                     ->sortable()
+                    ->formatStateUsing(fn($record) => $record->cabang ? "{$record->cabang->kode} - {$record->cabang->nama}" : '-')
                     ->toggleable(isToggledHiddenByDefault: false),
 
                 Tables\Columns\TextColumn::make('assetCoa.name')
@@ -787,7 +788,8 @@ class AssetResource extends Resource
                             \Filament\Notifications\Notification::make()
                                 ->title('Penyusutan berhasil dihitung')
                                 ->success()
-                                ->send();
+                                ->persistent()
+                                ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
                         }),
                     Tables\Actions\Action::make('post_asset_journal')
                         ->color('info')
@@ -800,21 +802,43 @@ class AssetResource extends Resource
                             \Filament\Notifications\Notification::make()
                                 ->title('Jurnal akuisisi aset berhasil dipost')
                                 ->success()
-                                ->send();
+                                ->persistent()
+                                ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
                         }),
                     Tables\Actions\Action::make('post_depreciation_journal')
                         ->color('purple')
                         ->label('Post Jurnal Penyusutan')
                         ->icon('heroicon-o-chart-bar')
+                        ->visible(fn(Asset $record) => $record->status !== 'fully_depreciated' && $record->monthly_depreciation > 0)
                         ->action(function (Asset $record) {
                             $currentMonth = now()->format('Y-m');
-                            $depreciationAmount = $record->monthlyDepreciation ?? 0;
+                            $depreciationAmount = $record->monthly_depreciation ?? 0;
 
                             if ($depreciationAmount <= 0) {
                                 \Filament\Notifications\Notification::make()
                                     ->title('Tidak ada penyusutan untuk dipost')
+                                    ->body('Nilai penyusutan bulanan asset ini adalah 0 atau negatif. Pastikan asset belum fully depreciated dan nilai penyusutan sudah dihitung dengan benar.')
                                     ->warning()
-                                    ->send();
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                                return;
+                            }
+
+                            // Check if depreciation journal already exists for this month
+                            $existingDepreciation = \App\Models\JournalEntry::where('source_type', 'App\Models\Asset')
+                                ->where('source_id', $record->id)
+                                ->where('description', 'like', '%Depreciation expense%')
+                                ->where('date', '>=', now()->startOfMonth())
+                                ->where('date', '<=', now()->endOfMonth())
+                                ->exists();
+
+                            if ($existingDepreciation) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Jurnal penyusutan bulan ini sudah ada')
+                                    ->body('Jurnal penyusutan untuk bulan ' . now()->format('F Y') . ' sudah pernah dipost.')
+                                    ->warning()
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
                                 return;
                             }
 
@@ -822,8 +846,10 @@ class AssetResource extends Resource
                             $assetService->postAssetDepreciationJournal($record, $depreciationAmount, $currentMonth);
                             \Filament\Notifications\Notification::make()
                                 ->title('Jurnal penyusutan berhasil dipost')
+                                ->body('Jurnal penyusutan untuk bulan ' . now()->format('F Y') . ' telah berhasil dibuat.')
                                 ->success()
-                                ->send();
+                                ->persistent()
+                                ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
                         }),
                     Tables\Actions\Action::make('view_asset_journals')
                         ->color('gray')

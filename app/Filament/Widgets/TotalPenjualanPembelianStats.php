@@ -30,10 +30,10 @@ class TotalPenjualanPembelianStats extends BaseWidget
                 ->description('Total Penjualan')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
-            Stat::make('Total pembelian', "Rp." . number_format($totalPurchasesMtd, 0, ',', '.'))
-                ->description('Total Penjualan')
-                ->descriptionIcon('heroicon-m-arrow-trending-up')
-                ->color('success'),
+            Stat::make('Total Pembelian', "Rp." . number_format($totalPurchasesMtd, 0, ',', '.'))
+                ->description('Total Pembelian')
+                ->descriptionIcon('heroicon-m-arrow-trending-down')
+                ->color('info'),
         ];
     }
 

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\AccontReceivablePayableChart;
 use App\Filament\Widgets\AccountReceivablePayableChart;
 use App\Filament\Widgets\AgeingScheduleChart;
 use App\Filament\Widgets\ArApChart;
