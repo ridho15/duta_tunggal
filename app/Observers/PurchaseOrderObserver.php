@@ -64,6 +64,9 @@ class PurchaseOrderObserver
      */
     protected function handleAssetPurchaseApproval(PurchaseOrder $purchaseOrder): void
     {
+        // Load relations to ensure they are available
+        $purchaseOrder->load('purchaseOrderItem.product');
+
         // Prevent duplicate asset creation: if assets already exist for this PO, skip
         if (\App\Models\Asset::where('purchase_order_id', $purchaseOrder->id)->exists()) {
             \Illuminate\Support\Facades\Log::warning('Assets already exist for PO, skipping auto-creation', [
@@ -126,7 +129,7 @@ class PurchaseOrderObserver
         \Illuminate\Support\Facades\Log::info('Assets auto-created for approved purchase order', [
             'purchase_order_id' => $purchaseOrder->id,
             'po_number' => $purchaseOrder->po_number,
-            'items_count' => $purchaseOrder->purchaseOrderItems->count(),
+            'items_count' => $purchaseOrder->purchaseOrderItem->count(),
         ]);
     }
 
