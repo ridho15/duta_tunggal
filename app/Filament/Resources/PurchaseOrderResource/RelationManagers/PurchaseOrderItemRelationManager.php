@@ -200,36 +200,36 @@ class PurchaseOrderItemRelationManager extends RelationManager
             ])
             ->headerActions([])
             ->actions([
-                ActionGroup::make([
-                    // Send PO item to Quality Control (QC-before-receipt flow)
-                    \Filament\Tables\Actions\Action::make('kirim_qc')
-                        ->label('Kirim QC')
-                        ->color('success')
-                        ->icon('heroicon-o-paper-airplane')
-                        ->requiresConfirmation()
-                        ->action(function ($record) {
-                            $qualityControlService = app(QualityControlService::class);
+                // ActionGroup::make([
+                //     // Send PO item to Quality Control (QC-before-receipt flow)
+                //     \Filament\Tables\Actions\Action::make('kirim_qc')
+                //         ->label('Kirim QC')
+                //         ->color('success')
+                //         ->icon('heroicon-o-paper-airplane')
+                //         ->requiresConfirmation()
+                //         ->action(function ($record) {
+                //             $qualityControlService = app(QualityControlService::class);
 
-                            $qc = $qualityControlService->createQCFromPurchaseOrderItem($record, [
-                                'inspected_by' => Filament::auth()->id(),
-                                'passed_quantity' => 0,
-                                'rejected_quantity' => 0,
-                            ]);
+                //             $qc = $qualityControlService->createQCFromPurchaseOrderItem($record, [
+                //                 'inspected_by' => Filament::auth()->id(),
+                //                 'passed_quantity' => 0,
+                //                 'rejected_quantity' => 0,
+                //             ]);
 
-                            if ($qc) {
-                                // Notify current user
-                                if (Auth::user()) {
-                                    Auth::user()->notify(new FilamentDatabaseNotification(
-                                        title: 'QC Created',
-                                        body: 'Quality Control created for PO Item: ' . optional($record->product)->name,
-                                        icon: 'heroicon-o-check-badge',
-                                        color: 'success',
-                                        actions: []
-                                    ));
-                                }
-                            }
-                        }),
-                ])
+                //             if ($qc) {
+                //                 // Notify current user
+                //                 if (Auth::user()) {
+                //                     Auth::user()->notify(new FilamentDatabaseNotification(
+                //                         title: 'QC Created',
+                //                         body: 'Quality Control created for PO Item: ' . optional($record->product)->name,
+                //                         icon: 'heroicon-o-check-badge',
+                //                         color: 'success',
+                //                         actions: []
+                //                     ));
+                //                 }
+                //             }
+                //         }),
+                // ])
             ])
             ->bulkActions([]);
     }

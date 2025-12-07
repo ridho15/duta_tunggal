@@ -50,10 +50,17 @@ class UserResource extends Resource
                         TextInput::make('username')
                             ->label('Username')
                             ->required()
-                            ->unique(ignoreRecord: true),
+                            ->unique(ignoreRecord: true)
+                            ->validationMessages([
+                                'required' => 'Username wajib diisi',
+                                'unique' => 'Username sudah digunakan'
+                            ]),
                         TextInput::make('telepon')
                             ->label('Telepon')
-                            ->tel(),
+                            ->tel()
+                            ->validationMessages([
+                                'tel' => 'Format telepon tidak valid'
+                            ]),
                         TextInput::make('password')
                             ->password()
                             ->dehydrateStateUsing(fn($state) => Hash::make($state))
@@ -61,7 +68,7 @@ class UserResource extends Resource
                             ->same('konfirmasi_password')
                             ->reactive()
                             ->validationMessages([
-                                'requried' => 'Password wajib diisi',
+                                'required' => 'Password wajib diisi',
                                 'same' => 'Password tidak sama'
                             ])
                             ->revealable()
@@ -81,7 +88,13 @@ class UserResource extends Resource
                             ->email()
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->validationMessages([
+                                'required' => 'Email wajib diisi',
+                                'email' => 'Format email tidak valid',
+                                'unique' => 'Email sudah digunakan',
+                                'max' => 'Email maksimal 255 karakter'
+                            ]),
                         Select::make('roles')
                             ->label('Level')
                             ->searchable()
@@ -105,7 +118,10 @@ class UserResource extends Resource
                             ->preload()
                             ->searchable()
                             ->required()
-                            ->reactive(),
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'Kelola wajib dipilih'
+                            ]),
                         Select::make('cabang_id')
                             ->label('Cabang')
                             ->preload()
@@ -152,22 +168,38 @@ class UserResource extends Resource
                             ->label('Nama Depan')
                             ->string()
                             ->maxLength(50)
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Nama depan wajib diisi',
+                                'max' => 'Nama depan maksimal 50 karakter'
+                            ]),
                         TextInput::make('last_name')
                             ->label('Nama Belakang')
                             ->maxLength(50)
                             ->string()
-                            ->nullable(),
+                            ->nullable()
+                            ->validationMessages([
+                                'max' => 'Nama belakang maksimal 50 karakter'
+                            ]),
                         TextInput::make('kode_user')
                             ->label('Kode User')
                             ->maxLength(50)
                             ->required()
-                            ->unique(ignoreRecord: true),
+                            ->unique(ignoreRecord: true)
+                            ->validationMessages([
+                                'required' => 'Kode user wajib diisi',
+                                'unique' => 'Kode user sudah digunakan',
+                                'max' => 'Kode user maksimal 50 karakter'
+                            ]),
                         TextInput::make('posisi')
                             ->label('Posisi')
                             ->string()
                             ->maxLength(50)
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Posisi wajib diisi',
+                                'max' => 'Posisi maksimal 50 karakter'
+                            ]),
                         ComponentsSignaturePad::make('signature')
                             ->label(__('Sign here'))
                             ->dotSize(2.0)

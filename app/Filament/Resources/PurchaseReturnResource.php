@@ -2,12 +2,6 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\PurchaseReturnResource\Pages;
-use App\Filament\Resources\PurchaseReturnResource\Pages\ViewPurchaseReturn;
-use App\Models\Product;
-use App\Models\PurchaseReceiptItem;
-use App\Models\PurchaseReturn;
-use App\Services\PurchaseReturnService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
@@ -24,8 +18,17 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\QueryBuilder;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use App\Filament\Resources\PurchaseReturnResource\Pages;
+use App\Filament\Resources\PurchaseReturnResource\Pages\ViewPurchaseReturn;
+use App\Models\Product;
+use App\Models\PurchaseReceiptItem;
+use App\Models\PurchaseReturn;
+use App\Services\PurchaseReturnService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
@@ -57,7 +60,11 @@ class PurchaseReturnResource extends Resource
                                     $purchaseReturnService = app(PurchaseReturnService::class);
                                     $set('nota_retur', $purchaseReturnService->generateNotaRetur());
                                 }))
-                            ->maxLength(50),
+                            ->maxLength(50)
+                            ->validationMessages([
+                                'required' => 'Nota retur wajib diisi',
+                                'max' => 'Nota retur maksimal 50 karakter'
+                            ]),
                         Select::make('purchase_receipt_id')
                             ->required()
                             ->label('Purchase Receipt')
@@ -68,10 +75,61 @@ class PurchaseReturnResource extends Resource
                                 $query->whereHas('purchaseOrder', function (Builder $query) {
                                     $query->where('status', 'closed');
                                 });
-                            }),
+                            })
+                            ->afterStateUpdated(function ($set, $state) {
+                                if ($state) {
+                                    $purchaseReceipt = \App\Models\PurchaseReceipt::find($state);
+                                    if ($purchaseReceipt && !in_array('all', Auth::user()?->manage_type ?? [])) {
+                                        $set('cabang_id', $purchaseReceipt->cabang_id);
+                                    }
+                                }
+                            })
+                            ->validationMessages([
+                                'required' => 'Purchase receipt wajib dipilih'
+                            ]),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+                                
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                        ->get()
+                                        ->mapWithKeys(function ($cabang) {
+                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                        });
+                                }
+                                
+                                return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                });
+                            })
+                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih'
+                            ]),
                         DateTimePicker::make('return_date')
                             ->label('Return Date')
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Tanggal retur wajib diisi'
+                            ]),
+                        Select::make('status')
+                            ->label('Status')
+                            ->options([
+                                'draft' => 'Draft',
+                                'pending_approval' => 'Pending Approval',
+                                'approved' => 'Approved',
+                                'rejected' => 'Rejected',
+                            ])
+                            ->default('draft')
+                            ->disabled(fn () => !in_array('all', Auth::user()?->manage_type ?? []))
+                            ->dehydrated(),
                         Textarea::make('notes')
                             ->label('Keterangan')
                             ->nullable(),
@@ -98,29 +156,47 @@ class PurchaseReturnResource extends Resource
                                     })
                                     ->getOptionLabelFromRecordUsing(function (PurchaseReceiptItem $purchaseReceiptItem) {
                                         return "({$purchaseReceiptItem->product->sku}) {$purchaseReceiptItem->product->name}";
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Purchase receipt item wajib dipilih'
+                                    ]),
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->preload()
                                     ->searchable()
                                     ->required()
-                                    ->disabled()
+                                    ->disabled(fn () => !in_array('all', Auth::user()?->manage_type ?? []))
                                     ->reactive()
                                     ->relationship('product', 'id')
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku} {$product->name})";
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Product wajib dipilih'
+                                    ]),
                                 TextInput::make('qty_returned')
                                     ->label('Quantity Return')
                                     ->numeric()
                                     ->default(0)
-                                    ->required(),
+                                    ->required()
+                                    ->minValue(0.01)
+                                    ->validationMessages([
+                                        'required' => 'Quantity retur wajib diisi',
+                                        'numeric' => 'Quantity retur harus berupa angka',
+                                        'min' => 'Quantity retur minimal 0.01'
+                                    ]),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price (Rp.)')
                                     ->numeric()
                                     ->indonesianMoney()
                                     ->default(0)
-                                    ->required(),
+                                    ->required()
+                                    ->minValue(0)
+                                    ->validationMessages([
+                                        'required' => 'Unit price wajib diisi',
+                                        'numeric' => 'Unit price harus berupa angka',
+                                        'min' => 'Unit price minimal 0'
+                                    ]),
                                 Textarea::make('reason')
                                     ->label('Reason')
                                     ->nullable(),
@@ -139,6 +215,25 @@ class PurchaseReturnResource extends Resource
                 TextColumn::make('purchaseReceipt.receipt_number')
                     ->label('Receipt Number')
                     ->sortable(),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
+                TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'draft' => 'gray',
+                        'pending_approval' => 'warning',
+                        'approved' => 'success',
+                        'rejected' => 'danger',
+                    }),
                 TextColumn::make('return_date')
                     ->dateTime()
                     ->sortable(),
@@ -162,27 +257,133 @@ class PurchaseReturnResource extends Resource
             ])
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Retur Pembelian</summary>' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Retur Pembelian & Sinkronisasi Otomatis</summary>' .
                     '<div class="mt-2 text-sm">' .
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Retur Pembelian digunakan untuk mengembalikan barang ke supplier atau membatalkan penerimaan yang tidak sesuai.</li>' .
                             '<li><strong>Mekanisme:</strong> Biasanya dibuat dari Purchase Receipt; pastikan pilih item yang benar agar stok dan jurnal akuntansi diproses sesuai alur.</li>' .
                             '<li><strong>QC & Stok:</strong> Jika barang sudah masuk inventory setelah QC atau receipt selesai, retur akan mengurangi stok dan membuat jurnal terkait. Jika belum masuk stok (mis. masih proses QC), perilaku retur mengikuti status QC dan policy retur.</li>' .
-                            '<li><strong>Catatan:</strong> Beberapa retur memerlukan approval; periksa hak akses dan prosedur sebelum submit.</li>' .
+                            '<li><strong>🔄 Sinkronisasi Otomatis:</strong> Purchase Return otomatis terupdate ketika qty_rejected di Purchase Receipt Item berubah. Jika qty_rejected dihapus, Purchase Return juga ikut terhapus.</li>' .
+                            '<li><strong>Approval Workflow:</strong> Beberapa retur memerlukan approval; periksa hak akses dan prosedur sebelum submit.</li>' .
+                            '<li><strong>Superadmin Access:</strong> Superadmin dapat mengubah status dan product field secara bebas, user biasa memiliki pembatasan.</li>' .
                         '</ul>' .
                     '</div>' .
                 '</details>'
             ))
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->label('Status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'pending_approval' => 'Pending Approval',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
+                    ])
+                    ->placeholder('Semua Status'),
+                SelectFilter::make('cabang')
+                    ->label('Cabang')
+                    ->relationship('cabang', 'nama')
+                    ->getOptionLabelFromRecordUsing(function ($record) {
+                        return "({$record->kode}) {$record->nama}";
+                    })
+                    ->searchable()
+                    ->preload()
+                    ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? [])),
+                Filter::make('return_date')
+                    ->form([
+                        \Filament\Forms\Components\DatePicker::make('return_date_from')
+                            ->label('Tanggal Retur Dari'),
+                        \Filament\Forms\Components\DatePicker::make('return_date_until')
+                            ->label('Tanggal Retur Sampai'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['return_date_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('return_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['return_date_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('return_date', '<=', $date),
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        
+                        if ($data['return_date_from'] ?? null) {
+                            $indicators[] = 'Tanggal retur dari ' . \Carbon\Carbon::parse($data['return_date_from'])->format('d/m/Y');
+                        }
+                        
+                        if ($data['return_date_until'] ?? null) {
+                            $indicators[] = 'Tanggal retur sampai ' . \Carbon\Carbon::parse($data['return_date_until'])->format('d/m/Y');
+                        }
+                        
+                        return $indicators;
+                    }),
+                SelectFilter::make('created_by')
+                    ->label('Dibuat Oleh')
+                    ->relationship('createdBy', 'name')
+                    ->searchable()
+                    ->preload(),
             ])
             ->actions([
                 ActionGroup::make([
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
-                        ->color('success'),
+                        ->color('success')
+                        ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
+                    \Filament\Tables\Actions\Action::make('submit_for_approval')
+                        ->label('Submit for Approval')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('warning')
+                        ->visible(fn ($record) => $record->status === 'draft')
+                        ->action(function ($record) {
+                            $service = app(PurchaseReturnService::class);
+                            $service->submitForApproval($record);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Purchase Return submitted for approval')
+                                ->success()
+                                ->send();
+                        }),
+                    \Filament\Tables\Actions\Action::make('approve')
+                        ->label('Approve')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn ($record) => $record->status === 'pending_approval')
+                        ->form([
+                            \Filament\Forms\Components\Textarea::make('approval_notes')
+                                ->label('Approval Notes')
+                                ->nullable(),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $service = app(PurchaseReturnService::class);
+                            $service->approve($record, $data);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Purchase Return approved')
+                                ->success()
+                                ->send();
+                        }),
+                    \Filament\Tables\Actions\Action::make('reject')
+                        ->label('Reject')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn ($record) => $record->status === 'pending_approval')
+                        ->form([
+                            \Filament\Forms\Components\Textarea::make('rejection_notes')
+                                ->label('Rejection Notes')
+                                ->required(),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $service = app(PurchaseReturnService::class);
+                            $service->reject($record, $data);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Purchase Return rejected')
+                                ->danger()
+                                ->send();
+                        }),
                     DeleteAction::make()
+                        ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

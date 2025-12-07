@@ -109,6 +109,11 @@ class DeliveryOrder extends Model
         });
     }
 
+    public function stockReservations()
+    {
+        return $this->hasMany(StockReservation::class, 'delivery_order_id');
+    }
+
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');

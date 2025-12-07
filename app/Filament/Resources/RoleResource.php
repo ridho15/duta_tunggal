@@ -31,7 +31,10 @@ class RoleResource extends Resource
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255)
-                    ->disabled(),
+                    ->validationMessages([
+                        'required' => 'Nama role wajib diisi',
+                        'max' => 'Nama role maksimal 255 karakter'
+                    ]),
                 Select::make('id_user')
                     ->label('User')
                     ->searchable()

@@ -46,39 +46,37 @@ class ViewQualityControlPurchase extends ViewRecord
                 ->form(function ($record) {
                     if ($record->rejected_quantity > 0) {
                         return [
-                            TextInput::make('return_number')
-                                ->label('Return Number')
-                                ->required()
-                                ->reactive()
-                                ->suffixAction(ActionsAction::make('generateReturnNumber')
-                                    ->icon('heroicon-m-arrow-path') // ikon reload
-                                    ->tooltip('Generate Return Number')
-                                    ->action(function ($set, $get, $state) {
-                                        $returnProductService = app(ReturnProductService::class);
-                                        $set('return_number', $returnProductService->generateReturnNumber());
-                                    }))
-                                ->unique(ignoreRecord: true)
-                                ->maxLength(255),
                             Select::make('warehouse_id')
-                                ->label('Gudang')
+                                ->label('Gudang Return')
                                 ->preload()
                                 ->reactive()
-                                ->searchable()
-                                ->options(function () {
-                                    return Warehouse::select(['id', 'name'])->get()->pluck('name', 'id');
-                                })
+                                ->searchable(['kode', 'name'])
+                                ->relationship('warehouse', 'name')
+                                ->getOptionLabelFromRecordUsing(fn (Warehouse $record) => "{$record->kode} - {$record->name}")
                                 ->required(),
                             Select::make('rak_id')
-                                ->label('Rak')
+                                ->label('Rak Return')
                                 ->preload()
                                 ->reactive()
                                 ->searchable()
                                 ->options(function ($get) {
                                     return Rak::where('warehouse_id', $get('warehouse_id'))->select(['id', 'name'])->get()->pluck('name', 'id');
                                 })
+                                ->getOptionLabelFromRecordUsing(fn (Rak $record) => "{$record->code} - {$record->name}")
                                 ->nullable(),
+                            Select::make('item_condition')
+                                ->label('Kondisi Item')
+                                ->options([
+                                    'damage' => 'Rusak',
+                                    'expired' => 'Kadaluarsa',
+                                    'wrong_item' => 'Barang Salah',
+                                    'poor_quality' => 'Kualitas Buruk',
+                                    'other' => 'Lainnya'
+                                ])
+                                ->default('damage')
+                                ->required(),
                             Textarea::make('reason')
-                                ->label('Reason')
+                                ->label('Alasan Return')
                                 ->nullable()
                                 ->string()
                                 ->default($record->reason_reject)

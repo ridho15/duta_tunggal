@@ -29,6 +29,11 @@ class SaleOrderObserver
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
             $this->createInvoiceForCompletedSaleOrder($saleOrder);
         }
+
+        // Sync related journal entries if total amount changed
+        if ($saleOrder->wasChanged('total_amount')) {
+            $this->syncJournalEntries($saleOrder);
+        }
     }
 
     /**
@@ -252,5 +257,47 @@ class SaleOrderObserver
             // Panggil method untuk membuat delivery order
             \App\Models\WarehouseConfirmation::createDeliveryOrderForConfirmedWarehouseConfirmation($warehouseConfirmation);
         }
+    }
+
+    /**
+     * Sync journal entries when sale order amounts change
+     */
+    protected function syncJournalEntries(SaleOrder $saleOrder): void
+    {
+        $journalEntries = $saleOrder->journalEntries()
+            ->where('journal_type', 'sales')
+            ->get();
+
+        if ($journalEntries->isEmpty()) {
+            return;
+        }
+
+        $reference = 'SO-' . $saleOrder->so_number;
+        $description = 'Sales Order: ' . $saleOrder->so_number;
+
+        foreach ($journalEntries as $entry) {
+            // Only update if the entry is directly linked to the SO
+            // (not through invoice, which should have its own sync logic)
+            if ($entry->source_type === 'App\\Models\\SaleOrder') {
+                $updates = [
+                    'reference' => $reference,
+                    'description' => $description,
+                    'date' => $saleOrder->order_date,
+                ];
+
+                // Update credit amount if this is a simple credit entry (no debit)
+                if ($entry->credit > 0 && $entry->debit == 0) {
+                    $updates['credit'] = $saleOrder->total_amount;
+                }
+
+                $entry->update($updates);
+            }
+        }
+
+        Log::info('SaleOrder journal entries synced', [
+            'sale_order_id' => $saleOrder->id,
+            'so_number' => $saleOrder->so_number,
+            'entries_updated' => $journalEntries->count(),
+        ]);
     }
 }

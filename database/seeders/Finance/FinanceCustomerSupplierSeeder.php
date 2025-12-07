@@ -4,6 +4,7 @@ namespace Database\Seeders\Finance;
 
 use App\Models\Customer;
 use App\Models\Supplier;
+use App\Models\Cabang;
 use Illuminate\Database\Seeder;
 
 class FinanceCustomerSupplierSeeder extends Seeder
@@ -14,6 +15,12 @@ class FinanceCustomerSupplierSeeder extends Seeder
 
     public function run(): void
     {
+        // Get the first cabang
+        $cabang = Cabang::first();
+        if (!$cabang) {
+            return; // Skip if no cabang exists
+        }
+
         $customers = [
             [
                 'code' => 'CUST-FIN-001',
@@ -30,7 +37,7 @@ class FinanceCustomerSupplierSeeder extends Seeder
                 'tipe_pembayaran' => 'Kredit',
                 'kredit_limit' => 500000000,
                 'isSpecial' => true,
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
             ],
             [
                 'code' => 'CUST-FIN-002',
@@ -47,7 +54,7 @@ class FinanceCustomerSupplierSeeder extends Seeder
                 'tipe_pembayaran' => 'Kredit',
                 'kredit_limit' => 350000000,
                 'isSpecial' => false,
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
             ],
             [
                 'code' => 'CUST-FIN-003',
@@ -64,7 +71,7 @@ class FinanceCustomerSupplierSeeder extends Seeder
                 'tipe_pembayaran' => 'Kredit',
                 'kredit_limit' => 600000000,
                 'isSpecial' => false,
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
             ],
         ];
 
@@ -88,7 +95,7 @@ class FinanceCustomerSupplierSeeder extends Seeder
                 'fax' => '021-9900-5599',
                 'npwp' => '09.876.543.2-101.000',
                 'kontak_person' => 'Bpk. Herman',
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
             ],
             [
                 'code' => 'SUPP-FIN-002',
@@ -102,7 +109,7 @@ class FinanceCustomerSupplierSeeder extends Seeder
                 'fax' => '024-7788-9977',
                 'npwp' => '08.765.432.1-202.000',
                 'kontak_person' => 'Ibu. Rina',
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
             ],
         ];
 

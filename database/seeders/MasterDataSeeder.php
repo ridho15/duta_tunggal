@@ -12,6 +12,7 @@ use App\Models\Warehouse;
 use App\Models\Rak;
 use App\Models\Currency;
 use App\Models\InventoryStock;
+use App\Models\Cabang;
 
 class MasterDataSeeder extends Seeder
 {
@@ -21,6 +22,13 @@ class MasterDataSeeder extends Seeder
     public function run(): void
     {
         $this->command->info('Creating master data...');
+
+        // Get the first cabang to use for relationships
+        $cabang = Cabang::first();
+        if (!$cabang) {
+            $this->command->error('No cabang found. Please run CabangSeeder first.');
+            return;
+        }
 
         // Create currencies - MOVED TO FinanceSeeder
         // $currencies = [
@@ -68,7 +76,7 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Gudang Utama',
                 'location' => 'Jl. Raya Industri No. 1',
                 'kode' => 'GU001',
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'tipe' => 'Besar',
                 'telepon' => '021-12345678',
                 'status' => true
@@ -77,7 +85,7 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Gudang Cabang A',
                 'location' => 'Jl. Cabang A No. 10',
                 'kode' => 'GCA001',
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'tipe' => 'Kecil',
                 'telepon' => '021-87654321',
                 'status' => true
@@ -116,7 +124,7 @@ class MasterDataSeeder extends Seeder
                 'tempo_kredit' => 30,
                 'kredit_limit' => 50000000,
                 'tipe_pembayaran' => 'Kredit',
-                'cabang_id' => 1
+                'cabang_id' => $cabang->id
             ],
             [
                 'name' => 'CV Sukses Makmur',
@@ -132,7 +140,7 @@ class MasterDataSeeder extends Seeder
                 'tempo_kredit' => 15,
                 'kredit_limit' => 25000000,
                 'tipe_pembayaran' => 'Kredit',
-                'cabang_id' => 1
+                'cabang_id' => $cabang->id
             ],
             [
                 'name' => 'Budi Santoso',
@@ -148,7 +156,7 @@ class MasterDataSeeder extends Seeder
                 'tempo_kredit' => 0,
                 'kredit_limit' => 5000000,
                 'tipe_pembayaran' => 'COD (Bayar Lunas)',
-                'cabang_id' => 1
+                'cabang_id' => $cabang->id
             ],
         ];
 
@@ -170,7 +178,7 @@ class MasterDataSeeder extends Seeder
                 'perusahaan' => 'PT Supplier Utama',
                 'tempo_hutang' => 30,
                 'kontak_person' => 'Andi Wijaya',
-                'cabang_id' => 1
+                'cabang_id' => $cabang->id
             ],
             [
                 'name' => 'CV Distributor Jaya',
@@ -184,7 +192,7 @@ class MasterDataSeeder extends Seeder
                 'perusahaan' => 'CV Distributor Jaya',
                 'tempo_hutang' => 45,
                 'kontak_person' => 'Sari Indah',
-                'cabang_id' => 1
+                'cabang_id' => $cabang->id
             ],
         ];
 
@@ -197,13 +205,13 @@ class MasterDataSeeder extends Seeder
             [
                 'name' => 'Elektronik',
                 'kode' => 'ELEC',
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'kenaikan_harga' => 0.00,
             ],
             [
                 'name' => 'Komputer & Aksesoris',
                 'kode' => 'COMP',
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'kenaikan_harga' => 0.00,
             ],
         ];
@@ -219,7 +227,7 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Laptop Asus ROG',
                 'description' => 'Laptop gaming dengan spesifikasi tinggi',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'cost_price' => 12000000,
                 'sell_price' => 15000000,
                 'uom_id' => 1, // Assuming UOM exists
@@ -236,7 +244,7 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Mouse Wireless Logitech',
                 'description' => 'Mouse wireless dengan sensor presisi tinggi',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'cost_price' => 500000,
                 'sell_price' => 750000,
                 'uom_id' => 1,
@@ -253,7 +261,7 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Keyboard Mechanical',
                 'description' => 'Keyboard mechanical dengan blue switch',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'cost_price' => 800000,
                 'sell_price' => 1200000,
                 'uom_id' => 1,
@@ -270,7 +278,7 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Monitor LED 24 inch',
                 'description' => 'Monitor LED full HD 24 inch',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'cost_price' => 2000000,
                 'sell_price' => 2800000,
                 'uom_id' => 1,
@@ -287,7 +295,7 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Printer Canon',
                 'description' => 'Printer inkjet Canon untuk kantor',
                 'product_category_id' => 1, // Elektronik
-                'cabang_id' => 1,
+                'cabang_id' => $cabang->id,
                 'cost_price' => 1500000,
                 'sell_price' => 2200000,
                 'uom_id' => 1,

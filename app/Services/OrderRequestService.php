@@ -23,6 +23,7 @@ class OrderRequestService
             $purchaseOrder = $orderRequest->purchaseOrder()->create([
                 'po_number' => $data['po_number'],
                 'supplier_id' => $supplier->id,
+                'cabang_id' => $orderRequest->cabang_id,
                 'order_date' => $data['order_date'],
                 'expected_date' => $data['expected_date'] ?? null,
                 'note' => $data['note'] ?? null,

@@ -127,11 +127,11 @@ class OrderRequestResource extends Resource
                                 $cabangId = $get('cabang_id');
                                 $query = Warehouse::where('name', 'like', "%{$search}%")
                                     ->orWhere('kode', 'like', "%{$search}%");
-                                
+
                                 if ($cabangId) {
                                     $query->where('cabang_id', $cabangId);
                                 }
-                                
+
                                 return $query->limit(50)
                                     ->get()
                                     ->mapWithKeys(function ($warehouse) {
@@ -250,6 +250,12 @@ class OrderRequestResource extends Resource
             ->columns([
                 TextColumn::make('request_number')
                     ->searchable(),
+                TextColumn::make('cabang')
+                    ->label('Cabang')
+                    ->searchable()
+                    ->formatStateUsing(function ($state) {
+                        return "({$state->kode}) {$state->nama}";
+                    }),
                 TextColumn::make('warehouse')
                     ->label('Gudang')
                     ->formatStateUsing(function ($state) {
@@ -308,15 +314,15 @@ class OrderRequestResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Order Request</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Order Request adalah permintaan pembelian internal yang dapat di-approve menjadi Purchase Order.</li>' .
-                            '<li><strong>Cara Approve:</strong> Gunakan tombol <em>Approve</em> pada baris request. Saat approve, Anda dapat memilih untuk membuat Purchase Order secara langsung.</li>' .
-                            '<li><strong>Create PO:</strong> Tombol <em>Create Purchase Order</em> memungkinkan pembuatan PO manual dari request yang telah di-approve.</li>' .
-                            '<li><strong>Dampak:</strong> Setelah disetujui, request berubah status menjadi <em>approved</em> dan siap diteruskan ke proses pembelian.</li>' .
-                            '<li><strong>Catatan:</strong> Akses tombol approve/create PO bergantung pada hak akses pengguna.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Order Request adalah permintaan pembelian internal yang dapat di-approve menjadi Purchase Order.</li>' .
+                    '<li><strong>Cara Approve:</strong> Gunakan tombol <em>Approve</em> pada baris request. Saat approve, Anda dapat memilih untuk membuat Purchase Order secara langsung.</li>' .
+                    '<li><strong>Create PO:</strong> Tombol <em>Create Purchase Order</em> memungkinkan pembuatan PO manual dari request yang telah di-approve.</li>' .
+                    '<li><strong>Dampak:</strong> Setelah disetujui, request berubah status menjadi <em>approved</em> dan siap diteruskan ke proses pembelian.</li>' .
+                    '<li><strong>Catatan:</strong> Akses tombol approve/create PO bergantung pada hak akses pengguna.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ))
             ->filters([
                 SelectFilter::make('status')
@@ -397,7 +403,7 @@ class OrderRequestResource extends Resource
                                 ->label('Supplier')
                                 ->preload()
                                 ->searchable()
-                                ->default(fn ($record) => $record->supplier_id)
+                                ->default(fn($record) => $record->supplier_id)
                                 ->options(function ($record) {
                                     return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
                                         return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
@@ -476,7 +482,7 @@ class OrderRequestResource extends Resource
                                 ->label('Supplier')
                                 ->preload()
                                 ->searchable()
-                                ->default(fn ($record) => $record->supplier_id)
+                                ->default(fn($record) => $record->supplier_id)
                                 ->options(function ($record) {
                                     return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
                                         return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
@@ -491,7 +497,7 @@ class OrderRequestResource extends Resource
                                             return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
                                         });
                                 })
-                                ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order'))
+                                ->required(fn(\Filament\Forms\Get $get) => $get('create_purchase_order'))
                                 ->validationMessages([
                                     'required' => 'Supplier wajib dipilih.',
                                 ]),
@@ -499,7 +505,7 @@ class OrderRequestResource extends Resource
                                 ->label('PO Number')
                                 ->string()
                                 ->maxLength(255)
-                                ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order'))
+                                ->required(fn(\Filament\Forms\Get $get) => $get('create_purchase_order'))
                                 ->suffixAction(
                                     FormAction::make('generatePoNumber')
                                         ->icon('heroicon-o-arrow-path')
@@ -513,7 +519,7 @@ class OrderRequestResource extends Resource
                                 ]),
                             DatePicker::make('order_date')
                                 ->label('Order Date')
-                                ->required(fn (\Filament\Forms\Get $get) => $get('create_purchase_order'))
+                                ->required(fn(\Filament\Forms\Get $get) => $get('create_purchase_order'))
                                 ->validationMessages([
                                     'required' => 'Tanggal order wajib diisi.',
                                 ]),
@@ -531,7 +537,7 @@ class OrderRequestResource extends Resource
                         })
                         ->action(function (array $data, $record) {
                             $orderRequestService = app(OrderRequestService::class);
-                            
+
                             if ($data['create_purchase_order']) {
                                 // Check purchase order number only if creating PO
                                 $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();

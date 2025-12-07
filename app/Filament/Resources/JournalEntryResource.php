@@ -170,6 +170,7 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\StockTransfer' => 'Stock Transfer',
                                 'App\\Models\\Asset' => 'Asset',
                                 'App\\Models\\Deposit' => 'Deposit',
+                                'App\\Models\\OtherSale' => 'Other Sale',
                             ])
                             ->searchable()
                             ->preload()
@@ -205,6 +206,7 @@ class JournalEntryResource extends Resource
                                         'App\\Models\\StockTransfer' => 'transfer_number',
                                         'App\\Models\\Asset' => 'asset_code',
                                         'App\\Models\\Deposit' => 'deposit_number',
+                                        'App\\Models\\OtherSale' => 'reference_number',
                                         default => 'id'
                                     };
 
@@ -235,6 +237,9 @@ class JournalEntryResource extends Resource
                                                 $q->whereIn('status', ['Paid', 'Partial']);
                                             });
                                             break;
+                                        case 'App\\Models\\OtherSale':
+                                            $query->where('status', 'posted');
+                                            break;
                                     }
 
                                     return $query->pluck($displayField, 'id')
@@ -253,6 +258,7 @@ class JournalEntryResource extends Resource
                                                          'App\\Models\\StockTransfer' => 'ST',
                                                          'App\\Models\\Asset' => 'ASSET',
                                                          'App\\Models\\Deposit' => 'DEP',
+                                                         'App\\Models\\OtherSale' => 'OS',
                                                          default => 'UNK'
                                                      };
                                                      return [$id => $prefix . '-' . $id . ': ' . $display];
@@ -536,6 +542,8 @@ class JournalEntryResource extends Resource
                                             'App\\Models\\Deposit' => 'Deposit',
                                             'App\\Models\\Production' => 'Production',
                                             'App\\Models\\QualityControl' => 'Quality Control',
+                                            'App\\Models\\OtherSale' => 'Other Sale',
+                                            'App\\Models\\StockOpname' => 'Stock Opname',
                                             default => $record->source_type,
                                         };
                                     })
@@ -550,6 +558,11 @@ class JournalEntryResource extends Resource
                                             } elseif ($record->source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
                                                 return 'purple'; // Purchase
                                             }
+                                        }
+
+                                        // Special handling for StockOpname
+                                        if ($record->source_type === 'App\\Models\\StockOpname') {
+                                            return 'orange';
                                         }
 
                                         return 'primary'; // Default color for other types
@@ -602,6 +615,10 @@ class JournalEntryResource extends Resource
                                                     return "PUR-{$qcNumber}"; // Purchase QC
                                                 }
                                                 return $qcNumber; // Fallback
+                                            case 'App\\Models\\OtherSale':
+                                                return $source->reference_number ?: 'N/A';
+                                            case 'App\\Models\\StockOpname':
+                                                return $source->opname_number ?: 'N/A';
                                             default:
                                                 return 'N/A';
                                         }
@@ -669,6 +686,12 @@ class JournalEntryResource extends Resource
                                                     $qcType = 'Purchase';
                                                 }
                                                 return "QC {$qcType}: {$qcNumber} - {$productName}";
+                                            case 'App\\Models\\OtherSale':
+                                                $customerName = $source->customer ? $source->customer->name : 'N/A';
+                                                return "Other Sale: {$source->reference_number} - {$customerName}";
+                                            case 'App\\Models\\StockOpname':
+                                                $warehouseName = $source->warehouse ? $source->warehouse->name : 'N/A';
+                                                return "Stock Opname: {$source->opname_number} - {$warehouseName}";
                                             default:
                                                 return 'Unknown Source';
                                         }
@@ -700,6 +723,7 @@ class JournalEntryResource extends Resource
                                                     'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
                                                     'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
                                                     'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
+                                                    // 'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $record->source_id), // No view route available
                                                     default => null,
                                                 };
                                             } catch (\Exception $e) {
@@ -824,6 +848,8 @@ class JournalEntryResource extends Resource
                             'App\\Models\\StockTransfer' => 'secondary',
                             'App\\Models\\Asset' => 'warning',
                             'App\\Models\\Deposit' => 'primary',
+                            'App\\Models\\OtherSale' => 'info',
+                            'App\\Models\\StockOpname' => 'orange',
                             default => 'gray',
                         };
                     })
@@ -866,6 +892,8 @@ class JournalEntryResource extends Resource
                             'App\\Models\\Asset' => 'Asset',
                             'App\\Models\\Deposit' => 'Deposit',
                             'App\\Models\\QualityControl' => 'Quality Control',
+                            'App\\Models\\OtherSale' => 'Other Sale',
+                            'App\\Models\\StockOpname' => 'Stock Opname',
                             null => '-',
                             default => $record->source_type
                         };
@@ -909,6 +937,8 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\Asset' => 'asset_code',
                                 'App\\Models\\Deposit' => 'deposit_number',
                                 'App\\Models\\Invoice' => 'invoice_number',
+                                'App\\Models\\OtherSale' => 'reference_number',
+                                'App\\Models\\StockOpname' => 'opname_number',
                                 default => 'id'
                             };
 

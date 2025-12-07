@@ -9,6 +9,8 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -40,7 +42,7 @@ class OtherSaleResource extends Resource
                             ->label('Nomor Referensi')
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->default(fn () => 'OS-' . now()->format('Ymd') . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT)),
+                            ->default(fn() => 'OS-' . now()->format('Ymd') . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT)),
 
                         Forms\Components\DatePicker::make('transaction_date')
                             ->label('Tanggal Transaksi')
@@ -58,11 +60,27 @@ class OtherSaleResource extends Resource
 
                         Forms\Components\Select::make('coa_id')
                             ->label('Akun Pendapatan')
-                            ->relationship('coa', 'name', function (Builder $query) {
-                                $query->where('type', 'Revenue');
+                            ->options(function () {
+                                return \App\Models\ChartOfAccount::where('type', 'Revenue')
+                                    ->get()
+                                    ->mapWithKeys(function ($coa) {
+                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                    });
                             })
                             ->searchable()
                             ->preload()
+                            ->getSearchResultsUsing(function (string $search) {
+                                return \App\Models\ChartOfAccount::where('type', 'Revenue')
+                                    ->where(function ($query) use ($search) {
+                                        $query->where('name', 'like', "%{$search}%")
+                                              ->orWhere('code', 'like', "%{$search}%");
+                                    })
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(function ($coa) {
+                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                    });
+                            })
                             ->required()
                             ->default(function () {
                                 // Default to "PENDAPATAN LAINNYA" for building rental
@@ -84,8 +102,8 @@ class OtherSaleResource extends Resource
                             }))
                             ->searchable()
                             ->preload()
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->required(),
                     ])
                     ->columns(2),
@@ -94,16 +112,57 @@ class OtherSaleResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('cash_bank_account_id')
                             ->label('Akun Kas/Bank')
-                            ->relationship('cashBankAccount', 'name')
+                            ->options(function () {
+                                return \App\Models\CashBankAccount::with('coa')
+                                    ->get()
+                                    ->mapWithKeys(function ($account) {
+                                        $coaCode = $account->coa ? $account->coa->code : 'N/A';
+                                        $coaName = $account->coa ? $account->coa->name : 'N/A';
+                                        return [$account->id => "({$coaCode}) {$account->name}"];
+                                    });
+                            })
                             ->searchable()
                             ->preload()
+                            ->getSearchResultsUsing(function (string $search) {
+                                return \App\Models\CashBankAccount::with('coa')
+                                    ->where(function ($query) use ($search) {
+                                        $query->where('name', 'like', "%{$search}%")
+                                              ->orWhereHas('coa', function ($coaQuery) use ($search) {
+                                                  $coaQuery->where('code', 'like', "%{$search}%")
+                                                           ->orWhere('name', 'like', "%{$search}%");
+                                              });
+                                    })
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(function ($account) {
+                                        $coaCode = $account->coa ? $account->coa->code : 'N/A';
+                                        $coaName = $account->coa ? $account->coa->name : 'N/A';
+                                        return [$account->id => "({$coaCode}) {$account->name}"];
+                                    });
+                            })
                             ->placeholder('Pilih jika pembayaran langsung ke kas/bank'),
 
                         Forms\Components\Select::make('customer_id')
                             ->label('Customer')
-                            ->relationship('customer', 'name')
+                            ->options(function () {
+                                return \App\Models\Customer::all()
+                                    ->mapWithKeys(function ($customer) {
+                                        return [$customer->id => "({$customer->code}) {$customer->name}"];
+                                    });
+                            })
                             ->searchable()
                             ->preload()
+                            ->getSearchResultsUsing(function (string $search) {
+                                return \App\Models\Customer::where(function ($query) use ($search) {
+                                        $query->where('name', 'like', "%{$search}%")
+                                              ->orWhere('code', 'like', "%{$search}%");
+                                    })
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(function ($customer) {
+                                        return [$customer->id => "({$customer->code}) {$customer->name}"];
+                                    });
+                            })
                             ->placeholder('Pilih jika ada customer tertentu'),
                     ])
                     ->columns(2),
@@ -118,7 +177,7 @@ class OtherSaleResource extends Resource
                         Forms\Components\Textarea::make('notes')
                             ->label('Catatan')
                             ->maxLength(1000),
-                    ]),
+                    ])->columns(2),
             ]);
     }
 
@@ -139,12 +198,12 @@ class OtherSaleResource extends Resource
                 Tables\Columns\TextColumn::make('type')
                     ->label('Jenis')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'building_rental' => 'success',
                         'other_income' => 'info',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'building_rental' => 'Sewa Gedung',
                         'other_income' => 'Pendapatan Lainnya',
                         default => $state,
@@ -167,7 +226,7 @@ class OtherSaleResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'draft' => 'warning',
                         'posted' => 'success',
                         'cancelled' => 'danger',
@@ -207,7 +266,7 @@ class OtherSaleResource extends Resource
                     ->options(function () {
                         $user = Auth::user();
                         $manageType = $user?->manage_type ?? [];
-                        
+
                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                             return \App\Models\Cabang::where('id', $user?->cabang_id)
                                 ->get()
@@ -215,46 +274,48 @@ class OtherSaleResource extends Resource
                                     return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                 });
                         }
-                        
+
                         return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                         });
                     })
             ])
             ->actions([
-                Tables\Actions\Action::make('post_journal')
-                    ->label('Post Journal')
-                    ->icon('heroicon-o-document-plus')
-                    ->color('success')
-                    ->visible(fn (OtherSale $record): bool => $record->status === 'draft')
-                    ->action(function (OtherSale $record) {
-                        $service = new \App\Services\OtherSaleService();
-                        $service->postJournalEntries($record);
+                ActionGroup::make([
+                    Tables\Actions\Action::make('post_journal')
+                        ->label('Post Journal')
+                        ->icon('heroicon-o-document-plus')
+                        ->color('success')
+                        ->visible(fn(OtherSale $record): bool => $record->status === 'draft')
+                        ->action(function (OtherSale $record) {
+                            $service = new \App\Services\OtherSaleService();
+                            $service->postJournalEntries($record);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Journal entries posted successfully')
-                            ->success()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Journal entries posted successfully')
+                                ->success()
+                                ->send();
+                        }),
 
-                Tables\Actions\Action::make('reverse_journal')
-                    ->label('Reverse Journal')
-                    ->icon('heroicon-o-arrow-uturn-left')
-                    ->color('warning')
-                    ->visible(fn (OtherSale $record): bool => $record->status === 'posted')
-                    ->action(function (OtherSale $record) {
-                        $service = new \App\Services\OtherSaleService();
-                        $service->reverseJournalEntries($record);
+                    Tables\Actions\Action::make('reverse_journal')
+                        ->label('Reverse Journal')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->visible(fn(OtherSale $record): bool => $record->status === 'posted')
+                        ->action(function (OtherSale $record) {
+                            $service = new \App\Services\OtherSaleService();
+                            $service->reverseJournalEntries($record);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Journal entries reversed successfully')
-                            ->warning()
-                            ->send();
-                    }),
+                            \Filament\Notifications\Notification::make()
+                                ->title('Journal entries reversed successfully')
+                                ->warning()
+                                ->send();
+                        }),
 
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-            ])
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -264,17 +325,17 @@ class OtherSaleResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Other Sale</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Other Sale adalah penjualan lainnya yang tidak melalui proses Sale Order standar, seperti penjualan langsung atau penjualan non-inventory.</li>' .
-                            '<li><strong>Status Flow:</strong> Dibuat langsung, dapat diedit atau dihapus. Termasuk opsi untuk reverse journal entries jika diperlukan.</li>' .
-                            '<li><strong>Validasi:</strong> Subtotal, Tax, PPN dihitung otomatis berdasarkan item. Terintegrasi dengan accounting untuk journal entries.</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah penjualan), <em>Delete</em> (hapus), <em>Reverse Journal</em> (balikkan entri jurnal).</li>' .
-                            '<li><strong>Filters:</strong> Customer, Date Range, Amount Range, dll.</li>' .
-                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan penjualan dari cabang tersebut jika tidak memiliki akses all.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan accounting untuk journal entries dan mungkin menghasilkan Account Receivable.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Other Sale adalah penjualan lainnya yang tidak melalui proses Sale Order standar, seperti penjualan langsung atau penjualan non-inventory.</li>' .
+                    '<li><strong>Status Flow:</strong> Dibuat langsung, dapat diedit atau dihapus. Termasuk opsi untuk reverse journal entries jika diperlukan.</li>' .
+                    '<li><strong>Validasi:</strong> Subtotal, Tax, PPN dihitung otomatis berdasarkan item. Terintegrasi dengan accounting untuk journal entries.</li>' .
+                    '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah penjualan), <em>Delete</em> (hapus), <em>Reverse Journal</em> (balikkan entri jurnal).</li>' .
+                    '<li><strong>Filters:</strong> Customer, Date Range, Amount Range, dll.</li>' .
+                    '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan penjualan dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan accounting untuk journal entries dan mungkin menghasilkan Account Receivable.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 

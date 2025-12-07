@@ -6,6 +6,7 @@ use App\Models\OtherSale;
 use App\Models\ChartOfAccount;
 use App\Models\Cabang;
 use App\Models\CashBankAccount;
+use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -22,8 +23,9 @@ class OtherSaleSeeder extends Seeder
         $cabang = Cabang::first();
         $revenueCoa = ChartOfAccount::where('code', '7000.04')->first(); // PENDAPATAN LAINNYA
         $cashAccount = CashBankAccount::first();
+        $user = User::first();
 
-        if (!$cabang || !$revenueCoa) {
+        if (!$cabang || !$revenueCoa || !$user) {
             $this->command->warn('Required data not found. Skipping other sales seeding.');
             return;
         }
@@ -41,7 +43,7 @@ class OtherSaleSeeder extends Seeder
                 'cabang_id' => $cabang->id,
                 'status' => 'draft',
                 'notes' => 'Pembayaran sewa gedung dari tenant ABC Corp untuk periode Oktober 2024',
-                'created_by' => 1,
+                'created_by' => $user->id,
             ],
             [
                 'reference_number' => 'OS-20241101-002',
@@ -54,7 +56,7 @@ class OtherSaleSeeder extends Seeder
                 'cabang_id' => $cabang->id,
                 'status' => 'draft',
                 'notes' => 'Pembayaran sewa gedung dari tenant XYZ Ltd untuk periode November 2024',
-                'created_by' => 1,
+                'created_by' => $user->id,
             ],
             [
                 'reference_number' => 'OS-20241101-003',
@@ -67,7 +69,7 @@ class OtherSaleSeeder extends Seeder
                 'cabang_id' => $cabang->id,
                 'status' => 'draft',
                 'notes' => 'Pendapatan dari jasa konsultasi IT untuk klien external',
-                'created_by' => 1,
+                'created_by' => $user->id,
             ],
         ];
 

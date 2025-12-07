@@ -88,14 +88,21 @@ class QualityControlManufactureResource extends Resource
                                             $set('rejected_quantity', 0);
                                         }
                                     })
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Production wajib dipilih'
+                                    ]),
                                 TextInput::make('qc_number')
                                     ->label('QC Number')
                                     ->default(function () {
                                         return HelperController::generateUniqueCode('quality_controls', 'qc_number', 'QC-M-' . date('Ymd') . '-', 4);
                                     })
                                     ->required()
-                                    ->unique(ignoreRecord: true),
+                                    ->unique(ignoreRecord: true)
+                                    ->validationMessages([
+                                        'required' => 'QC Number wajib diisi',
+                                        'unique' => 'QC Number sudah digunakan'
+                                    ]),
                             ]),
                         Section::make('Product Information')
                             ->columns(2)
@@ -118,7 +125,10 @@ class QualityControlManufactureResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                         return "({$warehouse->kode}) {$warehouse->name}";
                                     })
-                                    ->reactive(),
+                                    ->reactive()
+                                    ->validationMessages([
+                                        'required' => 'Warehouse wajib dipilih'
+                                    ]),
                                 Select::make('rak_id')
                                     ->label('Rak')
                                     ->options(function ($get) {
@@ -154,7 +164,11 @@ class QualityControlManufactureResource extends Resource
                                                 $set('passed_quantity', $production->quantity_produced - $rejected);
                                             }
                                         }
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Passed quantity wajib diisi',
+                                        'numeric' => 'Passed quantity harus berupa angka'
+                                    ]),
                                 TextInput::make('rejected_quantity')
                                     ->label('Rejected Quantity')
                                     ->numeric()
@@ -172,7 +186,11 @@ class QualityControlManufactureResource extends Resource
                                                 $set('rejected_quantity', $production->quantity_produced - $passed);
                                             }
                                         }
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Rejected quantity wajib diisi',
+                                        'numeric' => 'Rejected quantity harus berupa angka'
+                                    ]),
                                 TextInput::make('total_inspected')
                                     ->label('Total Inspected')
                                     ->disabled()
@@ -190,7 +208,10 @@ class QualityControlManufactureResource extends Resource
                                 Select::make('inspected_by')
                                     ->label('Inspected By')
                                     ->options(\App\Models\User::pluck('name', 'id'))
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Inspected by wajib dipilih'
+                                    ]),
                                 DatePicker::make('date_send_stock')
                                     ->label('Date Send to Stock'),
                                 Textarea::make('notes')

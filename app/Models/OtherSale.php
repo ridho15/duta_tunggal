@@ -73,5 +73,10 @@ class OtherSale extends Model
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);
+
+        // Cascade delete journal entries when OtherSale is deleted
+        static::deleting(function ($otherSale) {
+            $otherSale->journalEntries()->delete();
+        });
     }
 }

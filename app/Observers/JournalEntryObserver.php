@@ -17,18 +17,59 @@ class JournalEntryObserver
 {
     public function created(JournalEntry $entry): void
     {
-        // Send notification only to the currently authenticated user
+        // Try to get current authenticated user first
         $currentUser = Auth::user();
-        if ($currentUser) {
-            $currentUser->notify(new JournalEntryCreated($entry));
+
+        // If no authenticated user, try to get user from source model
+        if (!$currentUser && $entry->source_type && $entry->source_id) {
+            try {
+                $source = $entry->source;
+                if ($source && method_exists($source, 'creator')) {
+                    $currentUser = $source->creator;
+                } elseif ($source && isset($source->created_by)) {
+                    $currentUser = User::find($source->created_by);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to get user from source model', [
+                    'source_type' => $entry->source_type,
+                    'source_id' => $entry->source_id,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
 
-        // Log the notification for audit
-        Log::info('Journal Entry notification sent', [
-            'journal_entry_id' => $entry->id,
-            'reference' => $entry->reference,
-            'current_user_id' => $currentUser ? $currentUser->id : null,
-        ]);
+        // If still no user, send to admin users
+        if (!$currentUser) {
+            $adminUsers = User::where('email', 'like', '%admin%')->get();
+            if ($adminUsers->isEmpty()) {
+                // Fallback to first user
+                $currentUser = User::first();
+            } else {
+                // Send to all admin users
+                foreach ($adminUsers as $adminUser) {
+                    $adminUser->notify(new JournalEntryCreated($entry));
+                }
+                Log::info('Journal Entry notification sent to admin users', [
+                    'journal_entry_id' => $entry->id,
+                    'reference' => $entry->reference,
+                    'admin_count' => $adminUsers->count(),
+                ]);
+                return;
+            }
+        }
+
+        // Send notification to the determined user
+        if ($currentUser) {
+            $currentUser->notify(new JournalEntryCreated($entry));
+
+            // Log the notification for audit
+            Log::info('Journal Entry notification sent', [
+                'journal_entry_id' => $entry->id,
+                'reference' => $entry->reference,
+                'user_id' => $currentUser->id,
+                'user_method' => Auth::user() ? 'auth' : 'source_model',
+            ]);
+        }
     }
 
     public function updated(JournalEntry $entry): void

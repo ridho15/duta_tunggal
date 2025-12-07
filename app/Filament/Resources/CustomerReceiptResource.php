@@ -89,7 +89,10 @@ class CustomerReceiptResource extends Resource
                                 DatePicker::make('payment_date')
                                     ->label('Payment Date')
                                     ->required()
-                                    ->default(now()),
+                                    ->default(now())
+                                    ->validationMessages([
+                                        'required' => 'Tanggal pembayaran wajib diisi'
+                                    ]),
                                 Select::make('cabang_id')
                                     ->label('Cabang')
                                     ->searchable()
@@ -105,7 +108,10 @@ class CustomerReceiptResource extends Resource
                                         return in_array('all', is_array($manageType) ? $manageType : [$manageType]) ? null : Auth::user()?->cabang_id;
                                     })
                                     ->required()
-                                    ->helperText('Pilih cabang untuk customer receipt ini'),
+                                    ->helperText('Pilih cabang untuk customer receipt ini')
+                                    ->validationMessages([
+                                        'required' => 'Cabang wajib dipilih'
+                                    ]),
                             ]),
 
                         // Invoice Selection Section
@@ -275,7 +281,11 @@ class CustomerReceiptResource extends Resource
                                 TextInput::make('ntpn')
                                     ->label('NTPN')
                                     ->maxLength(255)
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'NTPN wajib diisi',
+                                        'max' => 'NTPN maksimal 255 karakter'
+                                    ]),
 
                                 TextInput::make('total_payment')
                                     ->label('Total Pembayaran')
@@ -289,7 +299,11 @@ class CustomerReceiptResource extends Resource
                                         'data-field' => 'total_payment',
                                         'style' => 'background-color: #f9fafb;' // Light gray background to indicate it's auto-calculated
                                     ])
-                                    ->helperText('Total ini dihitung otomatis berdasarkan invoice yang dipilih'),
+                                    ->helperText('Total ini dihitung otomatis berdasarkan invoice yang dipilih')
+                                    ->validationMessages([
+                                        'required' => 'Total pembayaran wajib diisi',
+                                        'numeric' => 'Total pembayaran harus berupa angka'
+                                    ]),
 
                                 Select::make('coa_id')
                                     ->label('COA')
@@ -330,7 +344,10 @@ class CustomerReceiptResource extends Resource
                                         'Credit' => 'Credit',
                                         'Deposit' => 'Deposit'
                                     ])
-                                    ->columnSpan(1),
+                                    ->columnSpan(1)
+                                    ->validationMessages([
+                                        'required' => 'Metode pembayaran wajib dipilih'
+                                    ]),
                             ]),
 
                         // Hidden fields for backward compatibility

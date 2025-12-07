@@ -8,6 +8,17 @@ use App\Models\PurchaseOrderItem;
 
 class QualityControlObserver
 {
+
+    public function created(QualityControl $qualityControl): void
+    {
+       if($qualityControl->from_model_type === PurchaseReceiptItem::class) {
+            // Revert PurchaseReceiptItem is_sent status when QC is updated
+            $purchaseReceiptItem = $qualityControl->fromModel;
+            if ($purchaseReceiptItem) {
+                $purchaseReceiptItem->update(['is_sent' => 1]);
+            }
+        }
+    }
     /**
      * Handle the QualityControl "saving" event.
      * This validates passed_quantity and total_inspected before create or update operations.
@@ -56,16 +67,69 @@ class QualityControlObserver
     }
 
     /**
-     * Handle the QualityControl "created" event.
+     * Handle the QualityControl "updated" event.
      */
-    public function created(QualityControl $qualityControl): void
+    public function updated(QualityControl $qualityControl): void
     {
-        // Update PurchaseReceiptItem is_sent status when QC is created
-        if ($qualityControl->from_model_type === PurchaseReceiptItem::class) {
-            $purchaseReceiptItem = $qualityControl->fromModel;
-            if ($purchaseReceiptItem) {
-                $purchaseReceiptItem->update(['is_sent' => 1]);
+        if ($qualityControl->wasChanged('passed_quantity')) {
+            $this->syncJournalEntries($qualityControl);
+        }
+        // Sync journal entries when passed_quantity changes
+        if ($qualityControl->wasChanged('passed_quantity')) {
+            $this->syncJournalEntries($qualityControl);
+        }
+    }
+
+    /**
+     * Sync journal entries when QC data changes
+     */
+    protected function syncJournalEntries(QualityControl $qualityControl): void
+    {
+        // Only sync if QC is completed and has journal entries
+        if ($qualityControl->status != 1) {
+            return;
+        }
+
+        $journalEntries = $qualityControl->journalEntries;
+        if ($journalEntries->isEmpty()) {
+            return;
+        }
+
+        // Get new amount based on updated passed_quantity
+        $fromModel = $qualityControl->fromModel;
+        $passedQuantity = $qualityControl->passed_quantity;
+
+        // Get unit price based on model type
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $unitPrice = $fromModel?->unit_price ?? 0;
+        } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
+            $unitPrice = $fromModel?->purchaseOrderItem?->unit_price ?? 0;
+        } else {
+            $unitPrice = 0;
+        }
+
+        if ($passedQuantity <= 0 || $unitPrice <= 0) {
+            return;
+        }
+
+        $newAmount = round($passedQuantity * $unitPrice, 2);
+
+        // Update all journal entries with new amount
+        foreach ($journalEntries as $entry) {
+            if ($entry->debit > 0) {
+                $entry->debit = $newAmount;
+            } elseif ($entry->credit > 0) {
+                $entry->credit = $newAmount;
             }
+            $entry->save();
+        }
+
+        // Also update stock movement value if exists
+        $stockMovement = $qualityControl->stockMovement;
+        if ($stockMovement) {
+            $stockMovement->value = $newAmount;
+            $stockMovement->quantity = $passedQuantity;
+            $stockMovement->save();
         }
     }
 

@@ -172,7 +172,7 @@ class QualityControlService
                 'return_number' => $returnProductService->generateReturnNumber(),
                 'from_model_id' => $qualityControl->id,
                 'from_model_type' => QualityControl::class,
-                'warehouse_id' => $qualityControl->warehouse_id,
+                'warehouse_id' => $data['warehouse_id'] ?? $qualityControl->warehouse_id,
                 'status' => 'draft',
             ]);
             $returnProduct = $qualityControl->returnProduct()->create($returnData);
@@ -181,6 +181,7 @@ class QualityControlService
                 'product_id' => $qualityControl->product_id,
                 'quantity' => $qualityControl->rejected_quantity,
                 'condition' => $data['item_condition'] ?? 'damage',
+                'rak_id' => $data['rak_id'] ?? null,
             ]);
         }
 

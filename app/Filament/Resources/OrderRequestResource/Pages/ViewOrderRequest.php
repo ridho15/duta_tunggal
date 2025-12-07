@@ -57,7 +57,7 @@ class ViewOrderRequest extends ViewRecord
                         ->label('Supplier')
                         ->preload()
                         ->searchable()
-                        ->default(fn () => $this->resolveDefaultSupplierId())
+                        ->default(fn() => $this->resolveDefaultSupplierId())
                         ->options(function () {
                             return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
                                 return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
@@ -73,7 +73,7 @@ class ViewOrderRequest extends ViewRecord
                                 });
                         })
                         ->required()
-                        ->visible(fn ($get) => $get('create_purchase_order')),
+                        ->visible(fn($get) => $get('create_purchase_order')),
                     TextInput::make('po_number')
                         ->label('PO Number')
                         ->string()
@@ -86,19 +86,19 @@ class ViewOrderRequest extends ViewRecord
                                     $set('po_number', HelperController::generatePoNumber());
                                 })
                         )
-                        ->visible(fn ($get) => $get('create_purchase_order')),
+                        ->visible(fn($get) => $get('create_purchase_order')),
                     DatePicker::make('order_date')
                         ->label('Order Date')
                         ->required()
-                        ->visible(fn ($get) => $get('create_purchase_order')),
+                        ->visible(fn($get) => $get('create_purchase_order')),
                     DatePicker::make('expected_date')
                         ->label('Expected Date')
                         ->nullable()
-                        ->visible(fn ($get) => $get('create_purchase_order')),
+                        ->visible(fn($get) => $get('create_purchase_order')),
                     Textarea::make('note')
                         ->label('Note')
                         ->nullable()
-                        ->visible(fn ($get) => $get('create_purchase_order'))
+                        ->visible(fn($get) => $get('create_purchase_order'))
                 ])
                 ->visible(function ($record) {
                     return Auth::user()->hasPermissionTo('approve order request') && $record->status == 'draft';
@@ -127,7 +127,7 @@ class ViewOrderRequest extends ViewRecord
                         ->label('Supplier')
                         ->preload()
                         ->searchable()
-                        ->default(fn () => $this->resolveDefaultSupplierId())
+                        ->default(fn() => $this->resolveDefaultSupplierId())
                         ->options(function () {
                             return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
                                 return [$supplier->id => "({$supplier->code}) {$supplier->name}"];

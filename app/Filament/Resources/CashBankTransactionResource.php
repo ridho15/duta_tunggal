@@ -53,7 +53,10 @@ class CashBankTransactionResource extends Resource
                             ->helperText('Otomatis terisi, bisa diubah manual jika diperlukan')
                             ->unique(ignoreRecord: true)
                             ->columnSpan(2)
-                            ->default(fn() => app(CashBankService::class)->generateNumber('CB')),
+                            ->default(fn() => app(CashBankService::class)->generateNumber('CB'))
+                            ->validationMessages([
+                                'unique' => 'Nomor bukti sudah digunakan'
+                            ]),
                         Select::make('numbering_format')
                             ->label('Format Penomoran')
                             ->options([
@@ -73,27 +76,45 @@ class CashBankTransactionResource extends Resource
                                     $set('number', $number);
                                 }
                             }),
-                        DatePicker::make('date')->label('Tanggal')->required()->default(now())->columnSpan(3),
+                        DatePicker::make('date')->label('Tanggal')->required()->default(now())->columnSpan(3)
+                            ->validationMessages([
+                                'required' => 'Tanggal wajib diisi'
+                            ]),
                         Select::make('type')->label('Tipe')->options([
                             'cash_in' => 'Kas Masuk',
                             'cash_out' => 'Kas Keluar',
                             'bank_in' => 'Bank Masuk',
                             'bank_out' => 'Bank Keluar',
-                        ])->required()->columnSpan(3),
-                        TextInput::make('amount')->numeric()->minValue(0.01)->required()->indonesianMoney()->columnSpan(2),
+                        ])->required()->columnSpan(3)
+                            ->validationMessages([
+                                'required' => 'Tipe transaksi wajib dipilih'
+                            ]),
+                        TextInput::make('amount')->numeric()->minValue(0.01)->required()->indonesianMoney()->columnSpan(2)
+                            ->validationMessages([
+                                'required' => 'Jumlah wajib diisi',
+                                'numeric' => 'Jumlah harus berupa angka',
+                                'min' => 'Jumlah minimal 0.01'
+                            ]),
                         Select::make('account_coa_id')->label('Kas/Bank (COA)')->searchable()
                             ->options(fn() => ChartOfAccount::where(function ($q) {
                                 $q->where('code', 'like', '1111%')
                                     ->orWhere('code', 'like', '1112%');
                             })->orderBy('code')->get()->mapWithKeys(fn($coa) => [$coa->id => $coa->code . ' - ' . $coa->name]))
-                            ->required()->columnSpan(6),
+                            ->required()->columnSpan(6)
+                            ->validationMessages([
+                                'required' => 'Kas/Bank (COA) wajib dipilih'
+                            ]),
                         Select::make('offset_coa_id')->label('Rincian Pembayaran (COA)')->searchable()
                             ->options(fn() => ChartOfAccount::where(function ($q) {
                                 $q->whereNot('code', 'like', '1111%')
                                     ->whereNot('code', 'like', '1112%');
                             })->orderBy('code')->get()->mapWithKeys(fn($coa) => [$coa->id => $coa->code . ' - ' . $coa->name]))
                             ->required()->columnSpan(6)
-                            ->rule('different:account_coa_id'),
+                            ->rule('different:account_coa_id')
+                            ->validationMessages([
+                                'required' => 'Rincian Pembayaran (COA) wajib dipilih',
+                                'different' => 'Rincian Pembayaran (COA) tidak boleh sama dengan Kas/Bank (COA)'
+                            ]),
                         TextInput::make('counterparty')->label('Pihak Terkait')->columnSpan(4),
                         Textarea::make('description')->label('Keterangan')->columnSpan(8),
                         FileUpload::make('attachment_path')->label('Lampiran')->directory('cashbank')->columnSpan(12),
@@ -151,7 +172,10 @@ class CashBankTransactionResource extends Resource
                             ->default('single_use')
                             ->required()
                             ->visible(fn(callable $get) => $get('voucher_request_id') || $get('voucher_number'))
-                            ->columnSpan(6),
+                            ->columnSpan(6)
+                            ->validationMessages([
+                                'required' => 'Tipe penggunaan voucher wajib dipilih'
+                            ]),
                         TextInput::make('voucher_amount_used')
                             ->label('Jumlah Voucher yang Digunakan')
                             ->numeric()
@@ -185,6 +209,10 @@ class CashBankTransactionResource extends Resource
                                         }
                                     };
                                 },
+                            ])
+                            ->validationMessages([
+                                'numeric' => 'Jumlah voucher harus berupa angka',
+                                'min' => 'Jumlah voucher minimal 0.01'
                             ]),
                     ]),
                 ])
@@ -214,7 +242,10 @@ class CashBankTransactionResource extends Resource
                                 })
                                 ->required()
                                 ->searchable()
-                                ->columnSpan(6),
+                                ->columnSpan(6)
+                                ->validationMessages([
+                                    'required' => 'Akun anak wajib dipilih'
+                                ]),
                             TextInput::make('amount')
                                 ->label('Jumlah')
                                 ->numeric()
@@ -223,7 +254,13 @@ class CashBankTransactionResource extends Resource
                                 ->required()
                                 ->indonesianMoney()
                                 ->helperText('Gunakan nilai negatif (-) untuk pajak/pengurang yang mengurangi nilai transaksi')
-                                ->columnSpan(2),
+                                ->columnSpan(2)
+                                ->validationMessages([
+                                    'required' => 'Jumlah wajib diisi',
+                                    'numeric' => 'Jumlah harus berupa angka',
+                                    'min' => 'Jumlah minimal -999.999.999',
+                                    'max' => 'Jumlah maksimal 999.999.999'
+                                ]),
                             TextInput::make('ntpn')
                                 ->label('NTPN')
                                 ->helperText('Nomor Transaksi Penerimaan Negara untuk PPH 22 Import')

@@ -673,12 +673,14 @@ class PurchaseReceiptResource extends Resource
             ])
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Quality Control</summary>' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Quality Control & Sinkronisasi Retur</summary>' .
                     '<div class="mt-2 text-sm">' .
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>QC Status</strong>: Menampilkan jumlah item yang dikirim ke QC (Terkirim / Total).</li>' .
                             '<li><strong>Cara kirim ke QC</strong>: Buka halaman detail Purchase Receipt dan gunakan tombol "Send to QC" pada item yang ingin diuji.</li>' .
                             '<li><strong>Status "Completed"</strong>: Semua item telah dikirim ke QC. Setelah QC disetujui, barang akan ditambahkan ke inventory dan Anda dapat melanjutkan dengan pembuatan invoice serta pembayaran.</li>' .
+                            '<li><strong>🔄 Sinkronisasi Retur:</strong> Jika qty_rejected diubah atau dihapus, Purchase Return akan otomatis terupdate atau terhapus untuk menjaga konsistensi data.</li>' .
+                            '<li><strong>Qty Rejected</strong>: Harus diisi manual. Jika > 0, sistem akan otomatis membuat Purchase Return untuk item yang ditolak.</li>' .
                             '<li><strong>Catatan</strong>: Stok hanya akan dimasukkan ke inventory setelah QC disetujui; pengiriman ke QC tidak otomatis menambah stok.</li>' .
                         '</ul>' .
                     '</div>' .

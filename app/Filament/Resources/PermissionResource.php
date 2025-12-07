@@ -31,7 +31,11 @@ class PermissionResource extends Resource
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255)
-                    ->disabled(),
+                    ->disabled()
+                    ->validationMessages([
+                        'required' => 'Nama permission wajib diisi',
+                        'max' => 'Nama permission maksimal 255 karakter'
+                    ]),
                 Select::make('roles')
                     ->label('Roles')
                     ->preload()

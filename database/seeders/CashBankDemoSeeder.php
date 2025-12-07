@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\CashBankTransfer;
 use App\Models\ChartOfAccount;
+use App\Models\Cabang;
 use App\Services\CashBankService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,14 @@ class CashBankDemoSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () {
+        // Get the first cabang
+        $cabang = Cabang::first();
+        if (!$cabang) {
+            Log::warning('[CashBankDemoSeeder] Skipping seeder because no cabang exists.');
+            return;
+        }
+
+        DB::transaction(function () use ($cabang) {
             // 1) Ensure two bank accounts exist and active
             $bankA = ChartOfAccount::firstOrCreate(
                 ['code' => '1112.01'],
@@ -42,7 +50,7 @@ class CashBankDemoSeeder extends Seeder
                 'description' => 'Seed transfer A ke B',
                 'reference' => 'SEED-TRF',
                 'status' => 'draft',
-                'cabang_id' => 1, // Default to first cabang
+                'cabang_id' => $cabang->id, // Use the first cabang
             ];
 
             [$transfer, $created] = $this->firstOrCreateWithFlag(CashBankTransfer::class, ['reference' => $transferAttrs['reference']], $transferAttrs);
@@ -63,6 +71,7 @@ class CashBankDemoSeeder extends Seeder
                 'description' => 'Seed transfer B ke A',
                 'reference' => 'SEED-TRF-2',
                 'status' => 'draft',
+                'cabang_id' => $cabang->id,
             ];
 
             [$transfer2, $created2] = $this->firstOrCreateWithFlag(CashBankTransfer::class, ['reference' => $transfer2Attrs['reference']], $transfer2Attrs);

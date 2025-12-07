@@ -48,6 +48,11 @@ class CashBankTransfer extends Model
         return $this->belongsTo(ChartOfAccount::class, 'other_costs_coa_id');
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);

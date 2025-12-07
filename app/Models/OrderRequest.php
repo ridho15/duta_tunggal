@@ -33,6 +33,11 @@ class OrderRequest extends Model
         return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
     }
 
+    public function cabang()
+    {
+        return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();
+    }
+
     public function orderRequestItem()
     {
         return $this->hasMany(OrderRequestItem::class, 'order_request_id');
