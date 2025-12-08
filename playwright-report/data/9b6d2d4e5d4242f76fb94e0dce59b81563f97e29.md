@@ -1,0 +1,1158 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - navigation [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - button "Buka notifikasi" [ref=e9] [cursor=pointer]:
+              - generic [ref=e10]: Buka notifikasi
+              - img [ref=e11]
+            - dialog
+          - button "Menu pengguna" [ref=e15] [cursor=pointer]:
+            - img "Avatar Ridho Al Amzah" [ref=e16]
+      - main [ref=e17]:
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - generic [ref=e21]:
+              - navigation [ref=e22]:
+                - list [ref=e23]:
+                  - listitem [ref=e24]:
+                    - link "Journal Entries" [ref=e25] [cursor=pointer]:
+                      - /url: http://127.0.0.1:8009/admin/journal-entries
+                  - listitem [ref=e26]:
+                    - img [ref=e27]
+                    - generic [ref=e29]: Daftar
+              - heading "Journal Entries" [level=1] [ref=e30]
+            - generic [ref=e32]:
+              - link "Grouped View" [ref=e33] [cursor=pointer]:
+                - /url: http://127.0.0.1:8009/admin/journal-entries/grouped
+                - img [ref=e34]
+                - generic [ref=e36]: Grouped View
+              - link "Buat Journal Entry" [ref=e37] [cursor=pointer]:
+                - /url: http://127.0.0.1:8009/admin/journal-entries/create
+                - img [ref=e38]
+                - generic [ref=e40]: Buat Journal Entry
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - generic [ref=e46]:
+                - generic [ref=e48]:
+                  - paragraph
+                  - group [ref=e49]:
+                    - generic "Panduan Journal Entry" [ref=e50] [cursor=pointer]
+                  - paragraph
+                - generic [ref=e51]:
+                  - generic [ref=e55]:
+                    - generic [ref=e56]: Kelompokkan berdasar
+                    - combobox "Kelompokkan berdasar" [ref=e59]:
+                      - option "Kelompokkan berdasar" [selected]
+                      - option "Reference"
+                      - option "Date"
+                  - generic [ref=e60]:
+                    - generic [ref=e61]:
+                      - generic [ref=e62]: Cari
+                      - generic [ref=e63]:
+                        - img [ref=e65]
+                        - searchbox "Cari" [ref=e68]
+                    - button "Filter 1" [ref=e71] [cursor=pointer]:
+                      - generic [ref=e72]: Filter
+                      - img [ref=e73]
+                      - generic [ref=e78]: "1"
+              - generic [ref=e79]:
+                - generic [ref=e80]:
+                  - generic [ref=e81]: Filter aktif
+                  - generic [ref=e83]:
+                    - generic [ref=e85]: "Source Type: Invoice"
+                    - button "Hapus filter" [ref=e86] [cursor=pointer]:
+                      - img [ref=e87]
+                      - generic [ref=e89]: Hapus filter
+                - button [ref=e91] [cursor=pointer]:
+                  - img [ref=e92]
+              - table [ref=e95]:
+                - rowgroup [ref=e96]:
+                  - row "Buat/batalkan pilihan semua item untuk tindakan massal. Aksi Date Reference COA Code Account Description Debit Credit Source Type Source Reference Cabang Created At" [ref=e97]:
+                    - columnheader "Buat/batalkan pilihan semua item untuk tindakan massal." [ref=e98]:
+                      - generic [ref=e100]:
+                        - checkbox "Buat/batalkan pilihan semua item untuk tindakan massal." [ref=e101]
+                        - generic [ref=e102]: Buat/batalkan pilihan semua item untuk tindakan massal.
+                    - columnheader "Aksi" [ref=e103]
+                    - columnheader "Date" [ref=e104]:
+                      - button "Date" [ref=e105] [cursor=pointer]:
+                        - generic [ref=e106]: Date
+                        - img [ref=e107]
+                    - columnheader "Reference" [ref=e109]:
+                      - button "Reference" [ref=e110] [cursor=pointer]:
+                        - generic [ref=e111]: Reference
+                        - img [ref=e112]
+                    - columnheader "COA Code" [ref=e114]:
+                      - button "COA Code" [ref=e115] [cursor=pointer]:
+                        - generic [ref=e116]: COA Code
+                        - img [ref=e117]
+                    - columnheader "Account" [ref=e119]:
+                      - button "Account" [ref=e120] [cursor=pointer]:
+                        - generic [ref=e121]: Account
+                        - img [ref=e122]
+                    - columnheader "Description" [ref=e124]:
+                      - generic [ref=e126]: Description
+                    - columnheader "Debit" [ref=e127]:
+                      - button "Debit" [ref=e128] [cursor=pointer]:
+                        - generic [ref=e129]: Debit
+                        - img [ref=e130]
+                    - columnheader "Credit" [ref=e132]:
+                      - button "Credit" [ref=e133] [cursor=pointer]:
+                        - generic [ref=e134]: Credit
+                        - img [ref=e135]
+                    - columnheader "Source Type" [ref=e137]:
+                      - generic [ref=e139]: Source Type
+                    - columnheader "Source Reference" [ref=e140]:
+                      - generic [ref=e142]: Source Reference
+                    - columnheader "Cabang" [ref=e143]:
+                      - generic [ref=e145]: Cabang
+                    - columnheader "Created At" [ref=e146]:
+                      - button "Created At" [ref=e147] [cursor=pointer]:
+                        - generic [ref=e148]: Created At
+                        - img [ref=e149]
+                - rowgroup [ref=e151]:
+                  - row "Buat/batalkan pilihan item 62 untuk tindakan massal. 08 Des 2025 INV-SO-TEST-20251208112643-20251208112643 1120 PIUTANG DAGANG Sales Invoice - Accounts Receivable Rp 0,00 Rp 0,00 Sales Invoice INV-SO-TEST-20251208112643-20251208112643 - 08 Des 2025 11:26" [ref=e152]:
+                    - cell "Buat/batalkan pilihan item 62 untuk tindakan massal." [ref=e153]:
+                      - generic [ref=e155]:
+                        - checkbox "Buat/batalkan pilihan item 62 untuk tindakan massal." [ref=e156]
+                        - generic [ref=e157]: Buat/batalkan pilihan item 62 untuk tindakan massal.
+                    - cell [ref=e158]:
+                      - button [ref=e163] [cursor=pointer]:
+                        - img [ref=e164]
+                    - cell "08 Des 2025" [ref=e166]:
+                      - link "08 Des 2025" [ref=e168] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e173]: 08 Des 2025
+                    - cell "INV-SO-TEST-20251208112643-20251208112643" [ref=e174]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643" [ref=e176] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e181]: INV-SO-TEST-20251208112643-20251208112643
+                    - cell "1120" [ref=e182]:
+                      - link "1120" [ref=e184] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e189]: "1120"
+                    - cell "PIUTANG DAGANG" [ref=e190]:
+                      - link "PIUTANG DAGANG" [ref=e192] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e197]: PIUTANG DAGANG
+                    - cell "Sales Invoice - Accounts Receivable" [ref=e198]:
+                      - link "Sales Invoice - Accounts Receivable" [ref=e200] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e205]: Sales Invoice - Accounts Receivable
+                    - cell "Rp 0,00" [ref=e206]:
+                      - link "Rp 0,00" [ref=e208] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e213]: Rp 0,00
+                    - cell "Rp 0,00" [ref=e214]:
+                      - link "Rp 0,00" [ref=e216] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e221]: Rp 0,00
+                    - cell "Sales Invoice" [ref=e222]:
+                      - link "Sales Invoice" [ref=e224] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e230]: Sales Invoice
+                    - cell "INV-SO-TEST-20251208112643-20251208112643" [ref=e231]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643" [ref=e233] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e238]: INV-SO-TEST-20251208112643-20251208112643
+                    - cell "-" [ref=e239]:
+                      - link "-" [ref=e241] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e246]: "-"
+                    - cell "08 Des 2025 11:26" [ref=e247]:
+                      - link "08 Des 2025 11:26" [ref=e249] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/62
+                        - generic [ref=e254]: 08 Des 2025 11:26
+                  - row "Buat/batalkan pilihan item 71 untuk tindakan massal. 08 Des 2025 INV-SO-TEST-20251208112643-20251208112643-REV 4110 POTONGAN PENJUALAN BARANG DAGANGAN Sales Revenue - INV-SO-TEST-20251208112643-2025120... Rp 0,00 Rp 1.000.000,00 Sales Invoice INV-SO-TEST-20251208112643-20251208112643 - 08 Des 2025 11:54" [ref=e255]:
+                    - cell "Buat/batalkan pilihan item 71 untuk tindakan massal." [ref=e256]:
+                      - generic [ref=e258]:
+                        - checkbox "Buat/batalkan pilihan item 71 untuk tindakan massal." [ref=e259]
+                        - generic [ref=e260]: Buat/batalkan pilihan item 71 untuk tindakan massal.
+                    - cell [ref=e261]:
+                      - button [ref=e266] [cursor=pointer]:
+                        - img [ref=e267]
+                    - cell "08 Des 2025" [ref=e269]:
+                      - link "08 Des 2025" [ref=e271] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e276]: 08 Des 2025
+                    - cell "INV-SO-TEST-20251208112643-20251208112643-REV" [ref=e277]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643-REV" [ref=e279] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e284]: INV-SO-TEST-20251208112643-20251208112643-REV
+                    - cell "4110" [ref=e285]:
+                      - link "4110" [ref=e287] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e292]: "4110"
+                    - cell "POTONGAN PENJUALAN BARANG DAGANGAN" [ref=e293]:
+                      - link "POTONGAN PENJUALAN BARANG DAGANGAN" [ref=e295] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e300]: POTONGAN PENJUALAN BARANG DAGANGAN
+                    - cell "Sales Revenue - INV-SO-TEST-20251208112643-2025120..." [ref=e301]:
+                      - link "Sales Revenue - INV-SO-TEST-20251208112643-2025120..." [ref=e303] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e308]: Sales Revenue - INV-SO-TEST-20251208112643-2025120...
+                    - cell "Rp 0,00" [ref=e309]:
+                      - link "Rp 0,00" [ref=e311] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e316]: Rp 0,00
+                    - cell "Rp 1.000.000,00" [ref=e317]:
+                      - link "Rp 1.000.000,00" [ref=e319] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e324]: Rp 1.000.000,00
+                    - cell "Sales Invoice" [ref=e325]:
+                      - link "Sales Invoice" [ref=e327] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e333]: Sales Invoice
+                    - cell "INV-SO-TEST-20251208112643-20251208112643" [ref=e334]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643" [ref=e336] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e341]: INV-SO-TEST-20251208112643-20251208112643
+                    - cell "-" [ref=e342]:
+                      - link "-" [ref=e344] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e349]: "-"
+                    - cell "08 Des 2025 11:54" [ref=e350]:
+                      - link "08 Des 2025 11:54" [ref=e352] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/71
+                        - generic [ref=e357]: 08 Des 2025 11:54
+                  - row "Buat/batalkan pilihan item 72 untuk tindakan massal. 08 Des 2025 INV-SO-TEST-20251208112643-20251208112643-COGS 5110 Pembelian Bahan Baku Cost of Goods Sold - INV-SO-TEST-20251208112643-20... Rp 600.000,00 Rp 0,00 Sales Invoice INV-SO-TEST-20251208112643-20251208112643 - 08 Des 2025 11:54" [ref=e358]:
+                    - cell "Buat/batalkan pilihan item 72 untuk tindakan massal." [ref=e359]:
+                      - generic [ref=e361]:
+                        - checkbox "Buat/batalkan pilihan item 72 untuk tindakan massal." [ref=e362]
+                        - generic [ref=e363]: Buat/batalkan pilihan item 72 untuk tindakan massal.
+                    - cell [ref=e364]:
+                      - button [ref=e369] [cursor=pointer]:
+                        - img [ref=e370]
+                    - cell "08 Des 2025" [ref=e372]:
+                      - link "08 Des 2025" [ref=e374] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e379]: 08 Des 2025
+                    - cell "INV-SO-TEST-20251208112643-20251208112643-COGS" [ref=e380]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643-COGS" [ref=e382] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e387]: INV-SO-TEST-20251208112643-20251208112643-COGS
+                    - cell "5110" [ref=e388]:
+                      - link "5110" [ref=e390] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e395]: "5110"
+                    - cell "Pembelian Bahan Baku" [ref=e396]:
+                      - link "Pembelian Bahan Baku" [ref=e398] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e403]: Pembelian Bahan Baku
+                    - cell "Cost of Goods Sold - INV-SO-TEST-20251208112643-20..." [ref=e404]:
+                      - link "Cost of Goods Sold - INV-SO-TEST-20251208112643-20..." [ref=e406] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e411]: Cost of Goods Sold - INV-SO-TEST-20251208112643-20...
+                    - cell "Rp 600.000,00" [ref=e412]:
+                      - link "Rp 600.000,00" [ref=e414] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e419]: Rp 600.000,00
+                    - cell "Rp 0,00" [ref=e420]:
+                      - link "Rp 0,00" [ref=e422] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e427]: Rp 0,00
+                    - cell "Sales Invoice" [ref=e428]:
+                      - link "Sales Invoice" [ref=e430] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e436]: Sales Invoice
+                    - cell "INV-SO-TEST-20251208112643-20251208112643" [ref=e437]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643" [ref=e439] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e444]: INV-SO-TEST-20251208112643-20251208112643
+                    - cell "-" [ref=e445]:
+                      - link "-" [ref=e447] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e452]: "-"
+                    - cell "08 Des 2025 11:54" [ref=e453]:
+                      - link "08 Des 2025 11:54" [ref=e455] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/72
+                        - generic [ref=e460]: 08 Des 2025 11:54
+                  - row "Buat/batalkan pilihan item 73 untuk tindakan massal. 08 Des 2025 INV-SO-TEST-20251208112643-20251208112643-INV 1140.01 Persediaan Bahan Baku - Gudang Utama Inventory Reduction - INV-SO-TEST-20251208112643-2... Rp 0,00 Rp 600.000,00 Sales Invoice INV-SO-TEST-20251208112643-20251208112643 - 08 Des 2025 11:54" [ref=e461]:
+                    - cell "Buat/batalkan pilihan item 73 untuk tindakan massal." [ref=e462]:
+                      - generic [ref=e464]:
+                        - checkbox "Buat/batalkan pilihan item 73 untuk tindakan massal." [ref=e465]
+                        - generic [ref=e466]: Buat/batalkan pilihan item 73 untuk tindakan massal.
+                    - cell [ref=e467]:
+                      - button [ref=e472] [cursor=pointer]:
+                        - img [ref=e473]
+                    - cell "08 Des 2025" [ref=e475]:
+                      - link "08 Des 2025" [ref=e477] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e482]: 08 Des 2025
+                    - cell "INV-SO-TEST-20251208112643-20251208112643-INV" [ref=e483]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643-INV" [ref=e485] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e490]: INV-SO-TEST-20251208112643-20251208112643-INV
+                    - cell "1140.01" [ref=e491]:
+                      - link "1140.01" [ref=e493] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e498]: "1140.01"
+                    - cell "Persediaan Bahan Baku - Gudang Utama" [ref=e499]:
+                      - link "Persediaan Bahan Baku - Gudang Utama" [ref=e501] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e506]: Persediaan Bahan Baku - Gudang Utama
+                    - cell "Inventory Reduction - INV-SO-TEST-20251208112643-2..." [ref=e507]:
+                      - link "Inventory Reduction - INV-SO-TEST-20251208112643-2..." [ref=e509] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e514]: Inventory Reduction - INV-SO-TEST-20251208112643-2...
+                    - cell "Rp 0,00" [ref=e515]:
+                      - link "Rp 0,00" [ref=e517] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e522]: Rp 0,00
+                    - cell "Rp 600.000,00" [ref=e523]:
+                      - link "Rp 600.000,00" [ref=e525] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e530]: Rp 600.000,00
+                    - cell "Sales Invoice" [ref=e531]:
+                      - link "Sales Invoice" [ref=e533] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e539]: Sales Invoice
+                    - cell "INV-SO-TEST-20251208112643-20251208112643" [ref=e540]:
+                      - link "INV-SO-TEST-20251208112643-20251208112643" [ref=e542] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e547]: INV-SO-TEST-20251208112643-20251208112643
+                    - cell "-" [ref=e548]:
+                      - link "-" [ref=e550] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e555]: "-"
+                    - cell "08 Des 2025 11:54" [ref=e556]:
+                      - link "08 Des 2025 11:54" [ref=e558] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/73
+                        - generic [ref=e563]: 08 Des 2025 11:54
+                  - row "Buat/batalkan pilihan item 19 untuk tindakan massal. 27 Okt 2025 INV-AP-002 2100.10 PENERIMAAN BARANG BELUM TERTAGIH Purchase invoice - unbilled purchase for INV-AP-00... Rp 57.000.000,00 Rp 0,00 Purchase Invoice INV-AP-002 - 08 Des 2025 01:37" [ref=e564]:
+                    - cell "Buat/batalkan pilihan item 19 untuk tindakan massal." [ref=e565]:
+                      - generic [ref=e567]:
+                        - checkbox "Buat/batalkan pilihan item 19 untuk tindakan massal." [ref=e568]
+                        - generic [ref=e569]: Buat/batalkan pilihan item 19 untuk tindakan massal.
+                    - cell [ref=e570]:
+                      - button [ref=e575] [cursor=pointer]:
+                        - img [ref=e576]
+                    - cell "27 Okt 2025" [ref=e578]:
+                      - link "27 Okt 2025" [ref=e580] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e585]: 27 Okt 2025
+                    - cell "INV-AP-002" [ref=e586]:
+                      - link "INV-AP-002" [ref=e588] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e593]: INV-AP-002
+                    - cell "2100.10" [ref=e594]:
+                      - link "2100.10" [ref=e596] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e601]: "2100.10"
+                    - cell "PENERIMAAN BARANG BELUM TERTAGIH" [ref=e602]:
+                      - link "PENERIMAAN BARANG BELUM TERTAGIH" [ref=e604] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e609]: PENERIMAAN BARANG BELUM TERTAGIH
+                    - cell "Purchase invoice - unbilled purchase for INV-AP-00..." [ref=e610]:
+                      - link "Purchase invoice - unbilled purchase for INV-AP-00..." [ref=e612] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e617]: Purchase invoice - unbilled purchase for INV-AP-00...
+                    - cell "Rp 57.000.000,00" [ref=e618]:
+                      - link "Rp 57.000.000,00" [ref=e620] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e625]: Rp 57.000.000,00
+                    - cell "Rp 0,00" [ref=e626]:
+                      - link "Rp 0,00" [ref=e628] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e633]: Rp 0,00
+                    - cell "Purchase Invoice" [ref=e634]:
+                      - link "Purchase Invoice" [ref=e636] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e642]: Purchase Invoice
+                    - cell "INV-AP-002" [ref=e643]:
+                      - link "INV-AP-002" [ref=e645] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e650]: INV-AP-002
+                    - cell "-" [ref=e651]:
+                      - link "-" [ref=e653] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e658]: "-"
+                    - cell "08 Des 2025 01:37" [ref=e659]:
+                      - link "08 Des 2025 01:37" [ref=e661] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/19
+                        - generic [ref=e666]: 08 Des 2025 01:37
+                  - row "Buat/batalkan pilihan item 20 untuk tindakan massal. 27 Okt 2025 INV-AP-002 2110 Hutang Dagang Accounts payable for INV-AP-002 Rp 0,00 Rp 57.000.000,00 Purchase Invoice INV-AP-002 - 08 Des 2025 01:37" [ref=e667]:
+                    - cell "Buat/batalkan pilihan item 20 untuk tindakan massal." [ref=e668]:
+                      - generic [ref=e670]:
+                        - checkbox "Buat/batalkan pilihan item 20 untuk tindakan massal." [ref=e671]
+                        - generic [ref=e672]: Buat/batalkan pilihan item 20 untuk tindakan massal.
+                    - cell [ref=e673]:
+                      - button [ref=e678] [cursor=pointer]:
+                        - img [ref=e679]
+                    - cell "27 Okt 2025" [ref=e681]:
+                      - link "27 Okt 2025" [ref=e683] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e688]: 27 Okt 2025
+                    - cell "INV-AP-002" [ref=e689]:
+                      - link "INV-AP-002" [ref=e691] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e696]: INV-AP-002
+                    - cell "2110" [ref=e697]:
+                      - link "2110" [ref=e699] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e704]: "2110"
+                    - cell "Hutang Dagang" [ref=e705]:
+                      - link "Hutang Dagang" [ref=e707] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e712]: Hutang Dagang
+                    - cell "Accounts payable for INV-AP-002" [ref=e713]:
+                      - link "Accounts payable for INV-AP-002" [ref=e715] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e720]: Accounts payable for INV-AP-002
+                    - cell "Rp 0,00" [ref=e721]:
+                      - link "Rp 0,00" [ref=e723] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e728]: Rp 0,00
+                    - cell "Rp 57.000.000,00" [ref=e729]:
+                      - link "Rp 57.000.000,00" [ref=e731] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e736]: Rp 57.000.000,00
+                    - cell "Purchase Invoice" [ref=e737]:
+                      - link "Purchase Invoice" [ref=e739] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e745]: Purchase Invoice
+                    - cell "INV-AP-002" [ref=e746]:
+                      - link "INV-AP-002" [ref=e748] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e753]: INV-AP-002
+                    - cell "-" [ref=e754]:
+                      - link "-" [ref=e756] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e761]: "-"
+                    - cell "08 Des 2025 01:37" [ref=e762]:
+                      - link "08 Des 2025 01:37" [ref=e764] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/20
+                        - generic [ref=e769]: 08 Des 2025 01:37
+                  - row "Buat/batalkan pilihan item 6 untuk tindakan massal. 09 Okt 2025 INV-AR-001 1120 PIUTANG DAGANG Sales Invoice - Accounts Receivable Rp 0,00 Rp 0,00 Sales Invoice INV-AR-001 - 08 Des 2025 01:37" [ref=e770]:
+                    - cell "Buat/batalkan pilihan item 6 untuk tindakan massal." [ref=e771]:
+                      - generic [ref=e773]:
+                        - checkbox "Buat/batalkan pilihan item 6 untuk tindakan massal." [ref=e774]
+                        - generic [ref=e775]: Buat/batalkan pilihan item 6 untuk tindakan massal.
+                    - cell [ref=e776]:
+                      - button [ref=e781] [cursor=pointer]:
+                        - img [ref=e782]
+                    - cell "09 Okt 2025" [ref=e784]:
+                      - link "09 Okt 2025" [ref=e786] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e791]: 09 Okt 2025
+                    - cell "INV-AR-001" [ref=e792]:
+                      - link "INV-AR-001" [ref=e794] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e799]: INV-AR-001
+                    - cell "1120" [ref=e800]:
+                      - link "1120" [ref=e802] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e807]: "1120"
+                    - cell "PIUTANG DAGANG" [ref=e808]:
+                      - link "PIUTANG DAGANG" [ref=e810] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e815]: PIUTANG DAGANG
+                    - cell "Sales Invoice - Accounts Receivable" [ref=e816]:
+                      - link "Sales Invoice - Accounts Receivable" [ref=e818] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e823]: Sales Invoice - Accounts Receivable
+                    - cell "Rp 0,00" [ref=e824]:
+                      - link "Rp 0,00" [ref=e826] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e831]: Rp 0,00
+                    - cell "Rp 0,00" [ref=e832]:
+                      - link "Rp 0,00" [ref=e834] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e839]: Rp 0,00
+                    - cell "Sales Invoice" [ref=e840]:
+                      - link "Sales Invoice" [ref=e842] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e848]: Sales Invoice
+                    - cell "INV-AR-001" [ref=e849]:
+                      - link "INV-AR-001" [ref=e851] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e856]: INV-AR-001
+                    - cell "-" [ref=e857]:
+                      - link "-" [ref=e859] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e864]: "-"
+                    - cell "08 Des 2025 01:37" [ref=e865]:
+                      - link "08 Des 2025 01:37" [ref=e867] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/6
+                        - generic [ref=e872]: 08 Des 2025 01:37
+                  - row "Buat/batalkan pilihan item 11 untuk tindakan massal. 24 Sep 2025 INV-AR-002 1120 PIUTANG DAGANG Sales Invoice - Accounts Receivable Rp 0,00 Rp 0,00 Sales Invoice INV-AR-002 - 08 Des 2025 01:37" [ref=e873]:
+                    - cell "Buat/batalkan pilihan item 11 untuk tindakan massal." [ref=e874]:
+                      - generic [ref=e876]:
+                        - checkbox "Buat/batalkan pilihan item 11 untuk tindakan massal." [ref=e877]
+                        - generic [ref=e878]: Buat/batalkan pilihan item 11 untuk tindakan massal.
+                    - cell [ref=e879]:
+                      - button [ref=e884] [cursor=pointer]:
+                        - img [ref=e885]
+                    - cell "24 Sep 2025" [ref=e887]:
+                      - link "24 Sep 2025" [ref=e889] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e894]: 24 Sep 2025
+                    - cell "INV-AR-002" [ref=e895]:
+                      - link "INV-AR-002" [ref=e897] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e902]: INV-AR-002
+                    - cell "1120" [ref=e903]:
+                      - link "1120" [ref=e905] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e910]: "1120"
+                    - cell "PIUTANG DAGANG" [ref=e911]:
+                      - link "PIUTANG DAGANG" [ref=e913] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e918]: PIUTANG DAGANG
+                    - cell "Sales Invoice - Accounts Receivable" [ref=e919]:
+                      - link "Sales Invoice - Accounts Receivable" [ref=e921] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e926]: Sales Invoice - Accounts Receivable
+                    - cell "Rp 0,00" [ref=e927]:
+                      - link "Rp 0,00" [ref=e929] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e934]: Rp 0,00
+                    - cell "Rp 0,00" [ref=e935]:
+                      - link "Rp 0,00" [ref=e937] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e942]: Rp 0,00
+                    - cell "Sales Invoice" [ref=e943]:
+                      - link "Sales Invoice" [ref=e945] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e951]: Sales Invoice
+                    - cell "INV-AR-002" [ref=e952]:
+                      - link "INV-AR-002" [ref=e954] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e959]: INV-AR-002
+                    - cell "-" [ref=e960]:
+                      - link "-" [ref=e962] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e967]: "-"
+                    - cell "08 Des 2025 01:37" [ref=e968]:
+                      - link "08 Des 2025 01:37" [ref=e970] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/11
+                        - generic [ref=e975]: 08 Des 2025 01:37
+                  - row "Buat/batalkan pilihan item 15 untuk tindakan massal. 11 Sep 2025 INV-AP-001 2100.10 PENERIMAAN BARANG BELUM TERTAGIH Purchase invoice - unbilled purchase for INV-AP-00... Rp 128.500.000,00 Rp 0,00 Purchase Invoice INV-AP-001 - 08 Des 2025 01:37" [ref=e976]:
+                    - cell "Buat/batalkan pilihan item 15 untuk tindakan massal." [ref=e977]:
+                      - generic [ref=e979]:
+                        - checkbox "Buat/batalkan pilihan item 15 untuk tindakan massal." [ref=e980]
+                        - generic [ref=e981]: Buat/batalkan pilihan item 15 untuk tindakan massal.
+                    - cell [ref=e982]:
+                      - button [ref=e987] [cursor=pointer]:
+                        - img [ref=e988]
+                    - cell "11 Sep 2025" [ref=e990]:
+                      - link "11 Sep 2025" [ref=e992] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e997]: 11 Sep 2025
+                    - cell "INV-AP-001" [ref=e998]:
+                      - link "INV-AP-001" [ref=e1000] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1005]: INV-AP-001
+                    - cell "2100.10" [ref=e1006]:
+                      - link "2100.10" [ref=e1008] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1013]: "2100.10"
+                    - cell "PENERIMAAN BARANG BELUM TERTAGIH" [ref=e1014]:
+                      - link "PENERIMAAN BARANG BELUM TERTAGIH" [ref=e1016] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1021]: PENERIMAAN BARANG BELUM TERTAGIH
+                    - cell "Purchase invoice - unbilled purchase for INV-AP-00..." [ref=e1022]:
+                      - link "Purchase invoice - unbilled purchase for INV-AP-00..." [ref=e1024] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1029]: Purchase invoice - unbilled purchase for INV-AP-00...
+                    - cell "Rp 128.500.000,00" [ref=e1030]:
+                      - link "Rp 128.500.000,00" [ref=e1032] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1037]: Rp 128.500.000,00
+                    - cell "Rp 0,00" [ref=e1038]:
+                      - link "Rp 0,00" [ref=e1040] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1045]: Rp 0,00
+                    - cell "Purchase Invoice" [ref=e1046]:
+                      - link "Purchase Invoice" [ref=e1048] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1054]: Purchase Invoice
+                    - cell "INV-AP-001" [ref=e1055]:
+                      - link "INV-AP-001" [ref=e1057] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1062]: INV-AP-001
+                    - cell "-" [ref=e1063]:
+                      - link "-" [ref=e1065] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1070]: "-"
+                    - cell "08 Des 2025 01:37" [ref=e1071]:
+                      - link "08 Des 2025 01:37" [ref=e1073] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/15
+                        - generic [ref=e1078]: 08 Des 2025 01:37
+                  - row "Buat/batalkan pilihan item 16 untuk tindakan massal. 11 Sep 2025 INV-AP-001 2110 Hutang Dagang Accounts payable for INV-AP-001 Rp 0,00 Rp 128.500.000,00 Purchase Invoice INV-AP-001 - 08 Des 2025 01:37" [ref=e1079]:
+                    - cell "Buat/batalkan pilihan item 16 untuk tindakan massal." [ref=e1080]:
+                      - generic [ref=e1082]:
+                        - checkbox "Buat/batalkan pilihan item 16 untuk tindakan massal." [ref=e1083]
+                        - generic [ref=e1084]: Buat/batalkan pilihan item 16 untuk tindakan massal.
+                    - cell [ref=e1085]:
+                      - button [ref=e1090] [cursor=pointer]:
+                        - img [ref=e1091]
+                    - cell "11 Sep 2025" [ref=e1093]:
+                      - link "11 Sep 2025" [ref=e1095] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1100]: 11 Sep 2025
+                    - cell "INV-AP-001" [ref=e1101]:
+                      - link "INV-AP-001" [ref=e1103] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1108]: INV-AP-001
+                    - cell "2110" [ref=e1109]:
+                      - link "2110" [ref=e1111] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1116]: "2110"
+                    - cell "Hutang Dagang" [ref=e1117]:
+                      - link "Hutang Dagang" [ref=e1119] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1124]: Hutang Dagang
+                    - cell "Accounts payable for INV-AP-001" [ref=e1125]:
+                      - link "Accounts payable for INV-AP-001" [ref=e1127] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1132]: Accounts payable for INV-AP-001
+                    - cell "Rp 0,00" [ref=e1133]:
+                      - link "Rp 0,00" [ref=e1135] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1140]: Rp 0,00
+                    - cell "Rp 128.500.000,00" [ref=e1141]:
+                      - link "Rp 128.500.000,00" [ref=e1143] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1148]: Rp 128.500.000,00
+                    - cell "Purchase Invoice" [ref=e1149]:
+                      - link "Purchase Invoice" [ref=e1151] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1157]: Purchase Invoice
+                    - cell "INV-AP-001" [ref=e1158]:
+                      - link "INV-AP-001" [ref=e1160] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1165]: INV-AP-001
+                    - cell "-" [ref=e1166]:
+                      - link "-" [ref=e1168] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1173]: "-"
+                    - cell "08 Des 2025 01:37" [ref=e1174]:
+                      - link "08 Des 2025 01:37" [ref=e1176] [cursor=pointer]:
+                        - /url: http://127.0.0.1:8009/admin/journal-entries/16
+                        - generic [ref=e1181]: 08 Des 2025 01:37
+              - navigation "Navigasi halaman" [ref=e1182]:
+                - generic [ref=e1185]:
+                  - generic [ref=e1187]: per halaman
+                  - combobox "per halaman" [ref=e1189]:
+                    - option "5" [selected]
+                    - option "10"
+                    - option "25"
+                    - option "50"
+                    - option "Semua"
+                - button "Selanjutnya" [ref=e1190] [cursor=pointer]:
+                  - generic [ref=e1191]: Selanjutnya
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+    - complementary [ref=e1192]:
+      - generic [ref=e1194]:
+        - link "Duta Tunggal ERP" [ref=e1196] [cursor=pointer]:
+          - /url: http://127.0.0.1:8009/admin
+          - generic [ref=e1197]: Duta Tunggal ERP
+        - button "Persempit menu" [ref=e1198] [cursor=pointer]:
+          - generic [ref=e1199]: Persempit menu
+          - img [ref=e1200]
+      - navigation [ref=e1202]:
+        - list [ref=e1203]:
+          - listitem [ref=e1204]:
+            - list [ref=e1205]:
+              - listitem [ref=e1206]:
+                - link "Dasbor" [ref=e1207] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin
+                  - img [ref=e1208]
+                  - generic [ref=e1210]: Dasbor
+          - listitem [ref=e1211]:
+            - generic [ref=e1212] [cursor=pointer]:
+              - generic [ref=e1213]: Reports
+              - button "Reports" [expanded] [ref=e1214]:
+                - generic [ref=e1215]: Reports
+                - img [ref=e1216]
+            - list [ref=e1218]:
+              - listitem [ref=e1219]:
+                - link "Laporan Penjualan" [ref=e1220] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/sales-report-page
+                  - img [ref=e1221]
+                  - generic [ref=e1223]: Laporan Penjualan
+              - listitem [ref=e1224]:
+                - link "Laporan Pembelian" [ref=e1225] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-report-page
+                  - img [ref=e1226]
+                  - generic [ref=e1228]: Laporan Pembelian
+              - listitem [ref=e1229]:
+                - link "Aging Report" [ref=e1230] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/view-ageing-report
+                  - img [ref=e1231]
+                  - generic [ref=e1233]: Aging Report
+              - listitem [ref=e1234]:
+                - link "Laporan Mutasi Barang" [ref=e1235] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/stock-mutation
+                  - img [ref=e1236]
+                  - generic [ref=e1238]: Laporan Mutasi Barang
+          - listitem [ref=e1239]:
+            - generic [ref=e1240] [cursor=pointer]:
+              - generic [ref=e1241]: Asset Management
+              - button "Asset Management" [expanded] [ref=e1242]:
+                - generic [ref=e1243]: Asset Management
+                - img [ref=e1244]
+            - list [ref=e1246]:
+              - listitem [ref=e1247]:
+                - link "Aset Tetap" [ref=e1248] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/assets
+                  - img [ref=e1249]
+                  - generic [ref=e1251]: Aset Tetap
+              - listitem [ref=e1252]:
+                - link "Transfer Aset" [ref=e1253] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/asset-transfers
+                  - img [ref=e1254]
+                  - generic [ref=e1256]: Transfer Aset
+              - listitem [ref=e1257]:
+                - link "Disposal Aset" [ref=e1258] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/asset-disposals
+                  - img [ref=e1259]
+                  - generic [ref=e1261]: Disposal Aset
+          - listitem [ref=e1262]:
+            - generic [ref=e1263] [cursor=pointer]:
+              - generic [ref=e1264]: Pembelian (Purchase Order)
+              - button "Pembelian (Purchase Order)" [expanded] [ref=e1265]:
+                - generic [ref=e1266]: Pembelian (Purchase Order)
+                - img [ref=e1267]
+            - list [ref=e1269]:
+              - listitem [ref=e1270]:
+                - link "Order Request" [ref=e1271] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/order-requests
+                  - img [ref=e1272]
+                  - generic [ref=e1274]: Order Request
+              - listitem [ref=e1275]:
+                - link "Pembelian" [ref=e1276] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-orders
+                  - img [ref=e1277]
+                  - generic [ref=e1279]: Pembelian
+              - listitem [ref=e1280]:
+                - link "Purchase Receipt" [ref=e1281] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-receipts
+                  - img [ref=e1282]
+                  - generic [ref=e1284]: Purchase Receipt
+              - listitem [ref=e1285]:
+                - link "Purchase Return" [ref=e1286] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-returns
+                  - img [ref=e1287]
+                  - generic [ref=e1289]: Purchase Return
+              - listitem [ref=e1290]:
+                - link "Quality Control Purchase" [ref=e1291] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/quality-control-purchases
+                  - img [ref=e1292]
+                  - generic [ref=e1294]: Quality Control Purchase
+          - listitem [ref=e1295]:
+            - generic [ref=e1296] [cursor=pointer]:
+              - generic [ref=e1297]: Penjualan (Sales Order)
+              - button "Penjualan (Sales Order)" [expanded] [ref=e1298]:
+                - generic [ref=e1299]: Penjualan (Sales Order)
+                - img [ref=e1300]
+            - list [ref=e1302]:
+              - listitem [ref=e1303]:
+                - link "Quotation" [ref=e1304] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/quotations
+                  - img [ref=e1305]
+                  - generic [ref=e1307]: Quotation
+              - listitem [ref=e1308]:
+                - link "Penjualan" [ref=e1309] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/sale-orders
+                  - img [ref=e1310]
+                  - generic [ref=e1312]: Penjualan
+          - listitem [ref=e1313]:
+            - generic [ref=e1314] [cursor=pointer]:
+              - generic [ref=e1315]: Delivery Order
+              - button "Delivery Order" [expanded] [ref=e1316]:
+                - generic [ref=e1317]: Delivery Order
+                - img [ref=e1318]
+            - list [ref=e1320]:
+              - listitem [ref=e1321]:
+                - link "Delivery Order" [ref=e1322] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/delivery-orders
+                  - img [ref=e1323]
+                  - generic [ref=e1325]: Delivery Order
+              - listitem [ref=e1326]:
+                - link "Surat Jalan" [ref=e1327] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/surat-jalans
+                  - img [ref=e1328]
+                  - generic [ref=e1330]: Surat Jalan
+          - listitem [ref=e1331]:
+            - generic [ref=e1332] [cursor=pointer]:
+              - generic [ref=e1333]: Finance
+              - button "Finance" [expanded] [ref=e1334]:
+                - generic [ref=e1335]: Finance
+                - img [ref=e1336]
+            - list [ref=e1338]:
+              - listitem [ref=e1339]:
+                - link "AR & AP Management" [ref=e1340] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/ar-ap-management
+                  - img [ref=e1341]
+                  - generic [ref=e1343]: AR & AP Management
+              - listitem [ref=e1344]:
+                - link "Buku Besar" [ref=e1345] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/buku-besar-page
+                  - img [ref=e1346]
+                  - generic [ref=e1348]: Buku Besar
+              - listitem [ref=e1349]:
+                - link "Laba Rugi" [ref=e1350] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/income-statement-page
+                  - img [ref=e1351]
+                  - generic [ref=e1353]: Laba Rugi
+              - listitem [ref=e1354]:
+                - link "Balance Sheet" [ref=e1355] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/balance-sheets
+                  - img [ref=e1356]
+                  - generic [ref=e1358]: Balance Sheet
+              - listitem [ref=e1359]:
+                - link "Kartu Persediaan" [ref=e1360] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/inventory-card
+                  - img [ref=e1361]
+                  - generic [ref=e1363]: Kartu Persediaan
+              - listitem [ref=e1364]:
+                - link "Laporan HPP" [ref=e1365] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/hpp
+                  - img [ref=e1366]
+                  - generic [ref=e1368]: Laporan HPP
+              - listitem [ref=e1369]:
+                - link "Laporan Arus Kas" [ref=e1370] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/cash-flow
+                  - img [ref=e1371]
+                  - generic [ref=e1373]: Laporan Arus Kas
+              - listitem [ref=e1374]:
+                - link "Aging Report (AR/AP)" [ref=e1375] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/ageing-reports
+                  - img [ref=e1376]
+                  - generic [ref=e1378]: Aging Report (AR/AP)
+          - listitem [ref=e1379]:
+            - generic [ref=e1380] [cursor=pointer]:
+              - generic [ref=e1381]: Finance - Pembelian
+              - button "Finance - Pembelian" [expanded] [ref=e1382]:
+                - generic [ref=e1383]: Finance - Pembelian
+                - img [ref=e1384]
+            - list [ref=e1386]:
+              - listitem [ref=e1387]:
+                - link "Account Payable" [ref=e1388] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/account-payables
+                  - img [ref=e1389]
+                  - generic [ref=e1391]: Account Payable
+              - listitem [ref=e1392]:
+                - link "Invoice Pembelian" [ref=e1393] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-invoices
+                  - img [ref=e1394]
+                  - generic [ref=e1396]: Invoice Pembelian
+          - listitem [ref=e1397]:
+            - generic [ref=e1398] [cursor=pointer]:
+              - generic [ref=e1399]: Finance - Penjualan
+              - button "Finance - Penjualan" [expanded] [ref=e1400]:
+                - generic [ref=e1401]: Finance - Penjualan
+                - img [ref=e1402]
+            - list [ref=e1404]:
+              - listitem [ref=e1405]:
+                - link "Account Receivable" [ref=e1406] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/account-receivables
+                  - img [ref=e1407]
+                  - generic [ref=e1409]: Account Receivable
+              - listitem [ref=e1410]:
+                - link "Penjualan Lainnya" [ref=e1411] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/other-sales
+                  - img [ref=e1412]
+                  - generic [ref=e1414]: Penjualan Lainnya
+              - listitem [ref=e1415]:
+                - link "Invoice Penjualan" [ref=e1416] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/sales-invoices
+                  - img [ref=e1417]
+                  - generic [ref=e1419]: Invoice Penjualan
+          - listitem [ref=e1420]:
+            - generic [ref=e1421] [cursor=pointer]:
+              - generic [ref=e1422]: Finance - Akuntansi
+              - button "Finance - Akuntansi" [expanded] [ref=e1423]:
+                - generic [ref=e1424]: Finance - Akuntansi
+                - img [ref=e1425]
+            - list [ref=e1427]:
+              - listitem [ref=e1428]:
+                - link "Ageing Schedule" [ref=e1429] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/ageing-schedules
+                  - img [ref=e1430]
+                  - generic [ref=e1432]: Ageing Schedule
+              - listitem [ref=e1433]:
+                - link "Rekonsiliasi Bank" [ref=e1434] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/bank-reconciliations
+                  - img [ref=e1435]
+                  - generic [ref=e1437]: Rekonsiliasi Bank
+              - listitem [ref=e1438]:
+                - link "Journal Entry" [ref=e1439] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/journal-entries
+                  - img [ref=e1440]
+                  - generic [ref=e1442]: Journal Entry
+              - listitem [ref=e1443]:
+                - link "Pengajuan Voucher" [ref=e1444] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/voucher-requests
+                  - img [ref=e1445]
+                  - generic [ref=e1447]: Pengajuan Voucher
+          - listitem [ref=e1448]:
+            - generic [ref=e1449] [cursor=pointer]:
+              - generic [ref=e1450]: Manufacturing Order
+              - button "Manufacturing Order" [expanded] [ref=e1451]:
+                - generic [ref=e1452]: Manufacturing Order
+                - img [ref=e1453]
+            - list [ref=e1455]:
+              - listitem [ref=e1456]:
+                - link "Bill Of Material" [ref=e1457] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/bill-of-materials
+                  - img [ref=e1458]
+                  - generic [ref=e1460]: Bill Of Material
+              - listitem [ref=e1461]:
+                - link "Manufacturing Order" [ref=e1462] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/manufacturing-orders
+                  - img [ref=e1463]
+                  - generic [ref=e1465]: Manufacturing Order
+              - listitem [ref=e1466]:
+                - link "Pengambilan Bahan Baku" [ref=e1467] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/material-issues
+                  - img [ref=e1468]
+                  - generic [ref=e1470]: Pengambilan Bahan Baku
+              - listitem [ref=e1471]:
+                - link "Rencana Produksi" [ref=e1472] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/production-plans
+                  - img [ref=e1473]
+                  - generic [ref=e1475]: Rencana Produksi
+              - listitem [ref=e1476]:
+                - link "Production" [ref=e1477] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/productions
+                  - img [ref=e1478]
+                  - generic [ref=e1480]: Production
+              - listitem [ref=e1481]:
+                - link "Quality Control Manufacture" [ref=e1482] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/quality-control-manufactures
+                  - img [ref=e1483]
+                  - generic [ref=e1486]: Quality Control Manufacture
+          - listitem [ref=e1487]:
+            - generic [ref=e1488] [cursor=pointer]:
+              - generic [ref=e1489]: Finance - Pembayaran
+              - button "Finance - Pembayaran" [expanded] [ref=e1490]:
+                - generic [ref=e1491]: Finance - Pembayaran
+                - img [ref=e1492]
+            - list [ref=e1494]:
+              - listitem [ref=e1495]:
+                - link "Transfer Kas & Bank" [ref=e1496] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/cash-bank-transfers
+                  - img [ref=e1497]
+                  - generic [ref=e1499]: Transfer Kas & Bank
+              - listitem [ref=e1500]:
+                - link "Customer Receipt" [ref=e1501] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/customer-receipts
+                  - img [ref=e1502]
+                  - generic [ref=e1504]: Customer Receipt
+              - listitem [ref=e1505]:
+                - link "Vendor Payment" [ref=e1506] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/vendor-payments
+                  - img [ref=e1507]
+                  - generic [ref=e1509]: Vendor Payment
+              - listitem [ref=e1510]:
+                - link "Transaksi Kas & Bank" [ref=e1511] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/cash-bank-transactions
+                  - img [ref=e1512]
+                  - generic [ref=e1514]: Transaksi Kas & Bank
+              - listitem [ref=e1515]:
+                - link "Deposit" [ref=e1516] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/deposits
+                  - img [ref=e1517]
+                  - generic [ref=e1519]: Deposit
+          - listitem [ref=e1520]:
+            - generic [ref=e1521] [cursor=pointer]:
+              - generic [ref=e1522]: Gudang
+              - button "Gudang" [expanded] [ref=e1523]:
+                - generic [ref=e1524]: Gudang
+                - img [ref=e1525]
+            - list [ref=e1527]:
+              - listitem [ref=e1528]:
+                - link "Inventory Stock" [ref=e1529] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/inventory-stocks
+                  - img [ref=e1530]
+                  - generic [ref=e1532]: Inventory Stock
+              - listitem [ref=e1533]:
+                - link "Return Product" [ref=e1534] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/return-products
+                  - img [ref=e1535]
+                  - generic [ref=e1537]: Return Product
+              - listitem [ref=e1538]:
+                - link "Stock Adjustments" [ref=e1539] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-adjustments
+                  - img [ref=e1540]
+                  - generic [ref=e1542]: Stock Adjustments
+              - listitem [ref=e1543]:
+                - link "Stock Movement" [ref=e1544] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-movements
+                  - img [ref=e1545]
+                  - generic [ref=e1547]: Stock Movement
+              - listitem [ref=e1548]:
+                - link "Stock Opnames" [ref=e1549] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-opnames
+                  - img [ref=e1550]
+                  - generic [ref=e1552]: Stock Opnames
+              - listitem [ref=e1553]:
+                - link "Transfer Stock" [ref=e1554] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-transfers
+                  - img [ref=e1555]
+                  - generic [ref=e1557]: Transfer Stock
+              - listitem [ref=e1558]:
+                - link "Konfirmasi Gudang" [ref=e1559] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/warehouse-confirmations
+                  - img [ref=e1560]
+                  - generic [ref=e1562]: Konfirmasi Gudang
+          - listitem [ref=e1563]:
+            - generic [ref=e1564] [cursor=pointer]:
+              - generic [ref=e1565]: Master Data
+              - button "Master Data" [expanded] [ref=e1566]:
+                - generic [ref=e1567]: Master Data
+                - img [ref=e1568]
+            - list [ref=e1570]:
+              - listitem [ref=e1571]:
+                - link "Cabang" [ref=e1572] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/cabangs
+                  - img [ref=e1573]
+                  - generic [ref=e1575]: Cabang
+              - listitem [ref=e1576]:
+                - link "Mata Uang" [ref=e1577] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/currencies
+                  - img [ref=e1578]
+                  - generic [ref=e1580]: Mata Uang
+              - listitem [ref=e1581]:
+                - link "Customer" [ref=e1582] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/customers
+                  - img [ref=e1583]
+                  - generic [ref=e1585]: Customer
+              - listitem [ref=e1586]:
+                - link "Driver" [ref=e1587] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/drivers
+                  - img [ref=e1588]
+                  - generic [ref=e1590]: Driver
+              - listitem [ref=e1591]:
+                - link "Kategori Produk" [ref=e1592] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/product-categories
+                  - img [ref=e1593]
+                  - generic [ref=e1595]: Kategori Produk
+              - listitem [ref=e1596]:
+                - link "Produk" [ref=e1597] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/products
+                  - img [ref=e1598]
+                  - generic [ref=e1600]: Produk
+              - listitem [ref=e1601]:
+                - link "Rak" [ref=e1602] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/raks
+                  - img [ref=e1603]
+                  - generic [ref=e1605]: Rak
+              - listitem [ref=e1606]:
+                - link "Supplier" [ref=e1607] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/suppliers
+                  - img [ref=e1608]
+                  - generic [ref=e1610]: Supplier
+              - listitem [ref=e1611]:
+                - link "Satuan" [ref=e1612] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/unit-of-measures
+                  - img [ref=e1613]
+                  - generic [ref=e1615]: Satuan
+              - listitem [ref=e1616]:
+                - link "Kendaraan" [ref=e1617] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/vehicles
+                  - img [ref=e1618]
+                  - generic [ref=e1620]: Kendaraan
+              - listitem [ref=e1621]:
+                - link "Gudang" [ref=e1622] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/warehouses
+                  - img [ref=e1623]
+                  - generic [ref=e1625]: Gudang
+              - listitem [ref=e1626]:
+                - link "Chart Of Account" [ref=e1627] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/chart-of-accounts
+                  - img [ref=e1628]
+                  - generic [ref=e1631]: Chart Of Account
+              - listitem [ref=e1632]:
+                - link "Tax Setting" [ref=e1633] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/tax-settings
+                  - img [ref=e1634]
+                  - generic [ref=e1637]: Tax Setting
+          - listitem [ref=e1638]:
+            - generic [ref=e1639] [cursor=pointer]:
+              - generic [ref=e1640]: User Roles Management
+              - button "User Roles Management" [expanded] [ref=e1641]:
+                - generic [ref=e1642]: User Roles Management
+                - img [ref=e1643]
+            - list [ref=e1645]:
+              - listitem [ref=e1646]:
+                - link "Permission" [ref=e1647] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/permissions
+                  - img [ref=e1648]
+                  - generic [ref=e1650]: Permission
+              - listitem [ref=e1651]:
+                - link "Role" [ref=e1652] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/roles
+                  - img [ref=e1653]
+                  - generic [ref=e1655]: Role
+              - listitem [ref=e1656]:
+                - link "User" [ref=e1657] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/users
+                  - img [ref=e1658]
+                  - generic [ref=e1660]: User
+  - generic:
+    - status
+  - generic [ref=e1661]:
+    - generic [ref=e1663]:
+      - generic [ref=e1665]:
+        - generic [ref=e1666] [cursor=pointer]:
+          - text: 
+          - generic: Request
+        - text: 
+        - generic [ref=e1667] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - text:  
+        - generic [ref=e1668] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e1669]: "4"
+        - generic [ref=e1670] [cursor=pointer]:
+          - text: 
+          - generic: Models
+          - generic [ref=e1671]: "1"
+        - generic [ref=e1672] [cursor=pointer]:
+          - text: 
+          - generic: Livewire
+          - generic [ref=e1673]: "1"
+        - text:  
+      - generic [ref=e1674]:
+        - generic [ref=e1676] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e1679] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e1680]: "2"
+        - combobox [ref=e1681] [cursor=pointer]:
+          - option "#1 journal-entries?tableFilters[source_type][value]=App%5CModels%5CInvoice (14:40:59)"
+          - option "#2 update (ajax) (14:41:00)" [selected]
+        - generic [ref=e1682] [cursor=pointer]:
+          - generic: 
+          - generic: 86.48ms
+        - generic [ref=e1683]:
+          - generic: 
+          - generic: 4MB
+        - generic [ref=e1684]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e1685] [cursor=pointer]:
+          - generic: 
+          - generic: POST livewire/update
+    - text:                                        
+  - text: 
+```

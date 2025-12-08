@@ -137,32 +137,6 @@ class Asset extends Model
         return ($this->accumulated_depreciation / $this->purchase_cost) * 100;
     }
 
-    // Quality Control Accessors
-    public function getQualityControlAttribute()
-    {
-        return $this->purchaseOrderItem->qualityControl ?? null;
-    }
-
-    public function getHasPassedQcAttribute()
-    {
-        $qc = $this->quality_control;
-        return $qc && $qc->passed_quantity > 0 && $qc->status == true;
-    }
-
-    public function getQcStatusAttribute()
-    {
-        $qc = $this->quality_control;
-        if (!$qc) {
-            return 'Tidak ada QC';
-        }
-        
-        if ($qc->status == true || $qc->status == 1) {
-            return 'Sudah diproses';
-        } else {
-            return 'Belum diproses';
-        }
-    }
-
     // Calculate depreciation
     public function calculateDepreciation()
     {

@@ -416,47 +416,6 @@ class AssetResource extends Resource
                             ->rows(3)
                     ])
                     ->columns(2),
-
-                Forms\Components\Section::make('Purchase Order & Quality Control')
-                    ->schema([
-                        Forms\Components\Placeholder::make('po_number')
-                            ->label('Nomor PO')
-                            ->content(fn($record) => $record?->purchaseOrder?->po_number ?? '-'),
-
-                        Forms\Components\Placeholder::make('po_date')
-                            ->label('Tanggal PO')
-                            ->content(fn($record) => $record?->purchaseOrder?->order_date ? $record->purchaseOrder->order_date->format('d/m/Y') : '-'),
-
-                        Forms\Components\Placeholder::make('supplier_name')
-                            ->label('Supplier')
-                            ->content(fn($record) => $record?->purchaseOrder?->supplier?->name ?? '-'),
-
-                        Forms\Components\Placeholder::make('qc_status_display')
-                            ->label('Status QC')
-                            ->content(fn($record) => $record?->qc_status ?? 'Tidak ada data QC'),
-
-                        Forms\Components\Placeholder::make('qc_number')
-                            ->label('Nomor QC')
-                            ->content(fn($record) => $record?->quality_control?->qc_number ?? '-'),
-
-                        Forms\Components\Placeholder::make('qc_passed_quantity')
-                            ->label('Jumlah Lulus QC')
-                            ->content(fn($record) => $record?->quality_control ? $record->quality_control->passed_quantity . ' unit' : '-'),
-
-                        Forms\Components\Placeholder::make('qc_rejected_quantity')
-                            ->label('Jumlah Reject QC')
-                            ->content(fn($record) => $record?->quality_control ? $record->quality_control->rejected_quantity . ' unit' : '-'),
-
-                        Forms\Components\Placeholder::make('qc_notes')
-                            ->label('Catatan QC')
-                            ->content(fn($record) => $record?->quality_control?->notes ?? '-'),
-
-                        Forms\Components\Placeholder::make('qc_inspected_by')
-                            ->label('Diperiksa Oleh')
-                            ->content(fn($record) => $record?->quality_control?->inspectedBy?->name ?? '-'),
-                    ])
-                    ->columns(3)
-                    ->visibleOn('view'),
             ]);
     }
 
@@ -656,17 +615,6 @@ class AssetResource extends Resource
                         default => $state,
                     }),
 
-                Tables\Columns\BadgeColumn::make('qc_status')
-                    ->label('Status QC')
-                    ->colors([
-                        'success' => 'Sudah diproses',
-                        'warning' => 'Belum diproses',
-                        'gray' => 'Tidak ada QC',
-                    ])
-                    ->formatStateUsing(function ($state) {
-                        return $state ?: 'Tidak ada QC';
-                    }),
-
                 Tables\Columns\TextColumn::make('product.name')
                     ->label('Product Master')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -718,35 +666,6 @@ class AssetResource extends Resource
                         'sum_of_years_digits' => 'Jumlah Digit Tahun',
                         'units_of_production' => 'Unit Produksi',
                     ]),
-
-                Tables\Filters\SelectFilter::make('qc_status')
-                    ->label('Status Quality Control')
-                    ->options([
-                        'Sudah diproses' => 'Sudah diproses',
-                        'Belum diproses' => 'Belum diproses',
-                        'Tidak ada QC' => 'Tidak ada QC',
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query->when(
-                            $data['value'],
-                            function (Builder $query, $status) {
-                                switch ($status) {
-                                    case 'Sudah diproses':
-                                        return $query->whereHas('purchaseOrderItem.qualityControl', function ($q) {
-                                            $q->whereIn('status', [1, true]);
-                                        });
-                                    case 'Belum diproses':
-                                        return $query->whereHas('purchaseOrderItem.qualityControl', function ($q) {
-                                            $q->whereIn('status', [0, false]);
-                                        });
-                                    case 'Tidak ada QC':
-                                        return $query->whereDoesntHave('purchaseOrderItem.qualityControl');
-                                    default:
-                                        return $query;
-                                }
-                            }
-                        );
-                    }),
 
                 Tables\Filters\Filter::make('purchase_date')
                     ->form([
@@ -901,7 +820,6 @@ class AssetResource extends Resource
                                 <li>Umur ekonomis minimal 1 tahun, maksimal 50 tahun</li>
                                 <li>Biaya aset harus lebih besar dari nilai salvage</li>
                                 <li>COA aset dan penyusutan harus sesuai mapping yang ditentukan</li>
-                                <li>QC status akan terupdate otomatis dari Purchase Order</li>
                             </ul>
                         </div>
 
@@ -930,7 +848,6 @@ class AssetResource extends Resource
                             <h4 class="font-semibold text-gray-800 dark:text-gray-200">🔗 Integrasi Sistem</h4>
                             <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
                                 <li><strong>Purchase Order:</strong> Aset dibuat dari PO yang disetujui</li>
-                                <li><strong>Quality Control:</strong> Status QC terupdate otomatis</li>
                                 <li><strong>Chart of Account:</strong> Mapping COA untuk jurnal otomatis</li>
                                 <li><strong>General Ledger:</strong> Posting jurnal ke buku besar</li>
                                 <li><strong>Asset Transfer:</strong> Sistem transfer aset antar cabang</li>

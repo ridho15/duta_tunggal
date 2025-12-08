@@ -11,6 +11,7 @@ use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
 
@@ -113,8 +114,11 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 Grid::make(4)
                                     ->schema([
-                                        TextEntry::make('product.name')
-                                            ->label('Product'),
+                                        TextEntry::make('product')
+                                            ->label('Product')
+                                            ->formatStateUsing(function($state){
+                                                return "{$state['sku']} - {$state['name']}";
+                                            }),
                                         TextEntry::make('quantity')
                                             ->label('Quantity'),
                                         TextEntry::make('price')
@@ -127,6 +131,16 @@ class ViewSalesInvoice extends ViewRecord
                             ])
                             ->columnSpanFull(),
                     ]),
+
+                Section::make('Journal Entries')
+                    ->schema([
+                        ViewEntry::make('journal_entries_table')
+                            ->label('')
+                            ->view('filament.infolists.journal-entries-table')
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsible()
+                    ->collapsed(),
             ]);
     }
 
@@ -135,6 +149,26 @@ class ViewSalesInvoice extends ViewRecord
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil'),
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\Action::make('view_journal_entries')
+                ->label('Lihat Journal Entries')
+                ->icon('heroicon-o-book-open')
+                ->color('success')
+                ->action(function ($record) {
+                    $journalEntries = \App\Models\JournalEntry::where('source_type', \App\Models\Invoice::class)
+                        ->where('source_id', $record->id)
+                        ->get();
+
+                    if ($journalEntries->count() === 1) {
+                        // Jika hanya 1 journal entry, langsung ke halaman detail
+                        $entry = $journalEntries->first();
+                        return redirect()->to("/admin/journal-entries/{$entry->id}");
+                    } else {
+                        // Jika multiple entries, gunakan filter
+                        $sourceType = urlencode(\App\Models\Invoice::class);
+                        $sourceId = $record->id;
+                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                    }
+                }),
             Actions\Action::make('print_invoice')
                 ->label('Cetak Invoice')
                 ->color('primary')

@@ -38,6 +38,8 @@ class ViewPurchaseOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->icon('heroicon-o-check-badge')
                 ->color('success')
+                ->modalHeading('Konfirmasi Purchase Order')
+                ->modalWidth('lg')
                 ->form(function ($record) {
                     if ($record->status == 'request_close') {
                         return [
@@ -124,6 +126,12 @@ class ViewPurchaseOrder extends ViewRecord
                                 }
                             }
                         });
+
+                        Notification::make()
+                            ->title('Purchase Order Berhasil Dikonfirmasi')
+                            ->body('Purchase Order telah berhasil dikonfirmasi dan ' . ($record->is_asset ? 'asset telah dibuat.' : 'menunggu approval.'))
+                            ->success()
+                            ->send();
                     } elseif ($record->status == 'request_close') {
                         $record->update([
                             'close_reason' => $data['close_reason'],

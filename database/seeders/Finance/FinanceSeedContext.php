@@ -320,8 +320,8 @@ class FinanceSeedContext
                 'credit' => $credit,
                 'journal_type' => 'seed',
                 'cabang_id' => $this->ensureCabang()->id,
-                'source_type' => self::class,
-                'source_id' => 0,
+                'source_type' => null,
+                'source_id' => null,
             ]
         );
     }

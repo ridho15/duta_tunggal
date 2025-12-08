@@ -15,6 +15,26 @@ class ViewPurchaseInvoice extends ViewRecord
     {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            Actions\Action::make('view_journal_entries')
+                ->label('Lihat Journal Entries')
+                ->icon('heroicon-o-book-open')
+                ->color('success')
+                ->action(function ($record) {
+                    $journalEntries = \App\Models\JournalEntry::where('source_type', \App\Models\Invoice::class)
+                        ->where('source_id', $record->id)
+                        ->get();
+
+                    if ($journalEntries->count() === 1) {
+                        // Jika hanya 1 journal entry, langsung ke halaman detail
+                        $entry = $journalEntries->first();
+                        return redirect()->to("/admin/journal-entries/{$entry->id}");
+                    } else {
+                        // Jika multiple entries, gunakan filter dengan format yang sesuai dengan filter options
+                        $sourceType = 'App\\Models\\Invoice'; // Format yang sama dengan filter options
+                        $sourceId = $record->id;
+                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                    }
+                }),
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('mark_as_sent')
                 ->label('Mark as Sent')

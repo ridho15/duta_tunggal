@@ -11,6 +11,10 @@ use App\Filament\Pages\BalanceSheetPage;
 use App\Filament\Pages\BukuBesarPage;
 use App\Filament\Pages\IncomeStatementPage;
 use App\Filament\Pages\MyDashboard;
+use App\Filament\Pages\PurchaseReportPage;
+use App\Filament\Pages\SalesReportPage;
+use App\Filament\Pages\VendorCustomerSummaryPage;
+use App\Filament\Pages\ViewAgeingReport;
 use App\Filament\Resources\JournalEntryResource;
 use App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries;
 use App\Filament\Widgets\AssetStatsWidget;
@@ -48,6 +52,9 @@ class AdminPanelProvider extends PanelProvider
                 BalanceSheetPage::class,
                 BukuBesarPage::class,
                 IncomeStatementPage::class,
+                SalesReportPage::class,
+                PurchaseReportPage::class,
+                ViewAgeingReport::class,
                 GroupedJournalEntries::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')

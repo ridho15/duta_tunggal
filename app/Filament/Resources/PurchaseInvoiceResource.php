@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Tables\Enums\ActionsPosition;
 
 class PurchaseInvoiceResource extends Resource
@@ -896,6 +897,16 @@ class PurchaseInvoiceResource extends Resource
                     ])
                     ->columns(2)
                     ->collapsed(),
+
+                    
+
+                Infolists\Components\Section::make('Journal Entries')
+                    ->schema([
+                        Infolists\Components\ViewEntry::make('journal_entries_table')
+                            ->label('')
+                            ->view('filament.infolists.journal-entries-table')
+                            ->columnSpanFull(),
+                    ])
             ]);
     }
 
@@ -990,6 +1001,26 @@ class PurchaseInvoiceResource extends Resource
                     ViewAction::make(),
                     EditAction::make(),
                     DeleteAction::make(),
+                    \Filament\Tables\Actions\Action::make('view_journal_entries')
+                        ->label('Lihat Journal Entries')
+                        ->icon('heroicon-o-book-open')
+                        ->color('success')
+                        ->action(function ($record) {
+                            $journalEntries = \App\Models\JournalEntry::where('source_type', \App\Models\Invoice::class)
+                                ->where('source_id', $record->id)
+                                ->get();
+
+                            if ($journalEntries->count() === 1) {
+                                // Jika hanya 1 journal entry, langsung ke halaman detail
+                                $entry = $journalEntries->first();
+                                return redirect()->to("/admin/journal-entries/{$entry->id}");
+                            } else {
+                                // Jika multiple entries, gunakan filter dengan format yang sesuai dengan filter options
+                                $sourceType = 'App\\Models\\Invoice'; // Format yang sama dengan filter options
+                                $sourceId = $record->id;
+                                return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                            }
+                        }),
                     \Filament\Tables\Actions\Action::make('mark_as_sent')
                         ->label('Mark as Sent')
                         ->icon('heroicon-o-paper-airplane')
@@ -1095,6 +1126,59 @@ class PurchaseInvoiceResource extends Resource
         return [
             //
         ];
+    }
+
+    protected static function formatJournalEntriesTableHtml(Invoice $record): string
+    {
+        $journalEntries = \App\Models\JournalEntry::where('source_type', \App\Models\Invoice::class)
+            ->where('source_id', $record->id)
+            ->with('coa')
+            ->get();
+
+        if ($journalEntries->isEmpty()) {
+            return '<div class="text-gray-500 italic">No journal entries found</div>';
+        }
+
+        $html = '<div class="overflow-x-auto">';
+        $html .= '<table class="w-full border-collapse border border-gray-300 text-sm">';
+        $html .= '<thead>';
+        $html .= '<tr class="bg-gray-50">';
+        $html .= '<th class="border border-gray-300 px-3 py-2 text-left font-semibold">COA Code</th>';
+        $html .= '<th class="border border-gray-300 px-3 py-2 text-left font-semibold">COA Name</th>';
+        $html .= '<th class="border border-gray-300 px-3 py-2 text-left font-semibold">Reference</th>';
+        $html .= '<th class="border border-gray-300 px-3 py-2 text-right font-semibold">Debit</th>';
+        $html .= '<th class="border border-gray-300 px-3 py-2 text-right font-semibold">Credit</th>';
+        $html .= '</tr>';
+        $html .= '</thead>';
+        $html .= '<tbody>';
+
+        foreach ($journalEntries as $entry) {
+            $debit = $entry->debit > 0 ? 'Rp ' . number_format($entry->debit, 0, ',', '.') : '-';
+            $credit = $entry->credit > 0 ? 'Rp ' . number_format($entry->credit, 0, ',', '.') : '-';
+
+            $html .= '<tr class="hover:bg-gray-50">';
+            $html .= '<td class="border border-gray-300 px-3 py-2 font-mono text-xs">' . htmlspecialchars($entry->coa->code) . '</td>';
+            $html .= '<td class="border border-gray-300 px-3 py-2">' . htmlspecialchars(substr($entry->coa->name, 0, 40)) . '</td>';
+            $html .= '<td class="border border-gray-300 px-3 py-2">' . htmlspecialchars(substr($entry->reference ?? '', 0, 35)) . '</td>';
+            $html .= '<td class="border border-gray-300 px-3 py-2 text-right font-mono ' . ($entry->debit > 0 ? 'text-green-600 font-semibold' : 'text-gray-400') . '">' . htmlspecialchars($debit) . '</td>';
+            $html .= '<td class="border border-gray-300 px-3 py-2 text-right font-mono ' . ($entry->credit > 0 ? 'text-red-600 font-semibold' : 'text-gray-400') . '">' . htmlspecialchars($credit) . '</td>';
+            $html .= '</tr>';
+
+            // Add description below each entry if exists
+            if (!empty($entry->description)) {
+                $html .= '<tr class="bg-gray-25">';
+                $html .= '<td colspan="5" class="border border-gray-300 px-3 py-1 text-xs text-gray-600 italic">';
+                $html .= '<strong>Description:</strong> ' . htmlspecialchars($entry->description);
+                $html .= '</td>';
+                $html .= '</tr>';
+            }
+        }
+
+        $html .= '</tbody>';
+        $html .= '</table>';
+        $html .= '</div>';
+
+        return $html;
     }
 
     public static function getPages(): array

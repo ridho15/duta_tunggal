@@ -6,10 +6,8 @@ use App\Models\CustomerReceipt;
 use App\Models\DeliveryOrder;
 use App\Models\Deposit;
 use App\Models\DepositLog;
-use App\Models\FinishedGoodsCompletion;
 use App\Models\Invoice;
 use App\Models\ManufacturingOrder;
-use App\Models\MaterialFulfillment;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
 use App\Models\Product;
@@ -83,9 +81,6 @@ class AppServiceProvider extends ServiceProvider
 
     protected function registerFilamentMacros(): void
     {
-        // Log that we're registering macros
-        \Illuminate\Support\Facades\Log::info('Registering Filament macros in AppServiceProvider');
-
         // Pastikan tampilan angka uang di Table menggunakan format Indonesia
         Table::$defaultCurrency = 'IDR';
         Table::$defaultNumberLocale = 'id';
@@ -161,8 +156,6 @@ class AppServiceProvider extends ServiceProvider
                 });
                 // ->helperText('Format: 500.000 (gunakan titik sebagai pemisah ribuan)');
         });
-
-        \Illuminate\Support\Facades\Log::info('indonesianMoney macro registered in AppServiceProvider');
     }
 
     /**

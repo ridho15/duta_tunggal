@@ -29,6 +29,7 @@ use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
 use Illuminate\Database\Eloquent\Builder;
@@ -627,9 +628,29 @@ class SalesInvoiceResource extends Resource
                 ActionGroup::make([
                     ViewAction::make(),
                     EditAction::make(),
+                    Tables\Actions\Action::make('view_journal_entries')
+                        ->label('Lihat Journal Entries')
+                        ->icon('heroicon-o-book-open')
+                        ->color('success')
+                        ->action(function ($record) {
+                            $journalEntries = \App\Models\JournalEntry::where('source_type', \App\Models\Invoice::class)
+                                ->where('source_id', $record->id)
+                                ->get();
+
+                            if ($journalEntries->count() === 1) {
+                                // Jika hanya 1 journal entry, langsung ke halaman detail
+                                $entry = $journalEntries->first();
+                                return redirect()->to("/admin/journal-entries/{$entry->id}");
+                            } else {
+                                // Jika multiple entries, gunakan filter
+                                $sourceType = urlencode(\App\Models\Invoice::class);
+                                $sourceId = $record->id;
+                                return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                            }
+                        }),
                     DeleteAction::make(),
-                ])
-            ])
+                    ])
+                    ],position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

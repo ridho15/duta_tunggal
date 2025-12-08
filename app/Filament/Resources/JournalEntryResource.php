@@ -14,6 +14,7 @@ use Filament\Tables;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Filament\Tables\Grouping;
+use Filament\Tables\Filters\TextFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
@@ -166,6 +167,7 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\VendorPayment' => 'Vendor Payment',
                                 'App\\Models\\CustomerReceipt' => 'Customer Receipt',
                                 'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
+                                'App\\Models\\CashBankTransfer' => 'Cash/Bank Transfer',
                                 'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
                                 'App\\Models\\StockTransfer' => 'Stock Transfer',
                                 'App\\Models\\Asset' => 'Asset',
@@ -536,6 +538,7 @@ class JournalEntryResource extends Resource
                                             'App\\Models\\VendorPayment' => 'Vendor Payment',
                                             'App\\Models\\CustomerReceipt' => 'Customer Receipt',
                                             'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
+                                            'App\\Models\\CashBankTransfer' => 'Cash/Bank Transfer',
                                             'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
                                             'App\\Models\\StockTransfer' => 'Stock Transfer',
                                             'App\\Models\\Asset' => 'Asset',
@@ -663,6 +666,9 @@ class JournalEntryResource extends Resource
                                             case 'App\\Models\\CashBankTransaction':
                                                 $description = $source->description ?: 'N/A';
                                                 return "CBT: {$source->transaction_number} - {$description}";
+                                            case 'App\\Models\\CashBankTransfer':
+                                                $description = $source->description ?: 'N/A';
+                                                return "CBT: {$source->transfer_number} - {$description}";
                                             case 'App\\Models\\StockTransfer':
                                                 $fromWarehouse = $source->from_warehouse ? $source->from_warehouse->name : 'N/A';
                                                 $toWarehouse = $source->to_warehouse ? $source->to_warehouse->name : 'N/A';
@@ -844,6 +850,7 @@ class JournalEntryResource extends Resource
                             'App\\Models\\VendorPayment' => 'danger',
                             'App\\Models\\CustomerReceipt' => 'success',
                             'App\\Models\\CashBankTransaction' => 'gray',
+                            'App\\Models\\CashBankTransfer' => 'gray',
                             'App\\Models\\CustomerReceiptItem' => 'secondary',
                             'App\\Models\\StockTransfer' => 'secondary',
                             'App\\Models\\Asset' => 'warning',
@@ -887,6 +894,7 @@ class JournalEntryResource extends Resource
                             'App\\Models\\PurchaseReceipt' => 'Purchase Receipt',
                             'App\\Models\\PurchaseReceiptItem' => 'Purchase Receipt Item',
                             'App\\Models\\CashBankTransaction' => 'Cash/Bank Transaction',
+                            'App\\Models\\CashBankTransfer' => 'Cash/Bank Transfer',
                             'App\\Models\\CustomerReceiptItem' => 'Customer Receipt Item',
                             'App\\Models\\StockTransfer' => 'Stock Transfer',
                             'App\\Models\\Asset' => 'Asset',
@@ -932,6 +940,7 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\PurchaseReceipt' => 'receipt_number',
                                 'App\\Models\\PurchaseReceiptItem' => 'id',
                                 'App\\Models\\CashBankTransaction' => 'reference',
+                                'App\\Models\\CashBankTransfer' => 'reference',
                                 'App\\Models\\CustomerReceiptItem' => 'id',
                                 'App\\Models\\StockTransfer' => 'transfer_number',
                                 'App\\Models\\Asset' => 'asset_code',
@@ -1026,7 +1035,37 @@ class JournalEntryResource extends Resource
                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                         });
                     })
+                    ->searchable(),
+
+                Tables\Filters\SelectFilter::make('source_type')
+                    ->label('Source Type')
                     ->searchable()
+                    ->options([
+                        'App\\Models\\SaleOrder' => 'Sale Order',
+                        'App\\Models\\PurchaseOrder' => 'Purchase Order',
+                        'App\\Models\\Invoice' => 'Invoice',
+                        'App\\Models\\DeliveryOrder' => 'Delivery Order',
+                        'App\\Models\\CustomerReceipt' => 'Customer Receipt',
+                        'App\\Models\\VendorPayment' => 'Vendor Payment',
+                        'App\\Models\\MaterialIssue' => 'Material Issue',
+                        'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
+                        'App\\Models\\QualityControl' => 'Quality Control',
+                        'App\\Models\\Asset' => 'Asset',
+                    ]),
+
+                Tables\Filters\Filter::make('source_id')
+                    ->label('Source ID')
+                    ->form([
+                        Forms\Components\TextInput::make('source_id')
+                            ->label('Source ID')
+                            ->placeholder('Enter Source ID'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['source_id'],
+                            fn(Builder $query, $sourceId): Builder => $query->where('source_id', $sourceId),
+                        );
+                    })
             ])
             ->actions([
                 ActionGroup::make([

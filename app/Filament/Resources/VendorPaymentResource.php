@@ -97,23 +97,39 @@ class VendorPaymentResource extends Resource
                                         }
 
                                         try {
+                                            // Check if we're in edit mode by checking if selected_invoices already has values
+                                            $currentSelectedInvoices = $get('selected_invoices') ?? [];
+                                            $isEditMode = !empty($currentSelectedInvoices) && is_array($currentSelectedInvoices);
+
                                             // Get unpaid/partial invoices for selected supplier
-                                            $invoices = Invoice::join('purchase_orders', function($join) use ($supplierId) {
+                                            $query = Invoice::join('purchase_orders', function($join) use ($supplierId) {
                                                     $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
                                                          ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder')
-                                                         ->where('purchase_orders.supplier_id', '=', $supplierId); // FIX: Filter by supplier
-                                                })
-                                                ->whereHas('accountPayable', function ($query) {
-                                                    $query->where('remaining', '>', 0);
+                                                         ->where('purchase_orders.supplier_id', '=', $supplierId);
                                                 })
                                                 ->with(['accountPayable'])
-                                                ->select('invoices.*')
-                                                ->get();
+                                                ->select('invoices.*');
+
+                                            // In edit mode, include previously selected invoices even if paid
+                                            if ($isEditMode) {
+                                                $query->where(function ($q) use ($currentSelectedInvoices) {
+                                                    $q->whereHas('accountPayable', function ($query) {
+                                                        $query->where('remaining', '>', 0);
+                                                    })->orWhereIn('invoices.id', $currentSelectedInvoices);
+                                                });
+                                            } else {
+                                                $query->whereHas('accountPayable', function ($query) {
+                                                    $query->where('remaining', '>', 0);
+                                                });
+                                            }
+
+                                            $invoices = $query->get();
 
                                             $options = [];
                                             foreach ($invoices as $invoice) {
                                                 $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
-                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.');
+                                                $statusText = $remaining <= 0 ? ' (SUDAH LUNAS)' : '';
+                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.') . $statusText;
                                             }
 
                                             $set('has_invoices', !empty($options));
@@ -135,7 +151,13 @@ class VendorPaymentResource extends Resource
                                             return 'Tidak ada invoice yang tersedia untuk vendor ini. Pastikan vendor memiliki invoice dengan sisa pembayaran.';
                                         }
 
-                                        $selectedInvoices = $get('selected_invoices');
+                                        $selectedInvoices = $get('selected_invoices') ?? [];
+                                        $isEditMode = !empty($selectedInvoices) && is_array($selectedInvoices);
+
+                                        if ($isEditMode) {
+                                            return 'Menampilkan invoice yang sudah dipilih sebelumnya dan invoice dengan sisa pembayaran. Invoice yang sudah lunas ditandai dengan "(SUDAH LUNAS)".';
+                                        }
+
                                         if (empty($selectedInvoices)) {
                                             return 'Pilih invoice yang akan dibayar. Hanya menampilkan invoice dengan sisa pembayaran.';
                                         }
@@ -351,6 +373,7 @@ class VendorPaymentResource extends Resource
                             ->schema([
                                 TextInput::make('ntpn')
                                     ->label('NTPN')
+                                    ->placeholder('Masukkan NTPN atau klik ikon untuk generate')
                                     ->suffixAction(
                                         Action::make('generateNTPN')
                                             ->icon('heroicon-m-arrow-path')
@@ -699,6 +722,11 @@ class VendorPaymentResource extends Resource
                     ->date('d/m/Y')
                     ->sortable(),
 
+                TextColumn::make('ntpn')
+                    ->label('NTPN')
+                    ->searchable()
+                    ->placeholder('-'),
+
                 TextColumn::make('total_payment')
                     ->label('Total Pembayaran')
                     ->money('IDR')
@@ -710,8 +738,10 @@ class VendorPaymentResource extends Resource
                     ->color(fn (string $state): string => match ($state) {
                         'Cash' => 'success',
                         'Bank Transfer' => 'info',
+                        'bank_transfer' => 'info',
                         'Credit' => 'warning',
                         'Deposit' => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('status')
@@ -755,9 +785,19 @@ class VendorPaymentResource extends Resource
             ->actions([
                 ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),])
-            ],position: ActionsPosition::BeforeColumns)
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('view_journal_entries')
+                        ->label('Journal Entries')
+                        ->icon('heroicon-o-document-text')
+                        ->color('info')
+                        ->url(fn ($record) => route('filament.admin.resources.journal-entries.index', [
+                            'tableFilters[source_type][value]' => 'App\Models\VendorPayment',
+                            'tableFilters[source_id][value]' => $record->id
+                        ]))
+                        ->openUrlInNewTab(),
+                    Tables\Actions\DeleteAction::make(),
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -798,6 +838,7 @@ class VendorPaymentResource extends Resource
         return [
             'index' => Pages\ListVendorPayments::route('/'),
             'create' => Pages\CreateVendorPayment::route('/create'),
+            'view' => Pages\ViewVendorPayment::route('/{record}'),
             'edit' => Pages\EditVendorPayment::route('/{record}/edit'),
         ];
     }

@@ -13,6 +13,7 @@ class EditVendorPayment extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
         ];
     }
