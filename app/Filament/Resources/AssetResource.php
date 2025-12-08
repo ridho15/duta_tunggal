@@ -40,6 +40,18 @@ class AssetResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Informasi Aset')
                     ->schema([
+                        Forms\Components\TextInput::make('code')
+                            ->label('Kode Asset')
+                            ->required()
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(50)
+                            ->default(fn() => \App\Models\Asset::generateAssetCode())
+                            ->validationMessages([
+                                'required' => 'Kode asset wajib diisi',
+                                'unique' => 'Kode asset sudah digunakan',
+                                'max' => 'Kode asset maksimal 50 karakter'
+                            ]),
+
                         Forms\Components\TextInput::make('name')
                             ->label('Nama Barang')
                             ->required()
@@ -537,6 +549,13 @@ class AssetResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('code')
+                    ->label('Kode Asset')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->weight('bold'),
+
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Barang')
                     ->searchable()

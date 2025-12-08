@@ -44,7 +44,7 @@ class ViewAgeingReport extends Page
                         ->label('Branch')
                         ->options(Cabang::pluck('nama', 'id'))
                         ->searchable()
-                        ->visible(fn () => auth()->user()->hasRole('super_admin')),
+                        ->visible(fn() => auth()->user()->hasRole('super_admin')),
 
                     Radio::make('report_type')
                         ->label('Report Type')
@@ -82,7 +82,7 @@ class ViewAgeingReport extends Page
                                     }
                                     return $query->where('remaining', '>', 0)->count();
                                 }),
-                        ]),
+                        ])->columns(2),
 
                     Card::make()
                         ->schema([
@@ -91,7 +91,7 @@ class ViewAgeingReport extends Page
                                 ->content(function () {
                                     $query = AccountPayable::query();
                                     if ($this->cabang_id) {
-                                        $query->whereHas('invoice', function($q) {
+                                        $query->whereHas('invoice', function ($q) {
                                             $q->where('cabang_id', $this->cabang_id);
                                         });
                                     }
@@ -103,49 +103,39 @@ class ViewAgeingReport extends Page
                                 ->content(function () {
                                     $query = AccountPayable::query();
                                     if ($this->cabang_id) {
-                                        $query->whereHas('invoice', function($q) {
+                                        $query->whereHas('invoice', function ($q) {
                                             $q->where('cabang_id', $this->cabang_id);
                                         });
                                     }
                                     return $query->where('remaining', '>', 0)->count();
                                 }),
-                        ]),
+                        ])->columns(2),
                 ]),
 
             Section::make('Aging Summary')
-                ->columns(4)
                 ->schema([
-                    Card::make()
+                    Grid::make(4)
+                        ->columns(4)
                         ->schema([
                             Placeholder::make('current_ar')
                                 ->label('Current (0-30 days)')
                                 ->content(function () {
                                     return $this->getAgingSummary('receivables', 'Current');
                                 }),
-                        ]),
-
-                    Card::make()
-                        ->schema([
                             Placeholder::make('31_60_ar')
                                 ->label('31-60 days')
                                 ->content(function () {
                                     return $this->getAgingSummary('receivables', '31–60');
                                 }),
-                        ]),
 
-                    Card::make()
-                        ->schema([
                             Placeholder::make('61_90_ar')
                                 ->label('61-90 days')
                                 ->content(function () {
                                     return $this->getAgingSummary('receivables', '61–90');
                                 }),
-                        ]),
 
-                    Card::make()
-                        ->schema([
                             Placeholder::make('over_90_ar')
-                                ->label('>90 days')
+                                ->label('Over 90 days')
                                 ->content(function () {
                                     return $this->getAgingSummary('receivables', '>90');
                                 }),
@@ -155,7 +145,8 @@ class ViewAgeingReport extends Page
             Section::make('Cash Flow Impact')
                 ->columns(2)
                 ->schema([
-                    Card::make()
+                    Section::make()
+                    ->columns(2)
                         ->schema([
                             Placeholder::make('expected_cash_inflow')
                                 ->label('Expected Cash Inflow (Next 30 days)')
@@ -167,7 +158,7 @@ class ViewAgeingReport extends Page
                             Placeholder::make('overdue_receivables')
                                 ->label('Overdue Receivables')
                                 ->content(function () {
-                                    $query = AccountReceivable::whereHas('invoice', function($q) {
+                                    $query = AccountReceivable::whereHas('invoice', function ($q) {
                                         $q->where('due_date', '<', now());
                                     });
                                     if ($this->cabang_id) {
@@ -178,7 +169,8 @@ class ViewAgeingReport extends Page
                                 }),
                         ]),
 
-                    Card::make()
+                    Section::make()
+                        ->columns(2)
                         ->schema([
                             Placeholder::make('expected_cash_outflow')
                                 ->label('Expected Cash Outflow (Next 30 days)')
@@ -190,11 +182,11 @@ class ViewAgeingReport extends Page
                             Placeholder::make('overdue_payables')
                                 ->label('Overdue Payables')
                                 ->content(function () {
-                                    $query = AccountPayable::whereHas('invoice', function($q) {
+                                    $query = AccountPayable::whereHas('invoice', function ($q) {
                                         $q->where('due_date', '<', now());
                                     });
                                     if ($this->cabang_id) {
-                                        $query->whereHas('invoice', function($q) {
+                                        $query->whereHas('invoice', function ($q) {
                                             $q->where('cabang_id', $this->cabang_id);
                                         });
                                     }
@@ -222,7 +214,7 @@ class ViewAgeingReport extends Page
             if ($type === 'receivables') {
                 $query->where('cabang_id', $this->cabang_id);
             } else {
-                $query->whereHas('invoice', function($q) {
+                $query->whereHas('invoice', function ($q) {
                     $q->where('cabang_id', $this->cabang_id);
                 });
             }
@@ -232,16 +224,16 @@ class ViewAgeingReport extends Page
             $q->where('bucket', $bucket);
         })->orWhere(function ($q) use ($bucket) {
             $q->whereDoesntHave('ageingSchedule')
-              ->whereHas('invoice', function ($invoiceQuery) use ($bucket) {
-                  $days = match ($bucket) {
-                      'Current' => 30,
-                      '31–60' => 60,
-                      '61–90' => 90,
-                      '>90' => PHP_INT_MAX,
-                  };
+                ->whereHas('invoice', function ($invoiceQuery) use ($bucket) {
+                    $days = match ($bucket) {
+                        'Current' => 30,
+                        '31–60' => 60,
+                        '61–90' => 90,
+                        '>90' => PHP_INT_MAX,
+                    };
 
-                  $invoiceQuery->whereRaw('DATEDIFF(NOW(), invoice_date) <= ?', [$days]);
-              });
+                    $invoiceQuery->whereRaw('DATEDIFF(NOW(), invoice_date) <= ?', [$days]);
+                });
         })->sum('remaining');
 
         return 'Rp ' . number_format($amount, 0, ',', '.');
@@ -256,7 +248,7 @@ class ViewAgeingReport extends Page
             if ($type === 'receivables') {
                 $query->where('cabang_id', $this->cabang_id);
             } else {
-                $query->whereHas('invoice', function($q) {
+                $query->whereHas('invoice', function ($q) {
                     $q->where('cabang_id', $this->cabang_id);
                 });
             }
@@ -264,7 +256,7 @@ class ViewAgeingReport extends Page
 
         return $query->whereHas('invoice', function ($q) use ($futureDate) {
             $q->where('due_date', '<=', $futureDate)
-              ->where('due_date', '>=', now());
+                ->where('due_date', '>=', now());
         })->sum('remaining');
     }
 }

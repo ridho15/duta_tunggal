@@ -206,7 +206,7 @@ class JournalEntryResource extends Resource
                                         'App\\Models\\CashBankTransaction' => 'reference',
                                         'App\\Models\\CustomerReceiptItem' => 'id',
                                         'App\\Models\\StockTransfer' => 'transfer_number',
-                                        'App\\Models\\Asset' => 'asset_code',
+                                        'App\\Models\\Asset' => 'code',
                                         'App\\Models\\Deposit' => 'deposit_number',
                                         'App\\Models\\OtherSale' => 'reference_number',
                                         default => 'id'
@@ -943,7 +943,7 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\CashBankTransfer' => 'reference',
                                 'App\\Models\\CustomerReceiptItem' => 'id',
                                 'App\\Models\\StockTransfer' => 'transfer_number',
-                                'App\\Models\\Asset' => 'asset_code',
+                                'App\\Models\\Asset' => 'code',
                                 'App\\Models\\Deposit' => 'deposit_number',
                                 'App\\Models\\Invoice' => 'invoice_number',
                                 'App\\Models\\OtherSale' => 'reference_number',

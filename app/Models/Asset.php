@@ -14,6 +14,7 @@ class Asset extends Model
     use HasFactory, SoftDeletes, LogsGlobalActivity;
 
     protected $fillable = [
+        'code',
         'name',
         'purchase_date',
         'usage_date',
@@ -50,6 +51,12 @@ class Asset extends Model
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);
+
+        static::creating(function ($asset) {
+            if (empty($asset->code)) {
+                $asset->code = static::generateAssetCode();
+            }
+        });
     }
 
     // Relationships
@@ -207,5 +214,13 @@ class Asset extends Model
         return \App\Models\JournalEntry::where('source_type', 'App\Models\Asset')
             ->where('source_id', $this->id)
             ->exists();
+    }
+
+    // Generate unique asset code
+    public static function generateAssetCode(): string
+    {
+        $lastAsset = static::orderBy('id', 'desc')->first();
+        $nextNumber = $lastAsset ? $lastAsset->id + 1 : 1;
+        return 'AST-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 }
