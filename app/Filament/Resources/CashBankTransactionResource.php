@@ -89,7 +89,15 @@ class CashBankTransactionResource extends Resource
                             ->validationMessages([
                                 'required' => 'Tipe transaksi wajib dipilih'
                             ]),
-                        TextInput::make('amount')->numeric()->minValue(0.01)->required()->indonesianMoney()->columnSpan(2)
+                        TextInput::make('amount')
+                            ->label('Jumlah Total')
+                            ->numeric()
+                            ->minValue(0.01)
+                            ->required()
+                            ->indonesianMoney()
+                            ->columnSpan(2)
+                            ->readonly(fn(callable $get) => count($get('transactionDetails') ?? []) > 0)
+                            ->helperText(fn(callable $get) => count($get('transactionDetails') ?? []) > 0 ? 'Jumlah otomatis dari total rincian' : 'Masukkan jumlah transaksi')
                             ->validationMessages([
                                 'required' => 'Jumlah wajib diisi',
                                 'numeric' => 'Jumlah harus berupa angka',
@@ -218,33 +226,37 @@ class CashBankTransactionResource extends Resource
                 ])
                 ->visible(fn(callable $get) => true) // Always show but fields inside are conditionally visible
                 ->collapsible(),
-            Section::make('Rincian Pembayaran ke Akun Anak')
+            Section::make('Rincian Transaksi')
+                ->description('Opsional: Tambahkan rincian breakdown untuk transaksi ini. Total rincian akan otomatis mengupdate jumlah transaksi utama.')
                 ->schema([
                     Placeholder::make('breakdown_info')
                         ->label('')
-                        ->content('Distribusikan jumlah pembayaran ke akun anak dari rekening bank yang dipilih. Total distribusi harus sama dengan jumlah pembayaran.'),
+                        ->content('Tambahkan rincian transaksi untuk memecah jumlah ke dalam beberapa akun COA. Total semua rincian akan dijadikan jumlah transaksi utama.'),
                     Repeater::make('transactionDetails')
                         ->relationship('transactionDetails')
                         ->schema([
                             Select::make('chart_of_account_id')
-                                ->label('Akun Anak')
-                                ->options(function (callable $get) {
-                                    $accountCoaId = $get('../../account_coa_id');
-                                    if (!$accountCoaId) return [];
-
-                                    $parentAccount = ChartOfAccount::find($accountCoaId);
-                                    if (!$parentAccount || !str_starts_with($parentAccount->code, '1112')) return [];
-
-                                    return ChartOfAccount::where('parent_id', $accountCoaId)
+                                ->label('Akun COA')
+                                ->options(function () {
+                                    return ChartOfAccount::where('is_active', true)
                                         ->orderBy('code')
                                         ->get()
                                         ->mapWithKeys(fn($coa) => [$coa->id => $coa->code . ' - ' . $coa->name]);
                                 })
                                 ->required()
                                 ->searchable()
-                                ->columnSpan(6)
+                                ->preload()
+                                ->columnSpan(4)
                                 ->validationMessages([
-                                    'required' => 'Akun anak wajib dipilih'
+                                    'required' => 'Akun COA wajib dipilih'
+                                ]),
+                            TextInput::make('description')
+                                ->label('Deskripsi')
+                                ->placeholder('Contoh: Buku tulis, Pensil, dll.')
+                                ->required()
+                                ->columnSpan(3)
+                                ->validationMessages([
+                                    'required' => 'Deskripsi wajib diisi'
                                 ]),
                             TextInput::make('amount')
                                 ->label('Jumlah')
@@ -253,7 +265,7 @@ class CashBankTransactionResource extends Resource
                                 ->maxValue(999999999)
                                 ->required()
                                 ->indonesianMoney()
-                                ->helperText('Gunakan nilai negatif (-) untuk pajak/pengurang yang mengurangi nilai transaksi')
+                                ->helperText('Gunakan nilai negatif (-) untuk pengurang')
                                 ->columnSpan(2)
                                 ->validationMessages([
                                     'required' => 'Jumlah wajib diisi',
@@ -264,7 +276,7 @@ class CashBankTransactionResource extends Resource
                             TextInput::make('ntpn')
                                 ->label('NTPN')
                                 ->helperText('Nomor Transaksi Penerimaan Negara untuk PPH 22 Import')
-                                ->columnSpan(2)
+                                ->columnSpan(3)
                                 ->suffixAction(
                                     FormAction::make('generateNTPN')
                                         ->label('Generate')
@@ -278,21 +290,29 @@ class CashBankTransactionResource extends Resource
                                             $set('ntpn', $ntpn);
                                         })
                                 ),
-                            TextInput::make('description')
-                                ->label('Keterangan')
-                                ->columnSpan(2),
                         ])
                         ->columns(12)
                         ->defaultItems(0)
                         ->addActionLabel('Tambah Rincian')
                         ->collapsible()
-                        ->itemLabel(fn(array $state): ?string => ChartOfAccount::find($state['chart_of_account_id'] ?? null)?->name ?? 'Rincian Baru')
+                        ->itemLabel(fn(array $state): ?string => $state['description'] ?? ChartOfAccount::find($state['chart_of_account_id'] ?? null)?->name ?? 'Rincian Baru')
                         ->afterStateUpdated(function ($state, callable $set) {
                             $total = collect($state ?? [])->sum('amount');
-                            $mainAmount = $set('../../amount', $total);
-                        }),
+                            if ($total > 0) {
+                                $set('../../amount', abs($total)); // Use absolute value for main amount
+                            }
+                        })
+                        ->rules([
+                            fn (): \Closure => function (string $attribute, $value, \Closure $fail) {
+                                $total = collect($value ?? [])->sum('amount');
+                                if ($total == 0) {
+                                    $fail('Total rincian tidak boleh 0');
+                                }
+                            },
+                        ]),
                 ])
-                ->visible(fn(callable $get) => $get('account_coa_id') && ChartOfAccount::find($get('account_coa_id')) && str_starts_with(ChartOfAccount::find($get('account_coa_id'))->code, '1112'))
+                ->visible(fn(callable $get) => true) // Always visible, but optional to use
+                ->collapsed() // Start collapsed since it's optional
         ]);
     }
 
@@ -312,16 +332,16 @@ class CashBankTransactionResource extends Resource
                 TextColumn::make('offsetCoa.code')->label('Lawan Akun')->formatStateUsing(fn($state, $record) => $record->offsetCoa->code . ' - ' . $record->offsetCoa->name)->searchable(),
                 TextColumn::make('amount')->money('IDR')->label('Jumlah')->sortable(),
                 TextColumn::make('transactionDetails')
-                    ->label('Rincian Akun Anak')
+                    ->label('Rincian Transaksi')
                     ->formatStateUsing(function ($record) {
                         if ($record->transactionDetails->isEmpty()) {
                             return '-';
                         }
 
                         return $record->transactionDetails->map(function ($detail) {
-                            $info = $detail->chartOfAccount->code . ' - ' . $detail->chartOfAccount->name . ': ' . formatCurrency($detail->amount);
+                            $info = $detail->description . ' (' . $detail->chartOfAccount->code . '): ' . formatCurrency($detail->amount);
                             if ($detail->ntpn) {
-                                $info .= ' (NTPN: ' . $detail->ntpn . ')';
+                                $info .= ' [NTPN: ' . $detail->ntpn . ']';
                             }
                             return $info;
                         })->join('; ');

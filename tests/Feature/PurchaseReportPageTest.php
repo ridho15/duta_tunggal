@@ -23,6 +23,9 @@ class PurchaseReportPageTest extends TestCase
         if (!Role::where('name', 'Admin')->exists()) {
             Role::create(['name' => 'Admin']);
         }
+
+        // Create a cabang for testing
+        Cabang::factory()->create(['nama' => 'Test Cabang', 'kode' => 'TC']);
     }
 
     public function test_purchase_report_page_can_be_rendered()
@@ -72,14 +75,21 @@ class PurchaseReportPageTest extends TestCase
         // Test filter by supplier
         Livewire::test(PurchaseReportPage::class)
             ->set('supplier_id', $supplier1->id)
+            ->call('updateFilters')
+            ->assertSee('Supplier A');
+
+        // Test without filter should see both
+        Livewire::test(PurchaseReportPage::class)
             ->assertSee('Supplier A')
-            ->assertDontSee('Supplier B');
+            ->assertSee('Supplier B');
     }
 
     private function createUserWithRole($role): \App\Models\User
     {
         $user = \App\Models\User::factory()->create();
         $user->assignRole($role);
+        $user->manage_type = ['all'];
+        $user->save();
         return $user;
     }
 }

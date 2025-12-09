@@ -16,6 +16,8 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Actions\ExportAction;
 use App\Exports\AgeingReportExport;
+use App\Exports\AgeingReportPdfExport;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
@@ -242,6 +244,7 @@ class AgeingReportResource extends Resource
                 \Filament\Tables\Actions\Action::make('export_excel')
                     ->label('Export to Excel')
                     ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
                     ->action(function () {
                         $type = request('tableFilters.type.value') ?? 'receivables';
                         $cabangId = request('tableFilters.cabang_id.value') ?? null;
@@ -250,6 +253,22 @@ class AgeingReportResource extends Resource
                             new AgeingReportExport(now(), $cabangId, $type),
                             'aging-report-' . now()->format('Y-m-d') . '.xlsx'
                         );
+                    }),
+
+                \Filament\Tables\Actions\Action::make('export_pdf')
+                    ->label('Export to PDF')
+                    ->icon('heroicon-o-document-text')
+                    ->color('danger')
+                    ->action(function () {
+                        $type = request('tableFilters.type.value') ?? 'receivables';
+                        $cabangId = request('tableFilters.cabang_id.value') ?? null;
+
+                        $export = new AgeingReportPdfExport(now(), $cabangId, $type);
+                        $pdf = $export->generatePdf();
+
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->output();
+                        }, 'ageing-report-' . now()->format('Y-m-d') . '.pdf');
                     }),
             ])
             ->defaultSort('invoice.invoice_date', 'desc');

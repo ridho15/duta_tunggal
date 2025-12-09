@@ -12,7 +12,9 @@ use App\Models\AccountReceivable;
 use App\Models\AccountPayable;
 use App\Models\Cabang;
 use App\Exports\AgeingReportExport;
+use App\Exports\AgeingReportPdfExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 
 class ViewAgeingReport extends Page
@@ -162,24 +164,40 @@ class ViewAgeingReport extends Page
         return '>90';
     }
 
-    public function exportReport(): void
-    {
-        $export = new AgeingReportExport(
-            $this->report_type,
-            $this->cabang_id,
-            $this->as_of_date
-        );
-
-        Excel::download($export, 'aging-report-' . now()->format('Y-m-d') . '.xlsx');
-    }
-
     protected function getActions(): array
     {
         return [
-            Action::make('export')
+            Action::make('export_excel')
                 ->label('Export to Excel')
                 ->icon('heroicon-o-arrow-down-tray')
-                ->action('exportReport'),
+                ->color('success')
+                ->action(function () {
+                    $export = new AgeingReportExport(
+                        $this->as_of_date,
+                        $this->cabang_id,
+                        $this->report_type
+                    );
+
+                    return Excel::download($export, 'aging-report-' . now()->format('Y-m-d') . '.xlsx');
+                }),
+
+            Action::make('export_pdf')
+                ->label('Export to PDF')
+                ->icon('heroicon-o-document-text')
+                ->color('danger')
+                ->action(function () {
+                    $export = new AgeingReportPdfExport(
+                        $this->as_of_date,
+                        $this->cabang_id,
+                        $this->report_type
+                    );
+
+                    $pdf = $export->generatePdf();
+
+                    return response()->streamDownload(function () use ($pdf) {
+                        echo $pdf->output();
+                    }, 'ageing-report-' . now()->format('Y-m-d') . '.pdf');
+                }),
         ];
     }
 }

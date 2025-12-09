@@ -18,8 +18,8 @@ use App\Models\Customer;
 use App\Exports\SalesReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Milon\Barcode\Facades\DNS2DFacade;
 
 class SalesReportPage extends Page implements HasTable
 {
@@ -116,13 +116,39 @@ class SalesReportPage extends Page implements HasTable
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        $this->updateFilters();
-                        $query = $this->getFilteredQuery();
-                        return Pdf::loadView('reports.sales_report', [
-                            'data' => $query->get(),
-                            'start_date' => $this->start_date,
-                            'end_date' => $this->end_date,
-                        ])->download('sales_report.pdf');
+                        return response()->streamDownload(function () {
+                            $this->updateFilters();
+                            $query = $this->getFilteredQuery();
+
+                            // Clean data to ensure UTF-8 encoding
+                            $cleanData = $query->get()->map(function ($order) {
+                                return [
+                                    'so_number' => mb_convert_encoding($order->so_number ?? '', 'UTF-8', 'UTF-8'),
+                                    'created_at' => $order->created_at,
+                                    'customer_code' => mb_convert_encoding($order->customer->code ?? '-', 'UTF-8', 'UTF-8'),
+                                    'customer_name' => mb_convert_encoding($order->customer->name ?? '-', 'UTF-8', 'UTF-8'),
+                                    'total_amount' => $order->total_amount ?? 0,
+                                    'status' => mb_convert_encoding($order->status ?? '', 'UTF-8', 'UTF-8'),
+                                ];
+                            });
+
+                            $pdf = Pdf::loadView('reports.sales_report', [
+                                'data' => $cleanData,
+                                'start_date' => $this->start_date,
+                                'end_date' => $this->end_date,
+                            ]);
+
+                            $pdf->setOptions([
+                                'defaultFont' => 'DejaVu Sans',
+                                'isHtml5ParserEnabled' => true,
+                                'isRemoteEnabled' => false,
+                                'isPhpEnabled' => false,
+                                'orientation' => 'landscape',
+                                'defaultPaperSize' => 'a4',
+                            ]);
+
+                            echo $pdf->output();
+                        }, 'sales_report_' . now()->format('Ymd_His') . '.pdf');
                     }),
             ]);
     }
@@ -219,7 +245,7 @@ class SalesReportPage extends Page implements HasTable
             ->when($this->customer_id, fn($q) => $q->where('customer_id', $this->customer_id))
             ->when($this->so_number, fn($q) => $q->where('so_number', 'like', '%' . $this->so_number . '%'))
             ->when($this->status, fn($q) => $q->where('status', $this->status))
-            ->with(['customer', 'saleOrderItem']);
+            ->with(['customer', 'saleOrderItem.product']);
 
         // Apply branch scoping
         $user = Auth::user();
