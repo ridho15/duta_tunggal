@@ -80,7 +80,7 @@ class AgeingReportPdfExport
     {
         $query = AccountReceivable::with([
             'customer',
-            'invoice.purchaseOrder.salesOrder',
+            'invoice.fromModel', // Use polymorphic relationship instead of purchaseOrder
             'cabang',
             'ageingSchedule'
         ])->where('remaining', '>', 0);
@@ -105,9 +105,10 @@ class AgeingReportPdfExport
                 }
             }
 
+            // Get sales person from related sales order through polymorphic relationship
             $salesPerson = '-';
-            if ($receivable->invoice && $receivable->invoice->purchaseOrder && $receivable->invoice->purchaseOrder->salesOrder) {
-                $salesPerson = $receivable->invoice->purchaseOrder->salesOrder->sales_person ?? '-';
+            if ($receivable->invoice && $receivable->invoice->fromModel && $receivable->invoice->fromModel_type === 'App\\Models\\SalesOrder') {
+                $salesPerson = $receivable->invoice->fromModel->sales_person ?? '-';
             }
 
             return [
@@ -137,7 +138,7 @@ class AgeingReportPdfExport
     {
         $query = AccountPayable::with([
             'supplier',
-            'invoice.purchaseOrder',
+            'invoice.fromModel', // Use polymorphic relationship instead of purchaseOrder
             'ageingSchedule'
         ])->where('remaining', '>', 0);
 
@@ -163,11 +164,12 @@ class AgeingReportPdfExport
                 }
             }
 
+            // Get procurement person from related purchase order through polymorphic relationship
             $procurementPerson = '-';
             $purchaseType = '-';
-            if ($payable->invoice && $payable->invoice->purchaseOrder) {
-                $procurementPerson = $payable->invoice->purchaseOrder->procurement_person ?? '-';
-                $purchaseType = $payable->invoice->purchaseOrder->type ?? '-';
+            if ($payable->invoice && $payable->invoice->fromModel && $payable->invoice->fromModel_type === 'App\\Models\\PurchaseOrder') {
+                $procurementPerson = $payable->invoice->fromModel->procurement_person ?? '-';
+                $purchaseType = $payable->invoice->fromModel->type ?? '-';
             }
 
             return [
