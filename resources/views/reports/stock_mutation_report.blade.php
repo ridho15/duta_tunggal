@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Laporan Penjualan - {{ $start_date }} s/d {{ $end_date }}</title>
+    <title>Laporan Mutasi Barang - {{ $start_date }} s/d {{ $end_date }}</title>
     <style>
         @page {
             size: A4 landscape;
@@ -210,108 +210,97 @@
         </div>
 
         <div class="report-info">
-            <h2>LAPORAN PENJUALAN</h2>
+            <h2>LAPORAN MUTASI BARANG</h2>
             <p>Periode: {{ \Carbon\Carbon::parse($start_date)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}</p>
             <p>Tanggal Cetak: {{ now()->format('d/m/Y H:i:s') }}</p>
             <p>Dicetak Oleh: {{ auth()->user()->name ?? 'System' }}</p>
         </div>
 
         <div class="qr-section">
-            <img src="data:image/png;base64,{{ base64_encode(\Milon\Barcode\Facades\DNS2DFacade::getBarcodePNG('Laporan Penjualan ' . $start_date . ' - ' . $end_date, 'QRCODE', 4, 4)) }}" alt="QR Code">
+            <img src="data:image/png;base64,{{ base64_encode(\Milon\Barcode\Facades\DNS2DFacade::getBarcodePNG('Laporan Mutasi Barang ' . $start_date . ' - ' . $end_date, 'QRCODE', 4, 4)) }}" alt="QR Code">
             <p>Scan untuk verifikasi</p>
         </div>
     </div>
 
     <div class="summary">
-        <h3>📊 Ringkasan Laporan Penjualan</h3>
+        <h3>📊 Ringkasan Laporan Mutasi Barang</h3>
         <table class="summary-table">
             <tbody>
                 <tr>
                     <td class="summary-item">
-                        <span class="icon">📋</span>
-                        <span class="value">{{ $data->count() }}</span>
-                        <span class="label">Total Transaksi</span>
+                        <span class="icon">📅</span>
+                        <span class="value">{{ \Carbon\Carbon::parse($start_date)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}</span>
+                        <span class="label">Periode</span>
                     </td>
                     <td class="summary-item">
-                        <span class="icon">💰</span>
-                        <span class="value">Rp {{ number_format($data->sum('total_amount'), 0, ',', '.') }}</span>
-                        <span class="label">Total Nilai</span>
+                        <span class="icon">🏭</span>
+                        <span class="value">{{ count($report['warehouseData']) }}</span>
+                        <span class="label">Total Gudang</span>
                     </td>
                     <td class="summary-item">
-                        <span class="icon">📊</span>
-                        <span class="value">Rp {{ $data->count() > 0 ? number_format($data->sum('total_amount') / $data->count(), 0, ',', '.') : '0' }}</span>
-                        <span class="label">Rata-rata per Transaksi</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="summary-item">
-                        <span class="icon">✅</span>
-                        <span class="value">{{ $data->where('status', 'confirmed')->count() }}</span>
-                        <span class="label">Transaksi Confirmed</span>
+                        <span class="icon">📦</span>
+                        <span class="value">{{ $report['totals']['total_movements'] ?? 0 }}</span>
+                        <span class="label">Total Mutasi</span>
                     </td>
                     <td class="summary-item">
-                        <span class="icon">⏳</span>
-                        <span class="value">{{ $data->where('status', 'draft')->count() }}</span>
-                        <span class="label">Transaksi Draft</span>
-                    </td>
-                    <td class="summary-item">
-                        <span class="icon">🚫</span>
-                        <span class="value">{{ $data->where('status', 'canceled')->count() }}</span>
-                        <span class="label">Transaksi Canceled</span>
+                        <span class="icon">📈</span>
+                        <span class="value">{{ collect($report['warehouseData'])->flatMap(fn($w) => $w['movements'])->pluck('product_name')->unique()->count() }}</span>
+                        <span class="label">Produk Terlibat</span>
                     </td>
                 </tr>
             </tbody>
         </table>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th class="text-center" style="width: 5%;">No</th>
-                <th style="width: 12%;">No. SO</th>
-                <th style="width: 10%;">Tanggal</th>
-                <th style="width: 10%;">Kode Customer</th>
-                <th style="width: 25%;">Nama Customer</th>
-                <th class="text-right" style="width: 15%;">Total (Rp)</th>
-                <th class="text-center" style="width: 10%;">Status</th>
-                <th style="width: 13%;">Keterangan</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($data as $index => $order)
-            <tr>
-                <td class="text-center">{{ $index + 1 }}</td>
-                <td>{{ $order['so_number'] }}</td>
-                <td>{{ $order['created_at']->format('d/m/Y') }}</td>
-                <td>{{ $order['customer_code'] }}</td>
-                <td>{{ $order['customer_name'] }}</td>
-                <td class="text-right">{{ number_format($order['total_amount'], 0, ',', '.') }}</td>
-                <td class="text-center">
-                    <span style="padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: bold;
-                        {{ $order['status'] === 'confirmed' ? 'background-color: #d4edda; color: #155724;' :
-                           ($order['status'] === 'draft' ? 'background-color: #fff3cd; color: #856404;' :
-                           'background-color: #f8d7da; color: #721c24;') }}">
-                        {{ ucfirst($order['status']) }}
-                    </span>
-                </td>
-                <td>{{ $order['created_at']->format('H:i') }} WIB</td>
-            </tr>
-            @endforeach
-        </tbody>
-        <tfoot>
-            <tr style="background-color: #e9ecef; font-weight: bold;">
-                <td colspan="5" class="text-right">TOTAL:</td>
-                <td class="text-right">{{ number_format($data->sum('total_amount'), 0, ',', '.') }}</td>
-                <td colspan="2"></td>
-            </tr>
-        </tfoot>
-    </table>
+    @foreach($report['warehouseData'] as $warehouseId => $warehouse)
+    <div style="page-break-inside: avoid;">
+        <h3 style="color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Gudang: {{ $warehouse['name'] }}</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th class="text-center" style="width: 5%;">No</th>
+                    <th style="width: 15%;">Tanggal</th>
+                    <th style="width: 20%;">Produk</th>
+                    <th style="width: 10%;">Rak</th>
+                    <th class="text-center" style="width: 10%;">Tipe</th>
+                    <th class="text-right" style="width: 10%;">Qty Masuk</th>
+                    <th class="text-right" style="width: 10%;">Qty Keluar</th>
+                    <th class="text-right" style="width: 10%;">Saldo</th>
+                    <th style="width: 20%;">Keterangan</th>
+                </tr>
+            </thead>
+            <tbody>
+                @php $no = 1; @endphp
+                @foreach($warehouse['movements'] as $movement)
+                <tr>
+                    <td class="text-center">{{ $no++ }}</td>
+                    <td>{{ \Carbon\Carbon::parse($movement['date'])->format('d/m/Y') }}</td>
+                    <td>{{ $movement['product_name'] }}</td>
+                    <td>{{ $movement['rak_name'] ?? '-' }}</td>
+                    <td class="text-center">
+                        <span style="padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: bold;
+                            {{ $movement['type'] === 'in' ? 'background-color: #d4edda; color: #155724;' :
+                               ($movement['type'] === 'out' ? 'background-color: #f8d7da; color: #721c24;' :
+                               'background-color: #fff3cd; color: #856404;') }}">
+                            {{ ucfirst($movement['type']) }}
+                        </span>
+                    </td>
+                    <td class="text-right">{{ $movement['type'] === 'in' ? number_format($movement['quantity'], 0, ',', '.') : '-' }}</td>
+                    <td class="text-right">{{ $movement['type'] === 'out' ? number_format($movement['quantity'], 0, ',', '.') : '-' }}</td>
+                    <td class="text-right">{{ number_format($movement['balance'], 0, ',', '.') }}</td>
+                    <td>{{ $movement['notes'] ?? '-' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endforeach
 
     <div class="footer">
         <div>
             <p><strong>Dokumen ini dihasilkan secara otomatis oleh sistem ERP</strong></p>
             <p>Untuk informasi lebih lanjut, hubungi departemen IT</p>
-            <p>File: sales_report_{{ now()->format('Ymd_His') }}.pdf</p>
+            <p>File: stock_mutation_report_{{ now()->format('Ymd_His') }}.pdf</p>
         </div>
         <div style="text-align: right;">
             <p>Halaman 1 dari 1</p>

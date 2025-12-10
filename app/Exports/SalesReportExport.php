@@ -64,21 +64,23 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
 
             // Item rows
             foreach ($order->saleOrderItem as $item) {
-                $data->push([
-                    'No. SO' => '',
-                    'Tanggal' => '',
-                    'Kode Customer' => '',
-                    'Nama Customer' => '',
-                    'Alamat Customer' => '',
-                    'No. Telp' => '',
-                    'Email' => '',
-                    'Produk' => $item->product->name ?? '-',
-                    'Qty' => $item->quantity ?? 0,
-                    'Harga Satuan' => 'Rp ' . number_format($item->price ?? 0, 0, ',', '.'),
-                    'Subtotal' => 'Rp ' . number_format(($item->quantity ?? 0) * ($item->price ?? 0), 0, ',', '.'),
-                    'Total SO' => '',
-                    'Status' => '',
-                ]);
+                if (($item->unit_price ?? 0) > 0 && ($item->quantity ?? 0) > 0) {
+                    $data->push([
+                        'No. SO' => '',
+                        'Tanggal' => '',
+                        'Kode Customer' => '',
+                        'Nama Customer' => '',
+                        'Alamat Customer' => '',
+                        'No. Telp' => '',
+                        'Email' => '',
+                        'Produk' => $item->product->name ?? '-',
+                        'Qty' => $item->quantity ?? 0,
+                        'Harga Satuan' => 'Rp ' . number_format($item->unit_price ?? 0, 0, ',', '.'),
+                        'Subtotal' => 'Rp ' . number_format(($item->quantity ?? 0) * ($item->unit_price ?? 0), 0, ',', '.'),
+                        'Total SO' => '',
+                        'Status' => '',
+                    ]);
+                }
             }
 
             // Empty row for separation

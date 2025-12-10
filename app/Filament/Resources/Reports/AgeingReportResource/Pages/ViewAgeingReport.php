@@ -7,6 +7,7 @@ use App\Models\AccountReceivable;
 use App\Models\AccountPayable;
 use App\Models\Cabang;
 use Filament\Resources\Pages\Page;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -19,6 +20,8 @@ use Filament\Forms\Get;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\AgeingReportExport;
+use App\Exports\AgeingReportPdfExport;
+use Barryvdh\DomPDF\Facade\Pdf as DomPdf;
 
 class ViewAgeingReport extends Page
 {
@@ -198,12 +201,32 @@ class ViewAgeingReport extends Page
         ];
     }
 
-    public function exportReport()
+    protected function getHeaderActions(): array
     {
-        return Excel::download(
-            new AgeingReportExport($this->as_of_date, $this->cabang_id, $this->report_type),
-            'aging-report-' . now()->format('Y-m-d') . '.xlsx'
-        );
+        return [
+            Action::make('export_excel')
+                ->label('Export Excel')
+                ->icon('heroicon-m-arrow-down-tray')
+                ->color('success')
+                ->action(function () {
+                    return Excel::download(
+                        new AgeingReportExport($this->as_of_date ?? now(), $this->cabang_id, $this->report_type),
+                        'ageing-report-' . now()->format('Y-m-d') . '.xlsx'
+                    );
+                }),
+            Action::make('export_pdf')
+                ->label('Export PDF')
+                ->icon('heroicon-m-document-text')
+                ->color('danger')
+                ->action(function () {
+                    $export = new AgeingReportPdfExport($this->as_of_date ?? now(), $this->cabang_id, $this->report_type);
+                    $pdf = $export->generatePdf();
+
+                    return response()->streamDownload(function () use ($pdf) {
+                        echo $pdf->output();
+                    }, 'ageing-report-' . now()->format('Y-m-d') . '.pdf');
+                }),
+        ];
     }
 
     private function getAgingSummary($type, $bucket)

@@ -107,7 +107,7 @@ class AgeingReportPdfExport
 
             // Get sales person from related sales order through polymorphic relationship
             $salesPerson = '-';
-            if ($receivable->invoice && $receivable->invoice->fromModel && $receivable->invoice->fromModel_type === 'App\\Models\\SalesOrder') {
+            if ($receivable->invoice && $receivable->invoice->fromModel && $receivable->invoice->from_model_type === 'App\\Models\\SaleOrder') {
                 $salesPerson = $receivable->invoice->fromModel->sales_person ?? '-';
             }
 
@@ -167,7 +167,7 @@ class AgeingReportPdfExport
             // Get procurement person from related purchase order through polymorphic relationship
             $procurementPerson = '-';
             $purchaseType = '-';
-            if ($payable->invoice && $payable->invoice->fromModel && $payable->invoice->fromModel_type === 'App\\Models\\PurchaseOrder') {
+            if ($payable->invoice && $payable->invoice->fromModel && $payable->invoice->from_model_type === 'App\\Models\\PurchaseOrder') {
                 $procurementPerson = $payable->invoice->fromModel->procurement_person ?? '-';
                 $purchaseType = $payable->invoice->fromModel->type ?? '-';
             }

@@ -107,12 +107,6 @@
         </div>
 
         <div class="flex flex-wrap gap-2 justify-end">
-            <x-filament::button wire:click="export('excel')" color="primary" icon="heroicon-m-arrow-down-tray">
-                Export Excel
-            </x-filament::button>
-            <x-filament::button wire:click="export('pdf')" style="background-color: #6b7280; color: white;" icon="heroicon-m-document-text">
-                Export PDF
-            </x-filament::button>
             <x-filament::button wire:click="$refresh">Refresh</x-filament::button>
         </div>
     </div>

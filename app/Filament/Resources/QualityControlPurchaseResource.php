@@ -32,6 +32,10 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Section as InfolistSection;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\RepeatableEntry;
 
 class QualityControlPurchaseResource extends Resource
 {
@@ -511,6 +515,76 @@ class QualityControlPurchaseResource extends Resource
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                InfolistSection::make('Quality Control Details')
+                    ->schema([
+                        TextEntry::make('qc_number')->label('QC Number'),
+                        TextEntry::make('created_at')->date()->label('QC Date'),
+                        TextEntry::make('product.name')->label('Product'),
+                        TextEntry::make('product.sku')->label('SKU'),
+                        TextEntry::make('warehouse.name')->label('Warehouse'),
+                        TextEntry::make('rak.name')->label('Rack'),
+                        TextEntry::make('status_formatted')->label('Status')->badge(),
+                        TextEntry::make('inspectedBy.name')->label('Inspected By'),
+                        TextEntry::make('notes'),
+                    ])->columns(2),
+                InfolistSection::make('Purchase Information')
+                    ->schema([
+                        TextEntry::make('fromModel.purchaseReceipt.receipt_number')->label('Receipt Number'),
+                        TextEntry::make('fromModel.purchaseReceipt.purchaseOrder.po_number')->label('PO Number'),
+                        TextEntry::make('fromModel.purchaseReceipt.purchaseOrder.supplier.name')->label('Supplier'),
+                        TextEntry::make('fromModel.qty_accepted')->label('Accepted Quantity'),
+                        TextEntry::make('fromModel.purchaseReceipt.currency.code')->label('Currency'),
+                    ])->columns(2),
+                InfolistSection::make('Quality Control Results')
+                    ->schema([
+                        TextEntry::make('fromModel.qty_received')->label('Qty Received'),
+                        TextEntry::make('passed_quantity')->label('Qty Accepted')->color('success'),
+                        TextEntry::make('rejected_quantity')->label('Qty Rejected')->color('danger'),
+                        TextEntry::make('reason_reject')->label('Rejection Reason'),
+                        TextEntry::make('date_send_stock')->date()->label('Date Send to Stock'),
+                    ])->columns(3),
+                InfolistSection::make('Journal Entries')
+                    ->headerActions([
+                        \Filament\Infolists\Components\Actions\Action::make('view_journal_entries')
+                            ->label('View All Journal Entries')
+                            ->icon('heroicon-o-document-text')
+                            ->color('primary')
+                            ->url(function ($record) {
+                                // Redirect to JournalEntryResource with filter for this quality control
+                                $sourceType = urlencode(\App\Models\QualityControl::class);
+                                $sourceId = $record->id;
+
+                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}";
+                            })
+                            ->openUrlInNewTab()
+                            ->visible(function ($record) {
+                                return $record->journalEntries()->exists();
+                            }),
+                    ])
+                    ->schema([
+                        RepeatableEntry::make('journalEntries')
+                            ->label('')
+                            ->schema([
+                                TextEntry::make('date')->date()->label('Date'),
+                                TextEntry::make('coa.code')->label('COA'),
+                                TextEntry::make('coa.name')->label('Account Name'),
+                                TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
+                                TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                                TextEntry::make('description')->label('Description'),
+                                TextEntry::make('journal_type')->badge()->label('Type'),
+                            ])->columns(4),
+                    ])
+                    ->columns(1)
+                    ->visible(function ($record) {
+                        return $record->journalEntries()->exists();
+                    }),
+            ]);
     }
 
     public static function getRelations(): array

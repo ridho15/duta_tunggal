@@ -206,6 +206,9 @@ class CashBankTransactionDetailsUITest extends TestCase
         $this->assertTrue($transaction->transactionDetails->isNotEmpty());
         $this->assertEquals(2, $transaction->transactionDetails->count());
 
+        // Reload transaction with relationships
+        $transaction->load('transactionDetails.chartOfAccount');
+
         // Test that details have correct relationships
         foreach ($transaction->transactionDetails as $detail) {
             $this->assertNotNull($detail->chartOfAccount);

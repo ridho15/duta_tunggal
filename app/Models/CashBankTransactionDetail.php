@@ -26,6 +26,32 @@ class CashBankTransactionDetail extends Model
 
     public function chartOfAccount(): BelongsTo
     {
-        return $this->belongsTo(ChartOfAccount::class);
+        return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id');
+    }
+
+    protected static function booted()
+    {
+        // Regenerate parent transaction's journal entries when detail is updated or deleted
+        static::saved(function ($detail) {
+            if ($detail->cashBankTransaction && $detail->wasChanged(['chart_of_account_id', 'amount', 'description'])) {
+                $transaction = $detail->cashBankTransaction;
+                $hasExistingEntries = $transaction->journalEntries()->exists();
+
+                if ($hasExistingEntries) {
+                    app(\App\Services\CashBankService::class)->postTransaction($transaction);
+                }
+            }
+        });
+
+        static::deleted(function ($detail) {
+            if ($detail->cashBankTransaction) {
+                $transaction = $detail->cashBankTransaction;
+                $hasExistingEntries = $transaction->journalEntries()->exists();
+
+                if ($hasExistingEntries) {
+                    app(\App\Services\CashBankService::class)->postTransaction($transaction);
+                }
+            }
+        });
     }
 }

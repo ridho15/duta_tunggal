@@ -92,7 +92,7 @@ foreach ($testData as $index => $data) {
         // Create invoice with minimal required fields
         $invoice = Invoice::create([
             'invoice_number' => 'TEST-' . str_pad($index + 1, 3, '0', STR_PAD_LEFT),
-            'from_model_type' => 'App\\Models\\SalesInvoice', // Required field
+            'from_model_type' => 'App\\Models\\SaleOrder', // Required field
             'from_model_id' => 1, // Dummy ID
             'invoice_date' => $data['invoice_date'],
             'due_date' => $data['due_date'],
@@ -117,7 +117,7 @@ foreach ($testData as $index => $data) {
             AgeingSchedule::create([
                 'ageable_type' => AccountReceivable::class,
                 'ageable_id' => $ar->id,
-                'from_model_type' => 'App\\Models\\SalesInvoice',
+                'from_model_type' => 'App\\Models\\SaleOrder',
                 'from_model_id' => 1,
                 'invoice_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'],
@@ -142,7 +142,7 @@ foreach ($testData as $index => $data) {
             AgeingSchedule::create([
                 'ageable_type' => AccountPayable::class,
                 'ageable_id' => $ap->id,
-                'from_model_type' => 'App\\Models\\PurchaseInvoice',
+                'from_model_type' => 'App\\Models\\PurchaseOrder',
                 'from_model_id' => 1,
                 'invoice_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'],

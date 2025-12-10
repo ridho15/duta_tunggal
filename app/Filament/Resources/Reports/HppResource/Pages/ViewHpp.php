@@ -6,7 +6,8 @@ use App\Exports\GenericViewExport;
 use App\Filament\Resources\Reports\HppResource;
 use App\Models\Cabang;
 use App\Services\Reports\HppReportService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf as DomPdf;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -65,6 +66,26 @@ class ViewHpp extends Page
                         })
                         ->helperText('Kosongkan bila ingin menampilkan semua cabang'),
                 ]),
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('export_excel')
+                ->label('Export Excel')
+                ->icon('heroicon-m-arrow-down-tray')
+                ->color('success')
+                ->action(function () {
+                    return $this->export('excel');
+                }),
+            Action::make('export_pdf')
+                ->label('Export PDF')
+                ->icon('heroicon-m-document-text')
+                ->color('danger')
+                ->action(function () {
+                    return $this->export('pdf');
+                }),
         ];
     }
 
@@ -141,7 +162,7 @@ class ViewHpp extends Page
 
                 // Let DomPDF render the Blade view directly. Keep sanitization for safety.
                 try {
-                    $pdfObj = Pdf::loadView('exports.hpp', [
+                    $pdfObj = DomPdf::loadView('exports.hpp', [
                         'report' => $sanitizedReport,
                         'selectedBranches' => $sanitizedBranches,
                     ])
@@ -174,7 +195,7 @@ class ViewHpp extends Page
                     $fullySanitized = $this->sanitizeForPdfDeep($report);
                     $fullySanitizedBranches = array_map([$this, 'sanitizeForPdf'], $branchNames);
                     try {
-                        $pdfObj2 = Pdf::loadView('exports.hpp', [
+                        $pdfObj2 = DomPdf::loadView('exports.hpp', [
                             'report' => $fullySanitized,
                             'selectedBranches' => $fullySanitizedBranches,
                         ])

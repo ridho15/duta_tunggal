@@ -579,8 +579,8 @@ class DeliveryOrderResource extends Resource
                             ->schema([
                                 TextEntry::make('so_number')->label('SO Number'),
                                 TextEntry::make('createdBy.name')->label('Sales'),
-                            ]),
-                    ]),
+                            ])->columns(2),
+                    ])->columns(2),
                 Section::make('Delivery Order Items')
                     ->schema([
                         RepeatableEntry::make('deliveryOrderItem')
@@ -589,8 +589,44 @@ class DeliveryOrderResource extends Resource
                                 TextEntry::make('product.name')->label('Product'),
                                 TextEntry::make('quantity'),
                                 TextEntry::make('reason'),
-                            ]),
-                    ]),
+                            ])->columns(3)
+                            ->columnSpanFull(),
+                    ])->columns(2),
+                Section::make('Journal Entries')
+                    ->headerActions([
+                        \Filament\Infolists\Components\Actions\Action::make('view_journal_entries')
+                            ->label('View All Journal Entries')
+                            ->icon('heroicon-o-document-text')
+                            ->color('primary')
+                            ->url(function ($record) {
+                                // Redirect to JournalEntryResource with filter for this delivery order
+                                $sourceType = urlencode(\App\Models\DeliveryOrder::class);
+                                $sourceId = $record->id;
+                                
+                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}";
+                            })
+                            ->openUrlInNewTab()
+                            ->visible(function ($record) {
+                                return $record->journalEntries()->exists();
+                            }),
+                    ])
+                    ->schema([
+                        RepeatableEntry::make('journalEntries')
+                            ->label('')
+                            ->schema([
+                                TextEntry::make('date')->date()->label('Date'),
+                                TextEntry::make('coa.code')->label('COA'),
+                                TextEntry::make('coa.name')->label('Account Name'),
+                                TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
+                                TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                                TextEntry::make('description')->label('Description'),
+                                TextEntry::make('journal_type')->badge()->label('Type'),
+                            ])->columns(4),
+                    ])
+                    ->columns(1)
+                    ->visible(function ($record) {
+                        return $record->journalEntries()->exists();
+                    }),
             ]);
     }
 
@@ -1056,7 +1092,10 @@ class DeliveryOrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->orderBy('delivery_date', 'DESC');
+        return parent::getEloquentQuery()
+            ->with(['journalEntries.coa'])
+            ->withCount('journalEntries')
+            ->orderBy('delivery_date', 'DESC');
     }
 
     public static function getPages(): array

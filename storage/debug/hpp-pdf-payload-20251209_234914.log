@@ -1,0 +1,340 @@
+HPP PAYLOAD DUMP - {
+    "time": "2025-12-09 23:49:14",
+    "report_sample": {
+        "period": {
+            "start": "2025-12-01",
+            "end": "2025-12-31"
+        },
+        "raw_materials": {
+            "opening": 37005567.91,
+            "purchases": 600000,
+            "available": 37605567.91,
+            "closing": 37005567.91,
+            "used": 600000
+        },
+        "direct_labor": 0,
+        "overhead": {
+            "items": [
+                {
+                    "key": "factory_electricity",
+                    "label": "Biaya Listrik Pabrik",
+                    "amount": 0
+                },
+                {
+                    "key": "machine_depreciation",
+                    "label": "Biaya Penyusutan Mesin",
+                    "amount": 0
+                },
+                {
+                    "key": "maintenance",
+                    "label": "Biaya Perawatan",
+                    "amount": 0
+                }
+            ],
+            "total": 0
+        },
+        "production_cost": 600000,
+        "wip": {
+            "opening": 0,
+            "closing": 0
+        },
+        "cogm": 600000
+    },
+    "branch_names": []
+}
+HTML_SAMPLE:
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Harga Pokok Produksi</title>
+    <style>
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background-color: #ffffff;
+            color: #333;
+            line-height: 1.4;
+            font-size: 14px;
+        }
+
+        .report-container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #e5e7eb;
+        }
+
+        .report-header {
+            background: #f8fafc;
+            border-bottom: 2px solid #e5e7eb;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .report-header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .report-info {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .info-grid {
+            display: table;
+            width: 100%;
+        }
+
+        .info-row {
+            display: table-row;
+        }
+
+        .info-label {
+            display: table-cell;
+            font-weight: 600;
+            color: #6b7280;
+            padding: 4px 0;
+            width: 100px;
+            font-size: 13px;
+        }
+
+        .info-value {
+            display: table-cell;
+            color: #374151;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .content-section {
+            padding: 15px;
+        }
+
+        .cost-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            border: 1px solid #e5e7eb;
+            font-size: 13px;
+        }
+
+        .cost-table th {
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+            background: #f9fafb;
+            font-size: 13px;
+        }
+
+        .cost-table th:last-child {
+            text-align: right;
+        }
+
+        .cost-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+        }
+
+        .cost-table .total-row {
+            background: #fef3c7;
+            font-weight: 600;
+            border-top: 1px solid #f59e0b;
+        }
+
+        .cost-table .subtotal-row {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+
+        .cost-table .final-total {
+            background: #1f2937;
+            color: white;
+            font-weight: 700;
+        }
+
+        .cost-table .final-total th,
+        .cost-table .final-total td {
+            padding: 12px;
+            border: none;
+        }
+
+        .amount-column {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .description-column {
+            font-weight: 500;
+        }
+
+        .indent-1 {
+            padding-left: 25px !important;
+        }
+
+        .indent-2 {
+            padding-left: 35px !important;
+        }
+
+        .negative-amount {
+            color: #dc2626;
+        }
+
+        .footer {
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 15px;
+            text-align: center;
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .footer p {
+            margin: 0;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .report-container {
+                border: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header -->
+        <div class="report-header">
+            <h1>Laporan Harga Pokok Produksi</h1>
+        </div>
+
+        <!-- Report Info -->
+        <div class="report-info">
+            <div class="info-grid">
+                <div class="info-row">
+                    <div class="info-label">Periode:</div>
+                    <div class="info-value">2025-12-01 s.d. 2025-12-31</div>
+                </div>
+                                <div class="info-row">
+                    <div class="info-label">Tanggal Cetak:</div>
+                    <div class="info-value">09/12/2025 23:49:14</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content-section">
+            <table class="cost-table">
+                <thead>
+                    <tr>
+                        <th class="description-column">Deskripsi</th>
+                        <th class="amount-column">Jumlah (Rp)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Raw Materials Section -->
+                    <tr class="subtotal-row">
+                        <td colspan="2"><strong>BAHAN BAKU</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Persediaan Awal Bahan Baku</td>
+                        <td class="amount-column">37.005.567,91</td>
+                    </tr>
+                    <tr>
+                        <td class="indent-1">+ Pembelian Bahan Baku</td>
+                        <td class="amount-column">600.000,00</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td><strong>= Total Bahan Baku Tersedia</strong></td>
+                        <td class="amount-column"><strong>37.605.567,91</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="indent-1 negative-amount">- Persediaan Akhir Bahan Baku</td>
+                        <td class="amount-column negative-amount">(37.005.567,91)</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td><strong>= Bahan Baku yang Digunakan</strong></td>
+                        <td class="amount-column"><strong>600.000,00</strong></td>
+                    </tr>
+
+                    <!-- Direct Labor Section -->
+                    <tr class="subtotal-row">
+                        <td colspan="2"><strong>TENAGA KERJA LANGSUNG</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Biaya Tenaga Kerja Langsung</td>
+                        <td class="amount-column">0,00</td>
+                    </tr>
+
+                    <!-- Overhead Section -->
+                    <tr class="subtotal-row">
+                        <td colspan="2"><strong>BIAYA OVERHEAD PABRIK</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Biaya Overhead Pabrik (Total)</td>
+                        <td class="amount-column">0,00</td>
+                    </tr>
+                                        <tr>
+                        <td class="indent-2">• Biaya Listrik Pabrik</td>
+                        <td class="amount-column">0,00</td>
+                    </tr>
+                                        <tr>
+                        <td class="indent-2">• Biaya Penyusutan Mesin</td>
+                        <td class="amount-column">0,00</td>
+                    </tr>
+                                        <tr>
+                        <td class="indent-2">• Biaya Perawatan</td>
+                        <td class="amount-column">0,00</td>
+                    </tr>
+                    
+                    <!-- Production Cost Total -->
+                    <tr class="total-row">
+                        <td><strong>= TOTAL BIAYA PRODUKSI</strong></td>
+                        <td class="amount-column"><strong>600.000,00</strong></td>
+                    </tr>
+
+                    <!-- WIP Section -->
+                    <tr class="subtotal-row">
+                        <td colspan="2"><strong>PERSISTDIAN BARANG DALAM PROSES (WIP)</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Persediaan Awal Barang Dalam Proses (WIP)</td>
+                        <td class="amount-column">0,00</td>
+                    </tr>
+                    <tr>
+                        <td class="indent-1 negative-amount">- Persediaan Akhir Barang Dalam Proses (WIP)</td>
+                        <td class="amount-column negative-amount">(0,00)</td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="final-total">
+                        <th class="description-column">HARGA POKOK PRODUKSI (COST OF GOODS MANUFACTURED)</th>
+                        <th class="amount-column">600.000,00</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Laporan ini dihasilkan secara otomatis oleh Sistem ERP - 09 December 2025</p>
+        </div>
+    </div>
+</body>
+</html>
+
+HEX_SAMPLE:
+3c 21 44 4f 43 54 59 50 45 20 68 74 6d 6c 3e 0a 3c 68 74 6d 6c 20 6c 61 6e 67 3d 22 69 64 22 3e 0a 3c 68 65 61 64 3e 0a 20 20 20 20 3c 6d 65 74 61 20 63 68 61 72 73 65 74 3d 22 55 54 46 2d 38 22 3e 0a 20 20 20 20 3c 6d 65 74 61 20 6e 61 6d 65 3d 22 76 69 65 77 70 6f 72 74 22 20 63 6f 6e 74 65 6e 74 3d 22 77 69 64 74 68 3d 64 65 76 69 63 65 2d 77 69 64 74 68 2c 20 69 6e 69 74 69 61 6c 2d 73 63 61 6c 65 3d 31 2e 30 22 3e 0a 20 20 20 20 3c 74 69 74 6c 65 3e 4c 61 70 6f 72 61 6e 20 48 61 72 67 61 20 50 6f 6b 6f 6b 20 50 72 6f 64 75 6b 73 69 3c 2f 74 69 74 6c 65 3e 0a 20 20 20 20 3c 73 74 79 6c 65 3e 0a 20 20 20 20 20 20 20 20 62 6f 64 79 20 7b 0a 20 20 20 20 20 20 20 20 20 20 20 20 66 6f 6e 74 2d 66 61 6d 69 6c 79 3a 20 27 44 65 6a 61 56 75 20 53 61 6e 73 27 2c 20 41 72 69 61 6c 2c 20 73 61 6e 73 2d 73 65 72 69 66 3b 0a 20 20 20 20 20 20 20 20 20 20 20 20 6d 61 72 67 69 6e 3a 20 30 3b 0a 20 20 20 20 20 20 20 20 20 20 20 20 70 61 64 64 69 6e 67 3a 20 31 35 70 78 3b 0a 20 20 20 20 20 20 20 20 20 20 20 20 62 61 63 6b 67 72 6f 75 6e 64 2d 63 6f 6c 6f 72 3a 20 23 66 66 66 66 66 66 3b 0a 20 20 20 20 20 20 20 20 20 20 20 20 63 6f 6c 6f 72 3a 20 23 33 33 33 3b 0a 20 20 20 20 20 20 20 20 20 20 

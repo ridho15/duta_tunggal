@@ -87,6 +87,27 @@ class CashBankTransaction extends Model
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);
+
+        // Regenerate journal entries when transaction is updated
+        static::updated(function ($transaction) {
+            // Only regenerate if certain fields that affect journal entries are changed
+            if ($transaction->wasChanged([
+                'amount', 'type', 'account_coa_id', 'offset_coa_id', 'date', 'number', 'description'
+            ])) {
+                // Check if transaction has existing journal entries (was previously posted)
+                $hasExistingEntries = $transaction->journalEntries()->exists();
+
+                if ($hasExistingEntries) {
+                    // Regenerate journal entries
+                    app(\App\Services\CashBankService::class)->postTransaction($transaction);
+                }
+            }
+        });
+
+        // Delete journal entries when transaction is deleted
+        static::deleting(function ($transaction) {
+            $transaction->journalEntries()->delete();
+        });
     }
 
     public function journalEntries()

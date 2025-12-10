@@ -6,81 +6,223 @@ use App\Filament\Resources\Reports\StockMutationReportResource;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
-use Filament\Forms;
+use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Resources\Pages\Page;
+use Filament\Tables\Table;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Actions\Action;
 use App\Exports\GenericViewExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
-use Maatwebsite\Excel\Facades\Excel;
 
-class ViewStockMutationReport extends Page
+class ViewStockMutationReport extends Page implements HasTable
 {
+    use InteractsWithTable;
+
     protected static string $resource = StockMutationReportResource::class;
 
     protected static string $view = 'filament.pages.reports.stock-mutation-report';
 
     public ?string $startDate = null;
-
     public ?string $endDate = null;
-
     public array $productIds = [];
-
     public array $warehouseIds = [];
 
     public function mount(): void
     {
-        // Handle export request
-        if (request('export') === 'excel') {
-            // Export will be handled by the exportExcel method called from the view
-            // This is just to set the context
-        }
+        $this->form->fill([
+            'startDate' => request('start', now()->startOfMonth()->format('Y-m-d')),
+            'endDate' => request('end', now()->endOfMonth()->format('Y-m-d')),
+            'productIds' => [],
+            'warehouseIds' => [],
+        ]);
 
-        // Set default values
-        $this->startDate = now()->startOfMonth()->format('Y-m-d');
-        $this->endDate = now()->endOfMonth()->format('Y-m-d');
+        $this->updateFilters();
     }
 
-    protected function getFormSchema(): array
+    public function table(Table $table): Table
     {
-        return [
-            Forms\Components\Section::make('Filter Laporan')
-                ->columns(2)
-                ->schema([
-                    DatePicker::make('startDate')
-                        ->label('Tanggal Mulai')
-                        ->default(now()->startOfMonth())
-                        ->reactive(),
-                    DatePicker::make('endDate')
-                        ->label('Tanggal Selesai')
-                        ->default(now()->endOfMonth())
-                        ->reactive(),
-                    Select::make('productIds')
-                        ->label('Produk')
-                        ->options(fn () => Product::query()->orderBy('name')->pluck('name', 'id'))
-                        ->multiple()
-                        ->searchable()
-                        ->helperText('Kosongkan untuk menampilkan semua produk'),
-                    Select::make('warehouseIds')
-                        ->label('Gudang')
-                        ->options(fn () => Warehouse::query()->orderBy('name')->pluck('name', 'id'))
-                        ->multiple()
-                        ->searchable()
-                        ->helperText('Kosongkan untuk menampilkan semua gudang'),
-                ]),
-        ];
+        $query = StockMovement::query()
+            ->with(['product', 'warehouse', 'rak'])
+            ->when($this->startDate, fn($q) => $q->whereDate('date', '>=', $this->startDate))
+            ->when($this->endDate, fn($q) => $q->whereDate('date', '<=', $this->endDate))
+            ->when(!empty($this->productIds), fn($q) => $q->whereIn('product_id', $this->productIds))
+            ->when(!empty($this->warehouseIds), fn($q) => $q->whereIn('warehouse_id', $this->warehouseIds))
+            ->orderBy('warehouse_id')
+            ->orderBy('date', 'desc')
+            ->orderBy('created_at', 'desc');
+
+        return $table
+            ->query($query)
+            ->columns([
+                TextColumn::make('date')
+                    ->label('Tanggal')
+                    ->date()
+                    ->sortable(),
+                TextColumn::make('warehouse.name')
+                    ->label('Gudang')
+                    ->sortable(),
+                TextColumn::make('product.name')
+                    ->label('Produk')
+                    ->sortable(),
+                TextColumn::make('product.sku')
+                    ->label('SKU')
+                    ->sortable(),
+                TextColumn::make('type')
+                    ->label('Tipe')
+                    ->formatStateUsing(fn (string $state): string => $this->getMovementTypeLabel($state))
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'purchase_in', 'manufacture_in', 'transfer_in', 'adjustment_in', 'return_in' => 'success',
+                        'sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'return_out' => 'danger',
+                        default => 'gray',
+                    }),
+                TextColumn::make('quantity')
+                    ->label('Qty')
+                    ->numeric()
+                    ->alignCenter(),
+                TextColumn::make('value')
+                    ->label('Nilai')
+                    ->money('IDR')
+                    ->sortable(),
+                TextColumn::make('reference_id')
+                    ->label('Referensi')
+                    ->copyable(),
+                TextColumn::make('notes')
+                    ->label('Catatan')
+                    ->limit(30),
+            ])
+            ->headerActions([
+                Action::make('export_excel')
+                    ->label('Export Excel')
+                    ->icon('heroicon-o-document')
+                    ->action(function () {
+                        $this->updateFilters();
+                        $data = $this->getReportData();
+
+                        $filename = 'laporan_mutasi_barang_' . date('Y-m-d_His') . '.xlsx';
+
+                        $view = view('filament.exports.stock-mutation-excel', [
+                            'report' => $data,
+                            'generated_at' => now(),
+                        ]);
+
+                        return Excel::download(
+                            new GenericViewExport($view),
+                            $filename
+                        );
+                    }),
+                Action::make('export_pdf')
+                    ->label('Export PDF')
+                    ->icon('heroicon-o-document')
+                    ->action(function () {
+                        return response()->streamDownload(function () {
+                            $data = $this->getReportData();
+
+                            $pdf = Pdf::loadView('reports.stock_mutation_report', [
+                                'report' => $data,
+                                'start_date' => $data['period']['start'],
+                                'end_date' => $data['period']['end'],
+                            ]);
+
+                            $pdf->setOptions([
+                                'defaultFont' => 'DejaVu Sans',
+                                'isHtml5ParserEnabled' => true,
+                                'isRemoteEnabled' => false,
+                                'isPhpEnabled' => false,
+                                'orientation' => 'landscape',
+                                'defaultPaperSize' => 'a4',
+                            ]);
+
+                            echo $pdf->output();
+                        }, 'laporan_mutasi_barang_' . now()->format('Ymd_His') . '.pdf');
+                    }),
+            ])
+            ->defaultSort('date', 'desc');
     }
 
-    public function getReportData(): array
+    public function form(Form $form): Form
     {
-        // Support filter manual dari form blade (GET parameter 'start' dan 'end')
-        $startDate = request('start', $this->startDate);
-        $endDate = request('end', $this->endDate);
+        return $form
+            ->schema([
+                DatePicker::make('startDate')
+                    ->label('Tanggal Mulai')
+                    ->default(now()->startOfMonth())
+                    ->live()
+                    ->afterStateUpdated(fn () => $this->updateFilters()),
 
-        $start = $startDate ? Carbon::parse($startDate)->startOfDay() : now()->startOfMonth()->startOfDay();
-        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfMonth()->endOfDay();
+                DatePicker::make('endDate')
+                    ->label('Tanggal Selesai')
+                    ->default(now()->endOfMonth())
+                    ->live()
+                    ->afterStateUpdated(fn () => $this->updateFilters()),
+
+                Select::make('productIds')
+                    ->label('Produk')
+                    ->options(fn () => Product::query()->orderBy('name')->get()->mapWithKeys(fn ($product) => [
+                        $product->id => "{$product->name} ({$product->sku})"
+                    ]))
+                    ->multiple()
+                    ->searchable()
+                    ->placeholder('Semua Produk')
+                    ->live()
+                    ->afterStateUpdated(fn () => $this->updateFilters()),
+
+                Select::make('warehouseIds')
+                    ->label('Gudang')
+                    ->options(fn () => Warehouse::query()->orderBy('name')->get()->mapWithKeys(fn ($warehouse) => [
+                        $warehouse->id => "{$warehouse->name} ({$warehouse->kode})"
+                    ]))
+                    ->multiple()
+                    ->searchable()
+                    ->placeholder('Semua Gudang')
+                    ->live()
+                    ->afterStateUpdated(fn () => $this->updateFilters()),
+            ])
+            ->columns(2);
+    }
+
+    public function updateFilters(): void
+    {
+        $formData = $this->form->getState();
+        $this->startDate = $formData['startDate'] ?? null;
+        $this->endDate = $formData['endDate'] ?? null;
+        $this->productIds = array_filter($formData['productIds'] ?? []);
+        $this->warehouseIds = array_filter($formData['warehouseIds'] ?? []);
+
+        // Reset table pagination when filters change
+        $this->resetTable();
+    }
+
+    private function getMovementTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'purchase_in' => 'Pembelian Masuk',
+            'purchase_out' => 'Pembelian Keluar',
+            'sales' => 'Penjualan',
+            'manufacture_in' => 'Produksi Masuk',
+            'manufacture_out' => 'Produksi Keluar',
+            'transfer_in' => 'Transfer Masuk',
+            'transfer_out' => 'Transfer Keluar',
+            'adjustment_in' => 'Penyesuaian Masuk',
+            'adjustment_out' => 'Penyesuaian Keluar',
+            'return_in' => 'Retur Masuk',
+            'return_out' => 'Retur Keluar',
+            default => ucfirst(str_replace('_', ' ', $type))
+        };
+    }
+
+    private function getReportData(): array
+    {
+        $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : now()->startOfMonth()->startOfDay();
+        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : now()->endOfMonth()->endOfDay();
 
         $productIds = array_filter($this->productIds);
         $warehouseIds = array_filter($this->warehouseIds);
@@ -202,24 +344,6 @@ class ViewStockMutationReport extends Page
         ];
     }
 
-    private function getMovementTypeLabel(string $type): string
-    {
-        return match ($type) {
-            'purchase_in' => 'Pembelian Masuk',
-            'purchase_out' => 'Pembelian Keluar',
-            'sales' => 'Penjualan',
-            'manufacture_in' => 'Produksi Masuk',
-            'manufacture_out' => 'Produksi Keluar',
-            'transfer_in' => 'Transfer Masuk',
-            'transfer_out' => 'Transfer Keluar',
-            'adjustment_in' => 'Penyesuaian Masuk',
-            'adjustment_out' => 'Penyesuaian Keluar',
-            'return_in' => 'Retur Masuk',
-            'return_out' => 'Retur Keluar',
-            default => ucfirst(str_replace('_', ' ', $type))
-        };
-    }
-
     public function getSelectedProductNames(): array
     {
         if (empty($this->productIds)) {
@@ -244,31 +368,5 @@ class ViewStockMutationReport extends Page
             ->orderBy('name')
             ->pluck('name')
             ->toArray();
-    }
-
-    public function exportExcel()
-    {
-        try {
-            $data = $this->getReportData();
-
-            $filename = 'Laporan_Mutasi_Barang_' . date('Y-m-d_His') . '.xlsx';
-
-            $view = view('filament.exports.stock-mutation-excel', [
-                'report' => $data,
-                'generated_at' => now(),
-            ]);
-
-            return Excel::download(
-                new GenericViewExport($view),
-                $filename
-            );
-
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Export Excel Gagal')
-                ->danger()
-                ->body('Terjadi kesalahan: ' . $e->getMessage())
-                ->send();
-        }
     }
 }

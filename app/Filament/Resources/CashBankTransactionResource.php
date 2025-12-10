@@ -33,6 +33,10 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\ActionGroup;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Section as InfolistSection;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\RepeatableEntry;
 
 class CashBankTransactionResource extends Resource
 {
@@ -369,6 +373,7 @@ class CashBankTransactionResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->color('primary'),
                     EditAction::make(),
                     TableAction::make('post_to_journal')
                         ->label('Posting ke Jurnal')
@@ -432,6 +437,78 @@ class CashBankTransactionResource extends Resource
             ));
     }
 
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                InfolistSection::make('Transaction Details')
+                    ->schema([
+                        TextEntry::make('number')->label('Transaction Number'),
+                        TextEntry::make('date')->date()->label('Transaction Date'),
+                        TextEntry::make('type')->label('Type')->badge(),
+                        TextEntry::make('amount')->money('IDR')->label('Amount'),
+                        TextEntry::make('accountCoa.code')->label('Account COA'),
+                        TextEntry::make('accountCoa.name')->label('Account Name'),
+                        TextEntry::make('offsetCoa.code')->label('Offset COA'),
+                        TextEntry::make('offsetCoa.name')->label('Offset Account'),
+                        TextEntry::make('counterparty')->label('Counterparty'),
+                        TextEntry::make('description'),
+                        TextEntry::make('voucher_number')->label('Voucher Number'),
+                        TextEntry::make('cabang.nama')->label('Branch'),
+                    ])->columns(2),
+                InfolistSection::make('Transaction Breakdown')
+                    ->schema([
+                        RepeatableEntry::make('transactionDetails')
+                            ->label('')
+                            ->schema([
+                                TextEntry::make('chartOfAccount.code')->label('COA'),
+                                TextEntry::make('chartOfAccount.name')->label('Account Name'),
+                                TextEntry::make('amount')->money('IDR')->label('Amount'),
+                                TextEntry::make('description')->label('Description'),
+                            ])->columns(4),
+                    ])
+                    ->columns(1)
+                    ->visible(function ($record) {
+                        return $record->transactionDetails()->exists();
+                    }),
+                InfolistSection::make('Journal Entries')
+                    ->headerActions([
+                        \Filament\Infolists\Components\Actions\Action::make('view_journal_entries')
+                            ->label('View All Journal Entries')
+                            ->icon('heroicon-o-document-text')
+                            ->color('primary')
+                            ->url(function ($record) {
+                                // Redirect to JournalEntryResource with filter for this transaction
+                                $sourceType = urlencode(\App\Models\CashBankTransaction::class);
+                                $sourceId = $record->id;
+
+                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}";
+                            })
+                            ->openUrlInNewTab()
+                            ->visible(function ($record) {
+                                return $record->journalEntries()->exists();
+                            }),
+                    ])
+                    ->schema([
+                        RepeatableEntry::make('journalEntries')
+                            ->label('')
+                            ->schema([
+                                TextEntry::make('date')->date()->label('Date'),
+                                TextEntry::make('coa.code')->label('COA'),
+                                TextEntry::make('coa.name')->label('Account Name'),
+                                TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
+                                TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                                TextEntry::make('description')->label('Description'),
+                                TextEntry::make('journal_type')->badge()->label('Type'),
+                            ])->columns(4),
+                    ])
+                    ->columns(1)
+                    ->visible(function ($record) {
+                        return $record->journalEntries()->exists();
+                    }),
+            ]);
+    }
+
     public static function getRelations(): array
     {
         return [];
@@ -442,6 +519,7 @@ class CashBankTransactionResource extends Resource
         return [
             'index' => Pages\ListCashBankTransactions::route('/'),
             'create' => Pages\CreateCashBankTransaction::route('/create'),
+            'view' => Pages\ViewCashBankTransaction::route('/{record}'),
             'edit' => Pages\EditCashBankTransaction::route('/{record}/edit'),
         ];
     }
