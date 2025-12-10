@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Filament\Resources\CashBankTransactionResource\Pages;
+namespace App\Filament\Resources\CashBankTransferResource\Pages;
 
-use App\Filament\Resources\CashBankTransactionResource;
+use App\Filament\Resources\CashBankTransferResource;
 use Filament\Actions;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
-class ViewCashBankTransaction extends ViewRecord
+class ViewCashBankTransfer extends ViewRecord
 {
-    protected static string $resource = CashBankTransactionResource::class;
+    protected static string $resource = CashBankTransferResource::class;
 
     protected function getHeaderActions(): array
     {

@@ -118,11 +118,11 @@ class CashBankTransferObserverTest extends TestCase
         $this->assertCount($originalJournalCount, $transfer->journalEntries);
 
         // Check updated amounts
-        $debitEntry = $transfer->journalEntries->where('type', 'debit')->first();
-        $this->assertEquals(2000000, $debitEntry->amount);
+        $debitEntry = $transfer->journalEntries->where('debit', '>', 0)->first();
+        $this->assertEquals(2000000, $debitEntry->debit);
 
-        $creditEntry = $transfer->journalEntries->where('type', 'credit')->first();
-        $this->assertEquals(2000000, $creditEntry->amount);
+        $creditEntry = $transfer->journalEntries->where('credit', '>', 0)->first();
+        $this->assertEquals(2000000, $creditEntry->credit);
     }
 
     #[Test]

@@ -27,6 +27,10 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Section as InfolistSection;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\RepeatableEntry;
 
 class CashBankTransferResource extends Resource
 {
@@ -148,6 +152,7 @@ class CashBankTransferResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->color('primary'),
                     EditAction::make(),
                     Action::make('view_reconciliation')->label('Lihat Rekonsiliasi Bank')->icon('heroicon-o-eye')
                         ->url(fn($record) => '/bank-reconciliations?tableFilters[coa_id][value]=' . ($record->fromCoa && str_starts_with($record->fromCoa->code, '111') ? $record->fromCoa->id : ($record->toCoa && str_starts_with($record->toCoa->code, '111') ? $record->toCoa->id : '')))
@@ -196,11 +201,73 @@ class CashBankTransferResource extends Resource
             ));
     }
 
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist->schema([
+            InfolistSection::make('Transfer Information')
+                ->schema([
+                    TextEntry::make('number')->label('Transfer Number'),
+                    TextEntry::make('date')->date('d/m/Y')->label('Transfer Date'),
+                    TextEntry::make('status')->badge()->label('Status'),
+                    TextEntry::make('amount')->money('IDR')->label('Transfer Amount'),
+                    TextEntry::make('other_costs')->money('IDR')->label('Other Costs')->placeholder('0'),
+                    TextEntry::make('description')->label('Description')->columnSpanFull(),
+                    TextEntry::make('reference')->label('Reference')->placeholder('-'),
+                ])->columns(2),
+            InfolistSection::make('Account Information')
+                ->schema([
+                    TextEntry::make('fromCoa.code')->label('From Account COA'),
+                    TextEntry::make('fromCoa.name')->label('From Account Name'),
+                    TextEntry::make('toCoa.code')->label('To Account COA'),
+                    TextEntry::make('toCoa.name')->label('To Account Name'),
+                    TextEntry::make('otherCostsCoa.code')->label('Other Costs COA')->placeholder('-'),
+                    TextEntry::make('otherCostsCoa.name')->label('Other Costs Account')->placeholder('-'),
+                ])->columns(2),
+            InfolistSection::make('Journal Entries')
+                ->headerActions([
+                    \Filament\Infolists\Components\Actions\Action::make('view_journal_entries')
+                        ->label('View All Journal Entries')
+                        ->icon('heroicon-o-document-text')
+                        ->color('primary')
+                        ->url(function ($record) {
+                            // Redirect to JournalEntryResource with filter for this transfer
+                            $sourceType = urlencode(\App\Models\CashBankTransfer::class);
+                            $sourceId = $record->id;
+
+                            return "/admin/journal-entries?tableFilters[source_type]={$sourceType}&tableFilters[source_id]={$sourceId}";
+                        })
+                        ->openUrlInNewTab()
+                        ->visible(function ($record) {
+                            return $record->journalEntries()->exists();
+                        }),
+                ])
+                ->schema([
+                    RepeatableEntry::make('journalEntries')
+                        ->label('')
+                        ->schema([
+                            TextEntry::make('date')->date()->label('Date'),
+                            TextEntry::make('coa.code')->label('COA'),
+                            TextEntry::make('coa.name')->label('Account Name'),
+                            TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
+                            TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                            TextEntry::make('description')->label('Description'),
+                            TextEntry::make('journal_type')->badge()->label('Type'),
+                        ])
+                        ->columns(7),
+                ])
+                ->columns(1)
+                ->visible(function ($record) {
+                    return $record->journalEntries()->exists();
+                }),
+        ]);
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListCashBankTransfers::route('/'),
             'create' => Pages\CreateCashBankTransfer::route('/create'),
+            'view' => Pages\ViewCashBankTransfer::route('/{record}'),
             'edit' => Pages\EditCashBankTransfer::route('/{record}/edit'),
         ];
     }

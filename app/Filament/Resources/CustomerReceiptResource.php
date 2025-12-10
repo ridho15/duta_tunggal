@@ -838,37 +838,6 @@ class CustomerReceiptResource extends Resource
                     ->columns(1)
                     ->visible(fn ($record) => $record->customerReceiptItem->count() > 0),
 
-                InfoSection::make('Informasi Invoice yang Dibayar')
-                    ->schema([
-                        TextEntry::make('customerReceiptItem')
-                            ->label('Invoice yang Dipilih')
-                            ->formatStateUsing(function ($state, $record) {
-                                $items = $record->customerReceiptItem;
-                                if ($items->isEmpty()) return 'Tidak ada';
-                                
-                                $invoiceNumbers = $items->map(function ($item) {
-                                    return $item->invoice ? $item->invoice->invoice_number : 'Invoice tidak ditemukan';
-                                });
-                                
-                                return $invoiceNumbers->join(', ');
-                            }),
-                        TextEntry::make('customerReceiptItem')
-                            ->label('Detail Pembayaran')
-                            ->formatStateUsing(function ($state, $record) {
-                                $items = $record->customerReceiptItem;
-                                if ($items->isEmpty()) return 'Tidak ada data';
-                                
-                                $details = $items->map(function ($item) {
-                                    $invoiceNumber = $item->invoice ? $item->invoice->invoice_number : 'Unknown Invoice';
-                                    return "$invoiceNumber: Rp " . number_format($item->amount, 0, ',', '.');
-                                });
-                                
-                                return implode("\n", $details->toArray());
-                            })
-                            ->html()
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(1),
             ]);
     }
 

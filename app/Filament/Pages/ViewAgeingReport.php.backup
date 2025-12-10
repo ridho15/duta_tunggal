@@ -83,39 +83,36 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
     {
         return $table
             ->query(function (Builder $query) {
-                if ($this->report_type === 'receivables') {
-                    $query = AccountReceivable::query()
-                        ->with(['customer', 'invoice', 'ageingSchedule', 'cabang'])
-                        ->where('remaining', '>', 0);
+                // Get all records and paginate them
+                $records = $this->getAllRecords();
+                $perPage = $this->getTableRecordsPerPage();
+                $currentPage = $this->getTablePage();
 
-                    if ($this->cabang_id) {
-                        $query->where('cabang_id', $this->cabang_id);
-                    }
+                $paginatedRecords = $records->forPage($currentPage, $perPage);
 
-                    return $query;
-                } elseif ($this->report_type === 'payables') {
-                    $query = AccountPayable::query()
-                        ->with(['supplier', 'invoice', 'ageingSchedule'])
-                        ->where('remaining', '>', 0);
+                // Create a simple query that we'll modify
+                $ids = $paginatedRecords->pluck('id')->toArray();
+                $types = $paginatedRecords->map(function ($record) {
+                    return $record instanceof AccountReceivable ? 'ar' : 'ap';
+                })->toArray();
 
-                    if ($this->cabang_id) {
-                        $query->whereHas('invoice', function($q) {
-                            $q->where('cabang_id', $this->cabang_id);
-                        });
-                    }
+                $arIds = array_filter($ids, function($id, $index) use ($types) {
+                    return isset($types[$index]) && $types[$index] === 'ar';
+                }, ARRAY_FILTER_USE_BOTH);
 
-                    return $query;
+                $apIds = array_filter($ids, function($id, $index) use ($types) {
+                    return isset($types[$index]) && $types[$index] === 'ap';
+                }, ARRAY_FILTER_USE_BOTH);
+
+                if (!empty($arIds) && !empty($apIds)) {
+                    return AccountReceivable::whereIn('id', $arIds)
+                        ->union(AccountPayable::whereIn('id', $apIds));
+                } elseif (!empty($arIds)) {
+                    return AccountReceivable::whereIn('id', $arIds);
+                } elseif (!empty($apIds)) {
+                    return AccountPayable::whereIn('id', $apIds);
                 } else {
-                    // For 'both', show AR records (AP will be shown separately in view)
-                    $query = AccountReceivable::query()
-                        ->with(['customer', 'invoice', 'ageingSchedule', 'cabang'])
-                        ->where('remaining', '>', 0);
-
-                    if ($this->cabang_id) {
-                        $query->where('cabang_id', $this->cabang_id);
-                    }
-
-                    return $query;
+                    return AccountReceivable::whereRaw('1 = 0');
                 }
             })
             ->columns([
@@ -176,6 +173,42 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
             ->defaultSort('invoice.due_date', 'asc')
             ->paginated([10, 25, 50, 100])
             ->poll('30s');
+    }
+
+    protected function getAllRecords()
+    {
+        $records = collect();
+
+        if ($this->report_type === 'receivables' || $this->report_type === 'both') {
+            $arQuery = AccountReceivable::with(['customer', 'invoice', 'ageingSchedule', 'cabang'])
+                ->where('remaining', '>', 0);
+
+            if ($this->cabang_id) {
+                $arQuery->where('cabang_id', $this->cabang_id);
+            }
+
+            $records = $records->merge($arQuery->get());
+        }
+
+        if ($this->report_type === 'payables' || $this->report_type === 'both') {
+            $apQuery = AccountPayable::with(['supplier', 'invoice', 'ageingSchedule'])
+                ->where('remaining', '>', 0);
+
+            if ($this->cabang_id) {
+                $apQuery->whereHas('invoice', function($q) {
+                    $q->where('cabang_id', $this->cabang_id);
+                });
+            }
+
+            $records = $records->merge($apQuery->get());
+        }
+
+        return $records;
+    }
+
+    protected function getTableRecordsCount(): int
+    {
+        return $this->getAllRecords()->count();
     }
 
     public function refreshData(): void
@@ -321,4 +354,3 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                 }),
         ];
     }
-}

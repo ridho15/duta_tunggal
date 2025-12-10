@@ -13,11 +13,10 @@ use App\Filament\Pages\IncomeStatementPage;
 use App\Filament\Pages\MyDashboard;
 use App\Filament\Pages\PurchaseReportPage;
 use App\Filament\Pages\SalesReportPage;
-use App\Filament\Pages\VendorCustomerSummaryPage;
 use App\Filament\Pages\ViewAgeingReport;
+use App\Filament\Resources\OtherSaleResource;
 use App\Filament\Resources\JournalEntryResource;
 use App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries;
-use App\Filament\Widgets\AssetStatsWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -44,6 +43,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->resources([
                 JournalEntryResource::class,
+                OtherSaleResource::class,
             ])
             // ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages') // Commented out to avoid Livewire component conflicts
             ->pages([

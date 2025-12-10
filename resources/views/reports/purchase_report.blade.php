@@ -84,52 +84,65 @@
             grid-template-columns: repeat(6, 1fr);
             gap: 10px;
         }
+        .summary-table {
+            border-collapse: collapse;
+            border: none;
+            width: 100%;
+        }
+        .summary-table td {
+            border: none;
+            padding: 0 7.5px; /* setengah dari gap sebelumnya 15px */
+        }
         .summary-item {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
+            background: white;
+            padding: 12px;
             border-radius: 6px;
             text-align: center;
-            border-left: 4px solid #fff;
-            transition: transform 0.2s;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
         }
         .summary-item:hover {
             transform: translateY(-2px);
         }
         .summary-item .icon {
             font-size: 16px;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .summary-item .value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
             display: block;
             margin-bottom: 5px;
         }
-        .summary-item .value {
-            font-size: 12px;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 3px;
-        }
         .summary-item .label {
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            color: #6c757d;
+            display: block;
+        }
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .summary-item:nth-child(1) {
-            border-left: 4px solid #28a745;
+            border-left: 4px solid #6c757d;
         }
         .summary-item:nth-child(1) .icon {
-            color: #28a745;
+            color: #6c757d;
         }
         .summary-item:nth-child(2) {
-            border-left: 4px solid #007bff;
+            border-left: 4px solid #28a745;
         }
         .summary-item:nth-child(2) .icon {
-            color: #007bff;
+            color: #28a745;
         }
         .summary-item:nth-child(3) {
-            border-left: 4px solid #6f42c1;
+            border-left: 4px solid #007bff;
         }
         .summary-item:nth-child(3) .icon {
-            color: #6f42c1;
+            color: #007bff;
         }
         .summary-item:nth-child(4) {
             border-left: 4px solid #17a2b8;
@@ -138,16 +151,16 @@
             color: #17a2b8;
         }
         .summary-item:nth-child(5) {
-            border-left: 4px solid #ffc107;
-        }
-        .summary-item:nth-child(5) .icon {
-            color: #ffc107;
-        }
-        .summary-item:nth-child(6) {
             border-left: 4px solid #dc3545;
         }
-        .summary-item:nth-child(6) .icon {
+        .summary-item:nth-child(5) .icon {
             color: #dc3545;
+        }
+        .summary-item:nth-child(6) {
+            border-left: 4px solid #6f42c1;
+        }
+        .summary-item:nth-child(6) .icon {
+            color: #6f42c1;
         }
         table {
             width: 100%;
@@ -241,38 +254,61 @@
 
     <div class="summary">
         <h3>📊 Ringkasan Laporan Pembelian</h3>
-        <div class="summary-grid">
-            <div class="summary-item">
-                <span class="icon">📋</span>
-                <span class="value">{{ $data->count() }}</span>
-                <span class="label">Total Transaksi</span>
-            </div>
-            <div class="summary-item">
-                <span class="icon">💰</span>
-                <span class="value">Rp {{ number_format($data->sum('total_amount'), 0, ',', '.') }}</span>
-                <span class="label">Total Nilai</span>
-            </div>
-            <div class="summary-item">
-                <span class="icon">📊</span>
-                <span class="value">Rp {{ $data->count() > 0 ? number_format($data->sum('total_amount') / $data->count(), 0, ',', '.') : '0' }}</span>
-                <span class="label">Rata-rata per Transaksi</span>
-            </div>
-            <div class="summary-item">
-                <span class="icon">✅</span>
-                <span class="value">{{ $data->where('status', 'confirmed')->count() }}</span>
-                <span class="label">Transaksi Confirmed</span>
-            </div>
-            <div class="summary-item">
-                <span class="icon">⏳</span>
-                <span class="value">{{ $data->where('status', 'processing')->count() }}</span>
-                <span class="label">Transaksi Processing</span>
-            </div>
-            <div class="summary-item">
-                <span class="icon">🚫</span>
-                <span class="value">{{ $data->where('status', 'cancelled')->count() }}</span>
-                <span class="label">Transaksi Cancelled</span>
-            </div>
-        </div>
+        <table class="summary-table">
+            <tbody>
+                <tr>
+                    <td class="summary-item">
+                        <span class="icon">📋</span>
+                        <span class="value">{{ $data->count() }}</span>
+                        <span class="label">Total Transaksi</span>
+                    </td>
+                    <td class="summary-item">
+                        <span class="icon">💰</span>
+                        <span class="value">Rp {{ number_format($data->sum('total_amount'), 0, ',', '.') }}</span>
+                        <span class="label">Total Nilai</span>
+                    </td>
+                    <td class="summary-item">
+                        <span class="icon">📊</span>
+                        <span class="value">Rp {{ $data->count() > 0 ? number_format($data->sum('total_amount') / $data->count(), 0, ',', '.') : '0' }}</span>
+                        <span class="label">Rata-rata per Transaksi</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="summary-item">
+                        <span class="icon">📝</span>
+                        <span class="value">{{ $data->where('status', 'draft')->count() }}</span>
+                        <span class="label">Draft</span>
+                    </td>
+                    <td class="summary-item">
+                        <span class="icon">✅</span>
+                        <span class="value">{{ $data->where('status', 'approved')->count() }}</span>
+                        <span class="label">Approved</span>
+                    </td>
+                    <td class="summary-item">
+                        <span class="icon">📦</span>
+                        <span class="value">{{ $data->where('status', 'partially_received')->count() }}</span>
+                        <span class="label">Partially Received</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="summary-item">
+                        <span class="icon">🎯</span>
+                        <span class="value">{{ $data->where('status', 'completed')->count() }}</span>
+                        <span class="label">Completed</span>
+                    </td>
+                    <td class="summary-item">
+                        <span class="icon">🔒</span>
+                        <span class="value">{{ $data->where('status', 'closed')->count() }}</span>
+                        <span class="label">Closed</span>
+                    </td>
+                    <td class="summary-item">
+                        <span class="icon">⏳</span>
+                        <span class="value">{{ $data->where('status', 'request_approval')->count() }}</span>
+                        <span class="label">Request Approval</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <table>

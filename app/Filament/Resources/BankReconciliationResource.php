@@ -11,9 +11,11 @@ use Filament\Forms\Form;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -140,9 +142,11 @@ class BankReconciliationResource extends Resource
             ])
             ->defaultSort('period_end', 'desc')
             ->actions([
-                ViewAction::make(),
-                EditAction::make(),
-            ])
+                ActionGroup::make([
+                    ViewAction::make()->color('primary'),
+                    EditAction::make()->color('success'),
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Rekonsiliasi Bank</summary>' .

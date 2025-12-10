@@ -10,6 +10,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Infolists\Components\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -17,7 +18,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
-use Filament\Support\RawJs;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Section as InfolistSection;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\Placeholder;
 use Filament\Tables\Enums\ActionsPosition;
 
 class AssetResource extends Resource
@@ -885,6 +890,82 @@ class AssetResource extends Resource
                     </div>
                 </details>
             '));
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist->schema([
+            InfolistSection::make('Asset Information')
+                ->schema([
+                    TextEntry::make('code')->label('Asset Code'),
+                    TextEntry::make('name')->label('Asset Name'),
+                    TextEntry::make('cabang.nama')->label('Branch'),
+                    TextEntry::make('purchase_date')->date('d/m/Y')->label('Purchase Date'),
+                    TextEntry::make('usage_date')->date('d/m/Y')->label('Usage Date'),
+                    TextEntry::make('purchase_cost')->money('IDR')->label('Purchase Cost'),
+                    TextEntry::make('salvage_value')->money('IDR')->label('Salvage Value'),
+                    TextEntry::make('useful_life_years')->label('Useful Life (Years)'),
+                    TextEntry::make('depreciation_method')->label('Depreciation Method'),
+                    TextEntry::make('status')->badge()->label('Status'),
+                    TextEntry::make('notes')->label('Notes')->columnSpanFull(),
+                ])->columns(2),
+            InfolistSection::make('Chart of Accounts')
+                ->schema([
+                    TextEntry::make('assetCoa.code')->label('Asset COA'),
+                    TextEntry::make('assetCoa.name')->label('Asset Account'),
+                    TextEntry::make('accumulatedDepreciationCoa.code')->label('Accumulated Depreciation COA'),
+                    TextEntry::make('accumulatedDepreciationCoa.name')->label('Accumulated Depreciation Account'),
+                    TextEntry::make('depreciationExpenseCoa.code')->label('Depreciation Expense COA'),
+                    TextEntry::make('depreciationExpenseCoa.name')->label('Depreciation Expense Account'),
+                ])->columns(2),
+            InfolistSection::make('Depreciation Information')
+                ->schema([
+                    TextEntry::make('annual_depreciation')->money('IDR')->label('Annual Depreciation'),
+                    TextEntry::make('monthly_depreciation')->money('IDR')->label('Monthly Depreciation'),
+                    TextEntry::make('accumulated_depreciation')->money('IDR')->label('Accumulated Depreciation'),
+                    TextEntry::make('book_value')->money('IDR')->label('Book Value'),
+                ])->columns(2),
+            InfolistSection::make('Journal Entries')
+                ->headerActions([
+                    \Filament\Infolists\Components\Actions\Action::make('view_journal_entries')
+                        ->label('View All Journal Entries')
+                        ->icon('heroicon-o-document-text')
+                        ->color('primary')
+                        ->url(function ($record) {
+                            // Redirect to JournalEntryResource with filter for this asset
+                            $sourceType = urlencode(\App\Models\Asset::class);
+                            $sourceId = $record->id;
+
+                            return "/admin/journal-entries?tableFilters[source_type]={$sourceType}&tableFilters[source_id]={$sourceId}";
+                        })
+                        ->openUrlInNewTab()
+                        ->visible(function ($record) {
+                            return $record->journalEntries()->exists();
+                        }),
+                ])
+                ->schema([
+                    RepeatableEntry::make('journalEntries')
+                        ->label('')
+                        ->schema([
+                            TextEntry::make('date')->date()->label('Date'),
+                            TextEntry::make('coa.code')->label('COA'),
+                            TextEntry::make('coa.name')->label('Account Name'),
+                            TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
+                            TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                            TextEntry::make('description')->label('Description'),
+                            TextEntry::make('journal_type')->badge()->label('Type')->formatStateUsing(fn(string $state): string => match ($state) {
+                                'asset_acquisition' => 'Asset Acquisition',
+                                'asset_depreciation' => 'Asset Depreciation',
+                                default => $state,
+                            }),
+                        ])
+                        ->columns(7),
+                ])
+                ->columns(1)
+                ->visible(function ($record) {
+                    return $record->journalEntries()->exists();
+                }),
+        ]);
     }
 
     public static function getRelations(): array

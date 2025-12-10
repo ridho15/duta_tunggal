@@ -52,3 +52,5 @@ Route::get('exports/download/{filename}', function ($filename) {
 
     return response()->download($path, $filename)->deleteFileAfterSend(true);
 })->name('exports.download');
+
+

@@ -19,6 +19,9 @@ use App\Services\IncomeStatementService;
 use App\Models\Cabang;
 use App\Models\IncomeStatementItem;
 use Filament\Notifications\Notification;
+use App\Exports\IncomeStatementExport;
+use App\Exports\IncomeStatementPdfExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class IncomeStatementPage extends Page implements HasForms, HasTable
 {
@@ -140,6 +143,39 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
                     ->icon('heroicon-o-document-chart-bar')
                     ->action(function () {
                         $this->generateReport();
+                    }),
+                Action::make('export_excel')
+                    ->label('Export Excel')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->visible(fn () => IncomeStatementItem::count() > 0)
+                    ->action(function () {
+                        $data = $this->form->getState();
+                        return Excel::download(
+                            new IncomeStatementExport(
+                                $data['start_date'],
+                                $data['end_date'],
+                                $data['cabang_id'] ?? null
+                            ),
+                            'laporan-laba-rugi-' . now()->format('Y-m-d') . '.xlsx'
+                        );
+                    }),
+                Action::make('export_pdf')
+                    ->label('Export PDF')
+                    ->icon('heroicon-o-document')
+                    ->color('danger')
+                    ->visible(fn () => IncomeStatementItem::count() > 0)
+                    ->action(function () {
+                        $data = $this->form->getState();
+                        $pdfExport = new IncomeStatementPdfExport(
+                            $data['start_date'],
+                            $data['end_date'],
+                            $data['cabang_id'] ?? null
+                        );
+                        $pdf = $pdfExport->generatePdf();
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->output();
+                        }, 'laporan-laba-rugi-' . now()->format('Y-m-d') . '.pdf');
                     }),
             ])
             ->paginated(false);

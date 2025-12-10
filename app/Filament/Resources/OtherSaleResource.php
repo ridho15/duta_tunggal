@@ -282,6 +282,7 @@ class OtherSaleResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->color('primary'),
                     Tables\Actions\Action::make('post_journal')
                         ->label('Post Journal')
                         ->icon('heroicon-o-document-plus')
@@ -351,6 +352,7 @@ class OtherSaleResource extends Resource
         return [
             'index' => Pages\ListOtherSales::route('/'),
             'create' => Pages\CreateOtherSale::route('/create'),
+            'view' => Pages\ViewOtherSale::route('/{record}'),
             'edit' => Pages\EditOtherSale::route('/{record}/edit'),
         ];
     }

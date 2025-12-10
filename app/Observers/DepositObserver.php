@@ -17,7 +17,7 @@ class DepositObserver
         $deposit->depositLog()->create([
             'type' => 'create',
             'amount' => $deposit->amount,
-            'created_by' => Auth::user()->id
+            'created_by' => Auth::user()->id ?? $deposit->created_by
         ]);
 
         // Post deposit to ledger to ensure journal entries exist for all creation paths
