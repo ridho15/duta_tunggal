@@ -87,7 +87,33 @@ class InvoiceObserver
             'changed_attributes' => $invoice->getChanges(),
         ]);
 
-        // When invoice status becomes 'paid', post to ledger
+        // Check if critical financial fields changed (amounts, dates, etc.)
+        $financialFields = ['subtotal', 'total', 'ppn_rate', 'invoice_date', 'other_fee'];
+        $financialChanged = false;
+        foreach ($financialFields as $field) {
+            if ($invoice->wasChanged($field)) {
+                $financialChanged = true;
+                break;
+            }
+        }
+
+        // If financial fields changed, reverse existing journal entries and re-post
+        if ($financialChanged) {
+            Log::info('Invoice financial fields changed, reversing and re-posting journal entries', [
+                'invoice_id' => $invoice->id,
+                'changed_fields' => array_intersect_key($invoice->getChanges(), array_flip($financialFields))
+            ]);
+
+            // Delete existing journal entries
+            \App\Models\JournalEntry::where('source_type', Invoice::class)
+                ->where('source_id', $invoice->id)
+                ->delete();
+
+            // Re-post journal entries with new amounts
+            $this->ledger->postInvoice($invoice);
+        }
+
+        // When invoice status becomes 'paid', post to ledger (if not already posted)
         if (strtolower($invoice->status) === 'paid') {
             $this->ledger->postInvoice($invoice);
         }
@@ -107,6 +133,19 @@ class InvoiceObserver
                 $accountReceivable->delete(); // Asumsikan AccountReceivable juga punya logic serupa
             }
         }
+    }
+
+    public function deleted(Invoice $invoice)
+    {
+        // Hapus journal entries yang terkait dengan invoice yang dihapus
+        \App\Models\JournalEntry::where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->delete();
+
+        Log::info('Invoice deleted, related journal entries cleaned up', [
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+        ]);
     }
 
     protected function postSalesInvoice(Invoice $invoice)

@@ -62,7 +62,8 @@ class ProductionPlanResource extends Resource
                             ->unique(ignoreRecord: true)
                             ->validationMessages([
                                 'required' => 'Nomor rencana tidak boleh kosong',
-                                'unique' => 'Nomor rencana sudah digunakan'
+                                'unique' => 'Nomor rencana sudah digunakan',
+                                'max' => 'Nomor rencana maksimal 255 karakter'
                             ])
                             ->suffixAction(FormAction::make('generatePlanNumber')
                                 ->icon('heroicon-m-arrow-path')
@@ -92,6 +93,9 @@ class ProductionPlanResource extends Resource
                             ])
                             ->default('manual')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Sumber produksi harus dipilih'
+                            ])
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 // Reset dependent fields when source type changes
@@ -111,6 +115,9 @@ class ProductionPlanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Pesanan penjualan harus dipilih'
+                            ])
                             ->visible(fn($get) => $get('source_type') === 'sale_order')
                             ->reactive()
                             ->dehydrated()
@@ -132,6 +139,9 @@ class ProductionPlanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Formula produksi (BOM) harus dipilih'
+                            ])
                             ->visible(fn($get) => $get('source_type') === 'manual')
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
@@ -204,6 +214,9 @@ class ProductionPlanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Produk harus dipilih'
+                            ])
                             ->reactive()
                             ->disabled(fn($get) => $get('source_type') === 'manual')
                             ->dehydrated()
@@ -233,7 +246,8 @@ class ProductionPlanResource extends Resource
                             ->required()
                             ->validationMessages([
                                 'required' => 'Kuantitas tidak boleh kosong',
-                                'numeric' => 'Kuantitas harus berupa angka'
+                                'numeric' => 'Kuantitas harus berupa angka',
+                                'min' => 'Kuantitas minimal 0.01'
                             ])
                             ->minValue(0.01)
                             ->disabled(fn($get) => $get('source_type') === 'sale_order')
@@ -245,6 +259,9 @@ class ProductionPlanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Satuan harus dipilih'
+                            ])
                             ->getOptionLabelFromRecordUsing(function ($record) {
                                 return $record ? $record->name . ' (' . $record->abbreviation . ')' : '-';
                             })
@@ -305,7 +322,8 @@ class ProductionPlanResource extends Resource
                             ->label('Tanggal Selesai')
                             ->required()
                             ->validationMessages([
-                                'required' => 'Tanggal selesai tidak boleh kosong'
+                                'required' => 'Tanggal selesai tidak boleh kosong',
+                                'after' => 'Tanggal selesai harus setelah tanggal mulai'
                             ])
                             ->after('start_date'),
 

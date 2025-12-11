@@ -21,6 +21,7 @@ use App\Models\VoucherRequest;
 use App\Models\Asset;
 use App\Models\SaleOrder;
 use App\Models\PurchaseReturn;
+use App\Models\OtherSale;
 use App\Observers\PurchaseReturnObserver;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
@@ -53,6 +54,7 @@ use App\Observers\PurchaseReceiptItemObserver;
 use App\Observers\PurchaseOrderObserver;
 use App\Observers\PurchaseOrderItemObserver;
 use App\Observers\CashBankTransferObserver;
+use App\Observers\OtherSaleObserver;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
@@ -189,5 +191,6 @@ class AppServiceProvider extends ServiceProvider
         JournalEntry::observe(JournalEntryObserver::class);
         QualityControl::observe(QualityControlObserver::class);
         CashBankTransfer::observe(CashBankTransferObserver::class);
+        OtherSale::observe(OtherSaleObserver::class);
     }
 }

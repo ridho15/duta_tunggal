@@ -22,6 +22,7 @@ use App\Models\StockMovement;
 use App\Services\LedgerPostingService;
 use App\Services\PurchaseReceiptService;
 use App\Services\QualityControlService;
+use Database\Seeders\CabangSeeder;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
@@ -41,6 +42,7 @@ class PurchaseReceiptFlowTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(CabangSeeder::class);
         $this->seed(ChartOfAccountSeeder::class);
 
         $this->user = User::factory()->create();

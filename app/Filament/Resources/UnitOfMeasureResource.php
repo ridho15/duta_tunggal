@@ -42,10 +42,18 @@ class UnitOfMeasureResource extends Resource
                         TextInput::make('name')
                             ->required()
                             ->label('Nama')
+                            ->validationMessages([
+                                'required' => 'Nama satuan tidak boleh kosong',
+                                'max' => 'Nama satuan maksimal 255 karakter'
+                            ])
                             ->maxLength(255),
                         TextInput::make('abbreviation')
                             ->label('Satuan')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Satuan tidak boleh kosong',
+                                'max' => 'Satuan maksimal 255 karakter'
+                            ])
                             ->maxLength(255),
                     ])
             ]);

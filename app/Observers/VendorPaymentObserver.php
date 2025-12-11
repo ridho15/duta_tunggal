@@ -17,9 +17,17 @@ class VendorPaymentObserver
 
     public function updated(VendorPayment $payment)
     {
-        // Post journal for both partial and full payments
+        // Handle amount changes - reverse old journals and post new ones
+        if ($payment->wasChanged('total_payment') && $payment->journalEntries()->exists()) {
+            $this->reverseJournalEntries($payment);
+            // Re-post with new amount if payment is still active
+            if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
+                $this->ledger->postVendorPayment($payment);
+            }
+        }
+        
+        // Post journal for both partial and full payments (only if no journals exist)
         if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
-            // Avoid double posting journals: only post if none exist yet
             if (!$payment->journalEntries()->exists()) {
                 $this->ledger->postVendorPayment($payment);
             }
@@ -33,6 +41,11 @@ class VendorPaymentObserver
 
     public function created(VendorPayment $payment)
     {
+        // Validate payment amount against remaining balances before creating details
+        if (!empty($payment->selected_invoices)) {
+            $this->validatePaymentAmount($payment);
+        }
+
         // Create VendorPaymentDetail from selected_invoices if none exist
         if ($payment->vendorPaymentDetail()->count() == 0 && !empty($payment->selected_invoices)) {
             $this->createPaymentDetailsFromSelectedInvoices($payment);
@@ -57,8 +70,8 @@ class VendorPaymentObserver
         // Reverse account payable updates when payment is deleted
         $this->reverseAccountPayableAndInvoiceStatus($payment);
 
-        // Soft delete related journal entries for data consistency
-        $payment->journalEntries()->delete();
+        // Reverse journal entries when payment is deleted
+        $this->reverseJournalEntries($payment);
 
         // Soft delete related vendor payment details
         $payment->vendorPaymentDetail()->delete();
@@ -78,9 +91,14 @@ class VendorPaymentObserver
             if (!$accountPayable) {
                 throw new \Exception("Account payable not found for invoice {$invoiceId}");
             }
-            
+
             // Recalculate paid and remaining based on all payment details for this invoice
-            $totalPaidForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)->sum('amount');
+            $totalPaidForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+                ->whereHas('vendorPayment', function($query) {
+                    $query->whereIn('status', ['partial', 'paid']);
+                })
+                ->sum('amount');
+
             $newPaid = min($totalPaidForInvoice, $accountPayable->total);
             $newRemaining = max(0, $accountPayable->total - $newPaid);
 
@@ -126,6 +144,59 @@ class VendorPaymentObserver
                 $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : 'unpaid');
                 $accountPayable->invoice->save();
             }
+        }
+    }
+
+    protected function reverseJournalEntries(VendorPayment $payment)
+    {
+        // Delete existing journal entries to prepare for re-posting
+        $payment->journalEntries()->delete();
+    }
+
+    protected function validatePaymentAmount(VendorPayment $payment)
+    {
+        $selectedInvoices = $payment->selected_invoices;
+        if (!$selectedInvoices) {
+            return;
+        }
+
+        if (!is_array($selectedInvoices)) {
+            $selectedInvoices = json_decode($selectedInvoices, true) ?? [];
+        }
+
+        if (empty($selectedInvoices)) {
+            return;
+        }
+
+        // Extract invoice IDs
+        $invoiceIds = [];
+        foreach ($selectedInvoices as $item) {
+            if (is_numeric($item)) {
+                $invoiceIds[] = (int) $item;
+            } elseif (is_array($item) && isset($item['invoice_id'])) {
+                $invoiceIds[] = (int) $item['invoice_id'];
+            } elseif (is_object($item) && isset($item->invoice_id)) {
+                $invoiceIds[] = (int) $item->invoice_id;
+            }
+        }
+
+        $invoiceIds = array_unique($invoiceIds);
+
+        if (empty($invoiceIds)) {
+            return;
+        }
+
+        // Calculate total remaining balance
+        $totalRemaining = \App\Models\Invoice::whereIn('id', $invoiceIds)
+            ->with('accountPayable')
+            ->get()
+            ->sum(function ($invoice) {
+                return $invoice->accountPayable->remaining ?? $invoice->total;
+            });
+
+        // Check if payment amount exceeds total remaining balance
+        if ($payment->total_payment > $totalRemaining) {
+            throw new \Exception("Payment amount ({$payment->total_payment}) exceeds total remaining balance ({$totalRemaining}). Overpayment is not allowed.");
         }
     }
 

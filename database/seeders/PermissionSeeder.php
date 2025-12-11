@@ -41,5 +41,13 @@ class PermissionSeeder extends Seeder
                 'guard_name' => 'web'
             ]);
         }
+
+        // Ensure warehouse approval permission exists for material issue tests
+        Permission::updateOrCreate([
+            'name' => 'approve warehouse'
+        ], [
+            'name' => 'approve warehouse',
+            'guard_name' => 'web'
+        ]);
     }
 }

@@ -185,11 +185,18 @@ class QualityControlService
             ]);
         }
 
-        if ($qualityControl->from_model_type == 'App\Models\Production' && $qualityControl->passed_quantity >= $qualityControl->fromModel->manufacturingOrder->quantity) {
-            $qualityControl->fromModel->manufacturingOrder->update([
-                'status' => 'completed'
-            ]);
-            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing Completed");
+        // Load manufacturing order relationship only for Production model
+        if ($qualityControl->from_model_type == 'App\Models\Production') {
+            $qualityControl->fromModel->load('manufacturingOrder.productionPlan');
+
+            if ($qualityControl->passed_quantity >= $qualityControl->fromModel->manufacturingOrder->productionPlan->quantity) {
+                echo "passed_quantity: {$qualityControl->passed_quantity}, plan_quantity: {$qualityControl->fromModel->manufacturingOrder->productionPlan->quantity}\n";
+                echo "Completing MO: passed_quantity {$qualityControl->passed_quantity} >= plan_quantity {$qualityControl->fromModel->manufacturingOrder->productionPlan->quantity}\n";
+                $qualityControl->fromModel->manufacturingOrder->update([
+                    'status' => 'completed'
+                ]);
+                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing Completed");
+            }
         }
 
         $qualityControl->update([
@@ -667,6 +674,12 @@ class QualityControlService
                 'from_model_type' => QualityControl::class,
                 'from_model_id' => $qualityControl->id,
             ]);
+        }
+
+        // Update production status to finished only if all quantity passed QC
+        if ($passedQuantity >= $production->quantity_produced) {
+            $production->status = 'finished';
+            $production->save();
         }
     }
 }

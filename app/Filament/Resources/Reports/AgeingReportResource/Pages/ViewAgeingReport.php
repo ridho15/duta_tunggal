@@ -17,14 +17,21 @@ use Filament\Forms\Components\Card;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Get;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\AgeingReportExport;
 use App\Exports\AgeingReportPdfExport;
 use Barryvdh\DomPDF\Facade\Pdf as DomPdf;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
-class ViewAgeingReport extends Page
+class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 {
+    use Tables\Concerns\InteractsWithTable;
     protected static string $resource = AgeingReportResource::class;
     protected static string $view = 'filament.pages.reports.ageing-report';
 
@@ -47,7 +54,7 @@ class ViewAgeingReport extends Page
                         ->label('Branch')
                         ->options(Cabang::pluck('nama', 'id'))
                         ->searchable()
-                        ->visible(fn() => auth()->user()->hasRole('super_admin')),
+                        ->visible(fn() => Auth::user()->hasRole('super_admin')),
 
                     Radio::make('report_type')
                         ->label('Report Type')
@@ -281,5 +288,104 @@ class ViewAgeingReport extends Page
             $q->where('due_date', '<=', $futureDate)
                 ->where('due_date', '>=', now());
         })->sum('remaining');
+    }
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(function (Builder $query) {
+                if ($this->report_type === 'receivables') {
+                    $query = AccountReceivable::query()
+                        ->with(['customer', 'invoice', 'ageingSchedule', 'cabang'])
+                        ->where('remaining', '>', 0);
+
+                    if ($this->cabang_id) {
+                        $query->where('cabang_id', $this->cabang_id);
+                    }
+
+                    return $query;
+                } elseif ($this->report_type === 'payables') {
+                    $query = AccountPayable::query()
+                        ->with(['supplier', 'invoice', 'ageingSchedule'])
+                        ->where('remaining', '>', 0);
+
+                    if ($this->cabang_id) {
+                        $query->whereHas('invoice', function($q) {
+                            $q->where('cabang_id', $this->cabang_id);
+                        });
+                    }
+
+                    return $query;
+                } else {
+                    // For 'both', show AR records (AP will be shown separately in view)
+                    $query = AccountReceivable::query()
+                        ->with(['customer', 'invoice', 'ageingSchedule', 'cabang'])
+                        ->where('remaining', '>', 0);
+
+                    if ($this->cabang_id) {
+                        $query->where('cabang_id', $this->cabang_id);
+                    }
+
+                    return $query;
+                }
+            })
+            ->columns([
+                TextColumn::make('customer_supplier_name')
+                    ->label('Customer/Supplier')
+                    ->getStateUsing(function ($record) {
+                        if ($record instanceof AccountReceivable) {
+                            return $record->customer->name ?? '-';
+                        } else {
+                            return $record->supplier->name ?? '-';
+                        }
+                    })
+                    ->searchable(),
+
+                TextColumn::make('invoice.no_invoice')
+                    ->label('Invoice')
+                    ->searchable(),
+
+                TextColumn::make('invoice.invoice_date')
+                    ->label('Invoice Date')
+                    ->date('d/m/Y')
+                    ->sortable(),
+
+                TextColumn::make('invoice.due_date')
+                    ->label('Due Date')
+                    ->date('d/m/Y')
+                    ->sortable(),
+
+                TextColumn::make('days_outstanding')
+                    ->label('Days Outstanding')
+                    ->getStateUsing(function ($record) {
+                        return $this->calculateDaysOutstanding($record);
+                    }),
+
+                TextColumn::make('remaining')
+                    ->label('Remaining Amount')
+                    ->money('IDR')
+                    ->sortable(),
+
+                BadgeColumn::make('aging_bucket')
+                    ->label('Aging Bucket')
+                    ->getStateUsing(function ($record) {
+                        return $this->calculateBucket($record);
+                    })
+                    ->colors([
+                        'success' => 'Current',
+                        'warning' => '31–60',
+                        'orange' => '61–90',
+                        'danger' => '>90',
+                    ]),
+
+                BadgeColumn::make('status')
+                    ->colors([
+                        'success' => 'Lunas',
+                        'warning' => fn ($state) => !in_array($state, ['Lunas']),
+                    ]),
+            ])
+            ->defaultSort('invoice.due_date', 'asc')
+            ->paginated([10, 25, 50, 100])
+            ->poll('30s');
     }
 }

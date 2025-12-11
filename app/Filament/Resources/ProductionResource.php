@@ -49,6 +49,11 @@ class ProductionResource extends Resource
                             ->reactive()
                             ->unique(ignoreRecord: true)
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Nomor produksi tidak boleh kosong',
+                                'unique' => 'Nomor produksi sudah digunakan',
+                                'max' => 'Nomor produksi maksimal 255 karakter'
+                            ])
                             ->suffixAction(Action::make('generateProductionNumber')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
                                 ->tooltip('Generate Production Number')
@@ -63,9 +68,15 @@ class ProductionResource extends Resource
                             ->disabled()
                             ->searchable()
                             ->relationship('manufacturingOrder', 'mo_number')
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Manufacturing Order harus dipilih'
+                            ]),
                         DatePicker::make('production_date')
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Tanggal produksi tidak boleh kosong'
+                            ]),
                     ])
             ]);
     }

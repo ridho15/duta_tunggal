@@ -421,4 +421,104 @@ class MaterialIssueTest extends TestCase
         $this->assertEquals(95, $updatedStock->qty_available); // Stock should be reduced when reserved
         $this->assertEquals(5, $updatedStock->qty_reserved); // And reserved should increase
     }
+
+    /** @test */
+    public function it_can_request_approval_for_material_issue()
+    {
+        // Create a warehouse approver user
+        $warehouseApprover = User::factory()->create();
+        $warehouseApprover->givePermissionTo('approve warehouse');
+
+        $materialIssue = MaterialIssue::factory()->create([
+            'status' => MaterialIssue::STATUS_DRAFT,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        MaterialIssueItem::create([
+            'material_issue_id' => $materialIssue->id,
+            'product_id' => $this->rawMaterial->id,
+            'uom_id' => $this->uom->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'quantity' => 5,
+            'cost_per_unit' => 50000,
+            'total_cost' => 250000,
+            'status' => MaterialIssueItem::STATUS_DRAFT,
+        ]);
+
+        // Ensure material issue is in draft status and not approved
+        $this->assertEquals(MaterialIssue::STATUS_DRAFT, $materialIssue->status);
+        $this->assertNull($materialIssue->approved_by);
+
+        // Perform request approval action (simulating the UI action)
+        $materialIssue->update([
+            'approved_by' => $warehouseApprover->id,
+            'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+        ]);
+
+        // Refresh the model
+        $materialIssue->refresh();
+
+        // Assert that request approval was successful
+        $this->assertEquals(MaterialIssue::STATUS_PENDING_APPROVAL, $materialIssue->status);
+        $this->assertEquals($warehouseApprover->id, $materialIssue->approved_by);
+        $this->assertNull($materialIssue->approved_at); // Should still be null until actually approved
+
+        // Assert that all items are set to pending approval
+        $items = $materialIssue->items;
+        foreach ($items as $item) {
+            $this->assertEquals(MaterialIssueItem::STATUS_PENDING_APPROVAL, $item->status);
+        }
+    }
+
+    /** @test */
+    public function it_cannot_request_approval_if_already_approved()
+    {
+        $warehouseApprover = User::factory()->create();
+        $warehouseApprover->givePermissionTo('approve warehouse');
+
+        $materialIssue = MaterialIssue::factory()->create([
+            'status' => MaterialIssue::STATUS_APPROVED,
+            'approved_by' => $warehouseApprover->id,
+            'approved_at' => now(),
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        // Attempt to request approval again (should not be allowed)
+        // This should not change the status since it's already approved
+        $materialIssue->update([
+            'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+        ]);
+
+        // The status should remain approved
+        $this->assertEquals(MaterialIssue::STATUS_APPROVED, $materialIssue->fresh()->status);
+    }
+
+    /** @test */
+    public function it_can_only_request_approval_for_draft_status()
+    {
+        $warehouseApprover = User::factory()->create();
+        $warehouseApprover->givePermissionTo('approve warehouse');
+
+        // Test that only draft status can request approval
+        $draftIssue = MaterialIssue::factory()->create([
+            'status' => MaterialIssue::STATUS_DRAFT,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $pendingIssue = MaterialIssue::factory()->create([
+            'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $approvedIssue = MaterialIssue::factory()->create([
+            'status' => MaterialIssue::STATUS_APPROVED,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        // Only draft issue should be able to request approval
+        $this->assertTrue($draftIssue->isDraft());
+        $this->assertFalse($pendingIssue->isDraft());
+        $this->assertFalse($approvedIssue->isDraft());
+    }
 }

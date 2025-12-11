@@ -529,6 +529,15 @@ class JournalEntryResource extends Resource
                                             }
                                         }
 
+                                        // Special handling for Invoice to differentiate Purchase vs Sales
+                                        if ($record->source_type === 'App\\Models\\Invoice' && $record->source) {
+                                            if ($record->source->from_model_type === 'App\\Models\\PurchaseOrder') {
+                                                return 'Purchase Invoice';
+                                            } elseif ($record->source->from_model_type === 'App\\Models\\SaleOrder') {
+                                                return 'Sales Invoice';
+                                            }
+                                        }
+
                                         return match ($record->source_type) {
                                             'App\\Models\\PurchaseOrder' => 'Purchase Order',
                                             'App\\Models\\SaleOrder' => 'Sales Order',
@@ -560,6 +569,15 @@ class JournalEntryResource extends Resource
                                                 return 'warning'; // Manufacture
                                             } elseif ($record->source->from_model_type === 'App\\Models\\PurchaseReceiptItem') {
                                                 return 'purple'; // Purchase
+                                            }
+                                        }
+
+                                        // Special handling for Invoice to differentiate Purchase vs Sales
+                                        if ($record->source_type === 'App\\Models\\Invoice' && $record->source) {
+                                            if ($record->source->from_model_type === 'App\\Models\\PurchaseOrder') {
+                                                return 'success'; // Purchase Invoice
+                                            } elseif ($record->source->from_model_type === 'App\\Models\\SaleOrder') {
+                                                return 'info'; // Sales Invoice
                                             }
                                         }
 
@@ -618,6 +636,14 @@ class JournalEntryResource extends Resource
                                                     return "PUR-{$qcNumber}"; // Purchase QC
                                                 }
                                                 return $qcNumber; // Fallback
+                                            case 'App\\Models\\Invoice':
+                                                $prefix = '';
+                                                if ($source->from_model_type === 'App\\Models\\PurchaseOrder') {
+                                                    $prefix = 'PUR-';
+                                                } elseif ($source->from_model_type === 'App\\Models\\SaleOrder') {
+                                                    $prefix = 'SAL-';
+                                                }
+                                                return $prefix . ($source->invoice_number ?: 'N/A');
                                             case 'App\\Models\\OtherSale':
                                                 return $source->reference_number ?: 'N/A';
                                             case 'App\\Models\\StockOpname':
@@ -692,6 +718,17 @@ class JournalEntryResource extends Resource
                                                     $qcType = 'Purchase';
                                                 }
                                                 return "QC {$qcType}: {$qcNumber} - {$productName}";
+                                            case 'App\\Models\\Invoice':
+                                                $prefix = '';
+                                                $partyName = '';
+                                                if ($source->from_model_type === 'App\\Models\\PurchaseOrder') {
+                                                    $prefix = 'Purchase Invoice';
+                                                    $partyName = $source->supplier ? $source->supplier->name : 'N/A';
+                                                } elseif ($source->from_model_type === 'App\\Models\\SaleOrder') {
+                                                    $prefix = 'Sales Invoice';
+                                                    $partyName = $source->customer ? $source->customer->name : 'N/A';
+                                                }
+                                                return "{$prefix}: {$source->invoice_number} - {$partyName}";
                                             case 'App\\Models\\OtherSale':
                                                 $customerName = $source->customer ? $source->customer->name : 'N/A';
                                                 return "Other Sale: {$source->reference_number} - {$customerName}";
@@ -746,16 +783,21 @@ class JournalEntryResource extends Resource
                                             // Check if route exists for this source type
                                             try {
                                                 $url = match($record->source_type) {
-                                                    'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
                                                     'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->source_id),
+                                                    'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
                                                     'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->source_id),
                                                     'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $record->source_id),
                                                     'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $record->source_id),
+                                                    'App\\Models\\VendorPayment' => route('filament.admin.resources.vendor-payments.view', $record->source_id),
                                                     'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $record->source_id),
+                                                    'App\\Models\\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $record->source_id),
+                                                    'App\\Models\\CashBankTransaction' => route('filament.admin.resources.cash-bank-transactions.view', $record->source_id),
+                                                    'App\\Models\\CashBankTransfer' => route('filament.admin.resources.cash-bank-transfers.view', $record->source_id),
+                                                    'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
                                                     'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $record->source_id),
                                                     'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $record->source_id),
+                                                    'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $record->source_id),
                                                     'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
-                                                    'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
                                                     'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
                                                     default => null,
                                                 };
@@ -929,6 +971,17 @@ class JournalEntryResource extends Resource
                                 return $qcNumber; // Fallback
                             }
 
+                            // Special handling for Invoice to differentiate Purchase vs Sales
+                            if ($record->source_type === 'App\\Models\\Invoice') {
+                                $prefix = '';
+                                if ($model->from_model_type === 'App\\Models\\PurchaseOrder') {
+                                    $prefix = 'PUR-';
+                                } elseif ($model->from_model_type === 'App\\Models\\SaleOrder') {
+                                    $prefix = 'SAL-';
+                                }
+                                return $prefix . ($model->invoice_number ?: 'N/A');
+                            }
+
                             $displayField = match($record->source_type) {
                                 'App\\Models\\PurchaseOrder' => 'po_number',
                                 'App\\Models\\SaleOrder' => 'so_number',
@@ -1088,9 +1141,19 @@ class JournalEntryResource extends Resource
                             // Map source_type to resource URL
                             $url = match($sourceType) {
                                 'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $sourceId),
+                                'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $sourceId),
+                                'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $sourceId),
                                 'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $sourceId),
+                                'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $sourceId),
+                                'App\\Models\\VendorPayment' => route('filament.admin.resources.vendor-payments.view', $sourceId),
                                 'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $sourceId),
+                                'App\\Models\\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $sourceId),
+                                'App\\Models\\CashBankTransaction' => route('filament.admin.resources.cash-bank-transactions.view', $sourceId),
+                                'App\\Models\\CashBankTransfer' => route('filament.admin.resources.cash-bank-transfers.view', $sourceId),
+                                'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $sourceId),
                                 'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $sourceId),
+                                'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $sourceId),
+                                'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $sourceId),
                                 'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
                                 'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
                                 default => null

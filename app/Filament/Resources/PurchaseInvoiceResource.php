@@ -311,17 +311,17 @@ class PurchaseInvoiceResource extends Resource
                                                 if ($purchaseOrderItem) {
                                                     // Calculate price after discount and tax (both are percentages)
                                                     // Use local variable to avoid double accumulation bug
-                                                    $itemSubtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
-                                                    $discountAmount = $itemSubtotal * ($purchaseOrderItem->discount / 100);
-                                                    $afterDiscount = $itemSubtotal - $discountAmount;
+                                                    $unitPrice = $purchaseOrderItem->unit_price;
+                                                    $discountAmount = $unitPrice * ($purchaseOrderItem->discount / 100);
+                                                    $afterDiscount = $unitPrice - $discountAmount;
                                                     $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
-                                                    $price = $afterDiscount + $taxAmount;
-                                                    $total = $price;
+                                                    $finalUnitPrice = $afterDiscount + $taxAmount;
+                                                    $total = $finalUnitPrice * $item->qty_accepted;
                                                     
                                                     $items[] = [
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->qty_accepted,
-                                                        'price' => $price,
+                                                        'price' => $finalUnitPrice,
                                                         'total' => $total
                                                     ];
                                                     

@@ -74,9 +74,10 @@ class QualityControlObserver
         if ($qualityControl->wasChanged('passed_quantity')) {
             $this->syncJournalEntries($qualityControl);
         }
-        // Sync journal entries when passed_quantity changes
-        if ($qualityControl->wasChanged('passed_quantity')) {
-            $this->syncJournalEntries($qualityControl);
+
+        // Sync return product items if rejected_quantity changed
+        if ($qualityControl->wasChanged('rejected_quantity')) {
+            $this->syncReturnProductItems($qualityControl);
         }
     }
 
@@ -134,6 +135,28 @@ class QualityControlObserver
     }
 
     /**
+     * Sync return product items when QC rejected_quantity changes
+     */
+    protected function syncReturnProductItems(QualityControl $qualityControl): void
+    {
+        // Only sync if QC is completed and has return product
+        if ($qualityControl->status != 1) {
+            return;
+        }
+
+        $returnProduct = $qualityControl->returnProduct;
+        if (!$returnProduct) {
+            return;
+        }
+
+        $returnProductItem = $returnProduct->returnProductItems()->first();
+        if ($returnProductItem) {
+            $returnProductItem->quantity = $qualityControl->rejected_quantity;
+            $returnProductItem->save();
+        }
+    }
+
+    /**
      * Handle the QualityControl "deleting" event.
      */
     public function deleting(QualityControl $qualityControl): void
@@ -142,6 +165,9 @@ class QualityControlObserver
         $qualityControl->stockMovement()->delete();
         $qualityControl->returnProduct()->delete();
 
+        // Cascade delete related journal entries
+        $qualityControl->journalEntries()->delete();
+
         // Revert PurchaseReceiptItem is_sent status when QC is deleted
         if ($qualityControl->from_model_type === PurchaseReceiptItem::class) {
             $purchaseReceiptItem = $qualityControl->fromModel;
@@ -149,5 +175,23 @@ class QualityControlObserver
                 $purchaseReceiptItem->update(['is_sent' => 0]);
             }
         }
+    }
+
+    /**
+     * Handle the QualityControl "restored" event.
+     */
+    public function restored(QualityControl $qualityControl): void
+    {
+        // Revert PurchaseReceiptItem is_sent status when QC is restored
+        if ($qualityControl->from_model_type === PurchaseReceiptItem::class) {
+            $purchaseReceiptItem = $qualityControl->fromModel;
+            if ($purchaseReceiptItem) {
+                $purchaseReceiptItem->update(['is_sent' => 1]);
+            }
+        }
+
+        // Note: Journal entries and stock movements should be recreated by the service
+        // that handles QC completion, not automatically restored here
+        // This prevents duplicate entries if QC is restored multiple times
     }
 }

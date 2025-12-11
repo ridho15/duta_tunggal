@@ -16,6 +16,7 @@ class ManufacturingOrder extends Model
     protected $fillable = [
         'mo_number',
         'production_plan_id',
+        'quantity',
         'status', // draft, in_progress, completed
         'start_date',
         'end_date',
@@ -26,6 +27,7 @@ class ManufacturingOrder extends Model
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'quantity' => 'decimal:2',
         'items' => 'array',
     ];
 

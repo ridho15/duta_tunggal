@@ -7,7 +7,6 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use App\Models\InventoryStock;
-use App\Observers\InventoryStockObserver;
 
 class ZeroBalanceSheetSeeder extends Seeder
 {

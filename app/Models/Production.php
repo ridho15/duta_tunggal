@@ -14,8 +14,14 @@ class Production extends Model
     protected $fillable = [
         'production_number',
         'manufacturing_order_id',
+        'quantity_produced',
         'production_date',
         'status' // draft, finished
+    ];
+
+    protected $casts = [
+        'production_date' => 'date',
+        'quantity_produced' => 'decimal:2',
     ];
 
     public function manufacturingOrder()

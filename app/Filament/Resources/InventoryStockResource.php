@@ -260,7 +260,16 @@ class InventoryStockResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->orderBy('updated_at', 'DESC');
+        $query = parent::getEloquentQuery()->orderBy('updated_at', 'DESC');
+        
+        $user = Auth::user();
+        if ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('warehouse', function ($q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+        
+        return $query;
     }
 
     public static function getPages(): array

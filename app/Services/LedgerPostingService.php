@@ -110,7 +110,7 @@ class LedgerPostingService
                 ]);
             }
 
-            // Debit PPN Masukan based on ppn_rate
+            // Calculate PPN amount
             $ppnAmount = $invoice->subtotal * ($invoice->ppn_rate ?? 0) / 100;
             $actualPpnAmount = 0; // Track actual PPN amount that gets posted
             if ($ppnAmount > 0 && $ppnMasukanCoa) {
@@ -131,30 +131,27 @@ class LedgerPostingService
                 $actualPpnAmount = $ppnAmount;
             }
 
-            // Handle other fees from invoice other_fee array
-            $totalOtherFees = 0;
-            if (!empty($invoice->other_fee) && is_array($invoice->other_fee)) {
+            // Calculate total other fees as: invoice_total - subtotal - ppn_amount
+            // This ensures journal entries always balance with invoice total
+            $totalOtherFees = $total - $subtotal - $actualPpnAmount;
+
+            // Create journal entry for other fees if any
+            if ($totalOtherFees > 0) {
                 $expenseCoa = $invoice->expense_coa_id ? ChartOfAccount::find($invoice->expense_coa_id) : ChartOfAccount::where('code', '6100')->first(); // default expense
-                foreach ($invoice->other_fee as $fee) {
-                    $feeAmount = (float) ($fee['amount'] ?? 0);
-                    if ($feeAmount > 0) {
-                        $entries[] = JournalEntry::create([
-                            'coa_id' => $expenseCoa ? $expenseCoa->id : 1, // fallback to first COA if not found
-                            'date' => $date,
-                            'reference' => $invoice->invoice_number,
-                            'description' => 'Other fee - ' . ($fee['name'] ?? 'Biaya Lain') . ' for ' . $invoice->invoice_number,
-                            'debit' => $feeAmount,
-                            'credit' => 0,
-                            'journal_type' => 'purchase',
-                            'cabang_id' => $branchId,
-                            'department_id' => $departmentId,
-                            'project_id' => $projectId,
-                            'source_type' => Invoice::class,
-                            'source_id' => $invoice->id,
-                        ]);
-                        $totalOtherFees += $feeAmount;
-                    }
-                }
+                $entries[] = JournalEntry::create([
+                    'coa_id' => $expenseCoa ? $expenseCoa->id : 1, // fallback to first COA if not found
+                    'date' => $date,
+                    'reference' => $invoice->invoice_number,
+                    'description' => 'Biaya lainnya (termasuk dari purchase receipt) untuk ' . $invoice->invoice_number,
+                    'debit' => $totalOtherFees,
+                    'credit' => 0,
+                    'journal_type' => 'purchase',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
+                    'source_type' => Invoice::class,
+                    'source_id' => $invoice->id,
+                ]);
             }
 
             // Credit Accounts Payable for total amount (subtotal + actual PPN + other fees)
