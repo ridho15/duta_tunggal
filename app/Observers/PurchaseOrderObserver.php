@@ -3,6 +3,8 @@
 namespace App\Observers;
 
 use App\Models\PurchaseOrder;
+use App\Models\JournalEntry;
+use App\Models\ChartOfAccount;
 use App\Services\PurchaseOrderService;
 
 class PurchaseOrderObserver
@@ -131,6 +133,93 @@ class PurchaseOrderObserver
             'po_number' => $purchaseOrder->po_number,
             'items_count' => $purchaseOrder->purchaseOrderItem->count(),
         ]);
+
+        // Create journal entries for asset acquisition
+        $this->createAssetAcquisitionJournals($purchaseOrder);
+    }
+
+    /**
+     * Create journal entries for asset acquisition
+     */
+    protected function createAssetAcquisitionJournals(PurchaseOrder $purchaseOrder): void
+    {
+        try {
+            // Get total asset cost from PO
+            $totalAssetCost = $purchaseOrder->total_amount;
+
+            // Get branch and department info
+            $branchId = $purchaseOrder->cabang_id;
+            $departmentId = null; // Could be added later if needed
+            $projectId = null; // Could be added later if needed
+
+            // Get asset COA (debit side)
+            $assetCoa = ChartOfAccount::where('code', '1500')->first(); // HARGA PEROLEHAN ASET TETAP
+            if (!$assetCoa) {
+                $assetCoa = ChartOfAccount::where('name', 'like', '%aset%')->first();
+            }
+
+            // Get accounts payable COA (credit side) - assuming not paid yet
+            $payableCoa = ChartOfAccount::where('code', '2110')->first(); // HUTANG USAHA
+            if (!$payableCoa) {
+                $payableCoa = ChartOfAccount::where('name', 'like', '%hutang%')->first();
+            }
+
+            if (!$assetCoa || !$payableCoa) {
+                \Illuminate\Support\Facades\Log::warning('Asset acquisition journal entries not created - missing COA', [
+                    'purchase_order_id' => $purchaseOrder->id,
+                    'asset_coa_found' => $assetCoa ? true : false,
+                    'payable_coa_found' => $payableCoa ? true : false,
+                ]);
+                return;
+            }
+
+            // Create debit entry: Fixed Asset
+            $debitEntry = JournalEntry::create([
+                'coa_id' => $assetCoa->id,
+                'date' => $purchaseOrder->order_date,
+                'reference' => 'PO-' . $purchaseOrder->po_number,
+                'description' => 'Asset acquisition from PO ' . $purchaseOrder->po_number,
+                'debit' => $totalAssetCost,
+                'credit' => 0,
+                'journal_type' => 'asset_acquisition',
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
+                'source_type' => PurchaseOrder::class,
+                'source_id' => $purchaseOrder->id,
+            ]);
+
+            // Create credit entry: Accounts Payable
+            $creditEntry = JournalEntry::create([
+                'coa_id' => $payableCoa->id,
+                'date' => $purchaseOrder->order_date,
+                'reference' => 'PO-' . $purchaseOrder->po_number,
+                'description' => 'Accounts payable for asset acquisition PO ' . $purchaseOrder->po_number,
+                'debit' => 0,
+                'credit' => $totalAssetCost,
+                'journal_type' => 'asset_acquisition',
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
+                'source_type' => PurchaseOrder::class,
+                'source_id' => $purchaseOrder->id,
+            ]);
+
+            \Illuminate\Support\Facades\Log::info('Asset acquisition journal entries created', [
+                'purchase_order_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+                'total_amount' => $totalAssetCost,
+                'debit_entry_id' => $debitEntry->id,
+                'credit_entry_id' => $creditEntry->id,
+            ]);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to create asset acquisition journal entries', [
+                'purchase_order_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
