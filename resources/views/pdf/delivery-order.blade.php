@@ -85,6 +85,32 @@
             <td style="border: none;">Vehicle</td>
             <td style="border: none;">: {{ $deliveryOrder->vehicle->plate }} - {{ $deliveryOrder->vehicle->type }}</td>
         </tr>
+        <tr>
+            <td style="border: none;">Warehouse</td>
+            <td style="border: none;">: {{ $deliveryOrder->warehouse->name ?? 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="border: none;">Cabang</td>
+            <td style="border: none;">: {{ $deliveryOrder->cabang->name ?? 'N/A' }}</td>
+        </tr>
+        @if($deliveryOrder->additional_cost > 0)
+        <tr>
+            <td style="border: none;">Biaya Tambahan</td>
+            <td style="border: none;">: Rp {{ number_format($deliveryOrder->additional_cost, 0, ',', '.') }}</td>
+        </tr>
+        @if($deliveryOrder->additional_cost_description)
+        <tr>
+            <td style="border: none;">Deskripsi Biaya Tambahan</td>
+            <td style="border: none;">: {{ $deliveryOrder->additional_cost_description }}</td>
+        </tr>
+        @endif
+        @endif
+        @if($deliveryOrder->notes)
+        <tr>
+            <td style="border: none;">Catatan</td>
+            <td style="border: none;">: {{ $deliveryOrder->notes }}</td>
+        </tr>
+        @endif
     </table>
 
     <br>
@@ -109,6 +135,34 @@
             </tr>
             @endforeach
         </tbody>
+    </table>
+
+    @php
+        $subtotal = 0;
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            if ($item->saleOrderItem) {
+                $price = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
+                $subtotal += $price * $item->quantity;
+            }
+        }
+        $total = $subtotal + $deliveryOrder->additional_cost;
+    @endphp
+
+    <table style="border: none; margin-top: 20px; width: 50%; margin-left: auto;">
+        <tr>
+            <td style="border: none; text-align: right; font-weight: bold;">Subtotal:</td>
+            <td style="border: none; text-align: right;">Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
+        </tr>
+        @if($deliveryOrder->additional_cost > 0)
+        <tr>
+            <td style="border: none; text-align: right; font-weight: bold;">Biaya Tambahan:</td>
+            <td style="border: none; text-align: right;">Rp {{ number_format($deliveryOrder->additional_cost, 0, ',', '.') }}</td>
+        </tr>
+        @endif
+        <tr>
+            <td style="border: none; text-align: right; font-weight: bold; border-top: 1px solid #333;">Total:</td>
+            <td style="border: none; text-align: right; border-top: 1px solid #333; font-weight: bold;">Rp {{ number_format($total, 0, ',', '.') }}</td>
+        </tr>
     </table>
 
     <table style="border: none; margin-top: 50px; width: 100%;">

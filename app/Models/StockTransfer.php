@@ -43,6 +43,15 @@ class StockTransfer extends Model
     protected static function booted()
     {
         static::deleting(function ($stockTransfer) {
+            // Delete related StockMovement records and adjust inventory
+            foreach ($stockTransfer->stockTransferItem as $item) {
+                // Delete StockMovement records
+                $item->stockMovement()->delete();
+                
+                // Note: Inventory adjustments should be handled by StockMovement observer
+                // when StockMovement records are deleted
+            }
+            
             if ($stockTransfer->isForceDeleting()) {
                 $stockTransfer->stockTransferItem()->forceDelete();
             } else {
@@ -52,6 +61,43 @@ class StockTransfer extends Model
 
         static::restoring(function ($stockTransfer) {
             $stockTransfer->stockTransferItem()->withTrashed()->restore();
+        });
+
+        // Handle updates to StockTransfer (when quantity changes)
+        static::updating(function ($stockTransfer) {
+            // Only handle if status is approved and there are changes to items
+            if ($stockTransfer->status === 'Approved' && $stockTransfer->isDirty()) {
+                // Check if any related items have changed
+                $changedItems = $stockTransfer->stockTransferItem()->get();
+                foreach ($changedItems as $item) {
+                    if ($item->isDirty('quantity')) {
+                        // Update related StockMovement records
+                        $oldQuantity = $item->getOriginal('quantity');
+                        $newQuantity = $item->quantity;
+                        
+                        // Update transfer_out movement
+                        $transferOut = $item->stockMovement()
+                            ->where('type', 'transfer_out')
+                            ->where('warehouse_id', $item->from_warehouse_id)
+                            ->first();
+                        if ($transferOut) {
+                            $transferOut->update(['quantity' => $newQuantity]);
+                        }
+                        
+                        // Update transfer_in movement
+                        $transferIn = $item->stockMovement()
+                            ->where('type', 'transfer_in')
+                            ->where('warehouse_id', $item->to_warehouse_id)
+                            ->first();
+                        if ($transferIn) {
+                            $transferIn->update(['quantity' => $newQuantity]);
+                        }
+                        
+                        // Note: Inventory adjustments for quantity changes 
+                        // should be handled by StockMovement observer
+                    }
+                }
+            }
         });
     }
 }

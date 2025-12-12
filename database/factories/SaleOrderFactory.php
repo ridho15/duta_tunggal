@@ -20,7 +20,7 @@ class SaleOrderFactory extends Factory
     public function definition(): array
     {
         return [
-            'customer_id'          => Customer::inRandomOrder()->first()->id, // sesuaikan id customer yg ada
+            'customer_id'          => Customer::inRandomOrder()->first()?->id ?? Customer::factory()->create()->id,
             'so_number'            => 'SO-' . strtoupper(Str::random(6)),
             'order_date'           => now()->subDays(rand(1, 30)),
             'status'               => $this->faker->randomElement([

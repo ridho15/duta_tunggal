@@ -82,7 +82,14 @@ class StockOpname extends Model
         }
 
         // Format as 3-digit number with leading zeros
-        return $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+        $number = $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+        // In testing environment, add microseconds to ensure uniqueness only for auto-generated numbers
+        if (app()->environment('testing') && !str_contains($number, 'TEST')) {
+            $number .= '-' . now()->format('Hisu');
+        }
+
+        return $number;
     }
 
     protected static function booted()

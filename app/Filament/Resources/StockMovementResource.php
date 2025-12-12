@@ -121,6 +121,71 @@ class StockMovementResource extends Resource
                         TextInput::make('reference_id')
                             ->maxLength(255)
                             ->default(null),
+                        Select::make('source')
+                            ->label('Source')
+                            ->options([
+                                'App\Models\SaleOrder' => 'Sales Order',
+                                'App\Models\PurchaseOrder' => 'Purchase Order',
+                                'App\Models\DeliveryOrder' => 'Delivery Order',
+                                'App\Models\PurchaseReceipt' => 'Purchase Receipt',
+                                'App\Models\StockTransfer' => 'Stock Transfer',
+                                'App\Models\ManufacturingOrder' => 'Manufacturing Order',
+                                'App\Models\StockAdjustment' => 'Stock Adjustment',
+                            ])
+                            ->searchable()
+                            ->preload()
+                            ->reactive()
+                            ->default(function ($record) {
+                                return $record ? $record->from_model_type : null;
+                            })
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $set('source_number', null); // Reset source number when source changes
+                            }),
+                        Select::make('source_number')
+                            ->label('Source Number')
+                            ->searchable()
+                            ->preload()
+                            ->options(function ($get) {
+                                $source = $get('source');
+                                if (!$source) return [];
+
+                                switch ($source) {
+                                    case 'App\Models\SaleOrder':
+                                        return \App\Models\SaleOrder::pluck('so_number', 'id');
+                                    case 'App\Models\PurchaseOrder':
+                                        return \App\Models\PurchaseOrder::pluck('po_number', 'id');
+                                    case 'App\Models\DeliveryOrder':
+                                        return \App\Models\DeliveryOrder::pluck('do_number', 'id');
+                                    case 'App\Models\PurchaseReceipt':
+                                        return \App\Models\PurchaseReceipt::pluck('receipt_number', 'id');
+                                    case 'App\Models\StockTransfer':
+                                        return \App\Models\StockTransfer::pluck('transfer_number', 'id');
+                                    case 'App\Models\ManufacturingOrder':
+                                        return \App\Models\ManufacturingOrder::pluck('mo_number', 'id');
+                                    case 'App\Models\StockAdjustment':
+                                        return \App\Models\StockAdjustment::pluck('adjustment_number', 'id');
+                                    default:
+                                        return [];
+                                }
+                            })
+                            ->default(function ($record) {
+                                return $record ? $record->from_model_id : null;
+                            })
+                            ->visible(function ($get) {
+                                return !empty($get('source'));
+                            })
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                // Set the from_model_type and from_model_id based on selection
+                                $source = $get('source');
+                                if ($source && $state) {
+                                    $set('from_model_type', $source);
+                                    $set('from_model_id', $state);
+                                }
+                            }),
+                        TextInput::make('from_model_type')
+                            ->hidden(),
+                        TextInput::make('from_model_id')
+                            ->hidden(),
                         DatePicker::make('date')
                             ->required(),
                         Textarea::make('notes')
@@ -197,6 +262,40 @@ class StockMovementResource extends Resource
                 TextColumn::make('reference_id')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
+                TextColumn::make('fromModel')
+                    ->label('Source')
+                    ->formatStateUsing(function ($record) {
+                        if ($record->fromModel) {
+                            $modelType = $record->from_model_type;
+                            $modelName = match ($modelType) {
+                                'App\Models\SaleOrder' => 'Sales Order',
+                                'App\Models\PurchaseOrder' => 'Purchase Order',
+                                'App\Models\DeliveryOrder' => 'Delivery Order',
+                                'App\Models\PurchaseReceipt' => 'Purchase Receipt',
+                                'App\Models\StockTransfer' => 'Stock Transfer',
+                                'App\Models\ManufacturingOrder' => 'Manufacturing Order',
+                                'App\Models\StockAdjustment' => 'Stock Adjustment',
+                                default => 'Unknown'
+                            };
+
+                            $sourceNumber = match ($modelType) {
+                                'App\Models\SaleOrder' => $record->fromModel->so_number ?? 'N/A',
+                                'App\Models\PurchaseOrder' => $record->fromModel->po_number ?? 'N/A',
+                                'App\Models\DeliveryOrder' => $record->fromModel->do_number ?? 'N/A',
+                                'App\Models\PurchaseReceipt' => $record->fromModel->receipt_number ?? 'N/A',
+                                'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
+                                'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
+                                'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
+                                default => 'N/A'
+                            };
+
+                            return $modelName . ' - ' . $sourceNumber;
+                        }
+                        return '-';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        // This is complex to search, so we'll skip for now
+                    }),
                 TextColumn::make('date')
                     ->dateTime()
                     ->sortable(),
@@ -251,6 +350,23 @@ class StockMovementResource extends Resource
                     ])
                     ->multiple()
                     ->label('Type'),
+                SelectFilter::make('source_type')
+                    ->label('Source Type')
+                    ->options([
+                        'App\Models\SaleOrder' => 'Sales Order',
+                        'App\Models\PurchaseOrder' => 'Purchase Order',
+                        'App\Models\DeliveryOrder' => 'Delivery Order',
+                        'App\Models\PurchaseReceipt' => 'Purchase Receipt',
+                        'App\Models\StockTransfer' => 'Stock Transfer',
+                        'App\Models\ManufacturingOrder' => 'Manufacturing Order',
+                        'App\Models\StockAdjustment' => 'Stock Adjustment',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['value'],
+                            fn (Builder $query, $value): Builder => $query->where('from_model_type', $value)
+                        );
+                    }),
                 Filter::make('date')
                     ->form([
                         DatePicker::make('date_from')

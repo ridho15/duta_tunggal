@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Observers\StockTransferItemObserver;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,13 @@ class StockTransferItem extends Model
         'to_warehouse_id', // Gudang Tujuan
         'to_rak_id'
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // static::observe(StockTransferItemObserver::class);
+    }
 
     public function stockTransfer()
     {

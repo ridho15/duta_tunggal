@@ -1379,6 +1379,12 @@ class SaleOrderResource extends Resource
             SaleOrderItemRelationManager::class
         ];
     }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->orderBy('created_at', 'desc');
+    }
+
     public static function getPages(): array
     {
         return [

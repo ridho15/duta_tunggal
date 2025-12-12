@@ -20,23 +20,6 @@ class CreateDeliveryOrder extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Convert selected_items to deliveryOrderItem if selected_items exists
-        if (!empty($data['selected_items'])) {
-            $deliveryItems = [];
-            foreach ($data['selected_items'] as $item) {
-                if (!empty($item['selected']) && !empty($item['quantity']) && $item['quantity'] > 0) {
-                    $deliveryItems[] = [
-                        'options_from' => 2,
-                        'sale_order_item_id' => $item['sale_order_item_id'],
-                        'product_id' => $item['product_id'],
-                        'quantity' => $item['quantity'],
-                    ];
-                }
-            }
-            $data['deliveryOrderItem'] = $deliveryItems;
-        }
-
-
         // Normalize and validate that salesOrders is not empty
         // Filament/Livewire may send values as string, nested arrays or single values.
         $salesOrderIds = $data['salesOrders'] ?? $data['sales_orders'] ?? $data['salesOrder'] ?? [];
@@ -136,30 +119,53 @@ class CreateDeliveryOrder extends CreateRecord
             }
         }
 
-        // Additional validation before creating
         // Validate delivery order items against all selected sales orders
         $deliveryItems = $data['deliveryOrderItem'] ?? [];
-        $selectedItems = $data['selected_items'] ?? [];
 
-        // Validate that delivery order has at least 1 item
-        $hasDeliveryItems = !empty($deliveryItems);
-        $hasSelectedItems = !empty($selectedItems) && collect($selectedItems)->filter(function ($item) {
-            return !empty($item['selected']) && !empty($item['quantity']) && $item['quantity'] > 0;
-        })->isNotEmpty();
+        // If deliveryOrderItem is empty but salesOrders are selected, auto-populate from sales orders
+        if (empty($deliveryItems) && !empty($salesOrderIds)) {
+            $listSaleOrder = \App\Models\SaleOrder::whereIn('id', $salesOrderIds)->get();
+            $deliveryItems = [];
 
-        if (!$hasDeliveryItems && !$hasSelectedItems) {
+            foreach ($listSaleOrder as $saleOrder) {
+                foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
+                    $remainingQty = $saleOrderItem->remaining_quantity;
+                    // Only add items that still have remaining quantity
+                    if ($remainingQty > 0) {
+                        $deliveryItems[] = [
+                            'options_from' => 2,
+                            'sale_order_item_id' => $saleOrderItem->id,
+                            'product_id' => $saleOrderItem->product_id,
+                            'quantity' => $remainingQty,
+                            'reason' => '',
+                        ];
+                    }
+                }
+            }
+            
+            $data['deliveryOrderItem'] = $deliveryItems;
+        }
+
+        // Validate delivery order items against all selected sales orders
+        $validDeliveryItems = collect($deliveryItems)->filter(function ($item) {
+            return !empty($item['quantity']) && $item['quantity'] > 0;
+        });
+
+        \Illuminate\Support\Facades\Log::info('Delivery Order Create - validDeliveryItems count: ' . $validDeliveryItems->count());
+
+        if ($validDeliveryItems->isEmpty()) {
             \Filament\Notifications\Notification::make()
                 ->title('Validation Error')
-                ->body('Delivery Order harus memiliki minimal 1 item untuk dibuat.')
+                ->body('Delivery Order harus memiliki minimal 1 item dengan quantity lebih dari 0 untuk dibuat.')
                 ->danger()
                 ->send();
 
             $validator = Validator::make([], []);
-            $validator->errors()->add('deliveryOrderItem', 'Delivery Order harus memiliki minimal 1 item untuk dibuat.');
+            $validator->errors()->add('deliveryOrderItem', 'Delivery Order harus memiliki minimal 1 item dengan quantity lebih dari 0 untuk dibuat.');
             throw new ValidationException($validator);
         }
 
-        if (!empty($deliveryItems)) {
+        if ($validDeliveryItems->isNotEmpty()) {
             // Get all sale order items from selected sales orders
             $saleOrderItems = \App\Models\SaleOrderItem::whereIn('sale_order_id', $salesOrderIds)
                 ->with('product')
@@ -167,7 +173,7 @@ class CreateDeliveryOrder extends CreateRecord
                 ->keyBy('id');
 
             // Validate each delivery item
-            foreach ($deliveryItems as $index => $item) {
+            foreach ($validDeliveryItems as $index => $item) {
                 $saleOrderItemId = $item['sale_order_item_id'] ?? null;
                 $quantity = (float) ($item['quantity'] ?? 0);
 

@@ -20,11 +20,11 @@ class SaleOrderItemFactory extends Factory
      */
     public function definition(): array
     {
-        $warehouse = Warehouse::has('rak')->inRandomOrder()->first()->id;
-        $rak = Rak::where('warehouse_id', $warehouse)->inRandomOrder()->first()->id;
+        $warehouse = Warehouse::inRandomOrder()->first()?->id ?? Warehouse::factory()->create()->id;
+        $rak = Rak::where('warehouse_id', $warehouse)->inRandomOrder()->first()?->id ?? Rak::factory()->create(['warehouse_id' => $warehouse])->id;
         return [
-            'sale_order_id' => SaleOrder::inRandomOrder()->first()->id, // akan di-set saat seeding
-            'product_id'    => Product::inRandomOrder()->first()->id, // pastikan data produk tersedia
+            'sale_order_id' => SaleOrder::inRandomOrder()->first()?->id ?? SaleOrder::factory()->create()->id,
+            'product_id'    => Product::inRandomOrder()->first()?->id ?? Product::factory()->create()->id,
             'quantity'      => rand(1, 20),
             'unit_price'    => $this->faker->numberBetween(10000, 500000),
             'discount'      => $this->faker->numberBetween(0, 20),

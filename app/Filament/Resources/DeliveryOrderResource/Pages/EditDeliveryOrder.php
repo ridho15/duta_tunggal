@@ -38,28 +38,6 @@ class EditDeliveryOrder extends EditRecord
             $data['salesOrders'] = $this->record->salesOrders->pluck('id')->toArray();
         }
         
-        // Populate selected_items based on existing delivery order items
-        $selectedItems = [];
-        $deliveryOrderItems = $this->record->deliveryOrderItem ?? [];
-        
-        foreach ($deliveryOrderItems as $item) {
-            if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    $selectedItems[] = [
-                        'selected' => true,
-                        'product_name' => "({$saleOrderItem->product->sku}) {$saleOrderItem->product->name}",
-                        'remaining_qty' => $saleOrderItem->remaining_quantity + $item->quantity, // Add back the delivered quantity
-                        'quantity' => $item->quantity,
-                        'sale_order_item_id' => $item->sale_order_item_id,
-                        'product_id' => $item->product_id,
-                    ];
-                }
-            }
-        }
-        
-        $data['selected_items'] = $selectedItems;
-        
         return $data;
     }
     

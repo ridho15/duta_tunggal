@@ -26,13 +26,13 @@ class StockOpnameItem extends Model
     ];
 
     protected $casts = [
-        'system_qty' => 'decimal:2',
-        'physical_qty' => 'decimal:2',
-        'difference_qty' => 'decimal:2',
-        'unit_cost' => 'decimal:2',
-        'average_cost' => 'decimal:2',
-        'difference_value' => 'decimal:2',
-        'total_value' => 'decimal:2',
+        'system_qty' => 'float',
+        'physical_qty' => 'float',
+        'difference_qty' => 'float',
+        'unit_cost' => 'float',
+        'average_cost' => 'float',
+        'difference_value' => 'float',
+        'total_value' => 'float',
     ];
 
     public function stockOpname()
@@ -47,7 +47,7 @@ class StockOpnameItem extends Model
 
     public function rak()
     {
-        return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+        return $this->belongsTo(Rak::class, 'rak_id');
     }
 
     /**
@@ -62,7 +62,7 @@ class StockOpnameItem extends Model
             ->whereHas('purchaseReceipt', function($query) use ($opnameDate) {
                 $query->where('receipt_date', '<=', $opnameDate);
             })
-            ->with('purchaseReceipt')
+            ->with(['purchaseReceipt', 'purchaseOrderItem'])
             ->orderBy('purchase_receipt_items.created_at', 'asc')
             ->get();
 
@@ -74,8 +74,8 @@ class StockOpnameItem extends Model
         $totalValue = 0;
 
         foreach ($purchaseItems as $item) {
-            $quantity = $item->quantity_received ?? $item->quantity;
-            $unitPrice = $item->unit_price ?? 0;
+            $quantity = $item->qty_received ?? 0;
+            $unitPrice = $item->purchaseOrderItem->unit_price ?? 0;
 
             $totalQuantity += $quantity;
             $totalValue += ($quantity * $unitPrice);
@@ -89,7 +89,9 @@ class StockOpnameItem extends Model
      */
     public function calculateTotalValue()
     {
-        return $this->physical_qty * $this->average_cost;
+        // Use stored average_cost if available, otherwise calculate it
+        $averageCost = $this->average_cost ?: $this->calculateAverageCost();
+        return $this->physical_qty * $averageCost;
     }
 
     /**
