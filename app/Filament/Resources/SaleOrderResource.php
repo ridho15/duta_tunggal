@@ -1186,9 +1186,21 @@ class SaleOrderResource extends Resource
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('update sales order') &&
-                                   in_array($record->status, ['approved', 'confirmed']) &&
-                                   $record->deliveryOrder()->where('status', 'completed')->exists();
+                            if (!Auth::user()->hasPermissionTo('update sales order')) {
+                                return false;
+                            }
+
+                            if (!in_array($record->status, ['approved', 'confirmed'])) {
+                                return false;
+                            }
+
+                            // Untuk Ambil Sendiri: cukup approved tanpa Delivery Order
+                            if ($record->tipe_pengiriman === 'Ambil Sendiri') {
+                                return true;
+                            }
+
+                            // Untuk Kirim Langsung: perlu Delivery Order completed
+                            return $record->deliveryOrder()->where('status', 'completed')->exists();
                         })
                         ->color('success')
                         ->action(function ($record) {
