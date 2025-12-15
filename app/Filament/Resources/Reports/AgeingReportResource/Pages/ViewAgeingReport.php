@@ -388,4 +388,37 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
             ->paginated([10, 25, 50, 100])
             ->poll('30s');
     }
+
+    private function calculateBucket($record): string
+    {
+        $ageingSchedule = $record->ageingSchedule;
+        $daysOutstanding = 0;
+
+        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
+            $daysOutstanding = $ageingSchedule->days_outstanding;
+        } elseif ($record->invoice && $record->invoice->invoice_date) {
+            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
+            $daysOutstanding = $invoiceDate->diffInDays(Carbon::parse($this->as_of_date ?? now()), false);
+        }
+
+        if ($daysOutstanding <= 30) return 'Current';
+        if ($daysOutstanding <= 60) return '31–60';
+        if ($daysOutstanding <= 90) return '61–90';
+        return '>90';
+    }
+
+    private function calculateDaysOutstanding($record): int
+    {
+        $ageingSchedule = $record->ageingSchedule;
+        $daysOutstanding = 0;
+
+        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
+            $daysOutstanding = $ageingSchedule->days_outstanding;
+        } elseif ($record->invoice && $record->invoice->invoice_date) {
+            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
+            $daysOutstanding = $invoiceDate->diffInDays(Carbon::parse($this->as_of_date ?? now()), false);
+        }
+
+        return $daysOutstanding;
+    }
 }

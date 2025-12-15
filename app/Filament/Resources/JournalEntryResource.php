@@ -1010,7 +1010,7 @@ class JournalEntryResource extends Resource
                         }
                     })
                     ->placeholder('-')
-                    ->searchable(query: function ($query, $data) {
+                    ->searchable(query: function (Builder $query, string $search): Builder {
                         // This is a complex search, might need custom implementation
                         return $query;
                     }),

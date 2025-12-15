@@ -25,9 +25,10 @@ class SaleOrderObserver
             $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
         }
 
-        // Jika status berubah ke 'completed', buat invoice otomatis
+        // Jika status berubah ke 'completed', buat invoice otomatis dan kurangi stock untuk Ambil Sendiri
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
             $this->createInvoiceForCompletedSaleOrder($saleOrder);
+            $this->handleStockReductionForSelfPickup($saleOrder);
         }
 
         // Sync related journal entries if total amount changed
@@ -291,5 +292,58 @@ class SaleOrderObserver
             'so_number' => $saleOrder->so_number,
             'entries_updated' => $journalEntries->count(),
         ]);
+    }
+
+    /**
+     * Handle stock reduction for self-pickup sales orders
+     */
+    protected function handleStockReductionForSelfPickup(SaleOrder $saleOrder): void
+    {
+        // Only handle stock reduction for 'Ambil Sendiri' type
+        if ($saleOrder->tipe_pengiriman !== 'Ambil Sendiri') {
+            return;
+        }
+
+        Log::info('SaleOrderObserver: Handling stock reduction for self-pickup', [
+            'sale_order_id' => $saleOrder->id,
+            'so_number' => $saleOrder->so_number,
+        ]);
+
+        // Load sale order items with product data
+        $saleOrder->loadMissing('saleOrderItem.product');
+
+        $date = $saleOrder->order_date ?? now()->toDateString();
+
+        // Create stock movements for each item to reduce physical inventory
+        foreach ($saleOrder->saleOrderItem as $item) {
+            $qtySold = max(0, $item->quantity ?? 0);
+            if ($qtySold <= 0) {
+                continue;
+            }
+
+            $product = $item->product;
+            if (!$product) {
+                continue;
+            }
+
+            // Skip if warehouse_id is null
+            if (!$item->warehouse_id) {
+                continue;
+            }
+
+            // Create sales stock movement to reduce physical inventory
+            $productService = app(\App\Services\ProductService::class);
+            $productService->createStockMovement(
+                product_id: $product->id,
+                warehouse_id: $item->warehouse_id,
+                quantity: $qtySold,
+                type: 'sales',
+                date: $date,
+                notes: "Self-pickup sales for SO {$saleOrder->so_number}",
+                rak_id: $item->rak_id,
+                fromModel: null,
+                value: $product->cost_price * $qtySold
+            );
+        }
     }
 }

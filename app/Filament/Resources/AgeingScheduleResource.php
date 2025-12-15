@@ -117,10 +117,23 @@ class AgeingScheduleResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('fromModel.invoice.invoice_number')
+                TextColumn::make('invoice_number')
                     ->label('Invoice Number')
-                    ->searchable()
-                    ->sortable(),
+                    ->getStateUsing(function ($record) {
+                        return $record->fromModel?->invoice?->invoice_number ?? '-';
+                    })
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('fromModel.invoice', function ($q) use ($search) {
+                            $q->where('invoice_number', 'like', '%' . $search . '%');
+                        });
+                    })
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->join('invoices', function ($join) {
+                            $join->on('invoices.id', '=', 'ageing_schedules.from_model_id')
+                                 ->where('ageing_schedules.from_model_type', '=', 'App\\Models\\AccountPayable')
+                                 ->orWhere('ageing_schedules.from_model_type', '=', 'App\\Models\\AccountReceivable');
+                        })->orderBy('invoices.invoice_number', $direction);
+                    }),
                 TextColumn::make('from_model_type')
                     ->label('From')
                     ->formatStateUsing(function ($state) {
