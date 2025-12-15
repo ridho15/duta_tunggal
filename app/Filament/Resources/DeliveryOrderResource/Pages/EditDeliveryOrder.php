@@ -6,6 +6,7 @@ use App\Filament\Resources\DeliveryOrderResource;
 use App\Models\DeliveryOrder;
 use App\Services\DeliveryOrderItemService;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -26,6 +27,7 @@ class EditDeliveryOrder extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewAction::make()->color('primary')->icon('heroicon-o-eye')->label('Lihat'),
             DeleteAction::make()
                 ->icon('heroicon-o-trash'),
         ];

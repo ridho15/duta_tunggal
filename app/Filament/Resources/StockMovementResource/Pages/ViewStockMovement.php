@@ -69,6 +69,8 @@ class ViewStockMovement extends ViewRecord
                                     'App\Models\PurchaseOrder' => 'Purchase Order',
                                     'App\Models\DeliveryOrder' => 'Delivery Order',
                                     'App\Models\PurchaseReceipt' => 'Purchase Receipt',
+                                    'App\Models\PurchaseReceiptItem' => 'Purchase Receipt',
+                                    'App\Models\DeliveryOrderItem' => 'Delivery Order',
                                     'App\Models\StockTransfer' => 'Stock Transfer',
                                     'App\Models\ManufacturingOrder' => 'Manufacturing Order',
                                     'App\Models\StockAdjustment' => 'Stock Adjustment',
@@ -85,6 +87,8 @@ class ViewStockMovement extends ViewRecord
                                         'App\Models\PurchaseOrder' => $record->fromModel->po_number ?? 'N/A',
                                         'App\Models\DeliveryOrder' => $record->fromModel->do_number ?? 'N/A',
                                         'App\Models\PurchaseReceipt' => $record->fromModel->receipt_number ?? 'N/A',
+                                        'App\Models\PurchaseReceiptItem' => $record->fromModel->purchaseReceipt->receipt_number ?? 'N/A',
+                                        'App\Models\DeliveryOrderItem' => $record->fromModel->deliveryOrder->do_number ?? 'N/A',
                                         'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
                                         'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
                                         'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
@@ -103,6 +107,8 @@ class ViewStockMovement extends ViewRecord
                                         'App\Models\PurchaseOrder' => 'Purchase Order',
                                         'App\Models\DeliveryOrder' => 'Delivery Order',
                                         'App\Models\PurchaseReceipt' => 'Purchase Receipt',
+                                        'App\Models\PurchaseReceiptItem' => 'Purchase Receipt',
+                                        'App\Models\DeliveryOrderItem' => 'Delivery Order',
                                         'App\Models\StockTransfer' => 'Stock Transfer',
                                         'App\Models\ManufacturingOrder' => 'Manufacturing Order',
                                         'App\Models\StockAdjustment' => 'Stock Adjustment',
@@ -114,6 +120,8 @@ class ViewStockMovement extends ViewRecord
                                         'App\Models\PurchaseOrder' => $record->fromModel->po_number ?? 'N/A',
                                         'App\Models\DeliveryOrder' => $record->fromModel->do_number ?? 'N/A',
                                         'App\Models\PurchaseReceipt' => $record->fromModel->receipt_number ?? 'N/A',
+                                        'App\Models\PurchaseReceiptItem' => $record->fromModel->purchaseReceipt->receipt_number ?? 'N/A',
+                                        'App\Models\DeliveryOrderItem' => $record->fromModel->deliveryOrder->do_number ?? 'N/A',
                                         'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
                                         'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
                                         'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
@@ -123,7 +131,29 @@ class ViewStockMovement extends ViewRecord
                                     return $modelName . ' - ' . $sourceNumber;
                                 }
                                 return 'No Source';
-                            }),
+                            })
+                            ->url(function ($record) {
+                                if ($record->fromModel) {
+                                    $modelType = $record->from_model_type;
+
+                                    return match ($modelType) {
+                                        'App\Models\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->fromModel->id),
+                                        'App\Models\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->fromModel->id),
+                                        'App\Models\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $record->fromModel->id),
+                                        'App\Models\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $record->fromModel->id),
+                                        'App\Models\PurchaseReceiptItem' => route('filament.admin.resources.purchase-receipts.view', $record->fromModel->purchaseReceipt->id),
+                                        'App\Models\DeliveryOrderItem' => route('filament.admin.resources.delivery-orders.view', $record->fromModel->deliveryOrder->id),
+                                        'App\Models\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->fromModel->id),
+                                        'App\Models\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->fromModel->id),
+                                        'App\Models\StockAdjustment' => route('filament.admin.resources.stock-adjustments.view', $record->fromModel->id),
+                                        default => null
+                                    };
+                                }
+                                return null;
+                            })
+                            ->color('primary')
+                            ->openUrlInNewTab(false)
+                            ->suffix(' ↗️'),
                     ])->columns(3),
             ]);
     }

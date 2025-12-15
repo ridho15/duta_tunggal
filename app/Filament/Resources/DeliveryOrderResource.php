@@ -88,6 +88,9 @@ class DeliveryOrderResource extends Resource
                             ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
                             ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih',
+                            ])
                             ->helperText('Pilih cabang untuk delivery order ini'),
                         Select::make('salesOrders')
                             ->label('From Sales')
@@ -108,6 +111,9 @@ class DeliveryOrderResource extends Resource
                             })
                             ->multiple()
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Minimal satu Sales Order wajib dipilih',
+                            ])
                             ->helperText('Hanya Sales Order yang sudah dikonfirmasi warehouse yang dapat dipilih untuk membuat Delivery Order.')
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $listSaleOrder = SaleOrder::whereIn('id', $state)->get();
@@ -170,6 +176,10 @@ class DeliveryOrderResource extends Resource
                             ->default(0)
                             ->minValue(0)
                             ->step(0.01)
+                            ->validationMessages([
+                                'numeric' => 'Biaya tambahan harus berupa angka',
+                                'min' => 'Biaya tambahan tidak boleh negatif',
+                            ])
                             ->helperText('Biaya tambahan seperti ongkos kirim, asuransi, dll.')
                             ->nullable(),
                         Textarea::make('additional_cost_description')
@@ -321,7 +331,10 @@ class DeliveryOrderResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
                                     })
-                                    ->required(),
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Product wajib dipilih',
+                                    ]),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
@@ -330,6 +343,11 @@ class DeliveryOrderResource extends Resource
                                     ->rules(['required', 'numeric', 'min:1'])
                                     ->validationAttribute('quantity')
                                     ->live()
+                                    ->validationMessages([
+                                        'required' => 'Quantity wajib diisi',
+                                        'numeric' => 'Quantity harus berupa angka',
+                                        'min' => 'Quantity minimal 1',
+                                    ])
                                     ->afterStateUpdated(function ($state, $set, $get, $component) {
                                         $saleOrderItemId = $get('sale_order_item_id');
                                         $optionsFrom = $get('options_from');
@@ -630,7 +648,8 @@ class DeliveryOrderResource extends Resource
                         ->color('danger')
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request delivery order') && ($record->status != 'approved' || $record->status != 'confirmed' || $record->status != 'close' || $record->status != 'canceled' || $record->status == 'draft');
+                            return Auth::user()->hasPermissionTo('request delivery order') &&
+                                   in_array($record->status, ['draft', 'request_approve', 'request_close']);
                         })
                         ->action(function ($record) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
@@ -670,7 +689,8 @@ class DeliveryOrderResource extends Resource
                         ->color('warning')
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response delivery order') && ($record->status == 'request_close');
+                            return Auth::user()->hasPermissionTo('response delivery order') &&
+                                   $record->status == 'request_close';
                         })
                         ->action(function ($record) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
@@ -902,7 +922,8 @@ class DeliveryOrderResource extends Resource
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
                         ->visible(function ($record) {
-                            return Auth::user()->hasRole(['Super Admin', 'Owner']) && $record->status == 'sent';
+                            return Auth::user()->hasPermissionTo('response delivery order') &&
+                                   $record->status == 'sent';
                         })
                         ->color('success')
                         ->action(function ($record) {

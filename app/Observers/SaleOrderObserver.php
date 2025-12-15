@@ -67,9 +67,17 @@ class SaleOrderObserver
         foreach ($saleOrder->saleOrderItem as $item) {
             // Calculate subtotal using HelperController for consistency
             $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? null);
-            $lineTax = $item->tax > 0 ? $lineSubtotal * ($item->tax / 100) / (1 + $item->tax / 100) : 0; // Extract tax from total
-            $subtotalBeforeTax = $lineSubtotal / (1 + $item->tax / 100);
+            // Use TaxService to get correct breakdown
+            $taxService = \App\Services\TaxService::class;
+            $baseAmount = $item->quantity * $item->unit_price * (1 - $item->discount / 100);
+            $taxResult = $taxService::compute($baseAmount, $item->tax, $item->tipe_pajak ?? null);
+            $lineTax = $taxResult['ppn'];
+            $subtotalBeforeTax = $taxResult['dpp'];
+            $subtotal += $subtotalBeforeTax;
             $tax += $lineTax;
+
+            // Get sales COA from product
+            $salesCoaId = $item->product?->sales_coa_id;
 
             $invoiceItems[] = [
                 'product_id' => $item->product_id,
@@ -80,6 +88,7 @@ class SaleOrderObserver
                 'tax_amount' => $lineTax,
                 'subtotal' => $subtotalBeforeTax,
                 'total' => $lineSubtotal,
+                'coa_id' => $salesCoaId, // Add sales COA ID from product
             ];
         }
 
@@ -135,19 +144,10 @@ class SaleOrderObserver
         $invoice = new Invoice($invoiceData);
         $invoice->save();
 
-        Log::info('SaleOrderObserver: Invoice created, checking saved data', [
+        Log::info('SaleOrderObserver: Invoice created successfully', [
+            'sale_order_id' => $saleOrder->id,
             'invoice_id' => $invoice->id,
-            'saved_customer_name' => $invoice->customer_name,
-            'saved_customer_phone' => $invoice->customer_phone,
-            'fresh_from_db' => Invoice::find($invoice->id)->only(['customer_name', 'customer_phone']),
-        ]);
-
-        // Force refresh and check again
-        $invoice->refresh();
-        Log::info('SaleOrderObserver: After refresh', [
-            'invoice_id' => $invoice->id,
-            'refreshed_customer_name' => $invoice->customer_name,
-            'refreshed_customer_phone' => $invoice->customer_phone,
+            'invoice_number' => $invoice->invoice_number,
         ]);
 
         // Buat invoice items
@@ -155,17 +155,9 @@ class SaleOrderObserver
             InvoiceItem::create(array_merge($itemData, ['invoice_id' => $invoice->id]));
         }
 
-        // InvoiceObserver akan handle creation of AR dan journal entries
-
-        Log::info('Invoice created successfully', [
-            'invoice_id' => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'subtotal' => $subtotal,
-            'tax' => $tax,
-            'additional_costs' => $additionalCosts,
-            'total' => $total,
-            'delivery_orders_count' => $saleOrder->deliveryOrder->count(),
-        ]);
+        // Post journal entries after invoice and items are created
+        $invoiceObserver = new \App\Observers\InvoiceObserver();
+        $invoiceObserver->postSalesInvoice($invoice);
     }
 
     /**

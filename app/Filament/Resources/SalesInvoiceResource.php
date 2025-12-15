@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SalesInvoiceResource\Pages;
+use App\Http\Controllers\HelperController;
 use App\Models\Invoice;
 use App\Models\SaleOrder;
 use App\Models\DeliveryOrder;
@@ -190,9 +191,15 @@ class SalesInvoiceResource extends Resource
                                                 return $do && $do->status === 'completed';
                                             });
                                         
-                                        // Check which DOs are already invoiced
+                                        // Get current invoice record if editing (for allowing already selected DOs)
+                                        $currentInvoiceId = $get('id') ?? null;
+                                        
+                                        // Check which DOs are already invoiced (exclude current invoice if editing)
                                         $invoicedDOIds = Invoice::where('from_model_type', 'App\Models\SaleOrder')
                                             ->whereNotNull('delivery_orders')
+                                            ->when($currentInvoiceId, function ($query) use ($currentInvoiceId) {
+                                                return $query->where('id', '!=', $currentInvoiceId);
+                                            })
                                             ->get()
                                             ->pluck('delivery_orders')
                                             ->flatten()
@@ -225,6 +232,7 @@ class SalesInvoiceResource extends Resource
                                             $set('total', 0);
                                             $set('other_fees', []);
                                             $set('dpp', 0);
+                                            $set('delivery_order_items', []);
                                             return;
                                         }
                                         
@@ -234,7 +242,7 @@ class SalesInvoiceResource extends Resource
                                         if (!$saleOrderId || !$customerId) return;
                                         
                                         $saleOrder = SaleOrder::with('customer')->find($saleOrderId);
-                                        $deliveryOrders = DeliveryOrder::with('deliveryOrderItem.saleOrderItem')
+                                        $deliveryOrders = DeliveryOrder::with('deliveryOrderItem.saleOrderItem', 'deliveryOrderItem.product')
                                             ->whereIn('id', $state)
                                             ->get();
                                         
@@ -251,8 +259,8 @@ class SalesInvoiceResource extends Resource
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
                                                 if ($item->saleOrderItem) {
-                                                    $price = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
-                                                    $total = $price * $item->quantity;
+                                                    $price = (float) $item->saleOrderItem->unit_price - (float) $item->saleOrderItem->discount + (float) $item->saleOrderItem->tax;
+                                                    $total = (float) $price * (float) $item->quantity;
                                                     
                                                     $items[] = [
                                                         'product_id' => $item->product_id,
@@ -272,12 +280,171 @@ class SalesInvoiceResource extends Resource
                                         $set('delivery_orders', $state);
                                         $set('other_fees', []);
                                         
+                                        // For create, set delivery_order_items
+                                        if (!$get('id')) {
+                                            $deliveryOrderItems = [];
+                                            foreach ($deliveryOrders as $do) {
+                                                foreach ($do->deliveryOrderItem as $item) {
+                                                    if ($item->product && $item->saleOrderItem) {
+                                                        $originalPrice = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
+                                                        
+                                                        $deliveryOrderItems[] = [
+                                                            'do_number' => $do->do_number,
+                                                            'product_id' => $item->product_id,
+                                                            'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
+                                                            'original_quantity' => $item->quantity,
+                                                            'invoice_quantity' => $item->quantity,
+                                                            'original_price' => $originalPrice,
+                                                            'unit_price' => $originalPrice,
+                                                            'total_price' => (float) $originalPrice * (float) $item->quantity,
+                                                            'coa_id' => $item->product->sales_coa_id,
+                                                        ];
+                                                    }
+                                                }
+                                            }
+                                            $set('delivery_order_items', $deliveryOrderItems);
+                                        }
+                                        
                                         // Calculate tax and total
                                         $tax = $get('tax') ?? 0;
                                         $otherFee = 0; // Initialize as 0
                                         $ppnRate = $get('ppn_rate') ?? 0;
                                         $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
+                                    }),
+                            ]),
+
+                        // Edit Delivery Order Items Section
+                        Section::make('Edit Item Delivery Order')
+                            ->description('Edit quantity dan harga dari delivery order yang dipilih')
+                            ->schema([
+                                Repeater::make('delivery_order_items')
+                                    ->label('')
+                                    ->schema([
+                                        TextInput::make('do_number')
+                                            ->label('No. DO')
+                                            ->disabled()
+                                            ->columnSpan(1),
+                                        TextInput::make('product_name')
+                                            ->label('Product')
+                                            ->disabled()
+                                            ->columnSpan(2),
+                                        TextInput::make('original_quantity')
+                                            ->label('Qty DO Asli')
+                                            ->disabled()
+                                            ->numeric()
+                                            ->columnSpan(1),
+                                        TextInput::make('invoice_quantity')
+                                            ->label('Qty untuk Invoice')
+                                            ->numeric()
+                                            ->required()
+                                            ->default(function ($get) {
+                                                return $get('original_quantity') ?? 0;
+                                            })
+                                            ->minValue(0)
+                                            ->maxValue(function ($get) {
+                                                return $get('original_quantity') ?? 0;
+                                            })
+                                            ->validationMessages([
+                                                'required' => 'Qty invoice tidak boleh kosong',
+                                                'numeric' => 'Qty invoice harus berupa angka',
+                                                'min' => 'Qty invoice tidak boleh negatif',
+                                                'max' => 'Qty invoice tidak boleh lebih dari qty DO asli'
+                                            ])
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($set, $get) {
+                                                $quantity = (float) ($get('invoice_quantity') ?? 0);
+                                                $price = (float) str_replace(['.', ','], ['', '.'], $get('unit_price') ?? '0');
+                                                $set('total_price', $quantity * $price);
+                                            })
+                                            ->columnSpan(1),
+                                        TextInput::make('unit_price')
+                                            ->label('Harga Satuan')
+                                            ->indonesianMoney()
+                                            ->required()
+                                            ->default(function ($get) {
+                                                return $get('original_price') ?? 0;
+                                            })
+                                            ->minValue(0)
+                                            ->validationMessages([
+                                                'required' => 'Harga satuan tidak boleh kosong',
+                                                'numeric' => 'Harga satuan harus berupa angka',
+                                                'min' => 'Harga satuan tidak boleh negatif'
+                                            ])
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($set, $get) {
+                                                $quantity = (float) ($get('invoice_quantity') ?? 0);
+                                                $price = (float) str_replace(['.', ','], ['', '.'], $get('unit_price') ?? '0');
+                                                $set('total_price', $quantity * $price);
+                                            })
+                                            ->columnSpan(1),
+                                        TextInput::make('total_price')
+                                            ->label('Total')
+                                            ->indonesianMoney()
+                                            ->disabled()
+                                            ->columnSpan(1),
+                                        Select::make('coa_id')
+                                            ->label('COA Revenue')
+                                            ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
+                                                return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                            }))
+                                            ->searchable()
+                                            ->preload()
+                                            ->default(function ($get) {
+                                                $productId = $get('product_id');
+                                                if ($productId) {
+                                                    $product = \App\Models\Product::find($productId);
+                                                    return $product?->sales_coa_id;
+                                                }
+                                                return null;
+                                            })
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'COA revenue harus dipilih'
+                                            ])
+                                            ->columnSpan(1),
+                                    ])
+                                    ->columns(4)
+                                    ->columnSpanFull()
+                                    ->defaultItems(0)
+                                    ->itemLabel(function ($state) {
+                                        return $state['product_name'] ?? 'Item';
+                                    })
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        // Recalculate invoice items when delivery order items change
+                                        $deliveryOrderItems = $state ?? [];
+                                        
+                                        $invoiceItems = [];
+                                        $subtotal = 0;
+                                        
+                                        foreach ($deliveryOrderItems as $item) {
+                                            $quantity = (float) ($item['invoice_quantity'] ?? 0);
+                                            $price = (float) ($item['unit_price'] ?? 0);
+                                            $total = $quantity * $price;
+                                            
+                                            $invoiceItems[] = [
+                                                'product_id' => $item['product_id'] ?? null,
+                                                'quantity' => $quantity,
+                                                'price' => $price,
+                                                'total' => $total,
+                                                'coa_id' => $item['coa_id'] ?? null,
+                                            ];
+                                            
+                                            $subtotal += $total;
+                                        }
+                                        
+                                        $set('invoiceItem', $invoiceItems);
+                                        $set('subtotal', $subtotal);
+                                        $set('dpp', $subtotal);
+                                        
+                                        // Recalculate total
+                                        $tax = $get('tax') ?? 0;
+                                        $otherFees = $get('other_fees') ?? [];
+                                        $otherFeeTotal = collect($otherFees)->sum('amount');
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $set('total', $finalTotal);
+                                        $set('other_fee', $otherFeeTotal);
                                     }),
                             ]),
 
@@ -326,7 +493,7 @@ class SalesInvoiceResource extends Resource
                             ->columns(3)
                             ->schema([
                                 TextInput::make('dpp')
-                                    ->label('DPP')
+                                    ->label('DPP (Dasar Pengenaan Pajak)')
                                     ->indonesianMoney()
                                     ->numeric()
                                     ->validationMessages([
@@ -442,20 +609,10 @@ class SalesInvoiceResource extends Resource
                                     ->default(function () {
                                         return \App\Models\ChartOfAccount::where('code', '2120.06')->first()?->id;
                                     }),
-                                    
-                                Select::make('biaya_pengiriman_coa_id')
-                                    ->label('COA Biaya Pengiriman')
-                                    ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
-                                    }),
                             ]),
                             
                         // Hidden fields
+                        Hidden::make('id'),
                         Hidden::make('from_model_type')->default('App\Models\SaleOrder'),
                         Hidden::make('from_model_id'),
                         Hidden::make('customer_name'),
@@ -513,6 +670,7 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'Total harus berupa angka'
                                     ]),
                             ])
+                            ->columns(2)
                             ->defaultItems(0)
                             ->collapsed()
                             ->cloneable(),

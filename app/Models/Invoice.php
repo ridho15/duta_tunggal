@@ -65,6 +65,13 @@ class Invoice extends Model
         'other_fee' => 'array',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::observe(\App\Observers\InvoiceObserver::class);
+    }
+
     public function getOtherFeeTotalAttribute(): int
     {
         $fees = $this->other_fee;

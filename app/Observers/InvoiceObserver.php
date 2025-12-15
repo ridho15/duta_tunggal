@@ -65,9 +65,8 @@ class InvoiceObserver
                 'days_outstanding' => Carbon::parse($invoice->invoice_date)->diffInDays($invoice->due_date),
                 'bucket' => 'Current'
             ]);
-            
-            // Post journal entries for sales invoice
-            $this->postSalesInvoice($invoice);
+
+            // Note: postSalesInvoice will be called manually by SaleOrderObserver after invoice items are created
         }
 
         // If invoice already paid on creation, post to ledger
@@ -110,12 +109,27 @@ class InvoiceObserver
                 ->delete();
 
             // Re-post journal entries with new amounts
-            $this->ledger->postInvoice($invoice);
+            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                $this->postSalesInvoice($invoice);
+            } else {
+                $this->ledger->postInvoice($invoice);
+            }
         }
 
         // When invoice status becomes 'paid', post to ledger (if not already posted)
         if (strtolower($invoice->status) === 'paid') {
-            $this->ledger->postInvoice($invoice);
+            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                $this->postSalesInvoice($invoice);
+            } else {
+                $this->ledger->postInvoice($invoice);
+            }
+        }
+
+        // When invoice status becomes 'approved', post sales invoice journal entries
+        if ($invoice->wasChanged('status') && strtolower($invoice->status) === 'approved') {
+            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                $this->postSalesInvoice($invoice);
+            }
         }
     }
 
@@ -148,7 +162,7 @@ class InvoiceObserver
         ]);
     }
 
-    protected function postSalesInvoice(Invoice $invoice)
+    public function postSalesInvoice(Invoice $invoice)
     {
         // Prevent duplicate posting
         if (\App\Models\JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->exists()) {
@@ -165,6 +179,12 @@ class InvoiceObserver
         $biayaPengirimanCoa = $invoice->biayaPengirimanCoa ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first(); // Biaya Pengiriman
 
         if (!$arCoa || !$revenueCoa) {
+            dd('COAs not found', ['ar_coa' => $arCoa, 'revenue_coa' => $revenueCoa, 'all_coas' => \App\Models\ChartOfAccount::all()->pluck('code')->toArray()]);
+            Log::error('Essential COAs not found for sales invoice', [
+                'invoice_id' => $invoice->id,
+                'ar_coa' => $arCoa ? $arCoa->id : null,
+                'revenue_coa' => $revenueCoa ? $revenueCoa->id : null,
+            ]);
             return; // Skip if essential COAs not found
         }
 
@@ -177,10 +197,8 @@ class InvoiceObserver
         $otherFeeTotal = $invoice->getOtherFeeTotalAttribute();
 
         // DEBIT: Accounts Receivable (customer owes money) - total amount
-        $grandTotal = $invoice->invoiceItem->sum('total') + $otherFeeTotal;
+        $grandTotal = $invoice->total;
 
-        // DEBIT: Accounts Receivable (customer owes money) - total amount
-        $grandTotal = $invoice->invoiceItem->sum('total') + $otherFeeTotal;
         \App\Models\JournalEntry::create([
             'coa_id' => $arCoa->id,
             'date' => $date,
@@ -201,19 +219,20 @@ class InvoiceObserver
             $discountAmount = (float) $item->discount * (float) $item->quantity;
 
             // CREDIT: Revenue/Sales for this item
-            if ($subtotal > 0) {
+            if ($item->total > 0) {
+                $itemCoaId = $item->product->sales_coa_id ?? $revenueCoa->id;
                 \App\Models\JournalEntry::create([
-                    'coa_id' => $revenueCoa->id,
+                    'coa_id' => $itemCoaId,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
                     'description' => "Sales Invoice - Revenue: {$productName}",
                     'debit' => 0,
-                    'credit' => $subtotal,
+                    'credit' => $item->subtotal, // Use subtotal (revenue before tax)
                     'journal_type' => 'sales',
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                 ]);
-                $totalRevenue += $subtotal;
+                $totalRevenue += $item->subtotal;
             }
 
             // DEBIT: Sales Discount for this item (if any)
@@ -232,21 +251,25 @@ class InvoiceObserver
                 $totalDiscount += $discountAmount;
             }
 
-            // CREDIT: PPn Keluaran for this item (if any)
-            if ($taxAmount > 0 && $ppnKeluaranCoa) {
-                \App\Models\JournalEntry::create([
-                    'coa_id' => $ppnKeluaranCoa->id,
-                    'date' => $date,
-                    'reference' => $invoice->invoice_number,
-                    'description' => "Sales Invoice - PPn Keluaran: {$productName}",
-                    'debit' => 0,
-                    'credit' => $taxAmount,
-                    'journal_type' => 'sales',
-                    'source_type' => Invoice::class,
-                    'source_id' => $invoice->id,
-                ]);
-                $totalTax += $taxAmount;
-            }
+        }
+
+        // CREDIT: PPn Keluaran at invoice level (if any tax difference)
+        $invoiceTax = (float) $invoice->tax;
+        $calculatedTax = (float) $invoice->total - (float) $invoice->subtotal - $otherFeeTotal;
+        $totalTaxAmount = max($invoiceTax, $calculatedTax);
+        
+        if ($totalTaxAmount > 0 && $ppnKeluaranCoa) {
+            \App\Models\JournalEntry::create([
+                'coa_id' => $ppnKeluaranCoa->id,
+                'date' => $date,
+                'reference' => $invoice->invoice_number,
+                'description' => 'Sales Invoice - PPn Keluaran',
+                'debit' => 0,
+                'credit' => $totalTaxAmount,
+                'journal_type' => 'sales',
+                'source_type' => Invoice::class,
+                'source_id' => $invoice->id,
+            ]);
         }
 
         // CREDIT: Biaya Pengiriman (shipping/other costs)

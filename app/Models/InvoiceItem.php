@@ -21,6 +21,7 @@ class InvoiceItem extends Model
         'tax_amount',
         'subtotal',
         'total',
+        'coa_id',
     ];
     protected $casts = [
         'quantity' => 'decimal:2',

@@ -25,8 +25,26 @@ class CreateSalesInvoice extends CreateRecord
         // Create invoice items
         if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
             foreach ($this->data['invoiceItem'] as $item) {
-                $this->record->invoiceItem()->create($item);
+                // Calculate subtotal if not provided
+                $quantity = (float) ($item['quantity'] ?? 0);
+                $price = (float) ($item['price'] ?? 0);
+                $subtotal = $quantity * $price;
+                
+                $itemData = array_merge($item, [
+                    'subtotal' => $subtotal,
+                    'discount' => 0,
+                    'tax_rate' => 0,
+                    'tax_amount' => 0,
+                ]);
+                
+                $this->record->invoiceItem()->create($itemData);
             }
+        }
+
+        // Post journal entries for sales invoice
+        if ($this->record->from_model_type === 'App\Models\SaleOrder') {
+            $invoiceObserver = new \App\Observers\InvoiceObserver();
+            $invoiceObserver->postSalesInvoice($this->record);
         }
     }
 }

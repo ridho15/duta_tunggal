@@ -18,16 +18,29 @@ class ViewDeliveryOrder extends ViewRecord
     protected function getActions(): array
     {
         return [
-            Actions\EditAction::make()
-                ->icon('heroicon-o-pencil-square'),
-            DeleteAction::make(),
+            EditAction::make()
+                ->icon('heroicon-o-pencil-square')
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('update delivery order') &&
+                        in_array($record->status, ['draft', 'request_approve', 'request_close']);
+                }),
+            DeleteAction::make()
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('delete delivery order') &&
+                        $record->status == 'draft';
+                }),
+
             Actions\Action::make('request_approve')
                 ->label('Request Approve')
                 ->requiresConfirmation()
                 ->color('success')
                 ->icon('heroicon-o-arrow-uturn-up')
-                ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('request delivery order') && $record->status == 'draft';
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('request delivery order') &&
+                        $record->status == 'draft';
                 })
                 ->action(function ($record) {
                     $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
@@ -39,23 +52,27 @@ class ViewDeliveryOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('danger')
                 ->icon('heroicon-o-x-circle')
-                ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('request delivery order') && ($record->status != 'approved' || $record->status != 'confirmed' || $record->status != 'close' || $record->status != 'canceled' || $record->status == 'draft');
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('request delivery order') &&
+                        in_array($record->status, ['draft', 'request_approve', 'request_close']);
                 })
                 ->action(function ($record) {
                     $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'request_close');
                     \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
                 }),
+
             Actions\Action::make('approve')
                 ->label('Approve Delivery Order')
                 ->requiresConfirmation()
                 ->color('success')
                 ->icon('heroicon-o-check-badge')
-                ->visible(function ($record) {
+                ->visible(function () {
+                    $record = $this->record;
                     return Auth::user()->hasPermissionTo('response delivery order') &&
-                           $record->status == 'request_approve' &&
-                           $record->suratJalan()->exists();
+                        $record->status == 'request_approve' &&
+                        $record->suratJalan()->exists();
                 })
                 ->form([
                     \Filament\Forms\Components\Textarea::make('comments')
@@ -73,26 +90,15 @@ class ViewDeliveryOrder extends ViewRecord
                         throw $e;
                     }
                 }),
-            Actions\Action::make('closed')
-                ->label('Close')
-                ->requiresConfirmation()
-                ->color('warning')
-                ->icon('heroicon-o-x-circle')
-                ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('response delivery order') && ($record->status == 'request_close');
-                })
-                ->action(function ($record) {
-                    $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                    $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'closed');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order Closed");
-                }),
             Actions\Action::make('reject')
                 ->label('Reject Delivery Order')
                 ->requiresConfirmation()
                 ->color('danger')
                 ->icon('heroicon-o-x-circle')
-                ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('response delivery order') && $record->status == 'request_approve';
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('response delivery order') &&
+                        $record->status == 'request_approve';
                 })
                 ->form([
                     \Filament\Forms\Components\Textarea::make('comments')
@@ -105,6 +111,22 @@ class ViewDeliveryOrder extends ViewRecord
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'reject', comments: $data['comments'], action: 'rejected');
                     \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Delivery Order");
                 }),
+            Actions\Action::make('closed')
+                ->label('Close')
+                ->requiresConfirmation()
+                ->color('warning')
+                ->icon('heroicon-o-x-circle')
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('response delivery order') &&
+                        $record->status == 'request_close';
+                })
+                ->action(function ($record) {
+                    $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
+                    $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'closed');
+                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order Closed");
+                }),
+
             Actions\Action::make('sent')
                 ->label('Mark as Sent')
                 ->requiresConfirmation()
@@ -113,9 +135,10 @@ class ViewDeliveryOrder extends ViewRecord
                 ->modalSubmitActionLabel('Yes, Mark as Sent')
                 ->color('info')
                 ->icon('heroicon-o-paper-airplane')
-                ->visible(function ($record) {
+                ->visible(function () {
+                    $record = $this->record;
                     return Auth::user()->hasPermissionTo('response delivery order') &&
-                           $record->status == 'approved';
+                        $record->status == 'approved';
                 })
                 ->action(function ($record) {
                     try {
@@ -127,14 +150,38 @@ class ViewDeliveryOrder extends ViewRecord
                         throw $e;
                     }
                 }),
+            Actions\Action::make('completed')
+                ->label('Complete')
+                ->icon('heroicon-o-check-badge')
+                ->requiresConfirmation()
+                ->color('success')
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('response delivery order') &&
+                        $record->status == 'sent';
+                })
+                ->action(function ($record) {
+                    $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
+                    $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'completed');
+                    // Post delivery order to general ledger for HPP recognition
+                    $postResult = $deliveryOrderService->postDeliveryOrder($record);
+                    if ($postResult['status'] === 'posted') {
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed and posted to ledger");
+                    } elseif ($postResult['status'] === 'error') {
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
+                    } else {
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                    }
+                }),
+
             Actions\Action::make('checker_edit_quantity')
                 ->label('Checker Edit Qty')
                 ->color('warning')
                 ->icon('heroicon-o-pencil-square')
-                ->visible(function ($record) {
-                    // Hanya tampil untuk status approved dan user dengan role checker atau admin
+                ->visible(function () {
+                    $record = $this->record;
                     return ($record->status == 'approved' || $record->status == 'confirmed') &&
-                           Auth::user()->hasRole(['Checker', 'Super Admin', 'Owner', 'Admin']);
+                        Auth::user()->hasRole(['Checker', 'Super Admin', 'Owner', 'Admin']);
                 })
                 ->form([
                     \Filament\Forms\Components\Fieldset::make('Edit Quantity untuk Checker')
@@ -186,7 +233,8 @@ class ViewDeliveryOrder extends ViewRecord
                                         ]);
                                     })->values()->toArray();
                                 })
-                                ->default(function ($record) {
+                                ->default(function () {
+                                    $record = $this->record;
                                     $items = [];
                                     foreach ($record->deliveryOrderItem as $item) {
                                         $items[] = [
@@ -240,85 +288,27 @@ class ViewDeliveryOrder extends ViewRecord
                         message: "Quantity Delivery Order berhasil diupdate oleh Checker"
                     );
                 }),
-            Actions\Action::make('approve')
-                ->label('Approve Delivery Order')
-                ->requiresConfirmation()
-                ->color('success')
-                ->icon('heroicon-o-check-badge')
-                ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('response delivery order') &&
-                           $record->status == 'request_approve' &&
-                           $record->suratJalan()->exists();
-                })
-                ->form([
-                    \Filament\Forms\Components\Textarea::make('comments')
-                        ->label('Comments')
-                        ->placeholder('Optional approval comments...')
-                        ->nullable()
-                ])
-                ->action(function ($record, array $data) {
-                    try {
-                        $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                        $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve Delivery Order");
-                    } catch (\Exception $e) {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
-                        throw $e;
-                    }
-                }),
-            Actions\Action::make('reject')
-                ->label('Reject Delivery Order')
-                ->requiresConfirmation()
-                ->color('danger')
-                ->icon('heroicon-o-x-circle')
-                ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('response delivery order') && $record->status == 'request_approve';
-                })
-                ->form([
-                    \Filament\Forms\Components\Textarea::make('comments')
-                        ->label('Rejection Reason')
-                        ->placeholder('Please provide reason for rejection...')
-                        ->required()
-                ])
-                ->action(function ($record, array $data) {
-                    $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                    $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'reject', comments: $data['comments'], action: 'rejected');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Delivery Order");
-                }),
-            Actions\Action::make('sent')
-                ->label('Mark as Sent')
-                ->requiresConfirmation()
-                ->modalHeading('Mark Delivery Order as Sent')
-                ->modalDescription('Are you sure you want to mark this delivery order as sent? This will create journal entries for goods delivery.')
-                ->modalSubmitActionLabel('Yes, Mark as Sent')
-                ->color('info')
-                ->icon('heroicon-o-paper-airplane')
-                ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('response delivery order') &&
-                           $record->status == 'approved';
-                })
-                ->action(function ($record) {
-                    try {
-                        $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                        $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'sent');
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Success", message: "Delivery Order marked as sent successfully");
-                    } catch (\Exception $e) {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
-                        throw $e;
-                    }
-                }),
+
             Action::make('surat_jalan_status')
-                ->label(function ($record) {
+                ->label(function () {
+                    $record = $this->record;
                     return $record->suratJalan()->exists() ? 'Surat Jalan: Ada' : 'Surat Jalan: Belum Ada';
                 })
-                ->color(function ($record) {
+                ->color(function () {
+                    $record = $this->record;
                     return $record->suratJalan()->exists() ? 'success' : 'warning';
                 })
-                ->icon(function ($record) {
+                ->icon(function () {
+                    $record = $this->record;
                     return $record->suratJalan()->exists() ? 'heroicon-o-check-circle' : 'heroicon-o-exclamation-triangle';
                 })
                 ->disabled()
-                ->tooltip(function ($record) {
+                ->visible(function () {
+                    $record = $this->record;
+                    return in_array($record->status, ['approved', 'completed', 'confirmed', 'received', 'sent']);
+                })
+                ->tooltip(function () {
+                    $record = $this->record;
                     if ($record->suratJalan()->exists()) {
                         $suratJalan = $record->suratJalan()->where('status', 1)->first() ?? $record->suratJalan()->first();
                         if ($suratJalan) {
@@ -330,10 +320,11 @@ class ViewDeliveryOrder extends ViewRecord
             Action::make('pdf_delivery_order')
                 ->label('Download PDF')
                 ->color('danger')
-                ->visible(function ($record) {
-                    return $record->status == 'approved' || $record->status == 'completed' || $record->status == 'confirmed' || $record->status == 'received';
-                })
                 ->icon('heroicon-o-document')
+                ->visible(function () {
+                    $record = $this->record;
+                    return in_array($record->status, ['approved', 'completed', 'confirmed', 'received', 'sent']);
+                })
                 ->action(function ($record) {
                     // Load necessary relationships for PDF
                     $record->load([
@@ -350,27 +341,6 @@ class ViewDeliveryOrder extends ViewRecord
                     return response()->streamDownload(function () use ($pdf) {
                         echo $pdf->stream();
                     }, 'Delivery_Order_' . $record->do_number . '.pdf');
-                }),
-            Actions\Action::make('completed')
-                ->label('Complete')
-                ->icon('heroicon-o-check-badge')
-                ->requiresConfirmation()
-                ->visible(function ($record) {
-                    return Auth::user()->hasRole(['Super Admin', 'Owner']) && $record->status == 'sent';
-                })
-                ->color('success')
-                ->action(function ($record) {
-                    $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                    $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'completed');
-                    // Post delivery order to general ledger for HPP recognition
-                    $postResult = $deliveryOrderService->postDeliveryOrder($record);
-                    if ($postResult['status'] === 'posted') {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed and posted to ledger");
-                    } elseif ($postResult['status'] === 'error') {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
-                    } else {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
-                    }
                 }),
         ];
     }
