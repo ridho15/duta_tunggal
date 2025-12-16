@@ -53,19 +53,32 @@
             text-align: center;
         }
         .account-name {
-            font-weight: bold;
+            font-weight: normal;
         }
         .total-row {
-            background-color: #e8f4f8;
+            font-weight: bold;
+            background-color: #f0f0f0;
+        }
+        .profit-row {
+            font-weight: bold;
+            background-color: #f0f0f0;
+        }
+        .subtotal-row {
             font-weight: bold;
         }
         .number-column {
             text-align: right;
         }
         .section-header {
-            background-color: #f0f0f0;
+            background-color: #e0e0e0;
             font-weight: bold;
             font-size: 13px;
+        }
+        .child-row td:nth-child(2) {
+            padding-left: 30px;
+        }
+        .negative {
+            color: #000;
         }
         .footer {
             margin-top: 30px;
@@ -88,34 +101,68 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 50%">Akun</th>
-                <th style="width: 15%">Debit</th>
-                <th style="width: 15%">Kredit</th>
-                <th style="width: 20%">Saldo</th>
+                <th style="width: 15%">Kode</th>
+                <th style="width: 65%">Deskripsi</th>
+                <th style="width: 20%">Jumlah</th>
             </tr>
         </thead>
         <tbody>
             @foreach($items as $item)
-                <tr>
-                    <td class="account-name">{{ $item->account_name }}</td>
-                    <td class="number-column">
-                        @if($item->debit > 0)
-                            Rp {{ number_format($item->debit, 0, ',', '.') }}
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td class="number-column">
-                        @if($item->credit > 0)
-                            Rp {{ number_format($item->credit, 0, ',', '.') }}
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td class="number-column">
-                        <strong>Rp {{ number_format($item->balance, 0, ',', '.') }}</strong>
-                    </td>
-                </tr>
+                @php
+                    $isArray = is_array($item);
+                    $code = $isArray ? ($item['code'] ?? '') : ($item->code ?? '');
+                    $description = $isArray ? ($item['description'] ?? '') : ($item->description ?? '');
+                    $amount = $isArray ? ($item['amount'] ?? '') : ($item->amount ?? '');
+                    $isHeader = $isArray ? ($item['is_header'] ?? false) : ($item->is_header ?? false);
+                    $isTotal = $isArray ? ($item['is_total'] ?? false) : ($item->is_total ?? false);
+                    $isSpacer = $isArray ? ($item['is_spacer'] ?? false) : ($item->is_spacer ?? false);
+                @endphp
+
+                @php
+                    $rowType = $isArray ? ($item['row_type'] ?? '') : ($item->row_type ?? '');
+                    $isChild = $rowType === 'child';
+                    $isSubtotal = $rowType === 'subtotal';
+                    $isComputed = $rowType === 'computed';
+                    $amountNum = (float) $amount;
+                    $isNegative = $amountNum < 0;
+                    $absAmount = abs($amountNum);
+                    $formattedAmount = number_format($absAmount, 0, ',', '.');
+                    if ($isNegative) {
+                        $displayAmount = "({$formattedAmount})";
+                    } else {
+                        $displayAmount = $formattedAmount;
+                    }
+                @endphp
+
+                @if($isSpacer)
+                    <tr><td colspan="3">&nbsp;</td></tr>
+                @elseif($isHeader)
+                    <tr class="section-header"><td colspan="3">{{ $description }}</td></tr>
+                @elseif($isTotal || $isComputed)
+                    <tr class="{{ $isComputed ? 'profit-row' : 'total-row' }}">
+                        <td></td>
+                        <td>{{ $description }}</td>
+                        <td class="number-column {{ $isNegative ? 'negative' : '' }}">
+                            <strong>{{ $displayAmount }}</strong>
+                        </td>
+                    </tr>
+                @elseif($isSubtotal)
+                    <tr class="subtotal-row">
+                        <td></td>
+                        <td>{{ $description }}</td>
+                        <td class="number-column {{ $isNegative ? 'negative' : '' }}">
+                            <strong>{{ $displayAmount }}</strong>
+                        </td>
+                    </tr>
+                @else
+                    <tr class="{{ $isChild ? 'child-row' : '' }}">
+                        <td>{{ $code }}</td>
+                        <td class="account-name">{{ $description }}</td>
+                        <td class="number-column {{ $isNegative ? 'negative' : '' }}">
+                            <strong>{{ $displayAmount }}</strong>
+                        </td>
+                    </tr>
+                @endif
             @endforeach
         </tbody>
     </table>

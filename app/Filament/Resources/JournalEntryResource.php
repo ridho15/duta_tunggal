@@ -619,7 +619,7 @@ class JournalEntryResource extends Resource
                                             case 'App\\Models\\CustomerReceipt':
                                                 return $source->receipt_number ?: 'N/A';
                                             case 'App\\Models\\CashBankTransaction':
-                                                return $source->transaction_number ?: 'N/A';
+                                                return $source->number ?: 'N/A';
                                             case 'App\\Models\\StockTransfer':
                                                 return $source->transfer_number ?: 'N/A';
                                             case 'App\\Models\\Asset':
@@ -691,7 +691,7 @@ class JournalEntryResource extends Resource
                                                 return "CR: {$source->receipt_number} - {$customerName}";
                                             case 'App\\Models\\CashBankTransaction':
                                                 $description = $source->description ?: 'N/A';
-                                                return "CBT: {$source->transaction_number} - {$description}";
+                                                return "CBT: {$source->number} - {$description}";
                                             case 'App\\Models\\CashBankTransfer':
                                                 $description = $source->description ?: 'N/A';
                                                 return "CBT: {$source->transfer_number} - {$description}";
@@ -741,6 +741,11 @@ class JournalEntryResource extends Resource
                                     })
                                     ->placeholder('N/A')
                                     ->columnSpanFull(),
+
+                                Infolists\Components\TextEntry::make('transaction_id')
+                                    ->label('Transaction ID')
+                                    ->placeholder('N/A')
+                                    ->visible(fn ($record) => !is_null($record->transaction_id)),
 
                                 Infolists\Components\Actions::make([
                                     Infolists\Components\Actions\Action::make('view_source')

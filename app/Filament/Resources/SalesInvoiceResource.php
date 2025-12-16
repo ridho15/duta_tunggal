@@ -168,18 +168,23 @@ class SalesInvoiceResource extends Resource
                                     }),
                             ]),
 
-                        // Delivery Orders Selection
-                        Section::make('Silahkan Pilih DO')
+                        // Delivery Orders Selection / Direct SO Items
+                        Section::make('Silahkan Pilih DO atau Items')
                             ->schema([
                                 Forms\Components\CheckboxList::make('selected_delivery_orders')
                                     ->label('')
                                     ->options(function ($get) {
                                         $saleOrderId = $get('selected_sale_order');
                                         if (!$saleOrderId) return [];
-                                        
+
                                         $saleOrder = SaleOrder::find($saleOrderId);
                                         if (!$saleOrder) return [];
-                                        
+
+                                        // Jika SO tipe "Ambil Sendiri", return empty array (akan handle di bawah)
+                                        if ($saleOrder->tipe_pengiriman === 'Ambil Sendiri') {
+                                            return [];
+                                        }
+
                                         // Get all DOs from this SO
                                         $deliveryOrders = $saleOrder->deliverySalesOrder()
                                             ->with(['deliveryOrder' => function($query) {
@@ -190,10 +195,10 @@ class SalesInvoiceResource extends Resource
                                             ->filter(function ($do) {
                                                 return $do && $do->status === 'completed';
                                             });
-                                        
+
                                         // Get current invoice record if editing (for allowing already selected DOs)
                                         $currentInvoiceId = $get('id') ?? null;
-                                        
+
                                         // Check which DOs are already invoiced (exclude current invoice if editing)
                                         $invoicedDOIds = Invoice::where('from_model_type', 'App\Models\SaleOrder')
                                             ->whereNotNull('delivery_orders')
@@ -205,26 +210,33 @@ class SalesInvoiceResource extends Resource
                                             ->flatten()
                                             ->unique()
                                             ->toArray();
-                                        
+
                                         $options = [];
                                         foreach ($deliveryOrders as $do) {
                                             $isInvoiced = in_array($do->id, $invoicedDOIds);
                                             $total = $do->total ?? 0;
                                             $label = "{$do->do_number} - Rp. " . number_format($total, 0, ',', '.');
-                                            
+
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
                                                 // Don't add to options if already invoiced
                                                 continue;
                                             }
-                                            
+
                                             $options[$do->id] = $label;
                                         }
-                                        
+
                                         return $options;
                                     })
                                     ->columns(1)
                                     ->reactive()
+                                    ->visible(function ($get) {
+                                        $saleOrderId = $get('selected_sale_order');
+                                        if (!$saleOrderId) return false;
+
+                                        $saleOrder = SaleOrder::find($saleOrderId);
+                                        return $saleOrder && $saleOrder->tipe_pengiriman !== 'Ambil Sendiri';
+                                    })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
                                             $set('invoiceItem', []);
@@ -235,51 +247,51 @@ class SalesInvoiceResource extends Resource
                                             $set('delivery_order_items', []);
                                             return;
                                         }
-                                        
+
                                         $saleOrderId = $get('selected_sale_order');
                                         $customerId = $get('selected_customer');
-                                        
+
                                         if (!$saleOrderId || !$customerId) return;
-                                        
+
                                         $saleOrder = SaleOrder::with('customer')->find($saleOrderId);
                                         $deliveryOrders = DeliveryOrder::with('deliveryOrderItem.saleOrderItem', 'deliveryOrderItem.product')
                                             ->whereIn('id', $state)
                                             ->get();
-                                        
+
                                         // Set customer info
                                         $set('customer_name', $saleOrder->customer->name);
                                         $set('customer_phone', $saleOrder->customer->phone ?? '');
                                         $set('from_model_type', 'App\Models\SaleOrder');
                                         $set('from_model_id', $saleOrderId);
-                                        
+
                                         // Calculate items from delivery orders
                                         $items = [];
                                         $subtotal = 0;
-                                        
+
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
                                                 if ($item->saleOrderItem) {
                                                     $price = (float) $item->saleOrderItem->unit_price - (float) $item->saleOrderItem->discount + (float) $item->saleOrderItem->tax;
                                                     $total = (float) $price * (float) $item->quantity;
-                                                    
+
                                                     $items[] = [
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->quantity,
                                                         'price' => $price,
                                                         'total' => $total
                                                     ];
-                                                    
+
                                                     $subtotal += $total;
                                                 }
                                             }
                                         }
-                                        
+
                                         $set('invoiceItem', $items);
                                         $set('subtotal', $subtotal);
                                         $set('dpp', $subtotal);
                                         $set('delivery_orders', $state);
                                         $set('other_fees', []);
-                                        
+
                                         // For create, set delivery_order_items
                                         if (!$get('id')) {
                                             $deliveryOrderItems = [];
@@ -287,7 +299,7 @@ class SalesInvoiceResource extends Resource
                                                 foreach ($do->deliveryOrderItem as $item) {
                                                     if ($item->product && $item->saleOrderItem) {
                                                         $originalPrice = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
-                                                        
+
                                                         $deliveryOrderItems[] = [
                                                             'do_number' => $do->do_number,
                                                             'product_id' => $item->product_id,
@@ -304,10 +316,100 @@ class SalesInvoiceResource extends Resource
                                             }
                                             $set('delivery_order_items', $deliveryOrderItems);
                                         }
-                                        
+
                                         // Calculate tax and total
                                         $tax = $get('tax') ?? 0;
                                         $otherFee = 0; // Initialize as 0
+                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $set('total', $finalTotal);
+                                    }),
+
+                                // Checkbox untuk konfirmasi pemilihan SO Ambil Sendiri
+                                Forms\Components\Checkbox::make('confirm_self_pickup_invoice')
+                                    ->label('Buat invoice dari Sales Order "Ambil Sendiri" ini')
+                                    ->visible(function ($get) {
+                                        $saleOrderId = $get('selected_sale_order');
+                                        if (!$saleOrderId) return false;
+
+                                        $saleOrder = SaleOrder::find($saleOrderId);
+                                        return $saleOrder && $saleOrder->tipe_pengiriman === 'Ambil Sendiri';
+                                    })
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if (!$state) {
+                                            $set('invoiceItem', []);
+                                            $set('subtotal', 0);
+                                            $set('total', 0);
+                                            $set('other_fees', []);
+                                            $set('dpp', 0);
+                                            $set('delivery_order_items', []);
+                                            return;
+                                        }
+
+                                        $saleOrderId = $get('selected_sale_order');
+                                        $customerId = $get('selected_customer');
+
+                                        if (!$saleOrderId || !$customerId) return;
+
+                                        $saleOrder = SaleOrder::with('customer', 'saleOrderItem.product')->find($saleOrderId);
+
+                                        // Set customer info
+                                        $set('customer_name', $saleOrder->customer->name);
+                                        $set('customer_phone', $saleOrder->customer->phone ?? '');
+                                        $set('from_model_type', 'App\Models\SaleOrder');
+                                        $set('from_model_id', $saleOrderId);
+
+                                        // Calculate items directly from SO items
+                                        $items = [];
+                                        $subtotal = 0;
+
+                                        foreach ($saleOrder->saleOrderItem as $item) {
+                                            $price = (float) $item->unit_price - (float) $item->discount + (float) $item->tax;
+                                            $total = (float) $price * (float) $item->quantity;
+
+                                            $items[] = [
+                                                'product_id' => $item->product_id,
+                                                'quantity' => $item->quantity,
+                                                'price' => $price,
+                                                'total' => $total
+                                            ];
+
+                                            $subtotal += $total;
+                                        }
+
+                                        $set('invoiceItem', $items);
+                                        $set('subtotal', $subtotal);
+                                        $set('dpp', $subtotal);
+                                        $set('delivery_orders', []); // Empty for self-pickup
+                                        $set('other_fees', []);
+
+                                        // For create, set delivery_order_items from SO items
+                                        if (!$get('id')) {
+                                            $deliveryOrderItems = [];
+                                            foreach ($saleOrder->saleOrderItem as $item) {
+                                                if ($item->product) {
+                                                    $originalPrice = $item->unit_price - $item->discount + $item->tax;
+
+                                                    $deliveryOrderItems[] = [
+                                                        'do_number' => 'SO-' . $saleOrder->so_number, // Use SO number as reference
+                                                        'product_id' => $item->product_id,
+                                                        'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
+                                                        'original_quantity' => $item->quantity,
+                                                        'invoice_quantity' => $item->quantity,
+                                                        'original_price' => $originalPrice,
+                                                        'unit_price' => $originalPrice,
+                                                        'total_price' => (float) $originalPrice * (float) $item->quantity,
+                                                        'coa_id' => $item->product->sales_coa_id,
+                                                    ];
+                                                }
+                                            }
+                                            $set('delivery_order_items', $deliveryOrderItems);
+                                        }
+
+                                        // Calculate tax and total
+                                        $tax = $get('tax') ?? 0;
+                                        $otherFee = 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
                                         $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);

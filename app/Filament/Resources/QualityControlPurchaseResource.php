@@ -399,26 +399,48 @@ class QualityControlPurchaseResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('qc_number')
-                    ->label('QC Number'),
+                    ->label('QC Number')
+                    ->searchable(),
                 TextColumn::make('receipt_number')
                     ->label('Purchase Receipt')
                     ->getStateUsing(function ($record) {
                         return $record->fromModel?->purchaseReceipt?->receipt_number ?? 'N/A';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('fromModel.purchaseReceipt', function ($query) use ($search) {
+                            return $query->where('receipt_number', 'LIKE', '%' . $search . '%');
+                        });
                     }),
                 TextColumn::make('po_number')
                     ->label('Purchase Order')
                     ->getStateUsing(function ($record) {
                         return $record->fromModel?->purchaseReceipt?->purchaseOrder?->po_number ?? 'N/A';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('fromModel.purchaseReceipt.purchaseOrder', function ($query) use ($search) {
+                            return $query->where('po_number', 'LIKE', '%' . $search . '%');
+                        });
                     }),
                 TextColumn::make('product.name')
                     ->label('Product')
                     ->getStateUsing(function ($record) {
                         return $record->product?->name ?? 'N/A';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('product', function ($query) use ($search) {
+                            return $query->where('name', 'LIKE', '%' . $search . '%')
+                                ->orWhere('sku', 'LIKE', '%' . $search . '%');
+                        });
                     }),
                 TextColumn::make('inspectedBy.name')
                     ->label('Inspected By')
                     ->getStateUsing(function ($record) {
                         return $record->inspectedBy?->name ?? 'N/A';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('inspectedBy', function ($query) use ($search) {
+                            return $query->where('name', 'LIKE', '%' . $search . '%');
+                        });
                     }),
                 TextColumn::make('passed_quantity')
                     ->label('Passed')

@@ -490,6 +490,16 @@ class CashBankTransactionResource extends Resource
                             }),
                     ])
                     ->schema([
+                        TextEntry::make('journal_entries_summary')
+                            ->label('Summary')
+                            ->state(function ($record) {
+                                $entries = $record->journalEntries;
+                                $totalDebit = $entries->sum('debit');
+                                $totalCredit = $entries->sum('credit');
+                                $count = $entries->count();
+                                return "Total Entries: {$count} | Total Debit: Rp " . number_format($totalDebit, 0, ',', '.') . " | Total Credit: Rp " . number_format($totalCredit, 0, ',', '.');
+                            })
+                            ->columnSpanFull(),
                         RepeatableEntry::make('journalEntries')
                             ->label('')
                             ->schema([
@@ -500,6 +510,7 @@ class CashBankTransactionResource extends Resource
                                 TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
                                 TextEntry::make('description')->label('Description'),
                                 TextEntry::make('journal_type')->badge()->label('Type'),
+                                TextEntry::make('reference')->label('Reference'),
                             ])->columns(4),
                     ])
                     ->columns(1)
@@ -509,9 +520,11 @@ class CashBankTransactionResource extends Resource
             ]);
     }
 
-    public static function getRelations(): array
+    protected function afterCreate(): void
     {
-        return [];
+        // Automatically post journal entries after creating a transaction
+        $service = app(CashBankService::class);
+        $service->postTransaction($this->record);
     }
 
     public static function getPages(): array

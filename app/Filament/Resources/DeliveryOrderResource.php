@@ -606,6 +606,9 @@ class DeliveryOrderResource extends Resource
                     ->searchable(),
             ])
             ->modifyQueryUsing(function (Builder $query) {
+                // Eager load relationships to prevent N+1 queries
+                $query->with(['suratJalan', 'driver', 'vehicle', 'salesOrders']);
+                
                 $user = Auth::user();
                 
                 // Jika user adalah Super Sales, Sales Manager, Admin, Owner - bisa lihat semua
@@ -973,7 +976,7 @@ class DeliveryOrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['journalEntries.coa'])
+            ->with(['journalEntries.coa', 'suratJalan'])
             ->withCount('journalEntries')
             ->orderBy('delivery_date', 'DESC');
     }

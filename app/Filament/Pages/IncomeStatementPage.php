@@ -125,18 +125,37 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
         return $table
             ->query(IncomeStatementItem::query())
             ->columns([
-                TextColumn::make('account_name')
-                    ->label('Akun'),
-                TextColumn::make('debit')
-                    ->label('Debit')
-                    ->money('IDR'),
-                TextColumn::make('credit')
-                    ->label('Kredit')
-                    ->money('IDR'),
-                TextColumn::make('balance')
+                TextColumn::make('code')
+                    ->label('Kode')
+                    ->sortable(),
+                TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->wrap()
+                    ->sortable(),
+                TextColumn::make('amount')
                     ->label('Saldo')
-                    ->money('IDR'),
+                    ->formatStateUsing(function ($state) {
+                        $amount = (float) $state;
+                        if ($amount < 0) {
+                            $formatted = '(' . number_format(abs($amount), 0, ',', '.') . ')';
+                            return new \Illuminate\Support\HtmlString('<span style="color: #D9534F; font-weight: bold;">' . $formatted . '</span>');
+                        }
+                        return number_format($amount, 0, ',', '.');
+                    })
+                    ->sortable()
+                    ->alignRight(),
             ])
+            ->recordClasses(function ($record) {
+                // Apply different styling based on row_type
+                return match($record->row_type) {
+                    'section_total' => 'bg-red-100 font-bold',
+                    'computed' => 'bg-green-100 font-bold',
+                    'subtotal' => 'bg-yellow-50 font-bold',
+                    'child' => 'text-gray-600',
+                    'parent' => 'font-semibold',
+                    default => '',
+                };
+            })
             ->headerActions([
                 Action::make('generate_report')
                     ->label('Generate Laporan')
@@ -212,52 +231,105 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
 
         // Clear existing data and populate with new data
         IncomeStatementItem::truncate();
-        $incomeData = $this->getIncomeStatementData();
-        
-        // Process the complex income statement data into flat array
+
+        // Use grouped data (by parent COA) so we can show classification and totals
+        $groupedData = app(IncomeStatementService::class)->getGroupedByParent([
+            'start_date' => $data['start_date'],
+            'end_date' => $data['end_date'],
+            'cabang_id' => $data['cabang_id'] ?? null,
+        ]);
+
         $flatData = [];
-        
-        // Helper function to add accounts from a section
-        $addAccounts = function($accounts, $sectionName = '') use (&$flatData) {
-            if ($accounts instanceof \Illuminate\Support\Collection) {
-                foreach ($accounts as $account) {
-                    $flatData[] = [
-                        'account_name' => ($sectionName ? $sectionName . ' - ' : '') . ($account['name'] ?? ''),
-                        'debit' => $account['total_debit'] ?? 0,
-                        'credit' => $account['total_credit'] ?? 0,
-                        'balance' => $account['balance'] ?? 0,
-                    ];
+
+        // Local helper to push a row with code/description/amount and row_type
+        $pushRow = function ($code, $description, $amount, $rowType = null) use (&$flatData) {
+            $flatData[] = [
+                'code' => $code,
+                'description' => $description,
+                'amount' => $amount,
+                'row_type' => $rowType,
+            ];
+        };
+
+        // Process a section that uses grouped data
+        $processSection = function ($sectionGrouped, $sectionLabel) use (&$pushRow) {
+            // $sectionGrouped is an array with keys 'grouped' => Collection, 'total' => float
+            if (!isset($sectionGrouped['grouped'])) {
+                return;
+            }
+
+            $groups = $sectionGrouped['grouped'];
+            $sectionTotal = $sectionGrouped['total'] ?? 0;
+
+            foreach ($groups as $group) {
+                $parent = $group['account'] ?? null;
+                $children = $group['children'] ?? collect();
+
+                // Parent row
+                if ($this->show_parent_accounts && $parent) {
+                    $pushRow($parent['code'] ?? '', $parent['name'] ?? '', $parent['balance'] ?? 0, 'parent');
+                }
+
+                // Children rows
+                if ($this->show_child_accounts && $children instanceof \Illuminate\Support\Collection) {
+                    foreach ($children as $child) {
+                        $pushRow($child['code'] ?? '', $child['name'] ?? '', $child['balance'] ?? 0, 'child');
+                    }
+                }
+
+                // No subtotal per parent - balance already includes children
+            }
+
+            // Section total row
+            $pushRow('', 'Total ' . $sectionLabel, $sectionTotal, 'section_total');
+        };
+
+        // Map sections and labels
+        $sections = [
+            'sales_revenue' => ['data' => $groupedData['sales_revenue'] ?? null, 'label' => 'Pendapatan'],
+            'cogs' => ['data' => $groupedData['cogs'] ?? null, 'label' => 'HPP'],
+            'operating_expenses' => ['data' => $groupedData['operating_expenses'] ?? null, 'label' => 'Biaya Operasional'],
+            'other_income' => ['data' => $groupedData['other_income'] ?? null, 'label' => 'Pendapatan Lain'],
+            'other_expense' => ['data' => $groupedData['other_expense'] ?? null, 'label' => 'Biaya Lain'],
+            'tax_expense' => ['data' => $groupedData['tax_expense'] ?? null, 'label' => 'Pajak'],
+        ];
+
+        foreach ($sections as $key => $section) {
+            if ($section['data']) {
+                $processSection($section['data'], $section['label']);
+
+                // Insert computed rows in the right positions
+                if ($key === 'cogs') {
+                    // After COGS, add Gross Profit
+                    $gross = $groupedData['gross_profit'] ?? 0;
+                    $pushRow('', 'LABA KOTOR (Gross Profit)', $gross, 'computed');
+                }
+
+                if ($key === 'operating_expenses') {
+                    // After operating expenses, add Operating Profit
+                    $operatingProfit = $groupedData['operating_profit'] ?? 0;
+                    $pushRow('', 'LABA OPERASIONAL (Operating Profit)', $operatingProfit, 'computed');
+                }
+
+                if ($key === 'tax_expense') {
+                    // After tax, add Net Profit
+                    $net = $groupedData['net_profit'] ?? 0;
+                    $pushRow('', 'LABA BERSIH (Net Profit)', $net, 'computed');
                 }
             }
-        };
-        
-        // Add accounts from each section
-        if (isset($incomeData['sales_revenue']['accounts'])) {
-            $addAccounts($incomeData['sales_revenue']['accounts'], 'Pendapatan');
         }
-        if (isset($incomeData['cogs']['accounts'])) {
-            $addAccounts($incomeData['cogs']['accounts'], 'HPP');
-        }
-        if (isset($incomeData['operating_expenses']['accounts'])) {
-            $addAccounts($incomeData['operating_expenses']['accounts'], 'Biaya Operasional');
-        }
-        if (isset($incomeData['other_income']['accounts'])) {
-            $addAccounts($incomeData['other_income']['accounts'], 'Pendapatan Lain');
-        }
-        if (isset($incomeData['other_expense']['accounts'])) {
-            $addAccounts($incomeData['other_expense']['accounts'], 'Biaya Lain');
-        }
-        if (isset($incomeData['tax_expense']['accounts'])) {
-            $addAccounts($incomeData['tax_expense']['accounts'], 'Pajak');
-        }
-        
+
         // Save to database
         foreach ($flatData as $item) {
             IncomeStatementItem::create([
-                'account_name' => $item['account_name'],
-                'debit' => $item['debit'],
-                'credit' => $item['credit'],
-                'balance' => $item['balance'],
+                'account_name' => $item['description'] ?? $item['code'] ?? null,
+                'debit' => 0,
+                'credit' => 0,
+                'balance' => $item['amount'] ?? 0,
+                'code' => $item['code'] ?? null,
+                'description' => $item['description'] ?? null,
+                'amount' => $item['amount'] ?? 0,
+                'row_type' => $item['row_type'] ?? null,
             ]);
         }
 

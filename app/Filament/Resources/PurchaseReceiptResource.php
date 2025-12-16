@@ -14,6 +14,7 @@ use App\Models\Warehouse;
 use App\Services\PurchaseReceiptService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\FileUpload;
@@ -33,6 +34,8 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
@@ -687,7 +690,38 @@ class PurchaseReceiptResource extends Resource
                 '</details>'
             ))
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'partial' => 'Partial',
+                        'completed' => 'Completed',
+                    ]),
+                SelectFilter::make('cabang_id')
+                    ->label('Cabang')
+                    ->options(Cabang::pluck('nama', 'id'))
+                    ->searchable(),
+                Filter::make('receipt_date')
+                    ->form([
+                        DatePicker::make('receipt_date_from'),
+                        DatePicker::make('receipt_date_until'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['receipt_date_from'],
+                                fn(Builder $query, $date): Builder => $query->whereDate('receipt_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['receipt_date_until'],
+                                fn(Builder $query, $date): Builder => $query->whereDate('receipt_date', '<=', $date),
+                            );
+                    }),
+                SelectFilter::make('currency_id')
+                    ->label('Currency')
+                    ->relationship('currency', 'name')
+                    ->getOptionLabelFromRecordUsing(function ($record) {
+                        return "{$record->name} ({$record->symbol})";
+                    }),
             ])
             ->actions([
                 ActionGroup::make([

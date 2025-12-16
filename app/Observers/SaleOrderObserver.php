@@ -71,11 +71,33 @@ class SaleOrderObserver
             // Use TaxService to get correct breakdown
             $taxService = \App\Services\TaxService::class;
             $baseAmount = $item->quantity * $item->unit_price * (1 - $item->discount / 100);
-            $taxResult = $taxService::compute($baseAmount, $item->tax, $item->tipe_pajak ?? null);
-            $lineTax = $taxResult['ppn'];
-            $subtotalBeforeTax = $taxResult['dpp'];
+            
+            try {
+                $taxResult = $taxService::compute($baseAmount, $item->tax, $item->tipe_pajak ?? null);
+                $lineTax = $taxResult['ppn'];
+                $subtotalBeforeTax = $taxResult['dpp'];
+            } catch (\Throwable $e) {
+                Log::error('SaleOrderObserver: TaxService error', [
+                    'item_id' => $item->id,
+                    'base_amount' => $baseAmount,
+                    'tax' => $item->tax,
+                    'error' => $e->getMessage(),
+                ]);
+                // Fallback
+                $lineTax = 0;
+                $subtotalBeforeTax = $baseAmount;
+            }
+            
             $subtotal += $subtotalBeforeTax;
             $tax += $lineTax;
+
+            Log::info('SaleOrderObserver: Calculated values', [
+                'item_id' => $item->id,
+                'base_amount' => $baseAmount,
+                'tax_result' => $taxResult ?? 'error',
+                'subtotal_before_tax' => $subtotalBeforeTax,
+                'line_subtotal' => $lineSubtotal,
+            ]);
 
             // Get sales COA from product
             $salesCoaId = $item->product?->sales_coa_id;

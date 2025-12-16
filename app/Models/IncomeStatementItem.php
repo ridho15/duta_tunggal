@@ -11,6 +11,10 @@ class IncomeStatementItem extends Model
         'debit',
         'credit',
         'balance',
+        'code',
+        'description',
+        'amount',
+        'row_type',
     ];
 
     public $timestamps = false;
