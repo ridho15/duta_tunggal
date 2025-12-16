@@ -119,6 +119,11 @@ class DeliveryOrder extends Model
         return $this->morphMany(JournalEntry::class, 'source');
     }
 
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();

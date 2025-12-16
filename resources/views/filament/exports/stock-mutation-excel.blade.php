@@ -144,15 +144,16 @@
             <table>
                 <thead>
                     <tr>
-                        <th width="8%">Tanggal</th>
-                        <th width="20%">Produk</th>
-                        <th width="12%">Tipe</th>
-                        <th width="8%">Qty Masuk</th>
-                        <th width="8%">Qty Keluar</th>
-                        <th width="12%">Nilai</th>
-                        <th width="10%">Referensi</th>
-                        <th width="8%">Rak</th>
-                        <th width="14%">Catatan</th>
+                        <th width="60px">Tanggal</th>
+                        <th width="200px">Produk</th>
+                        <th width="100px">Tipe</th>
+                        <th width="80px">Qty Masuk</th>
+                        <th width="80px">Qty Keluar</th>
+                        <th width="80px">Saldo</th>
+                        <th width="120px">Nilai</th>
+                        <th width="100px">Referensi</th>
+                        <th width="80px">Rak</th>
+                        <th width="150px">Catatan</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -171,6 +172,9 @@
                             </td>
                             <td class="red-text">
                                 {{ $movement['qty_out'] > 0 ? number_format($movement['qty_out'], 2) : '-' }}
+                            </td>
+                            <td class="{{ $movement['balance'] >= 0 ? 'green-text' : 'red-text' }}">
+                                {{ number_format($movement['balance'], 2) }}
                             </td>
                             <td>
                                 {{ $movement['value'] ? 'Rp ' . number_format($movement['value'], 0) : '-' }}

@@ -254,12 +254,12 @@
 
     @foreach($report['warehouseData'] as $warehouseId => $warehouse)
     <div style="page-break-inside: avoid;">
-        <h3 style="color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Gudang: {{ $warehouse['name'] }}</h3>
+        <h3 style="color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Gudang: {{ $warehouse['warehouse_name'] }}</h3>
         <table>
             <thead>
                 <tr>
                     <th class="text-center" style="width: 5%;">No</th>
-                    <th style="width: 15%;">Tanggal</th>
+                    <th style="width: 15%;">Tanggalllll</th>
                     <th style="width: 20%;">Produk</th>
                     <th style="width: 10%;">Rak</th>
                     <th class="text-center" style="width: 10%;">Tipe</th>
@@ -279,14 +279,14 @@
                     <td>{{ $movement['rak_name'] ?? '-' }}</td>
                     <td class="text-center">
                         <span style="padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: bold;
-                            {{ $movement['type'] === 'in' ? 'background-color: #d4edda; color: #155724;' :
-                               ($movement['type'] === 'out' ? 'background-color: #f8d7da; color: #721c24;' :
+                            {{ $movement['qty_in'] > 0 ? 'background-color: #d4edda; color: #155724;' :
+                               ($movement['qty_out'] > 0 ? 'background-color: #f8d7da; color: #721c24;' :
                                'background-color: #fff3cd; color: #856404;') }}">
-                            {{ ucfirst($movement['type']) }}
+                            {{ $movement['type'] }}
                         </span>
                     </td>
-                    <td class="text-right">{{ $movement['type'] === 'in' ? number_format($movement['quantity'], 0, ',', '.') : '-' }}</td>
-                    <td class="text-right">{{ $movement['type'] === 'out' ? number_format($movement['quantity'], 0, ',', '.') : '-' }}</td>
+                    <td class="text-right">{{ $movement['qty_in'] > 0 ? number_format($movement['qty_in'], 0, ',', '.') : '-' }}</td>
+                    <td class="text-right">{{ $movement['qty_out'] > 0 ? number_format($movement['qty_out'], 0, ',', '.') : '-' }}</td>
                     <td class="text-right">{{ number_format($movement['balance'], 0, ',', '.') }}</td>
                     <td>{{ $movement['notes'] ?? '-' }}</td>
                 </tr>

@@ -86,13 +86,24 @@ class LedgerPostingService
 
         // For purchase invoices: Simplified journal entry format
         if ($isPurchaseInvoice) {
-            // Debit Unbilled Purchase for subtotal
-            if ($subtotal > 0 && $unbilledPurchaseCoa) {
+            // Check if there are any receipts for this PO
+            $hasReceipts = \App\Models\PurchaseReceipt::where('purchase_order_id', $invoice->from_model_id)->exists();
+
+            if ($hasReceipts) {
+                // If there are receipts, debit unbilled purchase (will be credited when QC approved)
+                $debitCoa = $unbilledPurchaseCoa;
+            } else {
+                // If no receipts, debit inventory directly
+                $debitCoa = $inventoryCoa;
+            }
+
+            // Debit for subtotal
+            if ($subtotal > 0 && $debitCoa) {
                 $debitEntry = JournalEntry::create([
-                    'coa_id' => $unbilledPurchaseCoa->id,
+                    'coa_id' => $debitCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
-                    'description' => 'Purchase invoice - unbilled purchase for ' . $invoice->invoice_number,
+                    'description' => 'Purchase invoice - ' . ($hasReceipts ? 'unbilled purchase' : 'inventory') . ' for ' . $invoice->invoice_number,
                     'debit' => $subtotal,
                     'credit' => 0,
                     'journal_type' => 'purchase',

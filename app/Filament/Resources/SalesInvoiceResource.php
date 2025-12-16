@@ -292,30 +292,49 @@ class SalesInvoiceResource extends Resource
                                         $set('delivery_orders', $state);
                                         $set('other_fees', []);
 
-                                        // For create, set delivery_order_items
-                                        if (!$get('id')) {
-                                            $deliveryOrderItems = [];
-                                            foreach ($deliveryOrders as $do) {
-                                                foreach ($do->deliveryOrderItem as $item) {
-                                                    if ($item->product && $item->saleOrderItem) {
-                                                        $originalPrice = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
-
-                                                        $deliveryOrderItems[] = [
-                                                            'do_number' => $do->do_number,
-                                                            'product_id' => $item->product_id,
-                                                            'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
-                                                            'original_quantity' => $item->quantity,
-                                                            'invoice_quantity' => $item->quantity,
-                                                            'original_price' => $originalPrice,
-                                                            'unit_price' => $originalPrice,
-                                                            'total_price' => (float) $originalPrice * (float) $item->quantity,
-                                                            'coa_id' => $item->product->sales_coa_id,
-                                                        ];
+                                        // For create and edit, set delivery_order_items
+                                        $deliveryOrderItems = [];
+                                        $currentInvoiceId = $get('id');
+                                        
+                                        foreach ($deliveryOrders as $do) {
+                                            foreach ($do->deliveryOrderItem as $item) {
+                                                if ($item->product && $item->saleOrderItem) {
+                                                    $originalPrice = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
+                                                    
+                                                    // For edit, try to find existing invoice item data
+                                                    $invoiceQuantity = $item->quantity;
+                                                    $invoicePrice = $originalPrice;
+                                                    $invoiceCoaId = $item->product->sales_coa_id;
+                                                    
+                                                    if ($currentInvoiceId) {
+                                                        // Find matching invoice item for this product
+                                                        $existingInvoiceItems = $get('invoiceItem') ?? [];
+                                                        $matchingItem = collect($existingInvoiceItems)->first(function ($invItem) use ($item) {
+                                                            return $invItem['product_id'] == $item->product_id;
+                                                        });
+                                                        
+                                                        if ($matchingItem) {
+                                                            $invoiceQuantity = $matchingItem['quantity'] ?? $item->quantity;
+                                                            $invoicePrice = $matchingItem['price'] ?? $originalPrice;
+                                                            $invoiceCoaId = $matchingItem['coa_id'] ?? $item->product->sales_coa_id;
+                                                        }
                                                     }
+
+                                                    $deliveryOrderItems[] = [
+                                                        'do_number' => $do->do_number,
+                                                        'product_id' => $item->product_id,
+                                                        'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
+                                                        'original_quantity' => $item->quantity,
+                                                        'invoice_quantity' => $invoiceQuantity,
+                                                        'original_price' => $originalPrice,
+                                                        'unit_price' => $invoicePrice,
+                                                        'total_price' => (float) $invoiceQuantity * (float) $invoicePrice,
+                                                        'coa_id' => $invoiceCoaId,
+                                                    ];
                                                 }
                                             }
-                                            $set('delivery_order_items', $deliveryOrderItems);
                                         }
+                                        $set('delivery_order_items', $deliveryOrderItems);
 
                                         // Calculate tax and total
                                         $tax = $get('tax') ?? 0;

@@ -503,6 +503,28 @@ class DeliveryOrderResource extends Resource
                 TextColumn::make('do_number')
                     ->label('Delivery Order Number')
                     ->searchable(),
+                TextColumn::make('suratJalan')
+                    ->label('Surat Jalan')
+                    ->getStateUsing(function ($record) {
+                        if ($record->suratJalan->isNotEmpty()) {
+                            $suratJalan = $record->suratJalan->first();
+                            return $suratJalan->sj_number;
+                        }
+                        return 'Tidak Ada';
+                    })
+                    ->badge()
+                    ->color(function ($state) {
+                        return $state === 'Ada' ? 'success' : 'warning';
+                    })
+                    ->tooltip(function ($record) {
+                        if ($record->suratJalan->isNotEmpty()) {
+                            $suratJalan = $record->suratJalan->first();
+                            if ($suratJalan) {
+                                return "Surat Jalan: {$suratJalan->sj_number}\nStatus: {$suratJalan->status}";
+                            }
+                        }
+                        return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
+                    }),
                 TextColumn::make('delivery_date')
                     ->date()
                     ->sortable(),
@@ -533,24 +555,6 @@ class DeliveryOrderResource extends Resource
                         };
                     })
                     ->badge(),
-                TextColumn::make('surat_jalan_status')
-                    ->label('Surat Jalan')
-                    ->formatStateUsing(function ($record) {
-                        return $record->suratJalan()->exists() ? 'Ada' : 'Belum Ada';
-                    })
-                    ->color(function ($record) {
-                        return $record->suratJalan()->exists() ? 'success' : 'warning';
-                    })
-                    ->badge()
-                    ->tooltip(function ($record) {
-                        if ($record->suratJalan()->exists()) {
-                            $suratJalan = $record->suratJalan()->first();
-                            if ($suratJalan) {
-                                return "Surat Jalan: {$suratJalan->sj_number}\nStatus: {$suratJalan->status}";
-                            }
-                        }
-                        return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
-                    }),
                 TextColumn::make('salesOrders.so_number')
                     ->label('Sales Orders')
                     ->badge()
@@ -667,7 +671,7 @@ class DeliveryOrderResource extends Resource
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response delivery order') &&
                                    $record->status == 'request_approve' &&
-                                   $record->suratJalan()->exists();
+                                   $record->suratJalan->isNotEmpty();
                         })
                         ->form([
                             Textarea::make('comments')
@@ -761,6 +765,9 @@ class DeliveryOrderResource extends Resource
                             // Load necessary relationships for PDF
                             $record->load([
                                 'cabang',
+                                'warehouse',
+                                'driver',
+                                'vehicle',
                                 'deliveryOrderItem.product',
                                 'deliveryOrderItem.saleOrderItem',
                                 'salesOrders.customer'

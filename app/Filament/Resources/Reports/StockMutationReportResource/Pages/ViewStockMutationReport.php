@@ -245,6 +245,26 @@ class ViewStockMutationReport extends Page implements HasTable
 
         $movements = $query->get();
 
+        // Calculate opening balances for each product-warehouse combination
+        $openingBalances = [];
+        $openingQuery = StockMovement::query()
+            ->selectRaw('product_id, warehouse_id, SUM(CASE WHEN type IN ("purchase_in", "manufacture_in", "transfer_in", "adjustment_in", "return_in") THEN quantity ELSE 0 END) - SUM(CASE WHEN type IN ("sales", "transfer_out", "manufacture_out", "adjustment_out", "return_out") THEN quantity ELSE 0 END) as opening_balance')
+            ->where('date', '<', $start->toDateTimeString())
+            ->groupBy('product_id', 'warehouse_id');
+
+        if (!empty($productIds)) {
+            $openingQuery->whereIn('product_id', $productIds);
+        }
+
+        if (!empty($warehouseIds)) {
+            $openingQuery->whereIn('warehouse_id', $warehouseIds);
+        }
+
+        $openingResults = $openingQuery->get();
+        foreach ($openingResults as $result) {
+            $openingBalances[$result->warehouse_id][$result->product_id] = $result->opening_balance;
+        }
+
         // Group by warehouse
         $warehouseData = [];
         $totals = [
@@ -257,6 +277,7 @@ class ViewStockMutationReport extends Page implements HasTable
 
         foreach ($movements as $movement) {
             $warehouseId = $movement->warehouse_id;
+            $productId = $movement->product_id;
             $warehouseName = $movement->warehouse->name ?? 'Tanpa Gudang';
 
             if (!isset($warehouseData[$warehouseId])) {
@@ -271,8 +292,15 @@ class ViewStockMutationReport extends Page implements HasTable
                         'value_out' => 0,
                         'net_qty' => 0,
                         'net_value' => 0,
-                    ]
+                    ],
+                    'running_balance' => [], // Change to array per product
                 ];
+            }
+
+            // Initialize running balance for this product if not exists
+            if (!isset($warehouseData[$warehouseId]['running_balance'][$productId])) {
+                $openingBalance = $openingBalances[$warehouseId][$productId] ?? 0;
+                $warehouseData[$warehouseId]['running_balance'][$productId] = $openingBalance;
             }
 
             // Determine if it's in or out movement
@@ -297,6 +325,9 @@ class ViewStockMutationReport extends Page implements HasTable
             $valueIn = $isInMovement ? ($movement->value ?? 0) : 0;
             $valueOut = $isOutMovement ? ($movement->value ?? 0) : 0;
 
+            // Calculate running balance for this product in this warehouse
+            $warehouseData[$warehouseId]['running_balance'][$productId] += ($qtyIn - $qtyOut);
+
             $warehouseData[$warehouseId]['movements'][] = [
                 'id' => $movement->id,
                 'date' => $movement->date,
@@ -312,6 +343,7 @@ class ViewStockMutationReport extends Page implements HasTable
                 'reference' => $movement->reference_id,
                 'notes' => $movement->notes,
                 'rak_name' => $movement->rak->name ?? null,
+                'balance' => $warehouseData[$warehouseId]['running_balance'][$productId], // Balance per product
             ];
 
             // Update warehouse summary
