@@ -4,8 +4,11 @@ namespace Tests\Unit;
 
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
+use App\Models\CostVariance;
 use App\Models\JournalEntry;
 use App\Models\Product;
+use App\Models\ProductStandardCost;
+use App\Models\ProductionCostEntry;
 use App\Models\Reports\HppOverheadItem;
 use App\Models\Reports\HppPrefix;
 use App\Models\StockMovement;
@@ -327,5 +330,170 @@ class HppReportServiceTest extends TestCase
             'source_type' => self::class,
             'source_id' => 0,
         ]);
+    }
+
+    public function test_variance_analysis_calculates_correct_values(): void
+    {
+        Carbon::setTestNow('2025-02-01 00:00:00');
+
+        $branch = Cabang::factory()->create(['nama' => 'Test Branch']);
+        $product = Product::factory()->create(['cabang_id' => $branch->id, 'name' => 'Test Product']);
+
+        // Create standard costs
+        $standardCost = ProductStandardCost::create([
+            'product_id' => $product->id,
+            'standard_material_cost' => 100.00,
+            'standard_labor_cost' => 50.00,
+            'standard_overhead_cost' => 25.00,
+            'total_standard_cost' => 175.00,
+            'effective_date' => '2025-01-01',
+        ]);
+
+        // Create production cost entries (actual costs)
+        $productionEntry = ProductionCostEntry::create([
+            'product_id' => $product->id,
+            'production_date' => '2025-01-15',
+            'quantity_produced' => 10,
+            'actual_material_cost' => 1200.00, // 120 per unit vs standard 100
+            'actual_labor_cost' => 450.00,     // 45 per unit vs standard 50
+            'actual_overhead_cost' => 300.00,  // 30 per unit vs standard 25
+            'total_actual_cost' => 1950.00,
+            'cabang_id' => $branch->id,
+        ]);
+
+        // Create cost variances
+        CostVariance::create([
+            'product_id' => $product->id,
+            'production_cost_entry_id' => $productionEntry->id,
+            'variance_type' => 'material',
+            'standard_cost' => 1000.00, // 10 * 100
+            'actual_cost' => 1200.00,
+            'variance_amount' => -200.00, // unfavorable
+            'variance_percentage' => -20.00,
+            'period' => '2025-01',
+        ]);
+
+        CostVariance::create([
+            'product_id' => $product->id,
+            'production_cost_entry_id' => $productionEntry->id,
+            'variance_type' => 'labor',
+            'standard_cost' => 500.00, // 10 * 50
+            'actual_cost' => 450.00,
+            'variance_amount' => 50.00, // favorable
+            'variance_percentage' => 10.00,
+            'period' => '2025-01',
+        ]);
+
+        CostVariance::create([
+            'product_id' => $product->id,
+            'production_cost_entry_id' => $productionEntry->id,
+            'variance_type' => 'overhead',
+            'standard_cost' => 250.00, // 10 * 25
+            'actual_cost' => 300.00,
+            'variance_amount' => -50.00, // unfavorable
+            'variance_percentage' => -20.00,
+            'period' => '2025-01',
+        ]);
+
+        $service = app(HppReportService::class);
+
+        // Use reflection to access private method
+        $reflection = new \ReflectionClass($service);
+        $method = $reflection->getMethod('calculateVarianceAnalysis');
+        $method->setAccessible(true);
+
+        $varianceAnalysis = $method->invoke($service, \Carbon\Carbon::parse('2025-01-01'), \Carbon\Carbon::parse('2025-01-31'));
+
+        // Verify total variances
+        $this->assertEquals(-200.00, $varianceAnalysis['material_variance']);
+        $this->assertEquals(50.00, $varianceAnalysis['labor_variance']);
+        $this->assertEquals(-50.00, $varianceAnalysis['overhead_variance']);
+        $this->assertEquals(-200.00, $varianceAnalysis['total_variance']);
+
+        // Verify details array
+        $this->assertCount(3, $varianceAnalysis['details']);
+        
+        $materialDetail = collect($varianceAnalysis['details'])->firstWhere('variance_type', 'material');
+        $this->assertEquals(1000.00, $materialDetail['standard_cost']);
+        $this->assertEquals(1200.00, $materialDetail['actual_cost']);
+        $this->assertEquals(-200.00, $materialDetail['variance_amount']);
+        $this->assertEquals(-20.00, $materialDetail['variance_percentage']);
+
+        $laborDetail = collect($varianceAnalysis['details'])->firstWhere('variance_type', 'labor');
+        $this->assertEquals(500.00, $laborDetail['standard_cost']);
+        $this->assertEquals(450.00, $laborDetail['actual_cost']);
+        $this->assertEquals(50.00, $laborDetail['variance_amount']);
+        $this->assertEquals(10.00, $laborDetail['variance_percentage']);
+    }
+
+    public function test_allocated_overhead_calculates_correctly(): void
+    {
+        Carbon::setTestNow('2025-02-01 00:00:00');
+
+        $branch = Cabang::factory()->create(['nama' => 'Test Branch']);
+
+        // Clear existing overhead items to avoid conflicts
+        HppOverheadItem::query()->delete();
+
+        // Create overhead item with allocation basis
+        $overheadItem = HppOverheadItem::create([
+            'key' => 'factory_electricity',
+            'label' => 'Biaya Listrik Pabrik',
+            'sort_order' => 1,
+            'allocation_basis' => 'direct_labor',
+            'allocation_rate' => 0.1, // 10% of direct labor
+        ]);
+        $overheadItem->prefixes()->create(['prefix' => '5130']);
+
+        // Create COA for direct labor
+        $directLaborCoa = ChartOfAccount::create([
+            'code' => '5120.001',
+            'name' => 'Biaya Tenaga Kerja Langsung',
+            'type' => 'Expense',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        // Create COA for raw materials
+        $rawMaterialCoa = ChartOfAccount::create([
+            'code' => '5110.001',
+            'name' => 'Biaya Bahan Baku',
+            'type' => 'Expense',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        // Create journal entries for direct labor and raw materials
+        $this->createJournal($directLaborCoa, '2025-01-15', 1000.00, 0, $branch->id);
+        $this->createJournal($rawMaterialCoa, '2025-01-10', 500.00, 0, $branch->id);
+
+        // Calculate totals for the period
+        $start = \Carbon\Carbon::parse('2025-01-01');
+        $end = \Carbon\Carbon::parse('2025-01-31');
+
+        $rawMaterialUsed = JournalEntry::where('coa_id', $rawMaterialCoa->id)
+            ->whereBetween('date', [$start, $end])
+            ->sum('debit');
+
+        $directLabor = JournalEntry::where('coa_id', $directLaborCoa->id)
+            ->whereBetween('date', [$start, $end])
+            ->sum('debit');
+
+        $service = app(HppReportService::class);
+
+        // Test allocation logic by calling generate with use_allocation = true
+        $report = $service->generate('2025-01-01', '2025-01-31', ['use_allocation' => true]);
+
+        // Should allocate 10% of direct labor (100) to factory electricity
+        $electricityAllocation = collect($report['overhead']['items'])->firstWhere('key', 'factory_electricity');
+        $this->assertEquals(100.00, $electricityAllocation['allocated_amount']);
+        $this->assertEquals('Direct Labor Cost', $electricityAllocation['allocation_basis']);
+        $this->assertEquals(0.1, $electricityAllocation['allocation_rate']);
     }
 }

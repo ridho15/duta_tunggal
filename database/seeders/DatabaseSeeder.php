@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             CabangSeeder::class, // ✅ TAMBAHKAN: Data cabang untuk multi-cabang
             ChartOfAccountSeeder::class, // ✅ TAMBAHKAN: COA lengkap
             ManufacturingCoaSeeder::class, // ✅ TAMBAHKAN: COA untuk manufacturing
+            HppSeeder::class, // ✅ TAMBAHKAN: HPP prefixes dan overhead items
             MasterDataSeeder::class, // ✅ TAMBAHKAN: Data master lengkap
             
             // Business Entities
@@ -40,6 +41,12 @@ class DatabaseSeeder extends Seeder
             VehicleSeeder::class,
             ProductSeeder::class,
             BillOfMaterialSeeder::class,
+            
+            // Manufacturing Process
+            ProductionPlanSeeder::class, // ✅ TAMBAHKAN: Production plans
+            ManufacturingOrderSeeder::class, // ✅ TAMBAHKAN: Manufacturing orders
+            MaterialIssueSeeder::class, // ✅ TAMBAHKAN: Material issues
+            ProductionSeeder::class, // ✅ TAMBAHKAN: Production records
             
             // Inventory & Warehouse
             WarehouseSeeder::class,

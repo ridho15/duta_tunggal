@@ -1720,48 +1720,6 @@ CREATE TABLE `report_cash_flow_sections` (
   UNIQUE KEY `report_cash_flow_sections_key_unique` (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `report_hpp_overhead_item_prefixes`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `report_hpp_overhead_item_prefixes` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `overhead_item_id` bigint unsigned NOT NULL,
-  `prefix` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `created_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `report_hpp_overhead_item_prefixes_overhead_item_id_foreign` (`overhead_item_id`),
-  CONSTRAINT `report_hpp_overhead_item_prefixes_overhead_item_id_foreign` FOREIGN KEY (`overhead_item_id`) REFERENCES `report_hpp_overhead_items` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `report_hpp_overhead_items`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `report_hpp_overhead_items` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `key` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `label` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `sort_order` int unsigned NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `report_hpp_overhead_items_key_unique` (`key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `report_hpp_prefixes`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `report_hpp_prefixes` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `category` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `prefix` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `sort_order` int unsigned NOT NULL DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `report_hpp_prefixes_category_sort_order_index` (`category`,`sort_order`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `return_product_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -2657,7 +2615,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (247,'2025_10_13_09
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (248,'2025_10_13_231113_add_other_costs_to_cash_bank_transfers_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (249,'2025_10_17_000001_extend_stock_movements_with_value_and_meta',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (250,'2025_10_18_000100_create_report_cash_flow_tables',1);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (251,'2025_10_18_000200_create_report_hpp_tables',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (252,'2025_10_29_104636_create_voucher_requests_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (253,'2025_10_29_110617_add_other_costs_coa_id_to_cash_bank_transfers_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (254,'2025_10_30_000000_create_cash_bank_accounts_table',1);

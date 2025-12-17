@@ -63,6 +63,11 @@ class ChartOfAccountSeeder extends Seeder
             '1140.02' => 'PERSEDIAAN BARANG PRODUKSI',
             '1140.10' => 'PERSEDIAAN BARANG DAGANGAN - DEFAULT PRODUK',
             '1140.20' => 'BARANG TERKIRIM',
+            // HPP Inventory Accounts
+            '1-101' => 'PERSEDIAAN BAHAN BAKU - RAW MATERIAL INVENTORY',
+            '1-102' => 'PERSEDIAAN BAHAN BAKU - RAW MATERIAL INVENTORY 2',
+            '1-201' => 'PERSEDIAAN BARANG DALAM PROSES - WIP INVENTORY',
+            '1-202' => 'PERSEDIAAN BARANG DALAM PROSES - WIP INVENTORY 2',
             '1150' => 'UANG MUKA',
             '1150.01' => 'UANG MUKA PEMBELIAN BARANG DAGANG',
             '1150.02' => 'UANG MUKA PEMBELIAN NON BARANG DAGANG',
@@ -184,6 +189,11 @@ class ChartOfAccountSeeder extends Seeder
             '5220' => 'RETUR PEMBELIAN BARANG DAGANGAN',
             '5230' => 'BIAYA TENAGA KERJA PROSES PRODUKSI',
             '5240' => 'BIAYA TENAGA KERJA LUAR PROSES PRODUKSI',
+            // HPP Expense Accounts
+            '5-101' => 'PEMBELIAN BAHAN BAKU - RAW MATERIAL PURCHASE',
+            '5-102' => 'PEMBELIAN BAHAN BAKU - RAW MATERIAL PURCHASE 2',
+            '6-201' => 'BIAYA TENAGA KERJA LANGSUNG - DIRECT LABOR',
+            '6-202' => 'BIAYA TENAGA KERJA LANGSUNG - DIRECT LABOR 2',
             '6000' => 'BIAYA',
             '6100' => 'BIAYA PENJUALAN',
             '6100.01' => 'BIAYA PACKING',
