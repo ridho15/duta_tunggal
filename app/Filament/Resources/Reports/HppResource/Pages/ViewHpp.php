@@ -26,7 +26,7 @@ class ViewHpp extends Page
 
     public function mount(): void
     {
-        $this->startDate = now()->startOfMonth()->toDateString();
+        $this->startDate = now()->startOfMonth()->subMonths(11)->toDateString();
         $this->endDate = now()->endOfMonth()->toDateString();
         $this->branchIds = [];
     }

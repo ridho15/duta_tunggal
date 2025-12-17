@@ -35,7 +35,18 @@ class HppReportService
         $openingRawMaterial = $this->calculateRawMaterialBalance($rawMaterialAccounts, $start->copy()->subDay());
         $closingRawMaterial = $this->calculateRawMaterialBalance($rawMaterialAccounts, $end);
         $rawMaterialUsed = $this->calculateRawMaterialUsedFromStockMovements($start, $end);
+        
+        // Calculate purchases: try purchase accounts first, then inventory accounts, then stock movements
         $purchasesRawMaterial = $this->sumDebitForAccounts($rawMaterialPurchaseAccounts, $start, $end);
+        if ($purchasesRawMaterial == 0) {
+            // If no entries in purchase accounts, try inventory account debits (for inventory accounting)
+            $purchasesRawMaterial = $this->sumDebitForAccounts($rawMaterialAccounts, $start, $end);
+        }
+        if ($purchasesRawMaterial == 0) {
+            // If no journal entries, fall back to stock movements
+            $purchasesRawMaterial = $this->calculateRawMaterialPurchasesFromStockMovements($start, $end);
+        }
+        
         $totalAvailableRawMaterial = $openingRawMaterial + $purchasesRawMaterial;
 
         $directLabor = $this->sumDebitForAccounts($directLaborAccounts, $start, $end);
@@ -137,7 +148,7 @@ class HppReportService
         return round($inValue - $outValue, 2);
     }
 
-    private function calculateRawMaterialPurchasesFromStockMovements(Carbon $start, Carbon $end): float
+    private function calculateRawMaterialPurchasesFromStockMovements(?Carbon $start, ?Carbon $end): float
     {
         $productIds = $this->getRawMaterialProductIds();
 
@@ -147,9 +158,12 @@ class HppReportService
 
         $query = StockMovement::query()
             ->whereIn('product_id', $productIds)
-            ->whereDate('date', '>=', $start->toDateString())
-            ->whereDate('date', '<=', $end->toDateString())
             ->whereIn('type', self::RAW_MATERIAL_IN_TYPES);
+
+        if ($start && $end) {
+            $query->whereDate('date', '>=', $start->toDateString())
+                  ->whereDate('date', '<=', $end->toDateString());
+        }
 
         $query = $this->applyStockMovementFilters($query);
 
