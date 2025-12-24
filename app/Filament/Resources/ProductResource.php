@@ -1170,7 +1170,17 @@ class ProductResource extends Resource
                             $pdf = Pdf::loadView($template, [
                                 'listProduct' => $products,
                                 'print_size' => $printSize,
-                                'copies_per_product' => $copiesPerProduct
+                                'copies_per_product' => $copiesPerProduct,
+                                'ukuran_barcode' => $printSize,
+                                'barcode_per_baris' => match($printSize) {
+                                    'extra-small' => 8,
+                                    'small' => 5,
+                                    'medium' => 4,
+                                    'standard' => 3,
+                                    'large' => 2,
+                                    default => 3
+                                },
+                                'ukuran_kertas' => $paperSize
                             ])->setPaper($paperSize, $orientation);
 
                             return response()->streamDownload(function () use ($pdf) {
