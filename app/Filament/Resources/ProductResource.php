@@ -149,9 +149,7 @@ class ProductResource extends Resource
                             ->label('Product Category')
                             ->searchable()
                             ->reactive()
-                            ->relationship('productCategory', 'name', function (Builder $query, $get) {
-                                $query->where('cabang_id', $get('cabang_id'));
-                            })
+                            ->relationship('productCategory', 'name')
                             ->preload()
                             ->required()
                             ->validationMessages([
@@ -708,6 +706,72 @@ class ProductResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
+                    Action::make('updateHargaCepat')
+                        ->label('Update Harga Cepat')
+                        ->icon('heroicon-o-currency-dollar')
+                        ->color('warning')
+                        ->form([
+                            Fieldset::make('Update Harga Produk')
+                                ->schema([
+                                    TextInput::make('cost_price')
+                                        ->label('Harga Beli Asli (Rp)')
+                                        ->required()
+                                        ->indonesianMoney()
+                                        ->default(fn ($record) => $record->cost_price)
+                                        ->validationMessages([
+                                            'required' => 'Harga beli tidak boleh kosong',
+                                            'numeric' => 'Harga beli harus berupa angka'
+                                        ]),
+                                    TextInput::make('sell_price')
+                                        ->label('Harga Jual (Rp)')
+                                        ->required()
+                                        ->indonesianMoney()
+                                        ->default(fn ($record) => $record->sell_price)
+                                        ->validationMessages([
+                                            'required' => 'Harga jual tidak boleh kosong',
+                                            'numeric' => 'Harga jual harus berupa angka'
+                                        ]),
+                                    TextInput::make('biaya')
+                                        ->label('Biaya (Rp)')
+                                        ->required()
+                                        ->indonesianMoney()
+                                        ->default(fn ($record) => $record->biaya)
+                                        ->validationMessages([
+                                            'required' => 'Biaya tidak boleh kosong',
+                                            'numeric' => 'Biaya harus berupa angka'
+                                        ]),
+                                    TextInput::make('harga_batas')
+                                        ->label('Harga Batas (%)')
+                                        ->numeric()
+                                        ->default(fn ($record) => $record->harga_batas)
+                                        ->validationMessages([
+                                            'numeric' => 'Harga batas harus berupa angka'
+                                        ]),
+                                    TextInput::make('item_value')
+                                        ->label('Item Value (Rp)')
+                                        ->numeric()
+                                        ->indonesianMoney()
+                                        ->default(fn ($record) => $record->item_value)
+                                        ->validationMessages([
+                                            'numeric' => 'Item value harus berupa angka'
+                                        ]),
+                                ])
+                        ])
+                        ->action(function (array $data, Product $record) {
+                            $record->update([
+                                'cost_price' => $data['cost_price'],
+                                'sell_price' => $data['sell_price'],
+                                'biaya' => $data['biaya'],
+                                'harga_batas' => $data['harga_batas'],
+                                'item_value' => $data['item_value'],
+                            ]);
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Harga Produk Berhasil Diupdate')
+                                ->body("Harga untuk produk {$record->name} ({$record->sku}) telah berhasil diupdate.")
+                                ->success()
+                                ->send();
+                        }),
                     Action::make('cetakLabel')
                         ->label('Cetak Label / Print Barcode')
                         ->color('success')
@@ -961,6 +1025,58 @@ class ProductResource extends Resource
                             \Filament\Notifications\Notification::make()
                                 ->title('Produk Dinonaktifkan')
                                 ->body("{$count} produk berhasil dinonaktifkan")
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    Action::make('bulk_update_harga')
+                        ->label('Update Harga Massal')
+                        ->icon('heroicon-o-currency-dollar')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Update Harga Produk Terpilih')
+                        ->modalDescription('Update harga untuk semua produk yang dipilih. Kosongkan field yang tidak ingin diubah.')
+                        ->form([
+                            Fieldset::make('Update Harga')
+                                ->schema([
+                                    TextInput::make('cost_price')
+                                        ->label('Harga Beli Asli (Rp)')
+                                        ->indonesianMoney()
+                                        ->numeric()
+                                        ->placeholder('Kosongkan jika tidak diubah'),
+                                    TextInput::make('sell_price')
+                                        ->label('Harga Jual (Rp)')
+                                        ->indonesianMoney()
+                                        ->numeric()
+                                        ->placeholder('Kosongkan jika tidak diubah'),
+                                    TextInput::make('biaya')
+                                        ->label('Biaya (Rp)')
+                                        ->indonesianMoney()
+                                        ->numeric()
+                                        ->placeholder('Kosongkan jika tidak diubah'),
+                                    TextInput::make('harga_batas')
+                                        ->label('Harga Batas (%)')
+                                        ->numeric()
+                                        ->placeholder('Kosongkan jika tidak diubah'),
+                                    TextInput::make('item_value')
+                                        ->label('Item Value (Rp)')
+                                        ->indonesianMoney()
+                                        ->numeric()
+                                        ->placeholder('Kosongkan jika tidak diubah'),
+                                ])
+                        ])
+                        ->action(function (array $data, $records) {
+                            $count = 0;
+                            $updateData = array_filter($data, fn($value) => $value !== null && $value !== '');
+                            foreach ($records as $record) {
+                                $record->update($updateData);
+                                $count++;
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Harga Produk Diupdate')
+                                ->body("Harga {$count} produk berhasil diupdate secara massal")
                                 ->success()
                                 ->send();
                         })

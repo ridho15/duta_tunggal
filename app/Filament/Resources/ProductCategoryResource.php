@@ -59,19 +59,6 @@ class ProductCategoryResource extends Resource
                         'unique' => 'Kode Kategori sudah digunakan'
                     ])
                     ->required(),
-                Select::make('cabang_id')
-                    ->label('Cabang')
-                    ->options(\App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
-                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
-                    }))
-                    ->preload()
-                    ->searchable()
-                    ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                    ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
-                    ->validationMessages([
-                        'required' => 'Cabang harus dipilih'
-                    ])
-                    ->required(),
                 TextInput::make('kenaikan_harga')
                     ->label('Kenaikan Harga (%)')
                     ->numeric()
@@ -94,18 +81,6 @@ class ProductCategoryResource extends Resource
                     ->label('Nama Kategori')
                     ->sortable()
                     ->searchable(),
-                TextColumn::make('cabang')
-                    ->label('Cabang')
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->kode}) {$state->nama}";
-                    })
-                    ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('cabang', function ($query) use ($search) {
-                            return $query->where('kode', 'LIKE', '%' . $search . '%')
-                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
-                        });
-                    })
-                    ->sortable(),
                 TextColumn::make('kenaikan_harga')
                     ->label('Kenaikan Harga (%)')
                     ->suffix('%'),

@@ -26,8 +26,9 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Table;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -331,7 +332,35 @@ class CustomerResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('cabang_id')
+                    ->label('Cabang')
+                    ->relationship('cabang', 'nama')
+                    ->getOptionLabelFromRecordUsing(function ($record) {
+                        return "({$record->kode}) {$record->nama}";
+                    })
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('tipe_pembayaran')
+                    ->label('Tipe Pembayaran')
+                    ->options([
+                        'Bebas' => 'Bebas',
+                        'COD (Bayar Lunas)' => 'COD (Bayar Lunas)',
+                        'Kredit' => 'Kredit (Bayar Kredit)',
+                    ])
+                    ->searchable(),
+                SelectFilter::make('tipe')
+                    ->label('Tipe Customer')
+                    ->options([
+                        'PKP' => 'PKP',
+                        'PRI' => 'PRI',
+                    ])
+                    ->searchable(),
+                SelectFilter::make('isSpecial')
+                    ->label('Spesial')
+                    ->options([
+                        '1' => 'Ya',
+                        '0' => 'Tidak',
+                    ]),
             ])
             ->actions([
                 ActionGroup::make([

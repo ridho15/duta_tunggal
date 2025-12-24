@@ -3,8 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\Cabang;
-use App\Models\ChartOfAccount;
-use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
@@ -22,16 +20,15 @@ class ProductFactory extends Factory
      */
     public function definition(): array
     {
-        $cabang = Cabang::inRandomOrder()->first() ?? Cabang::factory()->create();
-        $category = ProductCategory::where('cabang_id', $cabang->id)->inRandomOrder()->first()
-            ?? ProductCategory::factory()->create(['cabang_id' => $cabang->id]);
+        $category = ProductCategory::inRandomOrder()->first()
+            ?? ProductCategory::factory()->create();
 
         return [
             'sku' => 'SKU-' . $this->faker->unique()->numerify('###'),
             'name' => 'Produk ' . $this->faker->word,
-            'cabang_id' => $cabang->id,
             'supplier_id' => Supplier::inRandomOrder()->first()->id ?? Supplier::factory()->create()->id,
             'product_category_id' => $category->id,
+            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? Cabang::factory()->create()->id,
             'uom_id' => optional(UnitOfMeasure::inRandomOrder()->first())->id ?? UnitOfMeasure::factory()->create()->id,
             'cost_price' => $this->faker->randomFloat(2, 5000, 100000),
             'sell_price' => $this->faker->randomFloat(2, 10000, 200000),

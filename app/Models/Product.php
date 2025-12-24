@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,9 +14,9 @@ class Product extends Model
     protected $fillable = [
         'name', // Nama Product
         'sku', // Kode
-        'cabang_id',
         'supplier_id',
         'product_category_id',
+        'cabang_id',
         'cost_price', // Harga Beli Asli (Rp.)
         'sell_price', // Harga jual (Rp.)
         'biaya',
@@ -63,11 +62,6 @@ class Product extends Model
         return $query->where('is_active', false);
     }
 
-    public function cabang()
-    {
-        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
-    }
-
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
@@ -81,6 +75,11 @@ class Product extends Model
     public function productCategory()
     {
         return $this->belongsTo(ProductCategory::class, 'product_category_id')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     public function uom()
@@ -170,8 +169,8 @@ class Product extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope(new CabangScope);
-        
+        static::addGlobalScope(new \App\Models\Scopes\CabangScope);
+
         static::deleting(function ($product) {
             if ($product->isForceDeleting()) {
                 $product->purchaseOrderItem()->forceDelete();

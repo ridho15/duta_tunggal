@@ -20,7 +20,6 @@ class ProductCategoryFactory extends Factory
         return [
             'kode' => 'CAT-' . $this->faker->unique()->numerify('###'),
             'name' => 'Kategori ' . $this->faker->word,
-            'cabang_id' => Cabang::inRandomOrder()->first()?->id ?? Cabang::factory(),
             'kenaikan_harga' => $this->faker->randomFloat(2, 0, 20), // 0% - 20%
         ];
     }

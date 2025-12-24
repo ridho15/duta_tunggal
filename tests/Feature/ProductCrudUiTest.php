@@ -26,9 +26,7 @@ beforeEach(function () {
     $this->cabang = Cabang::factory()->create();
     $this->supplier = Supplier::factory()->create();
     $this->uom = UnitOfMeasure::factory()->create();
-    $this->category = ProductCategory::factory()->create([
-        'cabang_id' => $this->cabang->id,
-    ]);
+    $this->category = ProductCategory::factory()->create();
 
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
@@ -81,9 +79,9 @@ function productFormPayload(object $testCase, array $overrides = []): array
     return array_merge([
         'name' => 'Produk Form ' . uniqid(),
         'sku' => 'SKU-' . uniqid(),
-        'cabang_id' => $testCase->cabang->id,
         'supplier_id' => $testCase->supplier->id,
         'product_category_id' => $testCase->category->id,
+        'cabang_id' => $testCase->cabang->id,
         'cost_price' => '15000',
         'sell_price' => '25000',
         'biaya' => '500',
@@ -107,13 +105,14 @@ it('creates a product through the Filament create page', function () {
     $minimalData = [
         'sku' => 'SKU-MIN-' . uniqid(),
         'name' => 'Minimal Product',
-        'cabang_id' => $this->cabang->id,
         'product_category_id' => $this->category->id,
+        'cabang_id' => $this->cabang->id,
         'cost_price' => '10000',
         'sell_price' => '15000',
         'biaya' => '500',
         'kode_merk' => 'MRK-MIN-' . uniqid(),
         'uom_id' => $this->uom->id,
+        'unitConversions' => [], // Empty array for unit conversions
     ];
 
     Livewire::test(CreateProduct::class)

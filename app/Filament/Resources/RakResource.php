@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\RakResource\Pages;
 use App\Models\Rak;
 use App\Models\Warehouse;
+use App\Services\RakService;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -13,6 +15,7 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,7 +41,15 @@ class RakResource extends Resource
                 TextInput::make('code')
                     ->required()
                     ->label('Kode Rak')
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->suffixAction(Action::make('generateCode')
+                        ->icon('heroicon-m-arrow-path')
+                        ->tooltip('Generate Kode Rak')
+                        ->action(function ($set, $get, $state) {
+                            $rakService = app(RakService::class);
+                            $warehouseId = $get('warehouse_id');
+                            $set('code', $rakService->generateKodeRak($warehouseId));
+                        })),
                 Select::make('warehouse_id')
                     ->label('Gudang')
                     ->options(function () {
@@ -97,7 +108,14 @@ class RakResource extends Resource
                     }),
             ])
             ->filters([
-                //
+                SelectFilter::make('warehouse_id')
+                    ->label('Gudang')
+                    ->relationship('warehouse', 'name')
+                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
+                        return "({$warehouse->kode}) {$warehouse->name}";
+                    })
+                    ->searchable()
+                    ->preload(),
             ])
             ->actions([
                 EditAction::make(),
