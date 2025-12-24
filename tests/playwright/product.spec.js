@@ -162,4 +162,41 @@ test.describe('Product & Category Management', () => {
     // Verify
     await expect(page.locator(`text=Test Category`)).toBeVisible();
   });
+
+  test('can bulk update product prices', async ({ page }) => {
+    // Go to products page
+    await page.goto('http://localhost:8000/admin/products');
+
+    // Wait for table to load
+    await page.waitForSelector('table', { timeout: 10000 });
+
+    // Select first product using checkbox - Filament uses specific checkbox selectors
+    const checkboxes = page.locator('input[type="checkbox"][name="selectedRecords[]"]');
+    await checkboxes.first().waitFor();
+
+    // Check the first checkbox
+    await checkboxes.first().check();
+
+    // Wait for bulk actions to appear - now all bulk actions are in a single group
+    await page.waitForSelector('.fi-ta-bulk-actions', { timeout: 5000 });
+
+    // Click the bulk actions trigger to open the dropdown
+    await page.click('.fi-ta-bulk-actions button');
+
+    // Click "Update Harga Massal" action from the dropdown
+    await page.click('text=Update Harga Massal');
+
+    // Wait for modal to appear and verify it exists
+    await page.waitForSelector('.fi-modal', { timeout: 5000 });
+
+    // Verify modal title
+    await expect(page.locator('.fi-modal')).toContainText('Update Harga Produk Terpilih');
+
+    // Verify form fields are present
+    await expect(page.locator('input[name="data[cost_price]"]')).toBeVisible();
+    await expect(page.locator('input[name="data[sell_price]"]')).toBeVisible();
+    await expect(page.locator('input[name="data[biaya]"]')).toBeVisible();
+
+    console.log('Modal "Update Harga Massal" berhasil muncul!');
+  });
 });

@@ -17,6 +17,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -27,6 +28,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\BulkAction;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
@@ -982,7 +984,7 @@ class ProductResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
 
-                    Action::make('bulk_activate')
+                    BulkAction::make('bulk_activate')
                         ->label('Aktifkan Produk')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
@@ -1006,7 +1008,7 @@ class ProductResource extends Resource
                         })
                         ->deselectRecordsAfterCompletion(),
 
-                    Action::make('bulk_deactivate')
+                    BulkAction::make('bulk_deactivate')
                         ->label('Nonaktifkan Produk')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
@@ -1030,48 +1032,69 @@ class ProductResource extends Resource
                         })
                         ->deselectRecordsAfterCompletion(),
 
-                    Action::make('bulk_update_harga')
+                    BulkAction::make('bulk_update_harga')
                         ->label('Update Harga Massal')
                         ->icon('heroicon-o-currency-dollar')
                         ->color('warning')
-                        ->requiresConfirmation()
                         ->modalHeading('Update Harga Produk Terpilih')
-                        ->modalDescription('Update harga untuk semua produk yang dipilih. Kosongkan field yang tidak ingin diubah.')
-                        ->form([
-                            Fieldset::make('Update Harga')
-                                ->schema([
-                                    TextInput::make('cost_price')
-                                        ->label('Harga Beli Asli (Rp)')
-                                        ->indonesianMoney()
-                                        ->numeric()
-                                        ->placeholder('Kosongkan jika tidak diubah'),
-                                    TextInput::make('sell_price')
-                                        ->label('Harga Jual (Rp)')
-                                        ->indonesianMoney()
-                                        ->numeric()
-                                        ->placeholder('Kosongkan jika tidak diubah'),
-                                    TextInput::make('biaya')
-                                        ->label('Biaya (Rp)')
-                                        ->indonesianMoney()
-                                        ->numeric()
-                                        ->placeholder('Kosongkan jika tidak diubah'),
-                                    TextInput::make('harga_batas')
-                                        ->label('Harga Batas (%)')
-                                        ->numeric()
-                                        ->placeholder('Kosongkan jika tidak diubah'),
-                                    TextInput::make('item_value')
-                                        ->label('Item Value (Rp)')
-                                        ->indonesianMoney()
-                                        ->numeric()
-                                        ->placeholder('Kosongkan jika tidak diubah'),
-                                ])
-                        ])
+                        ->modalDescription('Update harga untuk semua produk yang dipilih. Setiap produk akan ditampilkan dengan harga saat ini sebagai default.')
+                        ->form(function ($records) {
+                            $schema = [];
+
+                            foreach ($records as $index => $record) {
+                                $schema[] = Fieldset::make("Produk: {$record->sku} - {$record->name}")
+                                    ->schema([
+                                        TextInput::make("products.{$index}.cost_price")
+                                            ->label('Harga Beli Asli (Rp)')
+                                            ->indonesianMoney()
+                                            ->default($record->cost_price)
+                                            ->placeholder('Kosongkan jika tidak diubah'),
+                                        TextInput::make("products.{$index}.sell_price")
+                                            ->label('Harga Jual (Rp)')
+                                            ->indonesianMoney()
+                                            ->default($record->sell_price)
+                                            ->placeholder('Kosongkan jika tidak diubah'),
+                                        TextInput::make("products.{$index}.biaya")
+                                            ->label('Biaya (Rp)')
+                                            ->indonesianMoney()
+                                            ->default($record->biaya)
+                                            ->placeholder('Kosongkan jika tidak diubah'),
+                                        TextInput::make("products.{$index}.harga_batas")
+                                            ->label('Harga Batas (%)')
+                                            ->default($record->harga_batas)
+                                            ->placeholder('Kosongkan jika tidak diubah'),
+                                        TextInput::make("products.{$index}.item_value")
+                                            ->label('Item Value (Rp)')
+                                            ->indonesianMoney()
+                                            ->default($record->item_value)
+                                            ->placeholder('Kosongkan jika tidak diubah'),
+                                        Hidden::make("products.{$index}.id")
+                                            ->default($record->id),
+                                    ])
+                                    ->columns(2);
+                            }
+
+                            return $schema;
+                        })
                         ->action(function (array $data, $records) {
                             $count = 0;
-                            $updateData = array_filter($data, fn($value) => $value !== null && $value !== '');
-                            foreach ($records as $record) {
-                                $record->update($updateData);
-                                $count++;
+                            $updatedProducts = [];
+
+                            foreach ($data['products'] ?? [] as $productData) {
+                                if (isset($productData['id'])) {
+                                    $product = Product::find($productData['id']);
+                                    if ($product) {
+                                        $updateData = array_filter($productData, function($value, $key) {
+                                            return $key !== 'id' && $value !== null && $value !== '';
+                                        }, ARRAY_FILTER_USE_BOTH);
+
+                                        if (!empty($updateData)) {
+                                            $product->update($updateData);
+                                            $updatedProducts[] = $product->name;
+                                            $count++;
+                                        }
+                                    }
+                                }
                             }
 
                             \Filament\Notifications\Notification::make()
@@ -1082,8 +1105,7 @@ class ProductResource extends Resource
                         })
                         ->deselectRecordsAfterCompletion(),
 
-                    // Bulk barcode print action
-                    Action::make('bulk_print_barcode')
+                    BulkAction::make('bulk_print_barcode')
                         ->label('Print Barcode (Bulk)')
                         ->icon('heroicon-o-printer')
                         ->color('success')
