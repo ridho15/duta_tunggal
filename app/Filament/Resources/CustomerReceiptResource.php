@@ -308,7 +308,7 @@ class CustomerReceiptResource extends Resource
                                 Select::make('coa_id')
                                     ->label('COA')
                                     ->preload()
-                                    ->searchable(['code', 'name'])
+                                    ->searchable(['code', 'perusahaan'])
                                     ->reactive()
                                     ->options(function () {
                                         return ChartOfAccount::all()->mapWithKeys(function ($coa) {

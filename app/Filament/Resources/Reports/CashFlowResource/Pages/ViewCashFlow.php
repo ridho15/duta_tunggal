@@ -7,6 +7,7 @@ use App\Filament\Resources\Reports\CashFlowResource;
 use App\Models\Cabang;
 use App\Services\Reports\CashFlowReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -18,6 +19,8 @@ class ViewCashFlow extends Page
 {
     protected static string $resource = CashFlowResource::class;
     protected static string $view = 'filament.pages.reports.cash-flow';
+
+    public bool $showPreview = false;
 
     public ?string $startDate = null;
     public ?string $endDate = null;
@@ -44,6 +47,48 @@ class ViewCashFlow extends Page
         // This will be called when any reactive property is updated
         // We can use this to refresh the data
         $this->resetValidation();
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+
+            Action::make('export_excel')
+                ->label('Export Excel')
+                ->icon('heroicon-m-arrow-down-tray')
+                ->color('success')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->export('excel')),
+
+            Action::make('export_pdf')
+                ->label('Export PDF')
+                ->icon('heroicon-m-document-text')
+                ->color('danger')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->export('pdf')),
+        ];
+    }
+
+    public function generateReport(): void
+    {
+        $this->showPreview = true;
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
     }
 
     protected function getFormSchema(): array

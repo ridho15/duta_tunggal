@@ -38,19 +38,22 @@ class ProductSeeder extends Seeder
     private function createOrUpdateProduct($index)
     {
         $cabang = Cabang::inRandomOrder()->first() ?? Cabang::factory()->create();
-        $category = ProductCategory::where('cabang_id', $cabang->id)->inRandomOrder()->first()
-            ?? ProductCategory::factory()->create(['cabang_id' => $cabang->id]);
+        $category = ProductCategory::inRandomOrder()->first()
+            ?? ProductCategory::factory()->create();
 
         $sku = 'SKU-' . str_pad($index, 3, '0', STR_PAD_LEFT);
+        $supplier = Supplier::inRandomOrder()->first() ?? Supplier::factory()->create();
+        $uom = UnitOfMeasure::inRandomOrder()->first() ?? UnitOfMeasure::factory()->create();
+        
 
         Product::updateOrCreate(
             ['sku' => $sku], // Find by SKU
             [
                 'name' => 'Produk ' . fake()->word . ' ' . $index,
-                'cabang_id' => $cabang->id,
-                'supplier_id' => Supplier::inRandomOrder()->first()->id ?? Supplier::factory()->create()->id,
+                'supplier_id' => $supplier->id,
                 'product_category_id' => $category->id,
-                'uom_id' => UnitOfMeasure::inRandomOrder()->first()->id ?? UnitOfMeasure::factory()->create()->id,
+                'cabang_id' => $cabang->id,
+                'uom_id' => $uom->id,
                 'cost_price' => fake()->numberBetween(5000, 100000),
                 'sell_price' => fake()->numberBetween(10000, 200000),
                 'biaya' => fake()->numberBetween(1000, 5000),

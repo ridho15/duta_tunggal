@@ -301,11 +301,6 @@
                         <span class="value">{{ $data->where('status', 'closed')->count() }}</span>
                         <span class="label">Closed</span>
                     </td>
-                    <td class="summary-item">
-                        <span class="icon">⏳</span>
-                        <span class="value">{{ $data->where('status', 'request_approval')->count() }}</span>
-                        <span class="label">Request Approval</span>
-                    </td>
                 </tr>
             </tbody>
         </table>
@@ -332,7 +327,7 @@
                 <td>{{ $order->po_number }}</td>
                 <td>{{ $order->order_date->format('d/m/Y') }}</td>
                 <td>{{ $order->supplier->code ?? '-' }}</td>
-                <td>{{ $order->supplier->name ?? '-' }}</td>
+                <td>{{ $order->supplier->perusahaan ?? '-' }}</td>
                 <td>{{ $order->supplier->address ?? '-' }}</td>
                 <td>{{ $order->supplier->phone ?? '-' }}</td>
                 <td class="text-right">Rp {{ number_format($order->total_amount ?? 0, 0, ',', '.') }}</td>

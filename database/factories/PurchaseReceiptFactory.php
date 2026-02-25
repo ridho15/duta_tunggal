@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -26,7 +27,9 @@ class PurchaseReceiptFactory extends Factory
             'currency_id' => 1,
             'other_cost' => $this->faker->numberBetween(0, 10000),
             'status' => 'completed',
-            'cabang_id' => 1, // Default cabang_id
+            'cabang_id' => function () {
+                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
+            },
         ];
     }
 }

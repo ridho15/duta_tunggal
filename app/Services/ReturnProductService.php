@@ -34,21 +34,15 @@ class ReturnProductService
     public function generateReturnNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'RN-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $last = ReturnProduct::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = ReturnProduct::where('return_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->return_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'RN-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     /**

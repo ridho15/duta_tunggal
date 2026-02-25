@@ -35,6 +35,8 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
     protected static string $resource = AgeingReportResource::class;
     protected static string $view = 'filament.pages.reports.ageing-report';
 
+    public bool $showPreview = false;
+
     public ?string $as_of_date = null;
     public ?string $cabang_id = null;
     public ?string $report_type = 'receivables'; // 'receivables', 'payables', 'both'
@@ -211,10 +213,24 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+
             Action::make('export_excel')
                 ->label('Export Excel')
                 ->icon('heroicon-m-arrow-down-tray')
                 ->color('success')
+                ->visible(fn () => $this->showPreview)
                 ->action(function () {
                     return Excel::download(
                         new AgeingReportExport($this->as_of_date ?? now(), $this->cabang_id, $this->report_type),
@@ -225,6 +241,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                 ->label('Export PDF')
                 ->icon('heroicon-m-document-text')
                 ->color('danger')
+                ->visible(fn () => $this->showPreview)
                 ->action(function () {
                     $export = new AgeingReportPdfExport($this->as_of_date ?? now(), $this->cabang_id, $this->report_type);
                     $pdf = $export->generatePdf();
@@ -234,6 +251,16 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                     }, 'ageing-report-' . now()->format('Y-m-d') . '.pdf');
                 }),
         ];
+    }
+
+    public function generateReport(): void
+    {
+        $this->showPreview = true;
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
     }
 
     private function getAgingSummary($type, $bucket)
@@ -336,7 +363,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                         if ($record instanceof AccountReceivable) {
                             return $record->customer->name ?? '-';
                         } else {
-                            return $record->supplier->name ?? '-';
+                            return $record->supplier->perusahaan ?? '-';
                         }
                     })
                     ->searchable(),

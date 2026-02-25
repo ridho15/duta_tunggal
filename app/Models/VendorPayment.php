@@ -13,6 +13,7 @@ class VendorPayment extends Model
     use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'vendor_payments';
     protected $fillable = [
+        'payment_request_id', // Task 15c: link to PaymentRequest
         'supplier_id',
         'selected_invoices',
         'invoice_receipts',
@@ -39,6 +40,11 @@ class VendorPayment extends Model
         'bea_masuk_amount' => 'float',
         'is_import_payment' => 'boolean',
     ];
+
+    public function paymentRequest()
+    {
+        return $this->belongsTo(\App\Models\PaymentRequest::class, 'payment_request_id');
+    }
 
     public function supplier()
     {

@@ -51,7 +51,7 @@ class BillOfMaterialSeeder extends Seeder
             $bom = BillOfMaterial::updateOrCreate(
                 ['code' => 'BOM-' . $product->sku],
                 [
-                    'cabang_id' => $product->cabang_id,
+                    'cabang_id' => $product->cabang_id ?? \App\Models\Cabang::first()?->id,
                     'product_id' => $product->id,
                     'quantity' => 1,
                     'nama_bom' => 'BOM ' . $product->name,

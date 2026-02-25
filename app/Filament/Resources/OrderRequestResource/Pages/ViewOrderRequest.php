@@ -59,17 +59,17 @@ class ViewOrderRequest extends ViewRecord
                         ->searchable()
                         ->default(fn() => $this->resolveDefaultSupplierId())
                         ->options(function () {
-                            return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                             });
                         })
                         ->getSearchResultsUsing(function (string $search) {
-                            return Supplier::where('name', 'like', "%{$search}%")
+                            return Supplier::where('perusahaan', 'like', "%{$search}%")
                                 ->orWhere('code', 'like', "%{$search}%")
                                 ->limit(50)
                                 ->get()
                                 ->mapWithKeys(function ($supplier) {
-                                    return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                 });
                         })
                         ->required()
@@ -129,17 +129,17 @@ class ViewOrderRequest extends ViewRecord
                         ->searchable()
                         ->default(fn() => $this->resolveDefaultSupplierId())
                         ->options(function () {
-                            return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                             });
                         })
                         ->getSearchResultsUsing(function (string $search) {
-                            return Supplier::where('name', 'like', "%{$search}%")
+                            return Supplier::where('perusahaan', 'like', "%{$search}%")
                                 ->orWhere('code', 'like', "%{$search}%")
                                 ->limit(50)
                                 ->get()
                                 ->mapWithKeys(function ($supplier) {
-                                    return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                 });
                         })
                         ->required(),

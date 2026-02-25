@@ -50,13 +50,13 @@ class VendorPaymentDetailObserver
                 // Use notification instead of exception for better UX
                 Notification::make()
                     ->title('Deposit Tidak Tersedia')
-                    ->body("Supplier {$vendorPayment->supplier->name} tidak memiliki deposit yang tersedia untuk pembayaran. Silakan pilih metode pembayaran lain atau buat deposit terlebih dahulu.")
+                    ->body("Supplier {$vendorPayment->supplier->perusahaan} tidak memiliki deposit yang tersedia untuk pembayaran. Silakan pilih metode pembayaran lain atau buat deposit terlebih dahulu.")
                     ->danger()
                     ->persistent()
                     ->send();
 
                 // Log for debugging but don't stop the process
-                Log::warning("No available deposits for supplier {$vendorPayment->supplier->name} during payment creation");
+                Log::warning("No available deposits for supplier {$vendorPayment->supplier->perusahaan} during payment creation");
 
                 // Skip deposit processing but continue with other logic
                 return;
@@ -68,13 +68,13 @@ class VendorPaymentDetailObserver
                 // Use notification instead of exception
                 Notification::make()
                     ->title('Saldo Deposit Tidak Mencukupi')
-                    ->body("Saldo deposit supplier {$vendorPayment->supplier->name} tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($vendorPaymentDetail->amount, 0, ',', '.'))
+                    ->body("Saldo deposit supplier {$vendorPayment->supplier->perusahaan} tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($vendorPaymentDetail->amount, 0, ',', '.'))
                     ->danger()
                     ->persistent()
                     ->send();
 
                 // Log for debugging
-                Log::warning("Insufficient deposit balance for supplier {$vendorPayment->supplier->name}. Available: {$totalAvailableDeposit}, Required: {$vendorPaymentDetail->amount}");
+                Log::warning("Insufficient deposit balance for supplier {$vendorPayment->supplier->perusahaan}. Available: {$totalAvailableDeposit}, Required: {$vendorPaymentDetail->amount}");
 
                 // Skip deposit processing but continue with other logic
                 return;

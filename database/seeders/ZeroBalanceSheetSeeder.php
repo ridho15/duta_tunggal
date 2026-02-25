@@ -118,32 +118,86 @@ class ZeroBalanceSheetSeeder extends Seeder
 
         $this->command?->info('Seeding master data for zero balance sheet...');
 
-        $this->call([
-            // Core System Setup
-            PermissionSeeder::class,
-            RoleSeeder::class,
-            UserSeeder::class,
+        try {
+            // Debug: inspect suppliers table columns to help diagnose unknown column errors seen in tests
+            try {
+                $columns = DB::select("SHOW COLUMNS FROM `suppliers`");
+                $this->command?->info('Suppliers columns: ' . json_encode(array_map(fn($c)=>$c->Field, $columns)));
+            } catch (\Throwable $e) {
+                $this->command?->warn('Unable to inspect suppliers columns: ' . $e->getMessage());
+            }
 
-            // Master Data
-            CurrencySeeder::class,
-            UnitOfMeasureSeeder::class,
-            CabangSeeder::class,
-            ChartOfAccountSeeder::class,
-            MasterDataSeeder::class,
+            $this->call([
+                // Core System Setup
+                PermissionSeeder::class,
+                RoleSeeder::class,
+                UserSeeder::class,
 
-            // Business Entities (without transactions)
-            ProductCategorySeeder::class,
-            CustomerSeeder::class,
-            SupplierSeeder::class,
-            DriverSeeder::class,
-            VehicleSeeder::class,
-            ProductSeeder::class,
-            BillOfMaterialSeeder::class,
+                // Master Data
+                CurrencySeeder::class,
+                UnitOfMeasureSeeder::class,
+                CabangSeeder::class,
+                ChartOfAccountSeeder::class,
+                MasterDataSeeder::class,
 
-            // Inventory & Warehouse Setup
-            WarehouseSeeder::class,
-            RakSeeder::class,
-        ]);
+                // Business Entities (without transactions)
+                ProductCategorySeeder::class,
+                CustomerSeeder::class,
+                SupplierSeeder::class,
+                DriverSeeder::class,
+                VehicleSeeder::class,
+                ProductSeeder::class,
+                BillOfMaterialSeeder::class,
+
+                // Inventory & Warehouse Setup
+                WarehouseSeeder::class,
+                RakSeeder::class,
+            ]);
+        } catch (\PDOException $e) {
+            // Some database drivers/environments can hit nested savepoint issues when
+            // seeders trigger transactions. Attempt a single automatic recovery by
+            // reconnecting and retrying the seeding once. If it still fails, rethrow.
+            if (str_contains($e->getMessage(), 'SAVEPOINT') || str_contains($e->getMessage(), 'does not exist')) {
+                $this->command?->warn('Encountered savepoint error during seeding. Reconnecting to DB and retrying once.');
+                try {
+                    DB::disconnect();
+                    DB::reconnect();
+
+                    // After reconnecting, ensure transactional data is cleaned again to get a
+                    // consistent state before retrying seeders.
+                    $this->cleanupTransactionalData();
+                    $this->resetChartOfAccounts();
+
+                    $this->call([
+                        PermissionSeeder::class,
+                        RoleSeeder::class,
+                        UserSeeder::class,
+
+                        CurrencySeeder::class,
+                        UnitOfMeasureSeeder::class,
+                        CabangSeeder::class,
+                        ChartOfAccountSeeder::class,
+                        MasterDataSeeder::class,
+
+                        ProductCategorySeeder::class,
+                        CustomerSeeder::class,
+                        SupplierSeeder::class,
+                        DriverSeeder::class,
+                        VehicleSeeder::class,
+                        ProductSeeder::class,
+                        BillOfMaterialSeeder::class,
+
+                        WarehouseSeeder::class,
+                        RakSeeder::class,
+                    ]);
+                } catch (\Throwable $e2) {
+                    $this->command?->error('Retry failed during seeding: ' . $e2->getMessage());
+                    throw $e2;
+                }
+            } else {
+                throw $e;
+            }
+        }
 
         // Ensure inventory stocks remain empty after seeding master data.
         // Some seeders may create InventoryStock records (e.g., Product/Warehouse seeders).

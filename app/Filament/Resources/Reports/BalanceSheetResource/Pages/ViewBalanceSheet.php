@@ -13,6 +13,8 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
 use Illuminate\Support\Carbon;
 use App\Models\Cabang;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -20,6 +22,8 @@ class ViewBalanceSheet extends Page
 {
     protected static string $resource = BalanceSheetResource::class;
     protected static string $view = 'filament.pages.reports.balance-sheet';
+
+    public bool $showPreview = false;
 
     public ?string $as_of_date = null; // position date
     public ?string $cabang_id = null; // single branch selection for compatibility
@@ -33,6 +37,34 @@ class ViewBalanceSheet extends Page
     public ?array $selected_periods = [];
     public ?string $display_mode = 'detailed'; // 'total_only', 'parent_only', 'detailed', 'with_zero'
     public ?bool $include_zero_balances = false;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+        ];
+    }
+
+    public function generateReport(): void
+    {
+        $this->showPreview = true;
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
+    }
 
     protected function getFormSchema(): array
     {
@@ -285,7 +317,7 @@ class ViewBalanceSheet extends Page
 
     public function printPdf()
     {
-        $asOf = $this->asOfDate ? Carbon::parse($this->asOfDate)->endOfDay() : now()->endOfDay();
+        $asOf = $this->as_of_date ? Carbon::parse($this->as_of_date)->endOfDay() : now()->endOfDay();
         $data = $this->getReportData();
         $html = view('export.balance-sheet', [
             'data' => $data,

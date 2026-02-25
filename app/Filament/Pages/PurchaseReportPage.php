@@ -60,7 +60,7 @@ class PurchaseReportPage extends Page implements HasTable
             ->columns([
                 TextColumn::make('po_number')->label('No. PO')->sortable(),
                 TextColumn::make('order_date')->label('Tanggal')->date()->sortable(),
-                TextColumn::make('supplier.name')->label('Supplier')->sortable(),
+                TextColumn::make('supplier.perusahaan')->label('Supplier')->sortable(),
                 TextColumn::make('total_amount')->label('Total')->money('IDR')->sortable(),
                 TextColumn::make('status')->label('Status')->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -137,7 +137,7 @@ class PurchaseReportPage extends Page implements HasTable
                     ->label('Supplier')
                     ->options(function () {
                         return Supplier::all()->mapWithKeys(function ($supplier) {
-                            return [$supplier->id => $supplier->code . ' - ' . $supplier->name];
+                            return [$supplier->id => $supplier->code . ' - ' . $supplier->perusahaan];
                         });
                     })
                     ->searchable()
@@ -147,7 +147,7 @@ class PurchaseReportPage extends Page implements HasTable
                             ->limit(50)
                             ->get()
                             ->mapWithKeys(function ($supplier) {
-                                return [$supplier->id => $supplier->code . ' - ' . $supplier->name];
+                                return [$supplier->id => $supplier->code . ' - ' . $supplier->perusahaan];
                             })
                             ->toArray();
                     })

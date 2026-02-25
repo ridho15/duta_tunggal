@@ -58,7 +58,7 @@ test('shows success notification after confirming asset purchase order', functio
 
     test()->actingAs($user);
 
-    // Create purchase order with asset
+    // Create purchase order with asset (approved by OR)
     $purchaseOrder = PurchaseOrder::factory()->create([
         'supplier_id' => $supplier->id,
         'po_number' => 'PO-ASSET-TEST-' . now()->format('YmdHis'),
@@ -68,7 +68,7 @@ test('shows success notification after confirming asset purchase order', functio
         'tempo_hutang' => 30,
         'note' => 'Test asset purchase order',
         'is_asset' => true,
-        'status' => 'request_approval',
+        'status' => 'approved',
         'created_by' => $user->id,
     ]);
 
@@ -84,22 +84,18 @@ test('shows success notification after confirming asset purchase order', functio
         'tipe_pajak' => 'Inklusif',
     ]);
 
-    // Test the action through Livewire
+    // Test completing the PO via the completion action which now creates assets
     Livewire::test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
-        ->mountAction('konfirmasi')
-        ->setActionData([
-            'usage_date' => now()->format('Y-m-d'),
-            'useful_life_years' => 5,
-            'salvage_value' => 0,
-            'asset_coa_id' => $assetCoa->id,
-            'accumulated_depreciation_coa_id' => $accumulatedDepreciationCoa->id,
-            'depreciation_expense_coa_id' => $depreciationExpenseCoa->id,
-        ])
+        ->mountAction('complete')
         ->callMountedAction()
-        ->assertNotified('Purchase Order Berhasil Dikonfirmasi');
+        ->assertNotified('Purchase Order Completed');
 
     // Verify asset was created
     expect(Asset::count())->toBe(1);
+    $asset = Asset::first();
+    expect($asset->name)->toBe($product->name);
+    expect($asset->purchase_cost)->toBe('1000000.00');
+    expect($asset->useful_life_years)->toBe(5);
     $asset = Asset::first();
     expect($asset->name)->toBe($product->name);
     expect($asset->purchase_cost)->toBe('1000000.00');

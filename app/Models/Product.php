@@ -67,6 +67,14 @@ class Product extends Model
         return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
     }
 
+    // Task 12: Multi-supplier support
+    public function suppliers()
+    {
+        return $this->belongsToMany(Supplier::class, 'product_supplier')
+            ->withPivot('supplier_price', 'supplier_sku', 'is_primary')
+            ->withTimestamps();
+    }
+
     public function unitConversions()
     {
         return $this->hasMany(ProductUnitConversion::class, 'product_id');

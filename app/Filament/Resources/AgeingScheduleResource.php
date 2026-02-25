@@ -72,7 +72,7 @@ class AgeingScheduleResource extends Resource
                                         if ($get('from_model_type') == 'App\Models\AccountPayable') {
                                             $listAccountPayable = AccountPayable::join('invoices', 'account_payables.invoice_id', '=', 'invoices.id')
                                                 ->join('suppliers', 'account_payables.supplier_id', "=", 'suppliers.id')
-                                                ->selectRaw('account_payables.id, CONCAT(invoices.invoice_number, " - ", suppliers.name) as label')
+                                                ->selectRaw('account_payables.id, CONCAT(invoices.invoice_number, " - ", suppliers.perusahaan) as label')
                                                 ->pluck('label', 'account_payables.id');
 
                                             return $listAccountPayable;

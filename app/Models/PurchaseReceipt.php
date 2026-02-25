@@ -17,7 +17,7 @@ class PurchaseReceipt extends Model
     protected $table = 'purchase_receipts';
     protected $fillable = [
         'receipt_number',
-        'purchase_order_id',
+        'purchase_order_id', // Now optional
         'receipt_date',
         'received_by',
         'notes',
@@ -58,15 +58,79 @@ class PurchaseReceipt extends Model
     }
 
     /**
-     * Update purchase receipt status based on QC items sent status
-     * - completed: all items sent to QC
-     * - partial: some items sent to QC
-     * - draft: no items sent to QC
+     * Check all receipt items status and update receipt status accordingly.
+     * - completed: all items are completed
+     * - partial: some items completed
+     * - draft: no items completed
+     * Also cascades to PurchaseOrder completion and auto-invoice.
+     */
+    public function checkAndUpdateStatus(): void
+    {
+        $totalItems = $this->purchaseReceiptItem()->count();
+        $completedItems = $this->purchaseReceiptItem()->where('status', 'completed')->count();
+
+        if ($totalItems === 0) {
+            $newStatus = 'draft';
+        } elseif ($completedItems === $totalItems) {
+            $newStatus = 'completed';
+        } elseif ($completedItems > 0) {
+            $newStatus = 'partial';
+        } else {
+            $newStatus = 'draft';
+        }
+
+        $this->update(['status' => $newStatus]);
+
+        if ($newStatus === 'completed') {
+            $this->cascadeToOrder();
+        }
+    }
+
+    /**
+     * Cascade PurchaseReceipt completion to PurchaseOrder.
+     */
+    protected function cascadeToOrder(): void
+    {
+        $purchaseOrder = $this->purchaseOrder;
+        if (!$purchaseOrder || in_array($purchaseOrder->status, ['completed', 'closed'])) {
+            return;
+        }
+
+        // Check if ALL receipts linked to this PO are now completed
+        $allReceipts = $purchaseOrder->purchaseReceipt()->get();
+        $allCompleted = $allReceipts->isNotEmpty() && $allReceipts->every(fn ($r) => $r->status === 'completed');
+
+        // Also validate every PO item has sufficient accepted quantity across receipts
+        $purchaseOrder->load('purchaseOrderItem');
+        $quantitiesFulfilled = $purchaseOrder->purchaseOrderItem->every(function ($poItem) {
+            $totalAccepted = $poItem->purchaseReceiptItem()->sum('qty_accepted');
+            return $totalAccepted >= $poItem->quantity;
+        });
+
+        if ($allCompleted && $quantitiesFulfilled) {
+            $purchaseOrder->update([
+                'status'       => 'completed',
+                'completed_by' => \Illuminate\Support\Facades\Auth::id() ?? 1,
+                'completed_at' => now(),
+            ]);
+
+            \Illuminate\Support\Facades\Log::info('PurchaseReceipt cascade: PO completed', ['po_id' => $purchaseOrder->id]);
+
+            // Auto-create invoice if configured
+            if (config('procurement.auto_create_invoice', false)) {
+                app(\App\Services\PurchaseReceiptService::class)->createAutomaticInvoiceFromReceipt($this);
+            }
+        }
+    }
+
+    /**
+     * Update purchase receipt status based on QC items sent status (backward compat).
+     * @deprecated Use checkAndUpdateStatus() instead.
      */
     public function updateStatusBasedOnQCItems()
     {
         $totalItems = $this->purchaseReceiptItem()->count();
-        $sentItems = $this->purchaseReceiptItem()->where('is_sent', true)->count();
+        $sentItems = $this->purchaseReceiptItem()->where('status', 'completed')->count();
 
         if ($totalItems === 0) {
             $this->status = 'draft';

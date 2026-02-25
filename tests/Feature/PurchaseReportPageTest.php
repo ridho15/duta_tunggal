@@ -49,14 +49,14 @@ class PurchaseReportPageTest extends TestCase
 
         Livewire::test(PurchaseReportPage::class)
             ->assertSee('Laporan Pembelian')
-            ->assertSee($supplier->name);
+            ->assertSee($supplier->perusahaan);
     }
 
     public function test_purchase_report_filters_work()
     {
         Cabang::factory()->create();
-        $supplier1 = Supplier::factory()->create(['name' => 'Supplier A']);
-        $supplier2 = Supplier::factory()->create(['name' => 'Supplier B']);
+        $supplier1 = Supplier::factory()->create(['perusahaan' => 'Supplier A']);
+        $supplier2 = Supplier::factory()->create(['perusahaan' => 'Supplier B']);
 
         PurchaseOrder::factory()->create([
             'supplier_id' => $supplier1->id,

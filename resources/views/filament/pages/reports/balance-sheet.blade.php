@@ -4,7 +4,10 @@
             {{ $this->form }}
         </form>
 
+        @if($this->showPreview)
+
         @php($data = $this->getReportData())
+        @php($asOfDate = $this->as_of_date ?? now()->format('Y-m-d'))
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div class="p-4 border rounded">
@@ -182,5 +185,14 @@
             <x-filament::button color="gray" wire:click="exportCsv">Export CSV</x-filament::button>
             <x-filament::button color="gray" wire:click="printPdf">Print PDF</x-filament::button>
         </div>
+
+        @else
+
+        <div class="mt-6 p-8 border rounded bg-gray-50 text-center text-gray-500">
+            <x-heroicon-o-document-chart-bar class="w-12 h-12 mx-auto mb-3 text-gray-400" style="width: 100px; height: 100px;"/>
+            <p class="text-lg font-medium" style="font-size: 11pt">Atur filter di atas, kemudian klik <strong>Tampilkan Laporan</strong> untuk melihat data.</p>
+        </div>
+
+        @endif
     </div>
 </x-filament::page>

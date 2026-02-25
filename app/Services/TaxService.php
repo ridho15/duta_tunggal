@@ -30,10 +30,11 @@ class TaxService
         if ($ratePercent <= 0) {
             return ['dpp' => $gross, 'ppn' => 0.0, 'total' => $gross];
         }
-        // Apply rule per client's image:
-        // PPN (inclusive) = gross * (rate - 1)% ; DPP = gross - PPN
-        $ppn = $gross * max($ratePercent - 1.0, 0.0) / 100.0;
-        $dpp = $gross - $ppn;
+        // Correct formula for inclusive tax (PPN included in gross):
+        // DPP = gross * 100 / (100 + rate)
+        // PPN = gross - DPP
+        $dpp = $gross * (100.0 / (100.0 + $ratePercent));
+        $ppn = $gross - $dpp;
         return ['dpp' => $dpp, 'ppn' => $ppn, 'total' => $gross];
     }
 

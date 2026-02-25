@@ -64,11 +64,7 @@ it('completes full purchase order workflow', function () {
 
     expect($purchaseOrder->status)->toBe('approved');
 
-    // 3. PO ISSUED - Status becomes request_approval (simulated)
-    $purchaseOrder->update(['status' => 'request_approval']);
-    $purchaseOrder->refresh();
-
-    expect($purchaseOrder->status)->toBe('request_approval');
+    // 3. PO ISSUED - Approval stage removed; PO proceeds as 'approved' or directly to receiving in the OR-driven flow.
 
     // 4. RECEIVING PROCESS - Create Purchase Receipt
     $purchaseReceipt = PurchaseReceipt::factory()->create([
@@ -88,7 +84,6 @@ it('completes full purchase order workflow', function () {
         'qty_accepted' => 10,
         'qty_rejected' => 0,
         'warehouse_id' => $warehouse->id,
-        'is_sent' => false,
     ]);
 
     expect($purchaseReceipt)
@@ -174,7 +169,7 @@ it('completes full purchase order workflow', function () {
 
     // 8. PAYMENT - Create Vendor Payment
     $vendorPayment = VendorPayment::factory()->create([
-        'invoice_id' => $purchaseInvoice->id,
+        'selected_invoices' => [$purchaseInvoice->id],
         'supplier_id' => $supplier->id,
         'payment_date' => now(),
         'total_payment' => 111000,
@@ -377,12 +372,8 @@ it('tests PO approval workflow', function () {
 
     expect($purchaseOrder->status)->toBe('draft');
 
-    // Submit for approval (request_approval)
-    $purchaseOrder->update(['status' => 'request_approval']);
-    expect($purchaseOrder->fresh()->status)->toBe('request_approval');
-
-    // Approve PO
-    $purchaseOrder->update(['status' => 'approved']);
+    // Approve PO directly (PO-level request approval removed in new flow)
+    $purchaseOrder->update(['is_asset' => false, 'status' => 'approved']);
     expect($purchaseOrder->fresh()->status)->toBe('approved');
 });
 
@@ -410,7 +401,6 @@ it('tests PO status transitions', function () {
     // Test all valid status transitions
     $statuses = [
         'draft',
-        'request_approval',
         'approved',
         'partially_received',
         'completed',

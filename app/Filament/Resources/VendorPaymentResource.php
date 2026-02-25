@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\VendorPaymentResource\Pages;
 use App\Models\ChartOfAccount;
 use App\Models\Invoice;
+use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\VendorPayment;
 use Filament\Forms\Components\Actions\Action;
@@ -45,6 +46,36 @@ class VendorPaymentResource extends Resource
             ->schema([
                 Section::make('Vendor Payment')
                     ->schema([
+                        // Payment Request Reference (Task 15c)
+                        Section::make('Referensi Payment Request')
+                            ->description('Vendor Payment harus mengacu pada Payment Request yang sudah disetujui')
+                            ->schema([
+                                Select::make('payment_request_id')
+                                    ->label('Payment Request (PR)')
+                                    ->options(function () {
+                                        return PaymentRequest::where('status', 'approved')
+                                            ->whereNull('vendor_payment_id')
+                                            ->with('supplier')
+                                            ->get()
+                                            ->mapWithKeys(function ($pr) {
+                                                return [$pr->id => "{$pr->request_number} - {$pr->supplier->perusahaan} (Rp " . number_format($pr->total_amount, 0, ',', '.') . ")"];
+                                            });
+                                    })
+                                    ->searchable()
+                                    ->nullable()
+                                    ->reactive()
+                                    ->helperText('Pilih Payment Request yang sudah disetujui (opsional - biarkan kosong jika tidak terkait PR)')
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if (!$state) return;
+                                        $pr = PaymentRequest::with('supplier')->find($state);
+                                        if ($pr) {
+                                            $set('supplier_id', $pr->supplier_id);
+                                            $set('selected_invoices', $pr->selected_invoices ?? []);
+                                        }
+                                    }),
+                            ])
+                            ->collapsible(),
+
                         // Header Section - Vendor and Payment Date
                         Section::make()
                             ->columns(2)
@@ -53,7 +84,7 @@ class VendorPaymentResource extends Resource
                                     ->label('Vendor')
                                     ->options(function () {
                                         return Supplier::all()->mapWithKeys(function ($supplier) {
-                                            return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                         })->toArray();
                                     })
                                     ->preload()
@@ -763,7 +794,7 @@ class VendorPaymentResource extends Resource
             ->filters([
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->relationship('supplier', 'name')
+                    ->relationship('supplier', 'perusahaan')
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('payment_method')

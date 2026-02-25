@@ -1,0 +1,937 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - navigation [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - button "Buka notifikasi" [ref=e9] [cursor=pointer]:
+              - generic [ref=e10]: Buka notifikasi
+              - img [ref=e11]
+            - dialog
+          - button "Menu pengguna" [ref=e15] [cursor=pointer]:
+            - img "Avatar Ridho Al Amzah" [ref=e16]
+      - main [ref=e17]:
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - generic [ref=e21]:
+              - navigation [ref=e22]:
+                - list [ref=e23]:
+                  - listitem [ref=e24]:
+                    - link "Inventory Stock" [ref=e25] [cursor=pointer]:
+                      - /url: http://localhost:8009/admin/inventory-stocks
+                  - listitem [ref=e26]:
+                    - img [ref=e27]
+                    - generic [ref=e29]: Daftar
+              - heading "Inventory Stock" [level=1] [ref=e30]
+            - link "Buat inventory stock" [ref=e33] [cursor=pointer]:
+              - /url: http://localhost:8009/admin/inventory-stocks/create
+              - img [ref=e34]
+              - generic [ref=e36]: Buat inventory stock
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - generic [ref=e42]:
+                - generic [ref=e44]:
+                  - paragraph
+                  - group [ref=e45]:
+                    - generic "Panduan Inventory Stock (Stok Inventory)" [ref=e46] [cursor=pointer]
+                  - paragraph
+                - generic [ref=e48]:
+                  - generic [ref=e49]:
+                    - generic [ref=e50]: Cari
+                    - generic [ref=e51]:
+                      - img [ref=e53]
+                      - searchbox "Cari" [ref=e56]
+                  - button "Filter 0" [ref=e59] [cursor=pointer]:
+                    - generic [ref=e60]: Filter
+                    - img [ref=e61]
+                    - generic [ref=e66]: "0"
+              - table [ref=e68]:
+                - rowgroup [ref=e69]:
+                  - row "Buat/batalkan pilihan semua item untuk tindakan massal. Aksi Product Gudang Rak Quantity Available Quantity Reserved Quantity Minimal" [ref=e70]:
+                    - columnheader "Buat/batalkan pilihan semua item untuk tindakan massal." [ref=e71]:
+                      - generic [ref=e73]:
+                        - checkbox "Buat/batalkan pilihan semua item untuk tindakan massal." [ref=e74]
+                        - generic [ref=e75]: Buat/batalkan pilihan semua item untuk tindakan massal.
+                    - columnheader "Aksi" [ref=e76]
+                    - columnheader "Product" [ref=e77]:
+                      - generic [ref=e79]: Product
+                    - columnheader "Gudang" [ref=e80]:
+                      - generic [ref=e82]: Gudang
+                    - columnheader "Rak" [ref=e83]:
+                      - generic [ref=e85]: Rak
+                    - columnheader "Quantity Available" [ref=e86]:
+                      - button "Quantity Available" [ref=e87] [cursor=pointer]:
+                        - generic [ref=e88]: Quantity Available
+                        - img [ref=e89]
+                    - columnheader "Quantity Reserved" [ref=e91]:
+                      - button "Quantity Reserved" [ref=e92] [cursor=pointer]:
+                        - generic [ref=e93]: Quantity Reserved
+                        - img [ref=e94]
+                    - columnheader "Quantity Minimal" [ref=e96]:
+                      - button "Quantity Minimal" [ref=e97] [cursor=pointer]:
+                        - generic [ref=e98]: Quantity Minimal
+                        - img [ref=e99]
+                - rowgroup [ref=e101]:
+                  - row "Buat/batalkan pilihan item 62 untuk tindakan massal. (SKU-011) Produk est 11 (GDG-564) Gudang rem () -73 0 0" [ref=e102]:
+                    - cell "Buat/batalkan pilihan item 62 untuk tindakan massal." [ref=e103]:
+                      - generic [ref=e105]:
+                        - checkbox "Buat/batalkan pilihan item 62 untuk tindakan massal." [ref=e106]
+                        - generic [ref=e107]: Buat/batalkan pilihan item 62 untuk tindakan massal.
+                    - cell [ref=e108]:
+                      - button [ref=e113] [cursor=pointer]:
+                        - img [ref=e114]
+                    - cell "(SKU-011) Produk est 11" [ref=e116]:
+                      - link "(SKU-011) Produk est 11" [ref=e118] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/62/edit
+                        - generic [ref=e123]: (SKU-011) Produk est 11
+                    - cell "(GDG-564) Gudang rem" [ref=e124]:
+                      - link "(GDG-564) Gudang rem" [ref=e126] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/62/edit
+                        - generic [ref=e131]: (GDG-564) Gudang rem
+                    - cell "()" [ref=e132]:
+                      - link "()" [ref=e134] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/62/edit
+                        - generic [ref=e139]: ()
+                    - cell "-73" [ref=e140]:
+                      - link "-73" [ref=e142] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/62/edit
+                        - generic [ref=e147]: "-73"
+                    - cell "0" [ref=e148]:
+                      - link "0" [ref=e150] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/62/edit
+                        - generic [ref=e155]: "0"
+                    - cell "0" [ref=e156]:
+                      - link "0" [ref=e158] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/62/edit
+                        - generic [ref=e163]: "0"
+                  - row "Buat/batalkan pilihan item 55 untuk tindakan massal. (SKU-019) Produk consequuntur 19 (GDG-081) Gudang totam () 73 0 0" [ref=e164]:
+                    - cell "Buat/batalkan pilihan item 55 untuk tindakan massal." [ref=e165]:
+                      - generic [ref=e167]:
+                        - checkbox "Buat/batalkan pilihan item 55 untuk tindakan massal." [ref=e168]
+                        - generic [ref=e169]: Buat/batalkan pilihan item 55 untuk tindakan massal.
+                    - cell [ref=e170]:
+                      - button [ref=e175] [cursor=pointer]:
+                        - img [ref=e176]
+                    - cell "(SKU-019) Produk consequuntur 19" [ref=e178]:
+                      - link "(SKU-019) Produk consequuntur 19" [ref=e180] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/55/edit
+                        - generic [ref=e185]: (SKU-019) Produk consequuntur 19
+                    - cell "(GDG-081) Gudang totam" [ref=e186]:
+                      - link "(GDG-081) Gudang totam" [ref=e188] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/55/edit
+                        - generic [ref=e193]: (GDG-081) Gudang totam
+                    - cell "()" [ref=e194]:
+                      - link "()" [ref=e196] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/55/edit
+                        - generic [ref=e201]: ()
+                    - cell "73" [ref=e202]:
+                      - link "73" [ref=e204] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/55/edit
+                        - generic [ref=e209]: "73"
+                    - cell "0" [ref=e210]:
+                      - link "0" [ref=e212] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/55/edit
+                        - generic [ref=e217]: "0"
+                    - cell "0" [ref=e218]:
+                      - link "0" [ref=e220] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/55/edit
+                        - generic [ref=e225]: "0"
+                  - row "Buat/batalkan pilihan item 60 untuk tindakan massal. (SKU-046) Produk fugit 46 (GDG-081) Gudang totam () -44 0 0" [ref=e226]:
+                    - cell "Buat/batalkan pilihan item 60 untuk tindakan massal." [ref=e227]:
+                      - generic [ref=e229]:
+                        - checkbox "Buat/batalkan pilihan item 60 untuk tindakan massal." [ref=e230]
+                        - generic [ref=e231]: Buat/batalkan pilihan item 60 untuk tindakan massal.
+                    - cell [ref=e232]:
+                      - button [ref=e237] [cursor=pointer]:
+                        - img [ref=e238]
+                    - cell "(SKU-046) Produk fugit 46" [ref=e240]:
+                      - link "(SKU-046) Produk fugit 46" [ref=e242] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/60/edit
+                        - generic [ref=e247]: (SKU-046) Produk fugit 46
+                    - cell "(GDG-081) Gudang totam" [ref=e248]:
+                      - link "(GDG-081) Gudang totam" [ref=e250] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/60/edit
+                        - generic [ref=e255]: (GDG-081) Gudang totam
+                    - cell "()" [ref=e256]:
+                      - link "()" [ref=e258] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/60/edit
+                        - generic [ref=e263]: ()
+                    - cell "-44" [ref=e264]:
+                      - link "-44" [ref=e266] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/60/edit
+                        - generic [ref=e271]: "-44"
+                    - cell "0" [ref=e272]:
+                      - link "0" [ref=e274] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/60/edit
+                        - generic [ref=e279]: "0"
+                    - cell "0" [ref=e280]:
+                      - link "0" [ref=e282] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/60/edit
+                        - generic [ref=e287]: "0"
+                  - row "Buat/batalkan pilihan item 57 untuk tindakan massal. (SKU-039) Produk laboriosam 39 (GDG-067) Gudang et () 21 0 0" [ref=e288]:
+                    - cell "Buat/batalkan pilihan item 57 untuk tindakan massal." [ref=e289]:
+                      - generic [ref=e291]:
+                        - checkbox "Buat/batalkan pilihan item 57 untuk tindakan massal." [ref=e292]
+                        - generic [ref=e293]: Buat/batalkan pilihan item 57 untuk tindakan massal.
+                    - cell [ref=e294]:
+                      - button [ref=e299] [cursor=pointer]:
+                        - img [ref=e300]
+                    - cell "(SKU-039) Produk laboriosam 39" [ref=e302]:
+                      - link "(SKU-039) Produk laboriosam 39" [ref=e304] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/57/edit
+                        - generic [ref=e309]: (SKU-039) Produk laboriosam 39
+                    - cell "(GDG-067) Gudang et" [ref=e310]:
+                      - link "(GDG-067) Gudang et" [ref=e312] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/57/edit
+                        - generic [ref=e317]: (GDG-067) Gudang et
+                    - cell "()" [ref=e318]:
+                      - link "()" [ref=e320] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/57/edit
+                        - generic [ref=e325]: ()
+                    - cell "21" [ref=e326]:
+                      - link "21" [ref=e328] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/57/edit
+                        - generic [ref=e333]: "21"
+                    - cell "0" [ref=e334]:
+                      - link "0" [ref=e336] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/57/edit
+                        - generic [ref=e341]: "0"
+                    - cell "0" [ref=e342]:
+                      - link "0" [ref=e344] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/57/edit
+                        - generic [ref=e349]: "0"
+                  - row "Buat/batalkan pilihan item 54 untuk tindakan massal. (SKU-027) Produk consequatur 27 (GDG-539) Gudang dignissimos () -46 0 0" [ref=e350]:
+                    - cell "Buat/batalkan pilihan item 54 untuk tindakan massal." [ref=e351]:
+                      - generic [ref=e353]:
+                        - checkbox "Buat/batalkan pilihan item 54 untuk tindakan massal." [ref=e354]
+                        - generic [ref=e355]: Buat/batalkan pilihan item 54 untuk tindakan massal.
+                    - cell [ref=e356]:
+                      - button [ref=e361] [cursor=pointer]:
+                        - img [ref=e362]
+                    - cell "(SKU-027) Produk consequatur 27" [ref=e364]:
+                      - link "(SKU-027) Produk consequatur 27" [ref=e366] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/54/edit
+                        - generic [ref=e371]: (SKU-027) Produk consequatur 27
+                    - cell "(GDG-539) Gudang dignissimos" [ref=e372]:
+                      - link "(GDG-539) Gudang dignissimos" [ref=e374] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/54/edit
+                        - generic [ref=e379]: (GDG-539) Gudang dignissimos
+                    - cell "()" [ref=e380]:
+                      - link "()" [ref=e382] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/54/edit
+                        - generic [ref=e387]: ()
+                    - cell "-46" [ref=e388]:
+                      - link "-46" [ref=e390] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/54/edit
+                        - generic [ref=e395]: "-46"
+                    - cell "0" [ref=e396]:
+                      - link "0" [ref=e398] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/54/edit
+                        - generic [ref=e403]: "0"
+                    - cell "0" [ref=e404]:
+                      - link "0" [ref=e406] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/54/edit
+                        - generic [ref=e411]: "0"
+                  - row "Buat/batalkan pilihan item 61 untuk tindakan massal. (SKU-043) Produk culpa 43 (GDG-274) Gudang rem () -68 0 0" [ref=e412]:
+                    - cell "Buat/batalkan pilihan item 61 untuk tindakan massal." [ref=e413]:
+                      - generic [ref=e415]:
+                        - checkbox "Buat/batalkan pilihan item 61 untuk tindakan massal." [ref=e416]
+                        - generic [ref=e417]: Buat/batalkan pilihan item 61 untuk tindakan massal.
+                    - cell [ref=e418]:
+                      - button [ref=e423] [cursor=pointer]:
+                        - img [ref=e424]
+                    - cell "(SKU-043) Produk culpa 43" [ref=e426]:
+                      - link "(SKU-043) Produk culpa 43" [ref=e428] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/61/edit
+                        - generic [ref=e433]: (SKU-043) Produk culpa 43
+                    - cell "(GDG-274) Gudang rem" [ref=e434]:
+                      - link "(GDG-274) Gudang rem" [ref=e436] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/61/edit
+                        - generic [ref=e441]: (GDG-274) Gudang rem
+                    - cell "()" [ref=e442]:
+                      - link "()" [ref=e444] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/61/edit
+                        - generic [ref=e449]: ()
+                    - cell "-68" [ref=e450]:
+                      - link "-68" [ref=e452] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/61/edit
+                        - generic [ref=e457]: "-68"
+                    - cell "0" [ref=e458]:
+                      - link "0" [ref=e460] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/61/edit
+                        - generic [ref=e465]: "0"
+                    - cell "0" [ref=e466]:
+                      - link "0" [ref=e468] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/61/edit
+                        - generic [ref=e473]: "0"
+                  - row "Buat/batalkan pilihan item 59 untuk tindakan massal. (SKU-047) Produk ducimus 47 (GDG-484) Gudang veniam () 57 0 0" [ref=e474]:
+                    - cell "Buat/batalkan pilihan item 59 untuk tindakan massal." [ref=e475]:
+                      - generic [ref=e477]:
+                        - checkbox "Buat/batalkan pilihan item 59 untuk tindakan massal." [ref=e478]
+                        - generic [ref=e479]: Buat/batalkan pilihan item 59 untuk tindakan massal.
+                    - cell [ref=e480]:
+                      - button [ref=e485] [cursor=pointer]:
+                        - img [ref=e486]
+                    - cell "(SKU-047) Produk ducimus 47" [ref=e488]:
+                      - link "(SKU-047) Produk ducimus 47" [ref=e490] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/59/edit
+                        - generic [ref=e495]: (SKU-047) Produk ducimus 47
+                    - cell "(GDG-484) Gudang veniam" [ref=e496]:
+                      - link "(GDG-484) Gudang veniam" [ref=e498] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/59/edit
+                        - generic [ref=e503]: (GDG-484) Gudang veniam
+                    - cell "()" [ref=e504]:
+                      - link "()" [ref=e506] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/59/edit
+                        - generic [ref=e511]: ()
+                    - cell "57" [ref=e512]:
+                      - link "57" [ref=e514] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/59/edit
+                        - generic [ref=e519]: "57"
+                    - cell "0" [ref=e520]:
+                      - link "0" [ref=e522] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/59/edit
+                        - generic [ref=e527]: "0"
+                    - cell "0" [ref=e528]:
+                      - link "0" [ref=e530] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/59/edit
+                        - generic [ref=e535]: "0"
+                  - row "Buat/batalkan pilihan item 101 untuk tindakan massal. (SKU-016) Produk sint 16 (GDG-940) Gudang omnis () -62 0 0" [ref=e536]:
+                    - cell "Buat/batalkan pilihan item 101 untuk tindakan massal." [ref=e537]:
+                      - generic [ref=e539]:
+                        - checkbox "Buat/batalkan pilihan item 101 untuk tindakan massal." [ref=e540]
+                        - generic [ref=e541]: Buat/batalkan pilihan item 101 untuk tindakan massal.
+                    - cell [ref=e542]:
+                      - button [ref=e547] [cursor=pointer]:
+                        - img [ref=e548]
+                    - cell "(SKU-016) Produk sint 16" [ref=e550]:
+                      - link "(SKU-016) Produk sint 16" [ref=e552] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/101/edit
+                        - generic [ref=e557]: (SKU-016) Produk sint 16
+                    - cell "(GDG-940) Gudang omnis" [ref=e558]:
+                      - link "(GDG-940) Gudang omnis" [ref=e560] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/101/edit
+                        - generic [ref=e565]: (GDG-940) Gudang omnis
+                    - cell "()" [ref=e566]:
+                      - link "()" [ref=e568] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/101/edit
+                        - generic [ref=e573]: ()
+                    - cell "-62" [ref=e574]:
+                      - link "-62" [ref=e576] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/101/edit
+                        - generic [ref=e581]: "-62"
+                    - cell "0" [ref=e582]:
+                      - link "0" [ref=e584] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/101/edit
+                        - generic [ref=e589]: "0"
+                    - cell "0" [ref=e590]:
+                      - link "0" [ref=e592] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/101/edit
+                        - generic [ref=e597]: "0"
+                  - row "Buat/batalkan pilihan item 58 untuk tindakan massal. (SKU-008) Produk ea 8 (GDG-545) Gudang fugiat () 91 0 0" [ref=e598]:
+                    - cell "Buat/batalkan pilihan item 58 untuk tindakan massal." [ref=e599]:
+                      - generic [ref=e601]:
+                        - checkbox "Buat/batalkan pilihan item 58 untuk tindakan massal." [ref=e602]
+                        - generic [ref=e603]: Buat/batalkan pilihan item 58 untuk tindakan massal.
+                    - cell [ref=e604]:
+                      - button [ref=e609] [cursor=pointer]:
+                        - img [ref=e610]
+                    - cell "(SKU-008) Produk ea 8" [ref=e612]:
+                      - link "(SKU-008) Produk ea 8" [ref=e614] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/58/edit
+                        - generic [ref=e619]: (SKU-008) Produk ea 8
+                    - cell "(GDG-545) Gudang fugiat" [ref=e620]:
+                      - link "(GDG-545) Gudang fugiat" [ref=e622] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/58/edit
+                        - generic [ref=e627]: (GDG-545) Gudang fugiat
+                    - cell "()" [ref=e628]:
+                      - link "()" [ref=e630] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/58/edit
+                        - generic [ref=e635]: ()
+                    - cell "91" [ref=e636]:
+                      - link "91" [ref=e638] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/58/edit
+                        - generic [ref=e643]: "91"
+                    - cell "0" [ref=e644]:
+                      - link "0" [ref=e646] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/58/edit
+                        - generic [ref=e651]: "0"
+                    - cell "0" [ref=e652]:
+                      - link "0" [ref=e654] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/58/edit
+                        - generic [ref=e659]: "0"
+                  - row "Buat/batalkan pilihan item 56 untuk tindakan massal. (SKU-003) Produk assumenda 3 (GDG-375) Gudang dolor () -82 0 0" [ref=e660]:
+                    - cell "Buat/batalkan pilihan item 56 untuk tindakan massal." [ref=e661]:
+                      - generic [ref=e663]:
+                        - checkbox "Buat/batalkan pilihan item 56 untuk tindakan massal." [ref=e664]
+                        - generic [ref=e665]: Buat/batalkan pilihan item 56 untuk tindakan massal.
+                    - cell [ref=e666]:
+                      - button [ref=e671] [cursor=pointer]:
+                        - img [ref=e672]
+                    - cell "(SKU-003) Produk assumenda 3" [ref=e674]:
+                      - link "(SKU-003) Produk assumenda 3" [ref=e676] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/56/edit
+                        - generic [ref=e681]: (SKU-003) Produk assumenda 3
+                    - cell "(GDG-375) Gudang dolor" [ref=e682]:
+                      - link "(GDG-375) Gudang dolor" [ref=e684] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/56/edit
+                        - generic [ref=e689]: (GDG-375) Gudang dolor
+                    - cell "()" [ref=e690]:
+                      - link "()" [ref=e692] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/56/edit
+                        - generic [ref=e697]: ()
+                    - cell "-82" [ref=e698]:
+                      - link "-82" [ref=e700] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/56/edit
+                        - generic [ref=e705]: "-82"
+                    - cell "0" [ref=e706]:
+                      - link "0" [ref=e708] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/56/edit
+                        - generic [ref=e713]: "0"
+                    - cell "0" [ref=e714]:
+                      - link "0" [ref=e716] [cursor=pointer]:
+                        - /url: http://localhost:8009/admin/inventory-stocks/56/edit
+                        - generic [ref=e721]: "0"
+              - navigation "Navigasi halaman" [ref=e722]:
+                - generic [ref=e725]:
+                  - generic [ref=e727]: per halaman
+                  - combobox "per halaman" [ref=e729]:
+                    - option "5"
+                    - option "10" [selected]
+                    - option "25"
+                    - option "50"
+                    - option "Semua"
+                - button "Selanjutnya" [ref=e730] [cursor=pointer]:
+                  - generic [ref=e731]: Selanjutnya
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+    - complementary [ref=e732]:
+      - generic [ref=e734]:
+        - link "Duta Tunggal ERP" [ref=e736] [cursor=pointer]:
+          - /url: http://localhost:8009/admin
+          - generic [ref=e737]: Duta Tunggal ERP
+        - button "Persempit menu" [ref=e738] [cursor=pointer]:
+          - generic [ref=e739]: Persempit menu
+          - img [ref=e740]
+      - navigation [ref=e742]:
+        - list [ref=e743]:
+          - listitem [ref=e744]:
+            - list [ref=e745]:
+              - listitem [ref=e746]:
+                - link "Dasbor" [ref=e747] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin
+                  - img [ref=e748]
+                  - generic [ref=e750]: Dasbor
+          - listitem [ref=e751]:
+            - generic [ref=e752] [cursor=pointer]:
+              - generic [ref=e753]: Finance - Akuntansi
+              - button "Finance - Akuntansi" [expanded] [ref=e754]:
+                - generic [ref=e755]: Finance - Akuntansi
+                - img [ref=e756]
+            - list [ref=e758]:
+              - listitem [ref=e759]:
+                - link "Buku Besar (General Ledger)" [ref=e760] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/buku-besar-page
+                  - img [ref=e761]
+                  - generic [ref=e763]: Buku Besar (General Ledger)
+              - listitem [ref=e764]:
+                - link "Ageing Schedule" [ref=e765] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/ageing-schedules
+                  - img [ref=e766]
+                  - generic [ref=e768]: Ageing Schedule
+              - listitem [ref=e769]:
+                - link "Rekonsiliasi Bank" [ref=e770] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/bank-reconciliations
+                  - img [ref=e771]
+                  - generic [ref=e773]: Rekonsiliasi Bank
+              - listitem [ref=e774]:
+                - link "Journal Entry" [ref=e775] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/journal-entries
+                  - img [ref=e776]
+                  - generic [ref=e778]: Journal Entry
+              - listitem [ref=e779]:
+                - link "Trial Balance" [ref=e780] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/income-statement-page
+                  - img [ref=e781]
+                  - generic [ref=e783]: Trial Balance
+              - listitem [ref=e784]:
+                - link "Pengajuan Voucher" [ref=e785] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/voucher-requests
+                  - img [ref=e786]
+                  - generic [ref=e788]: Pengajuan Voucher
+              - listitem [ref=e789]:
+                - link "AR & AP Management" [ref=e790] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/ar-ap-management
+                  - img [ref=e791]
+                  - generic [ref=e793]: AR & AP Management
+          - listitem [ref=e794]:
+            - generic [ref=e795] [cursor=pointer]:
+              - generic [ref=e796]: Reports
+              - button "Reports" [expanded] [ref=e797]:
+                - generic [ref=e798]: Reports
+                - img [ref=e799]
+            - list [ref=e801]:
+              - listitem [ref=e802]:
+                - link "Laporan Penjualan" [ref=e803] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/sales-report-page
+                  - img [ref=e804]
+                  - generic [ref=e806]: Laporan Penjualan
+              - listitem [ref=e807]:
+                - link "Laporan Pembelian" [ref=e808] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/purchase-report-page
+                  - img [ref=e809]
+                  - generic [ref=e811]: Laporan Pembelian
+              - listitem [ref=e812]:
+                - link "Aging Report" [ref=e813] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/view-ageing-report
+                  - img [ref=e814]
+                  - generic [ref=e816]: Aging Report
+          - listitem [ref=e817]:
+            - generic [ref=e818] [cursor=pointer]:
+              - generic [ref=e819]: Asset Management
+              - button "Asset Management" [expanded] [ref=e820]:
+                - generic [ref=e821]: Asset Management
+                - img [ref=e822]
+            - list [ref=e824]:
+              - listitem [ref=e825]:
+                - link "Aset Tetap" [ref=e826] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/assets
+                  - img [ref=e827]
+                  - generic [ref=e829]: Aset Tetap
+              - listitem [ref=e830]:
+                - link "Transfer Aset" [ref=e831] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/asset-transfers
+                  - img [ref=e832]
+                  - generic [ref=e834]: Transfer Aset
+              - listitem [ref=e835]:
+                - link "Disposal Aset" [ref=e836] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/asset-disposals
+                  - img [ref=e837]
+                  - generic [ref=e839]: Disposal Aset
+          - listitem [ref=e840]:
+            - generic [ref=e841] [cursor=pointer]:
+              - generic [ref=e842]: Pembelian (Purchase Order)
+              - button "Pembelian (Purchase Order)" [expanded] [ref=e843]:
+                - generic [ref=e844]: Pembelian (Purchase Order)
+                - img [ref=e845]
+            - list [ref=e847]:
+              - listitem [ref=e848]:
+                - link "Order Request" [ref=e849] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/order-requests
+                  - img [ref=e850]
+                  - generic [ref=e852]: Order Request
+              - listitem [ref=e853]:
+                - link "Pembelian" [ref=e854] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/purchase-orders
+                  - img [ref=e855]
+                  - generic [ref=e857]: Pembelian
+              - listitem [ref=e858]:
+                - link "Purchase Receipt" [ref=e859] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/purchase-receipts
+                  - img [ref=e860]
+                  - generic [ref=e862]: Purchase Receipt
+              - listitem [ref=e863]:
+                - link "Purchase Return" [ref=e864] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/purchase-returns
+                  - img [ref=e865]
+                  - generic [ref=e867]: Purchase Return
+              - listitem [ref=e868]:
+                - link "Quality Control Purchase" [ref=e869] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/quality-control-purchases
+                  - img [ref=e870]
+                  - generic [ref=e872]: Quality Control Purchase
+          - listitem [ref=e873]:
+            - generic [ref=e874] [cursor=pointer]:
+              - generic [ref=e875]: Penjualan (Sales Order)
+              - button "Penjualan (Sales Order)" [expanded] [ref=e876]:
+                - generic [ref=e877]: Penjualan (Sales Order)
+                - img [ref=e878]
+            - list [ref=e880]:
+              - listitem [ref=e881]:
+                - link "Quotation" [ref=e882] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/quotations
+                  - img [ref=e883]
+                  - generic [ref=e885]: Quotation
+              - listitem [ref=e886]:
+                - link "Penjualan" [ref=e887] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/sale-orders
+                  - img [ref=e888]
+                  - generic [ref=e890]: Penjualan
+          - listitem [ref=e891]:
+            - generic [ref=e892] [cursor=pointer]:
+              - generic [ref=e893]: Delivery Order
+              - button "Delivery Order" [expanded] [ref=e894]:
+                - generic [ref=e895]: Delivery Order
+                - img [ref=e896]
+            - list [ref=e898]:
+              - listitem [ref=e899]:
+                - link "Delivery Order" [ref=e900] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/delivery-orders
+                  - img [ref=e901]
+                  - generic [ref=e903]: Delivery Order
+              - listitem [ref=e904]:
+                - link "Surat Jalan" [ref=e905] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/surat-jalans
+                  - img [ref=e906]
+                  - generic [ref=e908]: Surat Jalan
+          - listitem [ref=e909]:
+            - generic [ref=e910] [cursor=pointer]:
+              - generic [ref=e911]: Finance - Pembelian
+              - button "Finance - Pembelian" [expanded] [ref=e912]:
+                - generic [ref=e913]: Finance - Pembelian
+                - img [ref=e914]
+            - list [ref=e916]:
+              - listitem [ref=e917]:
+                - link "Account Payable" [ref=e918] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/account-payables
+                  - img [ref=e919]
+                  - generic [ref=e921]: Account Payable
+              - listitem [ref=e922]:
+                - link "Invoice Pembelian" [ref=e923] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/purchase-invoices
+                  - img [ref=e924]
+                  - generic [ref=e926]: Invoice Pembelian
+          - listitem [ref=e927]:
+            - generic [ref=e928] [cursor=pointer]:
+              - generic [ref=e929]: Finance - Penjualan
+              - button "Finance - Penjualan" [expanded] [ref=e930]:
+                - generic [ref=e931]: Finance - Penjualan
+                - img [ref=e932]
+            - list [ref=e934]:
+              - listitem [ref=e935]:
+                - link "Account Receivable" [ref=e936] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/account-receivables
+                  - img [ref=e937]
+                  - generic [ref=e939]: Account Receivable
+              - listitem [ref=e940]:
+                - link "Penjualan Lainnya" [ref=e941] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/other-sales
+                  - img [ref=e942]
+                  - generic [ref=e944]: Penjualan Lainnya
+              - listitem [ref=e945]:
+                - link "Invoice Penjualan" [ref=e946] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/sales-invoices
+                  - img [ref=e947]
+                  - generic [ref=e949]: Invoice Penjualan
+          - listitem [ref=e950]:
+            - generic [ref=e951] [cursor=pointer]:
+              - generic [ref=e952]: Manufacturing Order
+              - button "Manufacturing Order" [expanded] [ref=e953]:
+                - generic [ref=e954]: Manufacturing Order
+                - img [ref=e955]
+            - list [ref=e957]:
+              - listitem [ref=e958]:
+                - link "Bill Of Material" [ref=e959] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/bill-of-materials
+                  - img [ref=e960]
+                  - generic [ref=e962]: Bill Of Material
+              - listitem [ref=e963]:
+                - link "Manufacturing Order" [ref=e964] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/manufacturing-orders
+                  - img [ref=e965]
+                  - generic [ref=e967]: Manufacturing Order
+              - listitem [ref=e968]:
+                - link "Pengambilan Bahan Baku" [ref=e969] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/material-issues
+                  - img [ref=e970]
+                  - generic [ref=e972]: Pengambilan Bahan Baku
+              - listitem [ref=e973]:
+                - link "Rencana Produksi" [ref=e974] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/production-plans
+                  - img [ref=e975]
+                  - generic [ref=e977]: Rencana Produksi
+              - listitem [ref=e978]:
+                - link "Production" [ref=e979] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/productions
+                  - img [ref=e980]
+                  - generic [ref=e982]: Production
+              - listitem [ref=e983]:
+                - link "Quality Control Manufacture" [ref=e984] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/quality-control-manufactures
+                  - img [ref=e985]
+                  - generic [ref=e988]: Quality Control Manufacture
+          - listitem [ref=e989]:
+            - generic [ref=e990] [cursor=pointer]:
+              - generic [ref=e991]: Finance - Pembayaran
+              - button "Finance - Pembayaran" [expanded] [ref=e992]:
+                - generic [ref=e993]: Finance - Pembayaran
+                - img [ref=e994]
+            - list [ref=e996]:
+              - listitem [ref=e997]:
+                - link "Payment Request" [ref=e998] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/payment-requests
+                  - img [ref=e999]
+                  - generic [ref=e1001]: Payment Request
+              - listitem [ref=e1002]:
+                - link "Transfer Kas & Bank" [ref=e1003] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/cash-bank-transfers
+                  - img [ref=e1004]
+                  - generic [ref=e1006]: Transfer Kas & Bank
+              - listitem [ref=e1007]:
+                - link "Customer Receipt" [ref=e1008] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/customer-receipts
+                  - img [ref=e1009]
+                  - generic [ref=e1011]: Customer Receipt
+              - listitem [ref=e1012]:
+                - link "Vendor Payment" [ref=e1013] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/vendor-payments
+                  - img [ref=e1014]
+                  - generic [ref=e1016]: Vendor Payment
+              - listitem [ref=e1017]:
+                - link "Transaksi Kas & Bank" [ref=e1018] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/cash-bank-transactions
+                  - img [ref=e1019]
+                  - generic [ref=e1021]: Transaksi Kas & Bank
+              - listitem [ref=e1022]:
+                - link "Deposit" [ref=e1023] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/deposits
+                  - img [ref=e1024]
+                  - generic [ref=e1026]: Deposit
+          - listitem [ref=e1027]:
+            - generic [ref=e1028] [cursor=pointer]:
+              - generic [ref=e1029]: Gudang
+              - button "Gudang" [expanded] [ref=e1030]:
+                - generic [ref=e1031]: Gudang
+                - img [ref=e1032]
+            - list [ref=e1034]:
+              - listitem [ref=e1035]:
+                - link "Inventory Stock" [ref=e1036] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/inventory-stocks
+                  - img [ref=e1037]
+                  - generic [ref=e1039]: Inventory Stock
+              - listitem [ref=e1040]:
+                - link "Return Product" [ref=e1041] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/return-products
+                  - img [ref=e1042]
+                  - generic [ref=e1044]: Return Product
+              - listitem [ref=e1045]:
+                - link "Stock Adjustments" [ref=e1046] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/stock-adjustments
+                  - img [ref=e1047]
+                  - generic [ref=e1049]: Stock Adjustments
+              - listitem [ref=e1050]:
+                - link "Stock Movement" [ref=e1051] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/stock-movements
+                  - img [ref=e1052]
+                  - generic [ref=e1054]: Stock Movement
+              - listitem [ref=e1055]:
+                - link "Stock Opnames" [ref=e1056] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/stock-opnames
+                  - img [ref=e1057]
+                  - generic [ref=e1059]: Stock Opnames
+              - listitem [ref=e1060]:
+                - link "Transfer Stock" [ref=e1061] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/stock-transfers
+                  - img [ref=e1062]
+                  - generic [ref=e1064]: Transfer Stock
+              - listitem [ref=e1065]:
+                - link "Konfirmasi Gudang" [ref=e1066] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/warehouse-confirmations
+                  - img [ref=e1067]
+                  - generic [ref=e1069]: Konfirmasi Gudang
+              - listitem [ref=e1070]:
+                - link "Kartu Persediaan (Stock Card)" [ref=e1071] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/inventory-card
+                  - img [ref=e1072]
+                  - generic [ref=e1074]: Kartu Persediaan (Stock Card)
+          - listitem [ref=e1075]:
+            - generic [ref=e1076] [cursor=pointer]:
+              - generic [ref=e1077]: Master Data
+              - button "Master Data" [expanded] [ref=e1078]:
+                - generic [ref=e1079]: Master Data
+                - img [ref=e1080]
+            - list [ref=e1082]:
+              - listitem [ref=e1083]:
+                - link "Cabang" [ref=e1084] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/cabangs
+                  - img [ref=e1085]
+                  - generic [ref=e1087]: Cabang
+              - listitem [ref=e1088]:
+                - link "Mata Uang" [ref=e1089] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/currencies
+                  - img [ref=e1090]
+                  - generic [ref=e1092]: Mata Uang
+              - listitem [ref=e1093]:
+                - link "Customer" [ref=e1094] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/customers
+                  - img [ref=e1095]
+                  - generic [ref=e1097]: Customer
+              - listitem [ref=e1098]:
+                - link "Driver" [ref=e1099] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/drivers
+                  - img [ref=e1100]
+                  - generic [ref=e1102]: Driver
+              - listitem [ref=e1103]:
+                - link "Kategori Produk" [ref=e1104] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/product-categories
+                  - img [ref=e1105]
+                  - generic [ref=e1107]: Kategori Produk
+              - listitem [ref=e1108]:
+                - link "Produk" [ref=e1109] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/products
+                  - img [ref=e1110]
+                  - generic [ref=e1112]: Produk
+              - listitem [ref=e1113]:
+                - link "Rak" [ref=e1114] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/raks
+                  - img [ref=e1115]
+                  - generic [ref=e1117]: Rak
+              - listitem [ref=e1118]:
+                - link "Supplier" [ref=e1119] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/suppliers
+                  - img [ref=e1120]
+                  - generic [ref=e1122]: Supplier
+              - listitem [ref=e1123]:
+                - link "Satuan" [ref=e1124] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/unit-of-measures
+                  - img [ref=e1125]
+                  - generic [ref=e1127]: Satuan
+              - listitem [ref=e1128]:
+                - link "Kendaraan" [ref=e1129] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/vehicles
+                  - img [ref=e1130]
+                  - generic [ref=e1132]: Kendaraan
+              - listitem [ref=e1133]:
+                - link "Gudang" [ref=e1134] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/warehouses
+                  - img [ref=e1135]
+                  - generic [ref=e1137]: Gudang
+              - listitem [ref=e1138]:
+                - link "Chart Of Account" [ref=e1139] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/chart-of-accounts
+                  - img [ref=e1140]
+                  - generic [ref=e1143]: Chart Of Account
+              - listitem [ref=e1144]:
+                - link "Tax Setting" [ref=e1145] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/tax-settings
+                  - img [ref=e1146]
+                  - generic [ref=e1149]: Tax Setting
+          - listitem [ref=e1150]:
+            - generic [ref=e1151] [cursor=pointer]:
+              - generic [ref=e1152]: User Roles Management
+              - button "User Roles Management" [expanded] [ref=e1153]:
+                - generic [ref=e1154]: User Roles Management
+                - img [ref=e1155]
+            - list [ref=e1157]:
+              - listitem [ref=e1158]:
+                - link "Permission" [ref=e1159] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/permissions
+                  - img [ref=e1160]
+                  - generic [ref=e1162]: Permission
+              - listitem [ref=e1163]:
+                - link "Role" [ref=e1164] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/roles
+                  - img [ref=e1165]
+                  - generic [ref=e1167]: Role
+              - listitem [ref=e1168]:
+                - link "User" [ref=e1169] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/users
+                  - img [ref=e1170]
+                  - generic [ref=e1172]: User
+          - listitem [ref=e1173]:
+            - generic [ref=e1174] [cursor=pointer]:
+              - generic [ref=e1175]: Finance - Laporan
+              - button "Finance - Laporan" [expanded] [ref=e1176]:
+                - generic [ref=e1177]: Finance - Laporan
+                - img [ref=e1178]
+            - list [ref=e1180]:
+              - listitem [ref=e1181]:
+                - link "Balance Sheet" [ref=e1182] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/balance-sheets
+                  - img [ref=e1183]
+                  - generic [ref=e1185]: Balance Sheet
+              - listitem [ref=e1186]:
+                - link "Laporan Laba Rugi (P&L)" [ref=e1187] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/profit-and-losses
+                  - img [ref=e1188]
+                  - generic [ref=e1190]: Laporan Laba Rugi (P&L)
+              - listitem [ref=e1191]:
+                - link "HPP / Cost of Goods Sold" [ref=e1192] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/hpp
+                  - img [ref=e1193]
+                  - generic [ref=e1195]: HPP / Cost of Goods Sold
+              - listitem [ref=e1196]:
+                - link "Laporan Arus Kas (Direct/Indirect)" [ref=e1197] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/cash-flow
+                  - img [ref=e1198]
+                  - generic [ref=e1200]: Laporan Arus Kas (Direct/Indirect)
+              - listitem [ref=e1201]:
+                - link "Aging Report (AR/AP)" [ref=e1202] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/ageing-reports
+                  - img [ref=e1203]
+                  - generic [ref=e1205]: Aging Report (AR/AP)
+              - listitem [ref=e1206]:
+                - link "Laporan Mutasi Barang" [ref=e1207] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/stock-mutation
+                  - img [ref=e1208]
+                  - generic [ref=e1210]: Laporan Mutasi Barang
+              - listitem [ref=e1211]:
+                - link "Laporan Stok" [ref=e1212] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/reports/stock-report
+                  - img [ref=e1213]
+                  - generic [ref=e1215]: Laporan Stok
+  - generic:
+    - status
+  - generic [ref=e1216]:
+    - generic [ref=e1218]:
+      - generic [ref=e1220]:
+        - generic [ref=e1221] [cursor=pointer]:
+          - text: 
+          - generic: Request
+        - text: 
+        - generic [ref=e1222] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - text: 
+        - generic [ref=e1223] [cursor=pointer]:
+          - text: 
+          - generic: Views
+          - generic [ref=e1224]: "1"
+        - generic [ref=e1225] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e1226]: "4"
+        - generic [ref=e1227] [cursor=pointer]:
+          - text: 
+          - generic: Models
+          - generic [ref=e1228]: "1"
+        - generic [ref=e1229] [cursor=pointer]:
+          - text: 
+          - generic: Livewire
+          - generic [ref=e1230]: "1"
+        - text:  
+      - generic [ref=e1231]:
+        - generic [ref=e1233] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e1236] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e1237]: "2"
+        - combobox [ref=e1238] [cursor=pointer]:
+          - option "#1 inventory-stocks (01:06:48)"
+          - option "#2 update (ajax) (01:06:48)" [selected]
+        - generic [ref=e1239] [cursor=pointer]:
+          - generic: 
+          - generic: 94.86ms
+        - generic [ref=e1240]:
+          - generic: 
+          - generic: 4MB
+        - generic [ref=e1241]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e1242] [cursor=pointer]:
+          - generic: 
+          - generic: POST livewire/update
+    - text:                                            
+  - text: 
+```

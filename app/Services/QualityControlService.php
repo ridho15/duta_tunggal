@@ -19,41 +19,29 @@ class QualityControlService
     public function generateQcNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'QC-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $last = QualityControl::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = QualityControl::where('qc_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->qc_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'QC-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     public function generateQcManufactureNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'QC-M-' . $date . '-';
 
-        // Hitung berapa QC Manufacture pada hari ini
-        $last = QualityControl::where('qc_number', 'like', 'QC-M-' . $date . '-%')
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = QualityControl::where('qc_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->qc_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'QC-M-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     /**
@@ -88,7 +76,7 @@ class QualityControlService
         ]);
 
         // Update the purchase receipt item to mark it as sent to QC
-        $purchaseReceiptItem->update(['is_sent' => 1]);
+        $purchaseReceiptItem->update(['status' => 'completed']);
 
         return $qualityControl;
     }
@@ -217,13 +205,71 @@ class QualityControlService
         // }
 
         // Create journal entries and inventory stock for passed QC items from PurchaseOrderItem or PurchaseReceiptItem
-        if (($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' || $qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') && $qualityControl->passed_quantity > 0) {
+        // For PurchaseReceiptItem QC (legacy flow), journal entries are created when the receipt is posted
+        // For PurchaseOrderItem QC (new flow), journal entries are created here since receipt posting happens later
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
             $this->createJournalEntriesAndInventoryForQC($qualityControl);
         }
 
         // Handle Purchase Receipt and Purchase Order completion based on QC results
         if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
             $this->handlePurchaseReceiptCompletion($qualityControl);
+        }
+
+        // NEW FLOW: Auto-create Purchase Receipt after QC for PurchaseOrderItem
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
+            $purchaseReceipt = $this->autoCreatePurchaseReceiptFromQC($qualityControl, $data);
+            if ($purchaseReceipt) {
+                try {
+                    // Post the receipt so journals and stock movements are created via PurchaseReceiptService
+                    // Add retry-with-backoff to handle transient ordering/race conditions where
+                    // the receipt items may not be fully available immediately after creation.
+                    $purchaseReceiptService = app(\App\Services\PurchaseReceiptService::class);
+                    $maxAttempts = config('procurement.auto_post_retries', 3);
+                    $delayMs = [200, 500, 1000];
+                    $result = null;
+
+                    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+                        // Refresh receipt to pick up any related items that may have been attached
+                        $purchaseReceipt = $purchaseReceipt->fresh();
+                        $result = $purchaseReceiptService->postPurchaseReceipt($purchaseReceipt);
+
+                        Log::info('Auto postPurchaseReceipt returned (attempt ' . $attempt . ')', [
+                            'qc' => $qualityControl->id,
+                            'receipt_id' => $purchaseReceipt->id,
+                            'attempt' => $attempt,
+                            'result' => $result,
+                        ]);
+
+                        // Stop retrying when posted or an explicit error occurred
+                        if (($result['status'] ?? null) === 'posted' || ($result['status'] ?? null) === 'error') {
+                            break;
+                        }
+
+                        // Backoff before next attempt
+                        if ($attempt < $maxAttempts) {
+                            $sleepMs = $delayMs[$attempt - 1] ?? 500;
+                            usleep($sleepMs * 1000);
+                        }
+                    }
+
+                    if (($result['status'] ?? null) !== 'posted') {
+                        Log::warning('Auto postPurchaseReceipt did not post after retries', [
+                            'qc' => $qualityControl->id,
+                            'receipt_id' => $purchaseReceipt->id,
+                            'final_result' => $result,
+                            'attempts' => $maxAttempts,
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Auto postPurchaseReceipt failed for QC ' . $qualityControl->id . ': ' . $e->getMessage(), ['qc' => $qualityControl->id]);
+                }
+            }
+        }
+
+        // NEW: Check and auto-complete Purchase Order if all items are received
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $this->checkAndCompletePurchaseOrder($qualityControl);
         }
 
         // Create journal entries and stock movement for passed QC items from Production
@@ -463,7 +509,9 @@ class QualityControlService
         }
 
         // Load all purchase order items and their receipts
-        $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem.qualityControl']);
+        $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem' => function ($query) {
+            $query->with(['qualityControl']);
+        }]);
 
         $allItemsComplete = true;
         $totalOrdered = 0;
@@ -483,9 +531,18 @@ class QualityControlService
             }
         }
 
-        Log::info("QC Completion Check - PO {$purchaseOrder->id}: Ordered={$totalOrdered}, Received={$totalReceived}, AllComplete={$allItemsComplete}");
+        // Check if all items in THIS receipt have completed QC
+        $receiptItemsComplete = true;
+        foreach ($purchaseReceipt->purchaseReceiptItem as $receiptItem) {
+            if (!$receiptItem->qualityControl || $receiptItem->qualityControl->status != 1) {
+                $receiptItemsComplete = false;
+                break;
+            }
+        }
 
-        if ($allItemsComplete && $totalOrdered == $totalReceived) {
+        Log::info("QC Completion Check - Receipt {$purchaseReceipt->id}: ItemsComplete={$receiptItemsComplete}");
+
+        if ($receiptItemsComplete) {
             // Complete the purchase receipt
             $purchaseReceipt->update([
                 'status' => 'completed',
@@ -493,6 +550,18 @@ class QualityControlService
                 'completed_at' => Carbon::now()
             ]);
 
+            // Post the receipt so journals and inventory are posted via PurchaseReceiptService
+            try {
+                app(\App\Services\PurchaseReceiptService::class)->postPurchaseReceipt($purchaseReceipt);
+            } catch (\Exception $e) {
+                Log::error('postPurchaseReceipt failed during handlePurchaseReceiptCompletion for receipt ' . $purchaseReceipt->id . ': ' . $e->getMessage(), ['receipt' => $purchaseReceipt->id]);
+            }
+
+            Log::info("Completed Purchase Receipt {$purchaseReceipt->id} due to QC completion");
+        }
+
+        // Check if the entire purchase order is complete
+        if ($allItemsComplete && $totalOrdered == $totalReceived) {
             // Complete the purchase order
             $purchaseOrder->update([
                 'status' => 'completed',
@@ -500,13 +569,22 @@ class QualityControlService
                 'completed_at' => Carbon::now()
             ]);
 
-            Log::info("Completed Purchase Receipt {$purchaseReceipt->id} and Purchase Order {$purchaseOrder->id} due to QC completion");
+            Log::info("Completed Purchase Order {$purchaseOrder->id} due to QC completion");
 
             HelperController::sendNotification(
                 isSuccess: true,
                 title: "Purchase Order Completed",
                 message: "Purchase Order {$purchaseOrder->po_number} has been completed. All items have been received and quality controlled."
             );
+        } elseif ($allItemsComplete) {
+            // Complete the purchase receipt if all its items have been QC'd (even if not all ordered qty received)
+            $purchaseReceipt->update([
+                'status' => 'completed',
+                'completed_by' => Auth::id(),
+                'completed_at' => Carbon::now()
+            ]);
+
+            // Note: Receipt posting is already done in completeQualityControl via createJournalEntriesAndInventoryForQC
         } elseif ($totalReceived > 0) {
             // Set purchase order to partially_received if some items received but not all
             if ($purchaseOrder->status === 'approved') {
@@ -680,6 +758,156 @@ class QualityControlService
         if ($passedQuantity >= $production->quantity_produced) {
             $production->status = 'finished';
             $production->save();
+        }
+    }
+
+    /**
+     * Auto-create Purchase Receipt from Quality Control
+     * NEW FLOW: QC creates receipt automatically after QC pass
+     */
+    protected function autoCreatePurchaseReceiptFromQC($qualityControl, $data)
+    {
+        $purchaseOrderItem = $qualityControl->fromModel;
+        if (!$purchaseOrderItem) {
+            return;
+        }
+
+        $purchaseOrder = $purchaseOrderItem->purchaseOrder;
+        if (!$purchaseOrder) {
+            return;
+        }
+
+        // Check if receipt already exists for this QC
+        $existingReceipt = \App\Models\PurchaseReceiptItem::where('purchase_order_item_id', $purchaseOrderItem->id)
+            ->whereHas('purchaseReceipt', function ($query) use ($qualityControl) {
+                $query->where('notes', 'like', '%' . $qualityControl->qc_number . '%');
+            })
+            ->first();
+
+        if ($existingReceipt) {
+            Log::info('Purchase Receipt already exists for QC ' . $qualityControl->qc_number);
+            return;
+        }
+
+        // Generate receipt number
+        $receiptNumber = $this->generateReceiptNumber();
+
+        // Create Purchase Receipt
+        $purchaseReceipt = \App\Models\PurchaseReceipt::create([
+            'receipt_number' => $receiptNumber,
+            'purchase_order_id' => $purchaseOrder->id,
+            'receipt_date' => now(),
+            'received_by' => Auth::id() ?? $data['received_by'] ?? 1,
+            'notes' => 'Auto-created from QC: ' . $qualityControl->qc_number,
+            'currency_id' => $purchaseOrder->purchaseOrderCurrency->first()?->currency_id ?? 1,
+            'status' => 'completed',
+            'cabang_id' => $purchaseOrder->cabang_id,
+        ]);
+
+        // Create Purchase Receipt Item
+        $receiptItem = \App\Models\PurchaseReceiptItem::create([
+            'purchase_receipt_id'    => $purchaseReceipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id'             => $qualityControl->product_id,
+            'qty_received'           => $qualityControl->passed_quantity + $qualityControl->rejected_quantity,
+            'qty_accepted'           => $qualityControl->passed_quantity,
+            'qty_rejected'           => $qualityControl->rejected_quantity,
+            'reason_rejected'        => $qualityControl->rejected_quantity > 0 ? 'Failed QC inspection' : null,
+            'warehouse_id'           => $qualityControl->warehouse_id,
+            'rak_id'                 => $qualityControl->rak_id,
+            'status'                 => 'completed', // QC already done
+        ]);
+
+        Log::info('Auto-created Purchase Receipt from QC', [
+            'qc_number' => $qualityControl->qc_number,
+            'receipt_number' => $receiptNumber,
+            'receipt_id' => $purchaseReceipt->id,
+            'receipt_item_id' => $receiptItem->id,
+        ]);
+
+        return $purchaseReceipt;
+    }
+
+    /**
+     * Generate receipt number
+     */
+    protected function generateReceiptNumber()
+    {
+        $date = now()->format('Ymd');
+        $prefix = 'PR-' . $date . '-';
+
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = \App\Models\PurchaseReceipt::where('receipt_number', $candidate)->exists();
+        } while ($exists);
+
+        return $candidate;
+    }
+
+    /**
+     * Check and auto-complete Purchase Order if all items are fully received
+     * NEW: Auto-complete PO when all items have receipts
+     */
+    protected function checkAndCompletePurchaseOrder($qualityControl)
+    {
+        $purchaseOrderItem = $qualityControl->fromModel;
+        if (!$purchaseOrderItem) {
+            return;
+        }
+
+        $purchaseOrder = $purchaseOrderItem->purchaseOrder;
+        if (!$purchaseOrder) {
+            return;
+        }
+
+        // Don't auto-complete if already completed or closed
+        if (in_array($purchaseOrder->status, ['completed', 'closed', 'paid'])) {
+            return;
+        }
+
+        // Refresh PO to get latest data including newly created receipt items
+        $purchaseOrder->refresh();
+
+        // Load all items with their receipts
+        $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem']);
+
+        $allItemsReceived = true;
+        
+        foreach ($purchaseOrder->purchaseOrderItem as $item) {
+            // Sum all received quantities from receipt items for this PO item
+            $totalReceived = $item->purchaseReceiptItem->sum('qty_received');
+            
+            // If any item has not been fully received, don't complete
+            if ($totalReceived < $item->quantity) {
+                $allItemsReceived = false;
+                Log::info('PO item not fully received', [
+                    'po_item_id' => $item->id,
+                    'ordered_qty' => $item->quantity,
+                    'received_qty' => $totalReceived,
+                ]);
+                break;
+            }
+        }
+
+        if ($allItemsReceived && !in_array($purchaseOrder->status, ['completed', 'closed', 'paid'])) {
+            $purchaseOrder->update([
+                'status' => 'completed',
+                'completed_by' => Auth::id() ?? 1,
+                'completed_at' => now(),
+            ]);
+
+            Log::info('Auto-completed Purchase Order', [
+                'po_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+                'trigger' => 'QC completion',
+            ]);
+
+            HelperController::sendNotification(
+                isSuccess: true,
+                title: 'Purchase Order Completed',
+                message: 'PO ' . $purchaseOrder->po_number . ' has been automatically completed.'
+            );
         }
     }
 }

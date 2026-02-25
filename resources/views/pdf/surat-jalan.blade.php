@@ -49,7 +49,7 @@
 <body>
 
     <div class="header">
-        <img src="{{ public_path('images/logo.png') }}" class="logo" alt="Logo">
+        <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
         <h2>PT.DUTA TUNGGAL</h2>
         <p>Alamat Perusahaan</p>
         <div class="title">SURAT JALAN</div>

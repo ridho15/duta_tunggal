@@ -9,8 +9,8 @@ use Filament\Tables\Table;
 
 class BalanceSheetResource extends Resource
 {
-    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationIcon = 'heroicon-o-scale';
+    protected static ?string $navigationGroup = 'Finance - Laporan';
     protected static ?string $navigationLabel = 'Balance Sheet';
     protected static ?int $navigationSort = 20;
     protected static ?string $model = JournalEntry::class;

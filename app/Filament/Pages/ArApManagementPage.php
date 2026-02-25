@@ -27,11 +27,11 @@ class ArApManagementPage extends Page implements HasTable
 
     protected static string $view = 'filament.pages.ar-ap-management-page';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Akuntansi';
 
     protected static ?string $navigationLabel = 'AR & AP Management';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 8;
 
     // Add this to make sure it's accessible
     protected static ?string $slug = 'ar-ap-management';
@@ -249,7 +249,7 @@ class ArApManagementPage extends Page implements HasTable
                     }
                     return '-';
                 })
-                ->searchable(['code', 'name'])
+                ->searchable(['code', 'perusahaan'])
                 ->sortable(),
             
             TextColumn::make('invoice.due_date')

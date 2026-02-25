@@ -570,7 +570,7 @@ class PayablesAgeingSheet implements FromCollection, WithHeadings, WithTitle, Wi
 
             return [
                 'No.' => $counter++,
-                'Supplier Name' => $payable->supplier->name ?? '-',
+                'Supplier Name' => $payable->supplier->perusahaan ?? '-',
                 'Contact Person' => $payable->supplier->contact_person ?? '-',
                 'Phone' => $payable->supplier->phone ?? '-',
                 'Email' => $payable->supplier->email ?? '-',

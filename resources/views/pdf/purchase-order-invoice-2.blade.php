@@ -148,7 +148,7 @@
     <div class="invoice-details clearfix">
         <div class="customer-info">
             <h3>Supplier:</h3>
-            <p><strong>{{ $invoice->supplier_name ?? $invoice->fromModel->supplier->name }}</strong><br>
+            <p><strong>{{ $invoice->supplier_name ?? $invoice->fromModel->supplier->perusahaan }}</strong><br>
                 @if($invoice->fromModel->supplier->perusahaan)
                 {{ $invoice->fromModel->supplier->perusahaan }}<br>
                 @endif

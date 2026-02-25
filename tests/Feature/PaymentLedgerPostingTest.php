@@ -263,7 +263,7 @@ class PaymentLedgerPostingTest extends TestCase
             'from_model_id' => $purchaseOrder->id,
             'invoice_date' => now(),
             'due_date' => now()->addDays(30),
-            'supplier_name' => $supplier->name,
+            'supplier_name' => $supplier->perusahaan,
             'subtotal' => 100000,
             'tax' => 11000, // 11% PPN
             'total' => 111000,
@@ -321,7 +321,7 @@ class PaymentLedgerPostingTest extends TestCase
             'from_model_id' => $purchaseOrder->id,
             'invoice_date' => now(),
             'due_date' => now()->addDays(30),
-            'supplier_name' => $supplier->name,
+            'supplier_name' => $supplier->perusahaan,
             'subtotal' => 100000,
             'tax' => 11000, // 11% PPN
             'total' => 111000,

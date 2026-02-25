@@ -290,7 +290,7 @@ class ProductionPlanResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', true)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('name', 'like', "%{$search}%")
+                                        $q->where('perusahaan', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
                                 

@@ -82,7 +82,7 @@ class DepositResource extends Resource
                                     ->options(function ($get) {
                                         if ($get('from_model_type') == 'App\Models\Supplier') {
                                             return Supplier::get()->mapWithKeys(function ($supplier) {
-                                                return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                             });
                                         } elseif ($get('from_model_type') == 'App\Models\Customer') {
                                             return Customer::get()->mapWithKeys(function ($customer) {

@@ -20,6 +20,8 @@ class ViewHpp extends Page
     protected static string $resource = HppResource::class;
     protected static string $view = 'filament.pages.reports.hpp';
 
+    public bool $showPreview = false;
+
     public ?string $startDate = null;
     public ?string $endDate = null;
     public array $branchIds = [];
@@ -72,10 +74,24 @@ class ViewHpp extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+
             Action::make('export_excel')
                 ->label('Export Excel')
                 ->icon('heroicon-m-arrow-down-tray')
                 ->color('success')
+                ->visible(fn () => $this->showPreview)
                 ->action(function () {
                     return $this->export('excel');
                 }),
@@ -83,10 +99,21 @@ class ViewHpp extends Page
                 ->label('Export PDF')
                 ->icon('heroicon-m-document-text')
                 ->color('danger')
+                ->visible(fn () => $this->showPreview)
                 ->action(function () {
                     return $this->export('pdf');
                 }),
         ];
+    }
+
+    public function generateReport(): void
+    {
+        $this->showPreview = true;
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
     }
 
     public function getReportData(): array

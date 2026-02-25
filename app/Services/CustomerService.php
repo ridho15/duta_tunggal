@@ -9,20 +9,14 @@ class CustomerService
     public function generateCode()
     {
         $date = now()->format('Ymd');
+        $prefix = 'CUS-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $last = Customer::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = Customer::where('code', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->code, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'CUS-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 }

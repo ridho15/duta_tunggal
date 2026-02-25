@@ -3,6 +3,8 @@
 namespace Database\Factories;
 
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
+use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
@@ -28,7 +30,6 @@ class ProductFactory extends Factory
             'name' => 'Produk ' . $this->faker->word,
             'supplier_id' => Supplier::inRandomOrder()->first()->id ?? Supplier::factory()->create()->id,
             'product_category_id' => $category->id,
-            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? Cabang::factory()->create()->id,
             'uom_id' => optional(UnitOfMeasure::inRandomOrder()->first())->id ?? UnitOfMeasure::factory()->create()->id,
             'cost_price' => $this->faker->randomFloat(2, 5000, 100000),
             'sell_price' => $this->faker->randomFloat(2, 10000, 200000),

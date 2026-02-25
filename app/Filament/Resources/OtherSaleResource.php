@@ -72,7 +72,7 @@ class OtherSaleResource extends Resource
                             ->getSearchResultsUsing(function (string $search) {
                                 return \App\Models\ChartOfAccount::where('type', 'Revenue')
                                     ->where(function ($query) use ($search) {
-                                        $query->where('name', 'like', "%{$search}%")
+                                        $query->where('perusahaan', 'like', "%{$search}%")
                                               ->orWhere('code', 'like', "%{$search}%");
                                     })
                                     ->limit(50)
@@ -126,7 +126,7 @@ class OtherSaleResource extends Resource
                             ->getSearchResultsUsing(function (string $search) {
                                 return \App\Models\CashBankAccount::with('coa')
                                     ->where(function ($query) use ($search) {
-                                        $query->where('name', 'like', "%{$search}%")
+                                        $query->where('perusahaan', 'like', "%{$search}%")
                                               ->orWhereHas('coa', function ($coaQuery) use ($search) {
                                                   $coaQuery->where('code', 'like', "%{$search}%")
                                                            ->orWhere('name', 'like', "%{$search}%");
@@ -154,7 +154,7 @@ class OtherSaleResource extends Resource
                             ->preload()
                             ->getSearchResultsUsing(function (string $search) {
                                 return \App\Models\Customer::where(function ($query) use ($search) {
-                                        $query->where('name', 'like', "%{$search}%")
+                                        $query->where('perusahaan', 'like', "%{$search}%")
                                               ->orWhere('code', 'like', "%{$search}%");
                                     })
                                     ->limit(50)

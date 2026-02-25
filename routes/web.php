@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Appearance;
+use App\Http\Controllers\Reports\StockReportController;
+use App\Http\Controllers\InventoryCardController;
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', function () {
@@ -52,5 +54,16 @@ Route::get('exports/download/{filename}', function ($filename) {
 
     return response()->download($path, $filename)->deleteFileAfterSend(true);
 })->name('exports.download');
+
+// Reports preview routes
+Route::middleware('auth')->group(function () {
+    Route::get('/reports/stock-report/preview', [StockReportController::class, 'preview'])
+        ->name('reports.stock-report.preview');
+
+    // Kartu Persediaan — print / PDF / Excel
+    Route::get('/reports/inventory-card/print',          [InventoryCardController::class, 'printView'])->name('inventory-card.print');
+    Route::get('/reports/inventory-card/download-pdf',   [InventoryCardController::class, 'downloadPdf'])->name('inventory-card.pdf');
+    Route::get('/reports/inventory-card/download-excel', [InventoryCardController::class, 'downloadExcel'])->name('inventory-card.excel');
+});
 
 

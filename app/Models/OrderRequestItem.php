@@ -15,6 +15,11 @@ class OrderRequestItem extends Model
         'order_request_id',
         'product_id',
         'quantity',
+        'fulfilled_quantity',
+        'unit_price',
+        'discount',
+        'tax',
+        'subtotal',
         'note'
     ];
 
@@ -31,5 +36,31 @@ class OrderRequestItem extends Model
     public function purchaseOrderItem()
     {
         return $this->morphOne(PurchaseOrderItem::class, 'refer_item_model')->withDefault();
+    }
+
+    /**
+     * Update fulfilled quantity by adding the given amount
+     */
+    public function addFulfilledQuantity($quantity)
+    {
+        $this->fulfilled_quantity = ($this->fulfilled_quantity ?? 0) + $quantity;
+        $this->save();
+    }
+
+    /**
+     * Update fulfilled quantity by subtracting the given amount
+     */
+    public function reduceFulfilledQuantity($quantity)
+    {
+        $this->fulfilled_quantity = max(0, ($this->fulfilled_quantity ?? 0) - $quantity);
+        $this->save();
+    }
+
+    /**
+     * Get remaining quantity (not yet fulfilled)
+     */
+    public function getRemainingQuantityAttribute()
+    {
+        return max(0, $this->quantity - ($this->fulfilled_quantity ?? 0));
     }
 }

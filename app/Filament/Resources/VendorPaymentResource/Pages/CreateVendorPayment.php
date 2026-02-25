@@ -7,6 +7,7 @@ use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use App\Models\Invoice;
 use App\Models\Deposit;
+use App\Models\PaymentRequest;
 use Filament\Notifications\Notification;
 
 class CreateVendorPayment extends CreateRecord
@@ -105,5 +106,17 @@ class CreateVendorPayment extends CreateRecord
         }
 
         return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        // Update linked PaymentRequest: set status to 'paid' and link vendor_payment_id
+        $paymentRequestId = $this->record->payment_request_id;
+        if ($paymentRequestId) {
+            PaymentRequest::where('id', $paymentRequestId)->update([
+                'status' => PaymentRequest::STATUS_PAID,
+                'vendor_payment_id' => $this->record->id,
+            ]);
+        }
     }
 }

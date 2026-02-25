@@ -74,9 +74,9 @@ class AccountPayableResource extends Resource
                             ->searchable(['name', 'code'])
                             ->required()
                             ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
-                                return "({$supplier->code}) {$supplier->name}";
+                                return "({$supplier->code}) {$supplier->perusahaan}";
                             })
-                            ->relationship('supplier', 'name'),
+                            ->relationship('supplier', 'perusahaan'),
                         TextInput::make('total')
                             ->required()
                             ->indonesianMoney()
@@ -345,7 +345,7 @@ class AccountPayableResource extends Resource
                     ->label('Supplier')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        return "🏢 ({$record->supplier->code}) {$record->supplier->name}";
+                        return "🏢 ({$record->supplier->code}) {$record->supplier->perusahaan}";
                     })
                     ->collapsible(),
                     
@@ -379,7 +379,7 @@ class AccountPayableResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->relationship('supplier', 'name')
+                    ->relationship('supplier', 'perusahaan')
                     ->searchable()
                     ->preload()
                     ->multiple()

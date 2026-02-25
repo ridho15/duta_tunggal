@@ -134,47 +134,19 @@ class PurchaseReceiptItemRelationManager extends RelationManager
             ->actions([
                 ActionGroup::make([
                     Action::make('send_to_qc')
-                        ->label('Kirim ke Quality Control')
+                        ->label('Kirim ke Quality Control (Legacy - Tidak Direkomendasikan)')
                         ->icon('heroicon-o-arrow-right-circle')
-                        ->color('warning')
+                        ->color('gray')
                         ->requiresConfirmation()
-                        ->modalHeading('Kirim ke Quality Control')
-                        ->modalDescription('Apakah Anda yakin ingin mengirim item ini ke Quality Control? Tindakan ini tidak dapat dibatalkan.')
-                        ->modalSubmitActionLabel('Ya, Kirim ke QC')
-                        ->action(function ($record) {
-                            // Check if already sent to QC
-                            if ($record->qualityControl()->exists()) {
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Sudah dikirim ke QC')
-                                    ->body('Item ini sudah dikirim ke Quality Control.')
-                                    ->warning()
-                                    ->send();
-                                return;
-                            }
-
-                            // Create Quality Control record
-                            $qcService = app(QualityControlService::class);
-                            $qcData = [
-                                'passed_quantity' => 0, // Start with 0, will be determined by QC inspection
-                                'rejected_quantity' => $record->qty_rejected ?? 0,
-                                'warehouse_id' => $record->warehouse_id,
-                                'rak_id' => $record->rak_id,
-                                'inspected_by' => Auth::id(),
-                            ];
-
-                            $qc = $qcService->createQCFromPurchaseReceiptItem($record, $qcData);
-
-                            // Update is_sent status
-                            $record->update(['is_sent' => 1]);
-
+                        ->modalHeading('Legacy Flow Deprecated')
+                        ->modalDescription('Flow QC dari Purchase Receipt Item sudah tidak direkomendasikan. Gunakan flow baru: Buat QC langsung dari Purchase Order Item untuk hasil yang lebih baik.')
+                        ->modalSubmitActionLabel('Mengerti')
+                        ->action(function () {
                             \Filament\Notifications\Notification::make()
-                                ->title('Berhasil dikirim ke QC')
-                                ->body('Item berhasil dikirim ke Quality Control. QC Number: ' . $qc->qc_number)
-                                ->success()
+                                ->title('Legacy Flow Deprecated')
+                                ->body('Silakan buat QC langsung dari Purchase Order Item untuk flow yang lebih efisien.')
+                                ->warning()
                                 ->send();
-
-                            // Redirect to QC edit page
-                            return redirect()->to(QualityControlPurchaseResource::getUrl('edit', ['record' => $qc->id]));
                         })
                         ->visible(function ($record) {
                             return !$record->qualityControl()->exists() && $record->qty_received > 0;

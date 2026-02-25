@@ -513,7 +513,7 @@ class SaleOrderResource extends Resource
                                             $query->where('product_id', $get('product_id'));
                                         })
                                         ->where(function ($q) use ($search) {
-                                            $q->where('name', 'like', "%{$search}%")
+                                            $q->where('perusahaan', 'like', "%{$search}%")
                                               ->orWhere('kode', 'like', "%{$search}%");
                                         });
                                         
@@ -1278,7 +1278,7 @@ class SaleOrderResource extends Resource
                                             }
                                         })
                                         ->options(function () {
-                                            return Supplier::select(['id', 'name', 'code', DB::raw("CONCAT('(', code, ') ', name) as label")])->get()->pluck('label', 'id');
+                                            return Supplier::select(['id', 'perusahaan', 'code', DB::raw("CONCAT('(', code, ') ', perusahaan) as label")])->get()->pluck('label', 'id');
                                         })->required(),
                                     TextInput::make('po_number')
                                         ->label('PO Number')

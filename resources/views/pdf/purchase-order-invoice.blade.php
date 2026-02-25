@@ -43,7 +43,7 @@
 <body>
     <div class="invoice-box">
         <div class="header">
-            <img src="{{ public_path('images/logo.png') }}" alt="Logo" height="50">
+            <img src="{{ public_path('logo_duta_tunggal.png') }}" alt="Logo" height="50">
             <h2>PT.DUTA TUNGGAL</h2>
             <p>Invoice #: {{ $invoice->invoice_number }}<br>
                 Tanggal: {{ Carbon\Carbon::parse($invoice->invoice_date)->locale('id')->format('D, d M Y') }}</p>

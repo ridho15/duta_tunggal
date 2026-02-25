@@ -218,7 +218,7 @@ class ViewSaleOrder extends ViewRecord
                                         }
                                     })
                                     ->options(function () {
-                                        return Supplier::select(['id', 'name', 'code', DB::raw("CONCAT('(', code, ') ', name) as label")])->get()->pluck('label', 'id');
+                                        return Supplier::select(['id', 'perusahaan', 'code', DB::raw("CONCAT('(', code, ') ', perusahaan) as label")])->get()->pluck('label', 'id');
                                     })->required(),
                                 TextInput::make('po_number')
                                     ->label('PO Number')

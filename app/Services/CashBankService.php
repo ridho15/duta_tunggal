@@ -15,34 +15,44 @@ class CashBankService
     public function generateNumber(string $prefix = 'CB', string $format = 'default'): string
     {
         $date = now()->format('Ymd');
-        $last = CashBankTransaction::whereDate('created_at', now()->toDateString())
-            ->orderByDesc('id')->first();
-        $seq = $last ? ((int) substr($last->number, -4)) + 1 : 1;
-
+        $base = $prefix;
         switch ($format) {
             case 'simple':
-                return sprintf('%s%04d', $prefix, $seq);
+                $base = $prefix;
+                break;
             case 'monthly':
-                $month = now()->format('Ym');
-                return sprintf('%s-%s-%04d', $prefix, $month, $seq);
+                $base = $prefix . '-' . now()->format('Ym');
+                break;
             case 'yearly':
-                $year = now()->format('Y');
-                return sprintf('%s-%s-%04d', $prefix, $year, $seq);
+                $base = $prefix . '-' . now()->format('Y');
+                break;
             case 'custom':
-                // For custom format, we'll use a more flexible approach
-                return sprintf('%s-%s-%04d', $prefix, $date, $seq);
+                $base = $prefix . '-' . $date;
+                break;
             default:
-                return sprintf('%s-%s-%04d', $prefix, $date, $seq);
+                $base = $prefix . '-' . $date;
         }
+
+        $prefixFull = $base . '-';
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefixFull . $random;
+            $exists = CashBankTransaction::where('number', $candidate)->exists();
+        } while ($exists);
+
+        return $candidate;
     }
 
     public function generateTransferNumber(): string
     {
         $date = now()->format('Ymd');
-        $last = CashBankTransfer::whereDate('created_at', now()->toDateString())
-            ->orderByDesc('id')->first();
-        $seq = $last ? ((int) substr($last->number, -4)) + 1 : 1;
-        return sprintf('TRF-%s-%04d', $date, $seq);
+        $prefix = 'TRF-' . $date . '-';
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = CashBankTransfer::where('number', $candidate)->exists();
+        } while ($exists);
+        return $candidate;
     }
 
     public function postTransaction(CashBankTransaction $trx): void

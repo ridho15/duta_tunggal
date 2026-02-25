@@ -15,7 +15,9 @@ class BillOfMaterialFactory extends Factory
     public function definition(): array
     {
         return [
-            'cabang_id' => Cabang::factory(),
+            'cabang_id' => function () {
+                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
+            },
             'product_id' => Product::factory(),
             'quantity' => $this->faker->randomFloat(2, 1, 100),
             'code' => 'BOM-' . $this->faker->unique()->numberBetween(1000, 9999),

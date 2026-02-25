@@ -19,20 +19,22 @@ class RakServiceTest extends TestCase
 
     public function test_generate_kode_rak_without_warehouse()
     {
-        // Test generate kode tanpa warehouse
+        // generated code should start with RAK- and include today's date
         $code = $this->rakService->generateKodeRak();
 
         $this->assertStringStartsWith('RAK-', $code);
-        $this->assertEquals(7, strlen($code)); // RAK-XXX
+        // pattern RAK-YYYYMMDD-XXX (3 digit suffix)
+        $this->assertMatchesRegularExpression('#^RAK-\d{8}-\d{3}$#', $code);
     }
 
     public function test_generate_kode_rak_logic()
     {
-        // Test logic tanpa database
-        // Asumsikan ada rak dengan kode RAK-001
-        // Method akan cari last dan increment
-
-        // Karena tidak bisa mock database dengan mudah, test basic
-        $this->assertTrue(true); // Placeholder
+        // The service now uses a random suffix, so we only verify it returns a
+        // string conforming to the expected format and is unique when stored.
+        $first = $this->rakService->generateKodeRak();
+        $second = $this->rakService->generateKodeRak();
+        $this->assertNotEquals($first, $second);
+        $this->assertMatchesRegularExpression('#^RAK-\d{8}-\d{3}$#', $first);
+        $this->assertMatchesRegularExpression('#^RAK-\d{8}-\d{3}$#', $second);
     }
 }

@@ -24,7 +24,7 @@ class AssetServiceTest extends TestCase
     {
         // Create test COAs
         $assetCoa = ChartOfAccount::factory()->create(['name' => 'Asset COA', 'type' => 'asset']);
-        $supplierCoa = ChartOfAccount::factory()->create(['name' => 'Supplier COA', 'type' => 'liability']);
+        $supplierCoa = ChartOfAccount::factory()->create(['perusahaan' => 'Supplier COA', 'type' => 'liability']);
 
         // Create test asset
         $asset = Asset::factory()->create([

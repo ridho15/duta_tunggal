@@ -669,7 +669,7 @@ class JournalEntryResource extends Resource
                                         // Get source information based on type
                                         switch ($record->source_type) {
                                             case 'App\\Models\\PurchaseOrder':
-                                                $supplierName = $source->supplier ? $source->supplier->name : 'N/A';
+                                                $supplierName = $source->supplier ? $source->supplier->perusahaan : 'N/A';
                                                 return "PO: {$source->po_number} - {$supplierName}";
                                             case 'App\\Models\\SaleOrder':
                                                 $customerName = $source->customer ? $source->customer->name : 'N/A';
@@ -684,7 +684,7 @@ class JournalEntryResource extends Resource
                                                 $moNumber = $source->manufacturingOrder ? $source->manufacturingOrder->mo_number : 'N/A';
                                                 return "MI: {$source->issue_number} - {$moNumber}";
                                             case 'App\\Models\\VendorPayment':
-                                                $supplierName = $source->supplier ? $source->supplier->name : 'N/A';
+                                                $supplierName = $source->supplier ? $source->supplier->perusahaan : 'N/A';
                                                 return "VP: {$source->payment_number} - {$supplierName}";
                                             case 'App\\Models\\CustomerReceipt':
                                                 $customerName = $source->customer ? $source->customer->name : 'N/A';
@@ -723,7 +723,7 @@ class JournalEntryResource extends Resource
                                                 $partyName = '';
                                                 if ($source->from_model_type === 'App\\Models\\PurchaseOrder') {
                                                     $prefix = 'Purchase Invoice';
-                                                    $partyName = $source->supplier ? $source->supplier->name : 'N/A';
+                                                    $partyName = $source->supplier ? $source->supplier->perusahaan : 'N/A';
                                                 } elseif ($source->from_model_type === 'App\\Models\\SaleOrder') {
                                                     $prefix = 'Sales Invoice';
                                                     $partyName = $source->customer ? $source->customer->name : 'N/A';

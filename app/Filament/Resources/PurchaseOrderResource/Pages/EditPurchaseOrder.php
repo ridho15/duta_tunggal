@@ -52,19 +52,6 @@ class EditPurchaseOrder extends EditRecord
                         'status' => 'draft'
                     ]);
                 }),
-            Action::make('request_approval')
-                ->label('Request Approval')
-                ->hidden(function ($record) {
-                    return Auth::user()->hasRole('Owner') || in_array($record->status, ['request_approval', 'closed', 'completed', 'approved']);
-                })
-                ->requiresConfirmation()
-                ->icon('heroicon-o-clipboard-document-check')
-                ->color('success')
-                ->action(function ($record) {
-                    $record->update([
-                        'status' => 'request_approval'
-                    ]);
-                }),
             Action::make('request_close')
                 ->label('Request Close')
                 ->hidden(function ($record) {

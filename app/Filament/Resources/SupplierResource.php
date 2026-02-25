@@ -73,22 +73,14 @@ class SupplierResource extends Resource
                                     $set('code', $supplierService->generateCode());
                                 })),
                         TextInput::make('perusahaan')
-                            ->label('Nama Perusahaan')
+                            ->label('Nama Perusahaan Supplier')
                             ->string()
                             ->validationMessages([
-                                'required' => 'Nama perusahaan tidak boleh kosong',
-                                'max' => 'Nama perusahaan terlalu panjang'
+                                'required' => 'Nama perusahaan supplier tidak boleh kosong',
+                                'max' => 'Nama perusahaan supplier terlalu panjang'
                             ])
                             ->maxLength(255)
                             ->required(),
-                        TextInput::make('name')
-                            ->required()
-                            ->label('Nama Supplier')
-                            ->validationMessages([
-                                'required' => 'Nama tidak boleh kosong',
-                                'max' => 'Nama terlalu panjang'
-                            ])
-                            ->maxLength(255),
                         TextInput::make('kontak_person')
                             ->label('Nama Contact Person')
                             ->string()
@@ -189,10 +181,7 @@ class SupplierResource extends Resource
                     })
                     ->sortable(),
                 TextColumn::make('perusahaan')
-                    ->label('Nama Perusahaan')
-                    ->searchable(),
-                TextColumn::make('name')
-                    ->label('Nama Supplier')
+                    ->label('Nama Perusahaan Supplier')
                     ->searchable(),
                 TextColumn::make('kontak_person')
                     ->label('Nama Contact Person')

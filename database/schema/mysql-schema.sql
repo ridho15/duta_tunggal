@@ -119,15 +119,15 @@ CREATE TABLE `asset_disposals` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `asset_id` bigint unsigned NOT NULL,
   `disposal_date` date NOT NULL,
-  `disposal_type` enum('sale','scrap','donation','theft','other') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `disposal_type` enum('sale','scrap','donation','theft','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `sale_price` decimal(15,2) DEFAULT NULL,
   `book_value_at_disposal` decimal(15,2) NOT NULL,
   `gain_loss_amount` decimal(15,2) DEFAULT NULL,
-  `notes` text COLLATE utf8mb4_unicode_ci,
-  `disposal_document` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `disposal_document` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `approved_by` bigint unsigned DEFAULT NULL,
   `approved_at` timestamp NULL DEFAULT NULL,
-  `status` enum('pending','approved','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `status` enum('pending','approved','completed','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -148,12 +148,12 @@ CREATE TABLE `asset_transfers` (
   `from_cabang_id` bigint unsigned NOT NULL,
   `to_cabang_id` bigint unsigned NOT NULL,
   `transfer_date` date NOT NULL,
-  `reason` text COLLATE utf8mb4_unicode_ci,
-  `transfer_document` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `transfer_document` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `requested_by` bigint unsigned NOT NULL,
   `approved_by` bigint unsigned DEFAULT NULL,
   `approved_at` timestamp NULL DEFAULT NULL,
-  `status` enum('pending','approved','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `status` enum('pending','approved','completed','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `completed_at` timestamp NULL DEFAULT NULL,
   `completed_by` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -180,14 +180,14 @@ DROP TABLE IF EXISTS `assets`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assets` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `code` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `purchase_date` date NOT NULL,
   `usage_date` date NOT NULL,
   `purchase_cost` decimal(20,2) NOT NULL,
   `salvage_value` decimal(20,2) NOT NULL DEFAULT '0.00',
   `useful_life_years` int NOT NULL,
-  `depreciation_method` enum('straight_line','declining_balance','sum_of_years_digits','units_of_production') COLLATE utf8mb4_unicode_ci DEFAULT 'straight_line',
+  `depreciation_method` enum('straight_line','declining_balance','sum_of_years_digits','units_of_production') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'straight_line',
   `asset_coa_id` bigint unsigned NOT NULL,
   `accumulated_depreciation_coa_id` bigint unsigned NOT NULL,
   `depreciation_expense_coa_id` bigint unsigned NOT NULL,
@@ -468,6 +468,25 @@ CREATE TABLE `chart_of_accounts` (
   UNIQUE KEY `chart_of_accounts_code_unique` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `cost_variances`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `cost_variances` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `production_cost_entry_id` bigint unsigned NOT NULL,
+  `variance_type` enum('material','labor','overhead','volume') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `standard_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `actual_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `variance_amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `variance_percentage` decimal(8,4) NOT NULL DEFAULT '0.0000',
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `cost_variances_production_cost_entry_id_foreign` (`production_cost_entry_id`),
+  CONSTRAINT `cost_variances_production_cost_entry_id_foreign` FOREIGN KEY (`production_cost_entry_id`) REFERENCES `production_cost_entries` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `currencies`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -606,13 +625,13 @@ CREATE TABLE `delivery_order_logs` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `delivery_order_id` int NOT NULL,
   `status` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `action` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `action` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `confirmed_by` int NOT NULL,
-  `comments` text COLLATE utf8mb4_unicode_ci,
+  `comments` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `user_id` bigint unsigned DEFAULT NULL,
-  `old_value` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `new_value` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `notes` text COLLATE utf8mb4_unicode_ci,
+  `old_value` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `new_value` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -631,7 +650,7 @@ CREATE TABLE `delivery_orders` (
   `status` enum('draft','sent','confirmed','received','supplier','completed','request_approve','approved','request_close','closed','reject') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `additional_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
-  `additional_cost_description` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `additional_cost_description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_by` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -742,10 +761,14 @@ DROP TABLE IF EXISTS `income_statement_items`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `income_statement_items` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `account_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `account_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `debit` decimal(15,2) NOT NULL DEFAULT '0.00',
   `credit` decimal(15,2) NOT NULL DEFAULT '0.00',
   `balance` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `row_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -781,6 +804,7 @@ CREATE TABLE `invoice_items` (
   `tax_amount` decimal(15,2) NOT NULL DEFAULT '0.00',
   `subtotal` decimal(15,2) NOT NULL DEFAULT '0.00',
   `total` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `coa_id` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -891,7 +915,7 @@ CREATE TABLE `journal_entries` (
   `cabang_id` bigint unsigned DEFAULT NULL,
   `department_id` bigint unsigned DEFAULT NULL,
   `project_id` bigint unsigned DEFAULT NULL,
-  `source_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source_type` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `source_id` bigint unsigned DEFAULT NULL,
   `transaction_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bank_recon_id` bigint unsigned DEFAULT NULL,
@@ -1056,6 +1080,11 @@ CREATE TABLE `order_request_items` (
   `order_request_id` int NOT NULL,
   `product_id` int NOT NULL,
   `quantity` int NOT NULL DEFAULT '0',
+  `fulfilled_quantity` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `unit_price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `discount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `tax` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `subtotal` decimal(15,2) NOT NULL DEFAULT '0.00',
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -1073,7 +1102,7 @@ CREATE TABLE `order_requests` (
   `supplier_id` int DEFAULT NULL,
   `cabang_id` bigint unsigned DEFAULT NULL,
   `request_date` date NOT NULL,
-  `status` enum('draft','approved','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `status` enum('draft','approved','rejected','closed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -1151,9 +1180,45 @@ CREATE TABLE `product_categories` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `kode` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `cabang_id` int NOT NULL,
   `kenaikan_harga` decimal(5,2) NOT NULL DEFAULT '0.00',
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `product_standard_costs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_standard_costs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` bigint unsigned NOT NULL,
+  `standard_material_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `standard_labor_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `standard_overhead_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `total_standard_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `effective_date` date NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `product_standard_costs_product_id_effective_date_unique` (`product_id`,`effective_date`),
+  CONSTRAINT `product_standard_costs_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `product_supplier`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_supplier` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` bigint unsigned NOT NULL,
+  `supplier_id` bigint unsigned NOT NULL,
+  `supplier_price` decimal(15,2) DEFAULT NULL COMMENT 'Price from this supplier',
+  `supplier_sku` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'SKU from this supplier',
+  `is_primary` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Is this the primary supplier',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `product_supplier_product_id_supplier_id_unique` (`product_id`,`supplier_id`),
+  KEY `product_supplier_supplier_id_foreign` (`supplier_id`),
+  CONSTRAINT `product_supplier_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `product_supplier_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `product_unit_conversions`;
@@ -1168,6 +1233,28 @@ CREATE TABLE `product_unit_conversions` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `production_cost_entries`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `production_cost_entries` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `production_id` bigint unsigned DEFAULT NULL,
+  `product_id` bigint unsigned NOT NULL,
+  `quantity_produced` int NOT NULL,
+  `actual_material_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `actual_labor_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `actual_overhead_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `total_actual_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `production_date` date NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `production_cost_entries_production_id_foreign` (`production_id`),
+  KEY `production_cost_entries_product_id_foreign` (`product_id`),
+  CONSTRAINT `production_cost_entries_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `production_cost_entries_production_id_foreign` FOREIGN KEY (`production_id`) REFERENCES `productions` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `production_plans`;
@@ -1232,6 +1319,7 @@ CREATE TABLE `products` (
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `sku` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `product_category_id` int NOT NULL,
+  `cabang_id` bigint unsigned DEFAULT NULL,
   `cost_price` decimal(18,2) NOT NULL DEFAULT '0.00',
   `sell_price` decimal(18,2) NOT NULL DEFAULT '0.00',
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -1239,7 +1327,6 @@ CREATE TABLE `products` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
-  `cabang_id` int NOT NULL,
   `supplier_id` bigint unsigned DEFAULT NULL,
   `harga_batas` int NOT NULL DEFAULT '0' COMMENT '%',
   `item_value` decimal(18,2) NOT NULL DEFAULT '0.00',
@@ -1273,6 +1360,8 @@ CREATE TABLE `products` (
   KEY `products_purchase_return_coa_id_foreign` (`purchase_return_coa_id`),
   KEY `products_unbilled_purchase_coa_id_foreign` (`unbilled_purchase_coa_id`),
   KEY `products_temporary_procurement_coa_id_foreign` (`temporary_procurement_coa_id`),
+  KEY `products_cabang_id_foreign` (`cabang_id`),
+  CONSTRAINT `products_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL,
   CONSTRAINT `products_cogs_coa_id_foreign` FOREIGN KEY (`cogs_coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL,
   CONSTRAINT `products_goods_delivery_coa_id_foreign` FOREIGN KEY (`goods_delivery_coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL,
   CONSTRAINT `products_inventory_coa_id_foreign` FOREIGN KEY (`inventory_coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL,
@@ -1361,7 +1450,7 @@ CREATE TABLE `purchase_orders` (
   `close_reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `date_approved` datetime DEFAULT NULL,
   `approved_by` int DEFAULT NULL,
-  `approval_signature` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `approval_signature` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `approval_signed_at` timestamp NULL DEFAULT NULL,
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `close_requested_by` int DEFAULT NULL COMMENT 'User yang melakukan request close',
@@ -1451,7 +1540,7 @@ CREATE TABLE `purchase_receipt_items` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `warehouse_id` int NOT NULL,
-  `is_sent` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('pending','completed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending' COMMENT 'Status of the receipt item: pending = not yet QC completed, completed = QC done and stock updated',
   `purchase_order_item_id` int DEFAULT NULL,
   `rak_id` int DEFAULT NULL,
   PRIMARY KEY (`id`)
@@ -1517,19 +1606,19 @@ CREATE TABLE `purchase_returns` (
   `purchase_receipt_id` int NOT NULL,
   `return_date` datetime NOT NULL,
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `status` enum('draft','pending_approval','approved','rejected') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `status` enum('draft','pending_approval','approved','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `approved_by` bigint unsigned DEFAULT NULL,
   `approved_at` timestamp NULL DEFAULT NULL,
-  `approval_notes` text COLLATE utf8mb4_unicode_ci,
+  `approval_notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `rejected_by` bigint unsigned DEFAULT NULL,
   `rejected_at` timestamp NULL DEFAULT NULL,
-  `rejection_notes` text COLLATE utf8mb4_unicode_ci,
-  `credit_note_number` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rejection_notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `credit_note_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `credit_note_date` date DEFAULT NULL,
   `credit_note_amount` decimal(15,2) DEFAULT NULL,
   `refund_amount` decimal(15,2) DEFAULT NULL,
   `refund_date` date DEFAULT NULL,
-  `refund_method` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `refund_method` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -1538,13 +1627,13 @@ CREATE TABLE `purchase_returns` (
   `cabang_id` bigint unsigned DEFAULT NULL,
   `replacement_po_id` bigint unsigned DEFAULT NULL,
   `replacement_date` date DEFAULT NULL,
-  `replacement_notes` text COLLATE utf8mb4_unicode_ci,
-  `supplier_response` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `replacement_notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `supplier_response` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `credit_note_received` tinyint(1) NOT NULL DEFAULT '0',
   `case_closed_date` date DEFAULT NULL,
-  `tracking_notes` text COLLATE utf8mb4_unicode_ci,
-  `delivery_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `shipping_details` text COLLATE utf8mb4_unicode_ci,
+  `tracking_notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `delivery_note` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `shipping_details` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `physical_return_date` date DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `purchase_returns_approved_by_foreign` (`approved_by`),
@@ -1720,6 +1809,48 @@ CREATE TABLE `report_cash_flow_sections` (
   UNIQUE KEY `report_cash_flow_sections_key_unique` (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `report_hpp_overhead_item_prefixes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `report_hpp_overhead_item_prefixes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `overhead_item_id` bigint unsigned NOT NULL,
+  `prefix` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `report_hpp_overhead_item_prefixes_overhead_item_id_foreign` (`overhead_item_id`),
+  CONSTRAINT `report_hpp_overhead_item_prefixes_overhead_item_id_foreign` FOREIGN KEY (`overhead_item_id`) REFERENCES `report_hpp_overhead_items` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `report_hpp_overhead_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `report_hpp_overhead_items` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `allocation_basis` enum('direct_labor','machine_hours','direct_material','production_volume','fixed_amount') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'direct_labor',
+  `allocation_rate` decimal(10,4) NOT NULL DEFAULT '1.0000',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `report_hpp_prefixes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `report_hpp_prefixes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `category` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `prefix` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `return_product_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -1751,7 +1882,7 @@ CREATE TABLE `return_products` (
   `warehouse_id` int NOT NULL,
   `status` enum('draft','approved','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `return_action` enum('reduce_quantity_only','close_do_partial','close_so_complete') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'reduce_quantity_only',
+  `return_action` enum('reduce_quantity_only','close_do_partial','close_so_complete') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'reduce_quantity_only',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -2056,7 +2187,6 @@ DROP TABLE IF EXISTS `suppliers`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `suppliers` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `phone` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2104,7 +2234,7 @@ CREATE TABLE `surat_jalans` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `created_by` int NOT NULL,
-  `document_path` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `document_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -2276,12 +2406,12 @@ CREATE TABLE `warehouse_confirmation_items` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `warehouse_confirmation_id` bigint unsigned NOT NULL,
   `sale_order_item_id` bigint unsigned NOT NULL,
-  `product_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `product_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `requested_qty` decimal(15,2) DEFAULT NULL,
   `confirmed_qty` decimal(15,2) NOT NULL,
   `warehouse_id` bigint unsigned NOT NULL,
   `rak_id` bigint unsigned DEFAULT NULL,
-  `status` enum('request','confirmed','partial_confirmed','rejected') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('request','confirmed','partial_confirmed','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -2303,10 +2433,10 @@ CREATE TABLE `warehouse_confirmation_warehouses` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `warehouse_confirmation_id` bigint unsigned NOT NULL,
   `warehouse_id` bigint unsigned NOT NULL,
-  `status` enum('request','confirmed','partial_confirmed','rejected') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'request',
+  `status` enum('request','confirmed','partial_confirmed','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'request',
   `confirmed_by` bigint unsigned DEFAULT NULL,
   `confirmed_at` timestamp NULL DEFAULT NULL,
-  `notes` text COLLATE utf8mb4_unicode_ci,
+  `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -2325,7 +2455,7 @@ DROP TABLE IF EXISTS `warehouse_confirmations`;
 CREATE TABLE `warehouse_confirmations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `manufacturing_order_id` int DEFAULT NULL,
-  `confirmation_type` enum('sales_order','manufacturing_order') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `confirmation_type` enum('sales_order','manufacturing_order') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sale_order_id` bigint unsigned DEFAULT NULL,
   `status` enum('Confirmed','Rejected','Request') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Request',
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -2713,3 +2843,19 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (346,'2025_12_07_13
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (347,'2025_12_07_135826_add_additional_fields_to_purchase_returns_table',2);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (348,'2025_12_08_151652_add_code_to_assets_table',2);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (349,'2025_12_10_215026_add_quantity_produced_to_productions_table',2);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (350,'2025_12_14_120048_add_coa_id_to_invoice_items_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (351,'2025_12_16_000000_add_columns_to_income_statement_items',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (352,'2025_12_17_093209_create_hpp_tables',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (353,'2025_12_17_104335_add_advanced_hpp_features_to_hpp_tables',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (354,'2025_12_24_005719_drop_cabang_id_from_product_categories_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (355,'2025_12_24_010233_drop_cabang_id_from_products_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (356,'2025_12_24_010715_drop_cabang_id_from_product_categories_and_products_tables',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (357,'2025_12_24_011218_add_cabang_id_back_to_products_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (358,'2026_02_02_111028_update_suppliers_name_field_nullable',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (359,'2026_02_02_111435_drop_name_column_from_suppliers_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (360,'2026_02_03_191416_add_price_fields_to_order_request_items_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (361,'2026_02_03_191431_add_closed_status_to_order_requests_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (362,'2026_02_03_191443_add_partial_fulfillment_to_order_request_items_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (363,'2026_02_03_200852_create_product_supplier_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (364,'2026_02_23_120000_add_status_to_purchase_receipt_items_table',4);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (365,'2026_02_23_123023_drop_is_sent_column_from_purchase_receipt_items_table',5);

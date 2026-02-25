@@ -69,40 +69,30 @@ class ManufacturingService
     public function generateMoNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'MO-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $last = ManufacturingOrder::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = ManufacturingOrder::where('mo_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->mo_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'MO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     public function generateIssueNumber(string $type = 'issue'): string
     {
         $prefix = $type === 'issue' ? 'MI' : 'MR'; // Material Issue / Material Return
         $date = now()->format('Ymd');
-        
-        $lastIssue = \App\Models\MaterialIssue::where('issue_number', 'like', "{$prefix}-{$date}-%")
-            ->orderBy('issue_number', 'desc')
-            ->first();
+        $prefixFull = $prefix . '-' . $date . '-';
 
-        if ($lastIssue) {
-            $lastNumber = (int) substr($lastIssue->issue_number, -4);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefixFull . $random;
+            $exists = \App\Models\MaterialIssue::where('issue_number', $candidate)->exists();
+        } while ($exists);
 
-        return sprintf('%s-%s-%04d', $prefix, $date, $newNumber);
+        return $candidate;
     }
 
     /**

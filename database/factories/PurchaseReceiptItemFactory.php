@@ -25,7 +25,7 @@ class PurchaseReceiptItemFactory extends Factory
             'qty_rejected' => $this->faker->numberBetween(0, 10),
             'reason_rejected' => $this->faker->optional()->sentence(),
             'warehouse_id' => 1, // will be overridden
-            'is_sent' => false,
+            'status' => 'pending',
             'rak_id' => $this->faker->optional()->numberBetween(1, 10),
         ];
     }

@@ -48,6 +48,7 @@ class Invoice extends Model
         'supplier_phone',
         'delivery_orders',
         'purchase_receipts',
+        'purchase_order_ids', // Task 14: multiple POs per invoice
         'accounts_payable_coa_id',
         'ppn_masukan_coa_id',
         'inventory_coa_id',
@@ -62,6 +63,7 @@ class Invoice extends Model
     protected $casts = [
         'delivery_orders' => 'array',
         'purchase_receipts' => 'array',
+        'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
         'other_fee' => 'array',
     ];
 

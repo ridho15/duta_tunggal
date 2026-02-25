@@ -23,6 +23,14 @@ class MasterDataSeeder extends Seeder
     {
         $this->command->info('Creating master data...');
 
+        // Debug: inspect suppliers table schema before master data insertion
+        try {
+            $columns = \Illuminate\Support\Facades\DB::select('SHOW COLUMNS FROM `suppliers`');
+            $this->command->info('MasterDataSeeder - suppliers columns: ' . json_encode(array_map(fn($c)=>$c->Field, $columns)));
+        } catch (\Throwable $e) {
+            $this->command->warn('MasterDataSeeder - unable to inspect suppliers columns: ' . $e->getMessage());
+        }
+
         // Get the first cabang to use for relationships
         $cabang = Cabang::first();
         if (!$cabang) {
@@ -205,13 +213,11 @@ class MasterDataSeeder extends Seeder
             [
                 'name' => 'Elektronik',
                 'kode' => 'ELEC',
-                'cabang_id' => $cabang->id,
                 'kenaikan_harga' => 0.00,
             ],
             [
                 'name' => 'Komputer & Aksesoris',
                 'kode' => 'COMP',
-                'cabang_id' => $cabang->id,
                 'kenaikan_harga' => 0.00,
             ],
         ];
@@ -227,7 +233,6 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Laptop Asus ROG',
                 'description' => 'Laptop gaming dengan spesifikasi tinggi',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => $cabang->id,
                 'cost_price' => 12000000,
                 'sell_price' => 15000000,
                 'uom_id' => 1, // Assuming UOM exists
@@ -244,7 +249,6 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Mouse Wireless Logitech',
                 'description' => 'Mouse wireless dengan sensor presisi tinggi',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => $cabang->id,
                 'cost_price' => 500000,
                 'sell_price' => 750000,
                 'uom_id' => 1,
@@ -261,7 +265,6 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Keyboard Mechanical',
                 'description' => 'Keyboard mechanical dengan blue switch',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => $cabang->id,
                 'cost_price' => 800000,
                 'sell_price' => 1200000,
                 'uom_id' => 1,
@@ -278,7 +281,6 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Monitor LED 24 inch',
                 'description' => 'Monitor LED full HD 24 inch',
                 'product_category_id' => 2, // Komputer & Aksesoris
-                'cabang_id' => $cabang->id,
                 'cost_price' => 2000000,
                 'sell_price' => 2800000,
                 'uom_id' => 1,
@@ -295,7 +297,6 @@ class MasterDataSeeder extends Seeder
                 'name' => 'Printer Canon',
                 'description' => 'Printer inkjet Canon untuk kantor',
                 'product_category_id' => 1, // Elektronik
-                'cabang_id' => $cabang->id,
                 'cost_price' => 1500000,
                 'sell_price' => 2200000,
                 'uom_id' => 1,

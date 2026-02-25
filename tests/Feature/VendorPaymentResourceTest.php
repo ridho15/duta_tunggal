@@ -491,7 +491,7 @@ class VendorPaymentResourceTest extends TestCase
             'invoice_number' => 'INV-TEST-' . rand(1000, 9999),
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             'subtotal' => 110000,
             'total' => 110000,
             'status' => 'draft'

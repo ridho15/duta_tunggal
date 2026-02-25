@@ -85,7 +85,6 @@ class FinanceCustomerSupplierSeeder extends Seeder
         $suppliers = [
             [
                 'code' => 'SUPP-FIN-001',
-                'name' => 'PT. Bahan Baku Global',
                 'perusahaan' => 'PT. Bahan Baku Global',
                 'email' => 'order@bbglobal.co.id',
                 'phone' => '021-9900-1122',
@@ -99,7 +98,6 @@ class FinanceCustomerSupplierSeeder extends Seeder
             ],
             [
                 'code' => 'SUPP-FIN-002',
-                'name' => 'CV. Precision Parts',
                 'perusahaan' => 'CV. Precision Parts',
                 'email' => 'sales@precisionparts.id',
                 'phone' => '024-7788-9988',

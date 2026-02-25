@@ -21,10 +21,9 @@ use Illuminate\Support\Collection;
 class ProfitAndLossResource extends Resource
 {
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
-    protected static ?string $navigationLabel = null; // intentionally hidden; merged into JournalEntry navigation
-    // Ensure this report resource does not register its own navigation item
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationLabel = 'Laporan Laba Rugi (P&L)';
+    protected static bool $shouldRegisterNavigation = true; // Task 15a: show in Finance - Laporan group
+    protected static ?string $navigationGroup = 'Finance - Laporan';
     protected static ?int $navigationSort = 22;
     protected static ?string $model = JournalEntry::class;
 

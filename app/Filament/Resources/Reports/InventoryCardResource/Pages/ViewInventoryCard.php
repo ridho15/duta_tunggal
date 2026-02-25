@@ -2,17 +2,22 @@
 
 namespace App\Filament\Resources\Reports\InventoryCardResource\Pages;
 
+use App\Exports\InventoryCardExport;
 use App\Filament\Resources\Reports\InventoryCardResource;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
-use App\Models\Cabang;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ViewInventoryCard extends Page
 {
@@ -20,15 +25,83 @@ class ViewInventoryCard extends Page
 
     protected static string $view = 'filament.pages.reports.inventory-card';
 
-    public ?string $startDate = null;
+    // Filter state
+    public ?string $startDate   = null;
+    public ?string $endDate     = null;
+    public ?int    $productId   = null;
+    public ?int    $warehouseId = null;
 
-    public ?string $endDate = null;
+    // Preview state
+    public bool  $showPreview = false;
+    public array $reportData  = [];
 
-    public array $productIds = [];
+    public function mount(): void
+    {
+        $this->startDate = now()->startOfMonth()->format('Y-m-d');
+        $this->endDate   = now()->endOfMonth()->format('Y-m-d');
+    }
 
-    public array $warehouseIds = [];
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('preview')
+                ->label('Preview')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(function () {
+                    if (!$this->startDate || !$this->endDate) {
+                        Notification::make()
+                            ->title('Tanggal wajib diisi')
+                            ->danger()
+                            ->send();
+                        return;
+                    }
+                    $this->generatePreview();
+                }),
 
-    public array $cabangIds = [];
+            Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible($this->showPreview)
+                ->action(function () {
+                    $this->resetPreview();
+                }),
+        ];
+    }
+
+    /**
+     * Dipanggil saat user klik "Preview" — membangun data & menampilkan tabel.
+     */
+    public function generatePreview(): void
+    {
+        $this->reportData  = $this->buildReportData();
+        $this->showPreview = true;
+    }
+
+    /**
+     * Reset ke tampilan filter saja.
+     */
+    public function resetPreview(): void
+    {
+        $this->showPreview = false;
+        $this->reportData  = [];
+    }
+
+    public function buildQueryParams(): array
+    {
+        return array_filter([
+            'start'        => $this->startDate,
+            'end'          => $this->endDate,
+            'product_id'   => $this->productId,
+            'warehouse_id' => $this->warehouseId,
+        ]);
+    }
+
+    public function getPrintUrl(): string
+    {
+        return route('inventory-card.print', $this->buildQueryParams());
+    }
 
     private const IN_TYPES = [
         'purchase_in',
@@ -47,183 +120,179 @@ class ViewInventoryCard extends Page
     protected function getFormSchema(): array
     {
         return [
-            Forms\Components\Section::make('Filter')
+            Forms\Components\Section::make('Filter Kartu Persediaan')
                 ->columns(2)
                 ->schema([
                     DatePicker::make('startDate')
                         ->label('Tanggal Mulai')
-                        ->default(now()->startOfMonth())
-                        ->reactive(),
+                        ->displayFormat('d/m/Y')
+                        ->required()
+                        ->default(now()->startOfMonth()),
+
                     DatePicker::make('endDate')
-                        ->label('Tanggal Selesai')
-                        ->default(now()->endOfMonth())
-                        ->reactive(),
-                    Select::make('cabangIds')
-                        ->label('Cabang')
-                        ->options(function () {
-                            return Cabang::all()->mapWithKeys(function ($cabang) {
-                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
-                            });
-                        })
-                        ->multiple()
+                        ->label('Tanggal Akhir')
+                        ->displayFormat('d/m/Y')
+                        ->required()
+                        ->default(now()->endOfMonth()),
+
+                    Select::make('productId')
+                        ->label('Item (Produk)')
+                        ->options(fn () => Product::query()->orderBy('name')->get()->mapWithKeys(fn ($product) => [
+                            $product->id => $product->name . ($product->sku ? ' (' . $product->sku . ')' : '')
+                        ]))
                         ->searchable()
                         ->preload()
-                        ->getSearchResultsUsing(function (string $search) {
-                            return Cabang::where('nama', 'like', "%{$search}%")
-                                ->orWhere('kode', 'like', "%{$search}%")
-                                ->limit(50)
-                                ->get()
-                                ->mapWithKeys(function ($cabang) {
-                                    return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
-                                });
-                        })
-                        ->helperText('Kosongkan bila ingin menampilkan semua cabang'),
-                    Select::make('productIds')
-                        ->label('Produk')
-                        ->options(fn () => Product::query()->orderBy('name')->pluck('name', 'id'))
-                        ->multiple()
-                        ->searchable()
-                        ->helperText('Kosongkan bila ingin menampilkan semua produk'),
-                    Select::make('warehouseIds')
+                        ->placeholder('— Semua Produk —')
+                        ->columnSpanFull(),
+
+                    Select::make('warehouseId')
                         ->label('Gudang')
-                        ->options(fn () => Warehouse::query()->orderBy('name')->pluck('name', 'id'))
-                        ->multiple()
+                        ->options(fn () => Warehouse::query()->orderBy('name')->get()->mapWithKeys(fn ($warehouse) => [
+                            $warehouse->id => $warehouse->name . ($warehouse->kode ? ' (' . $warehouse->kode . ')' : '')
+                        ]))
                         ->searchable()
-                        ->helperText('Kosongkan bila ingin menampilkan semua gudang'),
+                        ->preload()
+                        ->placeholder('— Semua Gudang —')
+                        ->columnSpanFull(),
                 ]),
         ];
     }
 
-    public function getReportData(): array
+    public function buildReportData(): array
     {
-        // Support filter manual dari form blade (GET parameter 'start' dan 'end')
-        // Prioritize GET parameters over Filament form properties
-        $startDate = request('start', $this->startDate);
-        $endDate = request('end', $this->endDate);
+        $start = $this->startDate
+            ? Carbon::parse($this->startDate)->startOfDay()
+            : now()->startOfMonth()->startOfDay();
 
-        $start = $startDate ? Carbon::parse($startDate)->startOfDay() : now()->startOfMonth()->startOfDay();
-        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfMonth()->endOfDay();
+        $end = $this->endDate
+            ? Carbon::parse($this->endDate)->endOfDay()
+            : now()->endOfMonth()->endOfDay();
 
-        $productIds = array_filter($this->productIds);
-        $warehouseIds = array_filter($this->warehouseIds);
-        $cabangIds = array_filter($this->cabangIds);
+        $productIds   = $this->productId   ? [$this->productId]   : [];
+        $warehouseIds = $this->warehouseId ? [$this->warehouseId] : [];
 
-        $openingData = $this->buildAggregateQuery($productIds, $warehouseIds, $cabangIds)
+        // Filter labels
+        $productLabel   = $this->productId   ? (Product::find($this->productId)?->name ?? '-')   : 'Semua Produk';
+        $warehouseLabel = $this->warehouseId ? (Warehouse::find($this->warehouseId)?->name ?? '-') : 'Semua Gudang';
+
+        $openingData = $this->buildAggregateQuery($productIds, $warehouseIds)
             ->where('date', '<', $start->toDateTimeString())
             ->get()
             ->keyBy(fn ($row) => $row->product_id . '-' . $row->warehouse_id);
 
-        $periodData = $this->buildAggregateQuery($productIds, $warehouseIds, $cabangIds)
+        $periodData = $this->buildAggregateQuery($productIds, $warehouseIds)
             ->whereBetween('date', [$start->toDateTimeString(), $end->toDateTimeString()])
             ->get()
             ->keyBy(fn ($row) => $row->product_id . '-' . $row->warehouse_id);
 
         $keys = $openingData->keys()->merge($periodData->keys())->unique()->values();
 
+        $emptyTotals = [
+            'opening_qty'   => 0.0,
+            'opening_value' => 0.0,
+            'qty_in'        => 0.0,
+            'value_in'      => 0.0,
+            'qty_out'       => 0.0,
+            'value_out'     => 0.0,
+            'closing_qty'   => 0.0,
+            'closing_value' => 0.0,
+        ];
+
         if ($keys->isEmpty()) {
             return [
-                'period' => [
-                    'start' => $start->toDateString(),
-                    'end' => $end->toDateString(),
-                ],
-                'rows' => [],
-                'totals' => [
-                    'opening_qty' => 0.0,
-                    'opening_value' => 0.0,
-                    'qty_in' => 0.0,
-                    'value_in' => 0.0,
-                    'qty_out' => 0.0,
-                    'value_out' => 0.0,
-                    'closing_qty' => 0.0,
-                    'closing_value' => 0.0,
-                ],
+                'period'          => ['start' => $start->toDateString(), 'end' => $end->toDateString()],
+                'product_label'   => $productLabel,
+                'warehouse_label' => $warehouseLabel,
+                'rows'            => [],
+                'totals'          => $emptyTotals,
             ];
         }
 
         $productMap = Product::query()
             ->whereIn('id', $keys->map(fn ($key) => (int) explode('-', $key)[0])->unique())
-            ->get()
-            ->keyBy('id');
+            ->get()->keyBy('id');
 
         $warehouseMap = Warehouse::query()
             ->whereIn('id', $keys->map(fn ($key) => (int) explode('-', $key)[1])->unique())
-            ->get()
-            ->keyBy('id');
+            ->get()->keyBy('id');
 
-        $rows = [];
-        $totals = [
-            'opening_qty' => 0.0,
-            'opening_value' => 0.0,
-            'qty_in' => 0.0,
-            'value_in' => 0.0,
-            'qty_out' => 0.0,
-            'value_out' => 0.0,
-            'closing_qty' => 0.0,
-            'closing_value' => 0.0,
-        ];
+        $rows   = [];
+        $totals = $emptyTotals;
 
         foreach ($keys as $key) {
-            [$productId, $warehouseId] = array_map('intval', explode('-', $key));
+            [$pid, $wid] = array_map('intval', explode('-', $key));
 
-            $opening = $openingData[$key] ?? null;
-            $movement = $periodData[$key] ?? null;
+            $opening  = $openingData[$key]  ?? null;
+            $movement = $periodData[$key]   ?? null;
 
-            $openingQty = ($opening->qty_in ?? 0.0) - ($opening->qty_out ?? 0.0);
-            $openingValue = ($opening->value_in ?? 0.0) - ($opening->value_out ?? 0.0);
-            $qtyIn = $movement->qty_in ?? 0.0;
-            $valueIn = $movement->value_in ?? 0.0;
-            $qtyOut = $movement->qty_out ?? 0.0;
-            $valueOut = $movement->value_out ?? 0.0;
-            $closingQty = $openingQty + $qtyIn - $qtyOut;
+            $openingQty   = ($opening->qty_in   ?? 0.0) - ($opening->qty_out   ?? 0.0);
+            $openingValue = ($opening->value_in  ?? 0.0) - ($opening->value_out ?? 0.0);
+            $qtyIn        = $movement->qty_in    ?? 0.0;
+            $valueIn      = $movement->value_in  ?? 0.0;
+            $qtyOut       = $movement->qty_out   ?? 0.0;
+            $valueOut     = $movement->value_out ?? 0.0;
+            $closingQty   = $openingQty + $qtyIn - $qtyOut;
             $closingValue = $openingValue + $valueIn - $valueOut;
 
-            $product = $productMap->get($productId);
-            $warehouse = $warehouseMap->get($warehouseId);
-
-            // Hanya tampilkan jika ada transaksi pada periode filter
             $hasMovement = ($qtyIn != 0) || ($qtyOut != 0) || ($valueIn != 0) || ($valueOut != 0);
-            if ($hasMovement) {
-                $rows[] = [
-                    'product_id' => $productId,
-                    'product_name' => $product->name ?? 'Produk Tidak Ditemukan',
-                    'product_sku' => $product->sku ?? null,
-                    'warehouse_id' => $warehouseId,
-                    'warehouse_name' => $warehouse->name ?? 'Tanpa Gudang',
-                    'warehouse_code' => $warehouse->kode ?? null,
-                    'opening_qty' => $openingQty,
-                    'opening_value' => $openingValue,
-                    'qty_in' => $qtyIn,
-                    'value_in' => $valueIn,
-                    'qty_out' => $qtyOut,
-                    'value_out' => $valueOut,
-                    'closing_qty' => $closingQty,
-                    'closing_value' => $closingValue,
-                ];
-
-                $totals['opening_qty'] += $openingQty;
-                $totals['opening_value'] += $openingValue;
-                $totals['qty_in'] += $qtyIn;
-                $totals['value_in'] += $valueIn;
-                $totals['qty_out'] += $qtyOut;
-                $totals['value_out'] += $valueOut;
-                $totals['closing_qty'] += $closingQty;
-                $totals['closing_value'] += $closingValue;
+            if (! $hasMovement) {
+                continue;
             }
+
+            $product   = $productMap->get($pid);
+            $warehouse = $warehouseMap->get($wid);
+
+            $rows[] = [
+                'product_id'     => $pid,
+                'product_name'   => $product->name  ?? 'Produk Tidak Ditemukan',
+                'product_sku'    => $product->sku   ?? null,
+                'warehouse_id'   => $wid,
+                'warehouse_name' => $warehouse->name ?? 'Tanpa Gudang',
+                'warehouse_code' => $warehouse->kode ?? null,
+                'opening_qty'    => $openingQty,
+                'opening_value'  => $openingValue,
+                'qty_in'         => $qtyIn,
+                'value_in'       => $valueIn,
+                'qty_out'        => $qtyOut,
+                'value_out'      => $valueOut,
+                'closing_qty'    => $closingQty,
+                'closing_value'  => $closingValue,
+            ];
+
+            $totals['opening_qty']   += $openingQty;
+            $totals['opening_value'] += $openingValue;
+            $totals['qty_in']        += $qtyIn;
+            $totals['value_in']      += $valueIn;
+            $totals['qty_out']       += $qtyOut;
+            $totals['value_out']     += $valueOut;
+            $totals['closing_qty']   += $closingQty;
+            $totals['closing_value'] += $closingValue;
         }
 
         return [
-            'period' => [
-                'start' => $start->toDateString(),
-                'end' => $end->toDateString(),
-            ],
-            'rows' => $rows,
-            'totals' => $totals,
+            'period'          => ['start' => $start->toDateString(), 'end' => $end->toDateString()],
+            'product_label'   => $productLabel,
+            'warehouse_label' => $warehouseLabel,
+            'rows'            => $rows,
+            'totals'          => $totals,
         ];
     }
 
-    protected function buildAggregateQuery(array $productIds, array $warehouseIds, array $cabangIds = []): Builder
+    public function getProductOptions(): array
     {
-        $inList = "'" . implode("','", self::IN_TYPES) . "'";
+        return Product::query()->orderBy('name')->get()
+            ->mapWithKeys(fn ($p) => [$p->id => "{$p->name}" . ($p->sku ? " [{$p->sku}]" : '')])
+            ->toArray();
+    }
+
+    public function getWarehouseOptions(): array
+    {
+        return Warehouse::query()->orderBy('name')->pluck('name', 'id')->toArray();
+    }
+
+    protected function buildAggregateQuery(array $productIds, array $warehouseIds): Builder
+    {
+        $inList  = "'" . implode("','", self::IN_TYPES)  . "'";
         $outList = "'" . implode("','", self::OUT_TYPES) . "'";
 
         $query = StockMovement::query()
@@ -236,60 +305,73 @@ class ViewInventoryCard extends Page
             )
             ->groupBy('product_id', 'warehouse_id');
 
-        if (!empty($productIds)) {
+        if (! empty($productIds)) {
             $query->whereIn('product_id', $productIds);
         }
 
-        if (!empty($warehouseIds)) {
+        if (! empty($warehouseIds)) {
             $query->whereIn('warehouse_id', $warehouseIds);
-        }
-
-        if (!empty($cabangIds)) {
-            $query->whereHas('warehouse', function (Builder $builder) use ($cabangIds) {
-                $builder->whereIn('cabang_id', $cabangIds);
-            });
         }
 
         return $query;
     }
 
-    public function getSelectedProductNames(): array
+    public function export(string $format = 'excel')
     {
-        if (empty($this->productIds)) {
-            return [];
+        $report = $this->buildReportData();
+        $filename = 'kartu-persediaan-' . now()->format('Ymd_His');
+
+        if ($format === 'pdf') {
+            $report['isPdf'] = true;
+            $pdf = Pdf::loadView('reports.inventory-card-print', ['data' => $report])
+                ->setPaper('a4', 'landscape');
+
+            $pdfBinary = $pdf->output();
+
+            // Ensure export directory exists
+            $exportsDir = storage_path('app/exports');
+            if (! is_dir($exportsDir)) {
+                @mkdir($exportsDir, 0755, true);
+            }
+
+            $tmpFilename = $filename . '.pdf';
+            $tmpPath = $exportsDir . '/' . $tmpFilename;
+            file_put_contents($tmpPath, $pdfBinary);
+
+            // If caller expects JSON (Livewire/Filament XHR), return a safe download URL instead
+            if (request()->wantsJson() || request()->ajax()) {
+                $url = route('exports.download', ['filename' => $tmpFilename]);
+                return response()->json(['download_url' => $url]);
+            }
+
+            return response()->download($tmpPath, $tmpFilename)->deleteFileAfterSend(true);
+        } else {
+            // Excel export
+            $export = new InventoryCardExport(
+                startDate: $this->startDate,
+                endDate: $this->endDate,
+                productId: $this->productId,
+                warehouseId: $this->warehouseId,
+            );
+
+            // Ensure export directory exists
+            $exportsDir = storage_path('app/exports');
+            if (! is_dir($exportsDir)) {
+                @mkdir($exportsDir, 0755, true);
+            }
+
+            $tmpFilename = $filename . '.xlsx';
+            $tmpPath = $exportsDir . '/' . $tmpFilename;
+
+            $excelBinary = Excel::raw($export, \Maatwebsite\Excel\Excel::XLSX);
+            file_put_contents($tmpPath, $excelBinary);
+
+            if (request()->wantsJson() || request()->ajax()) {
+                $url = route('exports.download', ['filename' => $tmpFilename]);
+                return response()->json(['download_url' => $url]);
+            }
+
+            return response()->download($tmpPath, $tmpFilename)->deleteFileAfterSend(true);
         }
-
-        return Product::query()
-            ->whereIn('id', array_filter($this->productIds))
-            ->orderBy('name')
-            ->pluck('name')
-            ->toArray();
-    }
-
-    public function getSelectedWarehouseNames(): array
-    {
-        if (empty($this->warehouseIds)) {
-            return [];
-        }
-
-        return Warehouse::query()
-            ->whereIn('id', array_filter($this->warehouseIds))
-            ->orderBy('name')
-            ->pluck('name')
-            ->toArray();
-    }
-
-    public function getSelectedCabangNames(): array
-    {
-        if (empty($this->cabangIds)) {
-            return [];
-        }
-
-        return Cabang::query()
-            ->whereIn('id', array_filter($this->cabangIds))
-            ->orderBy('nama')
-            ->get()
-            ->map(fn ($cabang) => "({$cabang->kode}) {$cabang->nama}")
-            ->toArray();
     }
 }

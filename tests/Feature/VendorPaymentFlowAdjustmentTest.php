@@ -38,8 +38,8 @@ class VendorPaymentFlowAdjustmentTest extends TestCase
             'is_active' => true,
         ]);
         $supplier = Supplier::factory()->create();
-        $invoice1 = Invoice::factory()->create(['total' => 200000, 'supplier_name' => $supplier->name]);
-        $invoice2 = Invoice::factory()->create(['total' => 150000, 'supplier_name' => $supplier->name]);
+        $invoice1 = Invoice::factory()->create(['total' => 200000, 'supplier_name' => $supplier->perusahaan]);
+        $invoice2 = Invoice::factory()->create(['total' => 150000, 'supplier_name' => $supplier->perusahaan]);
 
         $ap1 = AccountPayable::factory()->create([
             'invoice_id' => $invoice1->id,

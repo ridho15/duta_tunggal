@@ -185,6 +185,29 @@ class InventoryFinanceImpactTest extends TestCase
         $balanceSheetService = app(BalanceSheetService::class);
         $balanceSheet = $balanceSheetService->generate();
 
+        // --- DEBUG: dump journal entries and liability account balances to help diagnose test failures ---
+        $allJournals = \App\Models\JournalEntry::all()->map(fn($j) => [$j->id, $j->coa->code, (float)$j->debit, (float)$j->credit, $j->source_type])->toArray();
+        var_export($allJournals);
+
+        $liabilityDebug = \App\Models\ChartOfAccount::where('type','Liability')->get()->map(function($coa){
+            $entries = \App\Models\JournalEntry::where('coa_id', $coa->id)->get();
+            return [
+                'code' => $coa->code,
+                'debit_sum' => (float) $entries->sum('debit'),
+                'credit_sum' => (float) $entries->sum('credit'),
+                'opening_balance' => (float) ($coa->opening_balance ?? 0),
+                'balance' => (float) (($coa->opening_balance ?? 0) - $entries->sum('debit') + $entries->sum('credit')),
+            ];
+        })->toArray();
+        var_export($liabilityDebug);
+        // --- END DEBUG ---
+
+        // Dump balance sheet totals for comparison
+        var_export(['total_assets' => $balanceSheet['total_assets'], 'total_liabilities' => $balanceSheet['total_liabilities'], 'debug_all_liabilities_sum' => ($balanceSheet['debug_all_liabilities_sum'] ?? null)]);
+
+        // Guard: Ensure total liabilities equals direct sum of all liability account balances
+        $this->assertEquals($balanceSheet['debug_all_liabilities_sum'], $balanceSheet['total_liabilities'], 'Total liabilities must equal sum of all liability accounts');
+
         // Assert purchase affects balance sheet
         $this->assertEquals($purchaseAmount, $balanceSheet['total_assets'], 'Assets should equal purchase amount');
         $this->assertEquals($purchaseAmount, $balanceSheet['total_liabilities'], 'Liabilities should equal purchase amount');

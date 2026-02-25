@@ -26,6 +26,10 @@ class MinimalTestDataSeeder extends Seeder
     {
         $this->command->info('Creating minimal test data...');
 
+        // ensure entire COA tree exists for tests requiring specific accounts
+        $this->call(ChartOfAccountSeeder::class);
+
+
         // Check and create minimal chart of accounts
         $kasAccount = ChartOfAccount::firstOrCreate(['code' => '1-1000'], [
             'code' => '1-1000',

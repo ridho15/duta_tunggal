@@ -8,9 +8,6 @@ use Illuminate\Database\Seeder;
 
 class ReturnProductSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         ReturnProduct::factory()->count(20)->create();

@@ -963,19 +963,16 @@ class HelperController extends Controller
      */
     public static function generateUniqueCode(string $table, string $column, string $prefix, int $digits = 4): string
     {
-        // Find the latest record with the given prefix
-        $latest = DB::table($table)->where($column, 'like', $prefix . '%')
-            ->orderBy($column, 'desc')
-            ->first();
+        // produce random numeric suffix of specified length and loop until unique
+        $max = (int) pow(10, $digits) - 1;
 
-        if ($latest) {
-            $lastNumber = (int) substr($latest->$column, strlen($prefix));
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
+        do {
+            $random = str_pad(rand(0, $max), $digits, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = DB::table($table)->where($column, $candidate)->exists();
+        } while ($exists);
 
-        return $prefix . str_pad($nextNumber, $digits, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     public static function generateRequestNumber(): string
@@ -983,19 +980,14 @@ class HelperController extends Controller
         $date = now()->format('Ymd');
         $prefix = 'OR-' . $date . '-';
 
-        // Find the latest request number for today
-        $latest = \App\Models\OrderRequest::where('request_number', 'like', $prefix . '%')
-            ->orderBy('request_number', 'desc')
-            ->first();
+        // generate random 4-digit suffix and ensure uniqueness by checking database
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = \App\Models\OrderRequest::where('request_number', $candidate)->exists();
+        } while ($exists);
 
-        if ($latest) {
-            $lastNumber = (int) substr($latest->request_number, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     /**

@@ -50,7 +50,9 @@ class SaleOrderFactory extends Factory
             'reject_at'            => now(),
             'reason_close'         => $this->faker->optional()->sentence(),
             'tipe_pengiriman'      => $this->faker->randomElement(['Ambil Sendiri', 'Kirim Langsung']),
-            'cabang_id'            => Cabang::inRandomOrder()->first()->id ?? 1,
+            'cabang_id'            => function () {
+                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
+            },
         ];
     }
 }

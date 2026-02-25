@@ -8,25 +8,23 @@ class RakService
 {
     public function generateKodeRak($warehouseId = null)
     {
+        $date = now()->format('Ymd');
         $prefix = 'RAK-';
-
-        // Get the last rak code
-        $query = Rak::where('code', 'like', $prefix . '%');
-
         if ($warehouseId) {
-            $query->where('warehouse_id', $warehouseId);
+            $prefix .= $warehouseId . '-'; // optionally include warehouse part for uniqueness
         }
+        $prefix .= $date . '-';
 
-        $last = $query->orderBy('id', 'desc')->first();
+        do {
+            $random = str_pad(rand(0, 999), 3, '0', STR_PAD_LEFT); // three digits remains
+            $candidate = $prefix . $random;
+            $existsQuery = Rak::where('code', $candidate);
+            if ($warehouseId) {
+                $existsQuery->where('warehouse_id', $warehouseId);
+            }
+            $exists = $existsQuery->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Extract the number from the last code
-            $lastCode = str_replace($prefix, '', $last->code);
-            $number = intval($lastCode) + 1;
-        }
-
-        return $prefix . str_pad($number, 3, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 }

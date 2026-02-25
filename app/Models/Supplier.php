@@ -7,6 +7,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Supplier extends Model
 {
@@ -14,7 +15,6 @@ class Supplier extends Model
     protected $table = 'suppliers';
     protected $fillable = [
         'code',
-        'name',
         'perusahaan',
         'address',
         'phone',
@@ -32,6 +32,21 @@ class Supplier extends Model
     {
         // Removed CabangScope - suppliers are global entities that can serve multiple branches
         // static::addGlobalScope(new CabangScope);
+
+        // Ensure cabang_id is set when creating via Filament forms that may hide the field
+        static::creating(function ($model) {
+            if (empty($model->cabang_id)) {
+                $model->cabang_id = Auth::user()?->cabang_id
+                    ?? \App\Models\Cabang::first()?->id
+                    ?? \App\Models\Cabang::create([
+                        'kode' => 'CBG-' . uniqid(),
+                        'nama' => 'Cabang Default',
+                        'alamat' => 'Auto-created',
+                        'telepon' => '0000000000',
+                        'status' => true,
+                    ])->id;
+            }
+        });
     }
 
     public function purchaseOrder()
@@ -42,6 +57,14 @@ class Supplier extends Model
     public function products()
     {
         return $this->hasMany(Product::class, 'supplier_id');
+    }
+
+    // Task 12: Multi-supplier support (many-to-many)
+    public function productSuppliers()
+    {
+        return $this->belongsToMany(Product::class, 'product_supplier')
+            ->withPivot('supplier_price', 'supplier_sku', 'is_primary')
+            ->withTimestamps();
     }
 
     public function deposit()

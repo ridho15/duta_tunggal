@@ -4,6 +4,8 @@
             {{ $this->form }}
         </form>
 
+        @if($this->showPreview)
+
         @php
             try {
                 $data = method_exists($this, 'getReportData') ? $this->getReportData() : null;
@@ -62,5 +64,14 @@
         <div class="mt-6">
             <x-filament::button wire:click="$refresh">Refresh</x-filament::button>
         </div>
+
+        @else
+
+        <div class="mt-6 p-8 border rounded bg-gray-50 text-center text-gray-500">
+            <x-heroicon-o-document-chart-bar class="w-12 h-12 mx-auto mb-3 text-gray-400" style="width: 100px; height: 100px;"/>
+            <p class="text-lg font-medium" style="font-size: 11pt">Atur filter di atas, kemudian klik <strong>Tampilkan Laporan</strong> untuk melihat data.</p>
+        </div>
+
+        @endif
     </div>
 </x-filament::page>

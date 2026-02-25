@@ -78,10 +78,21 @@
                 Email: admin@dutatunggal.co.id
             </td>
             <td class="no-border right">
-                <img src="{{ public_path('images/logo.png') }}" class="logo">
+                <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo">
             </td>
         </tr>
     </table>
+
+    @php
+        // Jatuh tempo: calculated from order_date + supplier.tempo_hutang (hari)
+        $tempoHutang = (int) ($purchaseOrder->supplier->tempo_hutang ?? 0);
+        $jatuhTempoDate = $tempoHutang > 0
+            ? \Carbon\Carbon::parse($purchaseOrder->order_date)->addDays($tempoHutang)->format('d/m/Y')
+            : ($purchaseOrder->expected_date
+                ? \Carbon\Carbon::parse($purchaseOrder->expected_date)->format('d/m/Y')
+                : '-');
+        $jatuhTempoLabel = $tempoHutang > 0 ? $jatuhTempoDate . ' (' . $tempoHutang . ' hari)' : $jatuhTempoDate;
+    @endphp
 
     <div class="title">PEMBELIAN</div>
 
@@ -94,11 +105,15 @@
         </tr>
         <tr>
             <td><strong>Supplier:</strong></td>
-            <td colspan="3">{{ $purchaseOrder->supplier->name }}<br>{{ $purchaseOrder->supplier->address }}</td>
+            <td>{{ $purchaseOrder->supplier->perusahaan }}<br>{{ $purchaseOrder->supplier->address }}</td>
+            <td><strong>Jatuh Tempo:</strong></td>
+            <td>{{ $jatuhTempoLabel }}</td>
         </tr>
         <tr>
             <td><strong>Tipe:</strong></td>
-            <td colspan="3">{{ $purchaseOrder->is_asset ? 'Asset' : 'Non Asset' }}</td>
+            <td>{{ $purchaseOrder->is_asset ? 'Asset' : 'Non Asset' }}</td>
+            <td><strong>Cabang:</strong></td>
+            <td>{{ $purchaseOrder->cabang->nama ?? '-' }}</td>
         </tr>
     </table>
 
@@ -110,32 +125,88 @@
                 <th>Qty</th>
                 <th>Satuan</th>
                 <th>Harga Satuan</th>
-                <th>Discount</th>
-                <th>Tax</th>
-                <th>Subtotal</th>
+                <th>Diskon (%)</th>
+                <th>Diskon (Rp)</th>
+                <th>Tipe Pajak</th>
+                <th>Tax (%)</th>
+                <th>DPP</th>
+                <th>PPN</th>
+                <th>Total</th>
             </tr>
         </thead>
         <tbody>
-            @php $total = 0; @endphp
+            @php
+                $grandTotal        = 0;
+                $totalBruto        = 0;
+                $totalDiskon       = 0;
+                $totalAfterDiskon  = 0;
+                $totalDPP          = 0;
+                $totalPPN          = 0;
+            @endphp
             @foreach ($purchaseOrder->purchaseOrderItem as $index => $item)
             @php
-            $subtotal = ($item->quantity * $item->unit_price) - $item->discount + $item->tax;
-            $total += $subtotal;
+                $quantity       = (float) $item->quantity;
+                $unitPrice      = (float) $item->unit_price;
+                $discount       = (float) $item->discount;   // stored as %
+                $taxRate        = (float) $item->tax;        // stored as %
+                $taxType        = \App\Services\TaxService::normalizeType($item->tipe_pajak);
+
+                $bruto          = $quantity * $unitPrice;
+                $discountAmount = $bruto * ($discount / 100.0);
+                $afterDiscount  = $bruto - $discountAmount;
+
+                $taxResult  = \App\Services\TaxService::compute($afterDiscount, $taxRate, $taxType);
+                $itemDPP    = $taxResult['dpp'];
+                $itemPPN    = $taxResult['ppn'];
+                $itemTotal  = $taxResult['total'];
+
+                $totalBruto       += $bruto;
+                $totalDiskon      += $discountAmount;
+                $totalAfterDiskon += $afterDiscount;
+                $totalDPP         += $itemDPP;
+                $totalPPN         += $itemPPN;
+                $grandTotal       += $itemTotal;
             @endphp
             <tr>
                 <td>{{ $index + 1 }}</td>
                 <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
-                <td class="right">{{ $item->quantity }}</td>
-                <td>{{ $item->product->uom->name }}</td>
-                <td class="right">Rp.{{ number_format($item->unit_price, 0, ',', '.') }}</td>
-                <td class="right">Rp.{{ number_format($item->discount, 0, ',', '.') }}</td>
-                <td class="right">Rp.{{ number_format($item->tax, 0, ',', '.') }}</td>
-                <td class="right">Rp.{{ number_format($subtotal, 0, ',', '.') }}</td>
+                <td class="right">{{ number_format($quantity, 0, ',', '.') }}</td>
+                <td>{{ $item->product->uom->name ?? '-' }}</td>
+                <td class="right">Rp {{ number_format($unitPrice, 0, ',', '.') }}</td>
+                <td class="right">{{ number_format($discount, 2, ',', '.') }}%</td>
+                <td class="right">Rp {{ number_format($discountAmount, 0, ',', '.') }}</td>
+                <td>{{ $taxType }}</td>
+                <td class="right">{{ number_format($taxRate, 2, ',', '.') }}%</td>
+                <td class="right">Rp {{ number_format($itemDPP, 0, ',', '.') }}</td>
+                <td class="right">Rp {{ number_format($itemPPN, 0, ',', '.') }}</td>
+                <td class="right">Rp {{ number_format($itemTotal, 0, ',', '.') }}</td>
             </tr>
             @endforeach
+
+            {{-- Summary Breakdown --}}
             <tr>
-                <td colspan="7" class="right"><strong>Total</strong></td>
-                <td class="right"><strong>Rp.{{ number_format($total, 0, ',', '.') }}</strong></td>
+                <td colspan="11" class="right">Subtotal Bruto</td>
+                <td class="right">Rp {{ number_format($totalBruto, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td colspan="11" class="right">Total Diskon</td>
+                <td class="right">(Rp {{ number_format($totalDiskon, 0, ',', '.') }})</td>
+            </tr>
+            <tr>
+                <td colspan="11" class="right">Sub Total (setelah diskon)</td>
+                <td class="right">Rp {{ number_format($totalAfterDiskon, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td colspan="11" class="right">DPP (Dasar Pengenaan Pajak)</td>
+                <td class="right">Rp {{ number_format($totalDPP, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td colspan="11" class="right">PPN</td>
+                <td class="right">Rp {{ number_format($totalPPN, 0, ',', '.') }}</td>
+            </tr>
+            <tr style="background-color: #f0f0f0;">
+                <td colspan="11" class="right"><strong>TOTAL</strong></td>
+                <td class="right"><strong>Rp {{ number_format($grandTotal, 0, ',', '.') }}</strong></td>
             </tr>
         </tbody>
     </table>

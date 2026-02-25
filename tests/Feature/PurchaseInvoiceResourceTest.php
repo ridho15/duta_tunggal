@@ -241,7 +241,6 @@ class PurchaseInvoiceResourceTest extends TestCase
             'qty_accepted' => 10,
             'qty_rejected' => 0,
             'warehouse_id' => $warehouse->id,
-            'is_sent' => false
         ]);
 
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
@@ -392,7 +391,6 @@ class PurchaseInvoiceResourceTest extends TestCase
             'qty_accepted' => 10,
             'qty_rejected' => 0,
             'warehouse_id' => $warehouse->id,
-            'is_sent' => false
         ]);
 
         // Create biaya for the receipt
@@ -484,7 +482,7 @@ class PurchaseInvoiceResourceTest extends TestCase
         // Create supplier for deposit
         $supplier = Supplier::factory()->create([
             'code' => 'SUP001',
-            'name' => 'Test Supplier',
+            'perusahaan' => 'Test Supplier',
         ]);
 
         // Create deposit directly
@@ -565,7 +563,7 @@ class PurchaseInvoiceResourceTest extends TestCase
         // Create supplier with specific data
         $supplier = Supplier::factory()->create([
             'code' => 'SUP-OOGNE',
-            'name' => 'Yayasan Narpati (Persero) Tbk',
+            'perusahaan' => 'Yayasan Narpati (Persero) Tbk',
         ]);
 
         // Test deposit creation through Filament form
@@ -598,7 +596,7 @@ class PurchaseInvoiceResourceTest extends TestCase
         // Assert supplier was created correctly
         $this->assertDatabaseHas('suppliers', [
             'code' => 'SUP-OOGNE',
-            'name' => 'Yayasan Narpati (Persero) Tbk',
+            'perusahaan' => 'Yayasan Narpati (Persero) Tbk',
         ]);
 
         // Check if journal entries were created with amount 1,000,000

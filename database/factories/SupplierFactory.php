@@ -18,10 +18,12 @@ class SupplierFactory extends Factory
      */
     public function definition(): array
     {
+        $companyName = $this->faker->company();
+        
         return [
             'code'           => 'SUP-' . strtoupper(Str::random(5)),
-            'name'           => $this->faker->company(),
-            'perusahaan'     => $this->faker->companySuffix(),
+            // 'name' is handled by accessor/mutator, maps to perusahaan
+            'perusahaan'     => $companyName,
             'address'        => $this->faker->address(),
             'phone'          => $this->faker->numerify('021#######'),
             'email'          => $this->faker->unique()->safeEmail(),
@@ -31,7 +33,9 @@ class SupplierFactory extends Factory
             'tempo_hutang'   => $this->faker->randomElement([0, 15, 30, 45, 60]),
             'kontak_person'  => $this->faker->name(),
             'keterangan'     => $this->faker->optional()->sentence(),
-            'cabang_id'      => Cabang::inRandomOrder()->first()->id ?? 1,
+            'cabang_id'      => function () {
+                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
+            },
         ];
     }
 }

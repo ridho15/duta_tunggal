@@ -67,9 +67,6 @@ class PoBelumSelesaiTable extends BaseWidget
                             case 'request_close':
                                 return 'warning';
                                 break;
-                            case 'request_approval':
-                                return 'info';
-                                break;
                             case 'closed':
                                 return 'danger';
                                 break;

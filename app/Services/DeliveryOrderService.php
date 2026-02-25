@@ -58,26 +58,16 @@ class DeliveryOrderService
     public function generateDoNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'DO-' . $date . '-';
 
-        // Gunakan database transaction untuk menghindari race condition
-        return DB::transaction(function () use ($date) {
-            // Lock table untuk mencegah race condition
-            $last = DB::table('delivery_orders')
-                ->whereDate('created_at', now()->toDateString())
-                ->orderBy('id', 'desc')
-                ->lockForUpdate()
-                ->first();
+        // pick random suffix and ensure no collision
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = DeliveryOrder::where('do_number', $candidate)->exists();
+        } while ($exists);
 
-            $number = 1;
-
-            if ($last) {
-                // Ambil nomor urut terakhir
-                $lastNumber = intval(substr($last->do_number, -4));
-                $number = $lastNumber + 1;
-            }
-
-            return 'DO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
-        });
+        return $candidate;
     }
 
     /**

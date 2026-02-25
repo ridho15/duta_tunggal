@@ -66,16 +66,36 @@ class BalanceSheetService
 
         // LIABILITAS (Liabilities)
         $allLiabilities = $this->getAccountsByType('Liability', $asOfDate, $cabangId, null, 'all', true); // Get all liabilities for totals
+
+        // Debug logging placeholder (moved after classification to avoid referencing undefined variables)
+        // Detailed liabilities breakdown logging will be performed after current/long-term classification is computed.
+
         $currentLiabilities = $allLiabilities->filter(function ($liability) {
-            return $liability->is_current == true || $this->inferCurrentClassification($liability, 'Liability') === true;
+            return ($liability->is_current === true) || $this->inferCurrentClassification($liability, 'Liability') === true;
         });
         $longTermLiabilities = $allLiabilities->filter(function ($liability) {
-            return $liability->is_current == false || $this->inferCurrentClassification($liability, 'Liability') === false;
+            return ($liability->is_current === false) || $this->inferCurrentClassification($liability, 'Liability') === false;
         });
         
         $totalCurrentLiabilities = (float) $currentLiabilities->sum('balance');
         $totalLongTermLiabilities = (float) $longTermLiabilities->sum('balance');
         $totalLiabilities = $totalCurrentLiabilities + $totalLongTermLiabilities;
+
+        // Debug: log per-account liability balances to help diagnose unexpected totals in tests
+        try {
+            \Illuminate\Support\Facades\Log::debug('BalanceSheetService liabilities breakdown', [
+                'liabilities' => $allLiabilities->map(function ($a) { return ['code' => $a->code, 'name' => $a->name, 'balance' => $a->balance, 'debit' => $a->total_debit, 'credit' => $a->total_credit]; })->toArray(),
+                'current_codes' => $currentLiabilities->pluck('code')->toArray(),
+                'long_term_codes' => $longTermLiabilities->pluck('code')->toArray(),
+                'current_sum' => (float) $currentLiabilities->sum('balance'),
+                'long_term_sum' => (float) $longTermLiabilities->sum('balance'),
+            ]);
+        } catch (\Throwable $e) {
+            // Swallow logging errors to avoid impacting production behavior
+        }
+
+        // Debug: also compute sum of all liability balances directly for comparison
+        $debugAllLiabilitiesSum = (float) $allLiabilities->sum('balance');
 
         // EKUITAS (Equity)
         $equity = $this->getAccountsByType('Equity', $asOfDate, $cabangId, null, 'all', true);
@@ -149,6 +169,7 @@ class BalanceSheetService
                 'total' => $totalLongTermLiabilities,
             ],
             'total_liabilities' => $totalLiabilities,
+            'debug_all_liabilities_sum' => $debugAllLiabilitiesSum,
 
             // EQUITY
             'equity' => [

@@ -129,7 +129,7 @@ class AccountPayableFilamentFlowTest extends TestCase
             'invoice_number' => 'INV-FILAMENT-TEST-001',
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             'supplier_phone' => $this->supplier->phone ?? null,
             'invoice_date' => now(),
             'due_date' => now()->addDays(30),
@@ -303,7 +303,7 @@ class AccountPayableFilamentFlowTest extends TestCase
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
             'total' => 500000,
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             'supplier_phone' => $this->supplier->phone ?? null,
         ]);
 
@@ -375,7 +375,7 @@ class AccountPayableFilamentFlowTest extends TestCase
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
             'total' => 100000,
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             'supplier_phone' => $this->supplier->phone ?? null,
         ]);
 

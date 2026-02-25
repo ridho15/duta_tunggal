@@ -12,10 +12,10 @@ class HppResource extends Resource
 {
     protected static ?string $model = JournalEntry::class;
     protected static ?string $navigationIcon = 'heroicon-o-document-currency-dollar';
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Laporan';
     protected static ?int $navigationSort = 23;
     protected static ?string $slug = 'reports/hpp';
-    protected static ?string $navigationLabel = 'Laporan HPP';
+    protected static ?string $navigationLabel = 'HPP / Cost of Goods Sold';
 
     public static function form(Form $form): Form
     {

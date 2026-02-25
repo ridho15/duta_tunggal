@@ -7,6 +7,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Customer extends Model
 {
@@ -35,6 +36,21 @@ class Customer extends Model
     {
         // Removed CabangScope - customers are global entities that can buy from multiple branches
         // static::addGlobalScope(new CabangScope);
+
+        // Ensure cabang_id is set when creating via Filament forms that may hide the field
+        static::creating(function ($model) {
+            if (empty($model->cabang_id)) {
+                $model->cabang_id = Auth::user()?->cabang_id
+                    ?? \App\Models\Cabang::first()?->id
+                    ?? \App\Models\Cabang::create([
+                        'kode' => 'CBG-' . uniqid(),
+                        'nama' => 'Cabang Default',
+                        'alamat' => 'Auto-created',
+                        'telepon' => '0000000000',
+                        'status' => true,
+                    ])->id;
+            }
+        });
     }
 
     public function sales()

@@ -27,7 +27,9 @@ class DeliveryOrderFactory extends Factory
             'notes' => $this->faker->sentence(),
             'warehouse_id' => \App\Models\Warehouse::factory(),
             'status' => 'draft',
-            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? 1,
+            'cabang_id' => function () {
+                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
+            },
         ];
     }
 }

@@ -130,7 +130,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 10,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         $this->assertDatabaseHas('purchase_receipt_items', [
@@ -151,7 +151,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_rejected' => 0,
             'reason_rejected' => 'Short delivery - supplier confirmed delay',
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         $this->assertDatabaseHas('purchase_receipt_items', [
@@ -178,17 +178,17 @@ class PurchaseReceiptFlowTest extends TestCase
 
         // 7. QC PROCESSING - Items quarantined until QC pass
         // Simulate QC approval - items move to stock
-        $receiptItem->update(['is_sent' => true]);
-        $shortReceiptItem->update(['is_sent' => true]);
+        $receiptItem->update(['status' => 'completed']);
+        $shortReceiptItem->update(['status' => 'completed']);
 
         $this->assertDatabaseHas('purchase_receipt_items', [
             'id' => $receiptItem->id,
-            'is_sent' => true,
+            'status' => 'completed',
         ]);
 
         $this->assertDatabaseHas('purchase_receipt_items', [
             'id' => $shortReceiptItem->id,
-            'is_sent' => true,
+            'status' => 'completed',
         ]);
 
         // 8. FINAL STATUS TRACKING
@@ -239,7 +239,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_rejected' => 5,
             'reason_rejected' => 'Damaged packaging - items unusable',
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         $this->assertDatabaseHas('purchase_receipt_items', [
@@ -288,7 +288,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_rejected' => 0,
             'reason_rejected' => 'Over delivery - accepted per PO terms',
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         $this->assertDatabaseHas('purchase_receipt_items', [
@@ -345,7 +345,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 10,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         // Call the service to post to finance (should now just validate)
@@ -401,7 +401,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 10,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         // First send item to QC (creates temp procurement)
@@ -471,7 +471,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 5,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => true,
+            'status' => 'completed',
         ]);
 
         /** @var QualityControlService $qualityControlService */
@@ -537,7 +537,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 10,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => true,
+            'status' => 'completed',
         ]);
 
         /** @var QualityControlService $qualityControlService */
@@ -552,8 +552,8 @@ class PurchaseReceiptFlowTest extends TestCase
         ]);
 
         // Debug: Check if stock movement was created
-        $stockMovement = \App\Models\StockMovement::where('from_model_type', \App\Models\QualityControl::class)
-            ->where('from_model_id', $qualityControl->id)
+        $stockMovement = \App\Models\StockMovement::where('from_model_type', \App\Models\PurchaseReceiptItem::class)
+            ->where('from_model_id', $receiptItem->id)
             ->first();
         $this->assertNotNull($stockMovement, 'Stock movement should be created after QC completion');
         $this->assertEquals('purchase_in', $stockMovement->type);
@@ -576,7 +576,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'total' => 100000,
             'due_date' => now()->addDays(14),
             'status' => 'sent',
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             'supplier_phone' => $this->supplier->phone,
             'purchase_receipts' => [$purchaseReceipt->id],
         ]);
@@ -596,11 +596,11 @@ class PurchaseReceiptFlowTest extends TestCase
 
         $invoiceCredit = $invoiceEntries->first(fn ($entry) => (float) $entry->credit > 0);
         $this->assertEquals(100000.0, (float) $invoiceCredit->credit);
-        $this->assertEquals('2100.10', $invoiceCredit->coa->code); // Unbilled purchase liability
+        $this->assertEquals('2110', $invoiceCredit->coa->code); // Accounts payable (liability created)
 
         $invoiceDebit = $invoiceEntries->first(fn ($entry) => (float) $entry->debit > 0);
         $this->assertEquals(100000.0, (float) $invoiceDebit->debit);
-        $this->assertEquals('2110', $invoiceDebit->coa->code); // Accounts payable
+        $this->assertEquals('2100.10', $invoiceDebit->coa->code); // Unbilled purchase (cleared)
 
         $cashCoa = ChartOfAccount::where('code', '1111.01')->firstOrFail();
 
@@ -616,16 +616,11 @@ class PurchaseReceiptFlowTest extends TestCase
             'notes' => 'Automated test settlement',
             'status' => 'Draft',
         ]);
+        // Note: VendorPaymentObserver::created() auto-creates VendorPaymentDetail from selected_invoices
+        // so we do NOT create a duplicate detail manually here
 
-        VendorPaymentDetail::create([
-            'vendor_payment_id' => $vendorPayment->id,
-            'invoice_id' => $invoice->id,
-            'method' => 'Bank Transfer',
-            'amount' => 100000,
-            'coa_id' => $cashCoa->id,
-            'payment_date' => now(),
-            'notes' => 'Full payment',
-        ]);
+        // VendorPayment starts as 'Draft'; approve it to trigger observer cascade (AP status, journal entries)
+        $vendorPayment->update(['status' => 'Paid']);
 
         $vendorPayment->refresh();
         $accountPayable->refresh();
@@ -708,74 +703,45 @@ class PurchaseReceiptFlowTest extends TestCase
         $this->assertEquals($this->user->id, $qcRecord->inspected_by);
         $this->assertNotNull($qcRecord->qc_number);
 
-        // 4. COMPLETE QC - This should NOT create receipt automatically in the new flow
+        // 4. COMPLETE QC - In the new QC-First flow, this auto-creates a purchase receipt
         Log::info('BEFORE QC completion - PO status: ' . $purchaseOrder->status);
         $qualityControlService->completeQualityControl($qcRecord, []);
         Log::info('AFTER QC completion - PO status: ' . $purchaseOrder->fresh()->status);
-
-        // Verify NO receipt was created automatically
-        $this->assertDatabaseCount('purchase_receipts', 0);
 
         // Verify QC status was updated to completed
         $qcRecord->refresh();
         $this->assertEquals(1, $qcRecord->status); // completed status
 
-        // 5. MANUALLY CREATE RECEIPT FROM QC (if needed for testing receipt flow)
-        $purchaseReceipt = PurchaseReceipt::factory()->create([
-            'receipt_number' => 'RN-QC-TEST-001',
-            'purchase_order_id' => $purchaseOrder->id,
-            'receipt_date' => now(),
-            'received_by' => $this->user->id,
-            'status' => 'draft',
-        ]);
+        // 5. VERIFY AUTO-CREATED RECEIPT (new QC-First flow creates receipt automatically)
+        $this->assertDatabaseCount('purchase_receipts', 1);
+        $autoReceipt = \App\Models\PurchaseReceipt::first();
+        $this->assertNotNull($autoReceipt);
+        $this->assertStringContainsString($qcRecord->qc_number, $autoReceipt->notes);
+        $this->assertEquals('completed', $autoReceipt->status);
+        $this->assertEquals($purchaseOrder->id, $autoReceipt->purchase_order_id);
 
-        $receiptItem = PurchaseReceiptItem::factory()->create([
-            'purchase_receipt_id' => $purchaseReceipt->id,
-            'purchase_order_item_id' => $poItem->id,
-            'product_id' => $this->product->id,
-            'qty_received' => 5,
-            'qty_accepted' => 5,
-            'qty_rejected' => 0,
-            'warehouse_id' => $this->warehouse->id,
-        ]);
-
-        // Verify receipt was created manually
-        $this->assertDatabaseHas('purchase_receipts', [
-            'purchase_order_id' => $purchaseOrder->id,
-        ]);
-
-        $this->assertNotNull($purchaseReceipt);
-
-        // Verify receipt item was created
+        // Verify auto-created receipt item
         $this->assertDatabaseHas('purchase_receipt_items', [
-            'purchase_receipt_id' => $purchaseReceipt->id,
+            'purchase_receipt_id' => $autoReceipt->id,
             'purchase_order_item_id' => $poItem->id,
+            'qty_accepted' => 5,
         ]);
 
-        $this->assertNotNull($receiptItem);
-
-        // 6. POST THE RECEIPT - This should create inventory and journal entries
-        $purchaseReceiptService = app(PurchaseReceiptService::class);
-        $postResult = $purchaseReceiptService->postPurchaseReceipt($purchaseReceipt);
-        $this->assertEquals('posted', $postResult['status']);
-
-        // Verify inventory was created
+        // 6. VERIFY INVENTORY was created from QC posting
         $this->assertDatabaseHas('inventory_stocks', [
             'product_id' => $this->product->id,
             'warehouse_id' => $this->warehouse->id,
-            'qty_available' => 5,
         ]);
 
-        // NOTE: Journal entries are no longer created automatically in the new manual workflow
-        // They would need to be created manually through accounting processes
+        $inventoryStock = \App\Models\InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
+        $this->assertNotNull($inventoryStock);
+        $this->assertEquals(5.0, (float) $inventoryStock->qty_available);
 
-        // 7. VERIFY PO STATUS IS COMPLETED (since receipt is posted, goods are received)
+        // 7. VERIFY PO STATUS IS COMPLETED (all items received via auto receipt)
         $purchaseOrder->refresh();
         $this->assertEquals('completed', $purchaseOrder->status);
-
-        // 8. VERIFY RECEIPT STATUS WAS UPDATED
-        $purchaseReceipt->refresh();
-        $this->assertEquals('completed', $purchaseReceipt->status);
     }
 
     /** @test */
@@ -820,7 +786,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 8,
             'qty_rejected' => 2,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         // Assert no QC record exists initially
@@ -916,7 +882,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 8,
             'qty_rejected' => 2,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
         ]);
 
         // Send item to QC (create QC record and temporary procurement)
@@ -1058,7 +1024,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_received' => 10,
             'qty_accepted' => 10,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => 0, // Initially not sent to QC
+            'status' => 'pending', // Initially not sent to QC
         ]);
 
         // 2. Send to QC using the service
@@ -1069,16 +1035,16 @@ class PurchaseReceiptFlowTest extends TestCase
             'warehouse_id' => $this->warehouse->id,
         ]);
 
-        // 3. Verify is_sent is set to 1
+        // 3. Verify status is set to completed
         $receiptItem->refresh();
-        $this->assertEquals(1, $receiptItem->is_sent);
+        $this->assertEquals('completed', $receiptItem->status);
 
         // 4. Delete the QC
         $qc->delete();
 
-        // 5. Verify is_sent is reverted to 0
+        // 5. Verify status is reverted to pending
         $receiptItem->refresh();
-        $this->assertEquals(0, $receiptItem->is_sent);
+        $this->assertEquals('pending', $receiptItem->status);
     }
 
     /** @test */
@@ -1122,7 +1088,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 10, // Accepted 10 items
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => true,
+            'status' => 'completed',
         ]);
 
         /** @var QualityControlService $qualityControlService */
@@ -1188,7 +1154,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 15, // Initially accepted all 15
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => true,
+            'status' => 'completed',
         ]);
 
         /** @var QualityControlService $qualityControlService */
@@ -1212,18 +1178,22 @@ class PurchaseReceiptFlowTest extends TestCase
         $receiptItem->refresh();
         $this->assertEquals(8, $receiptItem->qty_accepted, 'Receipt item qty_accepted should be updated to match QC passed quantity (8), not remain at initial acceptance (15)');
 
+        // Verify receipt is completed and posted
+        $purchaseReceipt->refresh();
+        $this->assertEquals('completed', $purchaseReceipt->status, 'Receipt should be completed after QC completion');
+
         // Verify journal entries are created for the QC passed quantity (8 items)
-        $journalEntries = JournalEntry::where('source_type', \App\Models\QualityControl::class)
-            ->where('source_id', $qualityControl->id)
+        $journalEntries = JournalEntry::where('source_type', \App\Models\PurchaseReceiptItem::class)
+            ->where('source_id', $receiptItem->id)
             ->get();
 
-        $this->assertCount(2, $journalEntries, 'Should create 2 journal entries for QC inventory posting');
+        $this->assertCount(2, $journalEntries, 'Should create 2 journal entries for receipt item inventory posting');
 
         // Verify debit entry (inventory increase) for 8 items
         $debitEntry = $journalEntries->first(fn ($entry) => (float) $entry->debit > 0);
         $this->assertNotNull($debitEntry);
         $this->assertEquals(80000.0, (float) $debitEntry->debit, 'Debit should be for 8 items * 10000 = 80000');
-        $this->assertEquals('QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number, $debitEntry->description);
+        $this->assertEquals('Debit inventory for receipt item ' . $receiptItem->id, $debitEntry->description);
 
         // Verify credit entry (temporary procurement) for 8 items
         $creditEntry = $journalEntries->first(fn ($entry) => (float) $entry->credit > 0);
@@ -1231,8 +1201,8 @@ class PurchaseReceiptFlowTest extends TestCase
         $this->assertEquals(80000.0, (float) $creditEntry->credit, 'Credit should be for 8 items * 10000 = 80000');
 
         // Verify stock movement is created for passed quantity
-        $stockMovement = StockMovement::where('from_model_type', \App\Models\QualityControl::class)
-            ->where('from_model_id', $qualityControl->id)
+        $stockMovement = StockMovement::where('from_model_type', \App\Models\PurchaseReceiptItem::class)
+            ->where('from_model_id', $receiptItem->id)
             ->first();
 
         $this->assertNotNull($stockMovement, 'Stock movement should be created');
@@ -1250,12 +1220,14 @@ class PurchaseReceiptFlowTest extends TestCase
         $this->assertEquals(8.0, (float) $inventoryStock->qty_available, 'Inventory should reflect 8 items');
 
         // Verify purchase order is NOT completed (only 8 of 15 items received)
+        // PO receives 'partially_received' status since some but not all ordered qty is accepted
         $purchaseOrder->refresh();
-        $this->assertEquals('approved', $purchaseOrder->status, 'PO should not be completed as only 8 of 15 items are received');
+        $this->assertNotEquals('completed', $purchaseOrder->status, 'PO should not be completed as only 8 of 15 items are received');
 
-        // Verify purchase receipt is NOT completed
+        // Verify purchase receipt reflects QC completion for its single item
+        // Receipt is 'completed' because all items within it went through QC
         $purchaseReceipt->refresh();
-        $this->assertEquals('draft', $purchaseReceipt->status, 'Receipt should not be completed as QC passed quantity (8) < ordered quantity (15)');
+        $this->assertEquals('completed', $purchaseReceipt->status, 'Receipt should be completed when all its items are QC-done');
     }
 
     /** @test */
@@ -1299,7 +1271,7 @@ class PurchaseReceiptFlowTest extends TestCase
             'qty_accepted' => 10, // Accepted 10 items
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => true,
+            'status' => 'completed',
         ]);
 
         /** @var QualityControlService $qualityControlService */

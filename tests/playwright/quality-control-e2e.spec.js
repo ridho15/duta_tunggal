@@ -17,15 +17,15 @@ test.describe('Quality Control (QC) E2E Tests', () => {
 
     await login(page);
 
-    // Navigate to Quality Control page
-    await page.goto('/admin/quality-controls');
+    // Navigate to Quality Control Purchase page
+    await page.goto('/admin/quality-control-purchases');
     await page.waitForLoadState('networkidle');
 
     // Verify QC page loads
     await expect(page.locator('h1, .page-title')).toContainText(/quality control/i);
 
     // Check if create button exists
-    const createButton = page.locator('a[href*="quality-controls/create"]');
+    const createButton = page.locator('a[href*="quality-control-purchases/create"]');
     if (await createButton.isVisible()) {
       console.log('✅ Create QC button is visible');
     } else {
@@ -52,19 +52,19 @@ test.describe('Quality Control (QC) E2E Tests', () => {
     await login(page);
 
     // Check if QC page loads
-    await page.goto('/admin/quality-controls');
+    await page.goto('/admin/quality-control-purchases');
     await page.waitForLoadState('networkidle');
 
     // Verify QC page loads
     await expect(page.locator('h1, .page-title')).toContainText(/quality control/i);
 
     // Check if we can access QC creation
-    const createButton = page.locator('a[href*="quality-controls/create"]');
+    const createButton = page.locator('a[href*="quality-control-purchases/create"]');
     if (await createButton.isVisible()) {
       console.log('✅ QC create button is available');
 
       // Click create QC button
-      await page.click('a[href*="quality-controls/create"]');
+      await page.click('a[href*="quality-control-purchases/create"]');
       await page.waitForLoadState('networkidle');
 
       // Verify create form loads

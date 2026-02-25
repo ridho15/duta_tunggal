@@ -18,7 +18,7 @@ class OrderRequest extends Model
         'supplier_id',
         'cabang_id',
         'request_date',
-        'status', // draft, approved, rejected
+        'status', // draft, approved, rejected, closed
         'note',
         'created_by'
     ];

@@ -14,9 +14,9 @@ class StockMutationReportResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 
-    protected static ?string $navigationGroup = 'Reports';
+    protected static ?string $navigationGroup = 'Finance - Laporan';
 
-    protected static ?int $navigationSort = 22;
+    protected static ?int $navigationSort = 27;
 
     protected static ?string $slug = 'reports/stock-mutation';
 

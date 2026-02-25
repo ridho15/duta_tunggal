@@ -155,13 +155,13 @@ class PurchaseOrderObserver
             // Get asset COA (debit side)
             $assetCoa = ChartOfAccount::where('code', '1500')->first(); // HARGA PEROLEHAN ASET TETAP
             if (!$assetCoa) {
-                $assetCoa = ChartOfAccount::where('name', 'like', '%aset%')->first();
+                $assetCoa = ChartOfAccount::where('perusahaan', 'like', '%aset%')->first();
             }
 
             // Get accounts payable COA (credit side) - assuming not paid yet
             $payableCoa = ChartOfAccount::where('code', '2110')->first(); // HUTANG USAHA
             if (!$payableCoa) {
-                $payableCoa = ChartOfAccount::where('name', 'like', '%hutang%')->first();
+                $payableCoa = ChartOfAccount::where('perusahaan', 'like', '%hutang%')->first();
             }
 
             if (!$assetCoa || !$payableCoa) {
@@ -204,6 +204,35 @@ class PurchaseOrderObserver
                 'source_type' => PurchaseOrder::class,
                 'source_id' => $purchaseOrder->id,
             ]);
+
+            // Ensure both entries were created and are balanced
+            if (! $debitEntry || ! $creditEntry || ((float) $debitEntry->debit !== (float) $creditEntry->credit)) {
+                \Illuminate\Support\Facades\Log::error('Asset acquisition journal entries inconsistent - rolling back', [
+                    'purchase_order_id' => $purchaseOrder->id,
+                    'po_number' => $purchaseOrder->po_number,
+                    'debit_exists' => (bool) $debitEntry,
+                    'credit_exists' => (bool) $creditEntry,
+                    'debit_amount' => $debitEntry->debit ?? null,
+                    'credit_amount' => $creditEntry->credit ?? null,
+                ]);
+
+                // Try to remove partial entries to avoid leaving unbalanced journals
+                try {
+                    if ($debitEntry && $debitEntry->id) {
+                        JournalEntry::where('id', $debitEntry->id)->delete();
+                    }
+                    if ($creditEntry && $creditEntry->id) {
+                        JournalEntry::where('id', $creditEntry->id)->delete();
+                    }
+                } catch (\Exception $cleanupEx) {
+                    \Illuminate\Support\Facades\Log::error('Failed to cleanup inconsistent asset journal entries', [
+                        'error' => $cleanupEx->getMessage(),
+                        'purchase_order_id' => $purchaseOrder->id,
+                    ]);
+                }
+
+                return;
+            }
 
             \Illuminate\Support\Facades\Log::info('Asset acquisition journal entries created', [
                 'purchase_order_id' => $purchaseOrder->id,

@@ -14,11 +14,11 @@ class BukuBesarPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Akuntansi';
 
-    protected static ?string $navigationLabel = 'Buku Besar';
+    protected static ?string $navigationLabel = 'Buku Besar (General Ledger)';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'buku-besar-page';
 

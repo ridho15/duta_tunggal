@@ -23,11 +23,19 @@ class JournalEntryObserver
         // If no authenticated user, try to get user from source model
         if (!$currentUser && $entry->source_type && $entry->source_id) {
             try {
-                $source = $entry->source;
-                if ($source && method_exists($source, 'creator')) {
-                    $currentUser = $source->creator;
-                } elseif ($source && isset($source->created_by)) {
-                    $currentUser = User::find($source->created_by);
+                // Only attempt to fetch source model when source_type is a valid class
+                if (class_exists($entry->source_type)) {
+                    $source = $entry->source;
+                    if ($source && method_exists($source, 'creator')) {
+                        $currentUser = $source->creator;
+                    } elseif ($source && isset($source->created_by)) {
+                        $currentUser = User::find($source->created_by);
+                    }
+                } else {
+                    Log::info('JournalEntry source_type is not a class, skipping source lookup', [
+                        'source_type' => $entry->source_type,
+                        'source_id' => $entry->source_id,
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::warning('Failed to get user from source model', [

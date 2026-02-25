@@ -11,21 +11,16 @@ class StockTransferService
     public function generateTransferNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'TN-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $last = StockTransfer::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        // pick random suffix and avoid collisions
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = StockTransfer::where('transfer_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->transfer_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'TN-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     public function requestTransfer($stockTransfer)

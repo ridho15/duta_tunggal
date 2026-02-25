@@ -6,6 +6,7 @@ use App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\RelationManagers\InventoryStockRelationManager;
 use App\Filament\Resources\ProductResource\RelationManagers\StockMovementRelationManager;
+use App\Filament\Resources\ProductResource\RelationManagers\SuppliersRelationManager;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Product;
@@ -484,13 +485,13 @@ class ProductResource extends Resource
                                 ->orWhere('nama', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('supplier.name')
+                TextColumn::make('supplier.perusahaan')
                     ->label('Supplier')
                     ->searchable()
                     ->sortable()
                     ->formatStateUsing(function ($state, $record) {
                         if ($record->supplier) {
-                            return "({$record->supplier->code}) {$record->supplier->name}";
+                            return "({$record->supplier->code}) {$record->supplier->perusahaan}";
                         }
                         return '-';
                     })
@@ -1197,6 +1198,7 @@ class ProductResource extends Resource
         return [
             InventoryStockRelationManager::class,
             StockMovementRelationManager::class,
+            SuppliersRelationManager::class,
         ];
     }
 

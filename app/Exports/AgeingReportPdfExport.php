@@ -174,7 +174,7 @@ class AgeingReportPdfExport
 
             return [
                 'no' => $index + 1,
-                'supplier_name' => $payable->supplier->name ?? '-',
+                'supplier_name' => $payable->supplier->perusahaan ?? '-',
                 'contact_person' => $payable->supplier->contact_person ?? '-',
                 'phone' => $payable->supplier->phone ?? '-',
                 'email' => $payable->supplier->email ?? '-',

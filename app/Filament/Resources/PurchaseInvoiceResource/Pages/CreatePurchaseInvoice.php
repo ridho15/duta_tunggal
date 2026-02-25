@@ -14,7 +14,11 @@ class CreatePurchaseInvoice extends CreateRecord
     {
         // Remove temporary fields
         unset($data['selected_supplier']);
-        unset($data['selected_purchase_order']);
+        unset($data['selected_order_request']); // Task 14: remove OR filter field
+        
+        // Task 14: Move selected POs to purchase_order_ids, remove form temp fields
+        $data['purchase_order_ids'] = $data['selected_purchase_orders'] ?? [];
+        unset($data['selected_purchase_orders']);
         unset($data['selected_purchase_receipts']);
         
         // Ensure status is set to 'paid' for automatic journal posting

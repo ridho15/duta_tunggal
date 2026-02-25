@@ -128,7 +128,7 @@ class ReturnProductResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = \App\Models\Warehouse::where('status', 1)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('name', 'like', "%{$search}%")
+                                        $q->where('perusahaan', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
                                 

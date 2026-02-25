@@ -125,7 +125,7 @@ class OrderRequestResource extends Resource
                             ->searchable()
                             ->getSearchResultsUsing(function (string $search, callable $get) {
                                 $cabangId = $get('cabang_id');
-                                $query = Warehouse::where('name', 'like', "%{$search}%")
+                                $query = Warehouse::where('perusahaan', 'like', "%{$search}%")
                                     ->orWhere('kode', 'like', "%{$search}%");
 
                                 if ($cabangId) {
@@ -152,17 +152,17 @@ class OrderRequestResource extends Resource
                             })
                             ->searchable()
                             ->options(function () {
-                                return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                    return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                 });
                             })
                             ->getSearchResultsUsing(function (string $search) {
-                                return Supplier::where('name', 'like', "%{$search}%")
+                                return Supplier::where('perusahaan', 'like', "%{$search}%")
                                     ->orWhere('code', 'like', "%{$search}%")
                                     ->limit(50)
                                     ->get()
                                     ->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                     });
                             })
                             ->required()
@@ -180,9 +180,8 @@ class OrderRequestResource extends Resource
                         Repeater::make('orderRequestItem')
                             ->relationship()
                             ->columnSpanFull()
-                            ->columns(3)
-                            ->hint('Pilih supplier terlebih dahulu sebelum menambah item')
-                            ->disabled(fn(callable $get) => !$get('supplier_id'))
+                            ->columns(6)
+                            ->hint('Tambahkan item produk yang ingin dipesan')
                             ->minItems(1)
                             ->required()
                             ->validationMessages([
@@ -194,28 +193,34 @@ class OrderRequestResource extends Resource
                                     ->label('Product')
                                     ->reactive()
                                     ->searchable()
-                                    ->options(function (callable $get) {
-                                        $supplierId = $get('../../supplier_id'); // Mengakses supplier_id dari parent form
-                                        if ($supplierId) {
-                                            return Product::where('supplier_id', $supplierId)
-                                                ->select(['id', 'name', 'sku'])
-                                                ->get()
-                                                ->mapWithKeys(function ($product) {
-                                                    return [$product->id => "({$product->sku}) {$product->name}"];
-                                                });
+                                    ->columnSpan(2)
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        if ($state) {
+                                            $product = Product::find($state);
+                                            if ($product) {
+                                                $set('unit_price', $product->cost_price);
+                                                // Recalculate subtotal
+                                                $quantity = $get('quantity') ?? 0;
+                                                $unitPrice = $product->cost_price;
+                                                $discount = $get('discount') ?? 0;
+                                                $tax = $get('tax') ?? 0;
+                                                $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                                $set('subtotal', $subtotal);
+                                            }
                                         }
-                                        return [];
+                                    })
+                                    ->options(function (callable $get) {
+                                        // Task 11: Allow selecting any product regardless of supplier
+                                        return Product::orderBy('name')
+                                            ->get()
+                                            ->mapWithKeys(function ($product) {
+                                                return [$product->id => "({$product->sku}) {$product->name}"];
+                                            });
                                     })
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
-                                        $supplierId = $get('../../supplier_id'); // Mengakses supplier_id dari parent form
-                                        $query = Product::where('name', 'like', "%{$search}%")
-                                            ->orWhere('sku', 'like', "%{$search}%");
-
-                                        if ($supplierId) {
-                                            $query->where('supplier_id', $supplierId);
-                                        }
-
-                                        return $query->limit(50)
+                                        return Product::where('name', 'like', "%{$search}%")
+                                            ->orWhere('sku', 'like', "%{$search}%")
+                                            ->limit(50)
                                             ->get()
                                             ->mapWithKeys(function ($product) {
                                                 return [$product->id => "({$product->sku}) {$product->name}"];
@@ -229,6 +234,15 @@ class OrderRequestResource extends Resource
                                     ->label('Quantity')
                                     ->numeric()
                                     ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        $quantity = $state ?? 0;
+                                        $unitPrice = $get('unit_price') ?? 0;
+                                        $discount = $get('discount') ?? 0;
+                                        $tax = $get('tax') ?? 0;
+                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $set('subtotal', $subtotal);
+                                    })
                                     ->required()
                                     ->minValue(0.01)
                                     ->validationMessages([
@@ -236,9 +250,63 @@ class OrderRequestResource extends Resource
                                         'numeric' => 'Quantity harus berupa angka.',
                                         'min' => 'Quantity minimal 0.01.',
                                     ]),
+                                TextInput::make('unit_price')
+                                    ->label('Unit Price')
+                                    ->numeric()
+                                    ->indonesianMoney()
+                                    ->default(0)
+                                    ->reactive()
+                                    ->readonly()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        $quantity = $get('quantity') ?? 0;
+                                        $unitPrice = $state ?? 0;
+                                        $discount = $get('discount') ?? 0;
+                                        $tax = $get('tax') ?? 0;
+                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $set('subtotal', $subtotal);
+                                    })
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Harga satuan wajib diisi.',
+                                        'numeric' => 'Harga satuan harus berupa angka.',
+                                    ]),
+                                TextInput::make('discount')
+                                    ->label('Discount')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        $quantity = $get('quantity') ?? 0;
+                                        $unitPrice = $get('unit_price') ?? 0;
+                                        $discount = $state ?? 0;
+                                        $tax = $get('tax') ?? 0;
+                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $set('subtotal', $subtotal);
+                                    }),
+                                TextInput::make('tax')
+                                    ->label('Tax')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        $quantity = $get('quantity') ?? 0;
+                                        $unitPrice = $get('unit_price') ?? 0;
+                                        $discount = $get('discount') ?? 0;
+                                        $tax = $state ?? 0;
+                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $set('subtotal', $subtotal);
+                                    }),
+                                TextInput::make('subtotal')
+                                    ->label('Subtotal')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->indonesianMoney()
+                                    ->disabled()
+                                    ->dehydrated(),
                                 Textarea::make('note')
                                     ->nullable()
                                     ->label('Note')
+                                    ->columnSpanFull()
                             ])
                     ])
             ]);
@@ -247,6 +315,7 @@ class OrderRequestResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('request_number')
                     ->searchable(),
@@ -267,7 +336,7 @@ class OrderRequestResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('supplier.name')
+                TextColumn::make('supplier.perusahaan')
                     ->label('Supplier')
                     ->searchable()
                     ->placeholder('No Supplier'),
@@ -283,7 +352,8 @@ class OrderRequestResource extends Resource
                         return match ($state) {
                             'draft' => 'gray',
                             'approved' => 'success',
-                            'rejected' => 'danger'
+                            'rejected' => 'danger',
+                            'closed' => 'warning'
                         };
                     })
                     ->badge(),
@@ -331,11 +401,12 @@ class OrderRequestResource extends Resource
                         'draft' => 'Draft',
                         'approved' => 'Approved',
                         'rejected' => 'Rejected',
+                        'closed' => 'Closed',
                     ])
                     ->placeholder('All Statuses'),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->relationship('supplier', 'name')
+                    ->relationship('supplier', 'perusahaan')
                     ->getOptionLabelFromRecordUsing(function ($record) {
                         return "({$record->code}) {$record->name}";
                     })
@@ -405,17 +476,17 @@ class OrderRequestResource extends Resource
                                 ->searchable()
                                 ->default(fn($record) => $record->supplier_id)
                                 ->options(function ($record) {
-                                    return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                    return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                     });
                                 })
                                 ->getSearchResultsUsing(function (string $search, $record) {
-                                    return Supplier::where('name', 'like', "%{$search}%")
+                                    return Supplier::where('perusahaan', 'like', "%{$search}%")
                                         ->orWhere('code', 'like', "%{$search}%")
                                         ->limit(50)
                                         ->get()
                                         ->mapWithKeys(function ($supplier) {
-                                            return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                         });
                                 })
                                 ->required()
@@ -484,17 +555,17 @@ class OrderRequestResource extends Resource
                                 ->searchable()
                                 ->default(fn($record) => $record->supplier_id)
                                 ->options(function ($record) {
-                                    return Supplier::select(['id', 'name', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                    return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                     });
                                 })
                                 ->getSearchResultsUsing(function (string $search, $record) {
-                                    return Supplier::where('name', 'like', "%{$search}%")
+                                    return Supplier::where('perusahaan', 'like', "%{$search}%")
                                         ->orWhere('code', 'like', "%{$search}%")
                                         ->limit(50)
                                         ->get()
                                         ->mapWithKeys(function ($supplier) {
-                                            return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                         });
                                 })
                                 ->required(fn(\Filament\Forms\Get $get) => $get('create_purchase_order'))
@@ -549,6 +620,22 @@ class OrderRequestResource extends Resource
 
                             $orderRequestService->approve($record, $data);
                             HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request Approved");
+                        }),
+                    Action::make('close')
+                        ->label('Close')
+                        ->color('warning')
+                        ->icon('heroicon-o-lock-closed')
+                        ->requiresConfirmation()
+                        ->modalHeading('Close Order Request')
+                        ->modalDescription('Are you sure you want to close this order request? This action cannot be undone.')
+                        ->visible(function ($record) {
+                            /** @var \App\Models\User $user */
+                            $user = Auth::user();
+                            return $user && $user->hasPermissionTo('approve order request') && in_array($record->status, ['draft', 'approved']);
+                        })
+                        ->action(function ($record) {
+                            $record->update(['status' => 'closed']);
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request Closed");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
@@ -578,13 +665,6 @@ class OrderRequestResource extends Resource
 
     protected static function mutateFormDataBeforeCreate(array $data): array
     {
-        // Ensure orderRequestItem is not empty
-        if (empty($data['orderRequestItem']) || count($data['orderRequestItem']) === 0) {
-            throw ValidationException::withMessages([
-                'orderRequestItem' => 'Order request harus memiliki setidaknya satu item produk.'
-            ]);
-        }
-
         // Set cabang_id if not provided
         if (empty($data['cabang_id'])) {
             $user = Auth::user();
@@ -596,13 +676,6 @@ class OrderRequestResource extends Resource
 
     protected static function mutateFormDataBeforeSave(array $data): array
     {
-        // Ensure orderRequestItem is not empty
-        if (empty($data['orderRequestItem']) || count($data['orderRequestItem']) === 0) {
-            throw ValidationException::withMessages([
-                'orderRequestItem' => 'Order request harus memiliki setidaknya satu item produk.'
-            ]);
-        }
-
         return $data;
     }
 }

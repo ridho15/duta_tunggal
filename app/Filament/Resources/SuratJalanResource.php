@@ -152,7 +152,7 @@ class SuratJalanResource extends Resource
                     })
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('deliveryOrder.salesOrders.customer', function (Builder $query) use ($search) {
-                            $query->where('name', 'like', "%{$search}%")
+                            $query->where('perusahaan', 'like', "%{$search}%")
                                 ->orWhere('code', 'like', "%{$search}%");
                         });
                     })

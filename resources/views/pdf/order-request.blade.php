@@ -36,7 +36,7 @@
 
 <body>
     <div class="header">
-        <img src="{{ public_path('images/logo.png') }}" alt="Logo PT DUTA TUNGGAL" class="logo"><br>
+        <img src="{{ public_path('logo_duta_tunggal.png') }}" alt="Logo PT DUTA TUNGGAL" class="logo"><br>
         <h2>ORDER REQUEST</h2>
         <p>PT DUTA TUNGGAL</p>
     </div>

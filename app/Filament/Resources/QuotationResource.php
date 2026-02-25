@@ -307,7 +307,7 @@ class QuotationResource extends Resource
                                     ->getSearchResultsUsing(function (string $search) {
                                         // Return array of id => label to satisfy Filament Select expectations
                                         return Product::query()
-                                            ->where('name', 'like', "%{$search}%")
+                                            ->where('perusahaan', 'like', "%{$search}%")
                                             ->orWhere('sku', 'like', "%{$search}%")
                                             ->limit(50)
                                             ->get()
@@ -799,7 +799,7 @@ class QuotationResource extends Resource
                                                 }),
                                             Select::make('rak_id')
                                                 ->label('Rak')
-                                                ->searchable(['code', 'name'])
+                                                ->searchable(['code', 'perusahaan'])
                                                 ->preload()
                                                 ->options(function ($get) {
                                                     $warehouseId = $get('warehouse_id');

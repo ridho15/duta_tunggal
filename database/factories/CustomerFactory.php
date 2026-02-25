@@ -34,7 +34,9 @@ class CustomerFactory extends Factory
             'nik_npwp'          => $this->faker->numerify('################'),
             'keterangan'        => $this->faker->optional()->sentence(),
             'isSpecial'         => $this->faker->boolean(50),
-            'cabang_id'         => Cabang::inRandomOrder()->first()->id ?? 1,
+            'cabang_id'         => function () {
+                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
+            },
         ];
     }
 }

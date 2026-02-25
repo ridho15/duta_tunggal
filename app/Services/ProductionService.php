@@ -9,20 +9,14 @@ class ProductionService
     public function generateProductionNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'PRO-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $last = Production::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = Production::where('production_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($last) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($last->production_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'PRO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 }

@@ -15,13 +15,13 @@ class InventoryCardResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 26;
 
     protected static ?string $slug = 'reports/inventory-card';
 
-    protected static ?string $navigationLabel = 'Kartu Persediaan';
+    protected static ?string $navigationLabel = 'Kartu Persediaan (Stock Card)';
 
     public static function form(Form $form): Form
     {

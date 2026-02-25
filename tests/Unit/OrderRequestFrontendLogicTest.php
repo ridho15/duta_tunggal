@@ -18,8 +18,8 @@ beforeEach(function () {
 
 test('supplier product filtering logic', function () {
     // Create test data
-    $supplier1 = Supplier::factory()->create(['name' => 'Supplier A']);
-    $supplier2 = Supplier::factory()->create(['name' => 'Supplier B']);
+    $supplier1 = Supplier::factory()->create(['perusahaan' => 'Supplier A']);
+    $supplier2 = Supplier::factory()->create(['perusahaan' => 'Supplier B']);
 
     $product1 = Product::factory()->create(['supplier_id' => $supplier1->id, 'name' => 'Product 1']);
     $product2 = Product::factory()->create(['supplier_id' => $supplier1->id, 'name' => 'Product 2']);

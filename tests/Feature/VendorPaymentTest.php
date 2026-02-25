@@ -126,7 +126,7 @@ class VendorPaymentTest extends TestCase
             'invoice_number' => 'INV-TEST-001',
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             'subtotal' => 110000,
             'tax' => 0,
             'total' => 110000,
@@ -739,7 +739,7 @@ class VendorPaymentTest extends TestCase
             'invoice_number' => 'INV-TEST-' . rand(1000, 9999),
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             
             'subtotal' => 110000,
             'tax' => 0,

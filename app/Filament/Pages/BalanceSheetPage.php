@@ -16,11 +16,11 @@ class BalanceSheetPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-scale';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Laporan';
 
-    protected static ?string $navigationLabel = 'Neraca';
+    protected static ?string $navigationLabel = 'Neraca (Balance Sheet)';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
 
     public ?string $as_of_date = null;
     public ?int $cabang_id = null;

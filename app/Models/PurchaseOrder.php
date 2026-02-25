@@ -16,7 +16,7 @@ class PurchaseOrder extends Model
         'supplier_id',
         'po_number',
         'order_date',
-        'status', //'draft','approved','partially_received','completed','closed', 'request_close', 'request_approval'
+        'status', //'draft','approved','partially_received','completed','closed', 'request_close'
         'expected_date',
         'total_amount',
         'is_asset',
@@ -178,5 +178,85 @@ class PurchaseOrder extends Model
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    /**
+     * Manually complete Purchase Order
+     * This can be triggered via button/action
+     */
+    public function manualComplete($userId = null)
+    {
+        if (in_array($this->status, ['completed', 'closed', 'paid'])) {
+            throw new \Exception('Purchase Order is already ' . $this->status);
+        }
+
+        $this->update([
+            'status' => 'completed',
+            'completed_by' => $userId ?? \Illuminate\Support\Facades\Auth::id() ?? 1,
+            'completed_at' => now(),
+        ]);
+
+        // If this purchase order represents an asset purchase, create asset records
+        if ($this->is_asset) {
+            foreach ($this->purchaseOrderItem as $item) {
+                $total = \App\Http\Controllers\HelperController::hitungSubtotal(
+                    (int)$item->quantity,
+                    (int)$item->unit_price,
+                    (int)$item->discount,
+                    (int)$item->tax,
+                    $item->tipe_pajak
+                );
+
+                $asset = Asset::create([
+                    'name' => $item->product->name,
+                    'product_id' => $item->product_id,
+                    'purchase_order_id' => $this->id,
+                    'purchase_order_item_id' => $item->id,
+                    'purchase_date' => $this->order_date,
+                    'usage_date' => $this->order_date,
+                    'purchase_cost' => $total,
+                    'salvage_value' => 0,
+                    'useful_life_years' => 5,
+                    'asset_coa_id' => $item->product->inventory_coa_id ?? null,
+                    'accumulated_depreciation_coa_id' => null,
+                    'depreciation_expense_coa_id' => null,
+                    'status' => 'active',
+                    'notes' => 'Generated from PO ' . $this->po_number,
+                ]);
+
+                try {
+                    $asset->calculateDepreciation();
+                } catch (\Throwable $e) {
+                    // If depreciation calculation fails, log and continue
+                    \Illuminate\Support\Facades\Log::warning('Failed to calculate depreciation for asset', ['asset_id' => $asset->id, 'error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        \Illuminate\Support\Facades\Log::info('Manually completed Purchase Order', [
+            'po_id' => $this->id,
+            'po_number' => $this->po_number,
+            'completed_by' => $this->completed_by,
+        ]);
+
+        return $this;
+    }
+
+    /**
+     * Check if PO can be manually completed
+     */
+    public function canBeCompleted(): bool
+    {
+        // Can't complete if already completed, closed, or paid
+        if (in_array($this->status, ['completed', 'closed', 'paid'])) {
+            return false;
+        }
+
+        // Must have at least one receipt item to be completable
+        $hasReceiptItems = $this->purchaseOrderItem()
+            ->whereHas('purchaseReceiptItem')
+            ->exists();
+
+        return $hasReceiptItems;
     }
 }

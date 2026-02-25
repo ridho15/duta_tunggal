@@ -430,7 +430,7 @@ class InvoiceResource extends Resource
                     })
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('fromModel.customer', function (Builder $query) use ($search) {
-                            $query->where('name', 'like', "%{$search}%");
+                            $query->where('perusahaan', 'like', "%{$search}%");
                         });
                     }),
                 TextColumn::make('subtotal')

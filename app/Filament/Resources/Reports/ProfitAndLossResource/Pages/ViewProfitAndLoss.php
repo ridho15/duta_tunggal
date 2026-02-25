@@ -7,6 +7,7 @@ use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Models\Reports\HppPrefix;
 use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\Page;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
@@ -21,6 +22,8 @@ class ViewProfitAndLoss extends Page
     protected static string $resource = ProfitAndLossResource::class;
     protected static string $view = 'filament.pages.reports.profit-and-loss';
 
+    public bool $showPreview = false;
+
     public ?string $startDate = null;
     public ?string $endDate = null;
     public ?string $cabang_id = null;
@@ -28,6 +31,34 @@ class ViewProfitAndLoss extends Page
     public ?bool $compare = false;
     public ?string $compareStartDate = null;
     public ?string $compareEndDate = null;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+        ];
+    }
+
+    public function generateReport(): void
+    {
+        $this->showPreview = true;
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
+    }
 
     protected function getFormSchema(): array
     {
@@ -122,7 +153,7 @@ class ViewProfitAndLoss extends Page
             });
         } else {
             $query->where('type', 'Expense')
-                ->where('name', 'like', '%HPP%');
+                ->where('perusahaan', 'like', '%HPP%');
         }
 
         $cogsAccounts = $query->get();
@@ -151,14 +182,14 @@ class ViewProfitAndLoss extends Page
 
     protected function getOtherIncomeExpense($start, $end): float
     {
-        $otherIncome = ChartOfAccount::where('type', 'Revenue')->where('name', 'like', '%Lain%')->get();
-        $otherExpense = ChartOfAccount::where('type', 'Expense')->where('name', 'like', '%Lain%')->get();
+        $otherIncome = ChartOfAccount::where('type', 'Revenue')->where('perusahaan', 'like', '%Lain%')->get();
+        $otherExpense = ChartOfAccount::where('type', 'Expense')->where('perusahaan', 'like', '%Lain%')->get();
         return $this->sumByAccounts($otherIncome, $start, $end) - $this->sumByAccounts($otherExpense, $start, $end);
     }
 
     protected function getTaxExpense($start, $end): float
     {
-        $taxAccounts = ChartOfAccount::where('type', 'Expense')->where('name', 'like', '%Pajak%')->get();
+        $taxAccounts = ChartOfAccount::where('type', 'Expense')->where('perusahaan', 'like', '%Pajak%')->get();
         return $this->sumByAccounts($taxAccounts, $start, $end);
     }
 }

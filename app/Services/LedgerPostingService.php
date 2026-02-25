@@ -34,8 +34,11 @@ class LedgerPostingService
             return ['status' => 'skipped', 'message' => 'Sales invoices are posted by InvoiceObserver'];
         }
 
-        // Skip if not a purchase invoice
-        if ($invoice->from_model_type !== 'App\Models\PurchaseOrder') {
+        // Skip if not a purchase invoice (allow PurchaseOrder or PurchaseReceipt)
+        if (! in_array($invoice->from_model_type, [
+            'App\\Models\\PurchaseOrder',
+            'App\\Models\\PurchaseReceipt'
+        ], true)) {
             return ['status' => 'skipped', 'message' => 'Only purchase invoices are handled by this method'];
         }
 
@@ -84,10 +87,18 @@ class LedgerPostingService
             'isGoodsReceiptInvoice' => $isGoodsReceiptInvoice
         ]);
 
-        // For purchase invoices: Simplified journal entry format
-        if ($isPurchaseInvoice) {
-            // Check if there are any receipts for this PO
-            $hasReceipts = \App\Models\PurchaseReceipt::where('purchase_order_id', $invoice->from_model_id)->exists();
+        // For purchase invoices and goods receipt invoices: Simplified journal entry format
+        if ($isPurchaseInvoice || $isGoodsReceiptInvoice) {
+            // Determine whether to debit unbilled purchase or inventory.
+            if ($isPurchaseInvoice) {
+                // Check if there are any receipts for this PO
+                $hasReceipts = \App\Models\PurchaseReceipt::where('purchase_order_id', $invoice->from_model_id)->exists();
+            } elseif ($isGoodsReceiptInvoice) {
+                // Invoice originates from a receipt, treat as having receipts
+                $hasReceipts = true;
+            } else {
+                $hasReceipts = false;
+            }
 
             if ($hasReceipts) {
                 // If there are receipts, debit unbilled purchase (will be credited when QC approved)
@@ -121,9 +132,15 @@ class LedgerPostingService
                 ]);
             }
 
-            // Calculate PPN amount
-            $ppnAmount = $invoice->subtotal * ($invoice->ppn_rate ?? 0) / 100;
+            // Calculate PPN amount: prefer explicit invoice->tax when present, otherwise derive from ppn_rate
+            $ppnAmount = 0;
             $actualPpnAmount = 0; // Track actual PPN amount that gets posted
+            if (!empty($invoice->tax) && $invoice->tax > 0) {
+                $ppnAmount = (float)$invoice->tax;
+            } else {
+                $ppnAmount = $invoice->subtotal * ($invoice->ppn_rate ?? 0) / 100;
+            }
+
             if ($ppnAmount > 0 && $ppnMasukanCoa) {
                 $entries[] = JournalEntry::create([
                     'coa_id' => $ppnMasukanCoa->id,
@@ -184,15 +201,29 @@ class LedgerPostingService
                 ]);
                 $entries[] = $creditEntry;
             } else {
-                \Illuminate\Support\Facades\Log::info('DEBUG: Skipping credit entry for accounts payable', [
+                \Illuminate\Support\Facades\Log::error('Missing accounts payable COA - cannot post invoice to ledger', [
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
                     'totalAmount' => $totalAmount,
                     'utangCoa_exists' => $utangCoa ? true : false
                 ]);
+
+                return ['status' => 'error', 'message' => 'Missing accounts payable COA'];
             }
         }
 
         // Validate that entries are balanced
-        $this->validateJournalEntries($entries);
+        try {
+            $this->validateJournalEntries($entries);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Ledger posting validation failed for invoice', [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['status' => 'error', 'message' => 'Journal entries are not balanced', 'error' => $e->getMessage()];
+        }
 
         return ['status' => 'posted', 'entries' => $entries];
     }

@@ -16,8 +16,10 @@ class CreatePurchaseOrder extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['created_by'] = Auth::id();
-        $data['status'] = $data['status'] ?? 'draft';
+        $data['created_by']    = Auth::id();
+        $data['status']        = 'approved'; // PO langsung approved, tidak perlu approval manual
+        $data['date_approved'] = now();
+        $data['approved_by']   = Auth::id();
         return $data;
     }
 

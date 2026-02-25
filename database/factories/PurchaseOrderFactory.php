@@ -23,7 +23,7 @@ class PurchaseOrderFactory extends Factory
             'status' => $this->faker->randomElement(['draft', 'approved', 'partially_received', 'completed', 'closed']),
             'expected_date' => now()->addDays(rand(3, 14)),
             'total_amount' => $this->faker->numberBetween(50000, 2000000),
-            'is_asset' => $this->faker->boolean(),
+            'is_asset' => false,
             'close_reason' => $this->faker->optional()->sentence(),
             'date_approved' => now(),
             'approved_by' => 1, // user id
@@ -41,7 +41,9 @@ class PurchaseOrderFactory extends Factory
             'refer_model_id' => null,
             'is_import' => false,
             'ppn_option' => 'standard',
-            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? 1,
+            'cabang_id' => function () {
+                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
+            },
         ];
     }
 }

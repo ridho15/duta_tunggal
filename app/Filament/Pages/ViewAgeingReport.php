@@ -125,7 +125,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                         if ($record instanceof AccountReceivable) {
                             return $record->customer->name ?? '-';
                         } else {
-                            return $record->supplier->name ?? '-';
+                            return $record->supplier->perusahaan ?? '-';
                         }
                     })
                     ->searchable(),

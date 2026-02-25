@@ -15,16 +15,40 @@ class PurchaseReceiptItem extends Model
     protected $table = 'purchase_receipt_items';
     protected $fillable = [
         'purchase_receipt_id',
-        'purchase_order_item_id',
+        'purchase_order_item_id', // Now optional
         'product_id',
         'qty_received',
         'qty_accepted',
         'qty_rejected',
         'reason_rejected',
         'warehouse_id',
-        'is_sent',
+        'status', // pending | completed
         'rak_id', // optional
     ];
+
+    protected $appends = ['status_label'];
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status ?? 'pending') {
+            'completed' => 'Completed',
+            default     => 'Pending',
+        };
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->status === 'completed';
+    }
+
+    /**
+     * Mark this item as completed and propagate to parent receipt.
+     */
+    public function markCompleted(): void
+    {
+        $this->update(['status' => 'completed']);
+        optional($this->purchaseReceipt)->checkAndUpdateStatus();
+    }
 
     public function purchaseOrderItem()
     {

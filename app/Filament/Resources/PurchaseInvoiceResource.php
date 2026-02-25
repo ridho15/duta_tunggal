@@ -64,7 +64,7 @@ class PurchaseInvoiceResource extends Resource
                                 Select::make('selected_supplier')
                                     ->label('Supplier')
                                     ->options(Supplier::all()->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->name}"];
+                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                     }))
                                     ->searchable()
                                     ->preload()
@@ -74,7 +74,8 @@ class PurchaseInvoiceResource extends Resource
                                         'required' => 'Supplier harus dipilih'
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('selected_purchase_order', null);
+                                        $set('selected_order_request', null);
+                                        $set('selected_purchase_orders', []);
                                         $set('selected_purchase_receipts', []);
                                         $set('invoiceItem', []);
                                         $set('receiptBiayaItems', []);
@@ -96,43 +97,71 @@ class PurchaseInvoiceResource extends Resource
                                         'required' => 'Cabang harus dipilih'
                                     ]),
                                     
-                                Select::make('selected_purchase_order')
-                                    ->label('PO')
+                                // Task 14: Select Order Request to filter POs
+                                Select::make('selected_order_request')
+                                    ->label('Order Request (OR)')
                                     ->options(function ($get) {
                                         $supplierId = $get('selected_supplier');
                                         if (!$supplierId) return [];
                                         
-                                        return PurchaseOrder::where('supplier_id', $supplierId)
-                                            ->where('status', 'completed')
-                                            ->whereHas('purchaseReceipt', function ($query) {
-                                                $query->where('status', 'completed');
+                                        return \App\Models\OrderRequest::where('supplier_id', $supplierId)
+                                            ->whereHas('purchaseOrders', function ($q) {
+                                                $q->where('status', 'completed')
+                                                  ->whereHas('purchaseReceipt', fn($q2) => $q2->where('status', 'completed'));
                                             })
+                                            ->orderByDesc('request_date')
                                             ->get()
+                                            ->mapWithKeys(fn ($or) => [$or->id => $or->request_number]);
+                                    })
+                                    ->searchable()
+                                    ->reactive()
+                                    ->nullable()
+                                    ->helperText('Pilih OR untuk memfilter PO. Biarkan kosong untuk melihat semua PO.')
+                                    ->afterStateUpdated(function ($set) {
+                                        $set('selected_purchase_orders', []);
+                                        $set('selected_purchase_receipts', []);
+                                        $set('invoiceItem', []);
+                                        $set('receiptBiayaItems', []);
+                                        $set('subtotal', 0);
+                                        $set('total', 0);
+                                    }),
+
+                                // Task 14: Multiple PO selection filtered by OR
+                                Forms\Components\CheckboxList::make('selected_purchase_orders')
+                                    ->label('Purchase Orders')
+                                    ->options(function ($get) {
+                                        $supplierId = $get('selected_supplier');
+                                        if (!$supplierId) return [];
+                                        
+                                        $query = PurchaseOrder::where('supplier_id', $supplierId)
+                                            ->where('status', 'completed')
+                                            ->whereHas('purchaseReceipt', fn($q) => $q->where('status', 'completed'));
+                                        
+                                        // Filter by OR if selected
+                                        $orId = $get('selected_order_request');
+                                        if ($orId) {
+                                            $query->where('refer_model_type', 'App\Models\OrderRequest')
+                                                  ->where('refer_model_id', $orId);
+                                        }
+                                        
+                                        return $query->get()
                                             ->filter(function ($po) {
-                                                // Check if all receipts are invoiced
                                                 $allReceiptIds = $po->purchaseReceipt()
                                                     ->where('status', 'completed')
-                                                    ->pluck('id')
-                                                    ->toArray();
-                                                
+                                                    ->pluck('id')->toArray();
                                                 if (empty($allReceiptIds)) return false;
                                                 
                                                 $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
                                                     ->whereNotNull('purchase_receipts')
-                                                    ->get()
-                                                    ->pluck('purchase_receipts')
-                                                    ->flatten()
-                                                    ->intersect($allReceiptIds)
-                                                    ->unique()
-                                                    ->toArray();
+                                                    ->get()->pluck('purchase_receipts')->flatten()
+                                                    ->intersect($allReceiptIds)->unique()->toArray();
                                                 
                                                 return count($invoicedReceiptIds) < count($allReceiptIds);
                                             })
-                                            ->mapWithKeys(function ($po) {
-                                                return [$po->id => $po->po_number];
-                                            });
+                                            ->mapWithKeys(fn ($po) => [$po->id => $po->po_number . ($po->referModel?->request_number ? ' (OR: ' . $po->referModel->request_number . ')' : '')]);
                                     })
-                                    ->searchable()
+                                    ->columns(2)
+                                    ->bulkToggleable()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_purchase_receipts', []);
@@ -141,9 +170,9 @@ class PurchaseInvoiceResource extends Resource
                                         $set('subtotal', 0);
                                         $set('total', 0);
                                         
-                                        // Auto-set due date based on PO tempo_hutang
-                                        if ($state) {
-                                            $po = PurchaseOrder::find($state);
+                                        // Auto-set due date based on first PO tempo_hutang
+                                        if ($state && count($state) > 0) {
+                                            $po = PurchaseOrder::find($state[0]);
                                             if ($po && $po->tempo_hutang) {
                                                 $invoiceDate = $get('invoice_date') ?: now();
                                                 $dueDate = \Carbon\Carbon::parse($invoiceDate)->addDays($po->tempo_hutang);
@@ -184,10 +213,10 @@ class PurchaseInvoiceResource extends Resource
                                     ->default(now())
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        // Auto-update due date if PO is selected and has tempo_hutang
-                                        $poId = $get('selected_purchase_order');
-                                        if ($poId && $state) {
-                                            $po = PurchaseOrder::find($poId);
+                                        // Auto-update due date based on first selected PO tempo_hutang
+                                        $poIds = $get('selected_purchase_orders');
+                                        if ($poIds && count($poIds) > 0 && $state) {
+                                            $po = PurchaseOrder::find($poIds[0]);
                                             if ($po && $po->tempo_hutang) {
                                                 $dueDate = \Carbon\Carbon::parse($state)->addDays($po->tempo_hutang);
                                                 $set('due_date', $dueDate->toDateString());
@@ -216,53 +245,51 @@ class PurchaseInvoiceResource extends Resource
                         // Purchase Receipts Selection
                         Section::make('Silahkan Pilih Purchase Receipt')
                             ->schema([
+                                // Task 14: Receipts from ALL selected POs
                                 Forms\Components\CheckboxList::make('selected_purchase_receipts')
                                     ->label('')
                                     ->options(function ($get) {
-                                        $purchaseOrderId = $get('selected_purchase_order');
-                                        if (!$purchaseOrderId) return [];
+                                        $purchaseOrderIds = $get('selected_purchase_orders');
+                                        if (!$purchaseOrderIds || empty($purchaseOrderIds)) return [];
                                         
-                                        $purchaseOrder = PurchaseOrder::find($purchaseOrderId);
-                                        if (!$purchaseOrder) return [];
-                                        
-                                        // Get all receipts from this PO
-                                        $purchaseReceipts = $purchaseOrder->purchaseReceipt()
-                                            ->with('purchaseReceiptItem.purchaseOrderItem', 'purchaseReceiptBiaya')
-                                            ->where('status', 'completed')
-                                            ->get();
+                                        $purchaseOrders = PurchaseOrder::with('purchaseOrderItem')
+                                            ->whereIn('id', $purchaseOrderIds)->get()->keyBy('id');
+                                        if ($purchaseOrders->isEmpty()) return [];
                                         
                                         // Check which receipts are already invoiced
                                         $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
                                             ->whereNotNull('purchase_receipts')
-                                            ->get()
-                                            ->pluck('purchase_receipts')
-                                            ->flatten()
-                                            ->unique()
-                                            ->toArray();
+                                            ->get()->pluck('purchase_receipts')->flatten()->unique()->toArray();
                                         
-                                        return $purchaseReceipts->mapWithKeys(function ($receipt) use ($invoicedReceiptIds) {
-                                            $isInvoiced = in_array($receipt->id, $invoicedReceiptIds);
+                                        $options = [];
+                                        foreach ($purchaseOrders as $purchaseOrder) {
+                                            $purchaseReceipts = $purchaseOrder->purchaseReceipt()
+                                                ->with('purchaseReceiptItem.purchaseOrderItem', 'purchaseReceiptBiaya')
+                                                ->where('status', 'completed')
+                                                ->get();
                                             
-                                            // Calculate total from receipt items + biaya lainnya
-                                            $total = $receipt->purchaseReceiptItem->sum(function ($item) {
-                                                $purchaseOrderItem = $item->purchaseOrderItem;
-                                                if ($purchaseOrderItem) {
-                                                    // Calculate price after discount and tax (both are percentages)
-                                                    $subtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
-                                                    $discountAmount = $subtotal * ($purchaseOrderItem->discount / 100);
-                                                    $afterDiscount = $subtotal - $discountAmount;
-                                                    $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
-                                                    $finalPrice = $afterDiscount + $taxAmount;
-                                                    return $finalPrice;
-                                                }
-                                                return 0;
-                                            }) + $receipt->purchaseReceiptBiaya->sum('total');
-                                            $label = "{$receipt->receipt_number} - Rp. " . number_format($total, 0, ',', '.');
-                                            if ($isInvoiced) {
-                                                $label .= " (Sudah di-invoice)";
+                                            foreach ($purchaseReceipts as $receipt) {
+                                                $isInvoiced = in_array($receipt->id, $invoicedReceiptIds);
+                                                
+                                                $total = $receipt->purchaseReceiptItem->sum(function ($item) use ($purchaseOrder) {
+                                                    $purchaseOrderItem = $purchaseOrder->purchaseOrderItem
+                                                        ->firstWhere('product_id', $item->product_id);
+                                                    if ($purchaseOrderItem) {
+                                                        $subtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
+                                                        $discountAmount = $subtotal * ($purchaseOrderItem->discount / 100);
+                                                        $afterDiscount = $subtotal - $discountAmount;
+                                                        $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
+                                                        return $afterDiscount + $taxAmount;
+                                                    }
+                                                    return 0;
+                                                }) + $receipt->purchaseReceiptBiaya->sum('total');
+                                                
+                                                $label = "[{$purchaseOrder->po_number}] {$receipt->receipt_number} - Rp. " . number_format($total, 0, ',', '.');
+                                                if ($isInvoiced) $label .= ' (Sudah di-invoice)';
+                                                $options[$receipt->id] = $label;
                                             }
-                                            return [$receipt->id => $label];
-                                        })->toArray();
+                                        }
+                                        return $options;
                                     })
                                     ->columns(1)
                                     ->reactive()
@@ -283,19 +310,26 @@ class PurchaseInvoiceResource extends Resource
                                             return;
                                         }
                                         
-                                        $purchaseOrderId = $get('selected_purchase_order');
+                                        $purchaseOrderIds = $get('selected_purchase_orders');
                                         $supplierId = $get('selected_supplier');
                                         
-                                        if (!$purchaseOrderId || !$supplierId) return;
+                                        if (!$purchaseOrderIds || empty($purchaseOrderIds) || !$supplierId) return;
                                         
-                                        $purchaseOrder = PurchaseOrder::with('supplier')->find($purchaseOrderId);
-                                        $purchaseReceipts = PurchaseReceipt::with('purchaseReceiptItem.purchaseOrderItem', 'purchaseReceiptBiaya')->whereIn('id', $state)->get();
+                                        // Task 14: Load ALL selected POs, keyed by ID for quick lookup
+                                        $purchaseOrders = PurchaseOrder::with('supplier', 'purchaseOrderItem')
+                                            ->whereIn('id', $purchaseOrderIds)->get()->keyBy('id');
                                         
-                                        // Set supplier info
-                                        $set('supplier_name', $purchaseOrder->supplier->name);
-                                        $set('supplier_phone', $purchaseOrder->supplier->phone ?? '');
+                                        if ($purchaseOrders->isEmpty()) return;
+                                        
+                                        $purchaseReceipts = PurchaseReceipt::with('purchaseReceiptItem', 'purchaseReceiptBiaya')->whereIn('id', $state)->get();
+                                        
+                                        // Set supplier info from first PO
+                                        $firstPo = $purchaseOrders->first();
+                                        $set('supplier_name', $firstPo->supplier->perusahaan);
+                                        $set('supplier_phone', $firstPo->supplier->phone ?? '');
                                         $set('from_model_type', 'App\Models\PurchaseOrder');
-                                        $set('from_model_id', $purchaseOrderId);
+                                        $set('from_model_id', $firstPo->id);
+                                        $set('purchase_order_ids', $purchaseOrderIds);
                                         
                                         // Calculate items from purchase receipts
                                         $items = [];
@@ -303,10 +337,12 @@ class PurchaseInvoiceResource extends Resource
                                         $subtotal = 0;
                                         
                                         foreach ($purchaseReceipts as $receipt) {
+                                            // Task 14: Find the correct PO for this receipt
+                                            $receiptPo = $purchaseOrders->get($receipt->purchase_order_id) ?? $firstPo;
+                                            
                                             foreach ($receipt->purchaseReceiptItem as $item) {
-                                                $purchaseOrderItem = $purchaseOrder->purchaseOrderItem()
-                                                    ->where('product_id', $item->product_id)
-                                                    ->first();
+                                                $purchaseOrderItem = $receiptPo->purchaseOrderItem
+                                                    ->firstWhere('product_id', $item->product_id);
                                                 
                                                 if ($purchaseOrderItem) {
                                                     // Calculate price after discount and tax (both are percentages)
@@ -684,7 +720,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->options(\App\Models\ChartOfAccount::where('type', 'liability')->get()->mapWithKeys(function ($coa) {
                                         return [$coa->id => $coa->formatted_name];
                                     }))
-                                    ->searchable(['code', 'name'])
+                                    ->searchable(['code', 'perusahaan'])
                                     ->preload()
                                     ->required()
                                     ->validationMessages([
@@ -699,7 +735,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->options(\App\Models\ChartOfAccount::where('type', 'asset')->get()->mapWithKeys(function ($coa) {
                                         return [$coa->id => $coa->formatted_name];
                                     }))
-                                    ->searchable(['code', 'name'])
+                                    ->searchable(['code', 'perusahaan'])
                                     ->preload()
                                     ->default(function () {
                                         return \App\Models\ChartOfAccount::where('code', '1170.06')->first()?->id;
@@ -710,7 +746,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->options(\App\Models\ChartOfAccount::where('type', 'asset')->get()->mapWithKeys(function ($coa) {
                                         return [$coa->id => $coa->formatted_name];
                                     }))
-                                    ->searchable(['code', 'name'])
+                                    ->searchable(['code', 'perusahaan'])
                                     ->preload()
                                     ->default(function () {
                                         return \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
@@ -721,7 +757,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->options(\App\Models\ChartOfAccount::where('type', 'expense')->get()->mapWithKeys(function ($coa) {
                                         return [$coa->id => $coa->formatted_name];
                                     }))
-                                    ->searchable(['code', 'name'])
+                                    ->searchable(['code', 'perusahaan'])
                                     ->preload()
                                     ->default(function () {
                                         return \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;

@@ -52,7 +52,7 @@ class DepositSummaryPage extends Page implements HasTable
                     ->formatStateUsing(function ($state) {
                         return "({$state->code}) {$state->name}";
                     })
-                    ->searchable(['code', 'name'])
+                    ->searchable(['code', 'perusahaan'])
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('from_model_type')

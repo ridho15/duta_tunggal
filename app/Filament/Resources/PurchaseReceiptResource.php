@@ -91,74 +91,6 @@ class PurchaseReceiptResource extends Resource
                             ->required()
                             ->searchable()
                             ->helperText('Pilih cabang untuk purchase receipt ini'),
-                        Select::make('purchase_order_id')
-                            ->label('Kode Pembelian')
-                            ->preload()
-                            ->searchable()
-                            ->reactive()
-                            ->validationMessages([
-                                'required' => 'Kode pembelian belum dipilih',
-                                'exists' => 'Kode pembelian tidak tersedia'
-                            ])
-                            ->options(function () {
-                                return \App\Models\PurchaseOrder::whereIn('status', ['approved', 'partially_received', 'completed'])
-                                    ->get()
-                                    ->map(function ($po) {
-                                        return [
-                                            'id' => $po->id,
-                                            'label' => $po->po_number
-                                        ];
-                                    })
-                                    ->pluck('label', 'id');
-                            })
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                $items = [];
-                                $purchaseOrder = \App\Models\PurchaseOrder::with('purchaseOrderCurrency')->find($state);
-                                
-                                if (!$purchaseOrder) {
-                                    // Handle case when purchase order is not found
-                                    $set('currency_id', 7); // Default to IDR
-                                    $set('purchaseReceiptItem', []);
-                                    return;
-                                }
-                                
-                                $warehouse_id = $purchaseOrder->warehouse_id ?? null;
-                                $rak_id = $purchaseOrder->rak_id ?? null;
-                                $currency_id = $purchaseOrder->purchaseOrderCurrency->first()->currency_id ?? 7; // Default to IDR if none
-                                $set('currency_id', $currency_id);
-                                $listPurchaseOrderItem = \App\Models\PurchaseOrderItem::where('purchase_order_id', $state)->get();
-                                foreach ($listPurchaseOrderItem as $purchaseOrderItem) {
-                                    $remainingQty = $purchaseOrderItem->remaining_quantity;
-                                    $items[] = [
-                                        'product_id' => $purchaseOrderItem->product_id,
-                                        'purchase_order_item_id' => $purchaseOrderItem->id,
-                                        'qty_received' => $remainingQty, // Set to remaining quantity instead of full quantity
-                                        'qty_accepted' => 0,
-                                        'qty_rejected' => 0,
-                                        'reason_rejected' => null,
-                                        'warehouse_id' => $warehouse_id,
-                                        'rak_id' => $rak_id,
-                                    ];
-                                }
-                                $set('purchaseReceiptItem', $items);
-
-                                // Auto-copy biaya dari PO ke PR
-                                $biayas = [];
-                                $listPurchaseOrderBiaya = \App\Models\PurchaseOrderBiaya::where('purchase_order_id', $state)->get();
-                                foreach ($listPurchaseOrderBiaya as $poBiaya) {
-                                    $biayas[] = [
-                                        'nama_biaya' => $poBiaya->nama_biaya,
-                                        'currency_id' => $poBiaya->currency_id,
-                                        'coa_id' => $poBiaya->coa_id,
-                                        'total' => $poBiaya->total,
-                                        'untuk_pembelian' => $poBiaya->untuk_pembelian,
-                                        'masuk_invoice' => $poBiaya->masuk_invoice == 1 ? true : false,
-                                        'purchase_order_biaya_id' => $poBiaya->id,
-                                    ];
-                                }
-                                $set('purchaseReceiptBiaya', $biayas);
-                            })
-                            ->required(),
                         DateTimePicker::make('receipt_date')
                             ->validationMessages([
                                 'required' => 'Tanggal penerimaan belum dipilih',
@@ -299,10 +231,6 @@ class PurchaseReceiptResource extends Resource
                             ->reactive()
                             ->defaultItems(0)
                             ->schema([
-                                TextInput::make('purchase_order_item_id')
-                                    ->label('PO Item ID')
-                                    ->readOnly()
-                                    ->nullable(),
                                 Select::make('product_id')
                                     ->preload()
                                     ->required()
@@ -311,12 +239,7 @@ class PurchaseReceiptResource extends Resource
                                         'required' => 'Produk belum dipilih',
                                         'exists' => 'Produk tidak tersedia'
                                     ])
-                                    ->relationship('product', 'name', function ($get, Builder $query) {
-                                        $purchaseOrderId = $get('../../purchase_order_id');
-                                        return $query->whereHas('purchaseOrderItem', function (Builder $query) use ($purchaseOrderId) {
-                                            $query->where('purchase_order_id', $purchaseOrderId);
-                                        });
-                                    })
+                                    ->relationship('product', 'name')
                                     ->reactive()
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "{$record->sku} - {$record->name}";
@@ -345,7 +268,7 @@ class PurchaseReceiptResource extends Resource
                                         $manageType = $user?->manage_type ?? [];
                                         $query = Warehouse::where('status', 1)
                                             ->where(function ($q) use ($search) {
-                                                $q->where('name', 'like', "%{$search}%")
+                                                $q->where('perusahaan', 'like', "%{$search}%")
                                                   ->orWhere('kode', 'like', "%{$search}%");
                                             });
                                         
@@ -592,7 +515,7 @@ class PurchaseReceiptResource extends Resource
                     ->label('QC Status')
                     ->getStateUsing(function ($record) {
                         $totalItems = $record->purchaseReceiptItem()->count();
-                        $sentItems = $record->purchaseReceiptItem()->where('is_sent', true)->count();
+                        $sentItems = $record->purchaseReceiptItem()->where('status', 'completed')->count();
 
                         if ($totalItems === 0) {
                             return 'Tidak ada item';
@@ -676,15 +599,14 @@ class PurchaseReceiptResource extends Resource
             ])
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Quality Control & Sinkronisasi Retur</summary>' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Purchase Receipt</summary>' .
                     '<div class="mt-2 text-sm">' .
                         '<ul class="list-disc pl-5">' .
-                            '<li><strong>QC Status</strong>: Menampilkan jumlah item yang dikirim ke QC (Terkirim / Total).</li>' .
-                            '<li><strong>Cara kirim ke QC</strong>: Buka halaman detail Purchase Receipt dan gunakan tombol "Send to QC" pada item yang ingin diuji.</li>' .
-                            '<li><strong>Status "Completed"</strong>: Semua item telah dikirim ke QC. Setelah QC disetujui, barang akan ditambahkan ke inventory dan Anda dapat melanjutkan dengan pembuatan invoice serta pembayaran.</li>' .
+                            '<li><strong>Alur Baru (QC First)</strong>: Purchase Receipt dibuat <strong>otomatis</strong> oleh sistem setelah Quality Control Purchase disetujui (status Passed). Jangan buat receipt manual.</li>' .
+                            '<li><strong>Alur</strong>: Purchase Order → Quality Control Purchase → Purchase Receipt (otomatis).</li>' .
+                            '<li><strong>QC Status</strong>: Menampilkan status Quality Control terkait receipt ini.</li>' .
+                            '<li><strong>Stok</strong>: Stok ditambahkan ke inventory otomatis saat QC disetujui dan receipt dibuat.</li>' .
                             '<li><strong>🔄 Sinkronisasi Retur:</strong> Jika qty_rejected diubah atau dihapus, Purchase Return akan otomatis terupdate atau terhapus untuk menjaga konsistensi data.</li>' .
-                            '<li><strong>Qty Rejected</strong>: Harus diisi manual. Jika > 0, sistem akan otomatis membuat Purchase Return untuk item yang ditolak.</li>' .
-                            '<li><strong>Catatan</strong>: Stok hanya akan dimasukkan ke inventory setelah QC disetujui; pengiriman ke QC tidak otomatis menambah stok.</li>' .
                         '</ul>' .
                     '</div>' .
                 '</details>'
@@ -750,7 +672,6 @@ class PurchaseReceiptResource extends Resource
     {
         return [
             'index' => Pages\ListPurchaseReceipts::route('/'),
-            'create' => Pages\CreatePurchaseReceipt::route('/create'),
             'view' => ViewPurchaseReceipt::route('/{record}'),
             'edit' => Pages\EditPurchaseReceipt::route('/{record}/edit'),
         ];

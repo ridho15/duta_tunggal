@@ -15,6 +15,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Actions\Action;
+use Filament\Actions\Action as HeaderAction;
 use App\Exports\GenericViewExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -29,6 +30,8 @@ class ViewStockMutationReport extends Page implements HasTable
     protected static string $resource = StockMutationReportResource::class;
 
     protected static string $view = 'filament.pages.reports.stock-mutation-report';
+
+    public bool $showPreview = false;
 
     public ?string $startDate = null;
     public ?string $endDate = null;
@@ -47,10 +50,40 @@ class ViewStockMutationReport extends Page implements HasTable
         $this->updateFilters();
     }
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            HeaderAction::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            HeaderAction::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+        ];
+    }
+
+    public function generateReport(): void
+    {
+        $this->updateFilters();
+        $this->showPreview = true;
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
+    }
+
     public function table(Table $table): Table
     {
         $query = StockMovement::query()
             ->with(['product', 'warehouse', 'rak'])
+            ->when(!$this->showPreview, fn($q) => $q->whereRaw('1 = 0'))
             ->when($this->startDate, fn($q) => $q->whereDate('date', '>=', $this->startDate))
             ->when($this->endDate, fn($q) => $q->whereDate('date', '<=', $this->endDate))
             ->when(!empty($this->productIds), fn($q) => $q->whereIn('product_id', $this->productIds))

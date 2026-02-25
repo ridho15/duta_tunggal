@@ -715,7 +715,7 @@ class DepositFeatureTest extends TestCase
             'credit' => 0,
             'journal_type' => 'deposit',
             'date' => now(),
-            'description' => 'Deposit ke supplier - ' . $supplier->name,
+            'description' => 'Deposit ke supplier - ' . $supplier->perusahaan,
         ]);
 
         $journalEntry2 = JournalEntry::create([
@@ -727,7 +727,7 @@ class DepositFeatureTest extends TestCase
             'credit' => 500000,
             'journal_type' => 'deposit',
             'date' => now(),
-            'description' => 'Pembayaran deposit ke supplier - ' . $supplier->name,
+            'description' => 'Pembayaran deposit ke supplier - ' . $supplier->perusahaan,
         ]);
 
         // Verify initial journal entries

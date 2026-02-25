@@ -119,7 +119,7 @@ class AssetResource extends Resource
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->sku . ' - ' . $record->name)
                             ->getSearchResultsUsing(function (string $search, Get $get) {
                                 $cabangId = $get('cabang_id');
-                                $query = \App\Models\Product::where('name', 'like', "%{$search}%")
+                                $query = \App\Models\Product::where('perusahaan', 'like', "%{$search}%")
                                     ->orWhere('sku', 'like', "%{$search}%");
 
                                 if ($cabangId) {

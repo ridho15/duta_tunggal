@@ -12,10 +12,10 @@ class QualityControlObserver
     public function created(QualityControl $qualityControl): void
     {
        if($qualityControl->from_model_type === PurchaseReceiptItem::class) {
-            // Revert PurchaseReceiptItem is_sent status when QC is updated
+            // Revert PurchaseReceiptItem status when QC is updated
             $purchaseReceiptItem = $qualityControl->fromModel;
             if ($purchaseReceiptItem) {
-                $purchaseReceiptItem->update(['is_sent' => 1]);
+                $purchaseReceiptItem->update(['status' => 'completed']);
             }
         }
     }
@@ -35,18 +35,18 @@ class QualityControlObserver
         if ($qualityControl->from_model_type === PurchaseReceiptItem::class && $qualityControl->from_model_id) {
             $item = PurchaseReceiptItem::find($qualityControl->from_model_id);
             if ($item) {
-                // Always use qty_accepted if available, otherwise qty_received
-                $maxInspectable = $item->qty_accepted > 0 ? $item->qty_accepted : $item->qty_received;
+                // QC can inspect up to qty_received (all items actually delivered)
+                $maxInspectable = $item->qty_received;
 
                 // Validate passed_quantity individually
                 if ($qualityControl->passed_quantity > $maxInspectable) {
-                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed accepted quantity ({$maxInspectable}) in purchase receipt.");
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed available quantity ({$maxInspectable}) in purchase receipt.");
                 }
 
                 // Validate total inspected (passed + rejected)
                 $totalInspected = $qualityControl->passed_quantity + $qualityControl->rejected_quantity;
                 if ($totalInspected > $maxInspectable) {
-                    throw new \Exception("QC total inspected quantity ({$totalInspected}) cannot exceed accepted quantity ({$maxInspectable}) in purchase receipt.");
+                    throw new \Exception("QC total inspected quantity ({$totalInspected}) cannot exceed available quantity ({$maxInspectable}) in purchase receipt.");
                 }
             }
         } elseif ($qualityControl->from_model_type === PurchaseOrderItem::class && $qualityControl->from_model_id) {
@@ -168,11 +168,11 @@ class QualityControlObserver
         // Cascade delete related journal entries
         $qualityControl->journalEntries()->delete();
 
-        // Revert PurchaseReceiptItem is_sent status when QC is deleted
+        // Revert PurchaseReceiptItem status when QC is deleted
         if ($qualityControl->from_model_type === PurchaseReceiptItem::class) {
             $purchaseReceiptItem = $qualityControl->fromModel;
             if ($purchaseReceiptItem) {
-                $purchaseReceiptItem->update(['is_sent' => 0]);
+                $purchaseReceiptItem->update(['status' => 'pending']);
             }
         }
     }
@@ -182,11 +182,11 @@ class QualityControlObserver
      */
     public function restored(QualityControl $qualityControl): void
     {
-        // Revert PurchaseReceiptItem is_sent status when QC is restored
+        // Revert PurchaseReceiptItem status when QC is restored
         if ($qualityControl->from_model_type === PurchaseReceiptItem::class) {
             $purchaseReceiptItem = $qualityControl->fromModel;
             if ($purchaseReceiptItem) {
-                $purchaseReceiptItem->update(['is_sent' => 1]);
+                $purchaseReceiptItem->update(['status' => 'completed']);
             }
         }
 

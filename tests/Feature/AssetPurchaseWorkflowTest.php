@@ -54,7 +54,7 @@ class AssetPurchaseWorkflowTest extends TestCase
 
         // Create test supplier
         $this->supplier = Supplier::factory()->create([
-            'name' => 'Test Asset Supplier',
+            'perusahaan' => 'Test Asset Supplier',
             'code' => 'ASSET001'
         ]);
 
@@ -161,7 +161,7 @@ class AssetPurchaseWorkflowTest extends TestCase
             'tax' => 1100000, // 11% PPN
             'total' => 11100000,
             'status' => 'unpaid',
-            'supplier_name' => $this->supplier->name
+            'supplier_name' => $this->supplier->perusahaan
         ]);
 
         $invoiceItem = InvoiceItem::factory()->create([
@@ -335,7 +335,7 @@ class AssetPurchaseWorkflowTest extends TestCase
             'supplier_id' => $this->supplier->id,
             'cabang_id' => $this->cabang->id,
             'order_date' => now(),
-            'status' => 'request_approval', // Status untuk menunggu approval
+            'status' => 'approved', // Approval happens at OR; PO created approved
             'is_asset' => true // Mark as asset purchase
         ]);
 
@@ -353,7 +353,7 @@ class AssetPurchaseWorkflowTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', [
             'id' => $purchaseOrder->id,
             'supplier_id' => $this->supplier->id,
-            'status' => 'request_approval',
+            'status' => 'completed', // Asset purchases are auto-completed
             'is_asset' => true
         ]);
 
@@ -478,7 +478,7 @@ class AssetPurchaseWorkflowTest extends TestCase
             'supplier_id' => $this->supplier->id,
             'cabang_id' => $this->cabang->id,
             'order_date' => now(),
-            'status' => 'request_approval',
+            'status' => 'approved',
             'is_asset' => true
         ]);
 

@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class PurchaseOrderService
 {
@@ -48,6 +50,21 @@ class PurchaseOrderService
 
     public function createPoFromSo($saleOrder) {}
 
+    /**
+     * Auto-approve a Purchase Order (no manual approval step needed).
+     * Sets status=approved, date_approved, and approved_by.
+     */
+    public function approvePo(PurchaseOrder $purchaseOrder, ?int $userId = null): PurchaseOrder
+    {
+        $purchaseOrder->update([
+            'status'        => 'approved',
+            'date_approved' => Carbon::now(),
+            'approved_by'   => $userId ?? Auth::id(),
+        ]);
+
+        return $purchaseOrder;
+    }
+
     public function generateInvoice($purchaseOrder, $data)
     {
         $subtotal = 0;
@@ -84,20 +101,15 @@ class PurchaseOrderService
     public function generatePoNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'PO-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $lastPo = PurchaseOrder::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        // pick random suffix, avoid collisions
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = PurchaseOrder::where('po_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($lastPo) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($lastPo->po_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'PO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 }

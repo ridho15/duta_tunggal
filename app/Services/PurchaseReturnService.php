@@ -18,21 +18,15 @@ class PurchaseReturnService
     public function generateNotaRetur()
     {
         $date = now()->format('Ymd');
+        $prefix = 'NR-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $lastPurchaseReturn = PurchaseReturn::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = PurchaseReturn::where('nota_retur', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($lastPurchaseReturn) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($lastPurchaseReturn->nota_retur, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'NR-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     /**

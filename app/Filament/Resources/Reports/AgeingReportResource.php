@@ -28,7 +28,7 @@ class AgeingReportResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Finance - Laporan';
 
     protected static ?string $navigationLabel = 'Aging Report (AR/AP)';
 
@@ -51,7 +51,7 @@ class AgeingReportResource extends Resource
                         if ($record instanceof AccountReceivable) {
                             return $record->customer->name ?? '-';
                         } elseif ($record instanceof AccountPayable) {
-                            return $record->supplier->name ?? '-';
+                            return $record->supplier->perusahaan ?? '-';
                         }
                         return '-';
                     }),

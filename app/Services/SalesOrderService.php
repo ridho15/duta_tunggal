@@ -143,21 +143,15 @@ class SalesOrderService
     public function generateSoNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'RN-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $lastSaleOrder = SaleOrder::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = SaleOrder::where('so_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($lastSaleOrder) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($lastSaleOrder->so_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'RN-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     public function titipSaldo($saleOrder, $data)
@@ -310,20 +304,15 @@ class SalesOrderService
     public function generateDoNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'DO-' . $date . '-';
 
-        // Hitung berapa DO pada hari ini
-        $lastDeliveryOrder = \App\Models\DeliveryOrder::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = \App\Models\DeliveryOrder::where('do_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($lastDeliveryOrder) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($lastDeliveryOrder->do_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'DO-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
+
 }

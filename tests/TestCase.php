@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\Cabang;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -25,6 +26,16 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         if ($this->shouldSeedBaseData()) {
+            // Create default Cabang if not exists
+            if (!Cabang::exists()) {
+                Cabang::create([
+                    'kode' => 'CB-001',
+                    'nama' => 'Cabang Utama',
+                    'alamat' => 'Jl. Test No. 1',
+                    'telepon' => '021-123456',
+                ]);
+            }
+            
             $this->seed(PermissionSeeder::class);
             $this->seed(RoleSeeder::class);
         }

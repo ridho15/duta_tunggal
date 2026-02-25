@@ -24,21 +24,16 @@ class PurchaseReceiptService
     public function generateReceiptNumber()
     {
         $date = now()->format('Ymd');
+        $prefix = 'RN-' . $date . '-';
 
-        // Hitung berapa PO pada hari ini
-        $lastPurchaseReceipt = PurchaseReceipt::whereDate('created_at', now()->toDateString())
-            ->orderBy('id', 'desc')
-            ->first();
+        // pick random suffix; retry if collision
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = $prefix . $random;
+            $exists = PurchaseReceipt::where('receipt_number', $candidate)->exists();
+        } while ($exists);
 
-        $number = 1;
-
-        if ($lastPurchaseReceipt) {
-            // Ambil nomor urut terakhir
-            $lastNumber = intval(substr($lastPurchaseReceipt->receipt_number, -4));
-            $number = $lastNumber + 1;
-        }
-
-        return 'RN-' . $date . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        return $candidate;
     }
 
     /**
@@ -56,20 +51,28 @@ class PurchaseReceiptService
         ]);
 
         $validItems = 0;
+        $debugItems = [];
         foreach ($receipt->purchaseReceiptItem as $item) {
             $qtyAccepted = max(0, $item->qty_accepted ?? 0);
-            if ($qtyAccepted > 0) {
-                $poItem = $item->purchaseOrderItem;
-                $unitPrice = $poItem?->unit_price ?? 0;
-                if ($unitPrice > 0) {
-                    $validItems++;
-                }
+            $poItem = $item->purchaseOrderItem;
+            $unitPrice = $poItem?->unit_price ?? 0;
+            $debugItems[] = [
+                'item_id' => $item->id,
+                'qtyAccepted' => $qtyAccepted,
+                'po_item_id' => $poItem?->id ?? null,
+                'unitPrice' => $unitPrice,
+            ];
+
+            if ($qtyAccepted > 0 && $unitPrice > 0) {
+                $validItems++;
             }
         }
 
         if ($validItems === 0) {
+            Log::info('postPurchaseReceipt: no valid items', ['receipt_id' => $receipt->id, 'items' => $debugItems]);
             return ['status' => 'skipped', 'message' => 'No valid items to process'];
         }
+
 
         // Post inventory for each valid item (deferred posting after QC)
         $postedEntries = [];
@@ -162,6 +165,7 @@ class PurchaseReceiptService
             ->where('description', 'like', '%Inventory Stock%')
             ->exists()
         ) {
+            Log::info('postItemInventoryAfterQC: skipped - duplicate journal exists', ['item_id' => $item->id]);
             return ['status' => 'skipped', 'message' => 'Item inventory already posted'];
         }
 
@@ -175,17 +179,20 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         if ($qtyAccepted <= 0) {
+            Log::info('postItemInventoryAfterQC: skipped - no accepted quantity', ['item_id' => $item->id, 'qtyAccepted' => $qtyAccepted]);
             return ['status' => 'skipped', 'message' => 'No accepted quantity to post inventory'];
         }
 
         $poItem = $item->purchaseOrderItem;
         $unitPrice = $poItem?->unit_price ?? 0;
         if ($unitPrice <= 0) {
+            Log::info('postItemInventoryAfterQC: skipped - invalid unit price', ['item_id' => $item->id, 'unitPrice' => $unitPrice]);
             return ['status' => 'skipped', 'message' => 'Invalid unit price'];
         }
 
         $amount = round($qtyAccepted * $unitPrice, 2);
         if ($amount <= 0) {
+            Log::info('postItemInventoryAfterQC: skipped - invalid amount', ['item_id' => $item->id, 'amount' => $amount]);
             return ['status' => 'skipped', 'message' => 'Invalid amount'];
         }
 
@@ -195,6 +202,7 @@ class PurchaseReceiptService
         $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
 
         if (! $inventoryCoa || ! $temporaryProcurementCoa || ! $unbilledPurchaseCoa) {
+            Log::info('postItemInventoryAfterQC: skipped - missing COA', ['item_id' => $item->id]);
             return ['status' => 'skipped', 'message' => 'Missing required COA configuration'];
         }
         $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
@@ -204,13 +212,14 @@ class PurchaseReceiptService
         $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
         $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
 
+        $receiptRef = $item->purchaseReceipt?->receipt_number ?? ('PRI-' . $item->id);
         $entries = [];
 
         // Debit inventory account
         $entries[] = JournalEntry::create([
             'coa_id' => $inventoryCoa->id,
             'date' => $date,
-            'reference' => 'PRI-' . $item->id,
+            'reference' => $receiptRef,
             'description' => 'Debit inventory for receipt item ' . $item->id,
             'debit' => round($amount, 2),
             'credit' => 0,
@@ -227,7 +236,7 @@ class PurchaseReceiptService
         $entries[] = JournalEntry::create([
             'coa_id' => $temporaryProcurementCoa->id,
             'date' => $date,
-            'reference' => 'PRI-' . $item->id,
+            'reference' => $receiptRef,
             'description' => 'Inventory Posting - Credit temporary procurement for receipt item ' . $item->id,
             'debit' => 0,
             'credit' => round($amount, 2),
@@ -239,27 +248,48 @@ class PurchaseReceiptService
             'source_id' => $item->id,
         ]);
 
+        Log::info('postItemInventoryAfterQC: created journal entries', ['item_id' => $item->id, 'entries_count' => count($entries)]);
+
         if (! $this->validateJournalBalance($entries)) {
+            Log::info('postItemInventoryAfterQC: journal entries not balanced', ['item_id' => $item->id]);
             return ['status' => 'error', 'message' => 'Journal entries are not balanced'];
         }
 
+        Log::info('postItemInventoryAfterQC: journal entries validated balanced', ['item_id' => $item->id]);
+
         // Create stock movement so the StockMovementObserver will update inventory quantities.
-        // Avoid duplicate stock movements for the same receipt item.
-        // Also check if stock movement was already created from QC completion.
-        $existingMovement = StockMovement::where('from_model_type', PurchaseReceiptItem::class)
-            ->where('from_model_id', $item->id)
-            ->orWhere(function ($query) use ($item) {
-                $query->where('from_model_type', \App\Models\QualityControl::class)
-                    ->whereHas('fromModel', function ($q) use ($item) {
-                        $q->where('from_model_type', \App\Models\PurchaseOrderItem::class)
-                          ->where('from_model_id', $item->purchase_order_item_id);
-                    });
-            })
+        // Determine if this posting was triggered by a QC that originated from a PurchaseOrderItem.
+        $qc = \App\Models\QualityControl::where('from_model_type', \App\Models\PurchaseOrderItem::class)
+            ->where('from_model_id', $item->purchase_order_item_id)
+            ->where('status', 1)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        // Debug logging to assist test failures
+        Log::info('postItemInventoryAfterQC: checking for QC', [
+            'purchase_receipt_item_id' => $item->id,
+            'purchase_order_item_id' => $item->purchase_order_item_id,
+            'qc_found' => $qc?->id ?? null,
+        ]);
+
+        // Default to linking the movement to the receipt item
+        $movementFromType = PurchaseReceiptItem::class;
+        $movementFromId = $item->id;
+
+        if ($qc) {
+            // If QC exists (completed), link the stock movement to the QC instead
+            $movementFromType = \App\Models\QualityControl::class;
+            $movementFromId = $qc->id;
+        }
+
+        // Avoid duplicate stock movements for the same source (either receipt item or QC)
+        $existingMovement = StockMovement::where('from_model_type', $movementFromType)
+            ->where('from_model_id', $movementFromId)
             ->first();
 
         if (! $existingMovement) {
             $meta = [
-                'source' => 'purchase_receipt',
+                'source' => $qc ? 'quality_control' : 'purchase_receipt',
                 'purchase_receipt_id' => $item->purchase_receipt_id,
                 'purchase_receipt_item_id' => $item->id,
                 'unit_cost' => $unitPrice,
@@ -268,6 +298,11 @@ class PurchaseReceiptService
                 'receipt_number' => $item->purchaseReceipt->receipt_number,
             ];
 
+            if ($qc) {
+                $meta['qc_id'] = $qc->id;
+                $meta['qc_number'] = $qc->qc_number;
+            }
+
             StockMovement::create([
                 'product_id' => $product->id,
                 'warehouse_id' => $item->warehouse_id,
@@ -275,11 +310,11 @@ class PurchaseReceiptService
                 'value' => $amount,
                 'type' => 'purchase_in',
                 'date' => $date,
-                'notes' => 'Stock inbound from QC-approved receipt: ' . $item->purchaseReceipt->receipt_number,
+                'notes' => $qc ? 'Stock inbound from QC completion: ' . $qc->qc_number : 'Stock inbound from QC-approved receipt: ' . $item->purchaseReceipt->receipt_number,
                 'meta' => $meta,
                 'rak_id' => $item->rak_id ?? null,
-                'from_model_type' => PurchaseReceiptItem::class,
-                'from_model_id' => $item->id,
+                'from_model_type' => $movementFromType,
+                'from_model_id' => $movementFromId,
             ]);
         }
 
@@ -543,7 +578,7 @@ class PurchaseReceiptService
             'coa_id' => $temporaryProcurementCoa->id,
             'date' => $date,
             'reference' => 'PRI-' . $item->id,
-            'description' => 'Temporary Procurement Entry - From QC: ' . $product->name . ' (' . $qtyAccepted . ' ' . $product->unit . ')',
+            'description' => 'Temporary Procurement - Item sent to QC: ' . $product->name . ' (' . $qtyAccepted . ' ' . $product->unit . ')',
             'debit' => round($amount, 2),
             'credit' => 0,
             'journal_type' => 'procurement',
@@ -560,7 +595,7 @@ class PurchaseReceiptService
             'coa_id' => $unbilledPurchaseCoa->id,
             'date' => $date,
             'reference' => 'PRI-' . $item->id,
-            'description' => 'Temporary Procurement Entry - From QC: ' . $product->name . ' (' . $qtyAccepted . ' ' . $product->unit . ')',
+            'description' => 'Temporary Procurement - Item sent to QC: ' . $product->name . ' (' . $qtyAccepted . ' ' . $product->unit . ')',
             'debit' => 0,
             'credit' => round($amount, 2),
             'journal_type' => 'procurement',
@@ -679,6 +714,17 @@ class PurchaseReceiptService
                 $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
                 $total = round($unitPrice * $receiptItem->qty_accepted, 2);
 
+                // Debug per-item calculation
+                Log::info('createAutomaticInvoiceFromReceipt: item calc', [
+                    'receipt_item_id' => $receiptItem->id,
+                    'po_item_id' => $poItem?->id,
+                    'tipe_pajak' => $poItem?->tipe_pajak,
+                    'tax_rate' => $poItem?->tax,
+                    'unit_price' => $unitPrice,
+                    'qty' => $receiptItem->qty_accepted,
+                    'line_gross' => $total,
+                ]);
+
                 $invoiceItems[] = [
                     'product_id' => $receiptItem->product_id,
                     'quantity' => $receiptItem->qty_accepted,
@@ -721,11 +767,59 @@ class PurchaseReceiptService
             ];
         }
 
-        // Calculate tax (PPN 11%)
-        $ppnRate = 11;
-        $dpp = round($subtotal / (1 + ($ppnRate / 100)), 2);
-        $tax = round($subtotal - $dpp, 2);
+        // Calculate tax per item respecting tipe_pajak and per-item tax rate
+        $dppTotal = 0.0;
+        $taxTotal = 0.0;
+        $taxRates = [];
+
+        foreach ($receipt->purchaseReceiptItem as $receiptItem) {
+            if ($receiptItem->qty_accepted <= 0) {
+                continue;
+            }
+
+            $poItem = $receiptItem->purchaseOrderItem;
+            $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+            $qty = $receiptItem->qty_accepted;
+            $lineGross = round($unitPrice * $qty, 2);
+            $rate = (float)($poItem->tax ?? 0);
+            $tipe = $poItem->tipe_pajak ?? ($receiptItem->product->tipe_pajak ?? 'Non Pajak');
+
+            if ($tipe === 'Non Pajak') {
+                $dppLine = $lineGross;
+                $taxLine = 0.0;
+            } elseif (in_array($tipe, ['Eksklusif', 'Eklusif'], true)) {
+                // unitPrice is net, tax computed on top
+                $dppLine = $lineGross;
+                $taxLine = round($dppLine * ($rate / 100), 2);
+                $taxRates[] = $rate;
+            } else { // Inklusif
+                // unitPrice includes tax
+                $dppLine = round($lineGross / (1 + ($rate / 100)), 2);
+                $taxLine = round($lineGross - $dppLine, 2);
+                $taxRates[] = $rate;
+            }
+
+            $dppTotal += $dppLine;
+            $taxTotal += $taxLine;
+        }
+
+        // Include other fees (treated as non-taxable by default)
+        foreach ($otherFees as $fee) {
+            $dppTotal += $fee['amount'];
+        }
+
+        $subtotal = round($dppTotal, 2); // subtotal stored as DPP (net)
+        $tax = round($taxTotal, 2);
         $total = round($subtotal + $tax, 2);
+
+        // Determine invoice-wide ppn_rate only when all taxable items share the same rate
+        $ppnRate = 0;
+        if (!empty($taxRates)) {
+            $uniqueRates = array_values(array_unique($taxRates));
+            if (count($uniqueRates) === 1) {
+                $ppnRate = $uniqueRates[0];
+            }
+        }
 
         $supplier = $receipt->purchaseOrder->supplier ?? null;
 
@@ -741,8 +835,8 @@ class PurchaseReceiptService
             'due_date' => now()->addDays(30)->toDateString(),
             'status' => 'paid', // Create as paid directly
             'ppn_rate' => $ppnRate,
-            'dpp' => $dpp,
-            'supplier_name' => $supplier ? $supplier->name : null,
+            'dpp' => $subtotal,
+            'supplier_name' => $supplier ? $supplier->perusahaan : null,
             'supplier_phone' => $supplier ? $supplier->phone : null,
             'purchase_receipts' => [$receipt->id],
         ]);
@@ -771,7 +865,8 @@ class PurchaseReceiptService
 
         // Post journal entries manually since invoice is created as paid
         $ledgerService = new \App\Services\LedgerPostingService();
-        $ledgerService->postInvoice($invoice);
+        $postResult = $ledgerService->postInvoice($invoice);
+        Log::info('createAutomaticInvoiceFromReceipt: ledger post result', ['invoice_id' => $invoice->id, 'result' => $postResult]);
 
         return [
             'status' => 'created',

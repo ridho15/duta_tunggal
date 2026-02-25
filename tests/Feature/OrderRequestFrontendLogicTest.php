@@ -19,8 +19,8 @@ beforeEach(function () {
 
 test('supplier product filtering logic', function () {
     // Create test data
-    $supplier1 = Supplier::factory()->create(['name' => 'Supplier A']);
-    $supplier2 = Supplier::factory()->create(['name' => 'Supplier B']);
+    $supplier1 = Supplier::factory()->create(['perusahaan' => 'Supplier A']);
+    $supplier2 = Supplier::factory()->create(['perusahaan' => 'Supplier B']);
 
     $product1 = Product::factory()->create(['supplier_id' => $supplier1->id, 'name' => 'Product 1']);
     $product2 = Product::factory()->create(['supplier_id' => $supplier1->id, 'name' => 'Product 2']);
@@ -159,7 +159,7 @@ test('order request fillable attributes', function () {
 test('order request supplier relationship', function () {
     $user = User::factory()->create();
     $warehouse = Warehouse::factory()->create();
-    $supplier = Supplier::factory()->create(['name' => 'Test Supplier', 'code' => 'SUP001']);
+    $supplier = Supplier::factory()->create(['perusahaan' => 'Test Supplier', 'code' => 'SUP001']);
 
     test()->actingAs($user);
 
@@ -174,7 +174,7 @@ test('order request supplier relationship', function () {
 
     // Test relationship
     expect($orderRequest->supplier)->not->toBeNull();
-    expect($orderRequest->supplier->name)->toBe('Test Supplier');
+    expect($orderRequest->supplier->perusahaan)->toBe('Test Supplier');
     expect($orderRequest->supplier->code)->toBe('SUP001');
 
     // Test that supplier can be null
@@ -188,15 +188,15 @@ test('order request supplier relationship', function () {
     ]);
 
     expect($orderRequestWithoutSupplier->supplier)->not->toBeNull(); // withDefault() returns default model
-    expect($orderRequestWithoutSupplier->supplier->name)->toBeNull(); // default model has null name
+    expect($orderRequestWithoutSupplier->supplier->perusahaan)->toBeNull(); // default model has null name
 });
 
 test('order request filters work correctly', function () {
     $user = User::factory()->create();
     $warehouse1 = Warehouse::factory()->create(['name' => 'Warehouse A']);
     $warehouse2 = Warehouse::factory()->create(['name' => 'Warehouse B']);
-    $supplier1 = Supplier::factory()->create(['name' => 'Supplier A']);
-    $supplier2 = Supplier::factory()->create(['name' => 'Supplier B']);
+    $supplier1 = Supplier::factory()->create(['perusahaan' => 'Supplier A']);
+    $supplier2 = Supplier::factory()->create(['perusahaan' => 'Supplier B']);
 
     test()->actingAs($user);
 
@@ -262,7 +262,7 @@ test('order request filters work correctly', function () {
 test('approve form supplier auto-selected from order request', function () {
     $user = User::factory()->create();
     $warehouse = Warehouse::factory()->create();
-    $supplier = Supplier::factory()->create(['name' => 'Auto Select Supplier', 'code' => 'AUTO001']);
+    $supplier = Supplier::factory()->create(['perusahaan' => 'Auto Select Supplier', 'code' => 'AUTO001']);
     $product = Product::factory()->create(['supplier_id' => $supplier->id]);
 
     test()->actingAs($user);
@@ -286,7 +286,7 @@ test('approve form supplier auto-selected from order request', function () {
 
     // Verify that the order request has the supplier
     expect($orderRequest->supplier_id)->toBe($supplier->id);
-    expect($orderRequest->supplier->name)->toBe('Auto Select Supplier');
+    expect($orderRequest->supplier->perusahaan)->toBe('Auto Select Supplier');
 
     // In a real scenario, when opening the approve form, supplier_id should be pre-filled
     // This would be tested in a browser test with Dusk, but here we verify the data integrity

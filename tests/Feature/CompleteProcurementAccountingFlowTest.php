@@ -293,7 +293,7 @@ class CompleteProcurementAccountingFlowTest extends TestCase
             'invoice_number' => 'INV-20251112-0001',
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
-            'supplier_name' => $this->supplier->name,
+            'supplier_name' => $this->supplier->perusahaan,
             'supplier_phone' => $this->supplier->phone ?? null,
             'invoice_date' => now(),
             'due_date' => now()->addDays(30),

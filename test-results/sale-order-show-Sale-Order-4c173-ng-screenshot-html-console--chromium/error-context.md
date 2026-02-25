@@ -1,0 +1,56 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - heading "404" [level=1] [ref=e5]
+      - generic [ref=e6]: Not Found
+  - generic [ref=e7]:
+    - generic [ref=e9]:
+      - generic [ref=e11]:
+        - generic [ref=e12] [cursor=pointer]:
+          - text: 
+          - generic: Request
+          - generic [ref=e13]: 404 Not Found
+        - text: 
+        - generic [ref=e14] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - generic [ref=e15] [cursor=pointer]:
+          - text: 
+          - generic: Exceptions
+          - generic [ref=e16]: "1"
+        - generic [ref=e17] [cursor=pointer]:
+          - text: 
+          - generic: Views
+          - generic [ref=e18]: "2"
+        - generic [ref=e19] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e20]: "4"
+        - generic [ref=e21] [cursor=pointer]:
+          - text: 
+          - generic: Models
+          - generic [ref=e22]: "1"
+        - text:   
+      - generic [ref=e23]:
+        - generic [ref=e25] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e28] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e29] [cursor=pointer]:
+          - generic: 
+          - generic: 51.2ms
+        - generic [ref=e30]:
+          - generic: 
+          - generic: 4MB
+        - generic [ref=e31]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e32] [cursor=pointer]:
+          - generic: 
+          - generic: "GET admin/sale-orders/{record}"
+    - text:                                           
+  - text: 
+```

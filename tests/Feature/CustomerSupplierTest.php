@@ -17,13 +17,16 @@ use Spatie\Permission\PermissionRegistrar;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->create();
     $this->cabang = Cabang::factory()->create([
         'kode' => 'BRANCH001',
         'nama' => 'Test Branch',
         'alamat' => 'Test Address',
         'telepon' => '0211234567',
         'status' => true
+    ]);
+    
+    $this->user = User::factory()->create([
+        'cabang_id' => $this->cabang->id,
     ]);
 
     app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -33,10 +36,12 @@ beforeEach(function () {
         'view customer',
         'create customer',
         'update customer',
+        'delete customer',
         'view any supplier',
         'view supplier',
         'create supplier',
         'update supplier',
+        'delete supplier',
         'view any cabang',
         'view cabang',
     ];
@@ -50,6 +55,8 @@ beforeEach(function () {
 });
 
 it('can create customer with credit limit', function () {
+    $cabang = \App\Models\Cabang::factory()->create();
+    
     $customerData = [
         'code' => 'CUST-TEST001',
         'name' => 'Test Customer',
@@ -64,6 +71,7 @@ it('can create customer with credit limit', function () {
         'kredit_limit' => 50000000,
         'tipe_pembayaran' => 'Kredit',
         'tipe' => 'PKP',
+        'cabang_id' => $cabang->id,
         'isSpecial' => false,
         'keterangan' => 'Test customer'
     ];
@@ -82,10 +90,11 @@ it('can create customer with credit limit', function () {
 });
 
 it('can create supplier with payment terms', function () {
+    $cabang = \App\Models\Cabang::factory()->create();
+    
     $supplierData = [
         'code' => 'SUP-TEST001',
         'perusahaan' => 'Test Supplier Company',
-        'name' => 'Test Supplier',
         'kontak_person' => 'John Doe',
         'npwp' => '1234567890123456',
         'address' => 'Test Address',
@@ -94,6 +103,7 @@ it('can create supplier with payment terms', function () {
         'email' => 'supplier@example.com',
         'fax' => '0211234567',
         'tempo_hutang' => 45,
+        'cabang_id' => $cabang->id,
         'keterangan' => 'Test supplier'
     ];
 
@@ -228,7 +238,7 @@ it('can update supplier payment terms', function () {
     $updateData = [
         'code' => $supplier->code,
         'perusahaan' => $supplier->perusahaan,
-        'name' => $supplier->name,
+        'name' => $supplier->perusahaan,
         'kontak_person' => $supplier->kontak_person,
         'npwp' => $supplier->npwp,
         'address' => $supplier->address,

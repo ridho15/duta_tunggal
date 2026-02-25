@@ -69,7 +69,10 @@ class StockTransferResource extends Resource
                             ->label('Dari Gudang')
                             ->preload()
                             ->searchable()
-                            ->relationship('fromWarehouse', 'id')
+                            ->relationship('fromWarehouse', 'id', function (Builder $query) {
+                                // Show all warehouses across all branches
+                                $query->withoutGlobalScope(\App\Models\Scopes\CabangScope::class);
+                            })
                             ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                 return "({$warehouse->kode}) {$warehouse->name}";
                             })
@@ -80,7 +83,9 @@ class StockTransferResource extends Resource
                             ->searchable()
                             ->reactive()
                             ->relationship('toWarehouse', 'id', function (Builder $query, $get) {
-                                $query->where('id', '!=', $get('../../from_warehouse_id'));
+                                // Allow transfer to any warehouse, even from different cabang
+                                $query->withoutGlobalScope(\App\Models\Scopes\CabangScope::class)
+                                      ->where('id', '!=', $get('../../from_warehouse_id'));
                             })
                             ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                 return "({$warehouse->kode}) {$warehouse->name}";

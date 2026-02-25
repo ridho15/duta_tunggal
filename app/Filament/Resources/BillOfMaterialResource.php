@@ -212,7 +212,7 @@ class BillOfMaterialResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "({$record->code}) {$record->name}";
                                     })
-                                    ->searchable(['code', 'name'])
+                                    ->searchable(['code', 'perusahaan'])
                                     ->preload()
                                     ->nullable(),
                                 Select::make('work_in_progress_coa_id')
@@ -222,7 +222,7 @@ class BillOfMaterialResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "({$record->code}) {$record->name}";
                                     })
-                                    ->searchable(['code', 'name'])
+                                    ->searchable(['code', 'perusahaan'])
                                     ->preload()
                                     ->nullable(),
                             ])

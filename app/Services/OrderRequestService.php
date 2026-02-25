@@ -27,23 +27,31 @@ class OrderRequestService
                 'order_date' => $data['order_date'],
                 'expected_date' => $data['expected_date'] ?? null,
                 'note' => $data['note'] ?? null,
-                'status' => 'draft',
+                'status' => 'approved', // Auto-approved since OR is already approved
                 'warehouse_id' => $orderRequest->warehouse_id,
                 'tempo_hutang' => $supplier->tempo_hutang ?? 0,
                 'created_by' => Auth::id() ?? $orderRequest->created_by,
             ]);
 
             foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
+                $unitPrice = (($orderRequestItem->unit_price ?? 0) > 0) ? $orderRequestItem->unit_price : ($orderRequestItem->product->cost_price ?? 0);
+                $discount = ($orderRequestItem->discount ?? 0);
+                $tax = ($orderRequestItem->tax ?? 0);
+                
                 $orderRequestItem->purchaseOrderItem()->create([
                     'purchase_order_id' => $purchaseOrder->id,
                     'product_id' => $orderRequestItem->product_id,
                     'quantity' => $orderRequestItem->quantity,
-                    'unit_price' => $orderRequestItem->product->cost_price,
-                    'discount' => 0,
-                    'tax' => 0,
+                    'unit_price' => $unitPrice,
+                    'discount' => $discount,
+                    'tax' => $tax,
                     'tipe_pajak' => 'Non Pajak',
                     'currency_id' => $currency->id,
                 ]);
+                
+                // Update fulfilled quantity for the order request item
+                $orderRequestItem->fulfilled_quantity = ($orderRequestItem->fulfilled_quantity ?? 0) + $orderRequestItem->quantity;
+                $orderRequestItem->save();
             }
         }
 
@@ -69,26 +77,32 @@ class OrderRequestService
             'order_date' => $data['order_date'],
             'expected_date' => $data['expected_date'] ?? null,
             'note' => $data['note'] ?? null,
-            'status' => 'draft',
+            'status' => 'approved', // Auto-approved since OR is already approved
             'warehouse_id' => $orderRequest->warehouse_id,
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
             'created_by' => Auth::id() ?? $orderRequest->created_by,
         ]);
 
         foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
+            $unitPrice = (($orderRequestItem->unit_price ?? 0) > 0) ? $orderRequestItem->unit_price : ($orderRequestItem->product->cost_price ?? 0);
+            $discount = ($orderRequestItem->discount ?? 0);
+            $tax = ($orderRequestItem->tax ?? 0);
+            
             $orderRequestItem->purchaseOrderItem()->create([
                 'purchase_order_id' => $purchaseOrder->id,
                 'product_id' => $orderRequestItem->product_id,
                 'quantity' => $orderRequestItem->quantity,
-                'unit_price' => $orderRequestItem->product->cost_price,
-                'discount' => 0,
-                'tax' => 0,
+                'unit_price' => $unitPrice,
+                'discount' => $discount,
+                'tax' => $tax,
                 'tipe_pajak' => 'Non Pajak',
                 'currency_id' => $currency->id,
             ]);
+            
+            // Observer will automatically update fulfilled_quantity
         }
 
-        return $purchaseOrder;
+        return $purchaseOrder->fresh(['purchaseOrderItem']);
     }
 
     public function reject($orderRequest)
