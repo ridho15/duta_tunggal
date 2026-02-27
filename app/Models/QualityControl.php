@@ -96,4 +96,9 @@ class QualityControl extends Model
         // Jika tidak, kembalikan null atau default
         return null;
     }
+
+    public function purchaseReturns()
+    {
+        return $this->hasMany(\App\Models\PurchaseReturn::class, 'quality_control_id');
+    }
 }

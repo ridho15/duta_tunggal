@@ -4,10 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\QualityControlPurchaseResource\Pages;
 use App\Http\Controllers\HelperController;
+use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseReturn;
 use App\Models\QualityControl;
 use App\Models\Rak;
 use App\Models\Warehouse;
+use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
@@ -464,18 +467,80 @@ class QualityControlPurchaseResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->visible(function ($record) {
-                            // Sembunyikan action jika passed_quantity = 0
+                            // Sembunyikan action jika passed_quantity = 0 atau sudah diproses
                             return !$record->status && $record->passed_quantity > 0;
                         })
-                        ->requiresConfirmation(function ($record) {
+                        // Show a resolution form only when there are rejected items
+                        ->form(function ($record) {
+                            if (!$record || $record->rejected_quantity <= 0) {
+                                return [];
+                            }
+
                             return [
-                                'title' => 'Konfirmasi Process QC',
-                                'description' => "Passed: {$record->passed_quantity}, Rejected: {$record->rejected_quantity}. Apakah Anda yakin ingin memproses QC ini?",
-                                'submitLabel' => 'Ya, Proses QC',
+                                \Filament\Forms\Components\Placeholder::make('qc_summary')
+                                    ->label('Ringkasan QC')
+                                    ->content(function () use ($record) {
+                                        return "Qty Diterima: {$record->passed_quantity} | Qty Ditolak: {$record->rejected_quantity}";
+                                    }),
+                                \Filament\Forms\Components\Radio::make('failed_qc_action')
+                                    ->label('Tindakan untuk item yang ditolak')
+                                    ->required()
+                                    ->options(PurchaseReturn::qcActionOptions())
+                                    ->descriptions([
+                                        PurchaseReturn::QC_ACTION_REDUCE_STOCK
+                                            => 'Qty pada PO item akan dikurangi sebesar qty yang ditolak. Barang dianggap tidak datang.',
+                                        PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY
+                                            => 'PO tetap terbuka; supplier diharapkan mengirim ulang item yang ditolak.',
+                                        PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER
+                                            => 'Qty yang ditolak digabung ke PO berikutnya dengan harga asli.',
+                                    ])
+                                    ->reactive(),
+                                \Filament\Forms\Components\Select::make('merge_target_po_id')
+                                    ->label('Target PO (untuk penggabungan)')
+                                    ->searchable()
+                                    ->preload()
+                                    ->options(function () use ($record) {
+                                        return PurchaseOrder::whereIn('status', ['draft', 'pending_approval', 'approved'])
+                                            ->whereHas('purchaseOrderItems', function ($q) use ($record) {
+                                                $q->where('product_id', $record->product_id);
+                                            })
+                                            ->orWhere(function ($q) {
+                                                $q->whereIn('status', ['draft', 'pending_approval', 'approved']);
+                                            })
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(fn ($po) => [$po->id => "{$po->po_number} ({$po->supplier?->name})"])
+                                            ->toArray();
+                                    })
+                                    ->visible(fn ($get) => $get('failed_qc_action') === PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER)
+                                    ->required(fn ($get) => $get('failed_qc_action') === PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER),
                             ];
                         })
-                        ->action(function ($record) {
-                            $qcService = new QualityControlService();
+                        ->requiresConfirmation(function ($record) {
+                            // Only show plain confirmation when there are NO rejected items
+                            return $record && $record->rejected_quantity <= 0;
+                        })
+                        ->modalHeading(fn ($record) => $record && $record->rejected_quantity > 0
+                            ? 'Proses QC – Pilih Tindakan untuk Item yang Ditolak'
+                            : 'Konfirmasi Process QC'
+                        )
+                        ->modalDescription(fn ($record) => $record && $record->rejected_quantity <= 0
+                            ? "Passed: {$record->passed_quantity}, Rejected: {$record->rejected_quantity}. Apakah Anda yakin ingin memproses QC ini?"
+                            : null
+                        )
+                        ->modalSubmitActionLabel('Proses QC')
+                        ->action(function ($record, array $data) {
+                            $qcService     = new QualityControlService();
+                            $returnService = app(PurchaseReturnService::class);
+
+                            // If there are rejected items, create the purchase return first
+                            if ($record->rejected_quantity > 0) {
+                                $action     = $data['failed_qc_action'] ?? PurchaseReturn::QC_ACTION_REDUCE_STOCK;
+                                $mergePoId  = $data['merge_target_po_id'] ?? null;
+
+                                $returnService->createFromQualityControl($record, $action, $mergePoId ?: null);
+                            }
+
                             $qcService->completeQualityControl($record, []);
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed");
                         }),

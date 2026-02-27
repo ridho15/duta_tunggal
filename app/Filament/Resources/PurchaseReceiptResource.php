@@ -54,6 +54,15 @@ class PurchaseReceiptResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    /**
+     * Purchase Receipt hanya dibuat otomatis dari hasil Quality Control.
+     * Pembuatan manual di-nonaktifkan untuk menegakkan flow: PO → QC → Receipt.
+     */
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

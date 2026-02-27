@@ -9,6 +9,8 @@ use App\Models\StockMovement;
 use App\Models\AccountPayable;
 use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
+use App\Models\QualityControl;
+use App\Models\PurchaseOrderItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +29,212 @@ class PurchaseReturnService
         } while ($exists);
 
         return $candidate;
+    }
+
+    /**
+     * Create a PurchaseReturn automatically from a completed QC that has rejected items.
+     *
+     * @param  QualityControl  $qc           The completed QC record (from_model_type = PurchaseOrderItem)
+     * @param  string          $action       One of PurchaseReturn::QC_ACTION_* constants
+     * @param  int|null        $mergePoId    Target PO id when action = merge_next_order
+     * @return PurchaseReturn
+     * @throws \Exception
+     */
+    public function createFromQualityControl(QualityControl $qc, string $action, ?int $mergePoId = null): PurchaseReturn
+    {
+        if ($qc->rejected_quantity <= 0) {
+            throw new \Exception('Cannot create purchase return: QC has no rejected items.');
+        }
+
+        $validActions = [
+            PurchaseReturn::QC_ACTION_REDUCE_STOCK,
+            PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY,
+            PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER,
+        ];
+        if (!in_array($action, $validActions, true)) {
+            throw new \Exception("Invalid failed_qc_action: {$action}");
+        }
+
+        if ($action === PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER && !$mergePoId) {
+            throw new \Exception('merge_next_order requires a target purchase order (merge_target_po_id).');
+        }
+
+        /** @var PurchaseOrderItem $poItem */
+        $poItem = $qc->fromModel;
+        if (!$poItem || !$poItem->purchaseOrder) {
+            throw new \Exception('Cannot locate PurchaseOrderItem or its PurchaseOrder for this QC.');
+        }
+
+        $purchaseOrder = $poItem->purchaseOrder;
+        $unitPrice     = $poItem->unit_price;
+
+        return DB::transaction(function () use ($qc, $action, $mergePoId, $poItem, $purchaseOrder, $unitPrice) {
+            $purchaseReturn = PurchaseReturn::create([
+                'quality_control_id' => $qc->id,
+                'purchase_receipt_id' => null,          // receipt not yet created at QC stage
+                'failed_qc_action'   => $action,
+                'replacement_po_id'  => $action === PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER ? $mergePoId : null,
+                'nota_retur'         => $this->generateNotaRetur(),
+                'return_date'        => now(),
+                'created_by'         => Auth::id(),
+                'status'             => 'draft',
+                'cabang_id'          => $purchaseOrder->cabang_id ?? Auth::user()?->cabang_id,
+                'notes'              => $this->buildQcReturnNotes($qc, $action),
+            ]);
+
+            // Create one return item for the rejected product
+            PurchaseReturnItem::create([
+                'purchase_return_id'      => $purchaseReturn->id,
+                'purchase_receipt_item_id' => null,     // no receipt item yet
+                'product_id'             => $qc->product_id,
+                'qty_returned'           => $qc->rejected_quantity,
+                'unit_price'             => $unitPrice,  // original PO price preserved
+                'reason'                 => $qc->reason_reject ?? 'Rejected in QC: ' . $qc->qc_number,
+            ]);
+
+            // Mark QC purchase return as processed
+            $qc->update(['purchase_return_processed' => now()]);
+
+            Log::info('PurchaseReturn created from QC', [
+                'purchase_return_id' => $purchaseReturn->id,
+                'qc_id'              => $qc->id,
+                'action'             => $action,
+                'rejected_qty'       => $qc->rejected_quantity,
+                'unit_price'         => $unitPrice,
+            ]);
+
+            return $purchaseReturn;
+        });
+    }
+
+    private function buildQcReturnNotes(QualityControl $qc, string $action): string
+    {
+        $labels = PurchaseReturn::qcActionOptions();
+        $actionLabel = $labels[$action] ?? $action;
+        return "Retur otomatis dari QC #{$qc->qc_number}. Tindakan: {$actionLabel}. "
+             . "Qty ditolak: {$qc->rejected_quantity}. Alasan: " . ($qc->reason_reject ?? '-');
+    }
+
+    /**
+     * Execute the QC resolution action when a QC-based return is approved.
+     *
+     * reduce_stock       → decrement PO item quantity by the returned qty
+     * wait_next_delivery → update tracking notes; PO remains open so supplier resends
+     * merge_next_order   → create a new PO item on the target PO carrying the original price
+     */
+    public function executeQcResolution(PurchaseReturn $purchaseReturn): void
+    {
+        if (!$purchaseReturn->isQcReturn()) {
+            return;
+        }
+
+        $action = $purchaseReturn->failed_qc_action;
+        $qc     = $purchaseReturn->qualityControl;
+
+        if (!$qc || !$qc->fromModel) {
+            Log::warning('executeQcResolution: QC or fromModel not found', ['return_id' => $purchaseReturn->id]);
+            return;
+        }
+
+        /** @var PurchaseOrderItem $poItem */
+        $poItem = $qc->fromModel;
+
+        switch ($action) {
+            case PurchaseReturn::QC_ACTION_REDUCE_STOCK:
+                $this->resolveByReducingPoQty($purchaseReturn, $poItem);
+                break;
+
+            case PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY:
+                $this->resolveByWaitingNextDelivery($purchaseReturn, $poItem);
+                break;
+
+            case PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER:
+                $this->resolveByMergingNextOrder($purchaseReturn, $poItem);
+                break;
+        }
+    }
+
+    /**
+     * Option A – Reduce PO item qty so the order reflects actual received amount.
+     */
+    private function resolveByReducingPoQty(PurchaseReturn $purchaseReturn, PurchaseOrderItem $poItem): void
+    {
+        $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
+
+        // Clamp so qty doesn't go negative
+        $newQty = max(0, $poItem->quantity - $totalRejected);
+        $poItem->update(['quantity' => $newQty]);
+
+        $purchaseReturn->update([
+            'tracking_notes' => ($purchaseReturn->tracking_notes ?? '')
+                . "\n[Approved] PO item qty reduced from {$poItem->quantity} to {$newQty}.",
+        ]);
+
+        Log::info('QC return resolved: reduce_stock', [
+            'return_id'   => $purchaseReturn->id,
+            'po_item_id'  => $poItem->id,
+            'old_qty'     => $poItem->quantity,
+            'new_qty'     => $newQty,
+            'rejected_qty'=> $totalRejected,
+        ]);
+    }
+
+    /**
+     * Option B – Flag the return as pending supplier resend; PO stays open.
+     */
+    private function resolveByWaitingNextDelivery(PurchaseReturn $purchaseReturn, PurchaseOrderItem $poItem): void
+    {
+        $purchaseReturn->update([
+            'supplier_response' => 'pending_resend',
+            'tracking_notes'    => ($purchaseReturn->tracking_notes ?? '')
+                . "\n[Approved] Waiting for supplier to resend " . $purchaseReturn->purchaseReturnItem->sum('qty_returned') . " unit(s).",
+        ]);
+
+        // Keep PO open so future deliveries can be received
+        Log::info('QC return resolved: wait_next_delivery', [
+            'return_id'  => $purchaseReturn->id,
+            'po_item_id' => $poItem->id,
+        ]);
+    }
+
+    /**
+     * Option C – Add a new line item to the target PO carrying the original unit price.
+     */
+    private function resolveByMergingNextOrder(PurchaseReturn $purchaseReturn, PurchaseOrderItem $originalPoItem): void
+    {
+        $targetPoId    = $purchaseReturn->replacement_po_id;
+        $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
+        $originalPrice = $originalPoItem->unit_price;
+
+        if (!$targetPoId) {
+            Log::warning('resolveByMergingNextOrder: no replacement_po_id set', ['return_id' => $purchaseReturn->id]);
+            return;
+        }
+
+        // Create a new PO item on the target PO with the original price
+        PurchaseOrderItem::create([
+            'purchase_order_id'    => $targetPoId,
+            'product_id'           => $originalPoItem->product_id,
+            'quantity'             => $totalRejected,
+            'unit_price'           => $originalPrice,    // original price inherited
+            'uom_id'               => $originalPoItem->uom_id,
+            'notes'                => "Merged from rejected QC #{$purchaseReturn->qualityControl?->qc_number} "
+                                     . "(original PO item #{$originalPoItem->id}, price IDR {$originalPrice})",
+            'refer_item_model_type' => get_class($originalPoItem),
+            'refer_item_model_id'  => $originalPoItem->id,
+        ]);
+
+        $purchaseReturn->update([
+            'replacement_notes' => ($purchaseReturn->replacement_notes ?? '')
+                . "\n[Approved] {$totalRejected} unit(s) merged into PO #{$targetPoId} at original price IDR {$originalPrice}.",
+        ]);
+
+        Log::info('QC return resolved: merge_next_order', [
+            'return_id'    => $purchaseReturn->id,
+            'target_po_id' => $targetPoId,
+            'qty'          => $totalRejected,
+            'unit_price'   => $originalPrice,
+        ]);
     }
 
     /**
@@ -264,11 +472,16 @@ class PurchaseReturnService
                 'approval_notes' => $data['approval_notes'] ?? null,
             ]);
 
-            // Create journal entries
-            $this->createJournalEntry($purchaseReturn);
-
-            // Adjust stock
-            $this->adjustStock($purchaseReturn);
+            if ($purchaseReturn->isQcReturn()) {
+                // QC-based return: items were rejected before entering stock.
+                // Execute the chosen resolution (reduce PO qty / wait / merge) instead of
+                // the standard inventory reversal + journal.
+                $this->executeQcResolution($purchaseReturn);
+            } else {
+                // Standard receipt-based return: reverse inventory and create journal entries.
+                $this->createJournalEntry($purchaseReturn);
+                $this->adjustStock($purchaseReturn);
+            }
         });
 
         return true;

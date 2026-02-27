@@ -10,6 +10,10 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Section as InfolistSection;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -213,8 +217,27 @@ class PurchaseReturnResource extends Resource
                     ->label('Nota Return')
                     ->searchable(),
                 TextColumn::make('purchaseReceipt.receipt_number')
-                    ->label('Receipt Number')
+                    ->label('Receipt / QC')
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($state) {
+                            return $state;
+                        }
+                        return $record->qualityControl?->qc_number
+                            ? '(QC) ' . $record->qualityControl->qc_number
+                            : '-';
+                    })
                     ->sortable(),
+                TextColumn::make('failed_qc_action')
+                    ->label('Tindakan QC')
+                    ->formatStateUsing(fn ($state) => \App\Models\PurchaseReturn::qcActionOptions()[$state] ?? '-')
+                    ->badge()
+                    ->color(fn ($state) => match ($state) {
+                        'reduce_stock'       => 'danger',
+                        'wait_next_delivery' => 'warning',
+                        'merge_next_order'   => 'info',
+                        default              => 'gray',
+                    })
+                    ->toggleable(),
                 TextColumn::make('cabang')
                     ->label('Cabang')
                     ->formatStateUsing(function ($state) {
@@ -233,6 +256,7 @@ class PurchaseReturnResource extends Resource
                         'pending_approval' => 'warning',
                         'approved' => 'success',
                         'rejected' => 'danger',
+                        default => 'gray',
                     }),
                 TextColumn::make('return_date')
                     ->dateTime()
@@ -249,8 +273,6 @@ class PurchaseReturnResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('nota_retur')
-                    ->searchable(),
                 TextColumn::make('createdBy.name')
                     ->label('Created By')
                     ->searchable()
@@ -393,14 +415,120 @@ class PurchaseReturnResource extends Resource
             ]);
     }
 
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                InfolistSection::make('Informasi Retur')
+                    ->columns(3)
+                    ->schema([
+                        TextEntry::make('nota_retur')->label('Nota Retur'),
+                        TextEntry::make('return_date')->dateTime()->label('Tanggal Retur'),
+                        TextEntry::make('status')
+                            ->badge()
+                            ->color(fn ($state) => match ($state) {
+                                'draft'            => 'gray',
+                                'pending_approval' => 'warning',
+                                'approved'         => 'success',
+                                'rejected'         => 'danger',
+                                default            => 'gray',
+                            })
+                            ->label('Status'),
+                        TextEntry::make('cabang')
+                            ->formatStateUsing(fn ($state) => "({$state->kode}) {$state->nama}")
+                            ->label('Cabang'),
+                        TextEntry::make('createdBy.name')->label('Dibuat Oleh'),
+                        TextEntry::make('notes')->label('Keterangan')->columnSpanFull(),
+                    ]),
+
+                InfolistSection::make('Sumber Retur')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('purchaseReceipt.receipt_number')
+                            ->label('Purchase Receipt')
+                            ->placeholder('(Retur dari QC – belum ada Receipt)')
+                            ->visible(fn ($record) => !$record->isQcReturn()),
+                        TextEntry::make('qualityControl.qc_number')
+                            ->label('QC Number')
+                            ->visible(fn ($record) => $record->isQcReturn()),
+                        TextEntry::make('qualityControl.fromModel.purchaseOrder.po_number')
+                            ->label('PO Number')
+                            ->visible(fn ($record) => $record->isQcReturn()),
+                        TextEntry::make('qualityControl.fromModel.purchaseOrder.supplier.name')
+                            ->label('Supplier')
+                            ->visible(fn ($record) => $record->isQcReturn()),
+                    ]),
+
+                InfolistSection::make('Tindakan Penanganan QC')
+                    ->columns(2)
+                    ->visible(fn ($record) => $record->isQcReturn())
+                    ->schema([
+                        TextEntry::make('failed_qc_action')
+                            ->label('Tindakan yang Dipilih')
+                            ->formatStateUsing(fn ($state) => \App\Models\PurchaseReturn::qcActionOptions()[$state] ?? '-')
+                            ->badge()
+                            ->color(fn ($state) => match ($state) {
+                                'reduce_stock'       => 'danger',
+                                'wait_next_delivery' => 'warning',
+                                'merge_next_order'   => 'info',
+                                default              => 'gray',
+                            }),
+                        TextEntry::make('replacementPurchaseOrder.po_number')
+                            ->label('Target PO (Gabung Pesanan)')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => $record->failed_qc_action === 'merge_next_order'),
+                        TextEntry::make('supplier_response')
+                            ->label('Respon Supplier')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => $record->failed_qc_action === 'wait_next_delivery'),
+                        TextEntry::make('tracking_notes')
+                            ->label('Tracking Notes')
+                            ->columnSpanFull(),
+                    ]),
+
+                InfolistSection::make('Item Retur')
+                    ->schema([
+                        RepeatableEntry::make('purchaseReturnItem')
+                            ->label('')
+                            ->columns(4)
+                            ->schema([
+                                TextEntry::make('product.name')->label('Produk'),
+                                TextEntry::make('product.sku')->label('SKU'),
+                                TextEntry::make('qty_returned')->label('Qty Dikembalikan'),
+                                TextEntry::make('unit_price')->money('IDR')->label('Harga Satuan'),
+                                TextEntry::make('reason')->label('Alasan')->columnSpanFull(),
+                            ]),
+                    ]),
+
+                InfolistSection::make('Approval')
+                    ->columns(2)
+                    ->visible(fn ($record) => in_array($record->status, ['approved', 'rejected']))
+                    ->schema([
+                        TextEntry::make('approvedBy.name')->label('Disetujui Oleh')->placeholder('-'),
+                        TextEntry::make('approved_at')->dateTime()->label('Tanggal Persetujuan')->placeholder('-'),
+                        TextEntry::make('approval_notes')->label('Catatan Approval')->placeholder('-')->columnSpanFull(),
+                        TextEntry::make('rejectedBy.name')->label('Ditolak Oleh')->placeholder('-'),
+                        TextEntry::make('rejected_at')->dateTime()->label('Tanggal Penolakan')->placeholder('-'),
+                        TextEntry::make('rejection_notes')->label('Alasan Penolakan')->placeholder('-')->columnSpanFull(),
+                    ]),
+            ]);
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {
-            $query->whereHas('purchaseReceipt', function ($q) use ($user) {
-                $q->where('cabang_id', $user->cabang_id);
+            // Include both receipt-based returns (cabang via receipt) and
+            // QC-based returns (cabang stored directly on the return record)
+            $query->where(function (Builder $q) use ($user) {
+                $q->whereHas('purchaseReceipt', function (Builder $inner) use ($user) {
+                    $inner->where('cabang_id', $user->cabang_id);
+                })->orWhere(function (Builder $inner) use ($user) {
+                    $inner->whereNotNull('quality_control_id')
+                          ->where('cabang_id', $user->cabang_id);
+                });
             });
         }
 

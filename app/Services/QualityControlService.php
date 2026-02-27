@@ -155,22 +155,28 @@ class QualityControlService
         }
 
         if ($qualityControl->rejected_quantity > 0) {
-            $returnProductService = app(ReturnProductService::class);
-            $returnData = array_merge($data, [
-                'return_number' => $returnProductService->generateReturnNumber(),
-                'from_model_id' => $qualityControl->id,
-                'from_model_type' => QualityControl::class,
-                'warehouse_id' => $data['warehouse_id'] ?? $qualityControl->warehouse_id,
-                'status' => 'draft',
-            ]);
-            $returnProduct = $qualityControl->returnProduct()->create($returnData);
-            $qualityControl->returnProductItem()->create([
-                'return_product_id' => $returnProduct->id,
-                'product_id' => $qualityControl->product_id,
-                'quantity' => $qualityControl->rejected_quantity,
-                'condition' => $data['item_condition'] ?? 'damage',
-                'rak_id' => $data['rak_id'] ?? null,
-            ]);
+            // Only create a sales-side ReturnProduct for non-purchase QC types.
+            // Purchase QC (from PurchaseOrderItem) uses PurchaseReturn instead,
+            // which is created by PurchaseReturnService::createFromQualityControl()
+            // BEFORE completeQualityControl() is called (from the process_qc action form).
+            if ($qualityControl->from_model_type !== 'App\Models\PurchaseOrderItem') {
+                $returnProductService = app(ReturnProductService::class);
+                $returnData = array_merge($data, [
+                    'return_number' => $returnProductService->generateReturnNumber(),
+                    'from_model_id' => $qualityControl->id,
+                    'from_model_type' => QualityControl::class,
+                    'warehouse_id' => $data['warehouse_id'] ?? $qualityControl->warehouse_id,
+                    'status' => 'draft',
+                ]);
+                $returnProduct = $qualityControl->returnProduct()->create($returnData);
+                $qualityControl->returnProductItem()->create([
+                    'return_product_id' => $returnProduct->id,
+                    'product_id' => $qualityControl->product_id,
+                    'quantity' => $qualityControl->rejected_quantity,
+                    'condition' => $data['item_condition'] ?? 'damage',
+                    'rak_id' => $data['rak_id'] ?? null,
+                ]);
+            }
         }
 
         // Load manufacturing order relationship only for Production model
