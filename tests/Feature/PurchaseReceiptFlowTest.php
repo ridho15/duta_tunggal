@@ -476,7 +476,7 @@ class PurchaseReceiptFlowTest extends TestCase
 
         /** @var QualityControlService $qualityControlService */
         $qualityControlService = app(QualityControlService::class);
-        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+        $qualityControl = $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -542,7 +542,7 @@ class PurchaseReceiptFlowTest extends TestCase
 
         /** @var QualityControlService $qualityControlService */
         $qualityControlService = app(QualityControlService::class);
-        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+        $qualityControl = $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -809,7 +809,7 @@ class PurchaseReceiptFlowTest extends TestCase
         ];
 
         // Create QC record
-        $qc = $qcService->createQCFromPurchaseReceiptItem($receiptItem, $qcData);
+        $qc = $qcService->createQCFromPurchaseOrderItem($poItem, $qcData);
 
         // Create temporary procurement entries
         $result = $receiptService->createTemporaryProcurementEntriesForReceiptItem($receiptItem);
@@ -1030,7 +1030,7 @@ class PurchaseReceiptFlowTest extends TestCase
         // 2. Send to QC using the service
         /** @var QualityControlService $qualityControlService */
         $qualityControlService = app(QualityControlService::class);
-        $qc = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+        $qc = $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
             'warehouse_id' => $this->warehouse->id,
         ]);
@@ -1093,7 +1093,7 @@ class PurchaseReceiptFlowTest extends TestCase
 
         /** @var QualityControlService $qualityControlService */
         $qualityControlService = app(QualityControlService::class);
-        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+        $qualityControl = $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -1159,7 +1159,7 @@ class PurchaseReceiptFlowTest extends TestCase
 
         /** @var QualityControlService $qualityControlService */
         $qualityControlService = app(QualityControlService::class);
-        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+        $qualityControl = $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -1282,7 +1282,7 @@ class PurchaseReceiptFlowTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('QC total inspected quantity (12) cannot exceed available quantity (10.00) in purchase receipt.');
 
-        $qualityControl = $qualityControlService->createQCFromPurchaseReceiptItem($receiptItem, [
+        $qualityControl = $qualityControlService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
             'passed_quantity' => 8, // Trying to pass 8 items
             'rejected_quantity' => 4, // Trying to reject 4 items

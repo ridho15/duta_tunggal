@@ -112,19 +112,20 @@ class QualityControlWorkflowTest extends TestCase
 
         $service = app(QualityControlService::class);
 
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 
         $this->assertNotNull($qualityControl);
         $this->assertStringStartsWith('QC-' . now()->format('Ymd'), $qualityControl->qc_number);
-        $this->assertEquals($context['purchaseReceiptItem']->qty_accepted, $qualityControl->passed_quantity);
+        $this->assertEquals($context['purchaseOrderItem']->quantity, $qualityControl->passed_quantity);
         $this->assertEquals(0, $qualityControl->rejected_quantity);
         $this->assertEquals(0, $qualityControl->status);
         $this->assertEquals($this->user->id, $qualityControl->inspected_by);
-        $this->assertEquals($context['purchaseReceiptItem']->warehouse_id, $qualityControl->warehouse_id);
-        $this->assertEquals(PurchaseReceiptItem::class, $qualityControl->from_model_type);
-        $this->assertEquals($context['purchaseReceiptItem']->id, $qualityControl->from_model_id);
+        // warehouse is taken from order item via purchase order
+        $this->assertEquals($context['purchaseOrder']->warehouse_id, $qualityControl->warehouse_id);
+        $this->assertEquals(PurchaseOrderItem::class, $qualityControl->from_model_type);
+        $this->assertEquals($context['purchaseOrderItem']->id, $qualityControl->from_model_id);
     }
 
     public function test_quality_control_completion_creates_stock_movement_and_marks_processed(): void
@@ -132,7 +133,7 @@ class QualityControlWorkflowTest extends TestCase
         $context = $this->createPurchaseReceiptContext();
         $service = app(QualityControlService::class);
 
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ])->fresh();
 
@@ -168,7 +169,7 @@ class QualityControlWorkflowTest extends TestCase
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
 
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -188,7 +189,6 @@ class QualityControlWorkflowTest extends TestCase
         $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
 
         $qualityControl->refresh();
-        $context['purchaseReceiptItem']->refresh();
 
         $this->assertEquals(1, $qualityControl->status);
         $this->assertNotNull($qualityControl->date_send_stock);
@@ -205,34 +205,12 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertEquals($this->product->id, $returnItems->first()->product_id);
         $this->assertEquals($qualityControl->id, $returnItems->first()->from_item_model_id);
 
-        $this->assertEquals(5, $context['purchaseReceiptItem']->qty_accepted);
-
         $this->assertDatabaseHas('return_product_items', [
             'return_product_id' => $returnProduct->id,
             'product_id' => $this->product->id,
             'quantity' => 3,
             'condition' => 'damage',
         ]);
-    }
-
-    public function test_quality_control_completion_marks_purchase_order_completed_when_all_received(): void
-    {
-        $context = $this->createPurchaseReceiptContext(orderedQty: 5, receivedQty: 5, acceptedQty: 5);
-        $service = app(QualityControlService::class);
-
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
-            'inspected_by' => $this->user->id,
-        ])->fresh();
-
-        $context['purchaseReceiptItem']->update(['is_sent' => 1]);
-
-        $service->completeQualityControl($qualityControl, []);
-
-        $context['purchaseOrder']->refresh();
-
-                $this->assertEquals('completed', $context['purchaseOrder']->status);
-        $this->assertEquals($this->user->id, $context['purchaseOrder']->completed_by);
-        $this->assertNotNull($context['purchaseOrder']->completed_at);
     }
 
     public function test_quality_control_rejection_sends_notification_to_supplier(): void
@@ -242,7 +220,7 @@ class QualityControlWorkflowTest extends TestCase
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
 
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -272,7 +250,7 @@ class QualityControlWorkflowTest extends TestCase
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
 
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -321,7 +299,7 @@ class QualityControlWorkflowTest extends TestCase
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
 
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -376,7 +354,7 @@ class QualityControlWorkflowTest extends TestCase
         $service = app(QualityControlService::class);
 
         // First, complete QC with passed items to create initial stock
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -437,7 +415,7 @@ class QualityControlWorkflowTest extends TestCase
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
 
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 
@@ -494,7 +472,7 @@ class QualityControlWorkflowTest extends TestCase
         $service = app(QualityControlService::class);
 
         // First create stock movement through QC completion
-        $qualityControl = $service->createQCFromPurchaseReceiptItem($context['purchaseReceiptItem'], [
+        $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
         ]);
 

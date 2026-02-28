@@ -15,7 +15,7 @@ class StockReportResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Persediaan';
 
     protected static ?int $navigationSort = 28;
 

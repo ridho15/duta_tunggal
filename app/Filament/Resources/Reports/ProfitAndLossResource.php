@@ -24,7 +24,7 @@ class ProfitAndLossResource extends Resource
     protected static ?string $navigationLabel = 'Laporan Laba Rugi (P&L)';
     protected static bool $shouldRegisterNavigation = true; // Task 15a: show in Finance - Laporan group
     protected static ?string $navigationGroup = 'Finance - Laporan';
-    protected static ?int $navigationSort = 22;
+    protected static ?int $navigationSort = 3;
     protected static ?string $model = JournalEntry::class;
 
     public static function form(Form $form): Form

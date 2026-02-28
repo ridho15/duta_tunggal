@@ -12,7 +12,7 @@ class CashFlowResource extends Resource
 {
     protected static ?string $navigationIcon = 'heroicon-o-arrow-trending-up';
     protected static ?string $navigationGroup = 'Finance - Laporan';
-    protected static ?int $navigationSort = 24;
+    protected static ?int $navigationSort = 10;
     protected static ?string $slug = 'reports/cash-flow';
     protected static ?string $model = CashBankTransaction::class;
     protected static ?string $navigationLabel = 'Laporan Arus Kas (Direct/Indirect)';

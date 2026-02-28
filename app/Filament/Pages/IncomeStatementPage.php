@@ -14,7 +14,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Section;
-use Filament\Tables\Actions\Action;
+use Filament\Actions\Action;
 use App\Services\IncomeStatementService;
 use App\Models\Cabang;
 use App\Models\IncomeStatementItem;
@@ -33,9 +33,9 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
 
     protected static ?string $navigationLabel = 'Trial Balance';
 
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Finance - Laporan';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
     public ?string $start_date = null;
     public ?string $end_date = null;
@@ -43,6 +43,9 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
     public bool $show_comparison = false;
     public ?string $comparison_start_date = null;
     public ?string $comparison_end_date = null;
+
+    // Preview gate – show filters first, data only after Preview is clicked
+    public bool $showPreview = false;
 
     // Display options
     public bool $show_only_totals = false;
@@ -156,48 +159,70 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
                     default => '',
                 };
             })
-            ->headerActions([
-                Action::make('generate_report')
-                    ->label('Generate Laporan')
-                    ->icon('heroicon-o-document-chart-bar')
-                    ->action(function () {
-                        $this->generateReport();
-                    }),
-                Action::make('export_excel')
-                    ->label('Export Excel')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->color('success')
-                    ->visible(fn () => IncomeStatementItem::count() > 0)
-                    ->action(function () {
-                        $data = $this->form->getState();
-                        return Excel::download(
-                            new IncomeStatementExport(
-                                $data['start_date'],
-                                $data['end_date'],
-                                $data['cabang_id'] ?? null
-                            ),
-                            'laporan-laba-rugi-' . now()->format('Y-m-d') . '.xlsx'
-                        );
-                    }),
-                Action::make('export_pdf')
-                    ->label('Export PDF')
-                    ->icon('heroicon-o-document')
-                    ->color('danger')
-                    ->visible(fn () => IncomeStatementItem::count() > 0)
-                    ->action(function () {
-                        $data = $this->form->getState();
-                        $pdfExport = new IncomeStatementPdfExport(
+            ->emptyStateHeading('Klik "Preview" untuk menampilkan laporan')
+            ->emptyStateDescription('Pilih rentang tanggal lalu klik tombol Preview di atas.')
+            ->emptyStateIcon('heroicon-o-document-chart-bar')
+            ->modifyQueryUsing(fn ($query) => $this->showPreview ? $query : $query->whereRaw('1=0'))
+            ->paginated(false);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('preview')
+                ->label('Preview')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            \Filament\Actions\Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+
+            \Filament\Actions\Action::make('export_excel')
+                ->label('Export Excel')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success')
+                ->visible(fn () => $this->showPreview)
+                ->action(function () {
+                    $data = $this->form->getState();
+                    return Excel::download(
+                        new IncomeStatementExport(
                             $data['start_date'],
                             $data['end_date'],
                             $data['cabang_id'] ?? null
-                        );
-                        $pdf = $pdfExport->generatePdf();
-                        return response()->streamDownload(function () use ($pdf) {
-                            echo $pdf->output();
-                        }, 'laporan-laba-rugi-' . now()->format('Y-m-d') . '.pdf');
-                    }),
-            ])
-            ->paginated(false);
+                        ),
+                        'laporan-laba-rugi-' . now()->format('Y-m-d') . '.xlsx'
+                    );
+                }),
+
+            \Filament\Actions\Action::make('export_pdf')
+                ->label('Export PDF')
+                ->icon('heroicon-o-document')
+                ->color('danger')
+                ->visible(fn () => $this->showPreview)
+                ->action(function () {
+                    $data = $this->form->getState();
+                    $pdfExport = new IncomeStatementPdfExport(
+                        $data['start_date'],
+                        $data['end_date'],
+                        $data['cabang_id'] ?? null
+                    );
+                    $pdf = $pdfExport->generatePdf();
+                    return response()->streamDownload(function () use ($pdf) {
+                        echo $pdf->output();
+                    }, 'laporan-laba-rugi-' . now()->format('Y-m-d') . '.pdf');
+                }),
+        ];
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
+        $this->resetTable();
     }
 
     public function generateReport(): void
@@ -334,6 +359,7 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
         }
 
         // Refresh table data
+        $this->showPreview = true;
         $this->resetTable();
     }
 

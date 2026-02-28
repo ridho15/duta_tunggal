@@ -14,7 +14,6 @@ class Product extends Model
     protected $fillable = [
         'name', // Nama Product
         'sku', // Kode
-        'supplier_id',
         'product_category_id',
         'cabang_id',
         'cost_price', // Harga Beli Asli (Rp.)
@@ -62,17 +61,14 @@ class Product extends Model
         return $query->where('is_active', false);
     }
 
-    public function supplier()
-    {
-        return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
-    }
-
-    // Task 12: Multi-supplier support
     public function suppliers()
     {
         return $this->belongsToMany(Supplier::class, 'product_supplier')
-            ->withPivot('supplier_price', 'supplier_sku', 'is_primary')
-            ->withTimestamps();
+            ->withPivot('supplier_price')
+            ->withTimestamps()
+            ->withCasts([
+                'supplier_price' => 'decimal:2'
+            ]);
     }
 
     public function unitConversions()

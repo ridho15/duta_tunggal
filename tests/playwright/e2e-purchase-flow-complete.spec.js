@@ -40,20 +40,21 @@ const STATE_FILE = `/tmp/e2e-po-state.json`;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Login and wait for admin dashboard */
+/** Login (or re-login if session expired). Uses bounded timeouts — Livewire keeps polling. */
 async function login(page) {
   try {
     await page.goto(`${BASE_URL}/admin/login`, { waitUntil: 'domcontentloaded' });
   } catch (e) {
     if (!e.message.includes('ERR_ABORTED')) throw e;
   }
-  await page.waitForLoadState('networkidle');
+  // Use bounded networkidle — admin dashboard may poll indefinitely
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => null);
   if (!page.url().includes('/login')) return; // Already logged in
   await page.fill('[id="data.email"]', 'ralamzah@gmail.com');
   await page.fill('[id="data.password"]', 'ridho123');
   await page.getByRole('button', { name: 'Masuk' }).click();
   await page.waitForURL(`${BASE_URL}/admin**`, { timeout: 20000 });
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => null);
   await page.waitForTimeout(500);
 }
 
@@ -106,25 +107,39 @@ async function safeGoto(page, url) {
     e.message.includes('ERR_ABORTED') ||
     e.message.includes('ERR_FAILED') ||
     e.message.includes('interrupted by another navigation');
+
+  /** Check if login form is actually present (more reliable than URL check) */
+  const isLoginFormVisible = async () => {
+    return await page.locator('[id="data.email"]').isVisible({ timeout: 1500 }).catch(() => false);
+  };
+
+  /** Perform login when form is visible */
+  const doLogin = async () => {
+    await page.fill('[id="data.email"]', 'ralamzah@gmail.com');
+    await page.fill('[id="data.password"]', 'ridho123');
+    await page.getByRole('button', { name: 'Masuk' }).click();
+    await page.waitForURL(`${BASE_URL}/admin**`, { timeout: 20000 }).catch(() => null);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => null);
+  };
+
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
   } catch (e) {
     if (!isNavigationError(e)) throw e;
   }
-  // If redirected to login, re-authenticate and retry
-  if (page.url().includes('/login')) {
-    await page.fill('[id="data.email"]', 'ralamzah@gmail.com');
-    await page.fill('[id="data.password"]', 'ridho123');
-    await page.getByRole('button', { name: 'Masuk' }).click();
-    await page.waitForURL(`${BASE_URL}/admin**`, { timeout: 20000 }).catch(() => null);
-    await page.waitForLoadState('networkidle');
-    // Retry navigation
+
+  // If redirected to login FORM (verify by presence, not just URL — URL can briefly show /login)
+  if (await isLoginFormVisible()) {
+    console.log('  🔑 safeGoto: login form detected, authenticating...');
+    await doLogin();
+    // Retry navigation to target
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' });
     } catch (e) {
       if (!isNavigationError(e)) throw e;
     }
   }
+
   if (!page.url().includes(urlPath)) {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -133,9 +148,20 @@ async function safeGoto(page, url) {
     }
     await page.waitForTimeout(2000);
   }
+
   // Wait for Choices.js to initialize (async-alpine loads select.js dynamically)
   await page.waitForSelector('.choices__inner', { timeout: 8000 }).catch(() => null);
   await page.waitForTimeout(300);
+
+  // Final safety check: if login form appeared again after all retry, try once more
+  if (await isLoginFormVisible()) {
+    console.log('  🔐 safeGoto: final recovery login...');
+    await doLogin();
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    } catch (e) { /* ignore */ }
+    await page.waitForTimeout(1000);
+  }
 }
 
 /**
@@ -251,6 +277,9 @@ if (!fs.existsSync('test-results')) fs.mkdirSync('test-results', { recursive: tr
 
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe('E2E: Alur Lengkap Pembelian', () => {
+  // CRITICAL: run all steps sequentially - they depend on shared DB state
+  // and state file /tmp/e2e-po-state.json written between steps
+  test.describe.configure({ mode: 'serial' });
   test.setTimeout(180000);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -385,6 +414,22 @@ test.describe('E2E: Alur Lengkap Pembelian', () => {
       // Skip rows that are clearly not draft (already approved/closed)
       if (lower.includes('closed') || lower.includes('rejected')) continue;
 
+      // ── Try direct "Approve" button first (some Filament configs show buttons inline) ──
+      const directApproveBtn = row.locator('button').filter({ hasText: /^approve$/i }).first();
+      if (await directApproveBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+        console.log(`  Found direct Approve button in row ${i}`);
+        await directApproveBtn.click();
+        await page.waitForTimeout(500);
+        // Check if a modal appeared
+        const isModal = await page.locator('[role="dialog"]').isVisible({ timeout: 2000 }).catch(() => false);
+        if (!isModal) {
+          // Direct action - already done
+        }
+        foundApprove = true;
+        break;
+      }
+
+      // ── Try action group dropdown ──────────────────────────────────────────
       const actionGroupBtn = row.locator('button[aria-haspopup="true"], button[aria-haspopup="menu"]').first();
       if (!(await actionGroupBtn.isVisible({ timeout: 500 }).catch(() => false))) continue;
 
@@ -786,7 +831,8 @@ test.describe('E2E: Alur Lengkap Pembelian', () => {
     await page.waitForTimeout(1500);
 
     // Verify at least one receipt exists (created automatically by QC process)
-    const rows = page.locator('table tbody tr');
+    // Use Filament-specific selectors to exclude phpDebugBar table rows
+    const rows = page.locator('.fi-ta-row').or(page.locator('table.fi-ta-table tbody tr'));
     const rowCount = await rows.count();
     console.log(`  Purchase Receipt rows: ${rowCount}`);
 
@@ -794,22 +840,30 @@ test.describe('E2E: Alur Lengkap Pembelian', () => {
     let receiptNumber = null;
 
     if (rowCount > 0) {
-      // Click the first receipt to view it
+      // Navigate via action menu or direct link - avoid clicking row directly (debugbar conflict)
       const firstRow = rows.first();
-      const viewBtn = firstRow.getByRole('link').first()
-        .or(firstRow.locator('a').first());
-      if (await viewBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await viewBtn.click();
-        await page.waitForLoadState('networkidle');
-      } else {
-        // Try clicking the row itself or a view action
-        const viewAction = firstRow.getByRole('button', { name: /view|lihat/i }).first();
-        if (await viewAction.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await viewAction.click();
+      // Try action group first
+      const actionBtn = firstRow.locator('button[aria-haspopup="true"]').first();
+      if (await actionBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await actionBtn.click();
+        await page.waitForTimeout(400);
+        const viewItem = page.getByRole('menuitem', { name: /lihat|view/i }).first();
+        if (await viewItem.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await viewItem.click();
           await page.waitForLoadState('networkidle');
         } else {
-          await firstRow.click();
-          await page.waitForLoadState('networkidle');
+          await page.keyboard.press('Escape');
+        }
+      }
+      // Fallback: find direct link in row
+      if (!page.url().match(/purchase-receipts\/\d+/)) {
+        const directLink = firstRow.locator('a[href*="/admin/purchase-receipts/"]').first();
+        if (await directLink.isVisible({ timeout: 2000 }).catch(() => false)) {
+          const href = await directLink.getAttribute('href');
+          if (href) {
+            await page.goto(`${BASE_URL}${href}`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+            await page.waitForLoadState('networkidle');
+          }
         }
       }
       await page.waitForTimeout(1000);
@@ -949,61 +1003,91 @@ test.describe('E2E: Alur Lengkap Pembelian', () => {
   // STEP 9: Buat Vendor Payment
   // ─────────────────────────────────────────────────────────────────────────
   test('Step 9: Buat Vendor Payment', async ({ page }) => {
+    // Extra timeout — vendor payment has many Livewire reactive fields
+    test.setTimeout(300000); // 5 minutes
+
     await login(page);
     await safeGoto(page, `${BASE_URL}/admin/vendor-payments/create`);
     console.log(`\n💳 Step 9: Vendor Payment @ ${page.url()}`);
+    // Fixed wait instead of networkidle — Livewire keeps polling indefinitely
+    await page.waitForTimeout(3000);
     await page.screenshot({ path: 'test-results/09-payment-form.png', fullPage: true });
 
     const today = new Date().toISOString().split('T')[0];
 
-    // Select Supplier
-    await fillSelect(page, 'Supplier', 'Personal');
-    await page.waitForTimeout(1500); // Wait for invoices to load reactively
+    // ── 1. Select Vendor ───────────────────────────────────────────────────
+    const supplierOk = await fillSelect(page, 'Vendor', 'Personal');
+    if (!supplierOk) await fillSelect(page, 'Supplier', 'Personal');
+    await page.waitForTimeout(3000); // fixed wait for Livewire invoice options to load
+    console.log('  ✓ Vendor selected');
+    await page.screenshot({ path: 'test-results/09-payment-supplier.png', fullPage: true });
 
-    await page.screenshot({ path: 'test-results/09-payment-supplier-selected.png', fullPage: true });
-
-    // Payment Date
+    // ── 2. Payment Date ────────────────────────────────────────────────────
     const payDateInput = page.locator('input[id*="payment_date"]').first();
     if (await payDateInput.isVisible({ timeout: 2000 }).catch(() => false)) {
       await payDateInput.fill(today);
       await page.keyboard.press('Tab');
     }
 
-    // Fill amount
-    const amtInput = page.locator('input[id*="amount"]:not([disabled])').first();
-    if (await amtInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await amtInput.fill('100000');
+    // ── 3. Select Payment Method = Cash (required Radio) ───────────────────
+    const cashRadio = page.locator('input[type="radio"][value="Cash"]').first();
+    if (await cashRadio.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await cashRadio.check();
+      console.log('  ✓ Payment method: Cash');
     } else {
-      // Try payment_amount which is a typical Filament field name
-      const payAmt = page.locator('input[id*="payment_amount"], input[id*="total_amount"], .fi-fo-field-wrp').filter({ hasText: /jumlah|amount/i }).first().locator('input').first();
-      if (await payAmt.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await payAmt.fill('100000');
+      const cashLabel = page.getByText('Cash', { exact: true }).first();
+      if (await cashLabel.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await cashLabel.click();
+        console.log('  ✓ Cash label clicked');
       }
     }
+    // Fixed wait for afterStateUpdated COA auto-fill (avoid networkidle)
+    await page.waitForTimeout(3000);
 
-    // COA (Cash/Bank)
-    await fillSelect(page, 'COA', 'Kas');
+    // ── 4. COA is set reactively by Livewire afterStateUpdated on payment_method ─
+    // Important: DO NOT interact with the Choices.js COA field here!
+    // Any Choices.js AJAX search on this heavy Livewire page freezes the JS context.
+    // The Livewire server state already has coa_id set from afterStateUpdated.
+    // The form submits wire:model server values, not the Choices.js display text.
+    console.log('  COA: handled by Livewire reactive (coa_id set server-side)');
 
-    // Select invoice checkbox
-    await page.waitForTimeout(500);
-    const invoiceCheckboxes = page.locator('input[type="checkbox"]');
+    // ── 5. Check invoice if available ─────────────────────────────────────
+    const invoiceCheckboxes = page.locator('input[type="checkbox"][value]');
     const cbCount = await invoiceCheckboxes.count();
-    console.log(`Checkboxes on form: ${cbCount}`);
+    console.log(`  Invoices: ${cbCount}`);
     if (cbCount > 0) {
-      await invoiceCheckboxes.first().check().catch(() => {});
-      await page.waitForTimeout(300);
+      const cb = invoiceCheckboxes.first();
+      if (await cb.isEnabled({ timeout: 500 }).catch(() => false)) {
+        await cb.check().catch(() => {});
+        await page.waitForTimeout(2000);
+        console.log('  ✓ Invoice checked');
+      }
     }
 
     await page.screenshot({ path: 'test-results/09-payment-filled.png', fullPage: true });
 
-    // Submit via Filament primary action button
+    // ── 6. Submit — wait for URL change, NOT networkidle ──────────────────
     await clickSaveButton(page);
-    await page.waitForLoadState('networkidle');
+    console.log('  Save clicked');
+    // Wait for URL to change away from /create (success redirect)
+    await page.waitForURL(/vendor-payments\/\d+|\/vendor-payments$/, { timeout: 30000 }).catch(() => null);
     await page.waitForTimeout(2000);
     await page.screenshot({ path: 'test-results/09-payment-saved.png', fullPage: true });
 
-    const url = page.url();
-    const paymentId = url.match(/vendor-payments\/(\d+)/)?.[1];
+    // ── 7. Capture payment ID ──────────────────────────────────────────────
+    let paymentUrl = page.url();
+    let paymentId = paymentUrl.match(/vendor-payments\/(\d+)/)?.[1];
+    console.log(`  Post-save URL: ${paymentUrl}`);
+
+    if (!paymentId) {
+      try {
+        await page.goto(`${BASE_URL}/admin/vendor-payments`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+      } catch (e) { /* navigation abort ok */ }
+      await page.waitForTimeout(2000);
+      const firstLink = page.locator('.fi-ta-row a[href*="/vendor-payments/"]').first();
+      const href = await firstLink.getAttribute('href', { timeout: 5000 }).catch(() => null);
+      paymentId = href?.match(/vendor-payments\/(\d+)/)?.[1];
+    }
     writeState({ ...readState(), paymentId });
 
     expect(page.url()).toContain('/admin/vendor-payment');

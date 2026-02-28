@@ -19,23 +19,25 @@ class JournalEntry extends Model
         'description',
         'debit',
         'credit',
-        'journal_type', // misal: 'sales', 'purchase', 'manual'
+        'journal_type',
         'cabang_id',
         'department_id',
         'project_id',
         'source_type',
         'source_id',
         'transaction_id',
-        // Bank reconciliation fields
-        'bank_recon_id', // reference to reconciliation batch
-        'bank_recon_status', // null|matched|cleared
+        'bank_recon_id',
+        'bank_recon_status',
         'bank_recon_date',
+        'is_reversal',
+        'reversal_of_transaction_id',
     ];
 
     protected $casts = [
         'date' => 'date',
         'debit' => 'decimal:2',
         'credit' => 'decimal:2',
+        'is_reversal' => 'boolean',
     ];
 
     public function coa()

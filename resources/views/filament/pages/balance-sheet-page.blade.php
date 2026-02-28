@@ -1,9 +1,16 @@
 <x-filament-panels::page>
     @php
-        $data = $this->getBalanceSheetData();
-        $comparison = $this->getComparisonData();
-        $multiPeriodData = $this->getMultiPeriodData();
-        $drillDownData = $this->getDrillDownData();
+        if ($this->showPreview) {
+            $data = $this->getBalanceSheetData();
+            $comparison = $this->getComparisonData();
+            $multiPeriodData = $this->getMultiPeriodData();
+            $drillDownData = $this->getDrillDownData();
+        } else {
+            $data = null;
+            $comparison = null;
+            $multiPeriodData = [];
+            $drillDownData = null;
+        }
     @endphp
 
     <style>
@@ -755,6 +762,7 @@
         </div>
     </div>
 
+    @if($this->showPreview)
     <!-- Summary Cards -->
     <div class="summary-grid no-print" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
         @if($use_multi_period && !empty($multiPeriodData))
@@ -940,6 +948,15 @@
                 </div>
             </div>
         </div>
+    @endif
+
+    @else
+    <div class="p-10 text-center text-gray-500 dark:text-gray-400">
+        <svg class="mx-auto mb-3 h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+        </svg>
+        <p class="text-base font-medium">Set filter terlebih dahulu, lalu klik <strong>Tampilkan Laporan</strong> untuk melihat data.</p>
+    </div>
     @endif
 
     <script>

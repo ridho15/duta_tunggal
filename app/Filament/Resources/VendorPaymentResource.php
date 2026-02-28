@@ -38,6 +38,8 @@ class VendorPaymentResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance - Pembayaran';
 
+    protected static ?string $navigationLabel = 'Payment Vendor';
+
     protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
@@ -62,9 +64,9 @@ class VendorPaymentResource extends Resource
                                             });
                                     })
                                     ->searchable()
-                                    ->nullable()
+                                    ->required()
                                     ->reactive()
-                                    ->helperText('Pilih Payment Request yang sudah disetujui (opsional - biarkan kosong jika tidak terkait PR)')
+                                    ->helperText('Pilih Payment Request yang sudah disetujui. Vendor Payment wajib mengacu pada Payment Request yang telah diapprove.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state) return;
                                         $pr = PaymentRequest::with('supplier')->find($state);

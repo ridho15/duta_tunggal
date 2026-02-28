@@ -2,56 +2,22 @@
 
 namespace App\Filament\Resources\SupplierResource\RelationManagers;
 
+use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\DB;
 
 class ProductsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'products';
+    protected static string $relationship = 'productSuppliers';
     
     protected static ?string $title = 'Produk Supplier';
-
-    public function form(Form $form): Form
-    {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('sku')
-                    ->label('SKU')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('name')
-                    ->label('Nama Produk')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\Select::make('cabang_id')
-                    ->label('Cabang')
-                    ->relationship('cabang', 'nama')
-                    ->required(),
-                Forms\Components\Select::make('product_category_id')
-                    ->label('Kategori Produk')
-                    ->relationship('productCategory', 'name')
-                    ->required(),
-                Forms\Components\TextInput::make('cost_price')
-                    ->label('Harga Beli')
-                    ->numeric()
-                    ->indonesianMoney()
-                    ->required(),
-                Forms\Components\TextInput::make('sell_price')
-                    ->label('Harga Jual')
-                    ->numeric()
-                    ->indonesianMoney()
-                    ->required(),
-                Forms\Components\Select::make('uom_id')
-                    ->label('Satuan')
-                    ->relationship('uom', 'name')
-                    ->required(),
-            ]);
-    }
 
     public function table(Table $table): Table
     {
@@ -69,12 +35,8 @@ class ProductsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('productCategory.name')
                     ->label('Kategori')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('cost_price')
-                    ->label('Harga Beli')
-                    ->money('IDR')
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('sell_price')
-                    ->label('Harga Jual')
+                Tables\Columns\TextColumn::make('pivot.supplier_price')
+                    ->label('Harga Beli Supplier')
                     ->money('IDR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('uom.name')
@@ -84,26 +46,66 @@ class ProductsRelationManager extends RelationManager
                     ->boolean(),
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Action::make('associateProduct')
+                    ->label('Associate Product')
+                    ->icon('heroicon-o-plus')
+                    ->color('success')
+                    ->form([
+                        Forms\Components\Select::make('product_id')
+                            ->label('Produk')
+                            ->options(Product::all()->mapWithKeys(function ($product) {
+                                return [$product->id => "{$product->sku} - {$product->name}"];
+                            }))
+                            ->searchable()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Produk harus dipilih'
+                            ]),
+                        Forms\Components\TextInput::make('supplier_price')
+                            ->label('Harga Beli Supplier')
+                            ->numeric()
+                            ->indonesianMoney()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Harga beli supplier tidak boleh kosong'
+                            ]),
+                    ])
+                    ->action(function (array $data) {
+                        $this->ownerRecord->productSuppliers()->attach($data['product_id'], [
+                            'supplier_price' => $data['supplier_price'],
+                        ]);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Product associated successfully')
+                            ->success()
+                            ->send();
+                    })
+                    ->modalHeading('Associate Product')
+                    ->modalSubmitActionLabel('Associate')
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-                Tables\Actions\RestoreAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->fillForm(function ($record) {
+                        return [
+                            'supplier_price' => $record->pivot->supplier_price ?? null,
+                        ];
+                    })
+                    ->form([
+                        Forms\Components\TextInput::make('supplier_price')
+                            ->label('Harga Beli Supplier')
+                            ->numeric()
+                            ->indonesianMoney()
+                            ->required(),
+                    ]),
+                Tables\Actions\DissociateAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\RestoreBulkAction::make(),
-                    Tables\Actions\ForceDeleteBulkAction::make(),
                 ]),
-            ])
-            ->modifyQueryUsing(fn (Builder $query) => $query->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]));
+            ]);
     }
 }

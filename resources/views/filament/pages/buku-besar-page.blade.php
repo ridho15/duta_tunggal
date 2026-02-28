@@ -113,6 +113,7 @@
 			</div>
 		</div>
 
+		@if($this->showPreview)
 		<div class="bg-white dark:bg-gray-900 shadow rounded-xl">
 			@php
 				$startDate = $this->start_date ?: now()->startOfMonth()->format('Y-m-d');
@@ -353,6 +354,12 @@
 				@endforeach
 			@endif
 		</div>
+		@else
+		<div class="bg-white dark:bg-gray-900 shadow rounded-xl p-10 text-center text-gray-500 dark:text-gray-400">
+			<x-heroicon-o-funnel class="mx-auto mb-3 h-10 w-10 text-gray-400" />
+			<p class="text-base font-medium">Set filter terlebih dahulu, lalu klik <strong>Tampilkan Laporan</strong> untuk melihat data.</p>
+		</div>
+		@endif
 	</div>
 
 </x-filament-panels::page>

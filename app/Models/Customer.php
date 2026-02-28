@@ -27,7 +27,7 @@ class Customer extends Model
         'tempo_kredit', // harian
         'kredit_limit', // Rp
         'tipe_pembayaran', //'Bebas','COD (Bayar Lunas)','Kredit'
-        'nik_npwp', // NIK / NPWP,
+        'nik_npwp', // NIK / NPWP, -> string karena bisa mengandung karakter selain angka
         'keterangan',
         'cabang_id',
     ];

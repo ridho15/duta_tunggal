@@ -635,7 +635,7 @@ class PurchaseInvoiceResource extends Resource
                                             ->where('type', 'PPN')
                                             ->orderByDesc('effective_date')
                                             ->first();
-                                        return $taxSetting?->rate ?? 0;
+                                        return $taxSetting?->rate ?? 11;
                                     })
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {

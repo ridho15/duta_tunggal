@@ -53,7 +53,8 @@ class DriverResource extends Resource
                             ->maxLength(15)
                             ->default(null)
                             ->validationMessages([
-                                'regex' => 'Nomor telepon tidak valid (harus dimulai dengan 08)'
+                                'regex' => 'Nomor telepon tidak valid (harus dimulai dengan 08)',
+                                'max'   => 'Nomor telepon terlalu panjang',
                             ]),
                         TextInput::make('license')
                             ->maxLength(255)

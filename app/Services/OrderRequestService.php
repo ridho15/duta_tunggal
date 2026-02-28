@@ -34,7 +34,15 @@ class OrderRequestService
             ]);
 
             foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
-                $unitPrice = (($orderRequestItem->unit_price ?? 0) > 0) ? $orderRequestItem->unit_price : ($orderRequestItem->product->cost_price ?? 0);
+                // Use unit_price from order request item (should already be supplier price);
+                // if not available, try supplier price from pivot, then fallback to cost_price
+                if (($orderRequestItem->unit_price ?? 0) > 0) {
+                    $unitPrice = $orderRequestItem->unit_price;
+                } else {
+                    $product = $orderRequestItem->product;
+                    $supplierProduct = $product ? $product->suppliers()->where('suppliers.id', $supplier->id)->first() : null;
+                    $unitPrice = $supplierProduct ? (float) $supplierProduct->pivot->supplier_price : ($product->cost_price ?? 0);
+                }
                 $discount = ($orderRequestItem->discount ?? 0);
                 $tax = ($orderRequestItem->tax ?? 0);
                 

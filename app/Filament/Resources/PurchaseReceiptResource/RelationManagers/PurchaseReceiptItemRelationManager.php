@@ -133,24 +133,6 @@ class PurchaseReceiptItemRelationManager extends RelationManager
             ])
             ->actions([
                 ActionGroup::make([
-                    Action::make('send_to_qc')
-                        ->label('Kirim ke Quality Control (Legacy - Tidak Direkomendasikan)')
-                        ->icon('heroicon-o-arrow-right-circle')
-                        ->color('gray')
-                        ->requiresConfirmation()
-                        ->modalHeading('Legacy Flow Deprecated')
-                        ->modalDescription('Flow QC dari Purchase Receipt Item sudah tidak direkomendasikan. Gunakan flow baru: Buat QC langsung dari Purchase Order Item untuk hasil yang lebih baik.')
-                        ->modalSubmitActionLabel('Mengerti')
-                        ->action(function () {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Legacy Flow Deprecated')
-                                ->body('Silakan buat QC langsung dari Purchase Order Item untuk flow yang lebih efisien.')
-                                ->warning()
-                                ->send();
-                        })
-                        ->visible(function ($record) {
-                            return !$record->qualityControl()->exists() && $record->qty_received > 0;
-                        }),
                     EditAction::make()
                         ->color('success')
                         ->hidden(function ($record) {

@@ -53,32 +53,20 @@ class QualityControlService
      * @param array $data
      * @return \App\Models\QualityControl
      */
+    /**
+     * @deprecated QC should originate from PurchaseOrderItem only.
+     * This wrapper redirects legacy calls to the PO-item flow so that
+     * PurchaseReceipt remains purely a record.
+     */
     public function createQCFromPurchaseReceiptItem($purchaseReceiptItem, $data)
     {
-        // Validate passed_quantity doesn't exceed qty_accepted (or qty_received if qty_accepted is 0)
-        $passedQuantity = $data['passed_quantity'] ?? $purchaseReceiptItem->qty_accepted;
-        $maxAllowed = $purchaseReceiptItem->qty_accepted > 0 ? $purchaseReceiptItem->qty_accepted : $purchaseReceiptItem->qty_received;
-        if ($passedQuantity > $maxAllowed) {
-            throw new \Exception("QC passed quantity ({$passedQuantity}) cannot exceed accepted quantity ({$maxAllowed}) in purchase receipt.");
+        Log::warning('createQCFromPurchaseReceiptItem called; redirecting to PO-item QC');
+        $poItem = $purchaseReceiptItem->purchaseOrderItem;
+        if (! $poItem) {
+            throw new \Exception('Cannot create QC from receipt without associated PurchaseOrderItem');
         }
-
-        $qualityControl = QualityControl::create([
-            'qc_number' => $this->generateQcNumber(),
-            'passed_quantity' => $passedQuantity,
-            'rejected_quantity' => $data['rejected_quantity'] ?? 0,
-            'status' => 0,
-            'inspected_by' => $data['inspected_by'] ?? null,
-            'warehouse_id' => $purchaseReceiptItem->warehouse_id,
-            'product_id' => $purchaseReceiptItem->product_id,
-            'rak_id' => $purchaseReceiptItem->rak_id ?? null,
-            'from_model_type' => \App\Models\PurchaseReceiptItem::class,
-            'from_model_id' => $purchaseReceiptItem->id,
-        ]);
-
-        // Update the purchase receipt item to mark it as sent to QC
-        $purchaseReceiptItem->update(['status' => 'completed']);
-
-        return $qualityControl;
+        // do not modify receipt item; receipt is purely record now
+        return $this->createQCFromPurchaseOrderItem($poItem, $data);
     }
 
     /**

@@ -15,9 +15,9 @@ class InventoryCardResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Gudang';
+    protected static ?string $navigationGroup = 'Persediaan';
 
-    protected static ?int $navigationSort = 26;
+    protected static ?int $navigationSort = 11;
 
     protected static ?string $slug = 'reports/inventory-card';
 

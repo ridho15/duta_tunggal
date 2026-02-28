@@ -17,6 +17,8 @@
 7. [Status Lifecycle](#7-status-lifecycle)
 8. [Observers & Business Logic](#8-observers--business-logic)
 9. [Impact Analysis](#9-impact-analysis)
+10. [Alur Stok Masuk ke Inventory (Purchase Receipt & QC)](#10-alur-stok-masuk-ke-inventory-purchase-receipt--qc)
+11. [Alur Stock Keluar — Purchase Return](#11-alur-stock-keluar--purchase-return)
 
 ---
 
@@ -1560,6 +1562,165 @@ syncJournalEntries($po);
 
 ---
 
+## 10. ALUR STOK MASUK KE INVENTORY (PURCHASE RECEIPT & QC)
+
+Stok masuk ke `inventory_stocks` melalui dua tahap: **Purchase Receipt** (penerimaan fisik barang) diikuti oleh **Quality Control** (pemeriksaan kualitas). Stok baru benar-benar dicatat di warehouse setelah QC dinyatakan lulus.
+
+### 10.1 Alur Lengkap Stok Masuk
+
+```
+Purchase Order (status = approved)
+    ↓
+Purchase Receipt dibuat
+  • status = pending_qc
+  • Barang tiba secara fisik — belum masuk inventory
+    ↓
+Quality Control dibuat untuk setiap Receipt Item
+  • QC Inspector mengisi passed_quantity & rejected_quantity
+    ↓
+QC Selesai / Lulus (passed_quantity > 0)
+  • QualityControlService::completeQualityControl()
+        ↓
+  StockMovement::create([type = 'purchase_in', qty = passed_quantity])
+        ↓
+  StockMovementObserver::created()
+        ↓
+  InventoryStock::qty_available += passed_quantity
+        ↓
+  Journal Entry dibuat (Dr. Inventory / Cr. Procurement In Transit)
+    ↓
+Purchase Order → status = 'closed' (setelah receipt selesai / manualComplete)
+```
+
+### 10.2 Class & Method yang Terlibat
+
+| Class | Method / Event | Peran |
+|-------|---------------|-------|
+| `QualityControlService` | `completeQualityControl()` | Memvalidasi QC selesai, membuat StockMovement & JournalEntry |
+| `StockMovement` | `create(['type' => 'purchase_in'])` | Record audit trail stok masuk |
+| `StockMovementObserver` | `created()` | Menambah `qty_available` di `inventory_stocks` |
+| `InventoryStock` | `qty_available += qty` | Tabel stok yang diupdate |
+| `QualityControlObserver` | `created()` / `updated()` | Memperbarui status `purchase_receipt_items` |
+
+### 10.3 Tipe StockMovement untuk Stok Masuk
+
+| Type | Sumber | Keterangan |
+|------|--------|------------|
+| `purchase_in` | QC Pass (Purchase Receipt) | Barang dari supplier diterima & lulus QC |
+| `transfer_in` | Stock Transfer | Barang masuk dari cabang/gudang lain |
+| `manufacture_in` | Manufacturing Output | Barang hasil produksi |
+| `adjustment_in` | Stock Opname | Penyesuaian stok positif |
+
+### 10.4 Journal Entry Saat Stok Masuk (QC Pass)
+
+```
+Dr. Inventory (1101.01)              [nilai = passed_qty × unit_cost]
+Cr. Procurement In Transit (1101.02) [nilai = passed_qty × unit_cost]
+
+• source_type = QualityControl::class
+• source_id   = $qc->id
+• journal_type = 'inventory'
+```
+
+### 10.5 Catatan Penting
+
+- Jika `passed_quantity = 0` (semua ditolak), **tidak ada StockMovement** `purchase_in` yang dibuat.
+- Jika `rejected_quantity > 0`, sistem dapat **otomatis membuat Purchase Return** via `PurchaseReturnAutomationService`.
+- `qty_on_hand` di `inventory_stocks` tidak dikelola oleh `StockMovementObserver` secara langsung — hanya `qty_available`. `qty_on_hand` diupdate secara manual di beberapa place (contoh: saat Purchase Return di-approve).
+
+---
+
+## 11. ALUR STOCK KELUAR — PURCHASE RETURN
+
+Purchase Return digunakan untuk mengembalikan barang ke supplier. Stok berkurang saat Purchase Return berstatus `approved`.
+
+### 11.1 Alur Lengkap Stok Keluar (Purchase Return)
+
+```
+Purchase Receipt (PO status = closed)
+    ↓
+Purchase Return dibuat (status = draft)
+  • Pilih Purchase Receipt (hanya untuk PO yang sudah closed)
+  • Tambah item: purchase_receipt_item_id, qty_returned, reason
+  • nota_retur di-generate otomatis (format: NR-YYYYMMDD-NNNN)
+    ↓
+Submit for Approval (status = pending_approval)
+    ↓
+Approve (status = approved)
+    ↓
+PurchaseReturnObserver::updated()  ← wasChanged('status') → approved
+        ↓
+  PurchaseReturnService::adjustStock($purchaseReturn)
+        ↓
+  Per item:
+    InventoryStock::decrement('qty_available', qty_returned)
+    InventoryStock::decrement('qty_on_hand',   qty_returned)
+    StockMovement::create([type = 'purchase_return', qty = qty_returned])
+        ↓
+  PurchaseReturnService::createJournalEntry($purchaseReturn)
+        ↓
+  Journal Entries dibuat (Dr. AP / Cr. Inventory)
+```
+
+### 11.2 Class & Method yang Terlibat
+
+| Class | Method / Event | Peran |
+|-------|---------------|-------|
+| `PurchaseReturnObserver` | `updated()` | Mendeteksi status berubah ke `approved`, memanggil service |
+| `PurchaseReturnService` | `adjustStock()` | Mengurangi `qty_available` & `qty_on_hand`, membuat StockMovement |
+| `PurchaseReturnService` | `createJournalEntry()` | Membuat jurnal akuntansi return |
+| `InventoryStock` | `decrement('qty_available', n)` | Stok tersedia berkurang |
+| `InventoryStock` | `decrement('qty_on_hand', n)` | Stok fisik berkurang |
+| `StockMovement` | `create(['type' => 'purchase_return'])` | Record audit trail stok keluar |
+
+### 11.3 Journal Entry Saat Purchase Return Disetujui
+
+```
+Dr. Accounts Payable (2101.01)  [nilai = qty_returned × unit_price]
+Cr. Inventory (1101.01)         [nilai = qty_returned × unit_price]
+
+• reference   = 'PR-{nota_retur}'    (contoh: PR-NR-20260228-3827)
+• source_type = PurchaseReturn::class
+• source_id   = $purchaseReturn->id
+• journal_type = 'purchase_return'
+```
+
+**Interpretasi**: Kewajiban ke supplier (AP) berkurang karena barang dikembalikan, dan nilai inventory juga berkurang.
+
+### 11.4 Status Lifecycle Purchase Return
+
+```
+draft → pending_approval → approved
+                         ↘ rejected (opsional)
+```
+
+| Status | Aksi | Siapa |
+|--------|------|-------|
+| `draft` | Submit for Approval | Requester / Purchasing |
+| `pending_approval` | Approve / Reject | Approver |
+| `approved` | — | Sistem otomatis adjust stok & buat jurnal |
+| `rejected` | — | Tidak ada perubahan stok/jurnal |
+
+### 11.5 Constraint Penting
+
+| Constraint | Keterangan |
+|-----------|------------|
+| PO harus `closed` | `purchase_receipt_id` select hanya menampilkan receipt dari PO berstatus `closed` |
+| `cabang_id` wajib diisi manual untuk Super Admin | `afterStateUpdated` pada `purchase_receipt_id` hanya auto-set `cabang_id` untuk non-Super Admin |
+| `qty_returned ≤ qty_received` | Validasi di form — tidak boleh melebihi jumlah yang diterima |
+| Tidak ada duplikat posting | `createJournalEntry()` mengecek `JournalEntry::where('source_id', ...)` sebelum membuat baru |
+
+### 11.6 Tabel Database yang Terpengaruh
+
+| Tabel | Kolom | Perubahan |
+|-------|-------|-----------|
+| `purchase_returns` | `status` | `draft` → `pending_approval` → `approved` |
+| `inventory_stocks` | `qty_available`, `qty_on_hand` | Berkurang sebesar `qty_returned` |
+| `stock_movements` | baris baru | `type = 'purchase_return'`, `quantity = qty_returned` |
+| `journal_entries` | 2 baris baru | Dr. AP / Cr. Inventory |
+
+---
+
 ## KESIMPULAN
 
 ### Key Takeaways:
@@ -1581,6 +1742,12 @@ syncJournalEntries($po);
    - Tax Compliance (PPN, PPh 22)
 
 5. **Automatic Sync Mechanism** menjaga journal entries selalu konsisten dengan source model
+
+6. **Alur Stok Masuk** terjadi setelah QC lulus:
+   - `QualityControlService::completeQualityControl()` → `StockMovement[type=purchase_in]` → `StockMovementObserver` → `InventoryStock.qty_available +=`
+
+7. **Alur Stok Keluar (Purchase Return)** terjadi saat status `approved`:
+   - `PurchaseReturnObserver` → `PurchaseReturnService::adjustStock()` → `InventoryStock.qty_available --` + `qty_on_hand --` + `StockMovement[type=purchase_return]`
 
 ---
 

@@ -1,0 +1,47 @@
+{
+  "cookies": [
+    {
+      "name": "XSRF-TOKEN",
+      "value": "eyJpdiI6IldRZnhxVzNQWFMvUW41VStUOHR5MEE9PSIsInZhbHVlIjoiMm1ObXVvNWNVRFNpWmoycUExSVF6U2NGQUc0RXVrUUwwQmdQL3hwamNWY0N6Mjl3Vm9vaWNSVFVPTHNkbWRBWkJpK1FHZ0ZvZDdpQTBpYzlud0MxZ0hxblN2YVQ2b2hKem1Ub0thUnNIWXF3Zi9TSzc5V2NUaWpaZ25tbVA4LzciLCJtYWMiOiI4NzAyNDA4OGUzZGFjZDQ3MDkzYTQ2MDhhNzFiOGQ1ZGJlNmQ3ZWUzNzdlNDRhMGViOTQ4Y2JiNzdhNWIyN2Y5IiwidGFnIjoiIn0%3D",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1772285488.994194,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "duta_tunggal_erp_session",
+      "value": "eyJpdiI6IjRTMlVPZGZLNzZFaUF4K0MvVi9ySnc9PSIsInZhbHVlIjoibWdrLy9lVFI5cS96ZVA1UmhYOXBXbVVnSzZmMlVaK25zVGpISDVkQzFXZURmcXZmYlBpelU4NEx6Mm9FOUtLNFZidXdZekdJRGNsejhjQXJqbk1BbStFMnBQRkZXVUVjd0x1S0c3VUIvSFVMZVpubG4yTWlQbVNhZUc5VmhWbTkiLCJtYWMiOiIyYjRlNDEwODk1NDFkMzFiODMxMDg1NjJiNTRkN2FhZTk2ZTc2ZDhiZTQ4NTIwY2YzMWU0MmQyMjE1Y2MxMjcyIiwidGFnIjoiIn0%3D",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1772285488.994226,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:8009",
+      "localStorage": [
+        {
+          "name": "theme",
+          "value": "system"
+        },
+        {
+          "name": "phpdebugbar-height",
+          "value": "300"
+        },
+        {
+          "name": "isOpen",
+          "value": "true"
+        },
+        {
+          "name": "collapsedGroups",
+          "value": "[]"
+        }
+      ]
+    }
+  ]
+}

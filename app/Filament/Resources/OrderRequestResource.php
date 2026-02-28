@@ -198,10 +198,18 @@ class OrderRequestResource extends Resource
                                         if ($state) {
                                             $product = Product::find($state);
                                             if ($product) {
-                                                $set('unit_price', $product->cost_price);
+                                                // Use supplier price from product_supplier pivot; fallback to cost_price
+                                                $supplierId = $get('../../supplier_id');
+                                                $unitPrice = (float) $product->cost_price;
+                                                if ($supplierId) {
+                                                    $supplierProduct = $product->suppliers()->where('suppliers.id', $supplierId)->first();
+                                                    if ($supplierProduct) {
+                                                        $unitPrice = (float) $supplierProduct->pivot->supplier_price;
+                                                    }
+                                                }
+                                                $set('unit_price', $unitPrice);
                                                 // Recalculate subtotal
                                                 $quantity = $get('quantity') ?? 0;
-                                                $unitPrice = $product->cost_price;
                                                 $discount = $get('discount') ?? 0;
                                                 $tax = $get('tax') ?? 0;
                                                 $subtotal = ($quantity * $unitPrice) - $discount + $tax;

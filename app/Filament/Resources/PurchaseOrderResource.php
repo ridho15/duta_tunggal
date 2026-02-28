@@ -127,7 +127,14 @@ class PurchaseOrderResource extends Resource
                                                 array_push($items, [
                                                     'product_id' => $saleOrderItem->product_id,
                                                     'quantity' => $saleOrderItem->quantity,
-                                                    'unit_price' => $saleOrderItem->product->cost_price,
+                                                    'unit_price' => (function () use ($saleOrderItem, $get) {
+                                                        $supplierId = $get('supplier_id');
+                                                        if ($supplierId) {
+                                                            $sp = $saleOrderItem->product->suppliers()->where('suppliers.id', $supplierId)->first();
+                                                            if ($sp) return (float) $sp->pivot->supplier_price;
+                                                        }
+                                                        return (float) $saleOrderItem->product->cost_price;
+                                                    })(),
                                                     'discount' => 0,
                                                     'tax' => 0,
                                                     'subtotal' => $subtotal
@@ -146,8 +153,14 @@ class PurchaseOrderResource extends Resource
                                                     $remainingQuantity = $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0);
                                                     // Only add items that still have remaining quantity
                                                     if ($remainingQuantity > 0) {
-                                                        // Use unit_price from OrderRequestItem if available, otherwise fallback to product cost_price
-                                                        $unitPrice = $orderRequestItem->unit_price ?? $orderRequestItem->product->cost_price;
+                                                        // Use unit_price from OrderRequestItem if available, otherwise use supplier price from pivot, fallback to cost_price
+                                                        if (($orderRequestItem->unit_price ?? 0) > 0) {
+                                                            $unitPrice = $orderRequestItem->unit_price;
+                                                        } else {
+                                                            $product = $orderRequestItem->product;
+                                                            $supplierProduct = $product ? $product->suppliers()->where('suppliers.id', $orderRequest->supplier_id)->first() : null;
+                                                            $unitPrice = $supplierProduct ? (float) $supplierProduct->pivot->supplier_price : ($product->cost_price ?? 0);
+                                                        }
                                                         $discount = $orderRequestItem->discount ?? 0;
                                                         $tax = $orderRequestItem->tax ?? 0;
                                                         
@@ -404,8 +417,16 @@ class PurchaseOrderResource extends Resource
                                                 default => 'Inklusif',
                                             };
                                             $newTax = $newTipePajak === 'Non Pajak' ? 0 : (float)($product->pajak ?? 0);
-                                            $newUnitPrice = (float)$product->cost_price;
-                                            $set('unit_price', $product->cost_price);
+                                            // Use supplier price from product_supplier pivot; fallback to cost_price
+                                            $supplierId = $get('../../supplier_id');
+                                            $newUnitPrice = (float) $product->cost_price;
+                                            if ($supplierId) {
+                                                $supplierProduct = $product->suppliers()->where('suppliers.id', $supplierId)->first();
+                                                if ($supplierProduct) {
+                                                    $newUnitPrice = (float) $supplierProduct->pivot->supplier_price;
+                                                }
+                                            }
+                                            $set('unit_price', $newUnitPrice);
                                             $set('discount', 0);
                                             $set('tax', $newTax);
                                             $set('tipe_pajak', $newTipePajak);
@@ -592,27 +613,40 @@ class PurchaseOrderResource extends Resource
                                     ->readOnly()
                                     ->indonesianMoney()
                                     ->afterStateUpdated(function ($component, $state, $livewire) {
+                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         $items = $livewire->data['purchaseOrderItem'] ?? [];
                                         $total = 0;
                                         foreach ($items as $item) {
-                                            $total += \App\Http\Controllers\HelperController::hitungSubtotal(
+                                            $itemSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
                                                 \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
                                                 $item['tipe_pajak'] ?? null
                                             );
+                                            // Convert item subtotal to IDR using purchaseOrderCurrency nominal
+                                            $itemNominal = 1.0;
+                                            if (!empty($item['currency_id'])) {
+                                                foreach ($currencies as $c) {
+                                                    if (($c['currency_id'] ?? null) == $item['currency_id']) {
+                                                        $itemNominal = (float)($c['nominal'] ?? 1.0);
+                                                        if ($itemNominal <= 0) $itemNominal = 1.0;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            $total += $itemSubtotal * $itemNominal;
                                         }
 
-                                        // Add biaya amounts converted using purchaseOrderCurrency.nominal if available
+                                        // Add biaya amounts converted using purchaseOrderCurrency.nominal
                                         $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
-                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         foreach ($biayas as $biaya) {
-                                            $nominal = 1;
+                                            $nominal = 1.0;
                                             if (isset($biaya['currency_id'])) {
                                                 foreach ($currencies as $c) {
                                                     if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
-                                                        $nominal = $c['nominal'] ?? $nominal;
+                                                        $nominal = (float)($c['nominal'] ?? 1.0);
+                                                        if ($nominal <= 0) $nominal = 1.0;
                                                         break;
                                                     }
                                                 }
@@ -788,26 +822,39 @@ class PurchaseOrderResource extends Resource
                                     ->default(0)
                                     ->indonesianMoney()
                                     ->afterStateUpdated(function ($component, $state, $livewire) {
+                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         $items = $livewire->data['purchaseOrderItem'] ?? [];
                                         $total = 0;
                                         foreach ($items as $item) {
-                                            $total += \App\Http\Controllers\HelperController::hitungSubtotal(
+                                            $itemSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
                                                 \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
                                                 $item['tipe_pajak'] ?? null
                                             );
+                                            // Convert item subtotal to IDR using purchaseOrderCurrency nominal
+                                            $itemNominal = 1.0;
+                                            if (!empty($item['currency_id'])) {
+                                                foreach ($currencies as $c) {
+                                                    if (($c['currency_id'] ?? null) == $item['currency_id']) {
+                                                        $itemNominal = (float)($c['nominal'] ?? 1.0);
+                                                        if ($itemNominal <= 0) $itemNominal = 1.0;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            $total += $itemSubtotal * $itemNominal;
                                         }
 
                                         $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
-                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         foreach ($biayas as $biaya) {
-                                            $nominal = 1;
+                                            $nominal = 1.0;
                                             if (isset($biaya['currency_id'])) {
                                                 foreach ($currencies as $c) {
                                                     if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
-                                                        $nominal = $c['nominal'] ?? $nominal;
+                                                        $nominal = (float)($c['nominal'] ?? 1.0);
+                                                        if ($nominal <= 0) $nominal = 1.0;
                                                         break;
                                                     }
                                                 }
@@ -872,12 +919,22 @@ class PurchaseOrderResource extends Resource
                                             return [$c->id => "{$c->name} ({$c->symbol})"];
                                         });
                                     })
+                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                        // Auto-fill nominal from Currency.to_rupiah master rate
+                                        if ($state) {
+                                            $currency = Currency::find($state);
+                                            if ($currency && (float)$currency->to_rupiah > 0) {
+                                                $set('nominal', $currency->to_rupiah);
+                                            }
+                                        }
+                                    })
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih',
                                         'exists' => 'Mata uang tidak tersedia'
                                     ]),
                                 TextInput::make('nominal')
-                                    ->label('Nominal')
+                                    ->label('Nominal (Kurs ke IDR)')
+                                    ->helperText('Nilai tukar mata uang terhadap IDR. Otomatis terisi dari master, bisa disesuaikan.')
                                     ->reactive()
                                     ->indonesianMoney()
                                     ->prefix(function ($get) {
@@ -890,26 +947,39 @@ class PurchaseOrderResource extends Resource
                                     })
                                     ->numeric()
                                     ->afterStateUpdated(function ($component, $state, $livewire) {
+                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         $items = $livewire->data['purchaseOrderItem'] ?? [];
                                         $total = 0;
                                         foreach ($items as $item) {
-                                            $total += \App\Http\Controllers\HelperController::hitungSubtotal(
+                                            $itemSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
                                                 \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
                                                 $item['tipe_pajak'] ?? null
                                             );
+                                            // Convert item subtotal to IDR using purchaseOrderCurrency nominal
+                                            $itemNominal = 1.0;
+                                            if (!empty($item['currency_id'])) {
+                                                foreach ($currencies as $c) {
+                                                    if (($c['currency_id'] ?? null) == $item['currency_id']) {
+                                                        $itemNominal = (float)($c['nominal'] ?? 1.0);
+                                                        if ($itemNominal <= 0) $itemNominal = 1.0;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            $total += $itemSubtotal * $itemNominal;
                                         }
 
                                         $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
-                                        $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         foreach ($biayas as $biaya) {
                                             $nominal = 1.0;
                                             if (isset($biaya['currency_id'])) {
                                                 foreach ($currencies as $c) {
                                                     if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
-                                                        $nominal = (float)($c['nominal'] ?? $nominal);
+                                                        $nominal = (float)($c['nominal'] ?? 1.0);
+                                                        if ($nominal <= 0) $nominal = 1.0;
                                                         break;
                                                     }
                                                 }
@@ -933,13 +1003,32 @@ class PurchaseOrderResource extends Resource
                                 }
 
                                 $total = 0;
+                                // Load purchaseOrderCurrency for nominal (custom rate) lookup
+                                $record->loadMissing('purchaseOrderCurrency');
+                                $poCurrencies = $record->purchaseOrderCurrency->keyBy('currency_id');
+
                                 foreach ($record->purchaseOrderItem as $item) {
-                                    $total += \App\Http\Controllers\HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);
+                                    $itemSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
+                                        (float)$item->quantity,
+                                        (float)$item->unit_price,
+                                        (float)$item->discount,
+                                        (float)$item->tax,
+                                        $item->tipe_pajak
+                                    );
+                                    // Use purchaseOrderCurrency.nominal (custom PO rate), fallback to Currency.to_rupiah
+                                    $poCurrency = $poCurrencies->get($item->currency_id);
+                                    $itemNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
+                                        ? (float)$poCurrency->nominal
+                                        : ($item->currency->to_rupiah ?? 1);
+                                    $total += $itemSubtotal * $itemNominal;
                                 }
 
                                 foreach ($record->purchaseOrderBiaya as $biaya) {
-                                    $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
-                                    $total += $biayaAmount;
+                                    $poCurrency = $poCurrencies->get($biaya->currency_id);
+                                    $biayaNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
+                                        ? (float)$poCurrency->nominal
+                                        : ($biaya->currency->to_rupiah ?? 1);
+                                    $total += $biaya->total * $biayaNominal;
                                 }
                                 $component->state($total);
                             }),

@@ -10,18 +10,15 @@ class ProductionPlanService
     public function generatePlanNumber(): string
     {
         $date = now()->format('Ymd');
-        $lastPlan = ProductionPlan::where('plan_number', 'like', "PP{$date}%")
-            ->orderBy('plan_number', 'desc')
-            ->first();
+        $prefix = "PP{$date}";
+        // generate random 4-digit suffix and ensure it doesn't already exist
+        do {
+            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+            $candidate = "{$prefix}{$random}";
+            $exists = ProductionPlan::where('plan_number', $candidate)->exists();
+        } while ($exists);
 
-        if ($lastPlan) {
-            $lastNumber = (int) substr($lastPlan->plan_number, -4);
-            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '0001';
-        }
-
-        return "PP{$date}{$newNumber}";
+        return $candidate;
     }
 
     public function getSaleOrderOptions()

@@ -14,7 +14,7 @@ class BukuBesarPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Finance - Laporan';
 
     protected static ?string $navigationLabel = 'Buku Besar (General Ledger)';
 
@@ -26,6 +26,35 @@ class BukuBesarPage extends Page
     public $start_date = null;
     public $end_date = null;
     public $view_mode = 'by_coa'; // 'by_coa', 'all'
+    public bool $showPreview = false;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            \Filament\Actions\Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+        ];
+    }
+
+    public function generateReport(): void
+    {
+        $this->showPreview = true;
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
+    }
 
     public function mount(Request $request): void
     {

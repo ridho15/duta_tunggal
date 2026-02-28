@@ -132,8 +132,8 @@ class TaxSettingResource extends Resource
     {
         return [
             'index' => Pages\ListTaxSettings::route('/'),
-            // 'create' => Pages\CreateTaxSetting::route('/create'),
-            // 'edit' => Pages\EditTaxSetting::route('/{record}/edit'),
+            'create' => Pages\CreateTaxSetting::route('/create'),
+            'edit' => Pages\EditTaxSetting::route('/{record}/edit'),
         ];
     }
 }

@@ -1,0 +1,90 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]: Duta Tunggal ERP
+          - heading "Masuk ke akun Anda" [level=1] [ref=e9]
+        - generic [ref=e10]:
+          - generic [ref=e11]:
+            - generic [ref=e14]:
+              - generic [ref=e17]:
+                - text: Alamat email
+                - superscript [ref=e18]: "*"
+              - generic [ref=e19]:
+                - textbox "Alamat email*" [ref=e22]: e2e-test@duta-tunggal.test
+                - paragraph [ref=e23]: Kredensial yang diberikan tidak dapat ditemukan.
+            - generic [ref=e26]:
+              - generic [ref=e29]:
+                - text: Kata sandi
+                - superscript [ref=e30]: "*"
+              - generic [ref=e32]:
+                - textbox "Kata sandi*" [ref=e34]: e2e-password-123
+                - button "Tampilkan kata sandi" [ref=e37] [cursor=pointer]:
+                  - generic [ref=e38]: Tampilkan kata sandi
+                  - img [ref=e39]
+            - generic [ref=e46]:
+              - checkbox "Ingat saya" [ref=e47]
+              - generic [ref=e48]: Ingat saya
+          - button "Masuk" [ref=e51] [cursor=pointer]:
+            - generic [ref=e52]: Masuk
+      - generic:
+        - dialog
+      - generic:
+        - dialog
+      - generic:
+        - dialog
+  - generic:
+    - status
+  - generic [ref=e53]:
+    - generic [ref=e55]:
+      - generic [ref=e57]:
+        - generic [ref=e58] [cursor=pointer]:
+          - text: 
+          - generic: Request
+        - text: 
+        - generic [ref=e59] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - text: 
+        - generic [ref=e60] [cursor=pointer]:
+          - text: 
+          - generic: Views
+          - generic [ref=e61]: "12"
+        - generic [ref=e62] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e63]: "11"
+        - text: 
+        - generic [ref=e64] [cursor=pointer]:
+          - text: 
+          - generic: Livewire
+          - generic [ref=e65]: "1"
+        - text:  
+      - generic [ref=e66]:
+        - generic [ref=e68] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e71] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e72]: "2"
+        - combobox [ref=e73] [cursor=pointer]:
+          - option "#1 login (23:26:48)"
+          - option "#2 update (ajax) (23:26:49)" [selected]
+        - generic [ref=e74] [cursor=pointer]:
+          - generic: 
+          - generic: 295ms
+        - generic [ref=e75]:
+          - generic: 
+          - generic: 5MB
+        - generic [ref=e76]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e77] [cursor=pointer]:
+          - generic: 
+          - generic: POST livewire/update
+    - text:                                                                                                                         
+  - text: 
+```

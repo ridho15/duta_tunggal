@@ -212,7 +212,7 @@ class BillOfMaterialResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "({$record->code}) {$record->name}";
                                     })
-                                    ->searchable(['code', 'perusahaan'])
+                                    ->searchable(['code', 'name'])
                                     ->preload()
                                     ->nullable(),
                                 Select::make('work_in_progress_coa_id')
@@ -222,7 +222,7 @@ class BillOfMaterialResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "({$record->code}) {$record->name}";
                                     })
-                                    ->searchable(['code', 'perusahaan'])
+                                    ->searchable(['code', 'name'])
                                     ->preload()
                                     ->nullable(),
                             ])
@@ -343,6 +343,40 @@ class BillOfMaterialResource extends Resource
                                     ->reactive()
                                     ->getOptionLabelFromRecordUsing(function (UnitOfMeasure $uom) {
                                         return "{$uom->name} ({$uom->abbreviation})";
+                                    })
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $productId = $get('product_id');
+                                        $product = $productId ? Product::with('unitConversions')->find($productId) : null;
+                                        if (!$product || !$state) return;
+
+                                        // Check if selected UOM is an alternative UOM with a conversion factor
+                                        // nilai_konversi: 1 base unit = nilai_konversi alternative units
+                                        $conversions = $get('satuan_konversi') ?? [];
+                                        $convFactor = null;
+                                        foreach ($conversions as $conv) {
+                                            if (($conv['uom_id'] ?? null) == $state) {
+                                                $convFactor = (float)($conv['nilai_konversi'] ?? 0);
+                                                break;
+                                            }
+                                        }
+
+                                        if ($convFactor !== null && $convFactor > 0) {
+                                            // 1 base unit = convFactor alternative units
+                                            // => unit_price per alternative unit = cost_price / convFactor
+                                            // Example: base=kg/Rp10.000, 1kg=1000g => price/g = 10000/1000 = Rp10
+                                            $newUnitPrice = (float)$product->cost_price / $convFactor;
+                                        } elseif ((int)$state === (int)$product->uom_id) {
+                                            // Selected UOM is the product's base UOM
+                                            $newUnitPrice = (float)$product->cost_price;
+                                        } else {
+                                            // Unknown UOM — keep current unit_price
+                                            return;
+                                        }
+
+                                        $set('unit_price', $newUnitPrice);
+                                        $quantity = (float)($get('quantity') ?? 0);
+                                        $set('subtotal', number_format($newUnitPrice * $quantity, 2, ',', '.'));
+                                        self::updateTotalCost($set, $get);
                                     })
                                     ->validationMessages([
                                         'required' => 'Satuan belum dipilih',

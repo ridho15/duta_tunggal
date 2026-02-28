@@ -13,7 +13,7 @@ class HppResource extends Resource
     protected static ?string $model = JournalEntry::class;
     protected static ?string $navigationIcon = 'heroicon-o-document-currency-dollar';
     protected static ?string $navigationGroup = 'Finance - Laporan';
-    protected static ?int $navigationSort = 23;
+    protected static ?int $navigationSort = 9;
     protected static ?string $slug = 'reports/hpp';
     protected static ?string $navigationLabel = 'HPP / Cost of Goods Sold';
 

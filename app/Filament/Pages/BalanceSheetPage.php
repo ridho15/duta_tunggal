@@ -18,9 +18,12 @@ class BalanceSheetPage extends Page
 
     protected static ?string $navigationGroup = 'Finance - Laporan';
 
-    protected static ?string $navigationLabel = 'Neraca (Balance Sheet)';
+    protected static ?string $navigationLabel = 'Neraca (Balance Sheet) - Legacy';
 
     protected static ?int $navigationSort = 2;
+
+    // Kept for backward compat; primary Balance Sheet is BalanceSheetResource
+    public static function shouldRegisterNavigation(): bool { return false; }
 
     public ?string $as_of_date = null;
     public ?int $cabang_id = null;
@@ -38,12 +41,31 @@ class BalanceSheetPage extends Page
     // Drill-down state
     public ?int $selected_account_id = null;
     public bool $show_drill_down = false;
+    public bool $showPreview = false;
 
     protected BalanceSheetService $service;
 
     public function boot(BalanceSheetService $service): void
     {
         $this->service = $service;
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('preview')
+                ->label('Tampilkan Laporan')
+                ->icon('heroicon-o-eye')
+                ->color('primary')
+                ->action(fn () => $this->generateReport()),
+
+            \Filament\Actions\Action::make('reset')
+                ->label('Reset')
+                ->icon('heroicon-o-x-circle')
+                ->color('gray')
+                ->visible(fn () => $this->showPreview)
+                ->action(fn () => $this->resetReport()),
+        ];
     }
 
     public function mount(): void
@@ -75,13 +97,13 @@ class BalanceSheetPage extends Page
             return;
         }
 
-        Notification::make()
-            ->title('Laporan diperbarui')
-            ->success()
-            ->body('Neraca telah diperbarui.')
-            ->send();
-
+        $this->showPreview = true;
         $this->dispatch('report-updated');
+    }
+
+    public function resetReport(): void
+    {
+        $this->showPreview = false;
     }
 
     public function getBalanceSheetData(): array
@@ -269,14 +291,7 @@ class BalanceSheetPage extends Page
         );
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        // Hide the "Neraca" navigation item because we already expose the
-        // Balance Sheet page elsewhere or prefer a different menu entry.
-        // Returning false keeps the page registered (route available) but
-        // removes it from the Filament sidebar navigation.
-        return false;
-    }
+
 
     public function getTitle(): string
     {

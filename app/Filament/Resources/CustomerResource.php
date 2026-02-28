@@ -98,7 +98,7 @@ class CustomerResource extends Resource
                                 'required' => 'NIK / NPWP tidak boleh kosong',
                                 'numeric' => 'NIK / NPWP tidak valid !'
                             ])
-                            ->numeric(),
+                            ->string(),
                         TextInput::make('address')
                             ->required()
                             ->validationMessages([

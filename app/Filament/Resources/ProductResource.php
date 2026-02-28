@@ -138,16 +138,6 @@ class ProductResource extends Resource
                             ->validationMessages([
                                 'required' => 'Cabang harus dipilih'
                             ]),
-                        Select::make('supplier_id')
-                            ->label('Supplier')
-                            ->preload()
-                            ->searchable()
-                            ->nullable()
-                            ->relationship('supplier', 'name')
-                            ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
-                                return "({$supplier->code}) {$supplier->name}";
-                            })
-                            ->helperText('Pilih supplier untuk produk ini (opsional)'),
                         Select::make('product_category_id')
                             ->label('Product Category')
                             ->searchable()
@@ -404,7 +394,7 @@ class ProductResource extends Resource
                             ->preload()
                             ->nullable(),
                     ])
-                    ->columnSpanFull()
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -485,13 +475,19 @@ class ProductResource extends Resource
                                 ->orWhere('nama', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('supplier.perusahaan')
-                    ->label('Supplier')
+                TextColumn::make('suppliers')
+                    ->label('Suppliers')
                     ->searchable()
                     ->sortable()
                     ->formatStateUsing(function ($state, $record) {
-                        if ($record->supplier) {
-                            return "({$record->supplier->code}) {$record->supplier->perusahaan}";
+                        $primarySupplier = $record->suppliers->where('pivot.is_primary', true)->first();
+                        if ($primarySupplier) {
+                            return "({$primarySupplier->code}) {$primarySupplier->perusahaan}";
+                        }
+                        $suppliers = $record->suppliers->take(2);
+                        if ($suppliers->count() > 0) {
+                            $names = $suppliers->map(fn($s) => $s->perusahaan)->join(', ');
+                            return $suppliers->count() > 2 ? $names . '...' : $names;
                         }
                         return '-';
                     })
@@ -695,9 +691,19 @@ class ProductResource extends Resource
 
                 SelectFilter::make('supplier_id')
                     ->label('Filter Supplier')
-                    ->relationship('supplier', 'name')
-                    ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
-                        return "({$supplier->code}) {$supplier->name}";
+                    ->options(function () {
+                        return Supplier::orderBy('perusahaan')
+                            ->get()
+                            ->mapWithKeys(fn ($s) => [$s->id => "({$s->code}) {$s->perusahaan}"]);
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+
+                        return $query->whereHas('suppliers', function ($q) use ($data) {
+                            $q->where('suppliers.id', $data['value']);
+                        });
                     })
                     ->searchable()
                     ->preload(),
@@ -1196,9 +1202,9 @@ class ProductResource extends Resource
     public static function getRelations(): array
     {
         return [
+            SuppliersRelationManager::class,
             InventoryStockRelationManager::class,
             StockMovementRelationManager::class,
-            SuppliersRelationManager::class,
         ];
     }
 

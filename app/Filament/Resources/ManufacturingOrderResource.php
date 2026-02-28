@@ -74,6 +74,8 @@ class ManufacturingOrderResource extends Resource
                             ->options(Cabang::all()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
+                            ->searchable()
+                            ->preload()
                             ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
                             ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->required()

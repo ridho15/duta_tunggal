@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductCategoryResource\Pages;
 use App\Models\ProductCategory;
+use App\Services\ProductCategoryService;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -48,6 +50,7 @@ class ProductCategoryResource extends Resource
                 TextInput::make('kode')
                     ->label('Kode Kategori')
                     ->maxLength(50)
+                    ->reactive()
                     ->unique(ignoreRecord: true, modifyRuleUsing: function ($record) {
                         return Rule::unique('product_categories', 'kode')
                             ->where('deleted_at', null)
@@ -58,6 +61,13 @@ class ProductCategoryResource extends Resource
                         'max' => 'Kode kategori terlalu panjang',
                         'unique' => 'Kode Kategori sudah digunakan'
                     ])
+                    ->suffixAction(Action::make('generateKodeKategori')
+                        ->icon('heroicon-m-arrow-path')
+                        ->tooltip('Generate Kode Kategori')
+                        ->action(function ($set, $get, $state) {
+                            $productCategoryService = app(ProductCategoryService::class);
+                            $set('kode', $productCategoryService->generateKodeKategori());
+                        }))
                     ->required(),
                 TextInput::make('kenaikan_harga')
                     ->label('Kenaikan Harga (%)')

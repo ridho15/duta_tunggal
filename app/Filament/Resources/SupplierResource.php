@@ -102,26 +102,29 @@ class SupplierResource extends Resource
                             ->maxLength(255),
                         TextInput::make('phone')
                             ->tel()
+                            // allow full international format with parentheses anywhere
+                            ->telRegex('/^[\+]?[0-9][0-9\s\-\(\)]{6,19}$/')
                             ->label('Telepon')
                             ->validationMessages([
                                 'required' => 'Nomor Telepon tidak boleh kosong',
                                 'regex' => 'Nomor Telepon tidak valid !',
                                 'max' => 'Nomor telepon terlalu panjang'
                             ])
-                            ->helperText('Contoh : 07512345678')
-                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
+                            ->helperText('Contoh : +62 21 12345678, 07512345678, +1 234 567 8900')
+                            ->rules(['regex:/^[\+]?[\d\s\-\(\)]{7,20}$/'])
                             ->required()
                             ->maxLength(255),
                         TextInput::make('handphone')
                             ->tel()
+                            ->telRegex('/^[\+]?[0-9][0-9\s\-\(\)]{6,19}$/')
                             ->label('Handphone')
                             ->validationMessages([
                                 'required' => 'Nomor Handphone tidak boleh kosong',
                                 'regex' => 'Nomor handphone tidak valid !',
                                 'max' => 'Nomor handphone terlalu panjang'
                             ])
-                            ->helperText('Contoh : 081234567890')
-                            ->rules(['regex:/^08[1-9][0-9]{7,10}$/'])
+                            ->helperText('Contoh : +62 81234567890, 081234567890, +1 234 567 8900')
+                            ->rules(['regex:/^[\+]?[\d\s\-\(\)]{7,20}$/'])
                             ->required()
                             ->maxLength(255),
                         TextInput::make('email')
@@ -135,10 +138,11 @@ class SupplierResource extends Resource
                             ->maxLength(255),
                         TextInput::make('fax')
                             ->label('Fax')
-                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
-                            ->required()
                             ->tel()
-                            ->helperText('Contoh : 0213456789')
+                            ->telRegex('/^[\+]?[0-9][0-9\s\-\(\)]{6,19}$/')
+                            ->rules(['regex:/^[\+]?[\d\s\-\(\)]{7,20}$/'])
+                            ->required()
+                            ->helperText('Contoh : +62 21 1234567, 0213456789, +1 234 567 8900')
                             ->validationMessages([
                                 'required' => 'Fax tidak boleh kosong',
                                 'regex' => 'Fax tidak valid !'

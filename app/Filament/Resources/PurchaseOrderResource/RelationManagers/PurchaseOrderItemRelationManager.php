@@ -47,9 +47,18 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             })
                             ->relationship('product', 'name')
                             ->reactive()
-                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                            ->afterStateUpdated(function (Set $set, Get $get, $state, $livewire) {
                                 $product = Product::find($state);
-                                $set('unit_price', $product->cost_price);
+                                // Use supplier price from product_supplier pivot; fallback to cost_price
+                                $unitPrice = (float) ($product->cost_price ?? 0);
+                                $supplierId = $livewire->ownerRecord->supplier_id ?? null;
+                                if ($supplierId && $product) {
+                                    $supplierProduct = $product->suppliers()->where('suppliers.id', $supplierId)->first();
+                                    if ($supplierProduct) {
+                                        $unitPrice = (float) $supplierProduct->pivot->supplier_price;
+                                    }
+                                }
+                                $set('unit_price', $unitPrice);
 
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),

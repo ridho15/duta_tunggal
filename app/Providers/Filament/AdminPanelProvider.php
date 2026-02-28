@@ -7,9 +7,14 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Filament\Pages\ArApManagementPage;
+use App\Filament\Pages\AlkGraficPage;
 use App\Filament\Pages\BalanceSheetPage;
 use App\Filament\Pages\BukuBesarPage;
+use App\Filament\Pages\CostOfGoodsManufacturingPage;
+use App\Filament\Pages\DrillDownFinancialReportPage;
+use App\Filament\Pages\FinancialStatementPage;
 use App\Filament\Pages\IncomeStatementPage;
+use App\Filament\Pages\JournalConsolidationPage;
 use App\Filament\Pages\MyDashboard;
 use App\Filament\Pages\PurchaseReportPage;
 use App\Filament\Pages\SalesReportPage;
@@ -52,6 +57,11 @@ class AdminPanelProvider extends PanelProvider
                 BalanceSheetPage::class,
                 BukuBesarPage::class,
                 IncomeStatementPage::class,
+                DrillDownFinancialReportPage::class,
+                FinancialStatementPage::class,
+                CostOfGoodsManufacturingPage::class,
+                AlkGraficPage::class,
+                JournalConsolidationPage::class,
                 SalesReportPage::class,
                 PurchaseReportPage::class,
                 ViewAgeingReport::class,
