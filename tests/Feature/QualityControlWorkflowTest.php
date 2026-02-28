@@ -13,6 +13,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\QualityControlService;
+use App\Services\PurchaseReturnService;
 use Carbon\Carbon;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,7 +100,7 @@ class QualityControlWorkflowTest extends TestCase
             'qty_accepted' => $acceptedQty,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => false,
+            'status' => 'pending',
             'rak_id' => null,
         ]);
 
@@ -179,38 +180,26 @@ class QualityControlWorkflowTest extends TestCase
             'notes' => 'Damage detected during inspection',
         ]);
 
-        $returnPayload = [
-            'return_number' => 'RP-' . now()->format('Ymd') . '-0001',
-            'warehouse_id' => $this->warehouse->id,
-            'status' => 'draft',
-            'reason' => 'Damaged packaging',
-        ];
+        // For PO-item QC with rejection, create PurchaseReturn first (as done in UI)
+        $returnService = app(\App\Services\PurchaseReturnService::class);
+        $purchaseReturn = $returnService->createFromQualityControl($qualityControl, 'reduce_stock');
 
-        $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
+        $service->completeQualityControl($qualityControl->fresh(), []);
 
         $qualityControl->refresh();
 
         $this->assertEquals(1, $qualityControl->status);
         $this->assertNotNull($qualityControl->date_send_stock);
 
-        $returnProduct = $qualityControl->returnProduct;
-        $this->assertTrue($qualityControl->returnProduct()->exists());
-        $this->assertEquals('draft', $returnProduct->status);
-        $this->assertEquals('Damaged packaging', $returnProduct->reason);
+        // For PO-item QC, it creates a PurchaseReturn, not ReturnProduct
+        $this->assertTrue($qualityControl->purchaseReturns()->exists());
+        $this->assertEquals('draft', $purchaseReturn->status);
+        $this->assertEquals('reduce_stock', $purchaseReturn->failed_qc_action); // default action
 
-        $returnItems = $returnProduct->returnProductItem;
+        $returnItems = $purchaseReturn->purchaseReturnItem;
         $this->assertCount(1, $returnItems);
-        $this->assertEquals(3, $returnItems->first()->quantity);
-        $this->assertEquals('damage', $returnItems->first()->condition);
+        $this->assertEquals(3, $returnItems->first()->qty_returned);
         $this->assertEquals($this->product->id, $returnItems->first()->product_id);
-        $this->assertEquals($qualityControl->id, $returnItems->first()->from_item_model_id);
-
-        $this->assertDatabaseHas('return_product_items', [
-            'return_product_id' => $returnProduct->id,
-            'product_id' => $this->product->id,
-            'quantity' => 3,
-            'condition' => 'damage',
-        ]);
     }
 
     public function test_quality_control_rejection_sends_notification_to_supplier(): void

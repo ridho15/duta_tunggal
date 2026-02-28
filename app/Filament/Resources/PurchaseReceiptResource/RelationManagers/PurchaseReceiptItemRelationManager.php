@@ -2,23 +2,11 @@
 
 namespace App\Filament\Resources\PurchaseReceiptResource\RelationManagers;
 
-use App\Models\Currency;
-use App\Models\QualityControl;
-use App\Services\QualityControlService;
-use App\Services\PurchaseReceiptService;
-use App\Http\Controllers\HelperController;
-use App\Filament\Resources\QualityControlPurchaseResource;
-use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
-use App\Notifications\FilamentDatabaseNotification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
-use Filament\Facades\Filament;
-use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\CreateAction;
@@ -114,12 +102,11 @@ class PurchaseReceiptItemRelationManager extends RelationManager
                 TextColumn::make('rak.name')
                     ->label('Rak')
                     ->sortable(),
-                IconColumn::make('is_sent')
-                    ->label('Sent to QC')
+                IconColumn::make('has_qc')
+                    ->label('Has QC')
                     ->boolean()
                     ->getStateUsing(function ($record) {
-                        // dd($record->qualityControl()->exists());
-                        return $record->qualityControl()->exists() && $record->is_sent == 1;
+                        return $record->purchaseOrderItem->qualityControl()->exists();
                     }),
                 ImageColumn::make('purchaseReceiptItemPhoto.photo_url')
                     ->label('Photos')
@@ -134,14 +121,8 @@ class PurchaseReceiptItemRelationManager extends RelationManager
             ->actions([
                 ActionGroup::make([
                     EditAction::make()
-                        ->color('success')
-                        ->hidden(function ($record) {
-                            return $record->is_sent == 1;
-                        }),
-                    DeleteAction::make()
-                        ->hidden(function ($record) {
-                            return $record->is_sent == 1;
-                        }),
+                        ->color('success'),
+                    DeleteAction::make(),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
