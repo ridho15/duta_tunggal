@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Log;
+
 class TaxService
 {
     /**
@@ -11,6 +13,12 @@ class TaxService
     {
         $t = strtolower(trim((string) $type));
         if ($t === '' || $t === 'null') {
+            if (function_exists('app') && app()->bound('log')) {
+                Log::warning('TaxService: tipe_pajak is null/empty, defaulting to Eksklusif', [
+                    'raw_type' => $type,
+                    'trace'    => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3),
+                ]);
+            }
             return 'Eksklusif'; // default system mode per business logic (amount + ppn)
         }
         return match ($t) {
@@ -33,8 +41,9 @@ class TaxService
         // Correct formula for inclusive tax (PPN included in gross):
         // DPP = gross * 100 / (100 + rate)
         // PPN = gross - DPP
-        $dpp = $gross * (100.0 / (100.0 + $ratePercent));
-        $ppn = $gross - $dpp;
+        // Rounded to nearest Rupiah per PMK 136/2023
+        $dpp = round($gross * (100.0 / (100.0 + $ratePercent)), 0);
+        $ppn = round($gross - $dpp, 0);
         return ['dpp' => $dpp, 'ppn' => $ppn, 'total' => $gross];
     }
 
@@ -46,18 +55,37 @@ class TaxService
      */
     public static function compute(float $amount, float $ratePercent, ?string $type): array
     {
+        // Input validation guards
+        if ($amount < 0) {
+            throw new \InvalidArgumentException("TaxService::compute — amount tidak boleh negatif ({$amount})");
+        }
+        if ($ratePercent < 0 || $ratePercent > 100) {
+            throw new \InvalidArgumentException("TaxService::compute — rate di luar rentang valid ({$ratePercent})");
+        }
+
         $type = static::normalizeType($type);
 
         if ($ratePercent <= 0 || $type === 'Non Pajak') {
-            return ['dpp' => $amount, 'ppn' => 0.0, 'total' => $amount];
+            $result = ['dpp' => $amount, 'ppn' => 0.0, 'total' => $amount];
+        } elseif ($type === 'Eksklusif') {
+            $ppn    = round($amount * ($ratePercent / 100.0), 0);
+            $result = ['dpp' => $amount, 'ppn' => $ppn, 'total' => round($amount + $ppn, 0)];
+        } else {
+            // Inklusif
+            $result = static::computeFromInclusiveGross($amount, $ratePercent);
         }
 
-        if ($type === 'Eksklusif') {
-            $ppn = $amount * ($ratePercent / 100.0);
-            return ['dpp' => $amount, 'ppn' => $ppn, 'total' => $amount + $ppn];
+        if (function_exists('app') && app()->bound('log')) {
+            Log::debug('TaxService::compute', [
+                'amount'          => $amount,
+                'rate'            => $ratePercent,
+                'type_normalized' => $type,
+                'dpp'             => $result['dpp'],
+                'ppn'             => $result['ppn'],
+                'total'           => $result['total'],
+            ]);
         }
 
-        // Inklusif
-        return static::computeFromInclusiveGross($amount, $ratePercent);
+        return $result;
     }
 }

@@ -198,6 +198,11 @@ class OrderRequestResource extends Resource
                                         if ($state) {
                                             $product = Product::find($state);
                                             if ($product) {
+                                                // Set tax from product if available, otherwise keep current value
+                                                if ($product->pajak && $product->pajak > 0) {
+                                                    $set('tax', $product->pajak);
+                                                }
+
                                                 // Use supplier price from product_supplier pivot; fallback to cost_price
                                                 $supplierId = $get('../../supplier_id');
                                                 $unitPrice = (float) $product->cost_price;
@@ -208,11 +213,14 @@ class OrderRequestResource extends Resource
                                                     }
                                                 }
                                                 $set('unit_price', $unitPrice);
-                                                // Recalculate subtotal
+                                                // Recalculate subtotal as percentages
                                                 $quantity = $get('quantity') ?? 0;
-                                                $discount = $get('discount') ?? 0;
-                                                $tax = $get('tax') ?? 0;
-                                                $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                                $base = $quantity * $unitPrice;
+                                                $discountPct = $get('discount') ?? 0;
+                                                $taxPct = $get('tax') ?? 0;
+                                                $discountAmount = $base * ($discountPct / 100);
+                                                $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
+                                                $subtotal = $base - $discountAmount + $taxAmount;
                                                 $set('subtotal', $subtotal);
                                             }
                                         }
@@ -246,9 +254,12 @@ class OrderRequestResource extends Resource
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $quantity = $state ?? 0;
                                         $unitPrice = $get('unit_price') ?? 0;
-                                        $discount = $get('discount') ?? 0;
-                                        $tax = $get('tax') ?? 0;
-                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $base = $quantity * $unitPrice;
+                                        $discountPct = $get('discount') ?? 0;
+                                        $taxPct = $get('tax') ?? 0;
+                                        $discountAmount = $base * ($discountPct / 100);
+                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
+                                        $subtotal = $base - $discountAmount + $taxAmount;
                                         $set('subtotal', $subtotal);
                                     })
                                     ->required()
@@ -268,9 +279,12 @@ class OrderRequestResource extends Resource
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $quantity = $get('quantity') ?? 0;
                                         $unitPrice = $state ?? 0;
-                                        $discount = $get('discount') ?? 0;
-                                        $tax = $get('tax') ?? 0;
-                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $base = $quantity * $unitPrice;
+                                        $discountPct = $get('discount') ?? 0;
+                                        $taxPct = $get('tax') ?? 0;
+                                        $discountAmount = $base * ($discountPct / 100);
+                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
+                                        $subtotal = $base - $discountAmount + $taxAmount;
                                         $set('subtotal', $subtotal);
                                     })
                                     ->required()
@@ -279,31 +293,51 @@ class OrderRequestResource extends Resource
                                         'numeric' => 'Harga satuan harus berupa angka.',
                                     ]),
                                 TextInput::make('discount')
-                                    ->label('Discount')
+                                    ->label('Discount (%)')
                                     ->numeric()
                                     ->default(0)
+                                    ->minValue(0)
+                                    ->maxValue(100)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $quantity = $get('quantity') ?? 0;
                                         $unitPrice = $get('unit_price') ?? 0;
-                                        $discount = $state ?? 0;
-                                        $tax = $get('tax') ?? 0;
-                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $base = $quantity * $unitPrice;
+                                        $discountPct = $state ?? 0;
+                                        $taxPct = $get('tax') ?? 0;
+                                        $discountAmount = $base * ($discountPct / 100);
+                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
+                                        $subtotal = $base - $discountAmount + $taxAmount;
                                         $set('subtotal', $subtotal);
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'numeric' => 'Discount harus berupa angka.',
+                                        'min' => 'Discount tidak boleh negatif.',
+                                        'max' => 'Discount maksimal 100%.',
+                                    ]),
                                 TextInput::make('tax')
-                                    ->label('Tax')
+                                    ->label('Tax (%)')
                                     ->numeric()
                                     ->default(0)
+                                    ->minValue(0)
+                                    ->maxValue(100)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $quantity = $get('quantity') ?? 0;
                                         $unitPrice = $get('unit_price') ?? 0;
-                                        $discount = $get('discount') ?? 0;
-                                        $tax = $state ?? 0;
-                                        $subtotal = ($quantity * $unitPrice) - $discount + $tax;
+                                        $base = $quantity * $unitPrice;
+                                        $discountPct = $get('discount') ?? 0;
+                                        $taxPct = $state ?? 0;
+                                        $discountAmount = $base * ($discountPct / 100);
+                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
+                                        $subtotal = $base - $discountAmount + $taxAmount;
                                         $set('subtotal', $subtotal);
-                                    }),
+                                    })
+                                    ->validationMessages([
+                                        'numeric' => 'Tax harus berupa angka.',
+                                        'min' => 'Tax tidak boleh negatif.',
+                                        'max' => 'Tax maksimal 100%.',
+                                    ]),
                                 TextInput::make('subtotal')
                                     ->label('Subtotal')
                                     ->numeric()

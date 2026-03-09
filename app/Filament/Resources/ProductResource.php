@@ -12,6 +12,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
+use App\Models\TaxSetting;
 use App\Models\UnitOfMeasure;
 use App\Services\ProductService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -207,7 +208,14 @@ class ProductResource extends Resource
                         TextInput::make('pajak')
                             ->label('Pajak (%)')
                             ->numeric()
-                            ->default(0)
+                            ->default(function () {
+                                $taxSetting = TaxSetting::where('status', true)
+                                    ->where('effective_date', '<=', now())
+                                    ->where('type', 'PPN')
+                                    ->orderByDesc('effective_date')
+                                    ->first();
+                                return $taxSetting?->rate ?? 11;
+                            })
                             ->validationMessages([
                                 'numeric' => 'Pajak harus berupa angka'
                             ]),
@@ -477,7 +485,12 @@ class ProductResource extends Resource
                     }),
                 TextColumn::make('suppliers')
                     ->label('Suppliers')
-                    ->searchable()
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('suppliers', function ($query) use ($search) {
+                            return $query->where('suppliers.code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('suppliers.perusahaan', 'LIKE', '%' . $search . '%');
+                        });
+                    })
                     ->sortable()
                     ->formatStateUsing(function ($state, $record) {
                         $primarySupplier = $record->suppliers->where('pivot.is_primary', true)->first();

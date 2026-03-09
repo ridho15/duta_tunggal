@@ -350,6 +350,13 @@ class PurchaseOrderResource extends Resource
                                     $items = collect($get('purchaseOrderItem') ?? [])->map(function ($item) {
                                         $item['tax'] = 0;
                                         $item['tipe_pajak'] = 'Non Pajak';
+                                        $item['subtotal'] = \App\Http\Controllers\HelperController::hitungSubtotal(
+                                            (float)($item['quantity'] ?? 0),
+                                            \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                            (float)($item['discount'] ?? 0),
+                                            0,
+                                            'Non Pajak'
+                                        );
                                         return $item;
                                     })->all();
                                     $set('purchaseOrderItem', $items);
@@ -527,7 +534,7 @@ class PurchaseOrderResource extends Resource
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
                                     })
                                     ->numeric(),
                                 TextInput::make('unit_price')
@@ -540,7 +547,7 @@ class PurchaseOrderResource extends Resource
                                         'required' => 'Unit price tidak boleh kosong',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
                                     })
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
@@ -562,7 +569,7 @@ class PurchaseOrderResource extends Resource
                                         'required' => 'Discount tidak boleh kosong. Minimal 0'
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal((float)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? null));
+                                        $set('subtotal', HelperController::hitungSubtotal((float)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
                                     })
                                     ->suffix('%')
                                     ->default(0),
@@ -585,6 +592,7 @@ class PurchaseOrderResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Tax tidak boleh kosong, Minimal 0'
                                     ])
+                                    ->dehydrated(true)
                                     ->afterStateUpdated(function (Set $set, Get $get) {
                                         $tipePajak = $get('tipe_pajak') ?? 'Inklusif';
                                         $effectiveTax = $tipePajak === 'Non Pajak' ? 0 : (float)$get('tax');
@@ -662,6 +670,7 @@ class PurchaseOrderResource extends Resource
                                     ->reactive()
                                     ->required()
                                     ->default('Inklusif')
+                                    ->dehydrated(true)
                                     ->disabled(fn (Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn')
                                     ->options([
                                         'Non Pajak' => 'Non Pajak',

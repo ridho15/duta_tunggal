@@ -7,6 +7,7 @@ use App\Models\AccountReceivable;
 use App\Models\Invoice;
 use App\Services\LedgerPostingService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class InvoiceObserver
@@ -166,9 +167,30 @@ class InvoiceObserver
     {
         // Prevent duplicate posting
         if (\App\Models\JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->exists()) {
+            Log::info('postSalesInvoice: invoice already posted, skipping', ['invoice_id' => $invoice->id]);
             return;
         }
 
+        Log::info('postSalesInvoice: starting ledger posting', [
+            'invoice_id'     => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'total'          => $invoice->total,
+            'subtotal'       => $invoice->subtotal,
+            'tax'            => $invoice->tax,
+        ]);
+
+        DB::transaction(function () use ($invoice) {
+            $this->executeSalesInvoicePosting($invoice);
+        });
+
+        Log::info('postSalesInvoice: ledger posting completed', [
+            'invoice_id'     => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+        ]);
+    }
+
+    private function executeSalesInvoicePosting(Invoice $invoice): void
+    {
         $date = $invoice->invoice_date ?? Carbon::now()->toDateString();
 
         // Get COAs from invoice or fallback to defaults
@@ -179,13 +201,17 @@ class InvoiceObserver
         $biayaPengirimanCoa = $invoice->biayaPengirimanCoa ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first(); // Biaya Pengiriman
 
         if (!$arCoa || !$revenueCoa) {
-            dd('COAs not found', ['ar_coa' => $arCoa, 'revenue_coa' => $revenueCoa, 'all_coas' => \App\Models\ChartOfAccount::all()->pluck('code')->toArray()]);
-            Log::error('Essential COAs not found for sales invoice', [
-                'invoice_id' => $invoice->id,
-                'ar_coa' => $arCoa ? $arCoa->id : null,
-                'revenue_coa' => $revenueCoa ? $revenueCoa->id : null,
+            Log::error('postSalesInvoice: essential COA mapping missing — cannot post invoice', [
+                'invoice_id'    => $invoice->id,
+                'ar_coa_found'  => $arCoa  ? $arCoa->code  : null,
+                'rev_coa_found' => $revenueCoa ? $revenueCoa->code : null,
+                'hint'          => 'Pastikan Chart of Account dengan kode 1120 (AR) dan 4000 (Revenue) sudah ada',
             ]);
-            return; // Skip if essential COAs not found
+            throw new \RuntimeException(
+                "COA mapping tidak ditemukan untuk invoice {$invoice->invoice_number} — "
+                . "Kode 1120 (AR): " . ($arCoa ? 'OK' : 'TIDAK ADA') . ', '
+                . "Kode 4000 (Revenue): " . ($revenueCoa ? 'OK' : 'TIDAK ADA')
+            );
         }
 
         $invoice->loadMissing('invoiceItem.product');
@@ -253,10 +279,9 @@ class InvoiceObserver
 
         }
 
-        // CREDIT: PPn Keluaran at invoice level (if any tax difference)
-        $invoiceTax = (float) $invoice->tax;
-        $calculatedTax = (float) $invoice->total - (float) $invoice->subtotal - $otherFeeTotal;
-        $totalTaxAmount = max($invoiceTax, $calculatedTax);
+        // CREDIT: PPn Keluaran at invoice level — use the authoritative stored tax value
+        // Do NOT use max() of two independent calculations, which would cause journal imbalance
+        $totalTaxAmount = max(0.0, (float) $invoice->tax);
         
         if ($totalTaxAmount > 0 && $ppnKeluaranCoa) {
             \App\Models\JournalEntry::create([
@@ -287,13 +312,13 @@ class InvoiceObserver
             ]);
         }
 
-        Log::info('Sales invoice journal entries created', [
-            'invoice_id' => $invoice->id,
-            'total_revenue' => $totalRevenue,
-            'total_tax' => $totalTax,
+        Log::info('postSalesInvoice: journal entries created', [
+            'invoice_id'     => $invoice->id,
+            'total_revenue'  => $totalRevenue,
+            'total_tax'      => $totalTax,
             'total_discount' => $totalDiscount,
-            'other_fees' => $otherFeeTotal,
-            'grand_total' => $grandTotal,
+            'other_fees'     => $otherFeeTotal,
+            'grand_total'    => $grandTotal,
         ]);
 
         $this->postCostOfSalesEntries($invoice, $date);

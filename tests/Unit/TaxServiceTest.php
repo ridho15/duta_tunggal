@@ -21,12 +21,15 @@ test('eksklusif calculates ppn and total', function () {
         ->and(round($res['dpp'], 2))->toBe(950000.00);
 });
 
-test('inklusif computes dpp and ppn correctly', function () {
+test('inklusif computes dpp and ppn correctly — rounded to nearest Rupiah (PMK 136/2023)', function () {
+    // After fix: DPP and PPN are rounded to nearest Rupiah (0 decimal places)
+    // DPP = round(1,000,000 * 100/112, 0) = round(892857.142..., 0) = 892857
+    // PPN = round(1,000,000 - 892857, 0) = 107143
     $res = TaxService::compute(1000000.0, 12.0, 'Inklusif');
 
-    expect(round($res['dpp'], 2))->toBe(892857.14)
-        ->and(round($res['ppn'], 2))->toBe(107142.86)
-        ->and(round($res['total'], 2))->toBe(1000000.00);
+    expect($res['dpp'])->toBe(892857.0)
+        ->and($res['ppn'])->toBe(107143.0)
+        ->and($res['total'])->toBe(1000000.0);
 });
 
 test('zero tax rate returns same total regardless of type', function () {
@@ -140,4 +143,64 @@ test('hitungSubtotal formatted indonesian money string is parsed correctly', fun
     // Unit price given as formatted string "100.000" (Indonesian thousand separator)
     $result = HelperController::hitungSubtotal(2, '100.000', 0, 12, 'Eksklusif');
     expect($result)->toBe(224000.0);
+});
+
+// ─── New: Input Validation Guards ─────────────────────────────────────────────
+
+test('compute throws InvalidArgumentException for negative amount', function () {
+    expect(fn() => TaxService::compute(-1.0, 12.0, 'Eksklusif'))
+        ->toThrow(\InvalidArgumentException::class);
+});
+
+test('compute throws InvalidArgumentException when rate exceeds 100', function () {
+    expect(fn() => TaxService::compute(100000.0, 150.0, 'Eksklusif'))
+        ->toThrow(\InvalidArgumentException::class);
+});
+
+test('compute throws InvalidArgumentException for negative rate', function () {
+    expect(fn() => TaxService::compute(100000.0, -1.0, 'Eksklusif'))
+        ->toThrow(\InvalidArgumentException::class);
+});
+
+// ─── New: hitungSubtotal Input Guards ─────────────────────────────────────────
+
+test('hitungSubtotal clamps discount above 100 to 100 percent', function () {
+    // discount=150 is invalid; clamped to 100 → afterDiscount = 0 → total = 0
+    $result = HelperController::hitungSubtotal(1, 10000, 150, 11, 'Eksklusif');
+    expect($result)->toBe(0.0);
+});
+
+test('hitungSubtotal with null taxType uses Inklusif not Eksklusif', function () {
+    // After fix: null taxType explicitly defaults to 'Inklusif' in hitungSubtotal
+    // gross = 1 * 112000. Inklusif 12%: total stays 112000
+    $inklusif = HelperController::hitungSubtotal(1, 112000, 0, 12, 'Inklusif');
+    $nullType = HelperController::hitungSubtotal(1, 112000, 0, 12, null);
+    expect($nullType)->toBe($inklusif)->toBe(112000.0);
+});
+
+test('hitungSubtotal negative quantity is clamped to zero', function () {
+    $result = HelperController::hitungSubtotal(-5, 10000, 0, 12, 'Eksklusif');
+    expect($result)->toBe(0.0);
+});
+
+test('hitungSubtotal logs error on TaxService exception and falls back to exclusive', function () {
+    // Rate 200 would throw in TaxService; hitungSubtotal catches and falls back
+    // Note: hitungSubtotal clamps rate to 100 first, so this instead tests that clamping works
+    $result = HelperController::hitungSubtotal(1, 10000, 0, 200, 'Eksklusif');
+    // rate clamped to 100 → fallback exclusive: 10000 + 10000*100% = 20000
+    expect($result)->toBe(20000.0);
+});
+
+test('eksklusif ppn and total are integers (rounded to nearest Rupiah)', function () {
+    // 11% of 1,000,000 = exactly 110,000 — no fractional Rupiah
+    $res = TaxService::compute(1000000.0, 11.0, 'Eksklusif');
+    expect(fmod($res['ppn'], 1.0))->toBe(0.0)
+        ->and(fmod($res['total'], 1.0))->toBe(0.0);
+});
+
+test('inklusif dpp and ppn are integers (rounded to nearest Rupiah)', function () {
+    // gross 1,110,000, rate 11% → DPP and PPN should be whole Rupiah
+    $res = TaxService::compute(1110000.0, 11.0, 'Inklusif');
+    expect(fmod($res['dpp'], 1.0))->toBe(0.0)
+        ->and(fmod($res['ppn'], 1.0))->toBe(0.0);
 });

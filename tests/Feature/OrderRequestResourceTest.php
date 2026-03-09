@@ -69,9 +69,14 @@ it('creates an order request through the Filament create page', function () {
                 'product_id' => $this->product->id,
                 'quantity' => 2,
                 'unit_price' => $this->product->cost_price,
-                'discount' => 0,
-                'tax' => 0,
-                'subtotal' => 2 * $this->product->cost_price,
+                // supply nonzero percentages to ensure calculation logic is exercised
+                'discount' => 10, // 10%
+                'tax' => 5,       // 5%
+                // compute expected subtotal using percentage formula
+                'subtotal' => round(
+                    ((2 * $this->product->cost_price) * (1 - 0.10)) * (1 + 0.05),
+                    2
+                ),
             ],
         ],
     ];
@@ -123,7 +128,17 @@ it('edits an order request through the Filament edit page', function () {
 
     Livewire::actingAs($this->user)
         ->test(EditOrderRequest::class, ['record' => $or->getKey()])
-        ->fillForm(['note' => 'New Note via Edit', 'orderRequestItem' => [['product_id' => $this->product->id, 'quantity' => 1, 'unit_price' => 1000, 'discount' => 0, 'tax' => 0, 'subtotal' => 1000]]])
+        ->fillForm([
+            'note' => 'New Note via Edit',
+            'orderRequestItem' => [[
+                'product_id' => $this->product->id,
+                'quantity' => 1,
+                'unit_price' => 1000,
+                'discount' => 15, // percent
+                'tax' => 2,       // percent
+                'subtotal' => round(((1 * 1000) * (1 - 0.15)) * (1 + 0.02), 2),
+            ]]
+        ])
         ->call('save')
         ->assertHasNoFormErrors();
 

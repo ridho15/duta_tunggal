@@ -60,6 +60,8 @@ beforeEach(function () {
         'order_request_id' => $this->orderRequest->id,
         'product_id' => $this->productA->id,
         'quantity' => 5,
+        'discount' => 10, // percent
+        'tax' => 5,       // percent
         'note' => 'Untuk batch produksi 01',
     ]);
 
@@ -115,8 +117,8 @@ test('order request approval generates purchase order and items', function () {
     expect($poItemA)->not->toBeNull()
         ->and((float) $poItemA->quantity)->toBe(5.0)
         ->and((float) $poItemA->unit_price)->toBe((float) $this->productA->cost_price)
-        ->and((float) $poItemA->discount)->toBe(0.0)
-        ->and((float) $poItemA->tax)->toBe(0.0)
+        ->and((float) $poItemA->discount)->toBe(10.0)
+        ->and((float) $poItemA->tax)->toBe(5.0)
         ->and($poItemA->tipe_pajak)->toBe('Non Pajak')
         ->and($poItemA->currency_id)->toBe($this->currency->id)
         ->and($poItemA->refer_item_model_type)->toBe(OrderRequestItem::class)

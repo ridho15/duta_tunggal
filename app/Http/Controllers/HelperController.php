@@ -812,13 +812,21 @@ class HelperController extends Controller
             $unit_price = $parsed;
         }
 
+        // --- INPUT GUARDS ---
+        $quantity  = max(0.0, (float) $quantity);
+        $unit_price = max(0.0, (float) $unit_price);
+        $discount  = max(0.0, min(100.0, (float) $discount));  // clamp 0-100%
+        $tax       = max(0.0, min(100.0, (float) $tax));        // clamp 0-100%
+        // Use 'Inklusif' as explicit default — never pass null to TaxService silently
+        $taxType   = (is_string($taxType) && trim($taxType) !== '') ? $taxType : 'Inklusif';
+
         // Calculate base after discount
-        $subtotal = (float)$quantity * (float)$unit_price;
-        $discountAmount = $subtotal * ((float)$discount / 100);
+        $subtotal = $quantity * $unit_price;
+        $discountAmount = $subtotal * ($discount / 100);
         $afterDiscount = $subtotal - $discountAmount;
 
         // Use centralized tax service
-        $rate = (float)$tax; // expecting percent, e.g., 12 for 12%
+        $rate = $tax; // expecting percent, e.g., 12 for 12%
         try {
             // Lazy import to avoid circular deps in some contexts
             $service = \App\Services\TaxService::class;
@@ -826,6 +834,17 @@ class HelperController extends Controller
             $final = round($result['total'], 2);
             return $final;
         } catch (\Throwable $e) {
+            // Log the error so it is not silently swallowed (guarded for unit-test contexts without app bootstrap)
+            if (function_exists('app') && app()->bound('log')) {
+                \Illuminate\Support\Facades\Log::error('hitungSubtotal: TaxService exception, falling back to exclusive', [
+                    'quantity'   => $quantity,
+                    'unit_price' => $unit_price,
+                    'discount'   => $discount,
+                    'tax'        => $tax,
+                    'taxType'    => $taxType,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
             // Fallback: previous behavior (exclusive)
             $tax_amount = $afterDiscount * $rate / 100.0;
             $total = $afterDiscount + $tax_amount;
