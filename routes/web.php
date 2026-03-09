@@ -21,9 +21,12 @@ Route::middleware('auth')->group(function () {
 // Add home route for authenticated users
 Route::middleware('auth')->group(function () {
     Route::get('/', function () {
-        // Redirect authenticated users to the Filament admin dashboard by default
-        // Filament registers the dashboard page as 'my-dashboard' by default
-        return redirect()->route('filament.admin.pages.my-dashboard');
+        // Redirect authenticated users to the Filament admin dashboard by default.
+        // Use the dashboard page class to derive the current route name so
+        // production changes (slug overrides) won't break the redirect.
+        return redirect()->route(
+            \App\Filament\Pages\MyDashboard::getRouteName()
+        );
     })->name('home');
 });
 

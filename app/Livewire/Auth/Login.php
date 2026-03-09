@@ -46,7 +46,10 @@ class Login extends Component
     // After successful login, prefer the Filament admin dashboard as the
     // default destination. Keep `redirectIntended` so any previously
     // intended URL (e.g. pages protected by auth) is respected first.
-    $this->redirectIntended(default: route('filament.admin.pages.my-dashboard', absolute: false), navigate: true);
+        $this->redirectIntended(
+            default: route(\App\Filament\Pages\MyDashboard::getRouteName(), absolute: false),
+            navigate: true
+        );
     }
 
     /**

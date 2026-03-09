@@ -69,5 +69,5 @@ test('returns a successful response', function () {
     $response = $this->get('/');
 
     // After login, the application redirects to Filament admin dashboard
-    $response->assertRedirect(route('filament.admin.pages.my-dashboard'));
+    $response->assertRedirect(route(\App\Filament\Pages\MyDashboard::getRouteName()));
 });

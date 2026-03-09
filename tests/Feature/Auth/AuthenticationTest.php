@@ -20,7 +20,7 @@ test('users can authenticate using the login screen', function () {
 
     $response
         ->assertHasNoErrors()
-        ->assertRedirect(route('filament.admin.pages.my-dashboard', absolute: false));
+        ->assertRedirect(route(\App\Filament\Pages\MyDashboard::getRouteName(), absolute: false));
 
     $this->assertAuthenticated();
 });
