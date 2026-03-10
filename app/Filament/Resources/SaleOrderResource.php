@@ -6,6 +6,7 @@ use App\Filament\Resources\SaleOrderResource\Pages;
 use App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder;
 use App\Filament\Resources\SaleOrderResource\RelationManagers\SaleOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
+use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\InventoryStock;
 use App\Models\Product;
@@ -1229,7 +1230,9 @@ class SaleOrderResource extends Resource
                                         ->label('COA')
                                         ->preload()
                                         ->searchable()
-                                        ->relationship('coa', 'name')
+                                        ->options(ChartOfAccount::orderBy('code')->get()->mapWithKeys(function ($coa) {
+                                            return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                        }))
                                         ->required(),
                                     Textarea::make('note')
                                         ->label('Note')
