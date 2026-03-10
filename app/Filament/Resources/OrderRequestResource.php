@@ -275,7 +275,6 @@ class OrderRequestResource extends Resource
                                     ->indonesianMoney()
                                     ->default(0)
                                     ->reactive()
-                                    ->readonly()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $quantity = $get('quantity') ?? 0;
                                         $unitPrice = $state ?? 0;
