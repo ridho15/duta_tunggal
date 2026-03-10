@@ -40,7 +40,8 @@ class ItemsRelationManager extends RelationManager
                     ->required(),
                 Forms\Components\TextInput::make('cost_per_unit')
                     ->label('Harga per Unit')
-                    ->numeric(),
+                    ->numeric()
+                    ->indonesianMoney(),
                 Forms\Components\Select::make('status')
                     ->label('Status Approval')
                     ->options([

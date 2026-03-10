@@ -189,11 +189,23 @@ class DepositFeatureTest extends TestCase
             'warehouse_id' => $warehouse->id,
         ]);
 
+        // Create required COAs for InvoiceObserver (codes 1120 AR and 4000 Revenue)
+        $arCoa = \App\Models\ChartOfAccount::firstOrCreate(
+            ['code' => '1120'],
+            ['name' => 'Accounts Receivable', 'type' => 'Asset', 'is_active' => true]
+        );
+        $revenueCoa = \App\Models\ChartOfAccount::firstOrCreate(
+            ['code' => '4000'],
+            ['name' => 'Sales Revenue', 'type' => 'Revenue', 'is_active' => true]
+        );
+
         $invoice = Invoice::factory()->create([
             'from_model_type' => SaleOrder::class,
             'from_model_id' => $saleOrder->id,
             'total' => 1000000,
             'status' => 'unpaid',
+            'ar_coa_id' => $arCoa->id,
+            'revenue_coa_id' => $revenueCoa->id,
         ]);
 
         // Use deposit for invoice payment

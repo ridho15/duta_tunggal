@@ -65,7 +65,7 @@ class CustomerReceiptItemRelationManager extends RelationManager
                     }),
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Jumlah Pembayaran')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('method')
                     ->label('Metode')

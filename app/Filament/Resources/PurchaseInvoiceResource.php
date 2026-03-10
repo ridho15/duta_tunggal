@@ -105,7 +105,7 @@ class PurchaseInvoiceResource extends Resource
                                         if (!$supplierId) return [];
                                         
                                         return \App\Models\OrderRequest::where('supplier_id', $supplierId)
-                                            ->whereHas('purchaseOrders', function ($q) {
+                                            ->whereHas('purchaseOrder', function ($q) {
                                                 $q->where('status', 'completed')
                                                   ->whereHas('purchaseReceipt', fn($q2) => $q2->where('status', 'completed'));
                                             })
@@ -772,7 +772,6 @@ class PurchaseInvoiceResource extends Resource
                         Hidden::make('supplier_phone'),
                         Hidden::make('subtotal'),
                         Hidden::make('purchase_receipts'),
-                        Hidden::make('receiptBiayaItems'),
                         
                         // Biaya Lain dari Purchase Receipt
                         Repeater::make('receiptBiayaItems')
@@ -890,7 +889,7 @@ class PurchaseInvoiceResource extends Resource
                             ->date(),
                         Infolists\Components\TextEntry::make('subtotal')
                             ->label('Subtotal')
-                            ->money('IDR'),
+                            ->rupiah(),
                         Infolists\Components\TextEntry::make('tax')
                             ->label('Tax (%)')
                             ->state(function (Invoice $record) {
@@ -903,16 +902,16 @@ class PurchaseInvoiceResource extends Resource
                             }),
                         Infolists\Components\TextEntry::make('dpp')
                             ->label('DPP')
-                            ->money('IDR'),
+                            ->rupiah(),
                         Infolists\Components\TextEntry::make('other_fee_total')
                             ->label('Other Fees')
-                            ->money('IDR')
+                            ->rupiah()
                             ->state(function (Invoice $record) {
                                 return $record->getOtherFeeTotalAttribute();
                             }),
                         Infolists\Components\TextEntry::make('total')
                             ->label('Invoice Total')
-                            ->money('IDR'),
+                            ->rupiah(),
                         Infolists\Components\TextEntry::make('status')
                             ->label('Status')
                             ->badge(),
@@ -1006,7 +1005,7 @@ class PurchaseInvoiceResource extends Resource
                     
                 TextColumn::make('total')
                     ->label('Total')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                     
                 BadgeColumn::make('status')

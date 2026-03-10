@@ -97,9 +97,9 @@ class BankReconciliationResource extends Resource
                         Infolists\Components\TextEntry::make('coa.code')->label('Akun Bank')->formatStateUsing(fn ($state, $record) => $record->coa->code . ' - ' . $record->coa->name),
                         Infolists\Components\TextEntry::make('period_start')->date('d/m/Y')->label('Periode Dari'),
                         Infolists\Components\TextEntry::make('period_end')->date('d/m/Y')->label('Sampai'),
-                        Infolists\Components\TextEntry::make('statement_ending_balance')->money('IDR')->label('Saldo Akhir Rekening Koran'),
-                        Infolists\Components\TextEntry::make('book_balance')->money('IDR')->label('Saldo Buku'),
-                        Infolists\Components\TextEntry::make('difference')->money('IDR')->label('Selisih'),
+                        Infolists\Components\TextEntry::make('statement_ending_balance')->rupiah()->label('Saldo Akhir Rekening Koran'),
+                        Infolists\Components\TextEntry::make('book_balance')->rupiah()->label('Saldo Buku'),
+                        Infolists\Components\TextEntry::make('difference')->rupiah()->label('Selisih'),
                         Infolists\Components\TextEntry::make('status')->badge()->color(fn ($state) => $state === 'closed' ? 'success' : 'secondary'),
                         Infolists\Components\TextEntry::make('notes')->label('Catatan'),
                     ])->columns(2),
@@ -111,8 +111,8 @@ class BankReconciliationResource extends Resource
                                 Infolists\Components\TextEntry::make('date')->date('d/m/Y'),
                                 Infolists\Components\TextEntry::make('reference'),
                                 Infolists\Components\TextEntry::make('description'),
-                                Infolists\Components\TextEntry::make('debit')->money('IDR'),
-                                Infolists\Components\TextEntry::make('credit')->money('IDR'),
+                                Infolists\Components\TextEntry::make('debit')->rupiah(),
+                                Infolists\Components\TextEntry::make('credit')->rupiah(),
                             ])
                             ->columns(5)
                     ])
@@ -131,9 +131,9 @@ class BankReconciliationResource extends Resource
                 }),
                 TextColumn::make('period_start')->date('d/m/Y')->label('Mulai'),
                 TextColumn::make('period_end')->date('d/m/Y')->label('Selesai'),
-                TextColumn::make('statement_ending_balance')->money('IDR')->label('Saldo Rek Koran'),
-                TextColumn::make('book_balance')->money('IDR')->label('Saldo Buku'),
-                TextColumn::make('difference')->money('IDR')->label('Selisih')->color(fn ($state) => $state != 0 ? 'danger' : 'success'),
+                TextColumn::make('statement_ending_balance')->rupiah()->label('Saldo Rek Koran'),
+                TextColumn::make('book_balance')->rupiah()->label('Saldo Buku'),
+                TextColumn::make('difference')->rupiah()->label('Selisih')->color(fn ($state) => $state != 0 ? 'danger' : 'success'),
                 TextColumn::make('status')->badge()->colors(['secondary' => 'open', 'success' => 'closed'])->searchable(),
             ])
             ->filters([

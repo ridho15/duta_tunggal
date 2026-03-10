@@ -435,7 +435,7 @@ class InvoiceResource extends Resource
                     }),
                 TextColumn::make('subtotal')
                     ->numeric()
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('tax')
                     ->numeric()
@@ -445,11 +445,11 @@ class InvoiceResource extends Resource
                     ->label('Other Fee')
                     ->getStateUsing(fn ($record) => $record->other_fee_total ?? 0)
                     ->numeric()
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('total')
                     ->numeric()
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()

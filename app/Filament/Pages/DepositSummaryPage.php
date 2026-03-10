@@ -74,17 +74,17 @@ class DepositSummaryPage extends Page implements HasTable
                     
                 Tables\Columns\TextColumn::make('total_deposit')
                     ->label('Total Deposit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('total_used')
                     ->label('Total Used')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('total_remaining')
                     ->label('Available Balance')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger')
                     ->weight('bold'),

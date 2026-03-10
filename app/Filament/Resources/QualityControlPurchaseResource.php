@@ -50,7 +50,7 @@ class QualityControlPurchaseResource extends Resource
 
     protected static ?string $navigationLabel = 'Quality Control Purchase';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -501,7 +501,7 @@ class QualityControlPurchaseResource extends Resource
                                     ->preload()
                                     ->options(function () use ($record) {
                                         return PurchaseOrder::whereIn('status', ['draft', 'pending_approval', 'approved'])
-                                            ->whereHas('purchaseOrderItems', function ($q) use ($record) {
+                                            ->whereHas('purchaseOrderItem', function ($q) use ($record) {
                                                 $q->where('product_id', $record->product_id);
                                             })
                                             ->orWhere(function ($q) {
@@ -613,8 +613,8 @@ class QualityControlPurchaseResource extends Resource
                                 TextEntry::make('date')->date()->label('Date'),
                                 TextEntry::make('coa.code')->label('COA'),
                                 TextEntry::make('coa.name')->label('Account Name'),
-                                TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
-                                TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                                TextEntry::make('debit')->rupiah()->label('Debit')->color('success'),
+                                TextEntry::make('credit')->rupiah()->label('Credit')->color('danger'),
                                 TextEntry::make('description')->label('Description'),
                                 TextEntry::make('journal_type')->badge()->label('Type'),
                             ])->columns(4),

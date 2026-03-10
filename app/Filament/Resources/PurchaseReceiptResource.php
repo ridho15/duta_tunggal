@@ -52,7 +52,7 @@ class PurchaseReceiptResource extends Resource
     // Group label updated to indicate Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     /**
      * Purchase Receipt hanya dibuat otomatis dari hasil Quality Control.
@@ -515,7 +515,7 @@ class PurchaseReceiptResource extends Resource
                     ->label('Currency'),
                 TextColumn::make('total_biaya')
                     ->label('Total Biaya Lain')
-                    ->money('IDR')
+                    ->rupiah()
                     ->getStateUsing(function ($record) {
                         return $record->purchaseReceiptBiaya->sum('total');
                     })

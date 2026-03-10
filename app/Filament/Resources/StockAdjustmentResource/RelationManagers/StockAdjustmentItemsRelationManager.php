@@ -130,12 +130,12 @@ class StockAdjustmentItemsRelationManager extends RelationManager
 
                 TextColumn::make('unit_cost')
                     ->label('Harga Satuan')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 TextColumn::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->money('IDR')
+                    ->rupiah()
                     ->color(fn ($record) => $record->difference_value > 0 ? 'success' : ($record->difference_value < 0 ? 'danger' : 'gray'))
                     ->sortable(),
             ])

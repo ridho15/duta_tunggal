@@ -197,11 +197,11 @@ class AssetDisposalResource extends Resource
                         'other' => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('sale_price')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('book_value_at_disposal')
                     ->label('Book Value')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('formatted_gain_loss')
                     ->label('Gain/Loss'),

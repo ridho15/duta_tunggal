@@ -122,9 +122,9 @@ class CashBankTransferResource extends Resource
                         $record->toCoa ? $record->toCoa->code . ' - ' . $record->toCoa->name : '-'
                     )
                     ->searchable(),
-                TextColumn::make('amount')->money('IDR')->label('Jumlah')->sortable(),
+                TextColumn::make('amount')->rupiah()->label('Jumlah')->sortable(),
                 TextColumn::make('other_costs')
-                    ->money('IDR')
+                    ->rupiah()
                     ->label('Biaya Lainnya')
                     ->sortable()
                     ->toggleable(),
@@ -209,8 +209,8 @@ class CashBankTransferResource extends Resource
                     TextEntry::make('number')->label('Transfer Number'),
                     TextEntry::make('date')->date('d/m/Y')->label('Transfer Date'),
                     TextEntry::make('status')->badge()->label('Status'),
-                    TextEntry::make('amount')->money('IDR')->label('Transfer Amount'),
-                    TextEntry::make('other_costs')->money('IDR')->label('Other Costs')->placeholder('0'),
+                    TextEntry::make('amount')->rupiah()->label('Transfer Amount'),
+                    TextEntry::make('other_costs')->rupiah()->label('Other Costs')->placeholder('0'),
                     TextEntry::make('description')->label('Description')->columnSpanFull(),
                     TextEntry::make('reference')->label('Reference')->placeholder('-'),
                 ])->columns(2),
@@ -248,8 +248,8 @@ class CashBankTransferResource extends Resource
                             TextEntry::make('date')->date()->label('Date'),
                             TextEntry::make('coa.code')->label('COA'),
                             TextEntry::make('coa.name')->label('Account Name'),
-                            TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
-                            TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                            TextEntry::make('debit')->rupiah()->label('Debit')->color('success'),
+                            TextEntry::make('credit')->rupiah()->label('Credit')->color('danger'),
                             TextEntry::make('description')->label('Description'),
                             TextEntry::make('journal_type')->badge()->label('Type'),
                         ])

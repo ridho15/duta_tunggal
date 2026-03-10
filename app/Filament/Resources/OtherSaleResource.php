@@ -216,7 +216,7 @@ class OtherSaleResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Jumlah')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('coa.name')

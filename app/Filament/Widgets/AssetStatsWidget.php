@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Asset;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -32,12 +33,12 @@ class AssetStatsWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-x-circle')
                 ->color('warning'),
 
-            Stat::make('Total Nilai Aset', 'Rp ' . number_format($totalAssetValue, 0, ',', '.'))
+            Stat::make('Total Nilai Aset', MoneyHelper::rupiah($totalAssetValue))
                 ->description('Total nilai pembelian aset')
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->color('info'),
 
-            Stat::make('Total Book Value', 'Rp ' . number_format($totalBookValue, 0, ',', '.'))
+            Stat::make('Total Book Value', MoneyHelper::rupiah($totalBookValue))
                 ->description('Total nilai buku aset saat ini')
                 ->descriptionIcon('heroicon-m-calculator')
                 ->color('gray'),

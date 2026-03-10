@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -22,11 +23,11 @@ class SaldoStatsOverview extends BaseWidget
         $saldoBank = JournalEntry::where('coa_id', $bankCoaId)
             ->sum(DB::raw('debit - credit'));
         return [
-            Stat::make('Saldo Kas', "Rp." . number_format($saldoKas, 0, ',', '.'))
+            Stat::make('Saldo Kas', MoneyHelper::rupiah($saldoKas))
                 ->description('Total Kas')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
-            Stat::make('Saldo Bank', "Rp." . number_format($saldoBank, 0, ',', '.'))
+            Stat::make('Saldo Bank', MoneyHelper::rupiah($saldoBank))
                 ->description('Total Saldo Bank')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),

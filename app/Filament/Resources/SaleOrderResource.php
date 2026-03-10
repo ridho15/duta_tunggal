@@ -940,7 +940,7 @@ class SaleOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('stock_status')
                     ->label('Status Stok')

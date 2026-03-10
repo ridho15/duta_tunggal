@@ -253,7 +253,7 @@ class CustomerResource extends Resource
                     }),
                 TextColumn::make('kredit_limit')
                     ->label('Kredit Limit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->visible(fn () => true),
                 TextColumn::make('current_credit_usage')
@@ -263,7 +263,7 @@ class CustomerResource extends Resource
                         $creditService = app(CreditValidationService::class);
                         return $creditService->getCurrentCreditUsage($record);
                     })
-                    ->money('IDR')
+                    ->rupiah()
                     ->color(function (Customer $record): string {
                         if ($record->tipe_pembayaran !== 'Kredit') return 'gray';
                         $creditService = app(CreditValidationService::class);

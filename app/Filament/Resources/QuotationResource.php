@@ -428,7 +428,7 @@ class QuotationResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
@@ -851,6 +851,7 @@ class QuotationResource extends Resource
                                             TextInput::make('subtotal')
                                                 ->label('Subtotal')
                                                 ->numeric()
+                                                ->indonesianMoney()
                                                 ->readOnly()
                                                 ->default(0),
                                         ])

@@ -195,7 +195,7 @@ class JournalEntryResource extends Resource
                                     if (!is_subclass_of($modelClass, \Illuminate\Database\Eloquent\Model::class)) return [];
 
                                     // Get appropriate display field based on model
-                                    $displayField = match($modelClass) {
+                                    $displayField = match ($modelClass) {
                                         'App\\Models\\PurchaseOrder' => 'po_number',
                                         'App\\Models\\SaleOrder' => 'so_number',
                                         'App\\Models\\ManufacturingOrder' => 'mo_number',
@@ -215,7 +215,7 @@ class JournalEntryResource extends Resource
                                     $query = $modelClass::query();
 
                                     // Add specific conditions based on model type
-                                    switch($modelClass) {
+                                    switch ($modelClass) {
                                         case 'App\\Models\\PurchaseOrder':
                                             $query->where('status', 'approved');
                                             break;
@@ -235,7 +235,7 @@ class JournalEntryResource extends Resource
                                             $query->whereIn('status', ['Paid', 'Partial']);
                                             break;
                                         case 'App\\Models\\CustomerReceiptItem':
-                                            $query->whereHas('customerReceipt', function($q) {
+                                            $query->whereHas('customerReceipt', function ($q) {
                                                 $q->whereIn('status', ['Paid', 'Partial']);
                                             });
                                             break;
@@ -245,33 +245,33 @@ class JournalEntryResource extends Resource
                                     }
 
                                     return $query->pluck($displayField, 'id')
-                                                 ->mapWithKeys(function ($display, $id) use ($modelClass, $displayField) {
-                                                     $model = $modelClass::find($id);
-                                                     $prefix = match($modelClass) {
-                                                         'App\\Models\\PurchaseOrder' => 'PO',
-                                                         'App\\Models\\SaleOrder' => 'SO',
-                                                         'App\\Models\\ManufacturingOrder' => 'MO',
-                                                         'App\\Models\\DeliveryOrder' => 'DO',
-                                                         'App\\Models\\MaterialIssue' => 'MI',
-                                                         'App\\Models\\VendorPayment' => 'VP',
-                                                         'App\\Models\\CustomerReceipt' => 'CR',
-                                                         'App\\Models\\CashBankTransaction' => 'CBT',
-                                                         'App\\Models\\CustomerReceiptItem' => 'CRI',
-                                                         'App\\Models\\StockTransfer' => 'ST',
-                                                         'App\\Models\\Asset' => 'ASSET',
-                                                         'App\\Models\\Deposit' => 'DEP',
-                                                         'App\\Models\\OtherSale' => 'OS',
-                                                         default => 'UNK'
-                                                     };
-                                                     return [$id => $prefix . '-' . $id . ': ' . $display];
-                                                 });
+                                        ->mapWithKeys(function ($display, $id) use ($modelClass, $displayField) {
+                                            $model = $modelClass::find($id);
+                                            $prefix = match ($modelClass) {
+                                                'App\\Models\\PurchaseOrder' => 'PO',
+                                                'App\\Models\\SaleOrder' => 'SO',
+                                                'App\\Models\\ManufacturingOrder' => 'MO',
+                                                'App\\Models\\DeliveryOrder' => 'DO',
+                                                'App\\Models\\MaterialIssue' => 'MI',
+                                                'App\\Models\\VendorPayment' => 'VP',
+                                                'App\\Models\\CustomerReceipt' => 'CR',
+                                                'App\\Models\\CashBankTransaction' => 'CBT',
+                                                'App\\Models\\CustomerReceiptItem' => 'CRI',
+                                                'App\\Models\\StockTransfer' => 'ST',
+                                                'App\\Models\\Asset' => 'ASSET',
+                                                'App\\Models\\Deposit' => 'DEP',
+                                                'App\\Models\\OtherSale' => 'OS',
+                                                default => 'UNK'
+                                            };
+                                            return [$id => $prefix . '-' . $id . ': ' . $display];
+                                        });
                                 } catch (\Exception $e) {
                                     return [];
                                 }
                             })
                             ->searchable()
                             ->preload()
-                            ->visible(fn (callable $get) => !empty($get('source_type')))
+                            ->visible(fn(callable $get) => !empty($get('source_type')))
                             ->columnSpan(1),
 
                         Forms\Components\Select::make('cabang_id')
@@ -279,7 +279,7 @@ class JournalEntryResource extends Resource
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
-                                
+
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
                                         ->get()
@@ -287,14 +287,14 @@ class JournalEntryResource extends Resource
                                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                         });
                                 }
-                                
+
                                 return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
                                     return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                 });
                             })
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
-                            ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->kode} - {$record->nama}")
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->getOptionLabelFromRecordUsing(fn($record) => "{$record->kode} - {$record->nama}")
                             ->searchable(['kode', 'nama'])
                             ->preload(),
 
@@ -316,7 +316,7 @@ class JournalEntryResource extends Resource
                                     ->relationship('coa', 'name')
                                     ->searchable()
                                     ->preload()
-                                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->code} - {$record->name}")
+                                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->code} - {$record->name}")
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Chart of Account harus dipilih.',
@@ -372,9 +372,9 @@ class JournalEntryResource extends Resource
                             ])
                             ->addActionLabel('Add Journal Line')
                             ->collapsible()
-                            ->itemLabel(fn (array $state): ?string => $state['coa_id'] ? \App\Models\ChartOfAccount::find($state['coa_id'])?->name : 'New Line')
+                            ->itemLabel(fn(array $state): ?string => $state['coa_id'] ? \App\Models\ChartOfAccount::find($state['coa_id'])?->name : 'New Line')
                             ->rules([
-                                fn (): \Closure => function (string $attribute, $value, \Closure $fail) {
+                                fn(): \Closure => function (string $attribute, $value, \Closure $fail) {
                                     if (!is_array($value) || count($value) < 2) {
                                         $fail('Minimal 2 journal entries diperlukan.');
                                         return;
@@ -429,7 +429,7 @@ class JournalEntryResource extends Resource
                                 function ($get) {
                                     return function ($attribute, $value, $fail) use ($get) {
                                         $entries = $get('journal_entries') ?? [];
-                                        
+
                                         if (!is_array($entries) || count($entries) < 2) {
                                             $fail('Minimal 2 journal entries diperlukan.');
                                             return;
@@ -484,7 +484,7 @@ class JournalEntryResource extends Resource
                                 Infolists\Components\TextEntry::make('journal_type')
                                     ->label('Journal Type')
                                     ->badge()
-                                    ->color(fn (string $state): string => match ($state) {
+                                    ->color(fn(string $state): string => match ($state) {
                                         'sales' => 'success',
                                         'purchase' => 'warning',
                                         'depreciation' => 'info',
@@ -494,17 +494,17 @@ class JournalEntryResource extends Resource
 
                                 Infolists\Components\TextEntry::make('cabang')
                                     ->label('Branch')
-                                    ->formatStateUsing(fn ($state) => $state ? "({$state->kode}) {$state->nama}" : '-')
+                                    ->formatStateUsing(fn($state) => $state ? "({$state->kode}) {$state->nama}" : '-')
                                     ->placeholder('N/A'),
 
                                 Infolists\Components\TextEntry::make('debit')
                                     ->label('Debit')
-                                    ->money('IDR')
+                                    ->rupiah()
                                     ->color('success'),
 
                                 Infolists\Components\TextEntry::make('credit')
                                     ->label('Credit')
-                                    ->money('IDR')
+                                    ->rupiah()
                                     ->color('danger'),
                             ]),
 
@@ -745,7 +745,7 @@ class JournalEntryResource extends Resource
                                 Infolists\Components\TextEntry::make('transaction_id')
                                     ->label('Transaction ID')
                                     ->placeholder('N/A')
-                                    ->visible(fn ($record) => !is_null($record->transaction_id)),
+                                    ->visible(fn($record) => !is_null($record->transaction_id)),
 
                                 Infolists\Components\Actions::make([
                                     Infolists\Components\Actions\Action::make('view_source')
@@ -759,7 +759,7 @@ class JournalEntryResource extends Resource
 
                                             // Generate URL based on source type using named routes
                                             try {
-                                                return match($record->source_type) {
+                                                return match ($record->source_type) {
                                                     'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
                                                     'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->source_id),
                                                     'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->source_id),
@@ -787,7 +787,7 @@ class JournalEntryResource extends Resource
 
                                             // Check if route exists for this source type
                                             try {
-                                                $url = match($record->source_type) {
+                                                $url = match ($record->source_type) {
                                                     'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->source_id),
                                                     'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
                                                     'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->source_id),
@@ -812,7 +812,7 @@ class JournalEntryResource extends Resource
                                             }
                                         }),
                                 ])
-                                ->columnSpanFull(),
+                                    ->columnSpanFull(),
                             ])
                             ->columns(2)
                             ->collapsible()
@@ -854,13 +854,13 @@ class JournalEntryResource extends Resource
 
                 Tables\Columns\TextColumn::make('debit')
                     ->label('Debit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->color('success'),
 
                 Tables\Columns\TextColumn::make('credit')
                     ->label('Credit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->color('danger'),
 
@@ -930,7 +930,7 @@ class JournalEntryResource extends Resource
                             }
                         }
 
-                        return match($record->source_type) {
+                        return match ($record->source_type) {
                             'App\\Models\\PurchaseOrder' => 'Purchase Order',
                             'App\\Models\\SaleOrder' => 'Sales Order',
                             'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
@@ -987,7 +987,7 @@ class JournalEntryResource extends Resource
                                 return $prefix . ($model->invoice_number ?: 'N/A');
                             }
 
-                            $displayField = match($record->source_type) {
+                            $displayField = match ($record->source_type) {
                                 'App\\Models\\PurchaseOrder' => 'po_number',
                                 'App\\Models\\SaleOrder' => 'so_number',
                                 'App\\Models\\ManufacturingOrder' => 'mo_number',
@@ -1022,7 +1022,7 @@ class JournalEntryResource extends Resource
 
                 Tables\Columns\TextColumn::make('cabang')
                     ->label('Cabang')
-                    ->formatStateUsing(fn ($state, $record) => $record->cabang ? ($record->cabang->kode . ' - ' . $record->cabang->nama) : '-')
+                    ->formatStateUsing(fn($state, $record) => $record->cabang ? ($record->cabang->kode . ' - ' . $record->cabang->nama) : '-')
                     ->searchable(query: function (Builder $query, $search) {
                         return $query->whereHas('cabang', function ($query) use ($search) {
                             return $query->where('kode', 'LIKE', '%' . $search . '%')
@@ -1080,7 +1080,7 @@ class JournalEntryResource extends Resource
                     ->options(function () {
                         $user = Auth::user();
                         $manageType = $user?->manage_type ?? [];
-                        
+
                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                             return \App\Models\Cabang::where('id', $user?->cabang_id)
                                 ->get()
@@ -1088,7 +1088,7 @@ class JournalEntryResource extends Resource
                                     return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                 });
                         }
-                        
+
                         return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                         });
@@ -1128,120 +1128,120 @@ class JournalEntryResource extends Resource
             ->actions([
                 ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('view_source')
-                    ->label('Lihat Detail Source')
-                    ->icon('heroicon-o-eye')
-                    ->color('info')
-                    ->visible(fn ($record) => !empty($record->source_type) && !empty($record->source_id))
-                    ->action(function ($record) {
-                        $sourceType = $record->source_type;
-                        $sourceId = $record->source_id;
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('view_source')
+                        ->label('Lihat Detail Source')
+                        ->icon('heroicon-o-eye')
+                        ->color('info')
+                        ->visible(fn($record) => !empty($record->source_type) && !empty($record->source_id))
+                        ->action(function ($record) {
+                            $sourceType = $record->source_type;
+                            $sourceId = $record->source_id;
 
-                        if (!$sourceType || !$sourceId) {
-                            return;
-                        }
-
-                        try {
-                            // Map source_type to resource URL
-                            $url = match($sourceType) {
-                                'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $sourceId),
-                                'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $sourceId),
-                                'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $sourceId),
-                                'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $sourceId),
-                                'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $sourceId),
-                                'App\\Models\\VendorPayment' => route('filament.admin.resources.vendor-payments.view', $sourceId),
-                                'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $sourceId),
-                                'App\\Models\\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $sourceId),
-                                'App\\Models\\CashBankTransaction' => route('filament.admin.resources.cash-bank-transactions.view', $sourceId),
-                                'App\\Models\\CashBankTransfer' => route('filament.admin.resources.cash-bank-transfers.view', $sourceId),
-                                'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $sourceId),
-                                'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $sourceId),
-                                'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $sourceId),
-                                'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $sourceId),
-                                'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
-                                'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
-                                default => null
-                            };
-
-                            if ($url) {
-                                return redirect($url);
+                            if (!$sourceType || !$sourceId) {
+                                return;
                             }
-                        } catch (\Exception $e) {
-                            // Route not found, show notification instead
-                        }
 
-                        // Fallback: show notification with source info
-                        \Filament\Notifications\Notification::make()
-                            ->title('Source Detail')
-                            ->body("Source type: {$sourceType}, ID: {$sourceId}")
-                            ->info()
-                            ->send();
-                    }),
+                            try {
+                                // Map source_type to resource URL
+                                $url = match ($sourceType) {
+                                    'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $sourceId),
+                                    'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $sourceId),
+                                    'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $sourceId),
+                                    'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $sourceId),
+                                    'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $sourceId),
+                                    'App\\Models\\VendorPayment' => route('filament.admin.resources.vendor-payments.view', $sourceId),
+                                    'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $sourceId),
+                                    'App\\Models\\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $sourceId),
+                                    'App\\Models\\CashBankTransaction' => route('filament.admin.resources.cash-bank-transactions.view', $sourceId),
+                                    'App\\Models\\CashBankTransfer' => route('filament.admin.resources.cash-bank-transfers.view', $sourceId),
+                                    'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $sourceId),
+                                    'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $sourceId),
+                                    'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $sourceId),
+                                    'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $sourceId),
+                                    'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
+                                    'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
+                                    default => null
+                                };
 
-                Tables\Actions\Action::make('auto_reversal')
-                    ->label('Auto Reversal')
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalHeading('Buat Jurnal Auto Reversal')
-                    ->modalDescription(fn ($record) => "Ini akan membuat jurnal reversal (membalik debit/kredit) untuk semua baris yang sama dengan transaction_id: {$record->transaction_id}. Lanjutkan?")
-                    ->visible(fn ($record) => !empty($record->transaction_id) && !$record->is_reversal)
-                    ->action(function ($record) {
-                        $transactionId = $record->transaction_id;
+                                if ($url) {
+                                    return redirect($url);
+                                }
+                            } catch (\Exception $e) {
+                                // Route not found, show notification instead
+                            }
 
-                        // Check if reversal already exists
-                        $alreadyReversed = \App\Models\JournalEntry::where('reversal_of_transaction_id', $transactionId)->exists();
-                        if ($alreadyReversed) {
+                            // Fallback: show notification with source info
                             \Filament\Notifications\Notification::make()
-                                ->title('Sudah Di-Reversal')
-                                ->warning()
-                                ->body("Jurnal dengan transaction_id {$transactionId} sudah pernah di-reversal sebelumnya.")
+                                ->title('Source Detail')
+                                ->body("Source type: {$sourceType}, ID: {$sourceId}")
+                                ->info()
                                 ->send();
-                            return;
-                        }
+                        }),
 
-                        // Get all entries with same transaction_id
-                        $originalEntries = \App\Models\JournalEntry::where('transaction_id', $transactionId)->get();
+                    Tables\Actions\Action::make('auto_reversal')
+                        ->label('Auto Reversal')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Buat Jurnal Auto Reversal')
+                        ->modalDescription(fn($record) => "Ini akan membuat jurnal reversal (membalik debit/kredit) untuk semua baris yang sama dengan transaction_id: {$record->transaction_id}. Lanjutkan?")
+                        ->visible(fn($record) => !empty($record->transaction_id) && !$record->is_reversal)
+                        ->action(function ($record) {
+                            $transactionId = $record->transaction_id;
 
-                        if ($originalEntries->isEmpty()) {
+                            // Check if reversal already exists
+                            $alreadyReversed = \App\Models\JournalEntry::where('reversal_of_transaction_id', $transactionId)->exists();
+                            if ($alreadyReversed) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Sudah Di-Reversal')
+                                    ->warning()
+                                    ->body("Jurnal dengan transaction_id {$transactionId} sudah pernah di-reversal sebelumnya.")
+                                    ->send();
+                                return;
+                            }
+
+                            // Get all entries with same transaction_id
+                            $originalEntries = \App\Models\JournalEntry::where('transaction_id', $transactionId)->get();
+
+                            if ($originalEntries->isEmpty()) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Data Tidak Ditemukan')
+                                    ->danger()
+                                    ->body("Tidak ada entri dengan transaction_id {$transactionId}.")
+                                    ->send();
+                                return;
+                            }
+
+                            $newTransactionId = 'REV-' . $transactionId;
+                            $reversalDate = now()->format('Y-m-d');
+
+                            foreach ($originalEntries as $entry) {
+                                \App\Models\JournalEntry::create([
+                                    'coa_id'                      => $entry->coa_id,
+                                    'date'                        => $reversalDate,
+                                    'reference'                   => 'REV-' . $entry->reference,
+                                    'description'                 => 'Auto Reversal: ' . $entry->description,
+                                    'debit'                       => $entry->credit,   // swapped
+                                    'credit'                      => $entry->debit,    // swapped
+                                    'journal_type'                => 'REV',
+                                    'cabang_id'                   => $entry->cabang_id,
+                                    'department_id'               => $entry->department_id,
+                                    'project_id'                  => $entry->project_id,
+                                    'transaction_id'              => $newTransactionId,
+                                    'is_reversal'                 => true,
+                                    'reversal_of_transaction_id'  => $transactionId,
+                                ]);
+                            }
+
                             \Filament\Notifications\Notification::make()
-                                ->title('Data Tidak Ditemukan')
-                                ->danger()
-                                ->body("Tidak ada entri dengan transaction_id {$transactionId}.")
+                                ->title('Auto Reversal Berhasil')
+                                ->success()
+                                ->body("Berhasil membuat {$originalEntries->count()} entri jurnal reversal dengan transaction_id: {$newTransactionId}.")
                                 ->send();
-                            return;
-                        }
-
-                        $newTransactionId = 'REV-' . $transactionId;
-                        $reversalDate = now()->format('Y-m-d');
-
-                        foreach ($originalEntries as $entry) {
-                            \App\Models\JournalEntry::create([
-                                'coa_id'                      => $entry->coa_id,
-                                'date'                        => $reversalDate,
-                                'reference'                   => 'REV-' . $entry->reference,
-                                'description'                 => 'Auto Reversal: ' . $entry->description,
-                                'debit'                       => $entry->credit,   // swapped
-                                'credit'                      => $entry->debit,    // swapped
-                                'journal_type'                => 'REV',
-                                'cabang_id'                   => $entry->cabang_id,
-                                'department_id'               => $entry->department_id,
-                                'project_id'                  => $entry->project_id,
-                                'transaction_id'              => $newTransactionId,
-                                'is_reversal'                 => true,
-                                'reversal_of_transaction_id'  => $transactionId,
-                            ]);
-                        }
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Auto Reversal Berhasil')
-                            ->success()
-                            ->body("Berhasil membuat {$originalEntries->count()} entri jurnal reversal dengan transaction_id: {$newTransactionId}.")
-                            ->send();
-                    }),
+                        }),
                 ])
-                ], position: ActionsPosition::BeforeColumns)
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -1261,17 +1261,17 @@ class JournalEntryResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Journal Entry</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Journal Entry adalah pencatatan transaksi keuangan dalam sistem akuntansi ganda, mencatat debit dan kredit pada akun yang relevan.</li>' .
-                            '<li><strong>Validasi:</strong> Setiap entri harus balance (total debit = total kredit). Terkait dengan COA (Chart of Account) dan dapat memiliki reference ke transaksi lain.</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah entri), <em>Delete</em> (hapus), <em>Go to Source</em> (ke transaksi asal).</li>' .
-                            '<li><strong>Grouping:</strong> Berdasarkan Reference dan Date.</li>' .
-                            '<li><strong>Filters:</strong> COA, Date Range, Amount Range, Reference, dll.</li>' .
-                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan entri dari cabang tersebut jika tidak memiliki akses all.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan berbagai modul seperti penjualan, pembelian, inventory, dll. untuk otomatisasi pencatatan.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Journal Entry adalah pencatatan transaksi keuangan dalam sistem akuntansi ganda, mencatat debit dan kredit pada akun yang relevan.</li>' .
+                    '<li><strong>Validasi:</strong> Setiap entri harus balance (total debit = total kredit). Terkait dengan COA (Chart of Account) dan dapat memiliki reference ke transaksi lain.</li>' .
+                    '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah entri), <em>Delete</em> (hapus), <em>Go to Source</em> (ke transaksi asal).</li>' .
+                    '<li><strong>Grouping:</strong> Berdasarkan Reference dan Date.</li>' .
+                    '<li><strong>Filters:</strong> COA, Date Range, Amount Range, Reference, dll.</li>' .
+                    '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan entri dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan berbagai modul seperti penjualan, pembelian, inventory, dll. untuk otomatisasi pencatatan.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 

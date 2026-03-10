@@ -390,7 +390,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
                 TextColumn::make('remaining')
                     ->label('Remaining Amount')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 BadgeColumn::make('aging_bucket')

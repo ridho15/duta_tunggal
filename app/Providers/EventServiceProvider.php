@@ -6,7 +6,6 @@ use App\Events\TransferPosted;
 use App\Listeners\AutoCreateBankReconciliation;
 use Illuminate\Support\ServiceProvider;
 use Filament\Tables\Table;
-use Filament\Forms\Components\TextInput;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use App\Listeners\LogSuccessfulLogin;
@@ -45,32 +44,7 @@ class EventServiceProvider extends ServiceProvider
         Table::$defaultCurrency = 'IDR';
         Table::$defaultNumberLocale = 'id';
 
-        // Deklarasi mask global untuk input uang menggunakan format Indonesia
-        TextInput::macro('indonesianMoney', function (): TextInput {
-            /** @var TextInput $this */
-            return $this
-                ->prefix('Rp')
-                ->mask(fn () => static::moneyMask())
-                ->formatStateUsing(fn (?string $state) => $state)
-                ->stripCharacters(['Rp', '.', ' '])
-                ->numeric();
-        });
-    }
-
-    protected static function moneyMask(): \Filament\Support\RawJs
-    {
-        return \Filament\Support\RawJs::make(<<<'JS'
-            $input.map(function(value) {
-                // Hapus semua karakter non-digit
-                value = value.replace(/[^\d]/g, '');
-                if (!value) {
-                    return '';
-                }
-
-                // Format dengan pemisah ribuan titik
-                const formatter = new Intl.NumberFormat('id-ID');
-                return formatter.format(parseInt(value, 10));
-            })
-        JS);
+        // NOTE: indonesianMoney TextInput macro is defined in AppServiceProvider.
+        // Do not redefine it here to avoid overriding the robust PHP-side parsing version.
     }
 }

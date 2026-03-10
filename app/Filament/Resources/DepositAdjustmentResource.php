@@ -154,17 +154,17 @@ class DepositAdjustmentResource extends Resource
                     
                 TextColumn::make('amount')
                     ->label('Total Deposit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                     
                 TextColumn::make('used_amount')
                     ->label('Used Amount')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                     
                 TextColumn::make('remaining_amount')
                     ->label('Remaining')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                     
                 TextColumn::make('coa.code')

@@ -67,13 +67,13 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('dpp')
                                     ->label('DPP')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                 TextEntry::make('tax')
                                     ->label('PPN Amount')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                 TextEntry::make('ppn_rate')
                                     ->label('PPN Rate (%)')
                                     ->suffix('%'),
@@ -82,10 +82,10 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                 TextEntry::make('total')
                                     ->label('Grand Total')
-                                    ->money('IDR')
+                                    ->rupiah()
                                     ->weight('bold')
                                     ->size('lg'),
                             ]),
@@ -123,10 +123,10 @@ class ViewSalesInvoice extends ViewRecord
                                             ->label('Quantity'),
                                         TextEntry::make('price')
                                             ->label('Price')
-                                            ->money('IDR'),
+                                            ->rupiah(),
                                         TextEntry::make('total')
                                             ->label('Total')
-                                            ->money('IDR'),
+                                            ->rupiah(),
                                     ]),
                             ])
                             ->columnSpanFull(),

@@ -175,7 +175,6 @@ class MasterDataSeeder extends Seeder
         // Create suppliers
         $suppliers = [
             [
-                'name' => 'PT Supplier Utama',
                 'code' => 'SUPP001',
                 'email' => 'sales@supplierutama.co.id',
                 'phone' => '021-33333333',
@@ -189,7 +188,6 @@ class MasterDataSeeder extends Seeder
                 'cabang_id' => $cabang->id
             ],
             [
-                'name' => 'CV Distributor Jaya',
                 'code' => 'SUPP002',
                 'email' => 'order@distributorejaya.co.id',
                 'phone' => '021-44444444',

@@ -167,19 +167,19 @@ class ChartOfAccountResource extends Resource
                     ->searchable(),
                 TextColumn::make('opening_balance')
                     ->label('Saldo Awal')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('debit')
                     ->label('Debit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('credit')
                     ->label('Kredit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('ending_balance')
                     ->label('Saldo Akhir')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

@@ -85,7 +85,7 @@ class CurrencyResource extends Resource
                     ->searchable(),
                 TextColumn::make('to_rupiah')
                     ->label('Nilai')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

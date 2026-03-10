@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AssetResource\Pages;
 use App\Filament\Resources\AssetResource\RelationManagers;
+use App\Helpers\MoneyHelper;
 use App\Models\Asset;
 use App\Models\ChartOfAccount;
 use Filament\Forms;
@@ -375,7 +376,7 @@ class AssetResource extends Resource
                                 $purchaseCost = (float) str_replace(',', '', $get('purchase_cost') ?? 0);
                                 $salvageValue = (float) str_replace(',', '', $get('salvage_value') ?? 0);
                                 $depreciable = $purchaseCost - $salvageValue;
-                                return 'Rp ' . number_format($depreciable, 2, ',', '.');
+                                return MoneyHelper::rupiah($depreciable);
                             }),
 
                         Forms\Components\Placeholder::make('depreciation_method_explanation')
@@ -397,14 +398,14 @@ class AssetResource extends Resource
                             ->label('Penyusutan Per Tahun')
                             ->content(function (Get $get) {
                                 $annual = (float) str_replace(',', '', $get('annual_depreciation') ?? 0);
-                                return 'Rp ' . number_format($annual, 2, ',', '.');
+                                return MoneyHelper::rupiah($annual);
                             }),
 
                         Forms\Components\Placeholder::make('monthly_depreciation_display')
                             ->label('Penyusutan Per Bulan')
                             ->content(function (Get $get) {
                                 $monthly = (float) str_replace(',', '', $get('monthly_depreciation') ?? 0);
-                                return 'Rp ' . number_format($monthly, 2, ',', '.');
+                                return MoneyHelper::rupiah($monthly);
                             }),
 
                         Forms\Components\Hidden::make('annual_depreciation'),
@@ -590,7 +591,7 @@ class AssetResource extends Resource
 
                 Tables\Columns\TextColumn::make('purchase_cost')
                     ->label('Biaya Aset')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('useful_life_years')
@@ -612,17 +613,17 @@ class AssetResource extends Resource
 
                 Tables\Columns\TextColumn::make('monthly_depreciation')
                     ->label('Penyusutan/Bulan')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('accumulated_depreciation')
                     ->label('Akum. Penyusutan')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('book_value')
                     ->label('Nilai Buku')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 Tables\Columns\BadgeColumn::make('status')
@@ -902,8 +903,8 @@ class AssetResource extends Resource
                     TextEntry::make('cabang.nama')->label('Branch'),
                     TextEntry::make('purchase_date')->date('d/m/Y')->label('Purchase Date'),
                     TextEntry::make('usage_date')->date('d/m/Y')->label('Usage Date'),
-                    TextEntry::make('purchase_cost')->money('IDR')->label('Purchase Cost'),
-                    TextEntry::make('salvage_value')->money('IDR')->label('Salvage Value'),
+                    TextEntry::make('purchase_cost')->rupiah()->label('Purchase Cost'),
+                    TextEntry::make('salvage_value')->rupiah()->label('Salvage Value'),
                     TextEntry::make('useful_life_years')->label('Useful Life (Years)'),
                     TextEntry::make('depreciation_method')->label('Depreciation Method'),
                     TextEntry::make('status')->badge()->label('Status'),
@@ -920,10 +921,10 @@ class AssetResource extends Resource
                 ])->columns(2),
             InfolistSection::make('Depreciation Information')
                 ->schema([
-                    TextEntry::make('annual_depreciation')->money('IDR')->label('Annual Depreciation'),
-                    TextEntry::make('monthly_depreciation')->money('IDR')->label('Monthly Depreciation'),
-                    TextEntry::make('accumulated_depreciation')->money('IDR')->label('Accumulated Depreciation'),
-                    TextEntry::make('book_value')->money('IDR')->label('Book Value'),
+                    TextEntry::make('annual_depreciation')->rupiah()->label('Annual Depreciation'),
+                    TextEntry::make('monthly_depreciation')->rupiah()->label('Monthly Depreciation'),
+                    TextEntry::make('accumulated_depreciation')->rupiah()->label('Accumulated Depreciation'),
+                    TextEntry::make('book_value')->rupiah()->label('Book Value'),
                 ])->columns(2),
             InfolistSection::make('Journal Entries')
                 ->headerActions([
@@ -950,8 +951,8 @@ class AssetResource extends Resource
                             TextEntry::make('date')->date()->label('Date'),
                             TextEntry::make('coa.code')->label('COA'),
                             TextEntry::make('coa.name')->label('Account Name'),
-                            TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
-                            TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                            TextEntry::make('debit')->rupiah()->label('Debit')->color('success'),
+                            TextEntry::make('credit')->rupiah()->label('Credit')->color('danger'),
                             TextEntry::make('description')->label('Description'),
                             TextEntry::make('journal_type')->badge()->label('Type')->formatStateUsing(fn(string $state): string => match ($state) {
                                 'asset_acquisition' => 'Asset Acquisition',

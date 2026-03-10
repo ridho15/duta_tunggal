@@ -149,33 +149,33 @@ class AccountReceivableResource extends Resource
                     ->label('Total Amount')
                     ->sortable()
                     ->searchable()
-                    ->money('IDR')
+                    ->rupiah()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total AR')
                     ]),
                     
                 TextColumn::make('paid')
                     ->label('Paid Amount')
                     ->sortable()
-                    ->money('IDR')
+                    ->rupiah()
                     ->color('success')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total Paid')
                     ]),
                     
                 TextColumn::make('remaining')
                     ->label('Outstanding')
                     ->sortable()
-                    ->money('IDR')
+                    ->rupiah()
                     ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
                     ->weight('bold')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total Outstanding')
                     ]),
                     

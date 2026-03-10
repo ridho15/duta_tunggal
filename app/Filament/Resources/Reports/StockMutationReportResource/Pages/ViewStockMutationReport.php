@@ -123,7 +123,7 @@ class ViewStockMutationReport extends Page implements HasTable
                     ->alignCenter(),
                 TextColumn::make('value')
                     ->label('Nilai')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('reference_id')
                     ->label('Referensi')

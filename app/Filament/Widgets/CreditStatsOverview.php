@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Customer;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
@@ -59,7 +60,7 @@ class CreditStatsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color('danger'),
                 
-            Stat::make('Total Jatuh Tempo', 'Rp ' . number_format($totalOverdueAmount, 0, ',', '.'))
+            Stat::make('Total Jatuh Tempo', MoneyHelper::rupiah($totalOverdueAmount))
                 ->description('Total nilai tagihan yang jatuh tempo')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('danger'),
@@ -69,7 +70,7 @@ class CreditStatsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color('warning'),
                 
-            Stat::make('Total Piutang', 'Rp ' . number_format($totalOutstanding, 0, ',', '.'))
+            Stat::make('Total Piutang', MoneyHelper::rupiah($totalOutstanding))
                 ->description('Total outstanding receivables')
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->color('info'),

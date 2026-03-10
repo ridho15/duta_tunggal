@@ -45,7 +45,7 @@ class PurchaseReturnResource extends Resource
     // Group updated to the standardized Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
@@ -495,7 +495,7 @@ class PurchaseReturnResource extends Resource
                                 TextEntry::make('product.name')->label('Produk'),
                                 TextEntry::make('product.sku')->label('SKU'),
                                 TextEntry::make('qty_returned')->label('Qty Dikembalikan'),
-                                TextEntry::make('unit_price')->money('IDR')->label('Harga Satuan'),
+                                TextEntry::make('unit_price')->rupiah()->label('Harga Satuan'),
                                 TextEntry::make('reason')->label('Alasan')->columnSpanFull(),
                             ]),
                     ]),

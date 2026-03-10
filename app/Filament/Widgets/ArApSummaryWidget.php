@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -46,42 +47,42 @@ class ArApSummaryWidget extends BaseWidget
         })->where('status', 'Belum Lunas')->sum('remaining');
 
         return [
-            Card::make('Total Account Receivable', 'Rp ' . number_format($arStats->total_ar ?? 0))
+            Card::make('Total Account Receivable', MoneyHelper::rupiah($arStats->total_ar ?? 0))
                 ->description($arStats->count_ar . ' invoices, ' . $arStats->unpaid_count_ar . ' unpaid')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success')
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-receivables.index')),
                 
-            Card::make('Outstanding AR', 'Rp ' . number_format($arStats->outstanding_ar ?? 0))
+            Card::make('Outstanding AR', MoneyHelper::rupiah($arStats->outstanding_ar ?? 0))
                 ->description('Remaining to collect')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color($arStats->outstanding_ar > 0 ? 'warning' : 'success')
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-receivables.index', ['tableFilters[outstanding_only][isActive]' => true])),
                 
-            Card::make('Overdue AR', 'Rp ' . number_format($overdueAR))
+            Card::make('Overdue AR', MoneyHelper::rupiah($overdueAR))
                 ->description('Past due amount')
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color($overdueAR > 0 ? 'danger' : 'success')
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-receivables.index', ['tableFilters[overdue][isActive]' => true])),
                 
-            Card::make('Total Account Payable', 'Rp ' . number_format($apStats->total_ap ?? 0))
+            Card::make('Total Account Payable', MoneyHelper::rupiah($apStats->total_ap ?? 0))
                 ->description($apStats->count_ap . ' invoices, ' . $apStats->unpaid_count_ap . ' unpaid')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color('info')
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-payables.index')),
                 
-            Card::make('Outstanding AP', 'Rp ' . number_format($apStats->outstanding_ap ?? 0))
+            Card::make('Outstanding AP', MoneyHelper::rupiah($apStats->outstanding_ap ?? 0))
                 ->description('Remaining to pay')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color($apStats->outstanding_ap > 0 ? 'warning' : 'success')
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-payables.index', ['tableFilters[outstanding_only][isActive]' => true])),
                 
-            Card::make('Overdue AP', 'Rp ' . number_format($overdueAP))
+            Card::make('Overdue AP', MoneyHelper::rupiah($overdueAP))
                 ->description('Past due amount')
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color($overdueAP > 0 ? 'danger' : 'success')

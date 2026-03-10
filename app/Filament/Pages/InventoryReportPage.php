@@ -196,7 +196,7 @@ class InventoryReportPage extends Page implements HasTable
                         default => 'gray',
                     }),
                 TextColumn::make('quantity')->label('Quantity')->sortable(),
-                TextColumn::make('value')->label('Nilai')->money('IDR')->sortable(),
+                TextColumn::make('value')->label('Nilai')->rupiah()->sortable(),
                 TextColumn::make('from_model_type')->label('Referensi')->getStateUsing(function ($record) {
                     if ($record->from_model_type && $record->from_model_id) {
                         $modelName = class_basename($record->from_model_type);

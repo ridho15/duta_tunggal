@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AccountReceivableResource\Pages;
 
 use App\Filament\Resources\AccountReceivableResource;
 use App\Filament\Widgets\AccountReceivableStatsWidget;
+use App\Helpers\MoneyHelper;
 use App\Models\AccountReceivable;
 use Filament\Actions;
 use Filament\Actions\CreateAction;
@@ -25,7 +26,7 @@ class ListAccountReceivables extends ListRecords
     public function getTitle(): string
     {
         $totalAmount = $this->getFilteredQuery()->sum('remaining');
-        return 'Account Receivable - RP. ' . number_format($totalAmount, 0, ',', '.');
+        return 'Account Receivable - ' . MoneyHelper::rupiah($totalAmount);
     }
 
     protected function getFilteredQuery(): Builder

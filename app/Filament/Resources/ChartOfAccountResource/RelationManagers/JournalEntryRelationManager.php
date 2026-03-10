@@ -108,8 +108,8 @@ class JournalEntryRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('date')->label('Tanggal')->sortable(),
                 TextColumn::make('coa.name')->label('Akun'),
-                TextColumn::make('debit')->money('IDR'),
-                TextColumn::make('credit')->money('IDR'),
+                TextColumn::make('debit')->rupiah(),
+                TextColumn::make('credit')->rupiah(),
                 TextColumn::make('reference'),
                 TextColumn::make('journal_type')->label('Tipe'),
             ])

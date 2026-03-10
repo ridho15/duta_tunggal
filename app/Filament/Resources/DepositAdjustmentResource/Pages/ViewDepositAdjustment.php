@@ -47,15 +47,15 @@ class ViewDepositAdjustment extends ViewRecord
                             ->schema([
                                 TextEntry::make('amount')
                                     ->label('Total Deposit')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                     
                                 TextEntry::make('used_amount')
                                     ->label('Used Amount')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                     
                                 TextEntry::make('remaining_amount')
                                     ->label('Remaining Amount')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                             ]),
                             
                         TextEntry::make('coa')

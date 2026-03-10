@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
 use Carbon\Carbon;
@@ -26,11 +27,11 @@ class TotalPenjualanPembelianStats extends BaseWidget
             ->where('status', 'completed')
             ->sum('total_amount');
         return [
-            Stat::make('Total Penjualan', "Rp." . number_format($totalSalesMtd, 0, ',', '.'))
+            Stat::make('Total Penjualan', MoneyHelper::rupiah($totalSalesMtd))
                 ->description('Total Penjualan')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
-            Stat::make('Total Pembelian', "Rp." . number_format($totalPurchasesMtd, 0, ',', '.'))
+            Stat::make('Total Pembelian', MoneyHelper::rupiah($totalPurchasesMtd))
                 ->description('Total Pembelian')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color('info'),

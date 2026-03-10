@@ -508,7 +508,7 @@ class ProductResource extends Resource
                 TextColumn::make('sell_price')
                     ->sortable()
                     ->searchable()
-                    ->money('IDR')
+                    ->rupiah()
                     ->label('Harga Jual (Rp)'),
                 TextColumn::make('harga_batas')
                     ->label('Harga Batas (%)')
@@ -516,16 +516,16 @@ class ProductResource extends Resource
                     ->searchable(),
                 TextColumn::make('cost_price')
                     ->label('Cost Price (Rp)')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('biaya')
-                    ->money('IDR')
+                    ->rupiah()
                     ->label('Biaya (Rp)')
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('item_value')->label('Item Value (Rp)')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('pajak')

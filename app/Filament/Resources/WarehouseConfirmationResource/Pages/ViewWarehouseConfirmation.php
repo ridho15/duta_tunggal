@@ -120,7 +120,7 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                         Infolists\Components\TextEntry::make('saleOrder.total_amount')
                             ->label('Total Amount')
-                            ->money('IDR'),
+                            ->rupiah(),
 
                         Infolists\Components\TextEntry::make('saleOrder.status')
                             ->label('SO Status')
@@ -173,11 +173,11 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                                 Infolists\Components\TextEntry::make('unit_price')
                                     ->label('Price')
-                                    ->money('IDR'),
+                                    ->rupiah(),
 
                                 Infolists\Components\TextEntry::make('total_amount')
                                     ->label('Total')
-                                    ->money('IDR')
+                                    ->rupiah()
                                     ->state(function ($record) {
                                         return $record->unit_price * $record->quantity;
                                     }),

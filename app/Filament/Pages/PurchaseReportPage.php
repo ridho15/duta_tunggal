@@ -61,7 +61,7 @@ class PurchaseReportPage extends Page implements HasTable
                 TextColumn::make('po_number')->label('No. PO')->sortable(),
                 TextColumn::make('order_date')->label('Tanggal')->date()->sortable(),
                 TextColumn::make('supplier.perusahaan')->label('Supplier')->sortable(),
-                TextColumn::make('total_amount')->label('Total')->money('IDR')->sortable(),
+                TextColumn::make('total_amount')->label('Total')->rupiah()->sortable(),
                 TextColumn::make('status')->label('Status')->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'draft' => 'gray',

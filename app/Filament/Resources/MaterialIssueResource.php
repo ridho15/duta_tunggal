@@ -584,7 +584,7 @@ class MaterialIssueResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('total_cost')
                     ->label('Total Biaya')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('warehouse.name')
                     ->label('Gudang')

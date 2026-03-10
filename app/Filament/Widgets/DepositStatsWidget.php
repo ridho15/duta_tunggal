@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Deposit;
 use Filament\Widgets\StatsOverviewWidget;
 
@@ -15,17 +16,17 @@ class DepositStatsWidget extends StatsOverviewWidget
         $activeDeposits = Deposit::where('status', 'active')->count();
 
         return [
-            StatsOverviewWidget\Stat::make('Total Deposits', 'Rp ' . number_format($totalDeposits))
+            StatsOverviewWidget\Stat::make('Total Deposits', MoneyHelper::rupiah($totalDeposits))
                 ->description('All deposits combined')
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->color('primary'),
                 
-            StatsOverviewWidget\Stat::make('Total Used', 'Rp ' . number_format($totalUsed))
+            StatsOverviewWidget\Stat::make('Total Used', MoneyHelper::rupiah($totalUsed))
                 ->description('Amount already used')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color('warning'),
                 
-            StatsOverviewWidget\Stat::make('Total Remaining', 'Rp ' . number_format($totalRemaining))
+            StatsOverviewWidget\Stat::make('Total Remaining', MoneyHelper::rupiah($totalRemaining))
                 ->description('Available balance')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),

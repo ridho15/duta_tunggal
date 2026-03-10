@@ -75,17 +75,17 @@ class DepreciationEntriesRelationManager extends RelationManager
                 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Nilai Penyusutan')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 
                 Tables\Columns\TextColumn::make('accumulated_total')
                     ->label('Total Akumulasi')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 
                 Tables\Columns\TextColumn::make('book_value')
                     ->label('Nilai Buku')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 
                 Tables\Columns\BadgeColumn::make('status')

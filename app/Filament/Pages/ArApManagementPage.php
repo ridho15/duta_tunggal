@@ -296,18 +296,18 @@ class ArApManagementPage extends Page implements HasTable
                 
             TextColumn::make('total')
                 ->label('Total')
-                ->money('IDR')
+                ->rupiah()
                 ->sortable(),
                 
             TextColumn::make('paid')
                 ->label('Paid')
-                ->money('IDR')
+                ->rupiah()
                 ->sortable()
                 ->color('success'),
                 
             TextColumn::make('remaining')
                 ->label('Outstanding')
-                ->money('IDR')
+                ->rupiah()
                 ->sortable()
                 ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
                 ->weight('bold'),

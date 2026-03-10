@@ -64,7 +64,7 @@ class DepositLogRelationManager extends RelationManager
                 TextColumn::make('amount')
                     ->label('Amount')
                     ->sortable()
-                    ->money('IDR')
+                    ->rupiah()
                     ->color(function ($state, $record) {
                         return match ($record->type) {
                             'create', 'add', 'return' => 'success',
@@ -111,7 +111,7 @@ class DepositLogRelationManager extends RelationManager
                     
                 TextColumn::make('remaining_balance')
                     ->label('Balance After')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->color('success'),
             ])

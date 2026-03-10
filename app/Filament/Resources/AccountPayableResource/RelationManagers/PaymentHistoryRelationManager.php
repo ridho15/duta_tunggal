@@ -21,7 +21,8 @@ class PaymentHistoryRelationManager extends RelationManager
             ->schema([
                 Forms\Components\TextInput::make('amount')
                     ->required()
-                    ->numeric(),
+                    ->numeric()
+                    ->indonesianMoney(),
             ]);
     }
 
@@ -41,10 +42,10 @@ class PaymentHistoryRelationManager extends RelationManager
                     ->searchable(),
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Amount Paid')
-                    ->money('IDR')
+                    ->rupiah()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total Paid')
                     ]),
                 Tables\Columns\TextColumn::make('vendorPayment.payment_method')

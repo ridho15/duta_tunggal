@@ -212,36 +212,36 @@ class VoucherRequestResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Nominal')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total'),
                     ]),
 
                 Tables\Columns\TextColumn::make('total_amount_used')
                     ->label('Sudah Digunakan')
-                    ->money('IDR')
+                    ->rupiah()
                     ->getStateUsing(fn ($record) => $record->getTotalAmountUsed())
                     ->sortable()
                     ->toggleable()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total Digunakan'),
                     ]),
 
                 Tables\Columns\TextColumn::make('remaining_amount')
                     ->label('Sisa')
-                    ->money('IDR')
+                    ->rupiah()
                     ->getStateUsing(fn ($record) => $record->getRemainingAmount())
                     ->sortable()
                     ->toggleable()
                     ->color(fn ($record) => $record->getRemainingAmount() > 0 ? 'success' : 'gray')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total Sisa'),
                     ]),
 

@@ -74,16 +74,16 @@ class ViewChartOfAccount extends ViewRecord
                             }),
                         TextEntry::make('opening_balance')
                             ->label('Saldo Awal')
-                            ->money('IDR'),
+                            ->rupiah(),
                         TextEntry::make('debit')
                             ->label('Total Debit')
-                            ->money('IDR'),
+                            ->rupiah(),
                         TextEntry::make('credit')
                             ->label('Total Kredit')
-                            ->money('IDR'),
+                            ->rupiah(),
                         TextEntry::make('ending_balance')
                             ->label('Saldo Akhir')
-                            ->money('IDR'),
+                            ->rupiah(),
                     ])
                     ->columns(2),
                 

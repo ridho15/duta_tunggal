@@ -38,7 +38,9 @@ class EditPurchaseInvoice extends EditRecord
             $data['invoiceItem'] = $invoiceItems;
 
             // Load other_fees from database
-            $data['other_fees'] = $this->record->other_fee ?? [];
+            // other_fee can be stored as integer 0 in DB; always ensure it's an array
+            $rawOtherFee = $this->record->other_fee;
+            $data['other_fees'] = is_array($rawOtherFee) ? $rawOtherFee : [];
 
             // Load receiptBiayaItems from selected purchase receipts
             $receiptBiayaItems = [];
@@ -50,6 +52,7 @@ class EditPurchaseInvoice extends EditRecord
                 foreach ($purchaseReceipts as $receipt) {
                     foreach ($receipt->purchaseReceiptBiaya as $biaya) {
                         $receiptBiayaItems[] = [
+                            'receipt_id' => $receipt->id,
                             'nama_biaya' => $biaya->nama_biaya,
                             'total' => $biaya->total,
                         ];

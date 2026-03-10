@@ -180,7 +180,7 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->sortable(false),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
@@ -192,10 +192,9 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('id')
                     ->label('Sub Total')
-                    ->money('IDR')
                     ->formatStateUsing(function ($record) {
                         $hasil = HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, $record->tipe_pajak ?? null);
-                        return "Rp. " . number_format($hasil, 2, ',', '.');
+                        return \App\Helpers\MoneyHelper::rupiah($hasil);
                     })
                     ->sortable(),
             ])

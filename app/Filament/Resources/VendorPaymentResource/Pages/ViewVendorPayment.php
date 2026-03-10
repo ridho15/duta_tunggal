@@ -60,7 +60,7 @@ class ViewVendorPayment extends ViewRecord
                                     ->label('NTPN'),
                                 Infolists\Components\TextEntry::make('total_payment')
                                     ->label('Total Pembayaran')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                 Infolists\Components\TextEntry::make('coa.name')
                                     ->label('Akun Pembayaran'),
                                 Infolists\Components\TextEntry::make('payment_method')
@@ -98,8 +98,8 @@ class ViewVendorPayment extends ViewRecord
                                 Infolists\Components\TextEntry::make('date')->date()->label('Date'),
                                 Infolists\Components\TextEntry::make('coa.code')->label('COA'),
                                 Infolists\Components\TextEntry::make('coa.name')->label('Account Name'),
-                                Infolists\Components\TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
-                                Infolists\Components\TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                                Infolists\Components\TextEntry::make('debit')->rupiah()->label('Debit')->color('success'),
+                                Infolists\Components\TextEntry::make('credit')->rupiah()->label('Credit')->color('danger'),
                                 Infolists\Components\TextEntry::make('description')->label('Description'),
                                 Infolists\Components\TextEntry::make('journal_type')->badge()->label('Type'),
                             ])->columns(4),

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\AccountReceivable;
 use Filament\Widgets\StatsOverviewWidget;
 use Livewire\Livewire;
@@ -106,17 +107,17 @@ class AccountReceivableStatsWidget extends StatsOverviewWidget
         ')->first();
         
         return [
-            StatsOverviewWidget\Stat::make('Total Amount', 'RP. ' . number_format($totals->total_amount ?? 0, 0, ',', '.'))
+            StatsOverviewWidget\Stat::make('Total Amount', MoneyHelper::rupiah($totals->total_amount ?? 0))
                 ->description($totals->record_count . ' records')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('primary'),
                 
-            StatsOverviewWidget\Stat::make('Paid Amount', 'RP. ' . number_format($totals->paid_amount ?? 0, 0, ',', '.'))
+            StatsOverviewWidget\Stat::make('Paid Amount', MoneyHelper::rupiah($totals->paid_amount ?? 0))
                 ->description('Already received')
                 ->descriptionIcon('heroicon-m-check-circle')
                 ->color('success'),
                 
-            StatsOverviewWidget\Stat::make('Outstanding', 'RP. ' . number_format($totals->remaining_amount ?? 0, 0, ',', '.'))
+            StatsOverviewWidget\Stat::make('Outstanding', MoneyHelper::rupiah($totals->remaining_amount ?? 0))
                 ->description('Remaining to collect')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('warning'),

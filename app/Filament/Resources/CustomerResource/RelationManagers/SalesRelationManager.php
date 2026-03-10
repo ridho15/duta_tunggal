@@ -145,11 +145,11 @@ class SalesRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('titip_saldo')
                     ->label('Titip Saldo')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('requestApproveBy.name')
                     ->label('Request Approve By')

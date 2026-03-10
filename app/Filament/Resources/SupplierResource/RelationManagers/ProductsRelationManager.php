@@ -37,7 +37,7 @@ class ProductsRelationManager extends RelationManager
                     ->sortable(),
                 Tables\Columns\TextColumn::make('pivot.supplier_price')
                     ->label('Harga Beli Supplier')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('uom.name')
                     ->label('Satuan'),

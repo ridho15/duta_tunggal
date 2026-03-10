@@ -82,7 +82,7 @@ class QuotationItemRelationManager extends RelationManager
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
                             })
                             ->default(0)
-                            ->suffix('Rp.'),
+                            ->suffix('%'),
                         TextInput::make('total_price')
                             ->label('Total Price')
                             ->numeric()
@@ -109,7 +109,7 @@ class QuotationItemRelationManager extends RelationManager
                     }),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('quantity')
                     ->label('Quantity')
@@ -124,7 +124,7 @@ class QuotationItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('total_price')
                     ->label('Total Price')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
             ])
             ->filters([

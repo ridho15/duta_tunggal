@@ -777,6 +777,7 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('price')
                                     ->label('Price')
                                     ->numeric()
+                                    ->indonesianMoney()
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Harga tidak boleh kosong',
@@ -785,6 +786,7 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('total')
                                     ->label('Total')
                                     ->numeric()
+                                    ->indonesianMoney()
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Total tidak boleh kosong',
@@ -832,7 +834,7 @@ class SalesInvoiceResource extends Resource
                     
                 TextColumn::make('total')
                     ->label('Total')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                     
                 BadgeColumn::make('status')

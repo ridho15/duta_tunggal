@@ -334,7 +334,7 @@ class CashBankTransactionResource extends Resource
                     ->searchable(),
                 TextColumn::make('accountCoa.code')->label('Akun Kas/Bank')->formatStateUsing(fn($state, $record) => $record->accountCoa->code . ' - ' . $record->accountCoa->name)->searchable(),
                 TextColumn::make('offsetCoa.code')->label('Lawan Akun')->formatStateUsing(fn($state, $record) => $record->offsetCoa->code . ' - ' . $record->offsetCoa->name)->searchable(),
-                TextColumn::make('amount')->money('IDR')->label('Jumlah')->sortable(),
+                TextColumn::make('amount')->rupiah()->label('Jumlah')->sortable(),
                 TextColumn::make('transactionDetails')
                     ->label('Rincian Transaksi')
                     ->formatStateUsing(function ($record) {
@@ -446,7 +446,7 @@ class CashBankTransactionResource extends Resource
                         TextEntry::make('number')->label('Transaction Number'),
                         TextEntry::make('date')->date()->label('Transaction Date'),
                         TextEntry::make('type')->label('Type')->badge(),
-                        TextEntry::make('amount')->money('IDR')->label('Amount'),
+                        TextEntry::make('amount')->rupiah()->label('Amount'),
                         TextEntry::make('accountCoa.code')->label('Account COA'),
                         TextEntry::make('accountCoa.name')->label('Account Name'),
                         TextEntry::make('offsetCoa.code')->label('Offset COA'),
@@ -463,7 +463,7 @@ class CashBankTransactionResource extends Resource
                             ->schema([
                                 TextEntry::make('chartOfAccount.code')->label('COA'),
                                 TextEntry::make('chartOfAccount.name')->label('Account Name'),
-                                TextEntry::make('amount')->money('IDR')->label('Amount'),
+                                TextEntry::make('amount')->rupiah()->label('Amount'),
                                 TextEntry::make('description')->label('Description'),
                             ])->columns(4),
                     ])
@@ -506,8 +506,8 @@ class CashBankTransactionResource extends Resource
                                 TextEntry::make('date')->date()->label('Date'),
                                 TextEntry::make('coa.code')->label('COA'),
                                 TextEntry::make('coa.name')->label('Account Name'),
-                                TextEntry::make('debit')->money('IDR')->label('Debit')->color('success'),
-                                TextEntry::make('credit')->money('IDR')->label('Credit')->color('danger'),
+                                TextEntry::make('debit')->rupiah()->label('Debit')->color('success'),
+                                TextEntry::make('credit')->rupiah()->label('Credit')->color('danger'),
                                 TextEntry::make('description')->label('Description'),
                                 TextEntry::make('journal_type')->badge()->label('Type'),
                                 TextEntry::make('reference')->label('Reference'),

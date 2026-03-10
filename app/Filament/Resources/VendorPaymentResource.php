@@ -762,7 +762,7 @@ class VendorPaymentResource extends Resource
 
                 TextColumn::make('total_payment')
                     ->label('Total Pembayaran')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 TextColumn::make('payment_method')

@@ -90,18 +90,18 @@ class AgeingReportResource extends Resource
 
                 TextColumn::make('total')
                     ->label('Total Amount')
-                    ->money('IDR')
-                    ->summarize(Sum::make()->money('IDR')),
+                    ->rupiah()
+                    ->summarize(Sum::make()->rupiah()),
 
                 TextColumn::make('paid')
                     ->label('Paid Amount')
-                    ->money('IDR')
-                    ->summarize(Sum::make()->money('IDR')),
+                    ->rupiah()
+                    ->summarize(Sum::make()->rupiah()),
 
                 TextColumn::make('remaining')
                     ->label('Remaining Amount')
-                    ->money('IDR')
-                    ->summarize(Sum::make()->money('IDR'))
+                    ->rupiah()
+                    ->summarize(Sum::make()->rupiah())
                     ->color('danger'),
 
                 TextColumn::make('aging_bucket')

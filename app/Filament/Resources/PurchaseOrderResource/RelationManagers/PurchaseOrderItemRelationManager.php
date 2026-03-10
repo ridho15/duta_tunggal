@@ -187,7 +187,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')

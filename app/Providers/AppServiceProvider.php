@@ -61,12 +61,16 @@ use App\Observers\PurchaseOrderObserver;
 use App\Observers\PurchaseOrderItemObserver;
 use App\Observers\CashBankTransferObserver;
 use App\Observers\OtherSaleObserver;
+use App\Helpers\MoneyHelper;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TextInput\Mask;
+use Filament\Tables\Columns\Summarizers\Sum;
 use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
@@ -93,76 +97,106 @@ class AppServiceProvider extends ServiceProvider
         Table::$defaultCurrency = 'IDR';
         Table::$defaultNumberLocale = 'id';
 
-        // Deklarasi mask global untuk input uang menggunakan format Indonesia
+        // ---------------------------------------------------------------
+        // Rupiah macro for TextColumn (Table columns)
+        // Usage: TextColumn::make('price')->rupiah()
+        // ---------------------------------------------------------------
+        TextColumn::macro('rupiah', function (): TextColumn {
+            /** @var TextColumn $this */
+            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+        });
+
+        // ---------------------------------------------------------------
+        // Rupiah macro for TextEntry (Infolist entries)
+        // Usage: TextEntry::make('total')->rupiah()
+        // ---------------------------------------------------------------
+        TextEntry::macro('rupiah', function (): TextEntry {
+            /** @var TextEntry $this */
+            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+        });
+
+        // ---------------------------------------------------------------
+        // Rupiah macro for Sum Summarizer (Table column summaries)
+        // Usage: TextColumn::make('amount')->summarize(Sum::make()->rupiah())
+        // ---------------------------------------------------------------
+        \Filament\Tables\Columns\Summarizers\Sum::macro('rupiah', function () {
+            /** @var \Filament\Tables\Columns\Summarizers\Sum $this */
+            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+        });
+
+        // ---------------------------------------------------------------
+        // indonesianMoney macro for TextInput (Form inputs)
+        // Usage: TextInput::make('amount')->indonesianMoney()
+        //
+        // Behaviour:
+        //  - JS mask: real-time thousand-dot formatting while user types
+        //  - formatStateUsing: loads DB numeric value as formatted string
+        //  - dehydrateStateUsing: parses user input back to float for DB storage
+        // ---------------------------------------------------------------
         TextInput::macro('indonesianMoney', function (): TextInput {
             /** @var TextInput $this */
             return $this
                 ->prefix('Rp')
                 ->placeholder('500.000')
-                ->formatStateUsing(function ($state) {
-                    // Return the numeric value as-is, let Filament handle display formatting
+                ->mask(\Filament\Support\RawJs::make(<<<'JS'
+                    $input.map(function(value) {
+                        // Strip all non-digit characters
+                        value = value.replace(/[^\d]/g, '');
+                        if (!value) return '';
+                        // Format with dot as thousands separator (id-ID locale)
+                        return new Intl.NumberFormat('id-ID').format(parseInt(value, 10));
+                    })
+                JS))
+                ->formatStateUsing(function ($state): string {
+                    // Format DB numeric value for display in the input field
                     if ($state === null || $state === '') {
-                        return 0;
+                        return '0';
                     }
-                    return number_format(round($state, 2), 0, ',', '.');
+                    $numeric = (float) $state;
+                    return number_format($numeric, 0, ',', '.');
                 })
                 ->dehydrateStateUsing(function ($state) {
+                    // Parse the user's (possibly formatted) input back to a numeric value
                     if ($state === null || $state === '') {
                         return 0;
                     }
 
-                    // Parse Indonesian money format input from user
                     $str = (string) $state;
-                    // Keep only digits, dots and commas
+                    // Strip non-numeric characters except dots and commas
                     $clean = preg_replace('/[^\d\.,]/', '', $str);
                     if ($clean === '') {
                         return 0;
                     }
 
-                    // Simple approach: remove all separators and treat as integer, then divide by 100 if there are decimal places
-                    // This handles both Indonesian (1.000.000) and American (1,000,000.00) formats
                     $hasComma = strpos($clean, ',') !== false;
-                    $hasDot = strpos($clean, '.') !== false;
+                    $hasDot   = strpos($clean, '.') !== false;
 
                     if ($hasComma && $hasDot) {
-                        // Both present - determine which is decimal separator
-                        // If dot is followed by 1-2 digits and preceded by 3 digits, it's likely decimal
-                        $dotPos = strrpos($clean, '.');
+                        $dotPos   = strrpos($clean, '.');
                         $afterDot = strlen($clean) - $dotPos - 1;
                         if ($afterDot >= 1 && $afterDot <= 2) {
-                            // Dot is decimal separator, comma is thousands
+                            // Western format: dot = decimal, comma = thousands
                             $clean = str_replace(',', '', $clean);
                         } else {
-                            // Assume Indonesian format: dot is thousands, comma is decimal
+                            // Indonesian format: dot = thousands, comma = decimal
                             $clean = str_replace('.', '', $clean);
                             $clean = str_replace(',', '.', $clean);
                         }
                     } elseif ($hasDot) {
-                        // Only dots
-                        if (preg_match('/\.\d{1,2}$/', $clean)) {
-                            // Ends with dot followed by 1-3 digits - dot is decimal
-                            // Remove commas if any (shouldn't be there)
-                            $clean = str_replace(',', '', $clean);
-                        } else {
-                            // Dots are thousands separators
-                            $clean = str_replace('.', '', $clean);
-                        }
+                        // Only dots — treat as Indonesian thousands separators (e.g. 1.000.000)
+                        $clean = str_replace('.', '', $clean);
                     } elseif ($hasComma) {
-                        // Only commas
                         if (preg_match('/,\d{1,2}$/', $clean)) {
-                            // Ends with comma followed by 1-3 digits - comma is decimal
+                            // Comma is decimal separator
                             $clean = str_replace(',', '.', $clean);
                         } else {
-                            // Commas are thousands separators
+                            // Comma is thousands separator
                             $clean = str_replace(',', '', $clean);
                         }
                     }
 
-                    // Return the cleaned float value
-                    $value = (float) $clean;
-                    return $value;
+                    return (float) $clean;
                 });
-                // ->helperText('Format: 500.000 (gunakan titik sebagai pemisah ribuan)');
         });
     }
 

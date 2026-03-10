@@ -167,24 +167,24 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 TextColumn::make('unit_cost')
                     ->label('Harga Satuan')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 TextColumn::make('average_cost')
                     ->label('Average Cost')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->color('info'),
 
                 TextColumn::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->money('IDR')
+                    ->rupiah()
                     ->color(fn ($record) => $record->difference_value > 0 ? 'success' : ($record->difference_value < 0 ? 'danger' : 'gray'))
                     ->sortable(),
 
                 TextColumn::make('total_value')
                     ->label('Total Nilai')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
             ])
             ->filters([

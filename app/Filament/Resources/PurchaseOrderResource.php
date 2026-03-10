@@ -22,6 +22,7 @@ use App\Services\PurchaseOrderService;
 use App\Services\QualityControlService;
 use App\Services\PurchaseReceiptService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Helpers\MoneyHelper;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -714,7 +715,7 @@ class PurchaseOrderResource extends Resource
                                         $gross       = $qty * $unitPrice;
                                         $discAmt     = $gross * $discount / 100;
                                         $afterDisc   = $gross - $discAmt;
-                                        $fmt         = fn(float $n) => 'Rp\u00a0' . number_format(round($n), 0, ',', '.');
+                                        $fmt         = fn(float $n) => MoneyHelper::rupiah($n);
 
                                         if ($tipePajak === 'Non Pajak' || $taxRate <= 0) {
                                             return new \Illuminate\Support\HtmlString(
@@ -1164,7 +1165,7 @@ class PurchaseOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total Amount')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
                 TextColumn::make('remaining_qty_status')
                     ->label('Status Penerimaan')

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Helpers\MoneyHelper;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
@@ -41,11 +42,11 @@ class PenjualanOverview extends BaseWidget
         $rata_rata = ($jumlahTransaksi > 0) ? $totalPenjualan / $jumlahTransaksi : 0;
 
         return [
-            Stat::make('Total Penjualan', "Rp." . number_format($totalPenjualan, 0, ',', '.'))
+            Stat::make('Total Penjualan', MoneyHelper::rupiah($totalPenjualan))
                 ->description('Total Penjualan')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
-            Stat::make('Penjualan - PPN', "Rp." . number_format($totalPenjualan - $totalPpn, 0, ',', '.'))
+            Stat::make('Penjualan - PPN', MoneyHelper::rupiah($totalPenjualan - $totalPpn))
                 ->description('Tanpa PPN')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
@@ -53,7 +54,7 @@ class PenjualanOverview extends BaseWidget
                 ->description('Transaksi Selesai')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
-            Stat::make('Penjualan Rata-Rata', "Rp." . number_format($rata_rata, 0, ',', '.'))
+            Stat::make('Penjualan Rata-Rata', MoneyHelper::rupiah($rata_rata))
                 ->description('Rata-rata / Transaksi')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),

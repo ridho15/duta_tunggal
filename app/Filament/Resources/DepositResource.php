@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\DepositResource\Pages;
 use App\Filament\Resources\DepositResource\Pages\ViewDeposit;
 use App\Filament\Resources\DepositResource\RelationManagers\DepositLogRelationManager;
+use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\ChartOfAccount;
 use Illuminate\Support\Facades\Schema;
@@ -124,15 +125,27 @@ class DepositResource extends Resource
                             ->indonesianMoney()
                             ->required()
                             ->default(0)
-                            ->reactive()
+                            ->live(onBlur: true)  // onBlur avoids Livewire round-trips mid-keystroke that break the Alpine.js mask
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                $usedAmount = $get('used_amount') ?? 0;
-                                $set('remaining_amount', $state - $usedAmount);
+                                try {
+                                    $usedAmount = $get('used_amount') ?? 0;
+                                    $parsedAmount = MoneyHelper::parse($state);
+                                    $set('remaining_amount', $parsedAmount - $usedAmount);
+                                } catch (\Exception $e) {
+                                    \Illuminate\Support\Facades\Log::error('Deposit amount calculation error: ' . $e->getMessage(), [
+                                        'state' => $state,
+                                        'used_amount' => $usedAmount
+                                    ]);
+                                    // Don't use dd() in production - just log and set to 0
+                                    $set('remaining_amount', 0);
+                                }
                             })
+                            ->rules([
+                                'required',
+                                new \App\Rules\ValidIndonesianMoney(),
+                            ])
                             ->validationMessages([
                                 'required' => 'Jumlah deposit harus diisi.',
-                                'numeric' => 'Jumlah deposit harus berupa angka.',
-                                'min' => 'Jumlah deposit minimal :min.'
                             ]),
                     ]),
 
@@ -243,7 +256,7 @@ class DepositResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['coa', 'fromModel', 'paymentCoa']))
+            ->modifyQueryUsing(fn($query) => $query->with(['coa', 'fromModel', 'paymentCoa']))
             ->columns([
                 TextColumn::make('deposit_number')
                     ->label('Nomor Deposit')
@@ -292,34 +305,34 @@ class DepositResource extends Resource
 
                 TextColumn::make('amount')
                     ->label('Total Deposit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total All Deposits')
                     ]),
 
                 TextColumn::make('used_amount')
                     ->label('Used Amount')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->toggleable()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total Used')
                     ]),
 
                 TextColumn::make('remaining_amount')
                     ->label('Hutang Titipan Konsumen')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->toggleable()
                     ->color(fn($state) => $state > 0 ? 'success' : 'danger')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
-                            ->money('IDR')
+                            ->rupiah()
                             ->label('Total Hutang Titipan Konsumen')
                     ]),
 
@@ -639,21 +652,21 @@ class DepositResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Deposit (Uang Muka)</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Deposit adalah record uang muka yang diberikan kepada customer (uang muka penjualan) atau diterima dari supplier (uang muka pembelian) untuk mengamankan transaksi.</li>' .
-                            '<li><strong>Tipe Deposit:</strong> <em>Customer Deposit</em> (uang muka dari customer untuk penjualan) atau <em>Supplier Deposit</em> (uang muka ke supplier untuk pembelian).</li>' .
-                            '<li><strong>Komponen Utama:</strong> <em>Deposit Number</em> (nomor deposit unik), <em>From Model</em> (customer/supplier), <em>COA</em> (rekening deposit), <em>Payment COA</em> (rekening pembayaran), <em>Amount</em> (nominal deposit), <em>Balance</em> (saldo tersisa).</li>' .
-                            '<li><strong>Deposit Balance:</strong> Sistem melacak saldo deposit yang tersisa. Balance berkurang saat deposit digunakan untuk pembayaran invoice atau dikembalikan.</li>' .
-                            '<li><strong>Auto-Generation:</strong> Nomor deposit otomatis dibuat dengan format DEP-YYYYMMDD-XXX. COA deposit otomatis ditentukan berdasarkan tipe (customer/supplier).</li>' .
-                            '<li><strong>Validasi:</strong> <em>Model Validation</em> - memastikan customer/supplier valid. <em>COA Validation</em> - rekening deposit sesuai tipe. <em>Amount Validation</em> - amount positif dan tidak melebihi limit.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Customer Receipt</em> (penggunaan deposit customer), <em>Vendor Payment</em> (penggunaan deposit supplier), <em>Journal Entry</em> (otomatis buat jurnal), <em>Chart of Account</em> (rekening), dan <em>Deposit Log</em> (riwayat perubahan).</li>' .
-                            '<li><strong>Actions:</strong> <em>Add Balance</em> (tambah saldo deposit), <em>Reduce Balance</em> (kurangi saldo deposit), <em>View</em> (lihat detail), <em>Edit</em> (ubah deposit), <em>Delete</em> (hapus deposit), <em>View Logs</em> (lihat riwayat perubahan).</li>' .
-                            '<li><strong>Permissions:</strong> <em>view any deposit</em>, <em>create deposit</em>, <em>update deposit</em>, <em>delete deposit</em>, <em>restore deposit</em>, <em>force-delete deposit</em>.</li>' .
-                            '<li><strong>Journal Impact:</strong> <em>Add Balance</em> → Debit Uang Muka, Credit Kas/Bank. <em>Reduce Balance</em> → Debit Kas/Bank, Credit Uang Muka. <em>Usage in Payment</em> → otomatis adjust saat digunakan.</li>' .
-                            '<li><strong>Reporting:</strong> Menyediakan data untuk advance payment tracking, customer/supplier balance monitoring, dan cash flow forecasting.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Deposit adalah record uang muka yang diberikan kepada customer (uang muka penjualan) atau diterima dari supplier (uang muka pembelian) untuk mengamankan transaksi.</li>' .
+                    '<li><strong>Tipe Deposit:</strong> <em>Customer Deposit</em> (uang muka dari customer untuk penjualan) atau <em>Supplier Deposit</em> (uang muka ke supplier untuk pembelian).</li>' .
+                    '<li><strong>Komponen Utama:</strong> <em>Deposit Number</em> (nomor deposit unik), <em>From Model</em> (customer/supplier), <em>COA</em> (rekening deposit), <em>Payment COA</em> (rekening pembayaran), <em>Amount</em> (nominal deposit), <em>Balance</em> (saldo tersisa).</li>' .
+                    '<li><strong>Deposit Balance:</strong> Sistem melacak saldo deposit yang tersisa. Balance berkurang saat deposit digunakan untuk pembayaran invoice atau dikembalikan.</li>' .
+                    '<li><strong>Auto-Generation:</strong> Nomor deposit otomatis dibuat dengan format DEP-YYYYMMDD-XXX. COA deposit otomatis ditentukan berdasarkan tipe (customer/supplier).</li>' .
+                    '<li><strong>Validasi:</strong> <em>Model Validation</em> - memastikan customer/supplier valid. <em>COA Validation</em> - rekening deposit sesuai tipe. <em>Amount Validation</em> - amount positif dan tidak melebihi limit.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan <em>Customer Receipt</em> (penggunaan deposit customer), <em>Vendor Payment</em> (penggunaan deposit supplier), <em>Journal Entry</em> (otomatis buat jurnal), <em>Chart of Account</em> (rekening), dan <em>Deposit Log</em> (riwayat perubahan).</li>' .
+                    '<li><strong>Actions:</strong> <em>Add Balance</em> (tambah saldo deposit), <em>Reduce Balance</em> (kurangi saldo deposit), <em>View</em> (lihat detail), <em>Edit</em> (ubah deposit), <em>Delete</em> (hapus deposit), <em>View Logs</em> (lihat riwayat perubahan).</li>' .
+                    '<li><strong>Permissions:</strong> <em>view any deposit</em>, <em>create deposit</em>, <em>update deposit</em>, <em>delete deposit</em>, <em>restore deposit</em>, <em>force-delete deposit</em>.</li>' .
+                    '<li><strong>Journal Impact:</strong> <em>Add Balance</em> → Debit Uang Muka, Credit Kas/Bank. <em>Reduce Balance</em> → Debit Kas/Bank, Credit Uang Muka. <em>Usage in Payment</em> → otomatis adjust saat digunakan.</li>' .
+                    '<li><strong>Reporting:</strong> Menyediakan data untuk advance payment tracking, customer/supplier balance monitoring, dan cash flow forecasting.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 

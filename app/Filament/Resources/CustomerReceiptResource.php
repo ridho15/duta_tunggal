@@ -438,7 +438,7 @@ class CustomerReceiptResource extends Resource
 
                 TextColumn::make('total_payment')
                     ->label('Total Payment')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable(),
 
                 TextColumn::make('payment_count')
@@ -605,7 +605,7 @@ class CustomerReceiptResource extends Resource
                             ->date(),
                         TextEntry::make('total_payment')
                             ->label('Total Pembayaran')
-                            ->money('IDR'),
+                            ->rupiah(),
                         TextEntry::make('payment_method')
                             ->label('Metode Pembayaran')
                             ->formatStateUsing(function ($state) {
@@ -653,7 +653,7 @@ class CustomerReceiptResource extends Resource
                                     ->placeholder('No invoice linked'),
                                 TextEntry::make('amount')
                                     ->label('Jumlah Pembayaran')
-                                    ->money('IDR'),
+                                    ->rupiah(),
                                 TextEntry::make('method')
                                     ->label('Metode')
                                     ->badge()

@@ -328,6 +328,7 @@ class ViewQuotation extends ViewRecord
                                         TextInput::make('subtotal')
                                             ->label('Subtotal')
                                             ->numeric()
+                                            ->indonesianMoney()
                                             ->readOnly()
                                             ->default(0),
                                     ])

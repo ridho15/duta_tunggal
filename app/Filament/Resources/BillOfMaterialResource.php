@@ -483,17 +483,17 @@ class BillOfMaterialResource extends Resource
                     ->sortable(),
                 TextColumn::make('labor_cost')
                     ->label('Biaya TKL')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('overhead_cost')
                     ->label('Biaya BOP')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('items')
                     ->label('Biaya Material')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: false)
                     ->formatStateUsing(function ($state, $record) {
@@ -505,7 +505,7 @@ class BillOfMaterialResource extends Resource
                     }),
                 TextColumn::make('total_cost')
                     ->label('Total Biaya Produksi')
-                    ->money('IDR')
+                    ->rupiah()
                     ->sortable()
                     ->formatStateUsing(function ($state) {
                         return 'Rp ' . number_format($state, 2, ',', '.');

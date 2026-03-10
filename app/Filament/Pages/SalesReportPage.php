@@ -86,7 +86,7 @@ class SalesReportPage extends Page implements HasTable
                 TextColumn::make('created_at')->label('Tanggal')->date()->sortable(),
                 TextColumn::make('customer.code')->label('Kode Customer')->sortable(),
                 TextColumn::make('customer.name')->label('Nama Customer')->sortable(),
-                TextColumn::make('total_amount')->label('Total')->money('IDR')->sortable(),
+                TextColumn::make('total_amount')->label('Total')->rupiah()->sortable(),
                 TextColumn::make('status')->label('Status')->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'draft' => 'gray',

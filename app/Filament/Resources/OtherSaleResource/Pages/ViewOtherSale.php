@@ -127,7 +127,7 @@ class ViewOtherSale extends Page implements HasTable
 
                         Infolists\Components\TextEntry::make('amount')
                             ->label('Jumlah')
-                            ->money('IDR')
+                            ->rupiah()
                             ->weight('bold')
                             ->size('lg'),
                     ]),
@@ -205,12 +205,12 @@ class ViewOtherSale extends Page implements HasTable
 
                 Tables\Columns\TextColumn::make('debit')
                     ->label('Debit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->alignCenter(),
 
                 Tables\Columns\TextColumn::make('credit')
                     ->label('Credit')
-                    ->money('IDR')
+                    ->rupiah()
                     ->alignCenter(),
 
                 Tables\Columns\TextColumn::make('journal_type')
