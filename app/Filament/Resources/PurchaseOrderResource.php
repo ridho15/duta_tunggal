@@ -146,39 +146,43 @@ class PurchaseOrderResource extends Resource
                                             if ($orderRequest) {
                                                 $set('supplier_id', $orderRequest->supplier_id);
                                                 $set('warehouse_id', $orderRequest->warehouse_id);
-                                                if($orderRequest->supplier) {
+                                                if ($orderRequest->supplier) {
                                                     $set('tempo_hutang', $orderRequest->supplier->tempo_hutang);
                                                 }
+                                                // Resolve the default currency dynamically (first available, typically IDR)
+                                                $defaultCurrency = Currency::query()->first();
+                                                $defaultCurrencyId = $defaultCurrency?->id;
+
                                                 foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
                                                     // Calculate remaining quantity (not yet fulfilled)
                                                     $remainingQuantity = $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0);
-                                                    // Only add items that still have remaining quantity
-                                                    if ($remainingQuantity > 0) {
-                                                        // Use unit_price from OrderRequestItem if available, otherwise use supplier price from pivot, fallback to cost_price
-                                                        if (($orderRequestItem->unit_price ?? 0) > 0) {
-                                                            $unitPrice = $orderRequestItem->unit_price;
-                                                        } else {
-                                                            $product = $orderRequestItem->product;
-                                                            $supplierProduct = $product ? $product->suppliers()->where('suppliers.id', $orderRequest->supplier_id)->first() : null;
-                                                            $unitPrice = $supplierProduct ? (float) $supplierProduct->pivot->supplier_price : ($product->cost_price ?? 0);
-                                                        }
-                                                        $discount = $orderRequestItem->discount ?? 0;
-                                                        $tax = $orderRequestItem->tax ?? 0;
-                                                        
-                                                        // Calculate subtotal using HelperController for consistency
-                                                        $subtotal = HelperController::hitungSubtotal($remainingQuantity, $unitPrice, $discount, $tax, null);
-                                                        
-                                                        array_push($items, [
-                                                            'product_id' => $orderRequestItem->product_id,
-                                                            'quantity' => $remainingQuantity,
-                                                            'unit_price' => $unitPrice,
-                                                            'discount' => $discount,
-                                                            'tax' => $tax,
-                                                            'subtotal' => $subtotal,
-                                                            'currency_id' => 7, // Default to IDR (Indonesian Rupiah)
-                                                            'order_request_item_id' => $orderRequestItem->id, // Track the source
-                                                        ]);
+                                                    // Use unit_price from OrderRequestItem if available, otherwise use supplier price from pivot, fallback to cost_price
+                                                    if (($orderRequestItem->unit_price ?? 0) > 0) {
+                                                        $unitPrice = $orderRequestItem->unit_price;
+                                                    } else {
+                                                        $product = $orderRequestItem->product;
+                                                        $supplierProduct = $product ? $product->suppliers()->where('suppliers.id', $orderRequest->supplier_id)->first() : null;
+                                                        $unitPrice = $supplierProduct ? (float) $supplierProduct->pivot->supplier_price : ($product->cost_price ?? 0);
                                                     }
+                                                    $discount  = $orderRequestItem->discount ?? 0;
+                                                    $tax       = $orderRequestItem->tax ?? 0;
+                                                    $tipePajak = 'Non Pajak';
+
+                                                    // Calculate subtotal using HelperController for consistency
+                                                    $subtotal = HelperController::hitungSubtotal($remainingQuantity, $unitPrice, $discount, $tax, $tipePajak);
+
+                                                    array_push($items, [
+                                                        'product_id'            => $orderRequestItem->product_id,
+                                                        'quantity'              => $remainingQuantity,
+                                                        'unit_price'            => $unitPrice,
+                                                        'discount'              => $discount,
+                                                        'tax'                   => $tax,
+                                                        'tipe_pajak'            => $tipePajak,
+                                                        'subtotal'              => $subtotal,
+                                                        'currency_id'           => $defaultCurrencyId,
+                                                        'refer_item_model_type' => \App\Models\OrderRequestItem::class,
+                                                        'refer_item_model_id'   => $orderRequestItem->id,
+                                                    ]);
                                                 }
                                             }
                                         }
@@ -232,7 +236,7 @@ class PurchaseOrderResource extends Resource
                                 Forms\Components\Select::make('cabang_id')
                                     ->label('Cabang')
                                     ->options(\App\Models\Cabang::pluck('nama', 'id'))
-                                    ->default(fn () => Auth::user()?->cabang_id)
+                                    ->default(fn() => Auth::user()?->cabang_id)
                                     ->required(),
                             ])
                             ->createOptionUsing(function (array $data) {
@@ -244,7 +248,7 @@ class PurchaseOrderResource extends Resource
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
-                                
+
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
                                         ->get()
@@ -252,13 +256,13 @@ class PurchaseOrderResource extends Resource
                                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                         });
                                 }
-                                
+
                                 return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
                                     return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                 });
                             })
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->searchable()
                             ->preload()
                             ->required()
@@ -297,11 +301,11 @@ class PurchaseOrderResource extends Resource
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', 1)->orderBy('name');
-                                
+
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     $query->where('cabang_id', $user?->cabang_id);
                                 }
-                                
+
                                 return $query->get()->mapWithKeys(function ($warehouse) {
                                     return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                 });
@@ -314,13 +318,13 @@ class PurchaseOrderResource extends Resource
                                 $query = Warehouse::where('status', 1)
                                     ->where(function ($q) use ($search) {
                                         $q->where('perusahaan', 'like', "%{$search}%")
-                                          ->orWhere('kode', 'like', "%{$search}%");
+                                            ->orWhere('kode', 'like', "%{$search}%");
                                     });
-                                
+
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     $query->where('cabang_id', $user?->cabang_id);
                                 }
-                                
+
                                 return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
                                     return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                 });
@@ -387,7 +391,7 @@ class PurchaseOrderResource extends Resource
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
                                 // Normalize tipe_pajak to valid Radio option values (handles old 'Eklusif' spelling)
                                 $rawTipePajak = $data['tipe_pajak'] ?? 'Inklusif';
-                                $data['tipe_pajak'] = match(strtolower(trim((string)$rawTipePajak))) {
+                                $data['tipe_pajak'] = match (strtolower(trim((string)$rawTipePajak))) {
                                     'inklusif' => 'Inklusif',
                                     'eksklusif', 'eklusif' => 'Eksklusif',
                                     'non pajak', 'non-pajak', 'nonpajak', 'none' => 'Non Pajak',
@@ -418,7 +422,7 @@ class PurchaseOrderResource extends Resource
                                         if ($product) {
                                             // Normalize tipe_pajak from product to valid Radio option
                                             $rawTipePajak = $product->tipe_pajak ?? 'Inklusif';
-                                            $newTipePajak = match(strtolower(trim((string)$rawTipePajak))) {
+                                            $newTipePajak = match (strtolower(trim((string)$rawTipePajak))) {
                                                 'inklusif' => 'Inklusif',
                                                 'eksklusif', 'eklusif' => 'Eksklusif',
                                                 'non pajak', 'non-pajak', 'nonpajak' => 'Non Pajak',
@@ -486,7 +490,7 @@ class PurchaseOrderResource extends Resource
                                         ]);
 
                                         $currencyExists = false;
-                                        
+
                                         foreach ($currencies as $index => $currency) {
                                             \Illuminate\Support\Facades\Log::debug('POItem.currency checking currency', [
                                                 'index' => $index,
@@ -500,12 +504,12 @@ class PurchaseOrderResource extends Resource
                                                 break;
                                             }
                                         }
-                                        
+
                                         \Illuminate\Support\Facades\Log::debug('POItem.currency exists check result', [
                                             'currencyExists' => $currencyExists,
                                             'will_add' => (!$currencyExists && $state)
                                         ]);
-                                        
+
                                         if (!$currencyExists && $state) {
                                             $currencies[] = [
                                                 'currency_id' => $state,
@@ -515,7 +519,7 @@ class PurchaseOrderResource extends Resource
                                                 'new_currencies' => $currencies
                                             ]);
                                             $set('../../purchaseOrderCurrency', $currencies);
-                                            
+
                                             // Verify the set worked
                                             $updatedCurrencies = $get('../../purchaseOrderCurrency') ?? [];
                                             \Illuminate\Support\Facades\Log::debug('POItem.currency after set verification', [
@@ -523,7 +527,7 @@ class PurchaseOrderResource extends Resource
                                                 'updated_count' => count($updatedCurrencies)
                                             ]);
                                         }
-                                        
+
                                         \Illuminate\Support\Facades\Log::debug('POItem.currency afterStateUpdated END');
                                     })
                                     ->validationMessages([
@@ -580,11 +584,11 @@ class PurchaseOrderResource extends Resource
                                     ->numeric()
                                     ->maxValue(100)
                                     ->required()
-                                    ->disabled(fn (Get $get) =>
-                                        ($get('../../ppn_option') ?? 'standard') === 'non_ppn'
-                                        || $get('tipe_pajak') === 'Non Pajak'
+                                    ->disabled(
+                                        fn(Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn'
+                                            || $get('tipe_pajak') === 'Non Pajak'
                                     )
-                                    ->helperText(fn(Get $get) => match($get('tipe_pajak')) {
+                                    ->helperText(fn(Get $get) => match ($get('tipe_pajak')) {
                                         'Inklusif'  => 'Pajak sudah termasuk dalam harga satuan',
                                         'Eksklusif' => 'Pajak akan ditambahkan ke harga satuan',
                                         'Non Pajak' => 'Non Pajak — otomatis 0',
@@ -672,7 +676,7 @@ class PurchaseOrderResource extends Resource
                                     ->required()
                                     ->default('Inklusif')
                                     ->dehydrated(true)
-                                    ->disabled(fn (Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn')
+                                    ->disabled(fn(Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn')
                                     ->options([
                                         'Non Pajak' => 'Non Pajak',
                                         'Inklusif'  => 'Inklusif (PPN termasuk)',
@@ -686,10 +690,10 @@ class PurchaseOrderResource extends Resource
                                         $effectiveTax = $state === 'Non Pajak' ? 0 : (float)$get('tax');
                                         // Recalculate subtotal when tax type changes
                                         $set('subtotal', HelperController::hitungSubtotal(
-                                            (float)$get('quantity'), 
-                                            HelperController::parseIndonesianMoney($get('unit_price')), 
-                                            (float)$get('discount'), 
-                                            $effectiveTax, 
+                                            (float)$get('quantity'),
+                                            HelperController::parseIndonesianMoney($get('unit_price')),
+                                            (float)$get('discount'),
+                                            $effectiveTax,
                                             $state
                                         ));
                                     })
@@ -720,9 +724,9 @@ class PurchaseOrderResource extends Resource
                                         if ($tipePajak === 'Non Pajak' || $taxRate <= 0) {
                                             return new \Illuminate\Support\HtmlString(
                                                 '<div class="text-sm text-gray-600 py-1">' .
-                                                '<span class="font-semibold">&#9899; Non Pajak</span> &mdash; Tidak ada PPN. ' .
-                                                'Total: <strong>' . $fmt($afterDisc) . '</strong>' .
-                                                '</div>'
+                                                    '<span class="font-semibold">&#9899; Non Pajak</span> &mdash; Tidak ada PPN. ' .
+                                                    'Total: <strong>' . $fmt($afterDisc) . '</strong>' .
+                                                    '</div>'
                                             );
                                         }
 
@@ -731,10 +735,10 @@ class PurchaseOrderResource extends Resource
                                             $total = $afterDisc + $ppn;
                                             return new \Illuminate\Support\HtmlString(
                                                 '<div class="text-sm text-orange-700 py-1">' .
-                                                '<span class="font-semibold">&#9650; Eksklusif</span> &mdash; PPN <em>ditambahkan</em> ke harga:<br>' .
-                                                'DPP ' . $fmt($afterDisc) . ' + PPN ' . $taxRate . '% ' . $fmt($ppn) .
-                                                ' = Total <strong>' . $fmt($total) . '</strong>' .
-                                                '</div>'
+                                                    '<span class="font-semibold">&#9650; Eksklusif</span> &mdash; PPN <em>ditambahkan</em> ke harga:<br>' .
+                                                    'DPP ' . $fmt($afterDisc) . ' + PPN ' . $taxRate . '% ' . $fmt($ppn) .
+                                                    ' = Total <strong>' . $fmt($total) . '</strong>' .
+                                                    '</div>'
                                             );
                                         }
 
@@ -743,10 +747,10 @@ class PurchaseOrderResource extends Resource
                                         $ppn = $afterDisc - $dpp;
                                         return new \Illuminate\Support\HtmlString(
                                             '<div class="text-sm text-green-700 py-1">' .
-                                            '<span class="font-semibold">&#9989; Inklusif</span> &mdash; PPN sudah <em>termasuk</em> dalam harga:<br>' .
-                                            'Total ' . $fmt($afterDisc) .
-                                            ' (DPP <strong>' . $fmt($dpp) . '</strong> + PPN ' . $taxRate . '% <strong>' . $fmt($ppn) . '</strong>)' .
-                                            '</div>'
+                                                '<span class="font-semibold">&#9989; Inklusif</span> &mdash; PPN sudah <em>termasuk</em> dalam harga:<br>' .
+                                                'Total ' . $fmt($afterDisc) .
+                                                ' (DPP <strong>' . $fmt($dpp) . '</strong> + PPN ' . $taxRate . '% <strong>' . $fmt($ppn) . '</strong>)' .
+                                                '</div>'
                                         );
                                     }),
                             ]),
@@ -781,7 +785,7 @@ class PurchaseOrderResource extends Resource
                                         'string' => 'Nama biaya tidak valid !',
                                         'max' => 'Nama biaya terlalu panjang'
                                     ]),
-                               Select::make('currency_id')
+                                Select::make('currency_id')
                                     ->label('Mata uang')
                                     ->preload()
                                     ->searchable()
@@ -1001,7 +1005,7 @@ class PurchaseOrderResource extends Resource
                                     }),
                             ]),
                         TextInput::make('total_amount')
-                        ->label("Total Amount")
+                            ->label("Total Amount")
                             ->required()
                             ->reactive()
                             ->readOnly()
@@ -1081,14 +1085,14 @@ class PurchaseOrderResource extends Resource
                 IconColumn::make('is_import')
                     ->label('Import?')
                     ->boolean()
-                    ->tooltip(fn ($state) => $state ? 'Pembelian import (pajak dicatat saat pembayaran)' : 'Pembelian lokal'),
+                    ->tooltip(fn($state) => $state ? 'Pembelian import (pajak dicatat saat pembayaran)' : 'Pembelian lokal'),
                 TextColumn::make('ppn_option')
                     ->label('Opsi PPN')
                     ->formatStateUsing(function ($state) {
                         return $state === 'non_ppn' ? 'Non PPN' : 'PPN';
                     })
                     ->badge()
-                    ->color(fn ($state) => $state === 'non_ppn' ? 'warning' : 'success')
+                    ->color(fn($state) => $state === 'non_ppn' ? 'warning' : 'success')
                     ->toggleable(),
                 TextColumn::make('warehouse')
                     ->label('Gudang')
@@ -1140,7 +1144,7 @@ class PurchaseOrderResource extends Resource
                         $qcItems = $record->purchaseOrderItem->filter(function ($item) {
                             return $item->qualityControl !== null;
                         })->count();
-                        
+
                         if ($totalItems === 0) return 'No Items';
                         if ($qcItems === 0) return 'Not Started';
                         if ($qcItems === $totalItems) return 'Completed';
@@ -1151,7 +1155,7 @@ class PurchaseOrderResource extends Resource
                         $qcItems = $record->purchaseOrderItem->filter(function ($item) {
                             return $item->qualityControl !== null;
                         })->count();
-                        
+
                         if ($totalItems === 0) return 'gray';
                         if ($qcItems === 0) return 'warning';
                         if ($qcItems === $totalItems) return 'success';
@@ -1267,15 +1271,15 @@ class PurchaseOrderResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Purchase Order</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Purchase Order (PO) adalah instruksi pembelian resmi ke supplier.</li>' .
-                            '<li><strong>Membuat PO:</strong> PO dapat dibuat dari Order Request atau Sales Order, atau dibuat manual lewat tombol Create PO.</li>' .
-                            '<li><strong>Alur baru (QC First):</strong> Setelah PO dibuat (langsung <em>Approved</em>), lanjutkan ke <strong>Quality Control</strong> untuk inspeksi barang. Setelah QC lulus, Purchase Receipt akan dibuat otomatis dan stok diperbarui.</li>' .
-                            '<li><strong>Dampak Status Completed:</strong> PO berstatus <em>completed</em> menandakan semua barang telah melewati QC dan diterima; selanjutnya proses invoice dan pembayaran dapat dilanjutkan.</li>' .
-                            '<li><strong>Catatan:</strong> PO dibuat langsung dalam status <em>Approved</em> — tidak diperlukan langkah persetujuan manual. Tindakan <em>close</em> memerlukan hak akses tertentu.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Purchase Order (PO) adalah instruksi pembelian resmi ke supplier.</li>' .
+                    '<li><strong>Membuat PO:</strong> PO dapat dibuat dari Order Request atau Sales Order, atau dibuat manual lewat tombol Create PO.</li>' .
+                    '<li><strong>Alur baru (QC First):</strong> Setelah PO dibuat (langsung <em>Approved</em>), lanjutkan ke <strong>Quality Control</strong> untuk inspeksi barang. Setelah QC lulus, Purchase Receipt akan dibuat otomatis dan stok diperbarui.</li>' .
+                    '<li><strong>Dampak Status Completed:</strong> PO berstatus <em>completed</em> menandakan semua barang telah melewati QC dan diterima; selanjutnya proses invoice dan pembayaran dapat dilanjutkan.</li>' .
+                    '<li><strong>Catatan:</strong> PO dibuat langsung dalam status <em>Approved</em> — tidak diperlukan langkah persetujuan manual. Tindakan <em>close</em> memerlukan hak akses tertentu.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ))
             ->filters([
                 SelectFilter::make('status')
@@ -1330,11 +1334,11 @@ class PurchaseOrderResource extends Resource
                         return $query
                             ->when(
                                 $data['order_date_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('order_date', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('order_date', '>=', $date),
                             )
                             ->when(
                                 $data['order_date_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('order_date', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('order_date', '<=', $date),
                             );
                     })
                     ->indicateUsing(function (array $data): array {

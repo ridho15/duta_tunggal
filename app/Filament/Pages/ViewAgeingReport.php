@@ -39,6 +39,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
     public ?string $report_type = 'both';
     public ?string $cabang_id = null;
     public ?string $as_of_date = null;
+    public bool $showPreview = true;
 
     public function mount(): void
     {

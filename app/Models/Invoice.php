@@ -64,8 +64,27 @@ class Invoice extends Model
         'delivery_orders' => 'array',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
-        'other_fee' => 'array',
     ];
+
+    /**
+     * Ensure other_fee always returns an array even when stored as integer 0 or null in DB.
+     */
+    public function getOtherFeeAttribute($value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+        $decoded = is_string($value) ? json_decode($value, true) : $value;
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Encode other_fee as JSON before saving.
+     */
+    public function setOtherFeeAttribute($value): void
+    {
+        $this->attributes['other_fee'] = is_array($value) ? json_encode($value) : json_encode([]);
+    }
 
     protected static function boot()
     {

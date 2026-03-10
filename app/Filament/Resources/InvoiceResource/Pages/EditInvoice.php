@@ -18,4 +18,15 @@ class EditInvoice extends EditRecord
                 ->icon('heroicon-o-trash'),
         ];
     }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // Guard against other_fee stored as integer 0 in DB (non-JSON value)
+        // When DB stores 0, the Repeater must receive [] not int(0)
+        $rawOtherFee = $this->record->getAttributes()['other_fee'] ?? null;
+        $decoded = ($rawOtherFee !== null && $rawOtherFee !== '') ? @json_decode($rawOtherFee, true) : null;
+        $data['other_fee'] = is_array($decoded) ? $decoded : [];
+
+        return $data;
+    }
 }

@@ -32,6 +32,14 @@ class EditSalesInvoice extends EditRecord
         $this->record->load('invoiceItem.product');
         $data['invoiceItem'] = $this->record->invoiceItem->toArray();
 
+        // Load other_fees from the other_fee column (always ensure it's an array)
+        $rawOtherFee = $this->record->getAttributes()['other_fee'] ?? null;
+        $decoded = ($rawOtherFee !== null && $rawOtherFee !== '') ? @json_decode($rawOtherFee, true) : null;
+        $data['other_fees'] = is_array($decoded) ? $decoded : [];
+
+        // Ensure delivery_order_items defaults to empty array
+        $data['delivery_order_items'] = [];
+
         // Set delivery_order_items from invoice items and delivery orders
         if (isset($data['delivery_orders']) && is_array($data['delivery_orders']) && isset($data['invoiceItem'])) {
             $deliveryOrders = DeliveryOrder::with('deliveryOrderItem.product', 'deliveryOrderItem.saleOrderItem')

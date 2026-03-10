@@ -13,13 +13,18 @@ use App\Models\Warehouse;
 use App\Services\OrderRequestService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as FormAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
@@ -510,58 +515,126 @@ class OrderRequestResource extends Resource
                         ->label('Create Purchase Order')
                         ->color('primary')
                         ->icon('heroicon-o-plus')
+                        ->modalWidth('6xl')
+                        ->modalHeading('Buat Purchase Order')
+                        ->modalDescription('Isi form berikut untuk membuat Purchase Order dari Order Request yang telah disetujui.')
+                        ->fillForm(function ($record) {
+                            $items = $record->orderRequestItem->map(function ($item) {
+                                $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                                return [
+                                    'item_id'      => $item->id,
+                                    'product_name' => "({$item->product->sku}) {$item->product->name}",
+                                    'quantity'     => max(0, $remainingQty),
+                                    'unit_price'   => $item->unit_price ?? 0,
+                                    'include'      => $remainingQty > 0,
+                                ];
+                            })->values()->toArray();
+
+                            return [
+                                'supplier_id'    => $record->supplier_id,
+                                'selected_items' => $items,
+                            ];
+                        })
                         ->form([
-                            Select::make('supplier_id')
-                                ->label('Supplier')
-                                ->preload()
-                                ->searchable()
-                                ->default(fn($record) => $record->supplier_id)
-                                ->options(function ($record) {
-                                    return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                    });
-                                })
-                                ->getSearchResultsUsing(function (string $search, $record) {
-                                    return Supplier::where('perusahaan', 'like', "%{$search}%")
-                                        ->orWhere('code', 'like', "%{$search}%")
-                                        ->limit(50)
-                                        ->get()
-                                        ->mapWithKeys(function ($supplier) {
-                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                        });
-                                })
-                                ->required()
-                                ->validationMessages([
-                                    'required' => 'Supplier wajib dipilih.',
-                                ]),
-                            TextInput::make('po_number')
-                                ->label('PO Number')
-                                ->string()
-                                ->maxLength(255)
-                                ->required()
-                                ->suffixAction(
-                                    FormAction::make('generatePoNumber')
-                                        ->icon('heroicon-o-arrow-path')
-                                        ->action(function ($set) {
-                                            $set('po_number', HelperController::generatePoNumber());
+                            Section::make('Informasi Purchase Order')
+                                ->icon('heroicon-o-document-text')
+                                ->columns(2)
+                                ->schema([
+                                    Select::make('supplier_id')
+                                        ->label('Supplier')
+                                        ->preload()
+                                        ->searchable()
+                                        ->columnSpanFull()
+                                        ->options(function () {
+                                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                            });
                                         })
-                                )
-                                ->validationMessages([
-                                    'required' => 'Nomor PO wajib diisi.',
-                                    'max' => 'Nomor PO maksimal 255 karakter.',
+                                        ->getSearchResultsUsing(function (string $search) {
+                                            return Supplier::where('perusahaan', 'like', "%{$search}%")
+                                                ->orWhere('code', 'like', "%{$search}%")
+                                                ->limit(50)
+                                                ->get()
+                                                ->mapWithKeys(function ($supplier) {
+                                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                                });
+                                        })
+                                        ->required()
+                                        ->validationMessages([
+                                            'required' => 'Supplier wajib dipilih.',
+                                        ]),
+                                    TextInput::make('po_number')
+                                        ->label('PO Number')
+                                        ->string()
+                                        ->maxLength(255)
+                                        ->required()
+                                        ->suffixAction(
+                                            FormAction::make('generatePoNumber')
+                                                ->icon('heroicon-o-arrow-path')
+                                                ->tooltip('Generate PO Number')
+                                                ->action(function ($set) {
+                                                    $set('po_number', HelperController::generatePoNumber());
+                                                })
+                                        )
+                                        ->validationMessages([
+                                            'required' => 'Nomor PO wajib diisi.',
+                                            'max' => 'Nomor PO maksimal 255 karakter.',
+                                        ]),
+                                    DatePicker::make('order_date')
+                                        ->label('Order Date')
+                                        ->required()
+                                        ->native(false)
+                                        ->displayFormat('d M Y')
+                                        ->validationMessages([
+                                            'required' => 'Tanggal order wajib diisi.',
+                                        ]),
+                                    DatePicker::make('expected_date')
+                                        ->label('Expected Delivery Date')
+                                        ->nullable()
+                                        ->native(false)
+                                        ->displayFormat('d M Y'),
+                                    Textarea::make('note')
+                                        ->label('Catatan')
+                                        ->placeholder('Catatan tambahan untuk Purchase Order ini...')
+                                        ->rows(3)
+                                        ->columnSpanFull()
+                                        ->nullable(),
                                 ]),
-                            DatePicker::make('order_date')
-                                ->label('Order Date')
-                                ->required()
-                                ->validationMessages([
-                                    'required' => 'Tanggal order wajib diisi.',
+                            Section::make('Pilih Item yang Akan Dibeli')
+                                ->description('Centang item yang akan dimasukkan ke dalam Purchase Order. Anda dapat mengubah quantity dan harga sebelum membuat PO.')
+                                ->icon('heroicon-o-shopping-cart')
+                                ->collapsible()
+                                ->schema([
+                                    Repeater::make('selected_items')
+                                        ->label('')
+                                        ->columns(12)
+                                        ->addable(false)
+                                        ->deletable(false)
+                                        ->reorderable(false)
+                                        ->schema([
+                                            Hidden::make('item_id'),
+                                            TextInput::make('product_name')
+                                                ->label('Nama Produk')
+                                                ->readOnly()
+                                                ->columnSpan(5),
+                                            TextInput::make('quantity')
+                                                ->label('Qty')
+                                                ->numeric()
+                                                ->minValue(0)
+                                                ->required()
+                                                ->columnSpan(2),
+                                            TextInput::make('unit_price')
+                                                ->label('Harga Satuan (Rp)')
+                                                ->numeric()
+                                                ->minValue(0)
+                                                ->prefix('Rp')
+                                                ->columnSpan(3),
+                                            Checkbox::make('include')
+                                                ->label('Sertakan')
+                                                ->default(true)
+                                                ->columnSpan(2),
+                                        ]),
                                 ]),
-                            DatePicker::make('expected_date')
-                                ->label('Expected Date')
-                                ->nullable(),
-                            Textarea::make('note')
-                                ->label('Note')
-                                ->nullable()
                         ])
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */
@@ -584,63 +657,140 @@ class OrderRequestResource extends Resource
                         ->label('Approve')
                         ->color('success')
                         ->icon('heroicon-o-check-badge')
-                        ->requiresConfirmation()
+                        ->modalWidth('6xl')
+                        ->modalHeading('Approve Order Request')
+                        ->modalDescription('Tinjau dan setujui Order Request ini. Anda dapat memilih item yang akan dibuatkan Purchase Order.')
+                        ->modalSubmitActionLabel('Approve')
+                        ->fillForm(function ($record) {
+                            $items = $record->orderRequestItem->map(function ($item) {
+                                $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                                return [
+                                    'item_id'      => $item->id,
+                                    'product_name' => "({$item->product->sku}) {$item->product->name}",
+                                    'quantity'     => max(0, $remainingQty),
+                                    'unit_price'   => $item->unit_price ?? 0,
+                                    'include'      => $remainingQty > 0,
+                                ];
+                            })->values()->toArray();
+
+                            return [
+                                'supplier_id'           => $record->supplier_id,
+                                'create_purchase_order' => true,
+                                'selected_items'        => $items,
+                            ];
+                        })
                         ->form([
-                            \Filament\Forms\Components\Toggle::make('create_purchase_order')
-                                ->label('Buat Purchase Order?')
-                                ->default(true)
-                                ->reactive(),
-                            Select::make('supplier_id')
-                                ->label('Supplier')
-                                ->preload()
-                                ->searchable()
-                                ->default(fn($record) => $record->supplier_id)
-                                ->options(function ($record) {
-                                    return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                    });
-                                })
-                                ->getSearchResultsUsing(function (string $search, $record) {
-                                    return Supplier::where('perusahaan', 'like', "%{$search}%")
-                                        ->orWhere('code', 'like', "%{$search}%")
-                                        ->limit(50)
-                                        ->get()
-                                        ->mapWithKeys(function ($supplier) {
-                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                        });
-                                })
-                                ->required(fn(\Filament\Forms\Get $get) => $get('create_purchase_order'))
-                                ->validationMessages([
-                                    'required' => 'Supplier wajib dipilih.',
+                            Section::make('Opsi Persetujuan')
+                                ->icon('heroicon-o-cog-6-tooth')
+                                ->schema([
+                                    \Filament\Forms\Components\Toggle::make('create_purchase_order')
+                                        ->label('Buat Purchase Order secara otomatis?')
+                                        ->helperText('Aktifkan untuk langsung membuat PO setelah approval.')
+                                        ->default(true)
+                                        ->live()
+                                        ->columnSpanFull(),
                                 ]),
-                            TextInput::make('po_number')
-                                ->label('PO Number')
-                                ->string()
-                                ->maxLength(255)
-                                ->required(fn(\Filament\Forms\Get $get) => $get('create_purchase_order'))
-                                ->suffixAction(
-                                    FormAction::make('generatePoNumber')
-                                        ->icon('heroicon-o-arrow-path')
-                                        ->action(function ($set) {
-                                            $set('po_number', HelperController::generatePoNumber());
+                            Section::make('Informasi Purchase Order')
+                                ->icon('heroicon-o-document-text')
+                                ->columns(2)
+                                ->visible(fn(Get $get) => $get('create_purchase_order'))
+                                ->schema([
+                                    Select::make('supplier_id')
+                                        ->label('Supplier')
+                                        ->preload()
+                                        ->searchable()
+                                        ->columnSpanFull()
+                                        ->options(function () {
+                                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                            });
                                         })
-                                )
-                                ->validationMessages([
-                                    'required' => 'Nomor PO wajib diisi.',
-                                    'max' => 'Nomor PO maksimal 255 karakter.',
+                                        ->getSearchResultsUsing(function (string $search) {
+                                            return Supplier::where('perusahaan', 'like', "%{$search}%")
+                                                ->orWhere('code', 'like', "%{$search}%")
+                                                ->limit(50)
+                                                ->get()
+                                                ->mapWithKeys(function ($supplier) {
+                                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                                });
+                                        })
+                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->validationMessages([
+                                            'required' => 'Supplier wajib dipilih.',
+                                        ]),
+                                    TextInput::make('po_number')
+                                        ->label('PO Number')
+                                        ->string()
+                                        ->maxLength(255)
+                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->suffixAction(
+                                            FormAction::make('generatePoNumber')
+                                                ->icon('heroicon-o-arrow-path')
+                                                ->tooltip('Generate PO Number')
+                                                ->action(function ($set) {
+                                                    $set('po_number', HelperController::generatePoNumber());
+                                                })
+                                        )
+                                        ->validationMessages([
+                                            'required' => 'Nomor PO wajib diisi.',
+                                            'max' => 'Nomor PO maksimal 255 karakter.',
+                                        ]),
+                                    DatePicker::make('order_date')
+                                        ->label('Order Date')
+                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->native(false)
+                                        ->displayFormat('d M Y')
+                                        ->validationMessages([
+                                            'required' => 'Tanggal order wajib diisi.',
+                                        ]),
+                                    DatePicker::make('expected_date')
+                                        ->label('Expected Delivery Date')
+                                        ->native(false)
+                                        ->displayFormat('d M Y')
+                                        ->nullable(),
+                                    Textarea::make('note')
+                                        ->label('Catatan')
+                                        ->placeholder('Catatan tambahan untuk Purchase Order ini...')
+                                        ->rows(3)
+                                        ->columnSpanFull()
+                                        ->nullable(),
                                 ]),
-                            DatePicker::make('order_date')
-                                ->label('Order Date')
-                                ->required(fn(\Filament\Forms\Get $get) => $get('create_purchase_order'))
-                                ->validationMessages([
-                                    'required' => 'Tanggal order wajib diisi.',
+                            Section::make('Pilih Item yang Akan Dibeli')
+                                ->description('Centang item yang akan dimasukkan ke dalam Purchase Order. Anda dapat mengubah quantity dan harga sebelum menyetujui.')
+                                ->icon('heroicon-o-shopping-cart')
+                                ->collapsible()
+                                ->visible(fn(Get $get) => $get('create_purchase_order'))
+                                ->schema([
+                                    Repeater::make('selected_items')
+                                        ->label('')
+                                        ->columns(12)
+                                        ->addable(false)
+                                        ->deletable(false)
+                                        ->reorderable(false)
+                                        ->schema([
+                                            Hidden::make('item_id'),
+                                            TextInput::make('product_name')
+                                                ->label('Nama Produk')
+                                                ->readOnly()
+                                                ->columnSpan(5),
+                                            TextInput::make('quantity')
+                                                ->label('Qty')
+                                                ->numeric()
+                                                ->minValue(0)
+                                                ->required()
+                                                ->columnSpan(2),
+                                            TextInput::make('unit_price')
+                                                ->label('Harga Satuan (Rp)')
+                                                ->numeric()
+                                                ->minValue(0)
+                                                ->prefix('Rp')
+                                                ->columnSpan(3),
+                                            Checkbox::make('include')
+                                                ->label('Sertakan')
+                                                ->default(true)
+                                                ->columnSpan(2),
+                                        ]),
                                 ]),
-                            DatePicker::make('expected_date')
-                                ->label('Expected Date')
-                                ->nullable(),
-                            Textarea::make('note')
-                                ->label('Note')
-                                ->nullable()
                         ])
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */

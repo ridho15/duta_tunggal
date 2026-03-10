@@ -713,9 +713,16 @@ class AssetResource extends Resource
 
                 Tables\Filters\SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->relationship('purchaseOrder.supplier', 'name')
+                    ->options(fn () => \App\Models\Supplier::orderBy('perusahaan')->pluck('perusahaan', 'id')->toArray())
                     ->searchable()
-                    ->preload(),
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['value'])) {
+                            return $query;
+                        }
+                        return $query->whereHas('purchaseOrder', function (Builder $q) use ($data) {
+                            $q->where('supplier_id', $data['value']);
+                        });
+                    }),
 
                 Tables\Filters\TrashedFilter::make(),
             ])
