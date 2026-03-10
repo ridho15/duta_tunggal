@@ -80,6 +80,7 @@ class SalesReportPage extends Page implements HasTable
         }
 
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query($query)
             ->columns([
                 TextColumn::make('so_number')->label('No. SO')->sortable(),

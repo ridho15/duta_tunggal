@@ -19,6 +19,7 @@ class PoBelumSelesaiTable extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(function () {
                 return PurchaseOrder::query()
                     ->where('status', '!=', 'completed');

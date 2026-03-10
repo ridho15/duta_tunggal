@@ -18,6 +18,7 @@ class PenawaranHargaTable extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(function () {
                 return Quotation::query()
                     ->whereIn('status', ['draft', 'request_approve']);

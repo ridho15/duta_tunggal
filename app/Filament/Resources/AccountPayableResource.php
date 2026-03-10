@@ -590,7 +590,7 @@ class AccountPayableResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('account_payables.status', '!=', 'Lunas')->orderBy('account_payables.created_at', 'DESC');
+        $query = parent::getEloquentQuery()->where('account_payables.status', '!=', 'Lunas');
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {

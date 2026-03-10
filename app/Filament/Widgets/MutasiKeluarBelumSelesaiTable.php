@@ -19,6 +19,7 @@ class MutasiKeluarBelumSelesaiTable extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(function () {
                 return StockMovement::query()
                     ->whereIn('type', ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out']);

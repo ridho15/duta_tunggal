@@ -228,7 +228,7 @@ class InventoryStockResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('updated_at', 'desc')
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Inventory Stock (Stok Inventory)</summary>' .
@@ -260,7 +260,7 @@ class InventoryStockResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->orderBy('updated_at', 'DESC');
+        $query = parent::getEloquentQuery();
         
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {

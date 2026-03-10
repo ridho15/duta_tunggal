@@ -59,6 +59,7 @@ class CashBankAccountResource extends Resource
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')->label('Nama')->searchable()->sortable(),
                 TextColumn::make('bank_name')->label('Bank')->searchable()->sortable(),

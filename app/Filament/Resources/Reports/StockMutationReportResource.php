@@ -33,7 +33,9 @@ class StockMutationReportResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([]);
+        return $table
+            ->defaultSort('id', 'desc')
+            ->columns([]);
     }
 
     public static function getPages(): array

@@ -126,6 +126,7 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(IncomeStatementItem::query())
             ->columns([
                 TextColumn::make('code')

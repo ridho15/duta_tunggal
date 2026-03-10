@@ -390,6 +390,7 @@ class InvoiceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('invoice_date', 'desc')
             ->modifyQueryUsing(function (Builder $query) {
                 return $query->with(['fromModel']);
             })
@@ -533,11 +534,6 @@ class InvoiceResource extends Resource
         return [
             //
         ];
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()->orderBy('invoice_date', 'DESC');
     }
 
     public static function getPages(): array

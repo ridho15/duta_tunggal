@@ -62,6 +62,7 @@ class UnitOfMeasureResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')
                     ->label('Nama')

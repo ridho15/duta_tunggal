@@ -56,6 +56,7 @@ class PurchaseReportPage extends Page implements HasTable
         $query = $this->getFilteredQuery();
 
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query($query)
             ->columns([
                 TextColumn::make('po_number')->label('No. PO')->sortable(),

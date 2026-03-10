@@ -30,6 +30,7 @@ class DepositSummaryPage extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(
                 Deposit::query()
                     ->selectRaw('

@@ -110,6 +110,7 @@ class InventoryReportPage extends Page implements HasTable
     private function getStockByWarehouseTable(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(
                 InventoryStock::query()
                     ->when($this->warehouse_id, fn($q) => $q->where('warehouse_id', $this->warehouse_id))

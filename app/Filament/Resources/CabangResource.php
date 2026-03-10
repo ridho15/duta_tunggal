@@ -178,6 +178,7 @@ class CabangResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 ColorColumn::make('warna_background')
                     ->label('Background'),

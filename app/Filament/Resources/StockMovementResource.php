@@ -197,6 +197,7 @@ class StockMovementResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('product')
                     ->label('Product')
@@ -418,11 +419,6 @@ class StockMovementResource extends Resource
         return [
             //
         ];
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()->orderBy('date', 'DESC');
     }
 
     public static function getPages(): array

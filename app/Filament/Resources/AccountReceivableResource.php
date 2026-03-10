@@ -448,11 +448,6 @@ class AccountReceivableResource extends Resource
         ];
     }
 
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()->orderBy('created_at', 'DESC');
-    }
-
     public static function getPages(): array
     {
         return [

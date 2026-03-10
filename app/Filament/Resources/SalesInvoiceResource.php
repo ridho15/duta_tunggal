@@ -79,7 +79,7 @@ class SalesInvoiceResource extends Resource
                                         $set('other_fees', []);
                                         $set('dpp', 0);
                                     }),
-                                    
+
                                 Select::make('cabang_id')
                                     ->label('Cabang')
                                     ->options(Cabang::all()->mapWithKeys(function ($cabang) {
@@ -87,19 +87,19 @@ class SalesInvoiceResource extends Resource
                                     }))
                                     ->searchable()
                                     ->preload()
-                                    ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                                    ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                                    ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                                    ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Cabang harus dipilih'
                                     ]),
-                                    
+
                                 Select::make('selected_sale_order')
                                     ->label('SO (Sales Order)')
                                     ->options(function ($get) {
                                         $customerId = $get('selected_customer');
                                         if (!$customerId) return [];
-                                        
+
                                         return SaleOrder::where('customer_id', $customerId)
                                             ->where('status', 'completed')
                                             ->get()
@@ -140,12 +140,12 @@ class SalesInvoiceResource extends Resource
                                             })
                                     )
                                     ->maxLength(255),
-                                    
+
                                 TextInput::make('due_date_display')
                                     ->label('Due Date')
                                     ->disabled()
                                     ->placeholder('Auto calculated'),
-                                    
+
                                 DatePicker::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->required()
@@ -153,7 +153,7 @@ class SalesInvoiceResource extends Resource
                                         'required' => 'Tanggal invoice harus diisi'
                                     ])
                                     ->default(now()),
-                                    
+
                                 DatePicker::make('due_date')
                                     ->label('Due Date')
                                     ->required()
@@ -187,7 +187,7 @@ class SalesInvoiceResource extends Resource
 
                                         // Get all DOs from this SO
                                         $deliveryOrders = $saleOrder->deliverySalesOrder()
-                                            ->with(['deliveryOrder' => function($query) {
+                                            ->with(['deliveryOrder' => function ($query) {
                                                 $query->with('deliveryOrderItem.saleOrderItem');
                                             }])
                                             ->get()
@@ -295,24 +295,24 @@ class SalesInvoiceResource extends Resource
                                         // For create and edit, set delivery_order_items
                                         $deliveryOrderItems = [];
                                         $currentInvoiceId = $get('id');
-                                        
+
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
                                                 if ($item->product && $item->saleOrderItem) {
                                                     $originalPrice = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
-                                                    
+
                                                     // For edit, try to find existing invoice item data
                                                     $invoiceQuantity = $item->quantity;
                                                     $invoicePrice = $originalPrice;
                                                     $invoiceCoaId = $item->product->sales_coa_id;
-                                                    
+
                                                     if ($currentInvoiceId) {
                                                         // Find matching invoice item for this product
                                                         $existingInvoiceItems = $get('invoiceItem') ?? [];
                                                         $matchingItem = collect($existingInvoiceItems)->first(function ($invItem) use ($item) {
                                                             return $invItem['product_id'] == $item->product_id;
                                                         });
-                                                        
+
                                                         if ($matchingItem) {
                                                             $invoiceQuantity = $matchingItem['quantity'] ?? $item->quantity;
                                                             $invoicePrice = $matchingItem['price'] ?? $originalPrice;
@@ -534,15 +534,15 @@ class SalesInvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         // Recalculate invoice items when delivery order items change
                                         $deliveryOrderItems = $state ?? [];
-                                        
+
                                         $invoiceItems = [];
                                         $subtotal = 0;
-                                        
+
                                         foreach ($deliveryOrderItems as $item) {
                                             $quantity = (float) ($item['invoice_quantity'] ?? 0);
                                             $price = (float) ($item['unit_price'] ?? 0);
                                             $total = $quantity * $price;
-                                            
+
                                             $invoiceItems[] = [
                                                 'product_id' => $item['product_id'] ?? null,
                                                 'quantity' => $quantity,
@@ -550,14 +550,14 @@ class SalesInvoiceResource extends Resource
                                                 'total' => $total,
                                                 'coa_id' => $item['coa_id'] ?? null,
                                             ];
-                                            
+
                                             $subtotal += $total;
                                         }
-                                        
+
                                         $set('invoiceItem', $invoiceItems);
                                         $set('subtotal', $subtotal);
                                         $set('dpp', $subtotal);
-                                        
+
                                         // Recalculate total
                                         $tax = $get('tax') ?? 0;
                                         $otherFees = $get('other_fees') ?? [];
@@ -599,7 +599,7 @@ class SalesInvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $totalOtherFee = collect($state ?? [])->sum('amount');
                                         $set('other_fee', $totalOtherFee);
-                                        
+
                                         $subtotal = $get('subtotal') ?? 0;
                                         $tax = $get('tax') ?? 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
@@ -622,7 +622,7 @@ class SalesInvoiceResource extends Resource
                                     ])
                                     ->default(0)
                                     ->readonly(),
-                                    
+
                                 TextInput::make('tax')
                                     ->label('Tax (%)')
                                     ->numeric()
@@ -642,7 +642,7 @@ class SalesInvoiceResource extends Resource
                                         $set('total', $finalTotal);
                                         $set('other_fee', $otherFeeTotal);
                                     }),
-                                    
+
                                 TextInput::make('ppn_rate')
                                     ->label('PPN Rate (%)')
                                     ->numeric()
@@ -704,7 +704,7 @@ class SalesInvoiceResource extends Resource
                                     ->validationMessages([
                                         'required' => 'COA piutang usaha harus dipilih'
                                     ]),
-                                    
+
                                 Select::make('revenue_coa_id')
                                     ->label('COA Penjualan (Revenue)')
                                     ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
@@ -719,7 +719,7 @@ class SalesInvoiceResource extends Resource
                                     ->validationMessages([
                                         'required' => 'COA penjualan harus dipilih'
                                     ]),
-                                    
+
                                 Select::make('ppn_keluaran_coa_id')
                                     ->label('COA PPn Keluaran')
                                     ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
@@ -731,7 +731,7 @@ class SalesInvoiceResource extends Resource
                                         return \App\Models\ChartOfAccount::where('code', '2120.06')->first()?->id;
                                     }),
                             ]),
-                            
+
                         // Hidden fields
                         Hidden::make('id'),
                         Hidden::make('from_model_type')->default('App\Models\SaleOrder'),
@@ -752,7 +752,7 @@ class SalesInvoiceResource extends Resource
                             return $taxSetting?->rate ?? 11;
                         }),
                         Hidden::make('total')->default(0),
-                        
+
                         Repeater::make('invoiceItem')
                             ->label('Item Invoice')
                             ->schema([
@@ -812,31 +812,31 @@ class SalesInvoiceResource extends Resource
                     ->label('Nomor Invoice')
                     ->searchable()
                     ->sortable(),
-                    
+
                 TextColumn::make('customer_name')
                     ->label('Customer')
                     ->searchable()
                     ->sortable(),
-                    
+
                 TextColumn::make('customer_phone')
                     ->label('No. Telepon')
                     ->searchable(),
-                    
+
                 TextColumn::make('invoice_date')
                     ->label('Tanggal Invoice')
                     ->date()
                     ->sortable(),
-                    
+
                 TextColumn::make('due_date')
                     ->label('Jatuh Tempo')
                     ->date()
                     ->sortable(),
-                    
+
                 TextColumn::make('total')
                     ->label('Total')
                     ->rupiah()
                     ->sortable(),
-                    
+
                 BadgeColumn::make('status')
                     ->label('Status')
                     ->colors([
@@ -878,11 +878,11 @@ class SalesInvoiceResource extends Resource
                         return $query
                             ->when(
                                 $data['invoice_date_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('invoice_date', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('invoice_date', '>=', $date),
                             )
                             ->when(
                                 $data['invoice_date_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('invoice_date', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('invoice_date', '<=', $date),
                             );
                     }),
                 Filter::make('due_date')
@@ -897,11 +897,11 @@ class SalesInvoiceResource extends Resource
                         return $query
                             ->when(
                                 $data['due_date_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('due_date', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('due_date', '>=', $date),
                             )
                             ->when(
                                 $data['due_date_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('due_date', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('due_date', '<=', $date),
                             );
                     }),
             ])
@@ -930,8 +930,8 @@ class SalesInvoiceResource extends Resource
                             }
                         }),
                     DeleteAction::make(),
-                    ])
-                    ],position: ActionsPosition::BeforeColumns)
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -942,17 +942,17 @@ class SalesInvoiceResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Sales Invoice</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Sales Invoice adalah faktur penjualan kepada customer berdasarkan Sale Order yang telah disetujui, digunakan untuk mencatat pendapatan dan memproses penerimaan pembayaran.</li>' .
-                            '<li><strong>Status Flow:</strong> Dibuat dari Sale Order yang confirmed, dapat diedit sebelum dikirim.</li>' .
-                            '<li><strong>Validasi:</strong> Subtotal, Tax, PPN dihitung otomatis berdasarkan item. Total invoice digunakan untuk Account Receivable.</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah invoice), <em>Delete</em> (hapus).</li>' .
-                            '<li><strong>Filters:</strong> Customer, Status, Date Range, Amount Range, Due Date Range, dll.</li>' .
-                            '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan invoice dari cabang tersebut jika tidak memiliki akses all.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan Sale Order dan menghasilkan Account Receivable.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Sales Invoice adalah faktur penjualan kepada customer berdasarkan Sale Order yang telah disetujui, digunakan untuk mencatat pendapatan dan memproses penerimaan pembayaran.</li>' .
+                    '<li><strong>Status Flow:</strong> Dibuat dari Sale Order yang confirmed, dapat diedit sebelum dikirim.</li>' .
+                    '<li><strong>Validasi:</strong> Subtotal, Tax, PPN dihitung otomatis berdasarkan item. Total invoice digunakan untuk Account Receivable.</li>' .
+                    '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah invoice), <em>Delete</em> (hapus).</li>' .
+                    '<li><strong>Filters:</strong> Customer, Status, Date Range, Amount Range, Due Date Range, dll.</li>' .
+                    '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan invoice dari cabang tersebut jika tidak memiliki akses all.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan Sale Order dan menghasilkan Account Receivable.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 

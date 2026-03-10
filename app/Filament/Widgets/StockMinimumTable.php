@@ -18,6 +18,7 @@ class StockMinimumTable extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(function () {
                 return InventoryStock::with(['product', 'warehouse', 'rak'])
                     ->whereColumn('qty_available', '<=', 'qty_min');

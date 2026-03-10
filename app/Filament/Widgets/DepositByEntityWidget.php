@@ -19,6 +19,7 @@ class DepositByEntityWidget extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->query(
                 Deposit::with(['fromModel', 'coa'])
                     ->where('status', 'active')

@@ -207,6 +207,7 @@ class StockTransferResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('transfer_number')
                     ->label('Transfer Number')

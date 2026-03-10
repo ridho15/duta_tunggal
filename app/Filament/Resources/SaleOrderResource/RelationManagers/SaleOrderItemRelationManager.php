@@ -129,6 +129,7 @@ class SaleOrderItemRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->recordTitleAttribute('id')
             ->columns([
                 TextColumn::make('product')
