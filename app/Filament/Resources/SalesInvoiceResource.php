@@ -195,7 +195,6 @@ class SalesInvoiceResource extends Resource
                                             ->filter(function ($do) {
                                                 return $do && $do->status === 'completed';
                                             });
-
                                         // Get current invoice record if editing (for allowing already selected DOs)
                                         $currentInvoiceId = $get('id') ?? null;
 
@@ -220,7 +219,7 @@ class SalesInvoiceResource extends Resource
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
                                                 // Don't add to options if already invoiced
-                                                continue;
+                                                // continue;
                                             }
 
                                             $options[$do->id] = $label;
