@@ -133,9 +133,10 @@ class PurchaseOrderTest extends TestCase
 
         $po = $this->service->createPurchaseOrder($this->orderRequest, $data);
 
-        $this->assertDatabaseHas('order_request_purchase_orders', [
-            'order_request_id' => $this->orderRequest->id,
-            'purchase_order_id' => $po->id,
+        $this->assertDatabaseHas('purchase_orders', [
+            'id'               => $po->id,
+            'refer_model_type' => 'App\\Models\\OrderRequest',
+            'refer_model_id'   => $this->orderRequest->id,
         ]);
     }
 

@@ -81,10 +81,9 @@ class DeliveryWorkflowTest extends TestCase
         $do->salesOrders()->attach($so->id);
 
         // Verify DO exists and is linked to the Ambil Sendiri SO
-        $linked = DeliveryOrder::whereHas('salesOrders', fn($q) => $q->where('id', $so->id))->first();
+        $linked = DeliveryOrder::whereHas('salesOrders', fn($q) => $q->where('sale_orders.id', $so->id))->first();
 
-        $this->assertNotNull($linked,
-            'A Delivery Order must exist even for Ambil Sendiri pickup type');
+        $this->assertNotNull($linked, 'DO must be linked to an Ambil Sendiri Sale Order');
 
         $this->assertEquals('Ambil Sendiri', $linked->salesOrders->first()->tipe_pengiriman,
             'DO must be linked to an Ambil Sendiri Sale Order');
@@ -113,9 +112,9 @@ class DeliveryWorkflowTest extends TestCase
 
         $do->salesOrders()->attach($so->id);
 
-        $linked = DeliveryOrder::whereHas('salesOrders', fn($q) => $q->where('id', $so->id))->first();
+        $linked = DeliveryOrder::whereHas('salesOrders', fn($q) => $q->where('sale_orders.id', $so->id))->first();
 
-        $this->assertNotNull($linked, 'DO must be linked to Kirim Langsung Sale Order');
+        $this->assertNotNull($linked, 'DO must be linked to a Kirim Langsung Sale Order');
 
         $this->assertEquals('Kirim Langsung', $linked->salesOrders->first()->tipe_pengiriman,
             'DO must be linked to a Kirim Langsung Sale Order');
@@ -255,7 +254,7 @@ class DeliveryWorkflowTest extends TestCase
         $this->assertEquals($doNumber, $do->do_number);
 
         // Verify: delivery date
-        $this->assertEquals($deliveryDate, $do->delivery_date);
+        $this->assertEquals($deliveryDate, substr($do->delivery_date, 0, 10));
 
         // Verify: status
         $this->assertEquals('draft', $do->status);

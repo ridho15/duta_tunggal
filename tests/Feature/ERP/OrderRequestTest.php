@@ -356,7 +356,6 @@ class OrderRequestTest extends TestCase
         // Attach supplier price via pivot
         $this->productA->suppliers()->attach($this->supplier->id, [
             'supplier_price' => 95000,
-            'is_primary'     => true,
         ]);
 
         $item = OrderRequestItem::create([

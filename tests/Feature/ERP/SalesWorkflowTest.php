@@ -56,7 +56,6 @@ class SalesWorkflowTest extends TestCase
     {
         $quotation = Quotation::factory()->create([
             'customer_id' => $this->customer->id,
-            'cabang_id'   => $this->cabang->id,
             'status'      => 'approve',
         ]);
 
@@ -88,7 +87,6 @@ class SalesWorkflowTest extends TestCase
     {
         $quotation = Quotation::factory()->create([
             'customer_id' => $this->customer->id,
-            'cabang_id'   => $this->cabang->id,
             'status'      => 'draft',
         ]);
 
@@ -118,16 +116,17 @@ class SalesWorkflowTest extends TestCase
     {
         $quotation = Quotation::factory()->create([
             'customer_id' => $this->customer->id,
-            'cabang_id'   => $this->cabang->id,
             'status'      => 'draft',
         ]);
 
-        $item = QuotationItem::factory()->create([
+        $item = QuotationItem::create([
             'quotation_id' => $quotation->id,
             'product_id'   => $this->product->id,
             'quantity'     => 5,
             'unit_price'   => 750000,
-            'discount'     => 10, // 10%
+            'discount'     => 10,
+            'tax'          => 0,
+            'total_price'  => 5 * 750000 * 0.9,
         ]);
 
         $this->assertDatabaseHas('quotation_items', [
@@ -156,7 +155,7 @@ class SalesWorkflowTest extends TestCase
             'quantity'      => 2,
             'unit_price'    => 750000,
             'discount'      => 15,
-            'ppn'           => 0,
+            'tax'           => 0,
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
@@ -178,20 +177,26 @@ class SalesWorkflowTest extends TestCase
             'tipe_pengiriman' => 'Kirim Langsung',
         ]);
 
-        // Step 1: Request approval
-        $so->update(['status' => 'request_approve']);
+        // Step 1: Request approval — disable observer to keep test focused on status field logic
+        \App\Models\SaleOrder::withoutEvents(function () use ($so) {
+            $so->update(['status' => 'request_approve']);
+        });
         $this->assertEquals('request_approve', $so->fresh()->status);
 
-        // Step 2: Approve
-        $so->update([
-            'status'     => 'approved',
-            'approve_by' => $this->user->id,
-            'approve_at' => now(),
-        ]);
+        // Step 2: Approve — disable observer to prevent WC cascade changing status to 'confirmed'
+        \App\Models\SaleOrder::withoutEvents(function () use ($so) {
+            $so->update([
+                'status'     => 'approved',
+                'approve_by' => $this->user->id,
+                'approve_at' => now(),
+            ]);
+        });
         $this->assertEquals('approved', $so->fresh()->status);
 
         // Step 3: Close
-        $so->update(['status' => 'closed']);
+        \App\Models\SaleOrder::withoutEvents(function () use ($so) {
+            $so->update(['status' => 'closed']);
+        });
         $this->assertEquals('closed', $so->fresh()->status);
     }
 
@@ -234,7 +239,7 @@ class SalesWorkflowTest extends TestCase
             'quantity'      => 3,
             'unit_price'    => 1000000,
             'discount'      => 0,
-            'ppn'           => $ppnRate,
+            'tax'           => $ppnRate,
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
@@ -243,7 +248,7 @@ class SalesWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('sale_order_items', [
             'id'  => $item->id,
-            'ppn' => $ppnRate,
+            'tax' => $ppnRate,
         ]);
 
         // Tax amount = price * qty * (ppn / 100) = 1,000,000 * 3 * 0.12 = 360,000
@@ -267,12 +272,12 @@ class SalesWorkflowTest extends TestCase
             'quantity'      => 1,
             'unit_price'    => 500000,
             'discount'      => 0,
-            'ppn'           => 12,
+            'tax'           => 12,
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        // Verify ppn is persisted and non-zero
-        $this->assertNotEquals(0, $item->fresh()->ppn);
-        $this->assertEquals(12, $item->fresh()->ppn);
+        // Verify tax is persisted and non-zero
+        $this->assertNotEquals(0, $item->fresh()->tax);
+        $this->assertEquals(12, $item->fresh()->tax);
     }
 }

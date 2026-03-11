@@ -64,7 +64,7 @@ class QCModuleTest extends TestCase
         $receiptItem = PurchaseReceiptItem::factory()->create([
             'purchase_receipt_id' => $this->receipt->id,
             'product_id'          => $this->product->id,
-            'quantity'            => 10,
+            'qty_received'        => 10,
         ]);
 
         $this->qc = QualityControl::create([
@@ -152,7 +152,7 @@ class QCModuleTest extends TestCase
             'QC filter by date_send_stock must return records for today');
 
         foreach ($todayQcs as $q) {
-            $this->assertEquals($today, $q->date_send_stock,
+            $this->assertEquals($today, substr($q->date_send_stock, 0, 10),
                 'All returned QC records must match the filtered date');
         }
     }
