@@ -268,11 +268,10 @@ class InvoiceObserver
         // Create detailed CREDIT entries for each invoice item
         foreach ($invoice->invoiceItem as $item) {
             $productName = $item->product->name ?? 'Unknown Product';
-            $subtotal = (float) $item->subtotal; // Revenue after discount
-            $taxAmount = (float) $item->tax_amount;
-            $discountAmount = (float) $item->discount * (float) $item->quantity;
 
             // CREDIT: Revenue/Sales for this item
+            // item->subtotal is already net of discount, so no separate discount entry is needed
+            // (using net method: revenue is recorded after discount, keeping entries balanced)
             if ($item->total > 0) {
                 $itemCoaId = $item->product->sales_coa_id ?? $revenueCoa->id;
                 \App\Models\JournalEntry::create([
@@ -281,28 +280,12 @@ class InvoiceObserver
                     'reference' => $invoice->invoice_number,
                     'description' => "Sales Invoice - Revenue: {$productName}",
                     'debit' => 0,
-                    'credit' => $item->subtotal, // Use subtotal (revenue before tax)
+                    'credit' => $item->subtotal, // Revenue net of discount
                     'journal_type' => 'sales',
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                 ]);
                 $totalRevenue += $item->subtotal;
-            }
-
-            // DEBIT: Sales Discount for this item (if any)
-            if ($discountAmount > 0 && $discountCoa) {
-                \App\Models\JournalEntry::create([
-                    'coa_id' => $discountCoa->id,
-                    'date' => $date,
-                    'reference' => $invoice->invoice_number,
-                    'description' => "Sales Invoice - Discount: {$productName}",
-                    'debit' => $discountAmount,
-                    'credit' => 0,
-                    'journal_type' => 'sales',
-                    'source_type' => Invoice::class,
-                    'source_id' => $invoice->id,
-                ]);
-                $totalDiscount += $discountAmount;
             }
 
         }

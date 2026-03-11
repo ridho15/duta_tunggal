@@ -142,7 +142,7 @@ class SalesOrderService
 
     public function generateSoNumber()
     {
-        $prefix = 'RN-';
+        $prefix = 'SO-';
 
         // Find the highest existing sequence number globally (ignoring branch scopes)
         $max = SaleOrder::withoutGlobalScopes()
