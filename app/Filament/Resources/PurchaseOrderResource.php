@@ -393,7 +393,7 @@ class PurchaseOrderResource extends Resource
                                 $rawTipePajak = $data['tipe_pajak'] ?? 'Inklusif';
                                 $data['tipe_pajak'] = match (strtolower(trim((string)$rawTipePajak))) {
                                     'inklusif' => 'Inklusif',
-                                    'eksklusif', 'eklusif' => 'Eksklusif',
+                                    'Eklusif', 'eklusif' => 'Eklusif',
                                     'non pajak', 'non-pajak', 'nonpajak', 'none' => 'Non Pajak',
                                     default => 'Inklusif',
                                 };
@@ -424,7 +424,7 @@ class PurchaseOrderResource extends Resource
                                             $rawTipePajak = $product->tipe_pajak ?? 'Inklusif';
                                             $newTipePajak = match (strtolower(trim((string)$rawTipePajak))) {
                                                 'inklusif' => 'Inklusif',
-                                                'eksklusif', 'eklusif' => 'Eksklusif',
+                                                'Eklusif', 'eklusif' => 'Eksklusif',
                                                 'non pajak', 'non-pajak', 'nonpajak' => 'Non Pajak',
                                                 default => 'Inklusif',
                                             };
@@ -590,7 +590,7 @@ class PurchaseOrderResource extends Resource
                                     )
                                     ->helperText(fn(Get $get) => match ($get('tipe_pajak')) {
                                         'Inklusif'  => 'Pajak sudah termasuk dalam harga satuan',
-                                        'Eksklusif' => 'Pajak akan ditambahkan ke harga satuan',
+                                        'Eklusif' => 'Pajak akan ditambahkan ke harga satuan',
                                         'Non Pajak' => 'Non Pajak — otomatis 0',
                                         default     => 'Pilih Tipe Pajak terlebih dahulu',
                                     })
@@ -680,7 +680,7 @@ class PurchaseOrderResource extends Resource
                                     ->options([
                                         'Non Pajak' => 'Non Pajak',
                                         'Inklusif'  => 'Inklusif (PPN termasuk)',
-                                        'Eksklusif' => 'Eksklusif (PPN ditambahkan)',
+                                        'Eklusif' => 'Eksklusif (PPN ditambahkan)',
                                     ])
                                     ->afterStateUpdated(function ($state, Get $get, Set $set) {
                                         // Reset tax to 0 when Non Pajak selected
@@ -730,7 +730,7 @@ class PurchaseOrderResource extends Resource
                                             );
                                         }
 
-                                        if ($tipePajak === 'Eksklusif') {
+                                        if ($tipePajak === 'Eklusif') {
                                             $ppn   = $afterDisc * $taxRate / 100;
                                             $total = $afterDisc + $ppn;
                                             return new \Illuminate\Support\HtmlString(

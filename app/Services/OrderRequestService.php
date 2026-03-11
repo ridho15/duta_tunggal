@@ -88,7 +88,7 @@ class OrderRequestService
                 throw new \RuntimeException('Currency data is required before approving an order request.');
             }
 
-            $purchaseOrder = $orderRequest->purchaseOrder()->create([
+            $purchaseOrder = $orderRequest->purchaseOrders()->create([
                 'po_number'    => $data['po_number'],
                 'supplier_id'  => $supplier->id,
                 'cabang_id'    => $orderRequest->cabang_id,
@@ -114,7 +114,7 @@ class OrderRequestService
                     'unit_price'        => $row['unit_price'],
                     'discount'          => $row['discount'],
                     'tax'               => $row['tax'],
-                    'tipe_pajak'        => 'Non Pajak',
+                    'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
                     'currency_id'       => $currency->id,
                 ]);
 
@@ -138,7 +138,7 @@ class OrderRequestService
             throw new \RuntimeException('Currency data is required before creating a purchase order.');
         }
 
-        $purchaseOrder = $orderRequest->purchaseOrder()->create([
+        $purchaseOrder = $orderRequest->purchaseOrders()->create([
             'po_number'    => $data['po_number'],
             'supplier_id'  => $supplier->id,
             'order_date'   => $data['order_date'],
@@ -164,7 +164,7 @@ class OrderRequestService
                 'unit_price'        => $row['unit_price'],
                 'discount'          => $row['discount'],
                 'tax'               => $row['tax'],
-                'tipe_pajak'        => 'Non Pajak',
+                'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
                 'currency_id'       => $currency->id,
             ]);
 
@@ -172,6 +172,20 @@ class OrderRequestService
         }
 
         return $purchaseOrder->fresh(['purchaseOrderItem']);
+    }
+
+    /**
+     * Derive the PurchaseOrderItem tipe_pajak from the Order Request tax_type and item tax rate.
+     *  - tax = 0 → 'Non Pajak'
+     *  - tax_type = 'PPN Included' → 'Inklusif'
+     *  - tax_type = 'PPN Excluded' (default) → 'Eksklusif'
+     */
+    private function resolveTipePajak(?string $taxType, float $tax): string
+    {
+        if ((float) $tax <= 0) {
+            return 'Non Pajak';
+        }
+        return $taxType === 'PPN Included' ? 'Inklusif' : 'Eklusif';
     }
 
     public function reject($orderRequest)

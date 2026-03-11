@@ -182,10 +182,38 @@ class OrderRequestResource extends Resource
                         Textarea::make('note')
                             ->label('Note')
                             ->nullable(),
+                        Select::make('tax_type')
+                            ->label('Tipe PPN')
+                            ->options([
+                                'PPN Excluded' => 'PPN Excluded (PPN di luar harga)',
+                                'PPN Included' => 'PPN Included (PPN sudah termasuk harga)',
+                            ])
+                            ->default('PPN Excluded')
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function (string $state, callable $get, callable $set) {
+                                // Recalculate subtotals for all items when tax type changes
+                                $items = $get('orderRequestItem') ?? [];
+                                foreach ($items as $key => $item) {
+                                    $qty = (float) ($item['quantity'] ?? 0);
+                                    $price = (float) ($item['unit_price'] ?? 0);
+                                    $discPct = (float) ($item['discount'] ?? 0);
+                                    $taxPct  = (float) ($item['tax'] ?? 0);
+                                    $base        = $qty * $price;
+                                    $afterDisc   = $base - $base * ($discPct / 100);
+                                    $subtotal = $state === 'PPN Included'
+                                        ? $afterDisc
+                                        : $afterDisc + $afterDisc * ($taxPct / 100);
+                                    $set("orderRequestItem.{$key}.subtotal", $subtotal);
+                                }
+                            })
+                            ->validationMessages([
+                                'required' => 'Tipe PPN wajib dipilih.',
+                            ]),
                         Repeater::make('orderRequestItem')
                             ->relationship()
                             ->columnSpanFull()
-                            ->columns(6)
+                            ->columns(7)
                             ->hint('Tambahkan item produk yang ingin dipesan')
                             ->minItems(1)
                             ->required()
@@ -193,6 +221,25 @@ class OrderRequestResource extends Resource
                                 'required' => 'Order request harus memiliki setidaknya satu item produk.',
                                 'min' => 'Order request harus memiliki setidaknya satu item produk.',
                             ])
+                            ->afterStateHydrated(function ($state, callable $set, callable $get) {
+                                // Recalculate subtotal for each row when form is loaded
+                                $taxType = $get('tax_type') ?? 'PPN Excluded';
+                                $new = [];
+                                foreach ($state as $i => $row) {
+                                    $qty = (float) ($row['quantity'] ?? 0);
+                                    $unit = (float) ($row['unit_price'] ?? 0);
+                                    $disc = (float) ($row['discount'] ?? 0);
+                                    $tax  = (float) ($row['tax'] ?? 0);
+                                    $base = $qty * $unit;
+                                    $afterDisc = $base - $base * ($disc / 100);
+                                    $subtotal = $taxType === 'PPN Included'
+                                        ? $afterDisc
+                                        : $afterDisc + $afterDisc * ($tax / 100);
+                                    $row['subtotal'] = $subtotal;
+                                    $new[$i] = $row;
+                                }
+                                $set('orderRequestItem', $new);
+                            })
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
@@ -217,15 +264,19 @@ class OrderRequestResource extends Resource
                                                         $unitPrice = (float) $supplierProduct->pivot->supplier_price;
                                                     }
                                                 }
+                                                // Store the master price as original_price; user can override unit_price
+                                                $set('original_price', $unitPrice);
                                                 $set('unit_price', $unitPrice);
-                                                // Recalculate subtotal as percentages
-                                                $quantity = $get('quantity') ?? 0;
-                                                $base = $quantity * $unitPrice;
-                                                $discountPct = $get('discount') ?? 0;
-                                                $taxPct = $get('tax') ?? 0;
-                                                $discountAmount = $base * ($discountPct / 100);
-                                                $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
-                                                $subtotal = $base - $discountAmount + $taxAmount;
+                                                // Recalculate subtotal
+                                                $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
+                                                $quantity = (float) ($get('quantity') ?? 0);
+                                                $discPct  = (float) ($get('discount') ?? 0);
+                                                $taxPct   = (float) ($get('tax') ?? 0);
+                                                $base      = $quantity * $unitPrice;
+                                                $afterDisc = $base - $base * ($discPct / 100);
+                                                $subtotal  = $taxType === 'PPN Included'
+                                                    ? $afterDisc
+                                                    : $afterDisc + $afterDisc * ($taxPct / 100);
                                                 $set('subtotal', $subtotal);
                                             }
                                         }
@@ -257,14 +308,16 @@ class OrderRequestResource extends Resource
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $quantity = $state ?? 0;
-                                        $unitPrice = $get('unit_price') ?? 0;
-                                        $base = $quantity * $unitPrice;
-                                        $discountPct = $get('discount') ?? 0;
-                                        $taxPct = $get('tax') ?? 0;
-                                        $discountAmount = $base * ($discountPct / 100);
-                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
-                                        $subtotal = $base - $discountAmount + $taxAmount;
+                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        $quantity  = (float) ($state ?? 0);
+                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+                                        $discPct   = (float) ($get('discount') ?? 0);
+                                        $taxPct    = (float) ($get('tax') ?? 0);
+                                        $base      = $quantity * $unitPrice;
+                                        $afterDisc = $base - $base * ($discPct / 100);
+                                        $subtotal  = $taxType === 'PPN Included'
+                                            ? $afterDisc
+                                            : $afterDisc + $afterDisc * ($taxPct / 100);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->required()
@@ -274,21 +327,31 @@ class OrderRequestResource extends Resource
                                         'numeric' => 'Quantity harus berupa angka.',
                                         'min' => 'Quantity minimal 0.01.',
                                     ]),
+                                TextInput::make('original_price')
+                                    ->label('Harga Asli (Master)')
+                                    ->numeric()
+                                    ->indonesianMoney()
+                                    ->default(0)
+                                    ->readOnly()
+                                    ->dehydrated()
+                                    ->helperText('Harga dari master produk'),
                                 TextInput::make('unit_price')
-                                    ->label('Unit Price')
+                                    ->label('Harga Override')
                                     ->numeric()
                                     ->indonesianMoney()
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $quantity = $get('quantity') ?? 0;
-                                        $unitPrice = $state ?? 0;
-                                        $base = $quantity * $unitPrice;
-                                        $discountPct = $get('discount') ?? 0;
-                                        $taxPct = $get('tax') ?? 0;
-                                        $discountAmount = $base * ($discountPct / 100);
-                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
-                                        $subtotal = $base - $discountAmount + $taxAmount;
+                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        $quantity  = (float) ($get('quantity') ?? 0);
+                                        $unitPrice = (float) ($state ?? 0);
+                                        $discPct   = (float) ($get('discount') ?? 0);
+                                        $taxPct    = (float) ($get('tax') ?? 0);
+                                        $base      = $quantity * $unitPrice;
+                                        $afterDisc = $base - $base * ($discPct / 100);
+                                        $subtotal  = $taxType === 'PPN Included'
+                                            ? $afterDisc
+                                            : $afterDisc + $afterDisc * ($taxPct / 100);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->required()
@@ -304,14 +367,16 @@ class OrderRequestResource extends Resource
                                     ->maxValue(100)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $quantity = $get('quantity') ?? 0;
-                                        $unitPrice = $get('unit_price') ?? 0;
-                                        $base = $quantity * $unitPrice;
-                                        $discountPct = $state ?? 0;
-                                        $taxPct = $get('tax') ?? 0;
-                                        $discountAmount = $base * ($discountPct / 100);
-                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
-                                        $subtotal = $base - $discountAmount + $taxAmount;
+                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        $quantity  = (float) ($get('quantity') ?? 0);
+                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+                                        $discPct   = (float) ($state ?? 0);
+                                        $taxPct    = (float) ($get('tax') ?? 0);
+                                        $base      = $quantity * $unitPrice;
+                                        $afterDisc = $base - $base * ($discPct / 100);
+                                        $subtotal  = $taxType === 'PPN Included'
+                                            ? $afterDisc
+                                            : $afterDisc + $afterDisc * ($taxPct / 100);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->validationMessages([
@@ -327,14 +392,16 @@ class OrderRequestResource extends Resource
                                     ->maxValue(100)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $quantity = $get('quantity') ?? 0;
-                                        $unitPrice = $get('unit_price') ?? 0;
-                                        $base = $quantity * $unitPrice;
-                                        $discountPct = $get('discount') ?? 0;
-                                        $taxPct = $state ?? 0;
-                                        $discountAmount = $base * ($discountPct / 100);
-                                        $taxAmount = ($base - $discountAmount) * ($taxPct / 100);
-                                        $subtotal = $base - $discountAmount + $taxAmount;
+                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        $quantity  = (float) ($get('quantity') ?? 0);
+                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+                                        $discPct   = (float) ($get('discount') ?? 0);
+                                        $taxPct    = (float) ($state ?? 0);
+                                        $base      = $quantity * $unitPrice;
+                                        $afterDisc = $base - $base * ($discPct / 100);
+                                        $subtotal  = $taxType === 'PPN Included'
+                                            ? $afterDisc
+                                            : $afterDisc + $afterDisc * ($taxPct / 100);
                                         $set('subtotal', $subtotal);
                                     })
                                     ->validationMessages([
@@ -344,11 +411,14 @@ class OrderRequestResource extends Resource
                                     ]),
                                 TextInput::make('subtotal')
                                     ->label('Subtotal')
-                                    ->numeric()
+                                    // ->numeric()
                                     ->default(0)
                                     ->indonesianMoney()
                                     ->disabled()
-                                    ->dehydrated(),
+                                    ->validationMessages([
+                                        'numeric' => 'Subtotal harus berupa angka.',
+                                    ])
+                                    ->dehydrated(false),
                                 Textarea::make('note')
                                     ->nullable()
                                     ->label('Note')
@@ -519,26 +589,46 @@ class OrderRequestResource extends Resource
                         ->modalHeading('Buat Purchase Order')
                         ->modalDescription('Isi form berikut untuk membuat Purchase Order dari Order Request yang telah disetujui.')
                         ->fillForm(function ($record) {
-                            $items = $record->orderRequestItem->map(function ($item) {
+                            $supplierId = $record->supplier_id;
+                            $items = $record->orderRequestItem->map(function ($item) use ($supplierId) {
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                                $supplierPrice = $item->unit_price ?? 0;
+                                if ($supplierId && $item->product) {
+                                    $sp = $item->product->suppliers()->wherePivot('supplier_id', $supplierId)->first();
+                                    if ($sp && $sp->pivot->supplier_price > 0) {
+                                        $supplierPrice = (float) $sp->pivot->supplier_price;
+                                    }
+                                }
                                 return [
                                     'item_id'      => $item->id,
                                     'product_name' => "({$item->product->sku}) {$item->product->name}",
                                     'quantity'     => max(0, $remainingQty),
-                                    'unit_price'   => $item->unit_price ?? 0,
+                                    'unit_price'   => $supplierPrice,
                                     'include'      => $remainingQty > 0,
+                                    'item_supplier_id' => $supplierId,
                                 ];
                             })->values()->toArray();
 
                             return [
                                 'supplier_id'    => $record->supplier_id,
+                                'multi_supplier' => false,
                                 'selected_items' => $items,
                             ];
                         })
                         ->form([
-                            Section::make('Informasi Purchase Order')
+                            Section::make('Mode Pembuatan PO')
+                                ->icon('heroicon-o-cog-6-tooth')
+                                ->schema([
+                                    \Filament\Forms\Components\Toggle::make('multi_supplier')
+                                        ->label('Buat PO untuk beberapa supplier sekaligus?')
+                                        ->helperText('Aktifkan untuk memilih supplier berbeda per item. Sistem akan membuat satu PO per supplier secara otomatis.')
+                                        ->default(false)
+                                        ->live(),
+                                ]),
+                            Section::make('Informasi Purchase Order (Satu Supplier)')
                                 ->icon('heroicon-o-document-text')
                                 ->columns(2)
+                                ->visible(fn(Get $get) => ! $get('multi_supplier'))
                                 ->schema([
                                     Select::make('supplier_id')
                                         ->label('Supplier')
@@ -559,7 +649,7 @@ class OrderRequestResource extends Resource
                                                     return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                                 });
                                         })
-                                        ->required()
+                                        ->required(fn(Get $get) => ! $get('multi_supplier'))
                                         ->validationMessages([
                                             'required' => 'Supplier wajib dipilih.',
                                         ]),
@@ -567,7 +657,7 @@ class OrderRequestResource extends Resource
                                         ->label('PO Number')
                                         ->string()
                                         ->maxLength(255)
-                                        ->required()
+                                        ->required(fn(Get $get) => ! $get('multi_supplier'))
                                         ->suffixAction(
                                             FormAction::make('generatePoNumber')
                                                 ->icon('heroicon-o-arrow-path')
@@ -600,6 +690,28 @@ class OrderRequestResource extends Resource
                                         ->columnSpanFull()
                                         ->nullable(),
                                 ]),
+                            Section::make('Informasi Tanggal (Multi-Supplier)')
+                                ->icon('heroicon-o-calendar')
+                                ->columns(2)
+                                ->visible(fn(Get $get) => $get('multi_supplier'))
+                                ->schema([
+                                    DatePicker::make('order_date')
+                                        ->label('Order Date')
+                                        ->required()
+                                        ->native(false)
+                                        ->displayFormat('d M Y'),
+                                    DatePicker::make('expected_date')
+                                        ->label('Expected Delivery Date')
+                                        ->nullable()
+                                        ->native(false)
+                                        ->displayFormat('d M Y'),
+                                    Textarea::make('note')
+                                        ->label('Catatan')
+                                        ->placeholder('Catatan tambahan...')
+                                        ->rows(2)
+                                        ->columnSpanFull()
+                                        ->nullable(),
+                                ]),
                             Section::make('Pilih Item yang Akan Dibeli')
                                 ->description('Centang item yang akan dimasukkan ke dalam Purchase Order. Anda dapat mengubah quantity dan harga sebelum membuat PO.')
                                 ->icon('heroicon-o-shopping-cart')
@@ -616,7 +728,18 @@ class OrderRequestResource extends Resource
                                             TextInput::make('product_name')
                                                 ->label('Nama Produk')
                                                 ->readOnly()
-                                                ->columnSpan(5),
+                                                ->columnSpan(fn(Get $get) => $get('../../multi_supplier') ? 4 : 5),
+                                            Select::make('item_supplier_id')
+                                                ->label('Supplier')
+                                                ->options(function () {
+                                                    return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                                    });
+                                                })
+                                                ->searchable()
+                                                ->visible(fn(Get $get) => $get('../../multi_supplier'))
+                                                ->required(fn(Get $get) => $get('../../multi_supplier') && $get('../include'))
+                                                ->columnSpan(3),
                                             TextInput::make('quantity')
                                                 ->label('Qty')
                                                 ->numeric()
@@ -628,30 +751,64 @@ class OrderRequestResource extends Resource
                                                 ->numeric()
                                                 ->minValue(0)
                                                 ->prefix('Rp')
-                                                ->columnSpan(3),
+                                                ->columnSpan(fn(Get $get) => $get('../../multi_supplier') ? 2 : 3),
                                             Checkbox::make('include')
                                                 ->label('Sertakan')
                                                 ->default(true)
-                                                ->columnSpan(2),
+                                                ->columnSpan(1),
                                         ]),
                                 ]),
                         ])
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
-                            return $user && $user->hasPermissionTo('approve order request') && $record->status == 'approved' && !$record->purchaseOrder;
+                            if (!$user || !$user->hasPermissionTo('approve order request') || $record->status !== 'approved') {
+                                return false;
+                            }
+                            // Allow creating a new PO as long as some items still have unfulfilled quantity
+                            return $record->orderRequestItem->contains(
+                                fn($item) => ($item->quantity - ($item->fulfilled_quantity ?? 0)) > 0
+                            );
                         })
                         ->action(function (array $data, $record) {
                             $orderRequestService = app(OrderRequestService::class);
-                            // Check purchase order number
-                            $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
-                            if ($purchaseOrder) {
-                                HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
-                                return;
-                            }
 
-                            $orderRequestService->createPurchaseOrder($record, $data);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order Created");
+                            if (! empty($data['multi_supplier'])) {
+                                // Multi-supplier mode: group included items by supplier and create one PO each
+                                $includedItems = collect($data['selected_items'])->filter(fn($i) => $i['include'] ?? false);
+                                if ($includedItems->isEmpty()) {
+                                    HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                    return;
+                                }
+                                $groups = $includedItems->groupBy('item_supplier_id');
+                                $created = 0;
+                                foreach ($groups as $supplierId => $groupItems) {
+                                    if (empty($supplierId)) continue;
+                                    $poNumber = HelperController::generatePoNumber();
+                                    // Make sure it's unique
+                                    while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
+                                        $poNumber = HelperController::generatePoNumber();
+                                    }
+                                    $poData = array_merge($data, [
+                                        'supplier_id'    => $supplierId,
+                                        'po_number'      => $poNumber,
+                                        'selected_items' => $groupItems->values()->toArray(),
+                                        'multi_supplier' => false,
+                                    ]);
+                                    $orderRequestService->createPurchaseOrder($record, $poData);
+                                    $created++;
+                                }
+                                HelperController::sendNotification(isSuccess: true, title: 'Berhasil', message: "{$created} Purchase Order berhasil dibuat.");
+                            } else {
+                                // Single supplier mode (existing behaviour)
+                                $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
+                                if ($purchaseOrder) {
+                                    HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
+                                    return;
+                                }
+                                $orderRequestService->createPurchaseOrder($record, $data);
+                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order Created");
+                            }
                         }),
                     Action::make('approve')
                         ->label('Approve')
@@ -662,13 +819,22 @@ class OrderRequestResource extends Resource
                         ->modalDescription('Tinjau dan setujui Order Request ini. Anda dapat memilih item yang akan dibuatkan Purchase Order.')
                         ->modalSubmitActionLabel('Approve')
                         ->fillForm(function ($record) {
-                            $items = $record->orderRequestItem->map(function ($item) {
+                            $supplierId = $record->supplier_id;
+                            $items = $record->orderRequestItem->map(function ($item) use ($supplierId) {
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                                // Use supplier price from product_supplier pivot if available
+                                $supplierPrice = $item->unit_price ?? 0;
+                                if ($supplierId && $item->product) {
+                                    $sp = $item->product->suppliers()->wherePivot('supplier_id', $supplierId)->first();
+                                    if ($sp && $sp->pivot->supplier_price > 0) {
+                                        $supplierPrice = (float) $sp->pivot->supplier_price;
+                                    }
+                                }
                                 return [
                                     'item_id'      => $item->id,
                                     'product_name' => "({$item->product->sku}) {$item->product->name}",
                                     'quantity'     => max(0, $remainingQty),
-                                    'unit_price'   => $item->unit_price ?? 0,
+                                    'unit_price'   => $supplierPrice,
                                     'include'      => $remainingQty > 0,
                                 ];
                             })->values()->toArray();
@@ -867,6 +1033,28 @@ class OrderRequestResource extends Resource
 
     protected static function mutateFormDataBeforeSave(array $data): array
     {
+        // Recalculate subtotals server-side and ignore any client-provided values
+        if (isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
+            $taxType = $data['tax_type'] ?? 'PPN Excluded';
+
+            foreach ($data['orderRequestItem'] as &$item) {
+                $qty = (float) ($item['quantity'] ?? 0);
+                $price = (float) ($item['unit_price'] ?? 0);
+                $disc = (float) ($item['discount'] ?? 0);
+                $tax  = (float) ($item['tax'] ?? 0);
+
+                $base = $qty * $price;
+                $afterDisc = $base - $base * ($disc / 100);
+                $subtotal = $taxType === 'PPN Included'
+                    ? $afterDisc
+                    : $afterDisc + $afterDisc * ($tax / 100);
+
+                $item['subtotal'] = $subtotal;
+                // remove any extraneous subtotal key sent by client
+            }
+            unset($item);
+            $data['orderRequestItem'] = $data['orderRequestItem'];
+        }
         return $data;
     }
 }

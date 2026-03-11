@@ -103,7 +103,7 @@ class AppServiceProvider extends ServiceProvider
         // ---------------------------------------------------------------
         TextColumn::macro('rupiah', function (): TextColumn {
             /** @var TextColumn $this */
-            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
         });
 
         // ---------------------------------------------------------------
@@ -112,7 +112,7 @@ class AppServiceProvider extends ServiceProvider
         // ---------------------------------------------------------------
         TextEntry::macro('rupiah', function (): TextEntry {
             /** @var TextEntry $this */
-            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
         });
 
         // ---------------------------------------------------------------
@@ -121,7 +121,7 @@ class AppServiceProvider extends ServiceProvider
         // ---------------------------------------------------------------
         \Filament\Tables\Columns\Summarizers\Sum::macro('rupiah', function () {
             /** @var \Filament\Tables\Columns\Summarizers\Sum $this */
-            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
         });
 
         // ---------------------------------------------------------------
@@ -135,65 +135,41 @@ class AppServiceProvider extends ServiceProvider
         // ---------------------------------------------------------------
         TextInput::macro('indonesianMoney', function (): TextInput {
             /** @var TextInput $this */
+
             return $this
                 ->prefix('Rp')
                 ->placeholder('500.000')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
-                    $input.map(function(value) {
-                        // Strip all non-digit characters
-                        value = value.replace(/[^\d]/g, '');
-                        if (!value) return '';
-                        // Format with dot as thousands separator (id-ID locale)
-                        return new Intl.NumberFormat('id-ID').format(parseInt(value, 10));
-                    })
-                JS))
-                ->formatStateUsing(function ($state): string {
-                    // Format DB numeric value for display in the input field
+            $input.map(function(value) {
+                value = value.replace(/[^\d]/g, '');
+                if (!value) return '';
+                return new Intl.NumberFormat('id-ID').format(parseInt(value, 10));
+            })
+        JS))
+                ->formatStateUsing(function ($state) {
                     if ($state === null || $state === '') {
-                        return '0';
+                        return '';
                     }
-                    $numeric = (float) $state;
-                    return number_format($numeric, 0, ',', '.');
+
+                    return number_format((float) $state, 0, ',', '.');
                 })
                 ->dehydrateStateUsing(function ($state) {
-                    // Parse the user's (possibly formatted) input back to a numeric value
+
                     if ($state === null || $state === '') {
                         return 0;
                     }
 
-                    $str = (string) $state;
-                    // Strip non-numeric characters except dots and commas
-                    $clean = preg_replace('/[^\d\.,]/', '', $str);
-                    if ($clean === '') {
-                        return 0;
-                    }
+                    // remove Rp
+                    $clean = str_replace('Rp', '', $state);
 
-                    $hasComma = strpos($clean, ',') !== false;
-                    $hasDot   = strpos($clean, '.') !== false;
+                    // remove spaces
+                    $clean = trim($clean);
 
-                    if ($hasComma && $hasDot) {
-                        $dotPos   = strrpos($clean, '.');
-                        $afterDot = strlen($clean) - $dotPos - 1;
-                        if ($afterDot >= 1 && $afterDot <= 2) {
-                            // Western format: dot = decimal, comma = thousands
-                            $clean = str_replace(',', '', $clean);
-                        } else {
-                            // Indonesian format: dot = thousands, comma = decimal
-                            $clean = str_replace('.', '', $clean);
-                            $clean = str_replace(',', '.', $clean);
-                        }
-                    } elseif ($hasDot) {
-                        // Only dots — treat as Indonesian thousands separators (e.g. 1.000.000)
-                        $clean = str_replace('.', '', $clean);
-                    } elseif ($hasComma) {
-                        if (preg_match('/,\d{1,2}$/', $clean)) {
-                            // Comma is decimal separator
-                            $clean = str_replace(',', '.', $clean);
-                        } else {
-                            // Comma is thousands separator
-                            $clean = str_replace(',', '', $clean);
-                        }
-                    }
+                    // remove thousand separator
+                    $clean = str_replace('.', '', $clean);
+
+                    // replace decimal comma
+                    $clean = str_replace(',', '.', $clean);
 
                     return (float) $clean;
                 });

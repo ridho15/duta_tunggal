@@ -142,13 +142,30 @@ class SalesOrderService
 
     public function generateSoNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'RN-' . $date . '-';
+        $prefix = 'RN-';
 
+        // Find the highest existing sequence number globally (ignoring branch scopes)
+        $max = SaleOrder::withoutGlobalScopes()
+            ->where('so_number', 'like', $prefix . '%')
+            ->max('so_number');
+
+        $next = 1;
+        if ($max !== null) {
+            $suffix = substr((string) $max, strlen($prefix));
+            if (is_numeric($suffix)) {
+                $next = (int) $suffix + 1;
+            }
+        }
+
+        // Guard against concurrent inserts
         do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = SaleOrder::where('so_number', $candidate)->exists();
+            $candidate = $prefix . str_pad($next, 5, '0', STR_PAD_LEFT);
+            $exists = SaleOrder::withoutGlobalScopes()
+                ->where('so_number', $candidate)
+                ->exists();
+            if ($exists) {
+                $next++;
+            }
         } while ($exists);
 
         return $candidate;
@@ -222,7 +239,7 @@ class SalesOrderService
         ]);
 
         // Update warehouse confirmation status based on overall status
-        $confirmationStatus = match($overallStatus) {
+        $confirmationStatus = match ($overallStatus) {
             'confirmed' => 'confirmed',
             'partial_confirmed' => 'partial_confirmed',
             'reject' => 'rejected',
@@ -274,15 +291,29 @@ class SalesOrderService
         if (!$warehouseId) {
             throw new \Exception('Warehouse ID is required to create delivery order');
         }
+
+        // Resolve a real driver and vehicle to satisfy NOT NULL FK constraints
+        $driverId  = $deliveryData['driver_id']  ?? \App\Models\Driver::first()?->id;
+        $vehicleId = $deliveryData['vehicle_id'] ?? \App\Models\Vehicle::first()?->id;
+
+        if (!$driverId || !$vehicleId) {
+            \Filament\Notifications\Notification::make()
+                ->title('Gagal Membuat Delivery Order')
+                ->danger()
+                ->body('Tidak ditemukan driver atau kendaraan di database. Silakan pastikan data master sudah terisi untuk auto-creation Delivery Order.')
+                ->send();
+            throw new \Exception('A Driver and a Vehicle must exist before a Delivery Order can be created.');
+        }
+
         $deliveryOrder = $saleOrder->deliveryOrder()->create([
-            'do_number' => $this->generateDoNumber(),
+            'do_number'     => $this->generateDoNumber(),
             'delivery_date' => $deliveryData['delivery_date'],
-            'warehouse_id' => $warehouseId,
-            'driver_id' => 1, // Default driver for testing
-            'vehicle_id' => 1, // Default vehicle for testing
-            'status' => 'draft',
-            'notes' => $deliveryData['notes'] ?? null,
-            'created_by' => Auth::user()->id
+            'warehouse_id'  => $warehouseId,
+            'driver_id'     => $driverId,
+            'vehicle_id'    => $vehicleId,
+            'status'        => 'draft',
+            'notes'         => $deliveryData['notes'] ?? null,
+            'created_by'    => Auth::user()->id,
         ]);
 
         // Copy confirmed items to delivery order
@@ -290,10 +321,10 @@ class SalesOrderService
             if ($confirmedItem->status === 'confirmed' || $confirmedItem->status === 'partial_confirmed') {
                 $deliveryOrder->deliveryOrderItem()->create([
                     'sale_order_item_id' => $confirmedItem->sale_order_item_id,
-                    'product_id' => $confirmedItem->saleOrderItem->product_id,
-                    'qty' => $confirmedItem->confirmed_qty,
-                    'warehouse_id' => $confirmedItem->warehouse_id,
-                    'rak_id' => $confirmedItem->rak_id
+                    'product_id'         => $confirmedItem->saleOrderItem->product_id,
+                    'quantity'           => $confirmedItem->confirmed_qty,
+                    'warehouse_id'       => $confirmedItem->warehouse_id,
+                    'rak_id'             => $confirmedItem->rak_id,
                 ]);
             }
         }
@@ -303,16 +334,6 @@ class SalesOrderService
 
     public function generateDoNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'DO-' . $date . '-';
-
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = \App\Models\DeliveryOrder::where('do_number', $candidate)->exists();
-        } while ($exists);
-
-        return $candidate;
+        return \App\Services\DeliveryOrderService::generateStaticDoNumber();
     }
-
 }

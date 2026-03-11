@@ -48,7 +48,14 @@ class InvoiceObserver
             ]);
 
             // Post journal entries for purchase invoice (accrual basis)
-            $this->ledger->postInvoice($invoice);
+            try {
+                $this->ledger->postInvoice($invoice);
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to post purchase invoice journal on create', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
         } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
             // Create Account Receivable
             $accountReceivable = AccountReceivable::create([
@@ -110,26 +117,47 @@ class InvoiceObserver
                 ->delete();
 
             // Re-post journal entries with new amounts
-            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
-                $this->postSalesInvoice($invoice);
-            } else {
-                $this->ledger->postInvoice($invoice);
+            try {
+                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                    $this->postSalesInvoice($invoice);
+                } else {
+                    $this->ledger->postInvoice($invoice);
+                }
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to re-post journal on update', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
             }
         }
 
         // When invoice status becomes 'paid', post to ledger (if not already posted)
         if (strtolower($invoice->status) === 'paid') {
-            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
-                $this->postSalesInvoice($invoice);
-            } else {
-                $this->ledger->postInvoice($invoice);
+            try {
+                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                    $this->postSalesInvoice($invoice);
+                } else {
+                    $this->ledger->postInvoice($invoice);
+                }
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to post on status=paid', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
             }
         }
 
         // When invoice status becomes 'approved', post sales invoice journal entries
         if ($invoice->wasChanged('status') && strtolower($invoice->status) === 'approved') {
-            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
-                $this->postSalesInvoice($invoice);
+            try {
+                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                    $this->postSalesInvoice($invoice);
+                }
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to post on status=approved', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
             }
         }
     }
@@ -279,9 +307,9 @@ class InvoiceObserver
 
         }
 
-        // CREDIT: PPn Keluaran at invoice level — use the authoritative stored tax value
-        // Do NOT use max() of two independent calculations, which would cause journal imbalance
-        $totalTaxAmount = max(0.0, (float) $invoice->tax);
+        // CREDIT: PPn Keluaran at invoice level.
+        // invoice->tax stores the percentage rate (e.g. 12 for 12%), so compute the actual monetary amount.
+        $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ((float) $invoice->tax / 100));
         
         if ($totalTaxAmount > 0 && $ppnKeluaranCoa) {
             \App\Models\JournalEntry::create([

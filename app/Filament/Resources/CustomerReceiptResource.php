@@ -281,11 +281,8 @@ class CustomerReceiptResource extends Resource
                                 TextInput::make('ntpn')
                                     ->label('NTPN')
                                     ->maxLength(255)
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'NTPN wajib diisi',
-                                        'max' => 'NTPN maksimal 255 karakter'
-                                    ]),
+                                    ->hidden()
+                                    ->dehydrated(false),
 
                                 TextInput::make('total_payment')
                                     ->label('Total Pembayaran')
@@ -501,7 +498,7 @@ class CustomerReceiptResource extends Resource
                 TextColumn::make('ntpn')
                     ->label('NTPN')
                     ->searchable()
-                    ->toggleable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->copyable()
                     ->placeholder('Not set'),
 

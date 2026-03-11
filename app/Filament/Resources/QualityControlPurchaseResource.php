@@ -353,9 +353,29 @@ class QualityControlPurchaseResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('created_at')
+                    ->label('Tanggal')
+                    ->date('d M Y')
+                    ->sortable(),
                 TextColumn::make('qc_number')
                     ->label('QC Number')
                     ->searchable(),
+                TextColumn::make('supplier_name')
+                    ->label('Supplier')
+                    ->getStateUsing(function ($record) {
+                        $supplier = $record->fromModel?->purchaseOrder?->supplier;
+                        if ($supplier) {
+                            return "({$supplier->code}) " . ($supplier->perusahaan ?? $supplier->name ?? 'N/A');
+                        }
+                        return 'N/A';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('fromModel.purchaseOrder.supplier', function ($query) use ($search) {
+                            return $query->where('perusahaan', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%')
+                                ->orWhere('code', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('receipt_number')
                     ->label('Purchase Receipt')
                     ->getStateUsing(function ($record) {
@@ -367,12 +387,14 @@ class QualityControlPurchaseResource extends Resource
                         });
                     }),
                 TextColumn::make('po_number')
-                    ->label('Purchase Order')
+                    ->label('PO Number')
                     ->getStateUsing(function ($record) {
-                        return $record->fromModel?->purchaseReceipt?->purchaseOrder?->po_number ?? 'N/A';
+                        return $record->fromModel?->purchaseOrder?->po_number
+                            ?? $record->fromModel?->purchaseReceipt?->purchaseOrder?->po_number
+                            ?? 'N/A';
                     })
                     ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('fromModel.purchaseReceipt.purchaseOrder', function ($query) use ($search) {
+                        return $query->whereHas('fromModel.purchaseOrder', function ($query) use ($search) {
                             return $query->where('po_number', 'LIKE', '%' . $search . '%');
                         });
                     }),
@@ -441,10 +463,55 @@ class QualityControlPurchaseResource extends Resource
                     ->options(Warehouse::all()->mapWithKeys(function ($warehouse) {
                         return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                     })),
-                Filter::make('created_at')
+                Filter::make('supplier')
+                    ->label('Supplier')
                     ->form([
-                        DatePicker::make('created_from'),
-                        DatePicker::make('created_until'),
+                        \Filament\Forms\Components\Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->searchable()
+                            ->preload()
+                            ->options(function () {
+                                return \App\Models\Supplier::all()->mapWithKeys(function ($supplier) {
+                                    return [$supplier->id => "({$supplier->code}) " . ($supplier->perusahaan ?? $supplier->name ?? '')];
+                                });
+                            }),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['supplier_id'])) {
+                            return $query;
+                        }
+                        return $query->whereHas('fromModel.purchaseOrder', function (Builder $query) use ($data) {
+                            $query->where('supplier_id', $data['supplier_id']);
+                        });
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (empty($data['supplier_id'])) return null;
+                        $supplier = \App\Models\Supplier::find($data['supplier_id']);
+                        return $supplier ? 'Supplier: ' . ($supplier->perusahaan ?? $supplier->name) : null;
+                    }),
+                Filter::make('po_number_filter')
+                    ->label('PO Number')
+                    ->form([
+                        \Filament\Forms\Components\TextInput::make('po_number')
+                            ->label('PO Number')
+                            ->placeholder('Cari PO Number...'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['po_number'])) {
+                            return $query;
+                        }
+                        return $query->whereHas('fromModel.purchaseOrder', function (Builder $query) use ($data) {
+                            $query->where('po_number', 'LIKE', '%' . $data['po_number'] . '%');
+                        });
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        return !empty($data['po_number']) ? 'PO: ' . $data['po_number'] : null;
+                    }),
+                Filter::make('created_at')
+                    ->label('Tanggal QC')
+                    ->form([
+                        DatePicker::make('created_from')->label('Dari Tanggal'),
+                        DatePicker::make('created_until')->label('Sampai Tanggal'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query

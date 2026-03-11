@@ -189,9 +189,11 @@ class PurchaseInvoiceResource extends Resource
                                 TextInput::make('invoice_number')
                                     ->label('Invoice Number')
                                     ->required()
+                                    ->unique(table: 'invoices', column: 'invoice_number', ignoreRecord: true)
                                     ->validationMessages([
                                         'required' => 'Nomor invoice tidak boleh kosong',
-                                        'max' => 'Nomor invoice terlalu panjang'
+                                        'max' => 'Nomor invoice terlalu panjang',
+                                        'unique' => 'Nomor invoice sudah digunakan'
                                     ])
                                     ->suffixAction(
                                         Action::make('generate')
@@ -698,6 +700,8 @@ class PurchaseInvoiceResource extends Resource
                         Section::make('Pemilihan COA (Chart of Account)')
                             ->description('Pilih COA yang sesuai untuk pencatatan journal entry')
                             ->columns(2)
+                            ->collapsed()
+                            ->collapsible()
                             ->schema([
                                 Select::make('accounts_payable_coa_id')
                                     ->label('COA Hutang Supplier (Accounts Payable)')

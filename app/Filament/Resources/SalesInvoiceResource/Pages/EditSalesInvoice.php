@@ -94,12 +94,23 @@ class EditSalesInvoice extends EditRecord
     {
         // Sync invoice items
         if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            // Delete existing items
+            // Soft-delete existing items before recreating
             $this->record->invoiceItem()->delete();
-            
-            // Create new items
+
             foreach ($this->data['invoiceItem'] as $item) {
-                $this->record->invoiceItem()->create($item);
+                $quantity = (float) ($item['quantity'] ?? 0);
+                $price    = (float) ($item['price'] ?? 0);
+
+                // Ensure all NOT NULL columns are provided even when the
+                // Repeater only captured the 4 visible fields.
+                $itemData = array_merge($item, [
+                    'subtotal'   => $item['subtotal']   ?? ($quantity * $price),
+                    'discount'   => $item['discount']   ?? 0,
+                    'tax_rate'   => $item['tax_rate']   ?? 0,
+                    'tax_amount' => $item['tax_amount'] ?? 0,
+                ]);
+
+                $this->record->invoiceItem()->create($itemData);
             }
         }
     }

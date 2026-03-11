@@ -89,7 +89,7 @@ class SuratJalanResource extends Resource
                             ->required()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query) {
                                 $query->whereDoesntHave('suratJalan')
-                                      ->whereIn('status', ['draft', 'request_approve', 'sent', 'received']);
+                                      ->whereIn('status', ['draft', 'request_approve', 'approved', 'sent', 'received']);
                             })
                             ->multiple()
                             ->validationMessages([
@@ -105,6 +105,20 @@ class SuratJalanResource extends Resource
                                 'acceptedFileTypes' => 'File harus berupa PDF, JPG, atau PNG',
                                 'maxSize' => 'Ukuran file maksimal 5MB'
                             ]),
+                        TextInput::make('sender_name')
+                            ->label('Nama Pengirim')
+                            ->maxLength(255)
+                            ->helperText('Nama orang yang mengirimkan barang'),
+                        Select::make('shipping_method')
+                            ->label('Metode Pengiriman')
+                            ->options([
+                                'Ekspedisi' => 'Ekspedisi',
+                                'Kurir Internal' => 'Kurir Internal',
+                                'Ambil Sendiri' => 'Ambil Sendiri',
+                                'Lainnya' => 'Lainnya',
+                            ])
+                            ->searchable()
+                            ->helperText('Metode pengiriman yang digunakan'),
                         Hidden::make('status')
                             ->default(0), // 0 = Draft, 1 = Terbit
                         Hidden::make('created_by')
@@ -326,9 +340,11 @@ class SuratJalanResource extends Resource
                             }, 'Surat_Jalan_' . $record->sj_number . '.pdf');
                         }),
                     Action::make('terbit')
-                        ->label('Terbitkan')
+                        ->label('Setujui')
                         ->color('success')
                         ->requiresConfirmation()
+                        ->modalHeading('Setujui & Terbitkan Surat Jalan')
+                        ->modalDescription('Surat Jalan akan diterbitkan dan semua Delivery Order terkait akan ditandai sebagai "Terkirim" (Sent).')
                         ->icon('heroicon-o-clipboard-document-list')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response surat jalan') && $record->status == 0;
@@ -337,7 +353,24 @@ class SuratJalanResource extends Resource
                                 'signed_by' => Auth::user()->id,
                                 'status' => 1
                             ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: 'Surat Jalan Terbit');
+
+                            // Mark all linked DOs as 'sent'
+                            $record->loadMissing('deliveryOrder');
+                            foreach ($record->deliveryOrder as $do) {
+                                if (in_array($do->status, ['approved', 'draft'])) {
+                                    try {
+                                        app(\App\Services\DeliveryOrderService::class)->updateStatus(deliveryOrder: $do, status: 'sent');
+                                    } catch (\Throwable $e) {
+                                        \Illuminate\Support\Facades\Log::error('SuratJalan: Failed to mark DO as sent', [
+                                            'surat_jalan_id' => $record->id,
+                                            'do_id' => $do->id,
+                                            'error' => $e->getMessage(),
+                                        ]);
+                                    }
+                                }
+                            }
+
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: 'Surat Jalan Terbit dan Delivery Order ditandai Terkirim');
                         })
                 ])
             ], position: ActionsPosition::BeforeCells)

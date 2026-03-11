@@ -132,13 +132,14 @@ class LedgerPostingService
                 ]);
             }
 
-            // Calculate PPN amount: prefer explicit invoice->tax when present, otherwise derive from ppn_rate
+            // Calculate PPN amount from the stored percentage rate.
+            // invoice->tax stores the rate (e.g. 12 for 12%), NOT the absolute amount.
             $ppnAmount = 0;
             $actualPpnAmount = 0; // Track actual PPN amount that gets posted
             if (!empty($invoice->tax) && $invoice->tax > 0) {
-                $ppnAmount = (float)$invoice->tax;
-            } else {
-                $ppnAmount = $invoice->subtotal * ($invoice->ppn_rate ?? 0) / 100;
+                $ppnAmount = (float) $invoice->subtotal * ((float) $invoice->tax / 100);
+            } elseif (!empty($invoice->ppn_rate) && $invoice->ppn_rate > 0) {
+                $ppnAmount = (float) $invoice->subtotal * ((float) $invoice->ppn_rate / 100);
             }
 
             if ($ppnAmount > 0 && $ppnMasukanCoa) {

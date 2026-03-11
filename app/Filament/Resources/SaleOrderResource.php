@@ -798,6 +798,9 @@ class SaleOrderResource extends Resource
                                     ->label('Tax')
                                     ->numeric()
                                     ->reactive()
+                                    ->disabled()
+                                    ->dehydrated(true)
+                                    ->helperText('Dihitung otomatis oleh sistem')
                                     ->validationMessages([
                                         'numeric' => 'Tax harus berupa angka',
                                         'min' => 'Tax minimal 0%',
@@ -914,7 +917,19 @@ class SaleOrderResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
+                        return match ($state) {
+                            'draft'           => 'Draft',
+                            'request_approve' => 'Menunggu Persetujuan',
+                            'approved'        => 'Disetujui',
+                            'confirmed'       => 'Dikonfirmasi',
+                            'completed'       => 'Selesai',
+                            'request_close'   => 'Minta Ditutup',
+                            'closed'          => 'Ditutup',
+                            'reject'          => 'Ditolak',
+                            'canceled'        => 'Dibatalkan',
+                            'received'        => 'Diterima',
+                            default           => Str::upper($state),
+                        };
                     })
                     ->color(function ($state) {
                         return match ($state) {
@@ -1117,8 +1132,10 @@ class SaleOrderResource extends Resource
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
                         }),
                     Action::make('approve')
-                        ->label('Approve')
+                        ->label('Setujui')
                         ->requiresConfirmation()
+                        ->modalHeading('Setujui Sales Order')
+                        ->modalDescription('Dengan menyetujui Sales Order ini, Anda mengkonfirmasi bahwa persyaratan pembayaran dan pengiriman telah disepakati.')
                         ->color('success')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
@@ -1127,7 +1144,7 @@ class SaleOrderResource extends Resource
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->approve($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve sale order");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui");
                         }),
                     Action::make('closed')
                         ->label('Close')

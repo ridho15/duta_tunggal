@@ -57,17 +57,31 @@ class DeliveryOrderService
 
     public function generateDoNumber()
     {
-        $date = now()->format('Ymd');
+        return static::generateStaticDoNumber();
+    }
+
+    /**
+     * Static version so models / observers can call it without injecting the service.
+     */
+    public static function generateStaticDoNumber(): string
+    {
+        $date   = now()->format('Ymd');
         $prefix = 'DO-' . $date . '-';
 
-        // pick random suffix and ensure no collision
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = DeliveryOrder::where('do_number', $candidate)->exists();
-        } while ($exists);
+        // Sequential approach: no infinite-loop risk, works across branches
+        $max = DeliveryOrder::withoutGlobalScopes()
+            ->where('do_number', 'like', $prefix . '%')
+            ->max('do_number');
 
-        return $candidate;
+        $next = 1;
+        if ($max !== null) {
+            $suffix = substr((string) $max, strlen($prefix));
+            if (is_numeric($suffix)) {
+                $next = (int) $suffix + 1;
+            }
+        }
+
+        return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
     }
 
     /**

@@ -895,6 +895,9 @@ class QuotationResource extends Resource
                             $salesOrderService = app(SalesOrderService::class);
 
                             // Create sale order
+                            // If quotation is already approved, SO starts as 'request_approve' (needs final SO confirm)
+                            // This means the quotation approval already covered the commercial terms approval
+                            $soStatus = ($record->status === 'approve') ? 'request_approve' : 'draft';
                             $saleOrder = SaleOrder::create([
                                 'customer_id' => $record->customer_id,
                                 'quotation_id' => $record->id,
@@ -902,7 +905,7 @@ class QuotationResource extends Resource
                                 'order_date' => $data['order_date'],
                                 'delivery_date' => $data['delivery_date'],
                                 'tipe_pengiriman' => $data['tipe_pengiriman'],
-                                'status' => 'draft',
+                                'status' => $soStatus,
                                 'total_amount' => $record->total_amount,
                                 'created_by' => Auth::id(),
                                 'reference_type' => 2, // Refer Quotation

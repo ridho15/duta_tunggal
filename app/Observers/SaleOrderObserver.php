@@ -204,9 +204,10 @@ class SaleOrderObserver
             return;
         }
 
-        // Hanya buat warehouse confirmation untuk tipe pengiriman 'Kirim Langsung'
-        if ($saleOrder->tipe_pengiriman !== 'Kirim Langsung') {
-            Log::info('Skipping warehouse confirmation creation - not "Kirim Langsung" type', [
+        // Hanya buat warehouse confirmation untuk tipe pengiriman yang memerlukan DO
+        // Baik 'Kirim Langsung' maupun 'Ambil Sendiri' sekarang memerlukan DO untuk keperluan tracking
+        if (!in_array($saleOrder->tipe_pengiriman, ['Kirim Langsung', 'Ambil Sendiri'])) {
+            Log::info('Skipping warehouse confirmation creation - unrecognized delivery type', [
                 'tipe_pengiriman' => $saleOrder->tipe_pengiriman
             ]);
             return;
@@ -235,13 +236,16 @@ class SaleOrderObserver
         ]);
 
         // Buat warehouse confirmation items
+        $skippedProducts = [];
         foreach ($saleOrder->saleOrderItem as $item) {
             // Skip item yang tidak memiliki warehouse_id
             if (!$item->warehouse_id) {
+                $productName = $item->product->name ?? ('ID: ' . $item->product_id);
                 Log::warning('Skipping warehouse confirmation item - no warehouse_id', [
                     'sale_order_item_id' => $item->id,
-                    'product_name' => $item->product->name ?? 'Unknown'
+                    'product_name' => $productName,
                 ]);
+                $skippedProducts[] = $productName;
                 continue;
             }
 
@@ -263,6 +267,15 @@ class SaleOrderObserver
             'status' => $wcStatus,
             'auto_approved' => !$hasInsufficientStock,
         ]);
+
+        // Notify if some items were skipped because warehouse_id is missing
+        if (!empty($skippedProducts)) {
+            \Filament\Notifications\Notification::make()
+                ->title('Perhatian: Beberapa Item Tidak Diproses')
+                ->warning()
+                ->body('Item berikut tidak memiliki gudang sehingga tidak dimasukkan ke Warehouse Confirmation: ' . implode(', ', $skippedProducts) . '. Silakan set warehouse pada item SO tersebut.')
+                ->send();
+        }
 
         // Jika WC status adalah confirmed, buat delivery order otomatis
         if ($wcStatus === 'confirmed') {

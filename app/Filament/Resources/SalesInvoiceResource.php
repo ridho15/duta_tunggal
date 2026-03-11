@@ -126,9 +126,11 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('invoice_number')
                                     ->label('Invoice Number')
                                     ->required()
+                                    ->unique(table: 'invoices', column: 'invoice_number', ignoreRecord: true)
                                     ->validationMessages([
                                         'required' => 'Nomor invoice tidak boleh kosong',
-                                        'max' => 'Nomor invoice terlalu panjang'
+                                        'max' => 'Nomor invoice terlalu panjang',
+                                        'unique' => 'Nomor invoice sudah digunakan'
                                     ])
                                     ->suffixAction(
                                         Action::make('generate')
@@ -688,6 +690,8 @@ class SalesInvoiceResource extends Resource
                         Section::make('Pilih COA untuk Journal Entries')
                             ->description('Pilih COA yang akan digunakan untuk journal entries invoice penjualan')
                             ->columns(2)
+                            ->collapsed()
+                            ->collapsible()
                             ->schema([
                                 Select::make('ar_coa_id')
                                     ->label('COA Piutang Usaha (AR)')

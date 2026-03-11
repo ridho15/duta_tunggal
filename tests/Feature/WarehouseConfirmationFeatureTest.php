@@ -3,8 +3,10 @@
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\Customer;
+use App\Models\Driver;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\Vehicle;
 use App\Models\Warehouse;
 use App\Models\Rak;
 use App\Models\WarehouseConfirmation;
@@ -45,6 +47,10 @@ describe('Warehouse Confirmation Feature', function () {
         ]);
 
         $this->salesOrderService = app(SalesOrderService::class);
+
+        // Required for createDeliveryOrder – FK constraints on delivery_orders
+        $this->driver  = Driver::factory()->create();
+        $this->vehicle = Vehicle::factory()->create();
     });
 
     it('can fully confirm warehouse for approved SO', function () {

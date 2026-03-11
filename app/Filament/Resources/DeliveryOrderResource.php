@@ -501,6 +501,24 @@ class DeliveryOrderResource extends Resource
         return $table
             ->defaultSort('created_at', 'desc')
             ->columns([
+                TextColumn::make('customer_names')
+                    ->label('Customer')
+                    ->getStateUsing(function ($record) {
+                        $names = collect();
+                        foreach ($record->salesOrders as $so) {
+                            if ($so->customer) {
+                                $names->push($so->customer->perusahaan ?? $so->customer->name ?? '');
+                            }
+                        }
+                        return $names->unique()->filter()->implode(', ') ?: '-';
+                    })
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('salesOrders.customer', function (Builder $query) use ($search) {
+                            $query->where('perusahaan', 'like', "%{$search}%")
+                                ->orWhere('name', 'like', "%{$search}%");
+                        });
+                    })
+                    ->wrap(),
                 TextColumn::make('do_number')
                     ->label('Delivery Order Number')
                     ->searchable(),
@@ -553,6 +571,8 @@ class DeliveryOrderResource extends Resource
                             'request_close' => 'warning',
                             'closed' => 'danger',
                             'reject' => 'danger',
+                            'delivery_failed' => 'danger',
+                            default => 'gray',
                         };
                     })
                     ->badge(),
@@ -598,6 +618,7 @@ class DeliveryOrderResource extends Resource
                         'request_close' => 'Request Close',
                         'closed' => 'Closed',
                         'reject' => 'Reject',
+                        'delivery_failed' => 'Pengiriman Gagal',
                     ]),
                 SelectFilter::make('driver_id')
                     ->relationship('driver', 'name')
@@ -742,8 +763,15 @@ class DeliveryOrderResource extends Resource
                         ->color('info')
                         ->icon('heroicon-o-paper-airplane')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response delivery order') &&
-                                   $record->status == 'approved';
+                            if (!Auth::user()->hasPermissionTo('response delivery order')) {
+                                return false;
+                            }
+                            // If approval is required, only show for 'approved' status
+                            if (config('procurement.do_approval_required', true)) {
+                                return $record->status == 'approved';
+                            }
+                            // If approval is not required, allow from draft/request_approve/approved
+                            return in_array($record->status, ['draft', 'request_approve', 'approved']);
                         })
                         ->action(function ($record) {
                             try {
@@ -949,6 +977,22 @@ class DeliveryOrderResource extends Resource
                             } else {
                                 HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
                             }
+                        }),
+                        Action::make('mark_delivery_failed')
+                        ->label('Pengiriman Gagal')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Tandai Pengiriman Gagal')
+                        ->modalDescription('Apakah Anda yakin pengiriman ini gagal? DO akan ditandai sebagai Pengiriman Gagal dan dapat diprioritaskan untuk pengiriman berikutnya.')
+                        ->modalSubmitActionLabel('Ya, Tandai Gagal')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('response delivery order') &&
+                                   in_array($record->status, ['sent', 'approved']);
+                        })
+                        ->action(function ($record) {
+                            $record->update(['status' => 'delivery_failed']);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order ditandai sebagai Pengiriman Gagal. Prioritaskan untuk pengiriman berikutnya.");
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)

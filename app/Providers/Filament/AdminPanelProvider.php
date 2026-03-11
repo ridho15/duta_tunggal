@@ -85,6 +85,23 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->sidebarCollapsibleOnDesktop()
+            ->navigationGroups([
+                \Filament\Navigation\NavigationGroup::make('Penjualan (Sales Order)')->icon('heroicon-o-shopping-cart'),
+                \Filament\Navigation\NavigationGroup::make('Delivery Order')->icon('heroicon-o-truck'),
+                \Filament\Navigation\NavigationGroup::make('Finance - Penjualan')->icon('heroicon-o-banknotes'),
+                \Filament\Navigation\NavigationGroup::make('Pembelian (Purchase Order)')->icon('heroicon-o-shopping-bag'),
+                \Filament\Navigation\NavigationGroup::make('Finance - Pembelian')->icon('heroicon-o-credit-card'),
+                \Filament\Navigation\NavigationGroup::make('Finance - Pembayaran')->icon('heroicon-o-currency-dollar'),
+                \Filament\Navigation\NavigationGroup::make('Finance - Akuntansi')->icon('heroicon-o-calculator'),
+                \Filament\Navigation\NavigationGroup::make('Finance - Laporan')->icon('heroicon-o-document-chart-bar'),
+                \Filament\Navigation\NavigationGroup::make('Finance')->icon('heroicon-o-building-library'),
+                \Filament\Navigation\NavigationGroup::make('Gudang')->icon('heroicon-o-archive-box'),
+                \Filament\Navigation\NavigationGroup::make('Persediaan')->icon('heroicon-o-clipboard-document-list'),
+                \Filament\Navigation\NavigationGroup::make('Manufacturing Order')->icon('heroicon-o-cog-6-tooth'),
+                \Filament\Navigation\NavigationGroup::make('Asset Management')->icon('heroicon-o-building-office'),
+                \Filament\Navigation\NavigationGroup::make('Master Data')->icon('heroicon-o-circle-stack'),
+                \Filament\Navigation\NavigationGroup::make('User Roles Management')->icon('heroicon-o-users'),
+            ])
             ->authMiddleware([
                 Authenticate::class,
             ])
