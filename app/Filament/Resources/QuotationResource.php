@@ -298,7 +298,7 @@ class QuotationResource extends Resource
                                                 $numericUnit,
                                                 (int)$get('discount'),
                                                 (int)$get('tax'),
-                                                $get('tax_type') ?? 'Exclusive'
+                                                $get('tax_type') ?? 'None'
                                             ));
                                         }
                                     })
@@ -333,7 +333,7 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$get('discount'),
                                             (int)$get('tax'),
-                                            $get('tax_type') ?? 'Exclusive'
+                                            $get('tax_type') ?? 'None'
                                         ));
                                     })
                                     ->default(0)
@@ -352,7 +352,7 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$get('discount'),
                                             (int)$get('tax'),
-                                            $get('tax_type') ?? 'Exclusive'
+                                            $get('tax_type') ?? 'None'
                                         ));
                                     })
                                     ->reactive()
@@ -367,7 +367,7 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$state,
                                             (int)$get('tax'),
-                                            $get('tax_type') ?? 'Exclusive'
+                                            $get('tax_type') ?? 'None'
                                         ));
                                     })
                                     ->reactive()
@@ -376,21 +376,22 @@ class QuotationResource extends Resource
                                     ->suffix('%'),
                                 Select::make('tax_type')
                                     ->label('Tipe Pajak')
+                                    ->default('None')
                                     ->options([
+                                        'None' => 'Non Pajak',
                                         'Exclusive' => 'Eksklusif (PPN di luar harga)',
                                         'Inclusive' => 'Inklusif (PPN sudah termasuk harga)',
                                     ])
-                                    ->default('Exclusive')
-                                    ->required()
+                                    ->nullable()
                                     ->live()
-                                    ->afterStateUpdated(function (string $state, callable $get, callable $set) {
+                                    ->afterStateUpdated(function ($state, callable $get, callable $set) {
                                         $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
                                         $set('total_price', HelperController::hitungSubtotal(
                                             (int)$get('quantity'),
                                             $numericUnit,
                                             (int)$get('discount'),
                                             (int)$get('tax'),
-                                            $state
+                                            $state ?? "None"
                                         ));
                                     })
                                     ->validationMessages([
@@ -412,7 +413,7 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$get('discount'),
                                             (int)$state,
-                                            $get('tax_type') ?? 'Exclusive'
+                                            $get('tax_type') ?? 'None'
                                         ));
                                     })
                                     ->default(0)

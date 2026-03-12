@@ -21,7 +21,7 @@ class CreateSaleOrder extends CreateRecord
 
     // protected static string $view = 'filament.components.sale-order.form';
 
-    protected static ?string $title = 'Buat Penjualan';
+    protected static ?string $title = 'Buat Sales Order';
 
     public function mount(int $record = null): void
     {

@@ -976,7 +976,7 @@ class SaleOrderResource extends Resource
                     ->label('Status Stok')
                     ->badge()
                     ->state(function (SaleOrder $record): string {
-                        return $record->hasInsufficientStock() ? 'KURANG STOK' : 'STOK OK';
+                        return $record->hasInsufficientStock() ? 'STOK KURANG' : 'STOK READY';
                     })
                     ->color(function (SaleOrder $record): string {
                         return $record->hasInsufficientStock() ? 'warning' : 'success';
