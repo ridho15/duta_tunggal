@@ -20,6 +20,7 @@ class QuotationItem extends Model
         'total_price',
         'discount',
         'tax',
+        'tax_type',
     ];
 
     public function quotation()

@@ -90,7 +90,11 @@ class Invoice extends Model
     {
         parent::boot();
 
-        static::observe(\App\Observers\InvoiceObserver::class);
+        // BUG FIX: InvoiceObserver is already registered via AppServiceProvider.
+        // Double-registering it here caused all observer methods (created, updated, etc.)
+        // to fire twice, resulting in duplicate AccountReceivable/AccountPayable records
+        // and doubled journal entries on every invoice event.
+        // DO NOT add static::observe(InvoiceObserver::class) here.
     }
 
     public function getOtherFeeTotalAttribute(): int

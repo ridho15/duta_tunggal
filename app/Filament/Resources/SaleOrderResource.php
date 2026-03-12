@@ -62,9 +62,9 @@ class SaleOrderResource extends Resource
     // Group label updated to include English hint per request
     protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
 
-    protected static ?string $navigationLabel = 'Penjualan';
+    protected static ?string $navigationLabel = 'Penjualan (Sales Order)';
 
-    protected static ?string $pluralModelLabel = 'Penjualan';
+    protected static ?string $pluralModelLabel = 'Penjualan (Sales Orders)';
 
     // Ensure Penjualan group appears after Pembelian
     protected static ?int $navigationSort = 2;
@@ -109,16 +109,18 @@ class SaleOrderResource extends Resource
                                 $quotation = Quotation::find($state);
                                 if ($quotation) {
                                     foreach ($quotation->quotationItem as $item) {
+                                        $tipePajak = $item->tax_type ?? 'Exclusive';
                                         array_push($items, [
                                             'product_id' => $item->product_id,
                                             'quantity' => $item->quantity,
                                             'unit_price' => HelperController::parseIndonesianMoney($item->unit_price),
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
+                                            'tipe_pajak' => $tipePajak,
                                             'notes' => $item->notes,
-                                            'warehouse_id' => $item->warehouse_id,
-                                            'subtotal' => HelperController::hitungSubtotal($item->quantity, HelperController::parseIndonesianMoney($item->unit_price), $item->discount, $item->tax, null),
-                                            'rak_id' => $item->rak_id
+                                            'warehouse_id' => null,
+                                            'subtotal' => HelperController::hitungSubtotal($item->quantity, HelperController::parseIndonesianMoney($item->unit_price), $item->discount, $item->tax, $tipePajak),
+                                            'rak_id' => null,
                                         ]);
                                     }
                                     $set('total_amount', $quotation->total_amount);
@@ -331,7 +333,7 @@ class SaleOrderResource extends Resource
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
-                                
+
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
                                         ->get()
@@ -339,13 +341,13 @@ class SaleOrderResource extends Resource
                                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                         });
                                 }
-                                
+
                                 return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
                                     return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                 });
                             })
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->searchable()
                             ->preload()
                             ->required()
@@ -497,11 +499,11 @@ class SaleOrderResource extends Resource
                                         $query = Warehouse::whereHas('inventoryStock', function (Builder $query) use ($get) {
                                             $query->where('product_id', $get('product_id'));
                                         });
-                                        
+
                                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                             $query->where('cabang_id', $user?->cabang_id);
                                         }
-                                        
+
                                         return $query->get()->mapWithKeys(function ($warehouse) {
                                             return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
@@ -513,15 +515,15 @@ class SaleOrderResource extends Resource
                                         $query = Warehouse::whereHas('inventoryStock', function (Builder $query) use ($get) {
                                             $query->where('product_id', $get('product_id'));
                                         })
-                                        ->where(function ($q) use ($search) {
-                                            $q->where('perusahaan', 'like', "%{$search}%")
-                                              ->orWhere('kode', 'like', "%{$search}%");
-                                        });
-                                        
+                                            ->where(function ($q) use ($search) {
+                                                $q->where('name', 'like', "%{$search}%")
+                                                    ->orWhere('kode', 'like', "%{$search}%");
+                                            });
+
                                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                             $query->where('cabang_id', $user?->cabang_id);
                                         }
-                                        
+
                                         return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
                                             return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
@@ -550,7 +552,7 @@ class SaleOrderResource extends Resource
                                 Select::make('rak_id')
                                     ->label(function ($get) {
                                         $baseLabel = 'Rak';
-                                        
+
                                         if (!$get('product_id') || !$get('warehouse_id') || !$get('rak_id')) {
                                             return $baseLabel;
                                         }
@@ -578,10 +580,10 @@ class SaleOrderResource extends Resource
 
                                         // Only show racks that have inventory stock for the selected product and warehouse
                                         return $query->where('warehouse_id', $get('warehouse_id'))
-                                                    ->whereHas('inventoryStock', function (Builder $q) use ($get) {
-                                                        $q->where('product_id', $get('product_id'))
-                                                          ->where('qty_available', '>', 0);
-                                                    });
+                                            ->whereHas('inventoryStock', function (Builder $q) use ($get) {
+                                                $q->where('product_id', $get('product_id'))
+                                                    ->where('qty_available', '>', 0);
+                                            });
                                     })
                                     ->nullable()
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
@@ -625,7 +627,7 @@ class SaleOrderResource extends Resource
                                 TextInput::make('quantity')
                                     ->label(function ($get) {
                                         $baseLabel = 'Quantity';
-                                        
+
                                         if (!$get('product_id') || !$get('warehouse_id') || !$get('rak_id')) {
                                             return $baseLabel;
                                         }
@@ -636,7 +638,7 @@ class SaleOrderResource extends Resource
                                             ->sum('qty_available');
 
                                         $currentQuantity = (float) ($get('quantity') ?? 0);
-                                        
+
                                         if ($rakStock <= 0) {
                                             return $baseLabel . ' 🚨 STOCK HABIS';
                                         } elseif ($currentQuantity > $rakStock) {
@@ -794,6 +796,17 @@ class SaleOrderResource extends Resource
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                     })
                                     ->suffix('%'),
+                                \Filament\Forms\Components\Select::make('tipe_pajak')
+                                    ->label('Tipe Pajak')
+                                    ->options([
+                                        'Exclusive' => 'Exclusive (PPN di luar harga)',
+                                        'Inclusive' => 'Inclusive (PPN sudah termasuk)',
+                                    ])
+                                    ->default('Exclusive')
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $state));
+                                    }),
                                 TextInput::make('tax')
                                     ->label('Tax')
                                     ->numeric()
@@ -870,7 +883,7 @@ class SaleOrderResource extends Resource
                                             }
                                         }
                                     })
-                                    
+
                             ])
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 // Calculate total amount whenever repeater items change
@@ -888,8 +901,8 @@ class SaleOrderResource extends Resource
                                 }
                                 $set('total_amount', $totalAmount);
                             })
-            ])
-        ]);
+                    ])
+            ]);
     }
 
 
@@ -1086,12 +1099,12 @@ class SaleOrderResource extends Resource
                         ->color('primary')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('update sales order') &&
-                                   in_array($record->status, ['draft', 'request_approve', 'approved']);
+                                in_array($record->status, ['draft', 'request_approve', 'approved']);
                         }),
                     DeleteAction::make()
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('delete sales order') &&
-                                   in_array($record->status, ['draft', 'request_approve']);
+                                in_array($record->status, ['draft', 'request_approve']);
                         }),
                     Action::make('request_approve')
                         ->label('Request Approve')
@@ -1113,7 +1126,7 @@ class SaleOrderResource extends Resource
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('request sales order') &&
-                                   in_array($record->status, ['approved', 'confirmed', 'completed']);
+                                in_array($record->status, ['approved', 'confirmed', 'completed']);
                         })
                         ->form(
                             function ($record) {
@@ -1234,7 +1247,7 @@ class SaleOrderResource extends Resource
                         ->color('warning')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('update deposit') &&
-                                   in_array($record->status, ['approved', 'confirmed', 'completed']);
+                                in_array($record->status, ['approved', 'confirmed', 'completed']);
                         })
                         ->form(function ($record) {
                             if ($record->customer->deposit->id == null) {
@@ -1391,20 +1404,20 @@ class SaleOrderResource extends Resource
             ])
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Sale Order</summary>' .
+                    '<summary class="cursor-pointer font-semibold">Panduan Sales Order</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Sale Order adalah pesanan penjualan yang dibuat dari Quotation atau langsung, memerlukan approval sebelum diproses.</li>' .
-                            '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved → Confirmed → Received → Completed. Atau bisa Request Close → Closed.</li>' .
-                            '<li><strong>Tipe Pengiriman:</strong> <em>Ambil Sendiri</em> (customer datang ke gudang), <em>Kirim Langsung</em> (barang dikirim ke customer).</li>' .
-                            '<li><strong>Validasi:</strong> <em>Status Stok</em> menunjukkan apakah stok cukup. <em>Credit Limit</em> customer dicek saat approve.</li>' .
-                            '<li><strong>Stock Management:</strong> <em>Ambil Sendiri</em>: Stock berkurang saat <em>Complete</em> (manual). <em>Kirim Langsung</em>: Perlu Delivery Order completed terlebih dahulu.</li>' .
-                            '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Request Close</em> (approved+), <em>Close</em> (request_close), <em>Complete</em> (approved+), <em>PDF/Kwitansi</em> (approved+), <em>Create PO</em> (untuk drop ship), <em>Sync Total</em> (update amount).</li>' .
-                            '<li><strong>Permissions:</strong> <em>request sales order</em> untuk request actions, <em>response sales order</em> untuk approve/reject/close, <em>update sales order</em> untuk complete.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan inventory, accounting, dan bisa generate Purchase Order untuk drop shipping.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Sale Order adalah pesanan penjualan yang dibuat dari Quotation atau langsung, memerlukan approval sebelum diproses.</li>' .
+                    '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved → Confirmed → Received → Completed. Atau bisa Request Close → Closed.</li>' .
+                    '<li><strong>Tipe Pengiriman:</strong> <em>Ambil Sendiri</em> (customer datang ke gudang), <em>Kirim Langsung</em> (barang dikirim ke customer).</li>' .
+                    '<li><strong>Validasi:</strong> <em>Status Stok</em> menunjukkan apakah stok cukup. <em>Credit Limit</em> customer dicek saat approve.</li>' .
+                    '<li><strong>Stock Management:</strong> <em>Ambil Sendiri</em>: Stock berkurang saat <em>Complete</em> (manual). <em>Kirim Langsung</em>: Perlu Delivery Order completed terlebih dahulu.</li>' .
+                    '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Request Close</em> (approved+), <em>Close</em> (request_close), <em>Complete</em> (approved+), <em>PDF/Kwitansi</em> (approved+), <em>Create PO</em> (untuk drop ship), <em>Sync Total</em> (update amount).</li>' .
+                    '<li><strong>Permissions:</strong> <em>request sales order</em> untuk request actions, <em>response sales order</em> untuk approve/reject/close, <em>update sales order</em> untuk complete.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan inventory, accounting, dan bisa generate Purchase Order untuk drop shipping.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 

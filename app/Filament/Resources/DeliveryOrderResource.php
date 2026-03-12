@@ -435,6 +435,15 @@ class DeliveryOrderResource extends Resource
                         TextEntry::make('additional_cost')->rupiah(),
                         TextEntry::make('additional_cost_description'),
                     ])->columns(2),
+                // customer info derived from the first linked sale order
+                Section::make('Customer Information')
+                    ->schema([
+                        TextEntry::make('salesOrders.0.customer.name')->label('Name'),
+                        TextEntry::make('salesOrders.0.customer.perusahaan')->label('Company'),
+                        TextEntry::make('salesOrders.0.customer.address')->label('Address'),
+                        TextEntry::make('salesOrders.0.customer.phone')->label('Phone'),
+                        TextEntry::make('salesOrders.0.customer.email')->label('Email'),
+                    ])->columns(2),
                 Section::make('Sales Orders')
                     ->schema([
                         RepeatableEntry::make('salesOrders')

@@ -37,7 +37,8 @@ class InvoiceObserver
                 'total' => $invoice->total,
                 'paid' => 0,
                 'remaining' => $invoice->total,
-                'status' => 'Belum Lunas'
+                'status' => 'Belum Lunas',
+                'cabang_id' => $invoice->cabang_id, // FIX #5: propagate branch scope
             ]);
             // Create Ageing Schedule
             $accountPayable->ageingSchedule()->create([
@@ -64,7 +65,8 @@ class InvoiceObserver
                 'total' => $invoice->total,
                 'paid' => 0,
                 'remaining' => $invoice->total,
-                'status' => "Belum Lunas"
+                'status' => "Belum Lunas",
+                'cabang_id' => $invoice->cabang_id, // FIX #5: propagate branch scope so AR is visible to branch users
             ]);
             // Create Ageing Schedule
             $accountReceivable->ageingSchedule()->create([
@@ -291,8 +293,14 @@ class InvoiceObserver
         }
 
         // CREDIT: PPn Keluaran at invoice level.
-        // invoice->tax stores the percentage rate (e.g. 12 for 12%), so compute the actual monetary amount.
-        $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ((float) $invoice->tax / 100));
+        // FIX #2: Use sum of invoice items' pre-computed tax_amount as primary source.
+        // This is accurate for all tax types (Inclusive/Exclusive) and mixed-rate scenarios.
+        // Fallback to rate-based computation if items have no tax_amount (backward compat).
+        $totalTaxAmount = (float) $invoice->invoiceItem->sum('tax_amount');
+        if ($totalTaxAmount <= 0 && $invoice->tax > 0) {
+            // Fallback: invoice->tax stores the rate (e.g. 11 for 11%)
+            $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ((float) $invoice->tax / 100));
+        }
         
         if ($totalTaxAmount > 0 && $ppnKeluaranCoa) {
             \App\Models\JournalEntry::create([

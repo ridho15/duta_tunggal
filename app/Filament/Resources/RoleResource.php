@@ -35,6 +35,10 @@ class RoleResource extends Resource
                         'required' => 'Nama role wajib diisi',
                         'max' => 'Nama role maksimal 255 karakter'
                     ]),
+                TextInput::make('description')
+                    ->label('Deskripsi')
+                    ->maxLength(65535)
+                    ->columnSpanFull(),
                 Select::make('id_user')
                     ->label('User')
                     ->searchable()
@@ -58,6 +62,9 @@ class RoleResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->wrap(),
                 TextColumn::make('guard_name')
                     ->searchable(),
                 TextColumn::make('permissions.name')

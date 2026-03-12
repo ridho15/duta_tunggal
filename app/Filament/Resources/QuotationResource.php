@@ -298,7 +298,7 @@ class QuotationResource extends Resource
                                                 $numericUnit,
                                                 (int)$get('discount'),
                                                 (int)$get('tax'),
-                                                $get('tipe_pajak') ?? null
+                                                $get('tax_type') ?? 'Exclusive'
                                             ));
                                         }
                                     })
@@ -307,7 +307,7 @@ class QuotationResource extends Resource
                                     ->getSearchResultsUsing(function (string $search) {
                                         // Return array of id => label to satisfy Filament Select expectations
                                         return Product::query()
-                                            ->where('perusahaan', 'like', "%{$search}%")
+                                            ->where('name', 'like', "%{$search}%")
                                             ->orWhere('sku', 'like', "%{$search}%")
                                             ->limit(50)
                                             ->get()
@@ -333,7 +333,7 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$get('discount'),
                                             (int)$get('tax'),
-                                            $get('tipe_pajak') ?? null
+                                            $get('tax_type') ?? 'Exclusive'
                                         ));
                                     })
                                     ->default(0)
@@ -352,7 +352,7 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$get('discount'),
                                             (int)$get('tax'),
-                                            $get('tipe_pajak') ?? null
+                                            $get('tax_type') ?? 'Exclusive'
                                         ));
                                     })
                                     ->reactive()
@@ -367,13 +367,35 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$state,
                                             (int)$get('tax'),
-                                            $get('tipe_pajak') ?? null
+                                            $get('tax_type') ?? 'Exclusive'
                                         ));
                                     })
                                     ->reactive()
                                     ->maxValue(100)
                                     ->default(0)
                                     ->suffix('%'),
+                                Select::make('tax_type')
+                                    ->label('Tipe Pajak')
+                                    ->options([
+                                        'Exclusive' => 'Eksklusif (PPN di luar harga)',
+                                        'Inclusive' => 'Inklusif (PPN sudah termasuk harga)',
+                                    ])
+                                    ->default('Exclusive')
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function (string $state, callable $get, callable $set) {
+                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $set('total_price', HelperController::hitungSubtotal(
+                                            (int)$get('quantity'),
+                                            $numericUnit,
+                                            (int)$get('discount'),
+                                            (int)$get('tax'),
+                                            $state
+                                        ));
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Tipe Pajak wajib dipilih.',
+                                    ]),
                                 TextInput::make('tax')
                                     ->label('Tax')
                                     ->numeric()
@@ -390,7 +412,7 @@ class QuotationResource extends Resource
                                             $numericUnit,
                                             (int)$get('discount'),
                                             (int)$state,
-                                            $get('tipe_pajak') ?? null
+                                            $get('tax_type') ?? 'Exclusive'
                                         ));
                                     })
                                     ->default(0)
@@ -532,11 +554,11 @@ class QuotationResource extends Resource
                         return $query
                             ->when(
                                 $data['date_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('date', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('date', '>=', $date),
                             )
                             ->when(
                                 $data['date_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('date', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('date', '<=', $date),
                             );
                     })
                     ->indicateUsing(function (array $data): array {
@@ -561,7 +583,7 @@ class QuotationResource extends Resource
                         ->color('primary'),
                     DeleteAction::make(),
                     Action::make('pdf_quotation')
-                        ->label('PDF Quotation')
+                        ->label('Download PDF Quotation')
                         ->color('danger')
                         ->icon('heroicon-o-document')
                         ->hidden(function ($record) {
@@ -800,7 +822,7 @@ class QuotationResource extends Resource
                                                 }),
                                             Select::make('rak_id')
                                                 ->label('Rak')
-                                                ->searchable(['code', 'perusahaan'])
+                                                ->searchable(['code', 'name'])
                                                 ->preload()
                                                 ->options(function ($get) {
                                                     $warehouseId = $get('warehouse_id');
@@ -978,16 +1000,16 @@ class QuotationResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Quotation</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Quotation adalah penawaran harga kepada customer yang perlu disetujui sebelum menjadi Sales Order.</li>' .
-                            '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved/Rejected. Hanya quotation approved yang bisa dijadikan Sales Order.</li>' .
-                            '<li><strong>Validitas:</strong> Perhatikan tanggal <em>Valid Until</em> - quotation expired tidak bisa digunakan.</li>' .
-                            '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Sync Total</em> (update amount), <em>Create Sale Order</em> (approved only).</li>' .
-                            '<li><strong>PO File:</strong> Upload file Purchase Order customer sebagai referensi (opsional).</li>' .
-                            '<li><strong>Integration:</strong> Quotation approved otomatis bisa dikonversi menjadi Sales Order dengan semua detail item.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Quotation adalah penawaran harga kepada customer yang perlu disetujui sebelum menjadi Sales Order.</li>' .
+                    '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved/Rejected. Hanya quotation approved yang bisa dijadikan Sales Order.</li>' .
+                    '<li><strong>Validitas:</strong> Perhatikan tanggal <em>Valid Until</em> - quotation expired tidak bisa digunakan.</li>' .
+                    '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Sync Total</em> (update amount), <em>Create Sale Order</em> (approved only).</li>' .
+                    '<li><strong>PO File:</strong> Upload file Purchase Order customer sebagai referensi (opsional).</li>' .
+                    '<li><strong>Integration:</strong> Quotation approved otomatis bisa dikonversi menjadi Sales Order dengan semua detail item.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
 
         return $table;

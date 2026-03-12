@@ -36,6 +36,11 @@ class PermissionResource extends Resource
                         'required' => 'Nama permission wajib diisi',
                         'max' => 'Nama permission maksimal 255 karakter'
                     ]),
+                TextInput::make('description')
+                    ->label('Deskripsi')
+                    ->maxLength(65535)
+                    ->disabled()
+                    ->columnSpan('full'),
                 Select::make('roles')
                     ->label('Roles')
                     ->preload()
@@ -58,6 +63,8 @@ class PermissionResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('description')
+                    ->label('Deskripsi'),
                 TextColumn::make('guard_name')
                     ->searchable(),
                 TextColumn::make('roles.name')

@@ -13,7 +13,7 @@ class QuotationService
     {
         $total = 0;
         foreach ($quotation->quotationItem as $item) {
-            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax);
+            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tax_type ?? 'Exclusive');
         }
 
         $quotation->update([
@@ -53,10 +53,29 @@ class QuotationService
         $date = now()->format('Ymd');
         $prefix = 'QO-' . $date . '-';
 
+        // Use sequential numbering (consistent with SO/Invoice generators) to
+        // guarantee monotonic, audit-friendly document numbers.
+        $max = Quotation::withoutGlobalScopes()
+            ->where('quotation_number', 'like', $prefix . '%')
+            ->max('quotation_number');
+
+        $next = 1;
+        if ($max !== null) {
+            $suffix = substr((string) $max, strlen($prefix));
+            if (is_numeric($suffix)) {
+                $next = (int) $suffix + 1;
+            }
+        }
+
+        // Guard against concurrent inserts
         do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = Quotation::where('quotation_number', $candidate)->exists();
+            $candidate = $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+            $exists = Quotation::withoutGlobalScopes()
+                ->where('quotation_number', $candidate)
+                ->exists();
+            if ($exists) {
+                $next++;
+            }
         } while ($exists);
 
         return $candidate;

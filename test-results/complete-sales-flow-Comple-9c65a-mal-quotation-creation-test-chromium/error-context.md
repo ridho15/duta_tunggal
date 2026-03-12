@@ -1,0 +1,306 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - navigation [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - button "Buka notifikasi" [ref=e9] [cursor=pointer]:
+              - generic [ref=e10]: Buka notifikasi
+              - img [ref=e11]
+            - dialog
+          - button "Menu pengguna" [ref=e15] [cursor=pointer]:
+            - img "Avatar E2E Test User" [ref=e16]
+      - main [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - heading "Dasbor" [level=1] [ref=e22]
+            - generic [ref=e30]:
+              - generic [ref=e33]:
+                - generic [ref=e36]: Tanggal Mulai
+                - textbox "Tanggal Mulai" [ref=e40]: 2026-03-05
+              - generic [ref=e43]:
+                - generic [ref=e46]: Tanggal Akhir
+                - textbox "Tanggal Akhir" [ref=e50]: 2026-03-12
+          - generic:
+            - dialog
+          - generic:
+            - dialog
+          - generic:
+            - dialog
+    - complementary [ref=e51]:
+      - generic [ref=e53]:
+        - link "Duta Tunggal ERP" [ref=e55] [cursor=pointer]:
+          - /url: http://localhost:8009/admin/sales-report-page
+          - generic [ref=e56]: Duta Tunggal ERP
+        - button "Persempit menu" [ref=e57] [cursor=pointer]:
+          - generic [ref=e58]: Persempit menu
+          - img [ref=e59]
+      - navigation [ref=e61]:
+        - list [ref=e62]:
+          - listitem [ref=e63]:
+            - generic [ref=e64] [cursor=pointer]:
+              - generic [ref=e65]: Reports
+              - button "Reports" [expanded] [ref=e66]:
+                - generic [ref=e67]: Reports
+                - img [ref=e68]
+            - list [ref=e70]:
+              - listitem [ref=e71]:
+                - link "Laporan Penjualan" [ref=e72] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/sales-report-page
+                  - img [ref=e73]
+                  - generic [ref=e75]: Laporan Penjualan
+              - listitem [ref=e76]:
+                - link "Laporan Pembelian" [ref=e77] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/purchase-report-page
+                  - img [ref=e78]
+                  - generic [ref=e80]: Laporan Pembelian
+              - listitem [ref=e81]:
+                - link "Aging Report" [ref=e82] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/view-ageing-report
+                  - img [ref=e83]
+                  - generic [ref=e85]: Aging Report
+          - listitem [ref=e86]:
+            - generic [ref=e87] [cursor=pointer]:
+              - img [ref=e88]
+              - generic [ref=e90]: Finance - Penjualan
+              - button "Finance - Penjualan" [expanded] [ref=e91]:
+                - generic [ref=e92]: Finance - Penjualan
+                - img [ref=e93]
+            - list [ref=e95]:
+              - listitem [ref=e96]:
+                - link "Penjualan Lainnya" [ref=e97] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/other-sales
+                  - generic [ref=e100]: Penjualan Lainnya
+          - listitem [ref=e101]:
+            - generic [ref=e102] [cursor=pointer]:
+              - img [ref=e103]
+              - generic [ref=e105]: Finance - Pembayaran
+              - button "Finance - Pembayaran" [expanded] [ref=e106]:
+                - generic [ref=e107]: Finance - Pembayaran
+                - img [ref=e108]
+            - list [ref=e110]:
+              - listitem [ref=e111]:
+                - link "Payment Request" [ref=e112] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/payment-requests
+                  - generic [ref=e116]: Payment Request
+              - listitem [ref=e117]:
+                - link "Customer Receipt" [ref=e118] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/customer-receipts
+                  - generic [ref=e122]: Customer Receipt
+          - listitem [ref=e123]:
+            - generic [ref=e124] [cursor=pointer]:
+              - img [ref=e125]
+              - generic [ref=e127]: Finance - Akuntansi
+              - button "Finance - Akuntansi" [expanded] [ref=e128]:
+                - generic [ref=e129]: Finance - Akuntansi
+                - img [ref=e130]
+            - list [ref=e132]:
+              - listitem [ref=e133]:
+                - link "AR & AP Management" [ref=e134] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/ar-ap-management
+                  - generic [ref=e137]: AR & AP Management
+          - listitem [ref=e138]:
+            - generic [ref=e139] [cursor=pointer]:
+              - img [ref=e140]
+              - generic [ref=e142]: Finance - Laporan
+              - button "Finance - Laporan" [expanded] [ref=e143]:
+                - generic [ref=e144]: Finance - Laporan
+                - img [ref=e145]
+            - list [ref=e147]:
+              - listitem [ref=e148]:
+                - link "Buku Besar (General Ledger)" [ref=e149] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/buku-besar-page
+                  - generic [ref=e153]: Buku Besar (General Ledger)
+              - listitem [ref=e154]:
+                - link "Trial Balance" [ref=e155] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/income-statement-page
+                  - generic [ref=e160]: Trial Balance
+              - listitem [ref=e161]:
+                - link "Drill Down Financial Report" [ref=e162] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/drill-down-financial-report
+                  - generic [ref=e167]: Drill Down Financial Report
+              - listitem [ref=e168]:
+                - link "Dashboard Finance" [ref=e169] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin
+                  - generic [ref=e174]: Dashboard Finance
+              - listitem [ref=e175]:
+                - link "Financial Statement" [ref=e176] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/financial-statement
+                  - generic [ref=e181]: Financial Statement
+              - listitem [ref=e182]:
+                - link "Cost of Goods Manufacturing" [ref=e183] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/cost-of-goods-manufacturing
+                  - generic [ref=e188]: Cost of Goods Manufacturing
+              - listitem [ref=e189]:
+                - link "ALK Grafik (Analisis Laporan Keuangan)" [ref=e190] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/alk-grafik
+                  - generic [ref=e195]: ALK Grafik (Analisis Laporan Keuangan)
+              - listitem [ref=e196]:
+                - link "Journal List of Consolidation" [ref=e197] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/journal-consolidation
+                  - generic [ref=e201]: Journal List of Consolidation
+          - listitem [ref=e202]:
+            - generic [ref=e203] [cursor=pointer]:
+              - img [ref=e204]
+              - generic [ref=e206]: Gudang
+              - button "Gudang" [expanded] [ref=e207]:
+                - generic [ref=e208]: Gudang
+                - img [ref=e209]
+            - list [ref=e211]:
+              - listitem [ref=e212]:
+                - link "Return Product" [ref=e213] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/return-products
+                  - generic [ref=e217]: Return Product
+              - listitem [ref=e218]:
+                - link "Stock Adjustments" [ref=e219] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/stock-adjustments
+                  - generic [ref=e224]: Stock Adjustments
+              - listitem [ref=e225]:
+                - link "Stock Opnames" [ref=e226] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/stock-opnames
+                  - generic [ref=e231]: Stock Opnames
+              - listitem [ref=e232]:
+                - link "Konfirmasi Gudang" [ref=e233] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/warehouse-confirmations
+                  - generic [ref=e237]: Konfirmasi Gudang
+          - listitem [ref=e238]:
+            - generic [ref=e239] [cursor=pointer]:
+              - img [ref=e240]
+              - generic [ref=e243]: Manufacturing Order
+              - button "Manufacturing Order" [expanded] [ref=e244]:
+                - generic [ref=e245]: Manufacturing Order
+                - img [ref=e246]
+            - list [ref=e248]:
+              - listitem [ref=e249]:
+                - link "Pengambilan Bahan Baku" [ref=e250] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/material-issues
+                  - generic [ref=e254]: Pengambilan Bahan Baku
+              - listitem [ref=e255]:
+                - link "Rencana Produksi" [ref=e256] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/production-plans
+                  - generic [ref=e261]: Rencana Produksi
+              - listitem [ref=e262]:
+                - link "Production" [ref=e263] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/productions
+                  - generic [ref=e267]: Production
+          - listitem [ref=e268]:
+            - generic [ref=e269] [cursor=pointer]:
+              - img [ref=e270]
+              - generic [ref=e272]: Master Data
+              - button "Master Data" [expanded] [ref=e273]:
+                - generic [ref=e274]: Master Data
+                - img [ref=e275]
+            - list [ref=e277]:
+              - listitem [ref=e278]:
+                - link "Cabang" [ref=e279] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/cabangs
+                  - generic [ref=e283]: Cabang
+              - listitem [ref=e284]:
+                - link "Mata Uang" [ref=e285] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/currencies
+                  - generic [ref=e290]: Mata Uang
+              - listitem [ref=e291]:
+                - link "Customer" [ref=e292] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/customers
+                  - generic [ref=e297]: Customer
+              - listitem [ref=e298]:
+                - link "Driver" [ref=e299] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/drivers
+                  - generic [ref=e304]: Driver
+              - listitem [ref=e305]:
+                - link "Kategori Produk" [ref=e306] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/product-categories
+                  - generic [ref=e311]: Kategori Produk
+              - listitem [ref=e312]:
+                - link "Produk" [ref=e313] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/products
+                  - generic [ref=e318]: Produk
+              - listitem [ref=e319]:
+                - link "Rak" [ref=e320] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/raks
+                  - generic [ref=e325]: Rak
+              - listitem [ref=e326]:
+                - link "Supplier" [ref=e327] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/suppliers
+                  - generic [ref=e332]: Supplier
+              - listitem [ref=e333]:
+                - link "Satuan" [ref=e334] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/unit-of-measures
+                  - generic [ref=e339]: Satuan
+              - listitem [ref=e340]:
+                - link "Kendaraan" [ref=e341] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/vehicles
+                  - generic [ref=e346]: Kendaraan
+              - listitem [ref=e347]:
+                - link "Gudang" [ref=e348] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/warehouses
+                  - generic [ref=e353]: Gudang
+              - listitem [ref=e354]:
+                - link "Tax Setting" [ref=e355] [cursor=pointer]:
+                  - /url: http://localhost:8009/admin/tax-settings
+                  - generic [ref=e359]: Tax Setting
+  - generic:
+    - status
+  - generic [ref=e360]:
+    - generic [ref=e362]:
+      - generic [ref=e364]:
+        - generic [ref=e365] [cursor=pointer]:
+          - text: 
+          - generic: Request
+        - text: 
+        - generic [ref=e366] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - text: 
+        - generic [ref=e367] [cursor=pointer]:
+          - text: 
+          - generic: Views
+          - generic [ref=e368]: "1"
+        - generic [ref=e369] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e370]: "4"
+        - generic [ref=e371] [cursor=pointer]:
+          - text: 
+          - generic: Models
+          - generic [ref=e372]: "1"
+        - generic [ref=e373] [cursor=pointer]:
+          - text: 
+          - generic: Livewire
+          - generic [ref=e374]: "1"
+        - text:  
+      - generic [ref=e375]:
+        - generic [ref=e377] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e380] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e381]: "10"
+        - combobox [ref=e382] [cursor=pointer]:
+          - option "#1 login (stacked) (08:56:02)"
+          - option "#2 login (stacked) (08:56:03)"
+          - option "#3 login (stacked) (08:56:06)"
+          - option "#4 admin (08:56:06)"
+          - option "#5 update (ajax) (08:56:06)"
+          - option "#6 update (ajax) (08:56:36)"
+          - option "#7 update (ajax) (08:57:06)"
+          - option "#8 update (ajax) (08:57:36)"
+          - option "#9 update (ajax) (08:58:06)"
+          - option "#10 update (ajax) (08:58:36)" [selected]
+        - generic [ref=e383] [cursor=pointer]:
+          - generic: 
+          - generic: 46.06ms
+        - generic [ref=e384]:
+          - generic: 
+          - generic: 4MB
+        - generic [ref=e385]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e386] [cursor=pointer]:
+          - generic: 
+          - generic: POST livewire/update
+    - text:                                                                   
+  - text: 
+```

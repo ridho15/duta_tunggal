@@ -122,15 +122,42 @@
                 <th>No</th>
                 <th>Nama Barang</th>
                 <th>Qty</th>
+                <th>Harga Satuan</th>
+                <th>Discount (%)</th>
+                <th>Tax (%)</th>
+                <th>Tax Amount</th>
+                <th>Subtotal</th>
                 <th>Keterangan</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($deliveryOrder->deliveryOrderItem as $index => $item)
+            @php
+                $price = 0;
+                $discountPct = 0;
+                $taxRate = 0;
+                $taxAmount = 0;
+                $lineSubtotal = 0;
+                if ($item->saleOrderItem) {
+                    $price = $item->saleOrderItem->unit_price;
+                    $discountPct = $item->saleOrderItem->discount;
+                    $taxRate = $item->saleOrderItem->tax;
+                    $base = $item->quantity * $price * (1 - $discountPct/100);
+                    $tr = $item->saleOrderItem->tipe_pajak ?? 'Eksklusif';
+                    $taxResult = \App\Services\TaxService::compute($base, $taxRate, $tr);
+                    $taxAmount = $taxResult['ppn'];
+                    $lineSubtotal = $taxResult['total'];
+                }
+            @endphp
             <tr>
                 <td>{{ $index + 1 }}</td>
                 <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
                 <td>{{ $item->quantity }}</td>
+                <td>Rp {{ number_format($price,0,',','.') }}</td>
+                <td>{{ number_format($discountPct,2) }}%</td>
+                <td>{{ number_format($taxRate,2) }}%</td>
+                <td>Rp {{ number_format($taxAmount,0,',','.') }}</td>
+                <td>Rp {{ number_format($lineSubtotal,0,',','.') }}</td>
                 <td>{{ $item->reason }}</td>
             </tr>
             @endforeach

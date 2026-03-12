@@ -66,14 +66,19 @@ class SaleOrderObserver
         $invoiceItems = [];
 
         foreach ($saleOrder->saleOrderItem as $item) {
+            // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
+            // which also defaults to 'Exclusive' (normalises to 'Eksklusif').
+            // Keeping both paths consistent prevents SO total_amount diverging from invoice total.
+            $tipePajak = $item->tipe_pajak ?? 'Eksklusif';
+
             // Calculate subtotal using HelperController for consistency
-            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? null);
+            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $tipePajak);
             // Use TaxService to get correct breakdown
             $taxService = \App\Services\TaxService::class;
             $baseAmount = $item->quantity * $item->unit_price * (1 - $item->discount / 100);
             
             try {
-                $taxResult = $taxService::compute($baseAmount, $item->tax, $item->tipe_pajak ?? null);
+                $taxResult = $taxService::compute($baseAmount, $item->tax, $tipePajak);
                 $lineTax = $taxResult['ppn'];
                 $subtotalBeforeTax = $taxResult['dpp'];
             } catch (\Throwable $e) {
@@ -131,7 +136,19 @@ class SaleOrderObserver
             }
         }
 
-        $total = $subtotal + $tax + $additionalCosts;
+        // FIX #1a: $tax holds the monetary PPN sum; derive the rate to store in invoice->tax.
+        // invoice->tax column (int) must store the rate (e.g. 11 or 12), NOT the monetary amount.
+        // The monetary amount is used for the invoice->total calculation below.
+        $taxMonetaryAmount = $tax;
+        $ppnRate = 0;
+        foreach ($saleOrder->saleOrderItem as $item) {
+            if ($item->tax > 0) {
+                $ppnRate = (int) $item->tax; // Use first non-zero rate (rates normally uniform per invoice)
+                break;
+            }
+        }
+
+        $total = $subtotal + $taxMonetaryAmount + $additionalCosts;
 
         // Load customer data
         $saleOrder->load('customer');
@@ -144,8 +161,11 @@ class SaleOrderObserver
             'customer_object' => $saleOrder->customer,
         ]);
 
+        // FIX #4: Use InvoiceService for proper sequential invoice number generation.
+        $invoiceNumber = (new \App\Services\InvoiceService())->generateInvoiceNumber();
+
         $invoiceData = [
-            'invoice_number' => 'INV-' . $saleOrder->so_number . '-' . now()->format('YmdHis'),
+            'invoice_number' => $invoiceNumber,
             'from_model_type' => SaleOrder::class,
             'from_model_id' => $saleOrder->id,
             'customer_name' => $saleOrder->customer?->name,
@@ -153,10 +173,13 @@ class SaleOrderObserver
             'invoice_date' => now()->toDateString(),
             'due_date' => now()->addDays(30)->toDateString(), // Default 30 hari
             'subtotal' => $subtotal,
-            'tax' => $tax,
+            'tax' => $ppnRate,         // FIX #1a: store rate (int, e.g. 11), not monetary amount
+            'ppn_rate' => $ppnRate,    // FIX #1a: also populate dedicated ppn_rate field
+            'dpp' => $subtotal,        // FIX #1a: DPP = subtotal (sum of DPP amounts)
             'total' => $total,
             'other_fee' => $otherFees, // Tambahkan biaya tambahan dari delivery orders
             'delivery_orders' => $saleOrder->deliveryOrder->pluck('id')->toArray(), // Tambahkan delivery order IDs
+            'cabang_id' => $saleOrder->cabang_id, // FIX #5: propagate branch scope
             'status' => 'unpaid', // Atau sesuai logic
             'notes' => 'Auto-generated from completed Sale Order ' . $saleOrder->so_number,
         ];

@@ -1,0 +1,611 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - navigation [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - button "Buka notifikasi" [ref=e9] [cursor=pointer]:
+              - generic [ref=e10]: Buka notifikasi
+              - img [ref=e11]
+            - dialog
+          - button "Menu pengguna" [ref=e15] [cursor=pointer]:
+            - img "Avatar Ridho Al Amzah" [ref=e16]
+      - main [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - generic [ref=e21]:
+              - navigation [ref=e22]:
+                - list [ref=e23]:
+                  - listitem [ref=e24]:
+                    - link "Customer Receipt" [ref=e25] [cursor=pointer]:
+                      - /url: http://127.0.0.1:8009/admin/customer-receipts
+                  - listitem [ref=e26]:
+                    - img [ref=e27]
+                    - generic [ref=e29]: Buat
+              - heading "Buat Customer Receipt" [level=1] [ref=e30]
+            - generic [ref=e33]:
+              - generic [ref=e36]:
+                - heading "Customer Receipt" [level=3] [ref=e40]
+                - generic [ref=e43]:
+                  - generic [ref=e48]:
+                    - generic [ref=e51]:
+                      - generic [ref=e54]:
+                        - text: Customer
+                        - superscript [ref=e55]: "*"
+                      - combobox "Customer*" [ref=e60]
+                    - generic [ref=e63]:
+                      - generic [ref=e66]:
+                        - text: Payment Date
+                        - superscript [ref=e67]: "*"
+                      - textbox "Payment Date*" [ref=e71]: 2026-03-12
+                    - generic [ref=e74]:
+                      - generic [ref=e77]:
+                        - text: Cabang
+                        - superscript [ref=e78]: "*"
+                      - generic [ref=e79]:
+                        - combobox "Cabang*" [ref=e83]
+                        - generic [ref=e84]: Pilih cabang untuk customer receipt ini
+                  - generic [ref=e86]:
+                    - heading "Silahkan Pilih Invoice" [level=3] [ref=e90]
+                    - generic [ref=e93]:
+                      - generic [ref=e96]:
+                        - generic [ref=e99]: Selected Invoices (JSON)
+                        - generic [ref=e100]:
+                          - textbox "Selected Invoices (JSON)" [ref=e103]: "[]"
+                          - generic [ref=e104]: Invoice IDs yang dipilih (diupdate otomatis oleh JavaScript)
+                      - generic [ref=e107]:
+                        - generic [ref=e110]: Invoice Receipts (JSON)
+                        - generic [ref=e111]:
+                          - textbox "Invoice Receipts (JSON)" [ref=e114]: "{}"
+                          - generic [ref=e115]: Data pembayaran per invoice (diupdate otomatis oleh JavaScript)
+                  - generic [ref=e120]:
+                    - generic [ref=e123]:
+                      - generic [ref=e126]:
+                        - text: Total Pembayaran
+                        - superscript [ref=e127]: "*"
+                      - generic [ref=e128]:
+                        - generic [ref=e129]:
+                          - generic [ref=e131]: Rp
+                          - textbox "Total Pembayaran*" [ref=e133]:
+                            - /placeholder: "500.000"
+                        - generic [ref=e134]: Total ini dihitung otomatis berdasarkan invoice yang dipilih
+                    - generic [ref=e137]:
+                      - generic [ref=e140]:
+                        - text: COA
+                        - superscript [ref=e141]: "*"
+                      - combobox "COA*" [ref=e146]
+                  - generic [ref=e151]:
+                    - generic [ref=e154]:
+                      - generic [ref=e157]: Catatan
+                      - textbox "Catatan" [ref=e162]
+                    - generic [ref=e165]:
+                      - generic [ref=e168]:
+                        - text: Payment Method
+                        - superscript [ref=e169]: "*"
+                      - generic [ref=e171]:
+                        - generic [ref=e173]:
+                          - radio "Cash" [ref=e174]
+                          - generic [ref=e176]: Cash
+                        - generic [ref=e178]:
+                          - radio "Bank Transfer" [ref=e179]
+                          - generic [ref=e181]: Bank Transfer
+                        - generic [ref=e183]:
+                          - radio "Credit" [ref=e184]
+                          - generic [ref=e186]: Credit
+                        - generic [ref=e188]:
+                          - radio "Deposit" [ref=e189]
+                          - generic [ref=e191]: Deposit
+                  - generic [ref=e193]:
+                    - generic [ref=e195] [cursor=pointer]:
+                      - generic [ref=e196]:
+                        - heading "Detail Payment Items" [level=3] [ref=e197]
+                        - paragraph [ref=e198]: Items pembayaran akan dibuat otomatis berdasarkan invoice yang dipilih di atas
+                      - button [ref=e199]:
+                        - img [ref=e200]
+                    - generic [ref=e209]: Detail pembayaran per invoice akan ditampilkan setelah Customer Receipt disimpan. Anda hanya perlu memilih invoice di tabel di atas dan sistem akan membuat detail pembayaran secara otomatis.
+              - generic [ref=e211]:
+                - button "Buat" [ref=e212] [cursor=pointer]:
+                  - generic [ref=e213]: Buat
+                - button "Buat & buat lainnya" [ref=e214] [cursor=pointer]:
+                  - generic [ref=e215]: Buat & buat lainnya
+                - button "Batal" [ref=e216] [cursor=pointer]:
+                  - generic [ref=e217]: Batal
+          - generic:
+            - dialog
+          - generic:
+            - dialog
+          - generic:
+            - dialog
+    - complementary [ref=e218]:
+      - generic [ref=e220]:
+        - link "Duta Tunggal ERP" [ref=e222] [cursor=pointer]:
+          - /url: http://127.0.0.1:8009/admin/sales-report-page
+          - generic [ref=e223]: Duta Tunggal ERP
+        - button "Persempit menu" [ref=e224] [cursor=pointer]:
+          - generic [ref=e225]: Persempit menu
+          - img [ref=e226]
+      - navigation [ref=e228]:
+        - list [ref=e229]:
+          - listitem [ref=e230]:
+            - generic [ref=e231] [cursor=pointer]:
+              - generic [ref=e232]: Reports
+              - button "Reports" [expanded] [ref=e233]:
+                - generic [ref=e234]: Reports
+                - img [ref=e235]
+            - list [ref=e237]:
+              - listitem [ref=e238]:
+                - link "Laporan Penjualan" [ref=e239] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/sales-report-page
+                  - img [ref=e240]
+                  - generic [ref=e242]: Laporan Penjualan
+              - listitem [ref=e243]:
+                - link "Laporan Pembelian" [ref=e244] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-report-page
+                  - img [ref=e245]
+                  - generic [ref=e247]: Laporan Pembelian
+              - listitem [ref=e248]:
+                - link "Aging Report" [ref=e249] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/view-ageing-report
+                  - img [ref=e250]
+                  - generic [ref=e252]: Aging Report
+          - listitem [ref=e253]:
+            - generic [ref=e254] [cursor=pointer]:
+              - img [ref=e255]
+              - generic [ref=e257]: Penjualan (Sales Order)
+              - button "Penjualan (Sales Order)" [expanded] [ref=e258]:
+                - generic [ref=e259]: Penjualan (Sales Order)
+                - img [ref=e260]
+            - list [ref=e262]:
+              - listitem [ref=e263]:
+                - link "Quotation" [ref=e264] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/quotations
+                  - generic [ref=e268]: Quotation
+              - listitem [ref=e269]:
+                - link "Penjualan (Sales Order)" [ref=e270] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/sale-orders
+                  - generic [ref=e274]: Penjualan (Sales Order)
+          - listitem [ref=e275]:
+            - generic [ref=e276] [cursor=pointer]:
+              - img [ref=e277]
+              - generic [ref=e279]: Delivery Order
+              - button "Delivery Order" [expanded] [ref=e280]:
+                - generic [ref=e281]: Delivery Order
+                - img [ref=e282]
+            - list [ref=e284]:
+              - listitem [ref=e285]:
+                - link "Delivery Order" [ref=e286] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/delivery-orders
+                  - generic [ref=e290]: Delivery Order
+              - listitem [ref=e291]:
+                - link "Surat Jalan" [ref=e292] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/surat-jalans
+                  - generic [ref=e296]: Surat Jalan
+          - listitem [ref=e297]:
+            - generic [ref=e298] [cursor=pointer]:
+              - img [ref=e299]
+              - generic [ref=e301]: Finance - Penjualan
+              - button "Finance - Penjualan" [expanded] [ref=e302]:
+                - generic [ref=e303]: Finance - Penjualan
+                - img [ref=e304]
+            - list [ref=e306]:
+              - listitem [ref=e307]:
+                - link "Account Receivable" [ref=e308] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/account-receivables
+                  - generic [ref=e312]: Account Receivable
+              - listitem [ref=e313]:
+                - link "Penjualan Lainnya" [ref=e314] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/other-sales
+                  - generic [ref=e319]: Penjualan Lainnya
+              - listitem [ref=e320]:
+                - link "Invoice Penjualan" [ref=e321] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/sales-invoices
+                  - generic [ref=e325]: Invoice Penjualan
+          - listitem [ref=e326]:
+            - generic [ref=e327] [cursor=pointer]:
+              - img [ref=e328]
+              - generic [ref=e330]: Pembelian (Purchase Order)
+              - button "Pembelian (Purchase Order)" [expanded] [ref=e331]:
+                - generic [ref=e332]: Pembelian (Purchase Order)
+                - img [ref=e333]
+            - list [ref=e335]:
+              - listitem [ref=e336]:
+                - link "Order Request" [ref=e337] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/order-requests
+                  - generic [ref=e341]: Order Request
+              - listitem [ref=e342]:
+                - link "Pembelian" [ref=e343] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-orders
+                  - generic [ref=e348]: Pembelian
+              - listitem [ref=e349]:
+                - link "Quality Control Purchase" [ref=e350] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/quality-control-purchases
+                  - generic [ref=e355]: Quality Control Purchase
+              - listitem [ref=e356]:
+                - link "Purchase Receipt" [ref=e357] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-receipts
+                  - generic [ref=e362]: Purchase Receipt
+              - listitem [ref=e363]:
+                - link "Purchase Return" [ref=e364] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-returns
+                  - generic [ref=e368]: Purchase Return
+          - listitem [ref=e369]:
+            - generic [ref=e370] [cursor=pointer]:
+              - img [ref=e371]
+              - generic [ref=e373]: Finance - Pembelian
+              - button "Finance - Pembelian" [expanded] [ref=e374]:
+                - generic [ref=e375]: Finance - Pembelian
+                - img [ref=e376]
+            - list [ref=e378]:
+              - listitem [ref=e379]:
+                - link "Account Payable" [ref=e380] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/account-payables
+                  - generic [ref=e384]: Account Payable
+              - listitem [ref=e385]:
+                - link "Invoice Pembelian" [ref=e386] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/purchase-invoices
+                  - generic [ref=e390]: Invoice Pembelian
+          - listitem [ref=e391]:
+            - generic [ref=e392] [cursor=pointer]:
+              - img [ref=e393]
+              - generic [ref=e395]: Finance - Pembayaran
+              - button "Finance - Pembayaran" [expanded] [ref=e396]:
+                - generic [ref=e397]: Finance - Pembayaran
+                - img [ref=e398]
+            - list [ref=e400]:
+              - listitem [ref=e401]:
+                - link "Payment Request" [ref=e402] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/payment-requests
+                  - generic [ref=e406]: Payment Request
+              - listitem [ref=e407]:
+                - link "Transfer Kas & Bank" [ref=e408] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/cash-bank-transfers
+                  - generic [ref=e413]: Transfer Kas & Bank
+              - listitem [ref=e414]:
+                - link "Customer Receipt" [ref=e415] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/customer-receipts
+                  - generic [ref=e420]: Customer Receipt
+              - listitem [ref=e421]:
+                - link "Payment Vendor" [ref=e422] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/vendor-payments
+                  - generic [ref=e427]: Payment Vendor
+              - listitem [ref=e428]:
+                - link "Transaksi Kas & Bank" [ref=e429] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/cash-bank-transactions
+                  - generic [ref=e434]: Transaksi Kas & Bank
+              - listitem [ref=e435]:
+                - link "Deposit" [ref=e436] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/deposits
+                  - generic [ref=e440]: Deposit
+          - listitem [ref=e441]:
+            - generic [ref=e442] [cursor=pointer]:
+              - img [ref=e443]
+              - generic [ref=e445]: Finance - Akuntansi
+              - button "Finance - Akuntansi" [expanded] [ref=e446]:
+                - generic [ref=e447]: Finance - Akuntansi
+                - img [ref=e448]
+            - list [ref=e450]:
+              - listitem [ref=e451]:
+                - link "Ageing Schedule" [ref=e452] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/ageing-schedules
+                  - generic [ref=e456]: Ageing Schedule
+              - listitem [ref=e457]:
+                - link "Rekonsiliasi Bank" [ref=e458] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/bank-reconciliations
+                  - generic [ref=e463]: Rekonsiliasi Bank
+              - listitem [ref=e464]:
+                - link "Journal Entry" [ref=e465] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/journal-entries
+                  - generic [ref=e470]: Journal Entry
+              - listitem [ref=e471]:
+                - link "Pengajuan Voucher" [ref=e472] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/voucher-requests
+                  - generic [ref=e477]: Pengajuan Voucher
+              - listitem [ref=e478]:
+                - link "AR & AP Management" [ref=e479] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/ar-ap-management
+                  - generic [ref=e483]: AR & AP Management
+          - listitem [ref=e484]:
+            - generic [ref=e485] [cursor=pointer]:
+              - img [ref=e486]
+              - generic [ref=e488]: Finance - Laporan
+              - button "Finance - Laporan" [expanded] [ref=e489]:
+                - generic [ref=e490]: Finance - Laporan
+                - img [ref=e491]
+            - list [ref=e493]:
+              - listitem [ref=e494]:
+                - link "Buku Besar (General Ledger)" [ref=e495] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/buku-besar-page
+                  - generic [ref=e499]: Buku Besar (General Ledger)
+              - listitem [ref=e500]:
+                - link "Trial Balance" [ref=e501] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/income-statement-page
+                  - generic [ref=e506]: Trial Balance
+              - listitem [ref=e507]:
+                - link "Laporan Laba Rugi (P&L)" [ref=e508] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/profit-and-losses
+                  - generic [ref=e513]: Laporan Laba Rugi (P&L)
+              - listitem [ref=e514]:
+                - link "Balance Sheet" [ref=e515] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/balance-sheets
+                  - generic [ref=e520]: Balance Sheet
+              - listitem [ref=e521]:
+                - link "Drill Down Financial Report" [ref=e522] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/drill-down-financial-report
+                  - generic [ref=e527]: Drill Down Financial Report
+              - listitem [ref=e528]:
+                - link "Dashboard Finance" [ref=e529] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin
+                  - generic [ref=e534]: Dashboard Finance
+              - listitem [ref=e535]:
+                - link "Financial Statement" [ref=e536] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/financial-statement
+                  - generic [ref=e541]: Financial Statement
+              - listitem [ref=e542]:
+                - link "Cost of Goods Manufacturing" [ref=e543] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/cost-of-goods-manufacturing
+                  - generic [ref=e548]: Cost of Goods Manufacturing
+              - listitem [ref=e549]:
+                - link "HPP / Cost of Goods Sold" [ref=e550] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/hpp
+                  - generic [ref=e555]: HPP / Cost of Goods Sold
+              - listitem [ref=e556]:
+                - link "Laporan Arus Kas (Direct/Indirect)" [ref=e557] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/cash-flow
+                  - generic [ref=e562]: Laporan Arus Kas (Direct/Indirect)
+              - listitem [ref=e563]:
+                - link "ALK Grafik (Analisis Laporan Keuangan)" [ref=e564] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/alk-grafik
+                  - generic [ref=e569]: ALK Grafik (Analisis Laporan Keuangan)
+              - listitem [ref=e570]:
+                - link "Journal List of Consolidation" [ref=e571] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/journal-consolidation
+                  - generic [ref=e576]: Journal List of Consolidation
+              - listitem [ref=e577]:
+                - link "Aging Report (AR/AP)" [ref=e578] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/ageing-reports
+                  - generic [ref=e583]: Aging Report (AR/AP)
+              - listitem [ref=e584]:
+                - link "Laporan Mutasi Barang" [ref=e585] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/stock-mutation
+                  - generic [ref=e589]: Laporan Mutasi Barang
+          - listitem [ref=e590]:
+            - generic [ref=e591] [cursor=pointer]:
+              - img [ref=e592]
+              - generic [ref=e594]: Gudang
+              - button "Gudang" [expanded] [ref=e595]:
+                - generic [ref=e596]: Gudang
+                - img [ref=e597]
+            - list [ref=e599]:
+              - listitem [ref=e600]:
+                - link "Inventory Stock" [ref=e601] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/inventory-stocks
+                  - generic [ref=e605]: Inventory Stock
+              - listitem [ref=e606]:
+                - link "Return Product" [ref=e607] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/return-products
+                  - generic [ref=e612]: Return Product
+              - listitem [ref=e613]:
+                - link "Stock Adjustments" [ref=e614] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-adjustments
+                  - generic [ref=e619]: Stock Adjustments
+              - listitem [ref=e620]:
+                - link "Stock Movement" [ref=e621] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-movements
+                  - generic [ref=e626]: Stock Movement
+              - listitem [ref=e627]:
+                - link "Stock Opnames" [ref=e628] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-opnames
+                  - generic [ref=e633]: Stock Opnames
+              - listitem [ref=e634]:
+                - link "Transfer Stock" [ref=e635] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/stock-transfers
+                  - generic [ref=e640]: Transfer Stock
+              - listitem [ref=e641]:
+                - link "Konfirmasi Gudang" [ref=e642] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/warehouse-confirmations
+                  - generic [ref=e646]: Konfirmasi Gudang
+          - listitem [ref=e647]:
+            - generic [ref=e648] [cursor=pointer]:
+              - img [ref=e649]
+              - generic [ref=e651]: Persediaan
+              - button "Persediaan" [expanded] [ref=e652]:
+                - generic [ref=e653]: Persediaan
+                - img [ref=e654]
+            - list [ref=e656]:
+              - listitem [ref=e657]:
+                - link "Kartu Persediaan (Stock Card)" [ref=e658] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/inventory-card
+                  - generic [ref=e662]: Kartu Persediaan (Stock Card)
+              - listitem [ref=e663]:
+                - link "Laporan Stok" [ref=e664] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/reports/stock-report
+                  - generic [ref=e668]: Laporan Stok
+          - listitem [ref=e669]:
+            - generic [ref=e670] [cursor=pointer]:
+              - img [ref=e671]
+              - generic [ref=e674]: Manufacturing Order
+              - button "Manufacturing Order" [expanded] [ref=e675]:
+                - generic [ref=e676]: Manufacturing Order
+                - img [ref=e677]
+            - list [ref=e679]:
+              - listitem [ref=e680]:
+                - link "Bill Of Material" [ref=e681] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/bill-of-materials
+                  - generic [ref=e685]: Bill Of Material
+              - listitem [ref=e686]:
+                - link "Manufacturing Order" [ref=e687] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/manufacturing-orders
+                  - generic [ref=e692]: Manufacturing Order
+              - listitem [ref=e693]:
+                - link "Pengambilan Bahan Baku" [ref=e694] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/material-issues
+                  - generic [ref=e699]: Pengambilan Bahan Baku
+              - listitem [ref=e700]:
+                - link "Rencana Produksi" [ref=e701] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/production-plans
+                  - generic [ref=e706]: Rencana Produksi
+              - listitem [ref=e707]:
+                - link "Production" [ref=e708] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/productions
+                  - generic [ref=e713]: Production
+              - listitem [ref=e714]:
+                - link "Quality Control Manufacture" [ref=e715] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/quality-control-manufactures
+                  - generic [ref=e719]: Quality Control Manufacture
+          - listitem [ref=e720]:
+            - generic [ref=e721] [cursor=pointer]:
+              - img [ref=e722]
+              - generic [ref=e724]: Asset Management
+              - button "Asset Management" [expanded] [ref=e725]:
+                - generic [ref=e726]: Asset Management
+                - img [ref=e727]
+            - list [ref=e729]:
+              - listitem [ref=e730]:
+                - link "Aset Tetap" [ref=e731] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/assets
+                  - generic [ref=e735]: Aset Tetap
+              - listitem [ref=e736]:
+                - link "Transfer Aset" [ref=e737] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/asset-transfers
+                  - generic [ref=e742]: Transfer Aset
+              - listitem [ref=e743]:
+                - link "Disposal Aset" [ref=e744] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/asset-disposals
+                  - generic [ref=e748]: Disposal Aset
+          - listitem [ref=e749]:
+            - generic [ref=e750] [cursor=pointer]:
+              - img [ref=e751]
+              - generic [ref=e753]: Master Data
+              - button "Master Data" [expanded] [ref=e754]:
+                - generic [ref=e755]: Master Data
+                - img [ref=e756]
+            - list [ref=e758]:
+              - listitem [ref=e759]:
+                - link "Cabang" [ref=e760] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/cabangs
+                  - generic [ref=e764]: Cabang
+              - listitem [ref=e765]:
+                - link "Mata Uang" [ref=e766] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/currencies
+                  - generic [ref=e771]: Mata Uang
+              - listitem [ref=e772]:
+                - link "Customer" [ref=e773] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/customers
+                  - generic [ref=e778]: Customer
+              - listitem [ref=e779]:
+                - link "Driver" [ref=e780] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/drivers
+                  - generic [ref=e785]: Driver
+              - listitem [ref=e786]:
+                - link "Kategori Produk" [ref=e787] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/product-categories
+                  - generic [ref=e792]: Kategori Produk
+              - listitem [ref=e793]:
+                - link "Produk" [ref=e794] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/products
+                  - generic [ref=e799]: Produk
+              - listitem [ref=e800]:
+                - link "Rak" [ref=e801] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/raks
+                  - generic [ref=e806]: Rak
+              - listitem [ref=e807]:
+                - link "Supplier" [ref=e808] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/suppliers
+                  - generic [ref=e813]: Supplier
+              - listitem [ref=e814]:
+                - link "Satuan" [ref=e815] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/unit-of-measures
+                  - generic [ref=e820]: Satuan
+              - listitem [ref=e821]:
+                - link "Kendaraan" [ref=e822] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/vehicles
+                  - generic [ref=e827]: Kendaraan
+              - listitem [ref=e828]:
+                - link "Gudang" [ref=e829] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/warehouses
+                  - generic [ref=e834]: Gudang
+              - listitem [ref=e835]:
+                - link "Chart Of Account" [ref=e836] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/chart-of-accounts
+                  - generic [ref=e841]: Chart Of Account
+              - listitem [ref=e842]:
+                - link "Tax Setting" [ref=e843] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/tax-settings
+                  - generic [ref=e847]: Tax Setting
+          - listitem [ref=e848]:
+            - generic [ref=e849] [cursor=pointer]:
+              - img [ref=e850]
+              - generic [ref=e852]: User Roles Management
+              - button "User Roles Management" [expanded] [ref=e853]:
+                - generic [ref=e854]: User Roles Management
+                - img [ref=e855]
+            - list [ref=e857]:
+              - listitem [ref=e858]:
+                - link "Permission" [ref=e859] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/permissions
+                  - generic [ref=e863]: Permission
+              - listitem [ref=e864]:
+                - link "Role" [ref=e865] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/roles
+                  - generic [ref=e870]: Role
+              - listitem [ref=e871]:
+                - link "User" [ref=e872] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8009/admin/users
+                  - generic [ref=e876]: User
+  - generic:
+    - status
+  - generic [ref=e877]:
+    - generic [ref=e879]:
+      - generic [ref=e881]:
+        - generic [ref=e882] [cursor=pointer]:
+          - text: 
+          - generic: Request
+        - text: 
+        - generic [ref=e883] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - text: 
+        - generic [ref=e884] [cursor=pointer]:
+          - text: 
+          - generic: Views
+          - generic [ref=e885]: "1"
+        - generic [ref=e886] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e887]: "4"
+        - generic [ref=e888] [cursor=pointer]:
+          - text: 
+          - generic: Models
+          - generic [ref=e889]: "1"
+        - generic [ref=e890] [cursor=pointer]:
+          - text: 
+          - generic: Livewire
+          - generic [ref=e891]: "1"
+        - text:  
+      - generic [ref=e892]:
+        - generic [ref=e894] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e897] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e898]: "2"
+        - combobox [ref=e899] [cursor=pointer]:
+          - option "#1 create (08:59:17)"
+          - option "#2 update (ajax) (08:59:18)" [selected]
+        - generic [ref=e900] [cursor=pointer]:
+          - generic: 
+          - generic: 70.22ms
+        - generic [ref=e901]:
+          - generic: 
+          - generic: 4MB
+        - generic [ref=e902]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e903] [cursor=pointer]:
+          - generic: 
+          - generic: POST livewire/update
+    - text:                                            
+  - text: 
+```

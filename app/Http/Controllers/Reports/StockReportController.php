@@ -10,6 +10,7 @@ use App\Models\StockMovement;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 class StockReportController extends Controller
 {
@@ -18,6 +19,8 @@ class StockReportController extends Controller
      */
     public function preview(Request $request)
     {
+        abort_if(! Auth::user()?->can('view any inventory stock'), 403); // permission enforced
+
         $startDate   = $request->input('start_date') ? Carbon::parse($request->input('start_date'))->startOfDay() : now()->startOfMonth()->startOfDay();
         $endDate     = $request->input('end_date')   ? Carbon::parse($request->input('end_date'))->endOfDay()     : now()->endOfDay();
         $productIds  = array_filter((array) $request->input('product_ids', []));

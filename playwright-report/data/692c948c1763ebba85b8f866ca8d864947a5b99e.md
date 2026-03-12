@@ -1,0 +1,84 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]: Duta Tunggal ERP
+          - heading "Masuk ke akun Anda" [level=1] [ref=e9]
+        - generic [ref=e10]:
+          - generic [ref=e11]:
+            - generic [ref=e14]:
+              - generic [ref=e17]:
+                - text: Alamat email
+                - superscript [ref=e18]: "*"
+              - textbox "Alamat email*" [active] [ref=e22]
+            - generic [ref=e25]:
+              - generic [ref=e28]:
+                - text: Kata sandi
+                - superscript [ref=e29]: "*"
+              - generic [ref=e31]:
+                - textbox "Kata sandi*" [ref=e33]
+                - button "Tampilkan kata sandi" [ref=e36] [cursor=pointer]:
+                  - generic [ref=e37]: Tampilkan kata sandi
+                  - img [ref=e38]
+            - generic [ref=e45]:
+              - checkbox "Ingat saya" [ref=e46]
+              - generic [ref=e47]: Ingat saya
+          - button "Masuk" [ref=e50] [cursor=pointer]:
+            - generic [ref=e51]: Masuk
+      - generic:
+        - dialog
+      - generic:
+        - dialog
+      - generic:
+        - dialog
+  - generic:
+    - status
+  - generic [ref=e52]:
+    - generic [ref=e54]:
+      - generic [ref=e56]:
+        - generic [ref=e57] [cursor=pointer]:
+          - text: 
+          - generic: Request
+        - text: 
+        - generic [ref=e58] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - text: 
+        - generic [ref=e59] [cursor=pointer]:
+          - text: 
+          - generic: Views
+          - generic [ref=e60]: "15"
+        - generic [ref=e61] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e62]: "2"
+        - text: 
+        - generic [ref=e63] [cursor=pointer]:
+          - text: 
+          - generic: Livewire
+          - generic [ref=e64]: "2"
+        - text:  
+      - generic [ref=e65]:
+        - generic [ref=e67] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e70] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e71] [cursor=pointer]:
+          - generic: 
+          - generic: 49.58ms
+        - generic [ref=e72]:
+          - generic: 
+          - generic: 5MB
+        - generic [ref=e73]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e74] [cursor=pointer]:
+          - generic: 
+          - generic: GET admin/login
+    - text:                                                                   
+  - text: 
+```

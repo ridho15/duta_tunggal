@@ -64,26 +64,38 @@
                 <th>Product</th>
                 <th>Qty</th>
                 <th>Unit Price</th>
-                <th>Discount</th>
-                <th>Tax</th>
+                <th>Discount (%)</th>
+                <th>Tax (%)</th>
+                <th>Tax Type</th>
+                <th>Tax Amount</th>
                 <th>Subtotal</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($quotation->quotationItem as $index => $item)
+            @php
+                $lineBase       = $item['quantity'] * $item['unit_price'];
+                $discountAmount = $lineBase * ($item['discount'] / 100);
+                $afterDiscount  = $lineBase - $discountAmount;
+                $taxType        = $item['tax_type'] ?? 'Exclusive';
+                $taxResult      = \App\Services\TaxService::compute($afterDiscount, (float)$item['tax'], $taxType);
+                $taxAmount      = $taxResult['ppn'];
+                $lineSubtotal   = $taxResult['total'];
+            @endphp
             <tr>
                 <td>{{ $index + 1 }}</td>
                 <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
                 <td>{{ $item['quantity'] }}</td>
                 <td>Rp.{{ number_format($item['unit_price'], 0, ',', '.') }}</td>
-                <td>Rp.{{ number_format($item['discount'], 0, ',', '.') }}</td>
-                <td>Rp.{{ number_format($item['tax'], 0, ',', '.') }}</td>
-                <td>Rp.{{ number_format(($item['quantity'] * $item['unit_price']) - $item['discount'] + $item['tax'], 0,
-                    ',', '.') }}</td>
+                <td>{{ number_format($item['discount'], 2) }}%</td>
+                <td>{{ number_format($item['tax'], 2) }}%</td>
+                <td>{{ $taxType }}</td>
+                <td>Rp.{{ number_format($taxAmount, 0, ',', '.') }}</td>
+                <td>Rp.{{ number_format($lineSubtotal, 0, ',', '.') }}</td>
             </tr>
             @endforeach
             <tr>
-                <td colspan="6" style="text-align: right;"><strong>Total</strong></td>
+                <td colspan="8" style="text-align: right;"><strong>Total</strong></td>
                 <td><strong>Rp.{{ number_format($quotation->total_amount, 0, ',', '.') }}</strong></td>
             </tr>
         </tbody>

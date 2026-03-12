@@ -1,0 +1,60 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - heading "403" [level=1] [ref=e5]
+      - generic [ref=e6]: Forbidden
+  - generic [ref=e7]:
+    - generic [ref=e9]:
+      - generic [ref=e11]:
+        - generic [ref=e12] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e13]: 403 Forbidden
+        - text: 
+        - generic [ref=e14] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e15] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e16]: "1"
+        - generic [ref=e17] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e18]: "2"
+        - generic [ref=e19] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e20]: "6"
+        - generic [ref=e21] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e22]: "146"
+        - text:  
+        - generic [ref=e23] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e24]: "1"
+      - generic [ref=e25]:
+        - generic [ref=e27] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e30] [cursor=pointer]:
+          - generic: 
+          - generic [ref=e31]: "5"
+        - combobox [ref=e32] [cursor=pointer]:
+          - option "#1 login (stacked) (08:56:02)"
+          - option "#2 login (stacked) (08:56:03)"
+          - option "#3 login (stacked) (08:56:06)"
+          - option "#4 login (stacked) (08:57:49)"
+          - option "#5 sales-invoices (09:06:23)" [selected]
+        - generic [ref=e33] [cursor=pointer]:
+          - generic: 
+          - generic: 297ms
+        - generic [ref=e34]:
+          - generic: 
+          - generic: 5MB
+        - generic [ref=e35]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e36] [cursor=pointer]:
+          - generic: 
+          - generic: GET admin/sales-invoices
+    - text:                                                              
+  - text: 
+```

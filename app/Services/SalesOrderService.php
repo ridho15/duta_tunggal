@@ -16,7 +16,13 @@ class SalesOrderService
     {
         $total_amount = 0;
         foreach ($salesOrder->saleOrderItem as $item) {
-            $total_amount += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, 'Inklusif');
+            $total_amount += HelperController::hitungSubtotal(
+                $item->quantity,
+                $item->unit_price,
+                $item->discount,
+                $item->tax,
+                $item->tipe_pajak ?? 'Exclusive'
+            );
         }
 
         return $salesOrder->update([

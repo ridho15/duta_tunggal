@@ -42,6 +42,15 @@ class HelperController extends Controller
         return $colors;
     }
 
+    /**
+     * Returns a mapping between resource names and the set of actions
+     * that can be performed on them.  This is used by the permission
+     * seeder, the audit tests and various authorization helpers.
+     *
+     * The format must stay backwards compatible (resource => [action1,
+     * action2, …]) because the test-suite and seeder iterate over the
+     * values directly.  Do not change it to include descriptions here.
+     */
     public static function listPermission()
     {
         $listPermissions = [
@@ -686,6 +695,95 @@ class HelperController extends Controller
         return $listPermissions;
     }
 
+    /**
+     * Generate a map of full permission names ("action resource") to an
+     * Indonesian description explaining its purpose.  The descriptions are
+     * generated programmatically for common CRUD/workflow actions, and the
+     * method falls back to a generic template if a specific phrase is not
+     * defined.  Seeders and UI components can call this helper to retrieve
+     * human‑readable text.
+     *
+     * @return array<string,string>
+     */
+    public static function permissionDescriptions()
+    {
+        $descs = [];
+        $templates = [
+            'view any'    => 'Melihat daftar semua %s',
+            'view'        => 'Melihat detail %s',
+            'create'      => 'Membuat %s baru',
+            'update'      => 'Memperbarui %s',
+            'delete'      => 'Menghapus %s',
+            'restore'     => 'Mengembalikan %s yang dihapus',
+            'force-delete'=> 'Menghapus permanen %s',
+            'request'     => 'Mengajukan permintaan untuk %s',
+            'response'    => 'Menanggapi permintaan %s',
+            'submit'      => 'Mengajukan %s',
+            'approve'     => 'Menyetujui %s',
+            'reject'      => 'Menolak %s',
+            'cancel'      => 'Membatalkan %s',
+            'request-approve' => 'Meminta persetujuan %s',
+            'request'     => 'Meminta %s',
+            'reject'      => 'Menolak %s',
+            'approve'     => 'Menyetujui %s',
+            'request-approve' => 'Meminta persetujuan %s',
+            'submit'      => 'Mengirimkan %s',
+            'approve'     => 'Menyetujui %s',
+            'reject'      => 'Menolak %s',
+        ];
+
+        foreach (self::listPermission() as $resource => $actions) {
+            foreach ($actions as $action) {
+                $name = $action . ' ' . $resource;
+                $tpl  = $templates[$action] ?? 'Izin untuk ' . $action . ' ' . $resource;
+                $descs[$name] = sprintf($tpl, $resource);
+            }
+        }
+        // manual refinements if needed (special cases)
+        $descs['request sales order'] = 'Meminta persetujuan atau tindakan lebih lanjut pada sales order';
+        $descs['response sales order'] = 'Memberi jawaban (terima/tolak) atas permintaan sales order';
+        $descs['request-approve quotation'] = 'Meminta persetujuan pada quotation';
+        $descs['approve quotation'] = 'Menyetujui quotation';
+        $descs['reject quotation'] = 'Menolak quotation';
+        $descs['submit voucher request'] = 'Mengirimkan permintaan voucher';
+        $descs['approve voucher request'] = 'Menyetujui permintaan voucher';
+        $descs['reject voucher request'] = 'Menolak permintaan voucher';
+        $descs['cancel voucher request'] = 'Membatalkan permintaan voucher';
+        // ...any other hand-curated descriptions here
+
+        return $descs;
+    }
+
+    /**
+     * Return Indonesian descriptions for each role defined in the system.
+     *
+     * @return array<string,string>
+     */
+    public static function roleDescriptions()
+    {
+        return [
+            'Owner'            => 'Pengguna dengan hak penuh; biasanya pemilik perusahaan atau administrator tingkat tertinggi.',
+            'Super Admin'      => 'Administrator sistem dengan hampir semua izin, kecuali beberapa operasi ekstrim.',
+            'Admin'            => 'Administrator umum yang mengelola pengguna, peran, dan beberapa konfigurasi dasar.',
+            'Sales Manager'    => 'Mengawasi tim penjualan dan memiliki akses ke data sales order, quotation, dan invoice.',
+            'Sales'            => 'Staf penjualan yang membuat dan melihat sales order serta quotation pelanggan.',
+            'Kasir'            => 'Bertanggung jawab mencatat penerimaan pembayaran pelanggan dan membuat invoice.',
+            'Inventory Manager'=> 'Mengelola persediaan, gudang, transfer stok, dan konfigurasi produk.',
+            'Admin Inventory'  => 'Role pendukung di departemen inventaris dengan akses terbatas tetapi luas ke modul gudang.',
+            'Checker'          => 'Memeriksa konfirmasi gudang, kontrol kualitas, dan stok.',
+            'Finance Manager'  => 'Mengelola keuangan, akun payables/receivables, dan laporan keuangan.',
+            'Admin Keuangan'   => 'Pendukung manajer keuangan dengan hak akses ke sebagian besar modul keuangan.',
+            'Accounting'       => 'Bertanggung jawab atas buku besar, jurnal, dan catatan akuntansi lainnya.',
+            'Purchasing'       => 'Staf pembelian yang membuat dan memantau purchase order dan penerimaan.',
+            'Purchasing Manager'=> 'Mengawasi kegiatan pembelian dan dapat memproses pembayaran vendor.',
+            'Warehouse Staff'  => 'Staf gudang yang mengelola pengiriman, transfer, dan stok fisik.',
+            'Delivery Driver'  => 'Pengemudi yang melihat dan memperbarui informasi delivery order serta surat jalan.',
+            'Customer Service' => 'Layanan pelanggan yang menangani customer, quotation, dan sales order.',
+            'Auditor'          => 'Mempunyai hak baca (view any) di seluruh modul untuk keperluan audit.',
+            'IT Support'       => 'Tim teknis yang mengelola akun, izin, dan konfigurasi sistem.',
+        ];
+    }
+
     public static function getPermissionOwner()
     {
         return [
@@ -811,13 +909,14 @@ class HelperController extends Controller
             $parsed = self::parseIndonesianMoney($unit_price);
             $unit_price = $parsed;
         }
-
         // --- INPUT GUARDS ---
         $quantity  = max(0.0, (float) $quantity);
         $unit_price = max(0.0, (float) $unit_price);
         $discount  = max(0.0, min(100.0, (float) $discount));  // clamp 0-100%
         $tax       = max(0.0, min(100.0, (float) $tax));        // clamp 0-100%
-        // Use 'Inklusif' as explicit default — never pass null to TaxService silently
+        // Default to 'Inklusif' when taxType is null/empty — maintained for backward compatibility.
+        // NOTE: TaxService::normalizeType(null) defaults to 'Eksklusif'. If you call TaxService
+        // directly (not through this helper), ensure you pass an explicit type to avoid discrepancies.
         $taxType   = (is_string($taxType) && trim($taxType) !== '') ? $taxType : 'Inklusif';
 
         // Calculate base after discount

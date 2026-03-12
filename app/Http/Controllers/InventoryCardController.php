@@ -9,6 +9,7 @@ use App\Models\Warehouse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
 
 class InventoryCardController extends Controller
@@ -21,6 +22,8 @@ class InventoryCardController extends Controller
      */
     public function printView(Request $request)
     {
+        abort_if(! Auth::user()?->can('view any inventory stock'), 403);
+
         $data = $this->buildReportData($request);
         $data['isPdf'] = false;
         return view('reports.inventory-card-print', compact('data'));
@@ -31,6 +34,8 @@ class InventoryCardController extends Controller
      */
     public function downloadPdf(Request $request)
     {
+        abort_if(! Auth::user()?->can('view any inventory stock'), 403);
+
         $data = $this->buildReportData($request);
         $data['isPdf'] = true;
 
@@ -47,6 +52,8 @@ class InventoryCardController extends Controller
      */
     public function downloadExcel(Request $request)
     {
+        abort_if(! Auth::user()?->can('view any inventory stock'), 403);
+
         $export   = new InventoryCardExport(
             startDate:   $request->input('start'),
             endDate:     $request->input('end'),

@@ -272,7 +272,10 @@ class SalesInvoiceResource extends Resource
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
                                                 if ($item->saleOrderItem) {
-                                                    $price = (float) $item->saleOrderItem->unit_price - (float) $item->saleOrderItem->discount + (float) $item->saleOrderItem->tax;
+                                                    // FIX #3: discount and tax are percentages (0-100), not IDR amounts.
+                                                    // Correct net-DPP price = unit_price * (1 - discount/100)
+                                                    $discountPct = max(0.0, min(100.0, (float) $item->saleOrderItem->discount));
+                                                    $price = (float) $item->saleOrderItem->unit_price * (1 - $discountPct / 100);
                                                     $total = (float) $price * (float) $item->quantity;
 
                                                     $items[] = [
@@ -300,7 +303,9 @@ class SalesInvoiceResource extends Resource
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
                                                 if ($item->product && $item->saleOrderItem) {
-                                                    $originalPrice = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
+                                                    // FIX #3: discount is a percentage, not an IDR amount
+                                                    $discountPct = max(0.0, min(100.0, (float) $item->saleOrderItem->discount));
+                                                    $originalPrice = (float) $item->saleOrderItem->unit_price * (1 - $discountPct / 100);
 
                                                     // For edit, try to find existing invoice item data
                                                     $invoiceQuantity = $item->quantity;
@@ -385,7 +390,9 @@ class SalesInvoiceResource extends Resource
                                         $subtotal = 0;
 
                                         foreach ($saleOrder->saleOrderItem as $item) {
-                                            $price = (float) $item->unit_price - (float) $item->discount + (float) $item->tax;
+                                            // FIX #3: discount is a percentage, not an IDR amount
+                                            $discountPct = max(0.0, min(100.0, (float) $item->discount));
+                                            $price = (float) $item->unit_price * (1 - $discountPct / 100);
                                             $total = (float) $price * (float) $item->quantity;
 
                                             $items[] = [
@@ -409,7 +416,9 @@ class SalesInvoiceResource extends Resource
                                             $deliveryOrderItems = [];
                                             foreach ($saleOrder->saleOrderItem as $item) {
                                                 if ($item->product) {
-                                                    $originalPrice = $item->unit_price - $item->discount + $item->tax;
+                                                    // FIX #3: discount is a percentage, not an IDR amount
+                                                    $discountPct = max(0.0, min(100.0, (float) $item->discount));
+                                                    $originalPrice = (float) $item->unit_price * (1 - $discountPct / 100);
 
                                                     $deliveryOrderItems[] = [
                                                         'do_number' => 'SO-' . $saleOrder->so_number, // Use SO number as reference

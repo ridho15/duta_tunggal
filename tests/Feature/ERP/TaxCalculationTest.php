@@ -204,6 +204,7 @@ class TaxCalculationTest extends TestCase
             'unit_price'    => 1_120_000,
             'discount'      => 0,
             'tax'           => 12,
+            'tipe_pajak'    => 'Inklusif', // Explicit: null no longer defaults to Inklusif in SalesOrderService
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
