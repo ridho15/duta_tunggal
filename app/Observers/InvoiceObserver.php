@@ -31,15 +31,19 @@ class InvoiceObserver
         // Create AP or AR depending on source
         if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder') {
             // Create Account Payable
-            $accountPayable = AccountPayable::create([
+            $data = [
                 'invoice_id' => $invoice->id,
                 'supplier_id' => $invoice->fromModel->supplier_id,
                 'total' => $invoice->total,
                 'paid' => 0,
                 'remaining' => $invoice->total,
                 'status' => 'Belum Lunas',
-                'cabang_id' => $invoice->cabang_id, // FIX #5: propagate branch scope
-            ]);
+            ];
+            // branch column may not exist on older installs; include only when present
+            if (\Illuminate\Support\Facades\Schema::hasColumn('account_payables', 'cabang_id')) {
+                $data['cabang_id'] = $invoice->cabang_id;
+            }
+            $accountPayable = AccountPayable::create($data);
             // Create Ageing Schedule
             $accountPayable->ageingSchedule()->create([
                 'invoice_date' => $invoice->invoice_date,

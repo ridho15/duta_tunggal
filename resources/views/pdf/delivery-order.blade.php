@@ -91,7 +91,7 @@
         </tr>
         <tr>
             <td style="border: none;">Cabang</td>
-            <td style="border: none;">: {{ $deliveryOrder->cabang->name ?? 'N/A' }}</td>
+            <td style="border: none;">: {{ $deliveryOrder->cabang->nama ?? 'N/A' }}</td>
         </tr>
         @if($deliveryOrder->additional_cost > 0)
         <tr>
@@ -131,6 +131,10 @@
             </tr>
         </thead>
         <tbody>
+            @php
+                $total = 0;
+                $subtotal = 0;
+            @endphp
             @foreach ($deliveryOrder->deliveryOrderItem as $index => $item)
             @php
                 $price = 0;
@@ -147,6 +151,8 @@
                     $taxResult = \App\Services\TaxService::compute($base, $taxRate, $tr);
                     $taxAmount = $taxResult['ppn'];
                     $lineSubtotal = $taxResult['total'];
+                    $subtotal += $lineSubtotal;
+                    $total += $lineSubtotal;
                 }
             @endphp
             <tr>
@@ -165,14 +171,7 @@
     </table>
 
     @php
-        $subtotal = 0;
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->saleOrderItem) {
-                $price = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
-                $subtotal += $price * $item->quantity;
-            }
-        }
-        $total = $subtotal + $deliveryOrder->additional_cost;
+        $total = $total + $deliveryOrder->additional_cost;
     @endphp
 
     <table style="border: none; margin-top: 20px; width: 50%; margin-left: auto;">

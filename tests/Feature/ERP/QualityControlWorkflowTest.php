@@ -461,4 +461,45 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertNotEquals($qc1->qc_number, $qc2->qc_number,
             'Each QC record must have a unique QC number');
     }
+
+    /** @test */
+    public function journal_posting_is_skipped_when_coa_accounts_are_missing(): void
+    {
+        // purge COA table to simulate misconfiguration where fallback lookup fails
+        \App\Models\ChartOfAccount::query()->delete();
+
+        $qc = QualityControl::create([
+            'qc_number'         => 'QC-P-' . now()->format('Ymd') . '-0099',
+            // trigger the branch that creates journal entries (PurchaseOrderItem)
+            'from_model_type'   => 'App\\Models\\PurchaseOrderItem',
+            'from_model_id'     => $this->poItem->id,
+            'inspected_by'      => $this->user->id,
+            'passed_quantity'   => 10,
+            'rejected_quantity' => 0,
+            'status'            => 1,
+            'warehouse_id'      => $this->warehouse->id,
+            'product_id'        => $this->product->id,
+            'date_send_stock'   => now()->toDateString(),
+        ]);
+
+        // Spy on the log so we can assert a warning was emitted
+        \Illuminate\Support\Facades\Log::spy();
+
+        $service = app(\App\Services\QualityControlService::class);
+        $service->completeQualityControl($qc, []);
+
+        // no journal entries should have been created for the QC
+        $this->assertDatabaseMissing('journal_entries', [
+            'source_type' => QualityControl::class,
+            'source_id'   => $qc->id,
+        ]);
+
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')->withArgs(
+            function ($message, $context) use ($qc) {
+                return str_contains($message, 'QC journal posting skipped due to missing COA')
+                    && isset($context['qc_number'])
+                    && $context['qc_number'] === $qc->qc_number;
+            }
+        );
+    }
 }

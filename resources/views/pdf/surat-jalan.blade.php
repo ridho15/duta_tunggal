@@ -82,6 +82,12 @@
                 @endforeach
                 @endforeach</td>
         </tr>
+        <tr>
+            <td style="border: none;">Cabang</td>
+            <td style="border: none;">: @foreach ($suratJalan->deliveryOrder as $deliveryOrder)
+                {{ $deliveryOrder->cabang->name ?? 'N/A' }},
+                @endforeach</td>
+        </tr>
     </table>
 
     <br>

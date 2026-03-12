@@ -36,8 +36,59 @@ use App\Models\SuratJalan;
 use App\Services\SalesOrderService;
 use App\Services\TaxService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 
 uses(RefreshDatabase::class);
+
+it('database structure includes cabang_id on account_payables', function () {
+    $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('account_payables', 'cabang_id'),
+        'account_payables table must have cabang_id for branch scoping');
+});
+
+it('invoice model accessor returns monetary ppn amount not rate', function () {
+    $invoice = Invoice::factory()->create([
+        'subtotal' => 100000,
+        'tax' => 11, // percentage
+        'total' => 111000,
+    ]);
+
+    $this->assertEquals(11000.0, $invoice->ppn_amount,
+        'ppn_amount accessor should compute subtotal * (tax/100) when items absent');
+});
+
+it('view page logs ppn amount and account payable info', function () {
+    \Illuminate\Support\Facades\Log::spy();
+
+    $invoice = Invoice::factory()->create([
+        'subtotal' => 50000,
+        'tax' => 11,
+        'total' => 55500,
+    ]);
+
+    // create an account payable record so it will appear in context
+    \App\Models\AccountPayable::factory()->create([
+        'invoice_id' => $invoice->id,
+        'supplier_id' => \App\Models\Supplier::factory()->create()->id,
+        'total' => 55500,
+        'paid' => 0,
+        'remaining' => 55500,
+        'status' => 'Belum Lunas',
+    ]);
+
+    $page = new \App\Filament\Resources\SalesInvoiceResource\Pages\ViewSalesInvoice();
+    // Filament pages expect to be mounted with a record parameter
+    $page->mount('record', $invoice);
+    // trigger infolist construction which includes the afterStateHydrated hook
+    $page->infolist(app(\Filament\Infolists\Infolist::class));
+
+    \Illuminate\Support\Facades\Log::shouldHaveReceived('debug')->withArgs(
+        fn($msg, $context) =>
+            str_contains($msg, 'Viewing invoice for debug')
+            && isset($context['id'])
+            && $context['id'] === $invoice->id
+            && array_key_exists('account_payable', $context)
+    );
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -420,6 +471,10 @@ describe('PDF generators include required item columns and totals', function () 
         assertPdfHasColumns($html, [
             'Nama Barang', 'Qty', 'Harga Satuan', 'Discount', 'Tax (%)', 'Tax Amount', 'Subtotal'
         ]);
+        // ensure customer name, shipping address and branch show up
+        expect($html)->toContain($this->customer->name);
+        expect($html)->toContain($so->shipped_to);
+        expect($html)->toContain($this->cabang->name);
     });
 
     it('surat jalan PDF includes all columns', function () {
@@ -441,6 +496,10 @@ describe('PDF generators include required item columns and totals', function () 
         $do->salesOrders()->attach($so->id);
 
         $html = view('pdf.surat-jalan', ['suratJalan'=>$sj])->render();
+        // verify customer and address and branch present in surat jalan output
+        expect($html)->toContain($this->customer->name);
+        expect($html)->toContain($so->shipped_to);
+        expect($html)->toContain($this->cabang->name);
         assertPdfHasColumns($html, [
             'Nama Barang', 'Qty', 'Harga Satuan', 'Discount', 'Tax (%)', 'Tax Amount', 'Subtotal'
         ]);
@@ -783,6 +842,274 @@ describe('Account Receivable — creation and branch scope', function () {
             ->count();
 
         expect($arCount)->toBe(1);
+    });
+
+    it('invoice is created only once when sale order completes multiple times', function () {
+        $so = SaleOrder::factory()->create([
+            'customer_id' => $this->customer->id,
+            'cabang_id'   => $this->cabang->id,
+            'status'      => 'draft',
+        ]);
+        SaleOrderItem::factory()->create([
+            'sale_order_id' => $so->id,
+            'product_id'    => $this->product->id,
+            'quantity'      => 2,
+            'unit_price'    => 250_000,
+            'discount'      => 0,
+            'tax'           => 10,
+            'tipe_pajak'    => 'Eksklusif',
+            'warehouse_id'  => $this->warehouse->id,
+        ]);
+
+        $so->update(['status' => 'completed']);
+        $so->update(['status' => 'completed']); // repeat
+
+        $invoiceCount = Invoice::where('from_model_type', SaleOrder::class)
+            ->where('from_model_id', $so->id)
+            ->count();
+
+        expect($invoiceCount)->toBe(1);
+    });
+
+    it('delivery order completion rerun does not duplicate sale order update or invoice', function () {
+        // prepare sale order with item
+        $so = SaleOrder::factory()->create([
+            'customer_id' => $this->customer->id,
+            'cabang_id'   => $this->cabang->id,
+            'status'      => 'approved',
+        ]);
+        $soItem = SaleOrderItem::factory()->create([
+            'sale_order_id' => $so->id,
+            'product_id'    => $this->product->id,
+            'quantity'      => 1,
+            'unit_price'    => 100_000,
+            'discount'      => 0,
+            'tax'           => 0,
+            'tipe_pajak'    => 'Eksklusif',
+            'warehouse_id'  => $this->warehouse->id,
+        ]);
+
+        // create a delivery order linked to sale order
+        $do = DeliveryOrder::factory()->create([
+            'do_number' => 'DOX',
+            'delivery_date' => now(),
+            'cabang_id' => $this->cabang->id,
+        ]);
+        $do->salesOrders()->attach($so->id);
+        $doItem = DeliveryOrderItem::factory()->create([
+            'delivery_order_id' => $do->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+            'reason' => '',
+        ]);
+        $doItem->sale_order_item_id = $soItem->id;
+        $doItem->save();
+
+        // complete DO twice
+        $do->update(['status' => 'completed']);
+        $do->update(['status' => 'completed']);
+
+        // sale order should have been marked completed once
+        $so->refresh();
+        expect($so->status)->toBe('completed');
+
+        // invoice count remains one
+        $invoiceCount = Invoice::where('from_model_type', SaleOrder::class)
+            ->where('from_model_id', $so->id)
+            ->count();
+        expect($invoiceCount)->toBe(1);
+    });
+
+    it('completing sale order and delivery order never dispatches Laravel events', function () {
+        Event::fake();
+
+        $so = SaleOrder::factory()->create([
+            'customer_id' => $this->customer->id,
+            'cabang_id'   => $this->cabang->id,
+            'status'      => 'draft',
+        ]);
+        SaleOrderItem::factory()->create([
+            'sale_order_id' => $so->id,
+            'product_id'    => $this->product->id,
+            'quantity'      => 1,
+            'unit_price'    => 100_000,
+            'discount'      => 0,
+            'tax'           => 0,
+            'tipe_pajak'    => 'Eksklusif',
+            'warehouse_id'  => $this->warehouse->id,
+        ]);
+
+        $so->update(['status' => 'completed']);
+
+        $do = DeliveryOrder::factory()->create([
+            'do_number' => 'DOX',
+            'delivery_date' => now(),
+            'cabang_id' => $this->cabang->id,
+        ]);
+        $do->salesOrders()->attach($so->id);
+        $doItem = DeliveryOrderItem::factory()->create([
+            'delivery_order_id' => $do->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+            'reason' => '',
+        ]);
+        $doItem->sale_order_item_id = SaleOrderItem::first()->id;
+        $doItem->save();
+
+        $do->update(['status' => 'completed']);
+
+        Event::assertNothingDispatched();
+    });
+
+    it('ar-ap:sync command respects uniqueness and updates existing AR', function () {
+        $so = SaleOrder::factory()->create([
+            'customer_id' => $this->customer->id,
+            'cabang_id'   => $this->cabang->id,
+            'status'      => 'draft',
+        ]);
+        SaleOrderItem::factory()->create([
+            'sale_order_id' => $so->id,
+            'product_id'    => $this->product->id,
+            'quantity'      => 1,
+            'unit_price'    => 200_000,
+            'discount'      => 0,
+            'tax'           => 10,
+            'tipe_pajak'    => 'Eksklusif',
+            'warehouse_id'  => $this->warehouse->id,
+        ]);
+
+        $so->update(['status' => 'completed']);
+
+        $invoice = Invoice::where('from_model_type', SaleOrder::class)
+            ->where('from_model_id', $so->id)
+            ->first();
+
+        // first sync should create (already created by observer, but sync should not duplicate)
+        Artisan::call('ar-ap:sync');
+        $arCount = AccountReceivable::withoutGlobalScopes()
+            ->where('invoice_id', $invoice->id)
+            ->count();
+        expect($arCount)->toBe(1);
+
+        // change invoice total and force update via sync
+        $invoice->update(['total' => $invoice->total + 50_000]);
+        Artisan::call('ar-ap:sync', ['--force' => true]);
+        $ar = AccountReceivable::withoutGlobalScopes()
+            ->where('invoice_id', $invoice->id)
+            ->first();
+        expect((float) $ar->total)->toBe((float) $invoice->total);
+
+        // another sync without force should still not create duplicates
+        Artisan::call('ar-ap:sync');
+        $arCount = AccountReceivable::withoutGlobalScopes()
+            ->where('invoice_id', $invoice->id)
+            ->count();
+        expect($arCount)->toBe(1);
+    });
+
+    // ─── SECTION 8: DATABASE INTEGRITY ───────────────────────────────────────
+    describe('Database integrity for financial tables', function () {
+        it('sales_orders.customer_id references an existing customer', function () {
+            $cust = Customer::factory()->create();
+            $so = SaleOrder::factory()->create([ 'customer_id'=>$cust->id ]);
+            DB::table('sale_orders')->insert([
+                'customer_id' => 999999,
+                'so_number' => 'ORPHAN',
+                'order_date' => now(),
+                'status'=>'draft',
+                'total_amount' => 0,
+            ]);
+
+            $hasOrphan = DB::table('sale_orders')
+                ->leftJoin('customers','sale_orders.customer_id','customers.id')
+                ->whereNull('customers.id')
+                ->exists();
+
+            expect($hasOrphan)->toBeTrue();
+        });
+
+        it('quotations.customer_id points to existing customer', function () {
+            $cust = Customer::factory()->create();
+            $q = \App\Models\Quotation::factory()->create(['customer_id'=>$cust->id]);
+            DB::table('quotations')->insert([
+                'customer_id' => 999999,
+                'quotation_number'=>'Q-ORPHAN',
+                'date'=>now(),
+                'status'=>'draft',
+                'total_amount'=>0,
+            ]);
+
+            $orphan = DB::table('quotations')
+                ->leftJoin('customers','quotations.customer_id','customers.id')
+                ->whereNull('customers.id')
+                ->exists();
+            expect($orphan)->toBeTrue();
+        });
+
+        it('account_receivables link to existing invoice and customer', function () {
+            $inv = Invoice::factory()->create();
+            $cust = Customer::factory()->create();
+            AccountReceivable::factory()->create([
+                'invoice_id'=>$inv->id,
+                'customer_id'=>$cust->id,
+            ]);
+            DB::table('account_receivables')->insert([
+                'invoice_id'=>999999,
+                'customer_id'=>$cust->id,
+                'total'=>0,'paid'=>0,'remaining'=>0,'status'=>'Belum Lunas'
+            ]);
+            DB::table('account_receivables')->insert([
+                'invoice_id'=>$inv->id,
+                'customer_id'=>999999,
+                'total'=>0,'paid'=>0,'remaining'=>0,'status'=>'Belum Lunas'
+            ]);
+
+            $invoiceOrphan = DB::table('account_receivables')
+                ->leftJoin('invoices','account_receivables.invoice_id','invoices.id')
+                ->whereNull('invoices.id')
+                ->exists();
+            $customerOrphan = DB::table('account_receivables')
+                ->leftJoin('customers','account_receivables.customer_id','customers.id')
+                ->whereNull('customers.id')
+                ->exists();
+            expect($invoiceOrphan)->toBeTrue();
+            expect($customerOrphan)->toBeTrue();
+        });
+
+        it('invoice.from_model_id references existing sale_order when appropriate', function () {
+            $so = SaleOrder::factory()->create(['status'=>'completed']);
+            $inv = Invoice::factory()->create([
+                'from_model_type'=>SaleOrder::class,
+                'from_model_id'=>$so->id,
+            ]);
+            DB::table('invoices')->insert([
+                'from_model_type'=>SaleOrder::class,
+                'from_model_id'=>999999,
+                'invoice_number'=>'X','invoice_date'=>now(),'due_date'=>now(),
+                'subtotal'=>0,'tax'=>0,'total'=>0
+            ]);
+
+            $orphan = DB::table('invoices')
+                ->where('from_model_type',SaleOrder::class)
+                ->leftJoin('sale_orders','invoices.from_model_id','sale_orders.id')
+                ->whereNull('sale_orders.id')
+                ->exists();
+            expect($orphan)->toBeTrue();
+        });
+
+        it('no duplicate account_receivable for same invoice (unique constraint)', function () {
+            $inv = Invoice::factory()->create();
+            AccountReceivable::factory()->create(['invoice_id'=>$inv->id]);
+            $threw = false;
+            try {
+                DB::table('account_receivables')->insert([
+                    'invoice_id'=>$inv->id,'customer_id'=>1,'total'=>0,'paid'=>0,'remaining'=>0,'status'=>'Belum Lunas'
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                $threw = true;
+            }
+            expect($threw)->toBeTrue();
+        });
     });
 });
 

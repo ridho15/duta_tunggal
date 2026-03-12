@@ -376,16 +376,6 @@ class QualityControlPurchaseResource extends Resource
                                 ->orWhere('code', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('receipt_number')
-                    ->label('Purchase Receipt')
-                    ->getStateUsing(function ($record) {
-                        return $record->fromModel?->purchaseReceipt?->receipt_number ?? 'N/A';
-                    })
-                    ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('fromModel.purchaseReceipt', function ($query) use ($search) {
-                            return $query->where('receipt_number', 'LIKE', '%' . $search . '%');
-                        });
-                    }),
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->getStateUsing(function ($record) {
@@ -641,15 +631,16 @@ class QualityControlPurchaseResource extends Resource
                     ])->columns(2),
                 InfolistSection::make('Purchase Information')
                     ->schema([
-                        TextEntry::make('fromModel.purchaseReceipt.receipt_number')->label('Receipt Number'),
-                        TextEntry::make('fromModel.purchaseReceipt.purchaseOrder.po_number')->label('PO Number'),
-                        TextEntry::make('fromModel.purchaseReceipt.purchaseOrder.supplier.name')->label('Supplier'),
-                        TextEntry::make('fromModel.qty_accepted')->label('Accepted Quantity'),
-                        TextEntry::make('fromModel.purchaseReceipt.currency.code')->label('Currency'),
+                        // QC Purchase is created from a PurchaseOrderItem, not a receipt item.
+                        TextEntry::make('fromModel.purchaseOrder.po_number')->label('PO Number'),
+                        TextEntry::make('fromModel.purchaseOrder.supplier.perusahaan')->label('Supplier'),
+                        TextEntry::make('fromModel.quantity')->label('Ordered Quantity'),
+                        TextEntry::make('fromModel.unit_price')->label('Unit Price')->formatStateUsing(fn ($state) => "Rp " . number_format($state, 0, ',', '.'))
                     ])->columns(2),
                 InfolistSection::make('Quality Control Results')
                     ->schema([
-                        TextEntry::make('fromModel.qty_received')->label('Qty Received'),
+                        // use po item quantity as received qty for purchase QC
+                        TextEntry::make('fromModel.quantity')->label('Qty Order'),
                         TextEntry::make('passed_quantity')->label('Qty Accepted')->color('success'),
                         TextEntry::make('rejected_quantity')->label('Qty Rejected')->color('danger'),
                         TextEntry::make('reason_reject')->label('Rejection Reason'),

@@ -566,7 +566,7 @@ ADD INDEX   account_receivables_status_cabang_index (status, cabang_id)
 | `tests/Unit/Observers/InvoiceObserverPostSalesTest.php` (new) | 7 | 10 | ✅ All pass |
 | `tests/Feature/ERP/TaxCalculationTest.php` (prev. session) | 18 | — | ✅ All pass |
 | `tests/Feature/ERP/DocumentCodeGenerationTest.php` (prev.) | 11 | — | ✅ All pass |
-| `tests/Feature/ERP/QualityControlWorkflowTest.php` (prev.) | 12 | — | ✅ All pass |
+| `tests/Feature/ERP/QualityControlWorkflowTest.php` (prev.) | 13 | — | ✅ All pass |
 | `tests/Feature/ERP/SalesWorkflowTest.php` (prev.) | 8 | 14 | ✅ All pass |
 | **Grand Total** | **≥104** | **≥238+** | **✅** |
 

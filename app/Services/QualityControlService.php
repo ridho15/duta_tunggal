@@ -313,12 +313,33 @@ class QualityControlService
 
         $amount = round($passedQuantity * $unitPrice, 2);
 
-        // Get COA accounts
-        $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes(['1140.10', '1140.01']);
-        $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
-        $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        // Get COA accounts.  Note that the product relation uses withDefault(),
+        // which will return an empty ChartOfAccount instance with no id when the
+        // foreign key is null.  We only treat the relation as valid when an id is
+        // present; otherwise fall back to the hardcoded codes.
+        $inventoryCoa = ($product->inventoryCoa && $product->inventoryCoa->id)
+            ? $product->inventoryCoa
+            : $this->resolveCoaByCodes(['1140.10', '1140.01']);
+        $temporaryProcurementCoa = ($product->temporaryProcurementCoa && $product->temporaryProcurementCoa->id)
+            ? $product->temporaryProcurementCoa
+            : $this->resolveCoaByCodes(['1180.01', '1400.01']);
+        $unbilledPurchaseCoa = ($product->unbilledPurchaseCoa && $product->unbilledPurchaseCoa->id)
+            ? $product->unbilledPurchaseCoa
+            : $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
 
-        if (!$inventoryCoa || !$temporaryProcurementCoa || !$unbilledPurchaseCoa) {
+        // The relation may still produce a ChartOfAccount with an empty id, or the
+        // fallback resolver may return null if none of the codes exist.  We guard
+        // against any missing account to prevent attempting to insert a journal
+        // entry with a null coa_id (which caused the bug logged earlier).
+        if (!$inventoryCoa || !$inventoryCoa->id || !$temporaryProcurementCoa || !$temporaryProcurementCoa->id || !$unbilledPurchaseCoa || !$unbilledPurchaseCoa->id) {
+            // Log the issue so that developers know journal entries were skipped.
+            Log::warning('QC journal posting skipped due to missing COA', [
+                'qc_number' => $qualityControl->qc_number,
+                'inventory_coa' => $inventoryCoa?->id,
+                'temporary_procurement_coa' => $temporaryProcurementCoa?->id,
+                'unbilled_purchase_coa' => $unbilledPurchaseCoa?->id,
+            ]);
+
             // Skip posting if required COA accounts are not available (e.g., in test environment)
             return;
         }

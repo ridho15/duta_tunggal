@@ -650,7 +650,7 @@
         - generic [ref=e1105] [cursor=pointer]:
           - text: 
           - generic: Queries
-          - generic [ref=e1106]: "5"
+          - generic [ref=e1106]: "4"
         - generic [ref=e1107] [cursor=pointer]:
           - text: 
           - generic: Models
@@ -667,11 +667,11 @@
           - generic: 
           - generic [ref=e1117]: "2"
         - combobox [ref=e1118] [cursor=pointer]:
-          - option "#1 sales-report-page (11:56:58)"
-          - option "#2 update (ajax) (11:56:58)" [selected]
+          - option "#1 sales-report-page (12:00:42)"
+          - option "#2 update (ajax) (12:00:42)" [selected]
         - generic [ref=e1119] [cursor=pointer]:
           - generic: 
-          - generic: 42.71ms
+          - generic: 128ms
         - generic [ref=e1120]:
           - generic: 
           - generic: 4MB
@@ -681,6 +681,6 @@
         - generic [ref=e1122] [cursor=pointer]:
           - generic: 
           - generic: POST livewire/update
-    - text:                                                  
+    - text:                                            
   - text: 
 ```

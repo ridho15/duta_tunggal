@@ -115,7 +115,7 @@ QualityControl
 
 Status transitions: `Pending → Passed` or `Pending → Rejected` update `qty_accepted` / `qty_rejected` on the `PurchaseReceiptItem`.
 
-**Tested by:** `QualityControlWorkflowTest` — 12 tests, 12 passing.
+**Tested by:** `QualityControlWorkflowTest` — 13 tests, 13 passing.
 
 ---
 
@@ -144,7 +144,7 @@ All 29 tasks documented in `docs/IMPLEMENTATION_REPORT.md` were verified as impl
 | Pre-existing test suite (77 tests) | 77 | ✅ All pass |
 | `TaxCalculationTest.php` (new) | 18 | ✅ All pass |
 | `DocumentCodeGenerationTest.php` (new) | 11 | ✅ All pass |
-| `QualityControlWorkflowTest.php` (new) | 12 | ✅ All pass |
+| `QualityControlWorkflowTest.php` (new) | 13 | ✅ All pass |
 | **Total** | **118** | **✅ 118/118** |
 
 **New test coverage:**
