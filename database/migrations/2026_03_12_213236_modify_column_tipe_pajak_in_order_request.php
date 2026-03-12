@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('order_request', function (Blueprint $table) {
+        Schema::table('order_requests', function (Blueprint $table) {
             $table->string('tax_type', 20)->default('None')->change();
         });
     }
@@ -21,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('order_request', function (Blueprint $table) {
+        Schema::table('order_requests', function (Blueprint $table) {
             //
         });
     }

@@ -25,6 +25,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Support\Carbon;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\ViewAction;
@@ -143,13 +144,38 @@ class SalesInvoiceResource extends Resource
                                     )
                                     ->maxLength(255),
 
+                                TextInput::make('due_date_display')
+                                    ->label('Due Date')
+                                    ->disabled()
+                                    ->placeholder('Auto calculated')
+                                    ->dehydrated(false)
+                                    ->afterStateHydrated(function ($component, $state, $get) {
+                                        $due = $get('due_date');
+                                        $invoice = $get('invoice_date') ?? now();
+                                        if ($due) {
+                                            $days = \Illuminate\Support\Carbon::parse($invoice)
+                                                ->diffInDays(\Illuminate\Support\Carbon::parse($due));
+                                            $component->state("{$due} ({$days} hari)");
+                                        }
+                                    }),
+
                                 DatePicker::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->required()
+                                    ->reactive()
                                     ->validationMessages([
                                         'required' => 'Tanggal invoice harus diisi'
                                     ])
-                                    ->default(now()),
+                                    ->default(now())
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        // recalc due_date_display when invoice date changes
+                                        $due = $get('due_date');
+                                        if ($due) {
+                                            $days = \Illuminate\Support\Carbon::parse($state)
+                                                ->diffInDays(\Illuminate\Support\Carbon::parse($due));
+                                            $set('due_date_display', "{$due} ({$days} hari)");
+                                        }
+                                    }),
 
                                 DatePicker::make('due_date')
                                     ->label('Due Date')
@@ -160,7 +186,10 @@ class SalesInvoiceResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if ($state) {
-                                            $set('due_date_display', $state);
+                                            $invoice = $get('invoice_date') ?? now();
+                                            $days = \Illuminate\Support\Carbon::parse($invoice)
+                                                ->diffInDays(\Illuminate\Support\Carbon::parse($state));
+                                            $set('due_date_display', "{$state} ({$days} hari)");
                                         }
                                     }),
                             ]),
