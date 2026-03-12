@@ -185,10 +185,11 @@ class OrderRequestResource extends Resource
                         Select::make('tax_type')
                             ->label('Tipe PPN')
                             ->options([
+                                'None' => 'Non Pajak',
                                 'PPN Excluded' => 'PPN Excluded (PPN di luar harga)',
                                 'PPN Included' => 'PPN Included (PPN sudah termasuk harga)',
                             ])
-                            ->default('PPN Excluded')
+                            ->default('None')
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (string $state, callable $get, callable $set) {

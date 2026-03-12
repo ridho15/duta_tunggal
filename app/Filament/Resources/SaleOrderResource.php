@@ -799,10 +799,11 @@ class SaleOrderResource extends Resource
                                 \Filament\Forms\Components\Select::make('tipe_pajak')
                                     ->label('Tipe Pajak')
                                     ->options([
+                                        'None' => 'Non Pajak',
                                         'Exclusive' => 'Exclusive (PPN di luar harga)',
                                         'Inclusive' => 'Inclusive (PPN sudah termasuk)',
                                     ])
-                                    ->default('Exclusive')
+                                    ->default('None')
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $state));
@@ -837,34 +838,35 @@ class SaleOrderResource extends Resource
                                             $component->state(HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, $record->tipe_pajak ?? null));
                                         }
                                     })
-                                    ->afterStateUpdated(function ($component, $state, $livewire) {
-                                        $quantity = $livewire->data['quantity'] ?? 0;
-                                        $unit_price = HelperController::parseIndonesianMoney($livewire->data['unit_price'] ?? 0);
-                                        $discount = $livewire->data['discount'] ?? 0;
-                                        $tax = $livewire->data['tax'] ?? 0;
-                                        $component->state(HelperController::hitungSubtotal($quantity, $unit_price, $discount, $tax, $livewire->data['tipe_pajak'] ?? null));
+                                    ->afterStateUpdated(function ($component, $state, $livewire, $get) {
+                                        $qty   = $get('quantity') ?? 0;
+                                        $price = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                        $disc  = $get('discount') ?? 0;
+                                        $tax   = $get('tax') ?? 0;
+                                        $type  = $get('tipe_pajak') ?? 'None';
 
-                                        // Calculate and update total amount
-                                        $items = $livewire->data['saleOrderItem'] ?? [];
-                                        $totalAmount = 0;
-                                        foreach ($items as $item) {
-                                            $totalAmount += HelperController::hitungSubtotal(
+                                        $component->state(HelperController::hitungSubtotal($qty, $price, $disc, $tax, $type));
+
+                                        // hitung ulang total order
+                                        $total = 0;
+                                        foreach ($livewire->data['saleOrderItem'] ?? [] as $item) {
+                                            $total += HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
                                                 HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
-                                                $item['tipe_pajak'] ?? null
+                                                $item['tipe_pajak'] ?? 'None'
                                             );
                                         }
-                                        $livewire->data['total_amount'] = $totalAmount;
+                                        $livewire->data['total_amount'] = $total;
 
                                         // Check credit validation
                                         $customerId = $livewire->data['customer_id'] ?? null;
-                                        if ($customerId && $totalAmount > 0) {
+                                        if ($customerId && $total > 0) {
                                             $customer = Customer::find($customerId);
                                             if ($customer) {
                                                 $creditService = app(CreditValidationService::class);
-                                                $validation = $creditService->canCustomerMakePurchase($customer, (float)$totalAmount);
+                                                $validation = $creditService->canCustomerMakePurchase($customer, (float)$total);
 
                                                 if (!$validation['can_purchase']) {
                                                     Notification::make()

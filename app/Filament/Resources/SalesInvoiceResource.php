@@ -143,11 +143,6 @@ class SalesInvoiceResource extends Resource
                                     )
                                     ->maxLength(255),
 
-                                TextInput::make('due_date_display')
-                                    ->label('Due Date')
-                                    ->disabled()
-                                    ->placeholder('Auto calculated'),
-
                                 DatePicker::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->required()
