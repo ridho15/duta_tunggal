@@ -525,7 +525,7 @@ test('quotation approval workflow works correctly', function () {
 
 // ─── tax_type tests ──────────────────────────────────────────────────────────
 
-test('quotation item stores tax_type Exclusive by default', function () {
+test('quotation item stores tax_type None by default', function () {
     $customer = Customer::factory()->create();
 
     $quotation = Quotation::create([
@@ -543,11 +543,11 @@ test('quotation item stores tax_type Exclusive by default', function () {
         'unit_price'   => 100000,
         'discount'     => 0,
         'tax'          => 12,
-        // tax_type omitted — DB default is 'Exclusive'
+        // tax_type omitted — DB default is 'None' (changed by migration 2026_03_12_000001)
     ]);
 
     $item->refresh();
-    expect($item->tax_type)->toBe('Exclusive');
+    expect($item->tax_type)->toBe('None');
 });
 
 test('quotation item stores tax_type Inclusive when explicitly set', function () {

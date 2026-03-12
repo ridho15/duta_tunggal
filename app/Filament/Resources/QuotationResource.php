@@ -59,7 +59,7 @@ class QuotationResource extends Resource
     // Keep resource label, but group renamed to include english hint
     protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
     public static function form(Form $form): Form
     {
         return $form
@@ -250,6 +250,14 @@ class QuotationResource extends Resource
                             ])
                             ->required(),
                         DatePicker::make('valid_until'),
+                        TextInput::make('tempo_pembayaran')
+                            ->label('Tempo Pembayaran (Hari)')
+                            ->numeric()
+                            ->nullable()
+                            ->minValue(0)
+                            ->helperText('Masukkan jumlah hari tempo pembayaran khusus untuk quotation ini. Jika kosong, menggunakan default customer. Nilai ini akan diajukan untuk disetujui bersama discount.')
+                            ->placeholder('Contoh: 30')
+                            ->suffix('Hari'),
                         TextInput::make('total_amount')
                             ->readOnly()
                             ->indonesianMoney()
@@ -450,6 +458,11 @@ class QuotationResource extends Resource
                 TextColumn::make('valid_until')
                     ->date()
                     ->sortable(),
+                TextColumn::make('tempo_pembayaran')
+                    ->label('Tempo (Hari)')
+                    ->suffix(' hari')
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('total_amount')
                     ->numeric()
                     ->rupiah()
@@ -618,6 +631,19 @@ class QuotationResource extends Resource
                             return Auth::user()->hasPermissionTo('request-approve quotation') && $record->status == 'draft';
                         })
                         ->requiresConfirmation()
+                        ->modalHeading('Ajukan Persetujuan Quotation')
+                        ->modalDescription(function ($record) {
+                            $discountItems = $record->quotationItem->filter(fn($i) => $i->discount > 0);
+                            $tempoText = $record->tempo_pembayaran
+                                ? "Tempo pembayaran yang diajukan: **{$record->tempo_pembayaran} hari**."
+                                : 'Tidak ada tempo khusus (gunakan default customer).';
+                            $discountText = $discountItems->count() > 0
+                                ? "Terdapat **{$discountItems->count()} item** dengan discount."
+                                : 'Tidak ada discount.';
+                            return new \Illuminate\Support\HtmlString(
+                                "<div class='text-sm'><p>{$discountText}</p><p>{$tempoText}</p><p class='mt-2 text-warning-600'>Dengan mengajukan, manager akan mereview dan menyetujui term discount/tempo ini.</p></div>"
+                            );
+                        })
                         ->action(function ($record) {
                             $quotationService = app(QuotationService::class);
                             $quotationService->requestApprove($record);
@@ -631,6 +657,20 @@ class QuotationResource extends Resource
                         })
                         ->color('success')
                         ->requiresConfirmation()
+                        ->modalHeading('Setujui Quotation')
+                        ->modalDescription(function ($record) {
+                            $discountItems = $record->quotationItem->filter(fn($i) => $i->discount > 0);
+                            $tempoText = $record->tempo_pembayaran
+                                ? "<strong>Tempo Pembayaran:</strong> {$record->tempo_pembayaran} hari"
+                                : '<strong>Tempo Pembayaran:</strong> Default customer';
+                            $discountText = $discountItems->count() > 0
+                                ? "<strong>Discount:</strong> {$discountItems->count()} item memiliki discount"
+                                : '<strong>Discount:</strong> Tidak ada discount';
+                            $totalText = 'Rp ' . number_format($record->total_amount, 0, ',', '.');
+                            return new \Illuminate\Support\HtmlString(
+                                "<div class='text-sm space-y-1'><p>{$discountText}</p><p>{$tempoText}</p><p><strong>Total Penawaran:</strong> {$totalText}</p><p class='mt-2 text-success-600'>Dengan menyetujui, term discount dan tempo pembayaran ini akan resmi berlaku untuk Sales Order yang dibuat dari quotation ini.</p></div>"
+                            );
+                        })
                         ->action(function ($record) {
                             $quotationService = app(QuotationService::class);
                             $quotationService->approve($record);
@@ -917,10 +957,10 @@ class QuotationResource extends Resource
                         ->action(function ($data, $record) {
                             $salesOrderService = app(SalesOrderService::class);
 
-                            // Create sale order
-                            // If quotation is already approved, SO starts as 'request_approve' (needs final SO confirm)
-                            // This means the quotation approval already covered the commercial terms approval
-                            $soStatus = ($record->status === 'approve') ? 'request_approve' : 'draft';
+                            // Karena quotation sudah di-approve (termasuk discount & tempo pembayaran),
+                            // SO yang dibuat dari quotation approved langsung berstatus 'approved'.
+                            // Tidak perlu approval ulang di level SO karena sudah di-approve di Quotation.
+                            $soStatus = 'approved';
                             $saleOrder = SaleOrder::create([
                                 'customer_id' => $record->customer_id,
                                 'quotation_id' => $record->id,
@@ -930,8 +970,10 @@ class QuotationResource extends Resource
                                 'tipe_pengiriman' => $data['tipe_pengiriman'],
                                 'status' => $soStatus,
                                 'total_amount' => $record->total_amount,
+                                'tempo_pembayaran' => $record->tempo_pembayaran, // Warisi tempo yang sudah disetujui
+                                'approve_by' => Auth::id(), // Marking as approved by the person creating SO from approved quotation
+                                'approve_at' => now(),
                                 'created_by' => Auth::id(),
-                                'reference_type' => 2, // Refer Quotation
                                 'notes' => $data['notes'] ?? null,
                             ]);
 

@@ -100,6 +100,11 @@ class CreateDeposit extends CreateRecord
                 'exception' => $e,
                 'component_data' => $this->data ?? null,
             ]);
+            Notification::make()
+                ->title('Gagal Membuat Deposit')
+                ->body('Terjadi kesalahan saat menyimpan deposit: ' . $e->getMessage())
+                ->danger()
+                ->send();
             throw $e;
         }
     }

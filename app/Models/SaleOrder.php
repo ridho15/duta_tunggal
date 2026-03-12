@@ -48,6 +48,7 @@ class SaleOrder extends Model
         'reject_at',
         'reason_close',
         'tipe_pengiriman', // Ambil Sendiri, Kirim Langsung
+        'tempo_pembayaran',
         'created_by',
         'warehouse_confirmed_at',
         'cabang_id'

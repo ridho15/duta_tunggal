@@ -45,7 +45,7 @@ class PurchaseReturnResource extends Resource
     // Group updated to the standardized Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {

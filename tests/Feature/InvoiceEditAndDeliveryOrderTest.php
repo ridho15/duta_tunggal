@@ -191,11 +191,12 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
             'warehouse_id'  => $warehouse->id,
         ]);
 
-        // Build a WarehouseConfirmation with items (status confirmed, sufficient stock)
+        // Build a WarehouseConfirmation — create as 'request' first so the observer
+        // does not fire DO creation before WC items are added (race condition)
         $wc = WarehouseConfirmation::create([
             'sale_order_id'     => $saleOrder->id,
             'confirmation_type' => 'sales_order',
-            'status'            => 'confirmed',
+            'status'            => 'request',
             'confirmed_by'      => $user->id,
             'confirmed_at'      => now(),
         ]);
@@ -229,7 +230,7 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         $this->assertEquals(3, (int) $items->first()->quantity);
     }
 
-    public function test_delivery_order_is_not_created_when_no_driver_or_vehicle(): void
+    public function test_delivery_order_is_created_without_driver_or_vehicle(): void
     {
         $cabang   = Cabang::factory()->create();
         $user     = User::factory()->create(['cabang_id' => $cabang->id]);
@@ -240,6 +241,7 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         $product   = Product::factory()->create();
 
         // Deliberately do NOT create any Driver or Vehicle
+        // New behavior: DO IS created with null driver_id/vehicle_id (nullable since Task 15)
 
         $saleOrder = SaleOrder::factory()->create([
             'customer_id'     => $customer->id,
@@ -274,16 +276,18 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         ]);
 
         $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'saleOrder');
-
-        // Should not throw; should log a warning and return null
         $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
 
-        // No DO created
-        $this->assertEquals(0, $saleOrder->deliveryOrder()->count());
+        // DO IS now created even without driver/vehicle (nullable driver_id/vehicle_id)
+        $deliveryOrder = $saleOrder->deliveryOrder()->first();
+        $this->assertNotNull($deliveryOrder, 'DO should be created even without driver/vehicle');
+        $this->assertNull($deliveryOrder->driver_id, 'driver_id should be null when no driver exists');
+        $this->assertNull($deliveryOrder->vehicle_id, 'vehicle_id should be null when no vehicle exists');
     }
 
-    public function test_delivery_order_is_skipped_for_self_pickup_sales_order(): void
+    public function test_delivery_order_is_created_for_self_pickup_sales_order(): void
     {
+        // Task 15: Barang yang diambil sendiri oleh customer tetap perlu DO sebagai bukti keluar gudang
         $cabang  = Cabang::factory()->create();
         $user    = User::factory()->create(['cabang_id' => $cabang->id]);
         $this->actingAs($user);
@@ -291,10 +295,22 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         Driver::factory()->create();
         Vehicle::factory()->create();
 
+        $product  = Product::factory()->create();
+        $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
+        $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
+
         $saleOrder = SaleOrder::factory()->create([
             'cabang_id'       => $cabang->id,
+            'customer_id'     => $customer->id,
             'tipe_pengiriman' => 'Ambil Sendiri',
             'status'          => 'approved',
+        ]);
+
+        $soItem = SaleOrderItem::factory()->create([
+            'sale_order_id' => $saleOrder->id,
+            'product_id'    => $product->id,
+            'quantity'      => 5,
+            'warehouse_id'  => $warehouse->id,
         ]);
 
         $wc = WarehouseConfirmation::create([
@@ -305,10 +321,22 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
             'confirmed_at'      => now(),
         ]);
 
+        WarehouseConfirmationItem::create([
+            'warehouse_confirmation_id' => $wc->id,
+            'sale_order_item_id'        => $soItem->id,
+            'product_name'              => $product->name,
+            'requested_qty'             => 5,
+            'confirmed_qty'             => 5,
+            'warehouse_id'              => $warehouse->id,
+            'status'                    => 'confirmed',
+        ]);
+
         $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'saleOrder');
         $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
 
-        $this->assertEquals(0, DeliveryOrder::count(), 'DO should not be created for Ambil Sendiri');
+        // Task 15: DO IS now created for Ambil Sendiri as proof of goods leaving warehouse
+        $deliveryOrder = DeliveryOrder::where('cabang_id', $cabang->id)->first();
+        $this->assertNotNull($deliveryOrder, 'DO should be created for Ambil Sendiri (Task 15)');
     }
 
     // ──────────────────────────────────────────────────────────────────────────

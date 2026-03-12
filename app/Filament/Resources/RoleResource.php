@@ -22,7 +22,7 @@ class RoleResource extends Resource
     protected static ?string $navigationGroup = 'User Roles Management';
 
     // Put roles near the end as requested
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {

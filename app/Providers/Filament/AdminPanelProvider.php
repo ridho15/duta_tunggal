@@ -87,6 +87,7 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->navigationGroups([
                 \Filament\Navigation\NavigationGroup::make('Penjualan (Sales Order)')->icon('heroicon-o-shopping-cart'),
+                \Filament\Navigation\NavigationGroup::make('Customer Return')->icon('heroicon-o-arrow-uturn-left'),
                 \Filament\Navigation\NavigationGroup::make('Delivery Order')->icon('heroicon-o-truck'),
                 \Filament\Navigation\NavigationGroup::make('Finance - Penjualan')->icon('heroicon-o-banknotes'),
                 \Filament\Navigation\NavigationGroup::make('Pembelian (Purchase Order)')->icon('heroicon-o-shopping-bag'),

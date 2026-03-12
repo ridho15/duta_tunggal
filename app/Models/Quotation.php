@@ -24,6 +24,7 @@ class Quotation extends Model
         'customer_id',
         'date',
         'valid_until',
+        'tempo_pembayaran',
         'total_amount',
         'status_payment',
         'po_file_path',

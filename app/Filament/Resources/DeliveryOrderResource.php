@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\PurchaseReceiptItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
+use App\Models\AppSetting;
 use App\Services\DeliveryOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -53,7 +54,7 @@ class DeliveryOrderResource extends Resource
     protected static ?string $navigationGroup = 'Delivery Order';
 
     // Position Delivery Order after Penjualan groups
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -104,8 +105,7 @@ class DeliveryOrderResource extends Resource
                                 return is_array($state) ? $state : [];
                             })
                             ->options(function () {
-                                return SaleOrder::where('tipe_pengiriman', 'Kirim Langsung')
-                                    ->whereIn('status', ['confirmed', 'completed'])
+                                return SaleOrder::whereIn('status', ['confirmed', 'completed'])
                                     ->whereNotNull('warehouse_confirmed_at')
                                     ->pluck('so_number', 'id');
                             })
@@ -114,7 +114,7 @@ class DeliveryOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Minimal satu Sales Order wajib dipilih',
                             ])
-                            ->helperText('Hanya Sales Order yang sudah dikonfirmasi warehouse yang dapat dipilih untuk membuat Delivery Order.')
+                            ->helperText('Sales Order yang sudah dikonfirmasi warehouse dapat dipilih untuk membuat Delivery Order (berlaku untuk semua jenis pengiriman).')
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $listSaleOrder = SaleOrder::whereIn('id', $state)->get();
                                 $deliveryItems = [];
@@ -510,6 +510,10 @@ class DeliveryOrderResource extends Resource
         return $table
             ->defaultSort('created_at', 'desc')
             ->columns([
+                TextColumn::make('do_number')
+                    ->label('Nomor DO')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('customer_names')
                     ->label('Customer')
                     ->getStateUsing(function ($record) {
@@ -528,9 +532,32 @@ class DeliveryOrderResource extends Resource
                         });
                     })
                     ->wrap(),
-                TextColumn::make('do_number')
-                    ->label('Delivery Order Number')
-                    ->searchable(),
+                TextColumn::make('delivery_date')
+                    ->label('Tanggal Pengiriman')
+                    ->date()
+                    ->sortable(),
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->formatStateUsing(function ($state) {
+                        return Str::upper($state);
+                    })
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'draft' => 'gray',
+                            'sent' => 'primary',
+                            'received' => 'info',
+                            'supplier' => 'warning',
+                            'completed' => 'success',
+                            'request_approve' => 'primary',
+                            'approved' => 'primary',
+                            'request_close' => 'warning',
+                            'closed' => 'danger',
+                            'reject' => 'danger',
+                            'delivery_failed' => 'danger',
+                            default => 'gray',
+                        };
+                    })
+                    ->badge(),
                 TextColumn::make('suratJalan')
                     ->label('Surat Jalan')
                     ->getStateUsing(function ($record) {
@@ -553,42 +580,22 @@ class DeliveryOrderResource extends Resource
                         }
                         return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
                     }),
-                TextColumn::make('delivery_date')
-                    ->date()
-                    ->sortable(),
                 TextColumn::make('driver.name')
+                    ->label('Driver')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('vehicle')
-                    ->label('Vehicle')
+                    ->label('Kendaraan')
                     ->formatStateUsing(function ($state) {
                         return $state->plate . ' - ' . $state->type;
-                    }),
-                TextColumn::make('status')
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
                     })
-                    ->color(function ($state) {
-                        return match ($state) {
-                            'draft' => 'gray',
-                            'sent' => 'primary',
-                            'received' => 'info',
-                            'supplier' => 'warning',
-                            'completed' => 'success',
-                            'request_approve' => 'primary',
-                            'approved' => 'primary',
-                            'request_close' => 'warning',
-                            'closed' => 'danger',
-                            'reject' => 'danger',
-                            'delivery_failed' => 'danger',
-                            default => 'gray',
-                        };
-                    })
-                    ->badge(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('salesOrders.so_number')
                     ->label('Sales Orders')
                     ->badge()
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('salesOrders.createdBy.name')
                     ->label('Sales')
                     ->badge()
@@ -695,8 +702,11 @@ class DeliveryOrderResource extends Resource
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
                         }),
                     Action::make('approve')
-                        ->label('Approve')
+                        ->label('Konfirmasi Dana Diterima')
                         ->requiresConfirmation()
+                        ->modalHeading('Konfirmasi: Apakah Dana Sudah Diterima?')
+                        ->modalDescription('Dengan mengkonfirmasi ini, Anda menyatakan bahwa pembayaran untuk Delivery Order ini sudah diterima dan barang siap dikirim melalui Surat Jalan.')
+                        ->modalSubmitActionLabel('Ya, Dana Sudah Diterima')
                         ->color('success')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
@@ -706,8 +716,8 @@ class DeliveryOrderResource extends Resource
                         })
                         ->form([
                             Textarea::make('comments')
-                                ->label('Comments')
-                                ->placeholder('Optional approval comments...')
+                                ->label('Catatan (opsional)')
+                                ->placeholder('Tambahkan catatan jika diperlukan...')
                                 ->nullable()
                         ])
                         ->action(function ($record, array $data) {
@@ -715,7 +725,7 @@ class DeliveryOrderResource extends Resource
                                 $deliveryOrderService = app(DeliveryOrderService::class);
                                 $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
 
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve Delivery Order");
+                                HelperController::sendNotification(isSuccess: true, title: "Dana Dikonfirmasi", message: "Pembayaran Delivery Order telah dikonfirmasi diterima.");
                             } catch (\Exception $e) {
                                 HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
                                 throw $e;
@@ -762,35 +772,6 @@ class DeliveryOrderResource extends Resource
                             // ]);
 
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Delivery Order");
-                        }),
-                    Action::make('sent')
-                        ->label('Mark as Sent')
-                        ->requiresConfirmation()
-                        ->modalHeading('Mark Delivery Order as Sent')
-                        ->modalDescription('Are you sure you want to mark this delivery order as sent? This will create journal entries for goods delivery.')
-                        ->modalSubmitActionLabel('Yes, Mark as Sent')
-                        ->color('info')
-                        ->icon('heroicon-o-paper-airplane')
-                        ->visible(function ($record) {
-                            if (!Auth::user()->hasPermissionTo('response delivery order')) {
-                                return false;
-                            }
-                            // If approval is required, only show for 'approved' status
-                            if (config('procurement.do_approval_required', true)) {
-                                return $record->status == 'approved';
-                            }
-                            // If approval is not required, allow from draft/request_approve/approved
-                            return in_array($record->status, ['draft', 'request_approve', 'approved']);
-                        })
-                        ->action(function ($record) {
-                            try {
-                                $deliveryOrderService = app(DeliveryOrderService::class);
-                                $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'sent');
-                                HelperController::sendNotification(isSuccess: true, title: "Success", message: "Delivery Order marked as sent successfully");
-                            } catch (\Exception $e) {
-                                HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
-                                throw $e;
-                            }
                         }),
                     Action::make('pdf_delivery_order')
                         ->label('Download PDF')

@@ -425,6 +425,13 @@ class SaleOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Tipe Pengiriman belum di pilih'
                             ]),
+                        \Filament\Forms\Components\TextInput::make('tempo_pembayaran')
+                            ->label('Tempo Pembayaran (Hari)')
+                            ->numeric()
+                            ->nullable()
+                            ->readOnly()
+                            ->helperText('Tempo pembayaran yang telah disetujui di Quotation. Digunakan sebagai jatuh tempo invoice.')
+                            ->suffix('Hari'),
                         Repeater::make('saleOrderItem')
                             ->relationship()
                             ->columnSpanFull()
@@ -803,6 +810,7 @@ class SaleOrderResource extends Resource
                                         'Exclusive' => 'Exclusive (PPN di luar harga)',
                                         'Inclusive' => 'Inclusive (PPN sudah termasuk)',
                                     ])
+                                    ->hidden(true)
                                     ->default('None')
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
@@ -812,9 +820,12 @@ class SaleOrderResource extends Resource
                                     ->label('Tax')
                                     ->numeric()
                                     ->reactive()
-                                    ->disabled()
+                                    ->disabled(fn() => Auth::user()?->hasRole('Sales'))
+                                    ->readOnly(fn() => Auth::user()?->hasRole('Sales'))
                                     ->dehydrated(true)
-                                    ->helperText('Dihitung otomatis oleh sistem')
+                                    ->helperText(fn() => Auth::user()?->hasRole('Sales')
+                                        ? 'Dihitung otomatis oleh sistem (tidak dapat diubah oleh Sales)'
+                                        : 'Nilai PPN dalam persen')
                                     ->validationMessages([
                                         'numeric' => 'Tax harus berupa angka',
                                         'min' => 'Tax minimal 0%',
@@ -1017,6 +1028,11 @@ class SaleOrderResource extends Resource
                     ->dateTime()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->label('Approve At'),
+                TextColumn::make('tempo_pembayaran')
+                    ->label('Tempo (Hari)')
+                    ->suffix(' hari')
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('closeBy.name')
                     ->label('Close By')
                     ->toggleable(isToggledHiddenByDefault: true),

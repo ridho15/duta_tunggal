@@ -76,7 +76,7 @@ class PurchaseOrderResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Pembelian';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -1277,7 +1277,7 @@ class PurchaseOrderResource extends Resource
                     '<li><strong>Membuat PO:</strong> PO dapat dibuat dari Order Request atau Sales Order, atau dibuat manual lewat tombol Create PO.</li>' .
                     '<li><strong>Alur baru (QC First):</strong> Setelah PO dibuat (langsung <em>Approved</em>), lanjutkan ke <strong>Quality Control</strong> untuk inspeksi barang. Setelah QC lulus, Purchase Receipt akan dibuat otomatis dan stok diperbarui.</li>' .
                     '<li><strong>Dampak Status Completed:</strong> PO berstatus <em>completed</em> menandakan semua barang telah melewati QC dan diterima; selanjutnya proses invoice dan pembayaran dapat dilanjutkan.</li>' .
-                    '<li><strong>Catatan:</strong> PO dibuat langsung dalam status <em>Approved</em> — tidak diperlukan langkah persetujuan manual. Tindakan <em>close</em> memerlukan hak akses tertentu.</li>' .
+                    '<li><strong>Catatan:</strong> PO dibuat dalam status <em>Draft</em> — perlu disetujui melalui tombol <em>Setujui PO</em> sebelum dapat diproses lebih lanjut. Tindakan <em>close</em> memerlukan hak akses tertentu.</li>' .
                     '</ul>' .
                     '</div>' .
                     '</details>'
@@ -1421,7 +1421,35 @@ class PurchaseOrderResource extends Resource
                                 'status' => 'draft'
                             ]);
                         }),
-                    // approve_po action removed: PO langsung disetujui otomatis saat dibuat (auto-approve).
+                    Action::make('approve_po')
+                        ->label('Setujui PO')
+                        ->visible(function ($record) {
+                            return Gate::allows('response purchase order')
+                                && $record->status === 'draft';
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Setujui Purchase Order')
+                        ->modalDescription('Apakah Anda yakin ingin menyetujui Purchase Order ini?')
+                        ->modalSubmitActionLabel('Ya, Setujui')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->action(function ($record) {
+                            try {
+                                $poService = app(PurchaseOrderService::class);
+                                $poService->approvePo($record);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Purchase Order Disetujui')
+                                    ->body('PO ' . $record->po_number . ' berhasil disetujui.')
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Menyetujui PO')
+                                    ->body('Terjadi kesalahan: ' . $e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
                     Action::make('request_close')
                         ->label('Request Close')
                         ->visible(function ($record) {

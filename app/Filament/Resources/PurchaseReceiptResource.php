@@ -52,7 +52,7 @@ class PurchaseReceiptResource extends Resource
     // Group label updated to indicate Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     /**
      * Purchase Receipt hanya dibuat otomatis dari hasil Quality Control.

@@ -15,12 +15,16 @@ CREATE TABLE `account_payables` (
   `paid` decimal(18,2) NOT NULL DEFAULT '0.00',
   `remaining` decimal(18,2) NOT NULL,
   `status` enum('Lunas','Belum Lunas') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Belum Lunas',
+  `cabang_id` bigint unsigned DEFAULT NULL,
   `created_by` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `account_payables_created_by_foreign` (`created_by`),
+  KEY `account_payables_created_at_index` (`created_at`),
+  KEY `account_payables_cabang_id_index` (`cabang_id`),
+  CONSTRAINT `account_payables_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL,
   CONSTRAINT `account_payables_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -41,8 +45,12 @@ CREATE TABLE `account_receivables` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `cabang_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `account_receivables_invoice_id_unique` (`invoice_id`),
   KEY `account_receivables_created_by_foreign` (`created_by`),
   KEY `account_receivables_cabang_id_foreign` (`cabang_id`),
+  KEY `account_receivables_created_at_index` (`created_at`),
+  KEY `account_receivables_customer_id_index` (`customer_id`),
+  KEY `account_receivables_status_cabang_index` (`status`,`cabang_id`),
   CONSTRAINT `account_receivables_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `account_receivables_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -135,6 +143,7 @@ CREATE TABLE `asset_disposals` (
   KEY `asset_disposals_approved_by_foreign` (`approved_by`),
   KEY `asset_disposals_asset_id_status_index` (`asset_id`,`status`),
   KEY `asset_disposals_disposal_date_index` (`disposal_date`),
+  KEY `asset_disposals_created_at_index` (`created_at`),
   CONSTRAINT `asset_disposals_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`),
   CONSTRAINT `asset_disposals_asset_id_foreign` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -167,6 +176,7 @@ CREATE TABLE `asset_transfers` (
   KEY `asset_transfers_asset_id_status_index` (`asset_id`,`status`),
   KEY `asset_transfers_from_cabang_id_to_cabang_id_index` (`from_cabang_id`,`to_cabang_id`),
   KEY `asset_transfers_transfer_date_index` (`transfer_date`),
+  KEY `asset_transfers_created_at_index` (`created_at`),
   CONSTRAINT `asset_transfers_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`),
   CONSTRAINT `asset_transfers_asset_id_foreign` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `asset_transfers_completed_by_foreign` FOREIGN KEY (`completed_by`) REFERENCES `users` (`id`),
@@ -213,6 +223,7 @@ CREATE TABLE `assets` (
   KEY `assets_purchase_order_id_foreign` (`purchase_order_id`),
   KEY `assets_purchase_order_item_id_foreign` (`purchase_order_item_id`),
   KEY `assets_cabang_id_foreign` (`cabang_id`),
+  KEY `assets_created_at_index` (`created_at`),
   CONSTRAINT `assets_accumulated_depreciation_coa_id_foreign` FOREIGN KEY (`accumulated_depreciation_coa_id`) REFERENCES `chart_of_accounts` (`id`),
   CONSTRAINT `assets_asset_coa_id_foreign` FOREIGN KEY (`asset_coa_id`) REFERENCES `chart_of_accounts` (`id`),
   CONSTRAINT `assets_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE,
@@ -241,6 +252,7 @@ CREATE TABLE `bank_reconciliations` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `bank_reconciliations_coa_id_foreign` (`coa_id`),
+  KEY `bank_reconciliations_created_at_index` (`created_at`),
   CONSTRAINT `bank_reconciliations_coa_id_foreign` FOREIGN KEY (`coa_id`) REFERENCES `chart_of_accounts` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -405,6 +417,7 @@ CREATE TABLE `cash_bank_transactions` (
   KEY `cash_bank_transactions_offset_coa_id_foreign` (`offset_coa_id`),
   KEY `cash_bank_transactions_cash_bank_account_id_index` (`cash_bank_account_id`),
   KEY `cbt_voucher_idx` (`voucher_request_id`,`voucher_usage_type`),
+  KEY `cash_bank_transactions_created_at_index` (`created_at`),
   CONSTRAINT `cash_bank_transactions_account_coa_id_foreign` FOREIGN KEY (`account_coa_id`) REFERENCES `chart_of_accounts` (`id`),
   CONSTRAINT `cash_bank_transactions_offset_coa_id_foreign` FOREIGN KEY (`offset_coa_id`) REFERENCES `chart_of_accounts` (`id`),
   CONSTRAINT `cash_bank_transactions_voucher_request_id_foreign` FOREIGN KEY (`voucher_request_id`) REFERENCES `voucher_requests` (`id`) ON DELETE SET NULL
@@ -438,6 +451,7 @@ CREATE TABLE `cash_bank_transfers` (
   KEY `cash_bank_transfers_clearing_coa_id_foreign` (`clearing_coa_id`),
   KEY `cash_bank_transfers_other_costs_coa_id_index` (`other_costs_coa_id`),
   KEY `cash_bank_transfers_cabang_id_foreign` (`cabang_id`),
+  KEY `cash_bank_transfers_created_at_index` (`created_at`),
   CONSTRAINT `cash_bank_transfers_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `cash_bank_transfers_clearing_coa_id_foreign` FOREIGN KEY (`clearing_coa_id`) REFERENCES `chart_of_accounts` (`id`),
   CONSTRAINT `cash_bank_transfers_from_coa_id_foreign` FOREIGN KEY (`from_coa_id`) REFERENCES `chart_of_accounts` (`id`),
@@ -547,9 +561,68 @@ CREATE TABLE `customer_receipts` (
   KEY `customer_receipts_coa_id_foreign` (`coa_id`),
   KEY `customer_receipts_created_by_foreign` (`created_by`),
   KEY `customer_receipts_cabang_id_foreign` (`cabang_id`),
+  KEY `customer_receipts_created_at_index` (`created_at`),
   CONSTRAINT `customer_receipts_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `customer_receipts_coa_id_foreign` FOREIGN KEY (`coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL,
   CONSTRAINT `customer_receipts_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `customer_return_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `customer_return_items` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `customer_return_id` bigint unsigned NOT NULL,
+  `product_id` bigint unsigned NOT NULL,
+  `invoice_item_id` bigint unsigned DEFAULT NULL,
+  `quantity` decimal(10,2) NOT NULL DEFAULT '1.00',
+  `problem_description` text COLLATE utf8mb4_unicode_ci,
+  `qc_result` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qc_notes` text COLLATE utf8mb4_unicode_ci,
+  `decision` enum('repair','replace','reject') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `customer_return_items_customer_return_id_foreign` (`customer_return_id`),
+  KEY `customer_return_items_product_id_foreign` (`product_id`),
+  KEY `customer_return_items_invoice_item_id_foreign` (`invoice_item_id`),
+  CONSTRAINT `customer_return_items_customer_return_id_foreign` FOREIGN KEY (`customer_return_id`) REFERENCES `customer_returns` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `customer_return_items_invoice_item_id_foreign` FOREIGN KEY (`invoice_item_id`) REFERENCES `invoice_items` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `customer_return_items_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `customer_returns`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `customer_returns` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `return_number` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `invoice_id` bigint unsigned NOT NULL,
+  `customer_id` bigint unsigned DEFAULT NULL,
+  `cabang_id` bigint unsigned DEFAULT NULL,
+  `return_date` date NOT NULL,
+  `reason` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('pending','received','qc_inspection','approved','rejected','completed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `received_by` bigint unsigned DEFAULT NULL,
+  `received_at` timestamp NULL DEFAULT NULL,
+  `qc_inspected_by` bigint unsigned DEFAULT NULL,
+  `qc_inspected_at` timestamp NULL DEFAULT NULL,
+  `approved_by` bigint unsigned DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
+  `rejected_by` bigint unsigned DEFAULT NULL,
+  `rejected_at` timestamp NULL DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `customer_returns_return_number_unique` (`return_number`),
+  KEY `customer_returns_invoice_id_foreign` (`invoice_id`),
+  KEY `customer_returns_customer_id_foreign` (`customer_id`),
+  KEY `customer_returns_cabang_id_foreign` (`cabang_id`),
+  CONSTRAINT `customer_returns_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `customer_returns_customer_id_foreign` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `customer_returns_invoice_id_foreign` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `customers`;
@@ -644,10 +717,10 @@ DROP TABLE IF EXISTS `delivery_orders`;
 CREATE TABLE `delivery_orders` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `delivery_date` datetime NOT NULL,
-  `driver_id` int NOT NULL,
-  `vehicle_id` int NOT NULL,
+  `driver_id` int DEFAULT NULL,
+  `vehicle_id` int DEFAULT NULL,
   `warehouse_id` bigint unsigned DEFAULT NULL,
-  `status` enum('draft','sent','confirmed','received','supplier','completed','request_approve','approved','request_close','closed','reject') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `status` enum('draft','sent','confirmed','received','supplier','completed','request_approve','approved','request_close','closed','reject','delivery_failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `additional_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
   `additional_cost_description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -661,6 +734,7 @@ CREATE TABLE `delivery_orders` (
   KEY `delivery_orders_warehouse_id_foreign` (`warehouse_id`),
   KEY `delivery_orders_created_by_foreign` (`created_by`),
   KEY `delivery_orders_cabang_id_foreign` (`cabang_id`),
+  KEY `delivery_orders_created_at_index` (`created_at`),
   CONSTRAINT `delivery_orders_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `delivery_orders_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
   CONSTRAINT `delivery_orders_warehouse_id_foreign` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`)
@@ -721,6 +795,7 @@ CREATE TABLE `deposits` (
   UNIQUE KEY `deposits_deposit_number_unique` (`deposit_number`),
   KEY `deposits_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`),
   KEY `deposits_payment_coa_id_foreign` (`payment_coa_id`),
+  KEY `deposits_created_at_index` (`created_at`),
   CONSTRAINT `deposits_payment_coa_id_foreign` FOREIGN KEY (`payment_coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -787,7 +862,8 @@ CREATE TABLE `inventory_stocks` (
   `rak_id` int DEFAULT NULL,
   `qty_min` double NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `inventory_stocks_product_id_warehouse_id_rak_id_unique` (`product_id`,`warehouse_id`,`rak_id`)
+  UNIQUE KEY `inventory_stocks_product_id_warehouse_id_rak_id_unique` (`product_id`,`warehouse_id`,`rak_id`),
+  KEY `inventory_stocks_updated_at_index` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `invoice_items`;
@@ -858,6 +934,7 @@ CREATE TABLE `invoices` (
   KEY `invoices_ppn_keluaran_coa_id_foreign` (`ppn_keluaran_coa_id`),
   KEY `invoices_biaya_pengiriman_coa_id_foreign` (`biaya_pengiriman_coa_id`),
   KEY `invoices_cabang_id_foreign` (`cabang_id`),
+  KEY `invoices_invoice_date_index` (`invoice_date`),
   CONSTRAINT `invoices_accounts_payable_coa_id_foreign` FOREIGN KEY (`accounts_payable_coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL,
   CONSTRAINT `invoices_ar_coa_id_foreign` FOREIGN KEY (`ar_coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL,
   CONSTRAINT `invoices_biaya_pengiriman_coa_id_foreign` FOREIGN KEY (`biaya_pengiriman_coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL,
@@ -923,7 +1000,7 @@ CREATE TABLE `journal_entries` (
   `bank_recon_status` enum('matched','cleared','confirmed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bank_recon_date` date DEFAULT NULL,
   `is_reversal` tinyint(1) NOT NULL DEFAULT '0',
-  `reversal_of_transaction_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reversal_of_transaction_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -931,7 +1008,8 @@ CREATE TABLE `journal_entries` (
   KEY `journal_entries_source_type_source_id_index` (`source_type`,`source_id`),
   KEY `journal_entries_cabang_id_index` (`cabang_id`),
   KEY `journal_entries_department_id_index` (`department_id`),
-  KEY `journal_entries_project_id_index` (`project_id`)
+  KEY `journal_entries_project_id_index` (`project_id`),
+  KEY `journal_entries_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `manufacturing_orders`;
@@ -952,6 +1030,7 @@ CREATE TABLE `manufacturing_orders` (
   PRIMARY KEY (`id`),
   KEY `manufacturing_orders_production_plan_id_foreign` (`production_plan_id`),
   KEY `manufacturing_orders_cabang_id_foreign` (`cabang_id`),
+  KEY `manufacturing_orders_created_at_index` (`created_at`),
   CONSTRAINT `manufacturing_orders_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `manufacturing_orders_production_plan_id_foreign` FOREIGN KEY (`production_plan_id`) REFERENCES `production_plans` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1018,6 +1097,7 @@ CREATE TABLE `material_issues` (
   KEY `material_issues_created_by_foreign` (`created_by`),
   KEY `material_issues_approved_by_foreign` (`approved_by`),
   KEY `material_issues_production_plan_id_foreign` (`production_plan_id`),
+  KEY `material_issues_created_at_index` (`created_at`),
   CONSTRAINT `material_issues_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `material_issues_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `material_issues_manufacturing_order_id_foreign` FOREIGN KEY (`manufacturing_order_id`) REFERENCES `manufacturing_orders` (`id`) ON DELETE CASCADE,
@@ -1085,6 +1165,7 @@ CREATE TABLE `order_request_items` (
   `quantity` int NOT NULL DEFAULT '0',
   `fulfilled_quantity` decimal(15,2) NOT NULL DEFAULT '0.00',
   `unit_price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `original_price` decimal(15,2) NOT NULL DEFAULT '0.00',
   `discount` decimal(15,2) NOT NULL DEFAULT '0.00',
   `tax` decimal(15,2) NOT NULL DEFAULT '0.00',
   `subtotal` decimal(15,2) NOT NULL DEFAULT '0.00',
@@ -1107,12 +1188,14 @@ CREATE TABLE `order_requests` (
   `request_date` date NOT NULL,
   `status` enum('draft','approved','rejected','closed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `tax_type` enum('PPN Included','PPN Excluded') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PPN Excluded',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `created_by` int NOT NULL,
   PRIMARY KEY (`id`),
   KEY `order_requests_cabang_id_foreign` (`cabang_id`),
+  KEY `order_requests_created_at_index` (`created_at`),
   CONSTRAINT `order_requests_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1143,6 +1226,7 @@ CREATE TABLE `other_sales` (
   KEY `other_sales_customer_id_foreign` (`customer_id`),
   KEY `other_sales_cabang_id_foreign` (`cabang_id`),
   KEY `other_sales_created_by_foreign` (`created_by`),
+  KEY `other_sales_created_at_index` (`created_at`),
   CONSTRAINT `other_sales_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`),
   CONSTRAINT `other_sales_cash_bank_account_id_foreign` FOREIGN KEY (`cash_bank_account_id`) REFERENCES `cash_bank_accounts` (`id`),
   CONSTRAINT `other_sales_coa_id_foreign` FOREIGN KEY (`coa_id`) REFERENCES `chart_of_accounts` (`id`),
@@ -1165,7 +1249,7 @@ DROP TABLE IF EXISTS `payment_requests`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `payment_requests` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `request_number` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Auto-generated PR number',
+  `request_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Auto-generated PR number',
   `supplier_id` bigint unsigned NOT NULL,
   `cabang_id` bigint unsigned NOT NULL,
   `requested_by` bigint unsigned NOT NULL COMMENT 'User who created the request',
@@ -1174,9 +1258,9 @@ CREATE TABLE `payment_requests` (
   `payment_date` date DEFAULT NULL COMMENT 'Requested payment date',
   `total_amount` decimal(18,2) NOT NULL DEFAULT '0.00',
   `selected_invoices` json DEFAULT NULL COMMENT 'Invoice IDs to be paid',
-  `notes` text COLLATE utf8mb4_unicode_ci,
-  `approval_notes` text COLLATE utf8mb4_unicode_ci,
-  `status` enum('draft','pending_approval','approved','rejected','paid') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `approval_notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `status` enum('draft','pending_approval','approved','rejected','paid') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `approved_at` timestamp NULL DEFAULT NULL,
   `vendor_payment_id` bigint unsigned DEFAULT NULL COMMENT 'Linked VendorPayment after paid',
   `created_at` timestamp NULL DEFAULT NULL,
@@ -1185,6 +1269,7 @@ CREATE TABLE `payment_requests` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `payment_requests_request_number_unique` (`request_number`),
   KEY `payment_requests_supplier_id_foreign` (`supplier_id`),
+  KEY `payment_requests_created_at_index` (`created_at`),
   CONSTRAINT `payment_requests_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1195,6 +1280,7 @@ CREATE TABLE `permissions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `guard_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -1316,6 +1402,7 @@ CREATE TABLE `production_plans` (
   KEY `production_plans_uom_id_foreign` (`uom_id`),
   KEY `production_plans_created_by_foreign` (`created_by`),
   KEY `production_plans_warehouse_id_foreign` (`warehouse_id`),
+  KEY `production_plans_created_at_index` (`created_at`),
   CONSTRAINT `production_plans_bill_of_material_id_foreign` FOREIGN KEY (`bill_of_material_id`) REFERENCES `bill_of_materials` (`id`) ON DELETE CASCADE,
   CONSTRAINT `production_plans_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `production_plans_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
@@ -1337,7 +1424,8 @@ CREATE TABLE `productions` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `productions_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `products`;
@@ -1497,6 +1585,7 @@ CREATE TABLE `purchase_orders` (
   PRIMARY KEY (`id`),
   KEY `purchase_orders_refer_model_type_refer_model_id_index` (`refer_model_type`,`refer_model_id`),
   KEY `purchase_orders_cabang_id_foreign` (`cabang_id`),
+  KEY `purchase_orders_created_at_index` (`created_at`),
   CONSTRAINT `purchase_orders_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1607,6 +1696,7 @@ CREATE TABLE `purchase_receipts` (
   `cabang_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `purchase_receipts_cabang_id_foreign` (`cabang_id`),
+  KEY `purchase_receipts_created_at_index` (`created_at`),
   CONSTRAINT `purchase_receipts_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1634,7 +1724,7 @@ CREATE TABLE `purchase_returns` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `purchase_receipt_id` bigint unsigned DEFAULT NULL,
   `quality_control_id` bigint unsigned DEFAULT NULL,
-  `failed_qc_action` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `failed_qc_action` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `return_date` datetime NOT NULL,
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `status` enum('draft','pending_approval','approved','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
@@ -1671,6 +1761,7 @@ CREATE TABLE `purchase_returns` (
   KEY `purchase_returns_rejected_by_foreign` (`rejected_by`),
   KEY `purchase_returns_cabang_id_foreign` (`cabang_id`),
   KEY `purchase_returns_quality_control_id_foreign` (`quality_control_id`),
+  KEY `purchase_returns_created_at_index` (`created_at`),
   CONSTRAINT `purchase_returns_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`),
   CONSTRAINT `purchase_returns_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `purchase_returns_quality_control_id_foreign` FOREIGN KEY (`quality_control_id`) REFERENCES `quality_controls` (`id`) ON DELETE SET NULL,
@@ -1700,7 +1791,8 @@ CREATE TABLE `quality_controls` (
   `qc_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `purchase_return_processed` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `quality_controls_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`)
+  KEY `quality_controls_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`),
+  KEY `quality_controls_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `quotation_items`;
@@ -1716,6 +1808,7 @@ CREATE TABLE `quotation_items` (
   `total_price` decimal(18,2) NOT NULL DEFAULT '0.00',
   `discount` int NOT NULL DEFAULT '0',
   `tax` int NOT NULL DEFAULT '0',
+  `tax_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'None',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -1746,7 +1839,8 @@ CREATE TABLE `quotations` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `quotations_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `raks`;
@@ -1920,7 +2014,8 @@ CREATE TABLE `return_products` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `return_products_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`)
+  KEY `return_products_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`),
+  KEY `return_products_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `role_has_permissions`;
@@ -1942,6 +2037,7 @@ CREATE TABLE `roles` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `guard_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -1960,6 +2056,7 @@ CREATE TABLE `sale_order_items` (
   `unit_price` decimal(18,2) NOT NULL DEFAULT '0.00',
   `discount` int NOT NULL DEFAULT '0',
   `tax` int NOT NULL DEFAULT '0',
+  `tipe_pajak` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'None',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
@@ -2003,6 +2100,7 @@ CREATE TABLE `sale_orders` (
   PRIMARY KEY (`id`),
   KEY `sale_orders_quotation_id_foreign` (`quotation_id`),
   KEY `sale_orders_cabang_id_foreign` (`cabang_id`),
+  KEY `sale_orders_created_at_index` (`created_at`),
   CONSTRAINT `sale_orders_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sale_orders_quotation_id_foreign` FOREIGN KEY (`quotation_id`) REFERENCES `quotations` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2070,6 +2168,7 @@ CREATE TABLE `stock_adjustments` (
   KEY `stock_adjustments_warehouse_id_foreign` (`warehouse_id`),
   KEY `stock_adjustments_created_by_foreign` (`created_by`),
   KEY `stock_adjustments_approved_by_foreign` (`approved_by`),
+  KEY `stock_adjustments_created_at_index` (`created_at`),
   CONSTRAINT `stock_adjustments_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `stock_adjustments_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `stock_adjustments_warehouse_id_foreign` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`) ON DELETE CASCADE
@@ -2096,7 +2195,8 @@ CREATE TABLE `stock_movements` (
   `from_model_type` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `from_model_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `stock_movements_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`)
+  KEY `stock_movements_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`),
+  KEY `stock_movements_date_index` (`date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `stock_opname_items`;
@@ -2147,6 +2247,7 @@ CREATE TABLE `stock_opnames` (
   KEY `stock_opnames_warehouse_id_foreign` (`warehouse_id`),
   KEY `stock_opnames_created_by_foreign` (`created_by`),
   KEY `stock_opnames_approved_by_foreign` (`approved_by`),
+  KEY `stock_opnames_created_at_index` (`created_at`),
   CONSTRAINT `stock_opnames_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `stock_opnames_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `stock_opnames_warehouse_id_foreign` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`) ON DELETE CASCADE
@@ -2212,7 +2313,8 @@ CREATE TABLE `stock_transfers` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `stock_transfers_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `suppliers`;
@@ -2268,7 +2370,10 @@ CREATE TABLE `surat_jalans` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `created_by` int NOT NULL,
   `document_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `sender_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `shipping_method` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `surat_jalans_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `tax_settings`;
@@ -2392,6 +2497,7 @@ CREATE TABLE `vendor_payments` (
   `payment_adjustment` decimal(18,2) NOT NULL DEFAULT '0.00',
   PRIMARY KEY (`id`),
   KEY `vendor_payments_coa_id_foreign` (`coa_id`),
+  KEY `vendor_payments_created_at_index` (`created_at`),
   CONSTRAINT `vendor_payments_coa_id_foreign` FOREIGN KEY (`coa_id`) REFERENCES `chart_of_accounts` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -2426,6 +2532,7 @@ CREATE TABLE `voucher_requests` (
   KEY `voucher_requests_created_by_index` (`created_by`),
   KEY `voucher_requests_approved_by_index` (`approved_by`),
   KEY `voucher_requests_requested_to_owner_by_foreign` (`requested_to_owner_by`),
+  KEY `voucher_requests_created_at_index` (`created_at`),
   CONSTRAINT `voucher_requests_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `voucher_requests_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL,
   CONSTRAINT `voucher_requests_cash_bank_transaction_id_foreign` FOREIGN KEY (`cash_bank_transaction_id`) REFERENCES `cash_bank_transactions` (`id`) ON DELETE SET NULL,
@@ -2500,6 +2607,7 @@ CREATE TABLE `warehouse_confirmations` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `warehouse_confirmations_sale_order_id_foreign` (`sale_order_id`),
+  KEY `warehouse_confirmations_created_at_index` (`created_at`),
   CONSTRAINT `warehouse_confirmations_sale_order_id_foreign` FOREIGN KEY (`sale_order_id`) REFERENCES `sale_orders` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -2902,3 +3010,17 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (371,'2026_02_27_12
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (372,'2026_02_28_231021_drop_supplier_sku_from_product_supplier_table',6);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (373,'2026_03_01_001946_drop_is_primary_from_product_supplier_table',6);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (374,'2026_03_01_024900_add_reversal_fields_to_journal_entries',6);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (375,'2026_03_10_130453_add_created_at_indexes_for_sorting_performance',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (376,'2026_03_11_000001_add_original_price_and_tax_type_to_order_request_tables',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (377,'2026_03_11_022738_add_shipping_fields_to_surat_jalans_table',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (378,'2026_03_11_030000_add_delivery_failed_status_and_nullable_driver_to_delivery_orders_table',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (379,'2026_03_11_100000_add_tax_type_to_quotation_items_table',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (380,'2026_03_11_200000_add_tipe_pajak_to_sale_order_items_table',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (381,'2026_03_11_210000_add_indexes_and_unique_to_account_receivables_table',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (382,'2026_03_12_000000_add_cabang_id_to_account_payables_table',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (383,'2026_03_12_085008_add_description_to_roles_and_permissions_tables',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (384,'2026_03_12_000001_change_default_tax_type_on_quotation_items',8);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (385,'2026_03_12_212946_update_column_tipe_pajak_sale_order_items',9);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (386,'2026_03_12_100000_create_customer_returns_table',10);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (387,'2026_03_12_100001_create_customer_return_items_table',11);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (388,'2026_03_12_100002_rename_branch_id_to_cabang_id_in_customer_returns',12);

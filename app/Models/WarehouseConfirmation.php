@@ -178,12 +178,35 @@ class WarehouseConfirmation extends Model
         $existingDO = $warehouseConfirmation->saleOrder->deliveryOrder()->first();
 
         if ($existingDO) {
-            Log::info('Delivery order already exists for sale order', ['do_id' => $existingDO->id]);
-            \Filament\Notifications\Notification::make()
-                ->title('Gagal Membuat Delivery Order')
-                ->danger()
-                ->body('Delivery Order sudah ada untuk Sale Order ini. Tidak boleh membuat lebih dari satu Delivery Order untuk satu Sale Order.')
-                ->send();
+            // If the existing DO has no items, try to populate it (can happen if observer fired before WC items were created)
+            if ($existingDO->deliveryOrderItem()->count() === 0 && $warehouseConfirmation->warehouseConfirmationItems->isNotEmpty()) {
+                Log::info('Existing DO has no items — adding items now', ['do_id' => $existingDO->id]);
+                foreach ($warehouseConfirmation->warehouseConfirmationItems as $wcItem) {
+                    if ($wcItem->status === 'confirmed' && $wcItem->confirmed_qty > 0) {
+                        try {
+                            DeliveryOrderItem::create([
+                                'delivery_order_id' => $existingDO->id,
+                                'sale_order_item_id' => $wcItem->sale_order_item_id,
+                                'product_id'         => $wcItem->saleOrderItem->product_id ?? null,
+                                'quantity'           => $wcItem->confirmed_qty,
+                                'reason'             => 'From warehouse confirmation',
+                            ]);
+                        } catch (\Throwable $e) {
+                            Log::error('Failed to add item to existing DO', [
+                                'do_id' => $existingDO->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                }
+            } else {
+                Log::info('Delivery order already exists for sale order', ['do_id' => $existingDO->id]);
+                \Filament\Notifications\Notification::make()
+                    ->title('Gagal Membuat Delivery Order')
+                    ->danger()
+                    ->body('Delivery Order sudah ada untuk Sale Order ini. Tidak boleh membuat lebih dari satu Delivery Order untuk satu Sale Order.')
+                    ->send();
+            }
             return;
         }
 
@@ -221,6 +244,10 @@ class WarehouseConfirmation extends Model
                 'created_by'   => $warehouseConfirmation->confirmed_by
                     ?? $warehouseConfirmation->saleOrder->approve_by
                     ?? \App\Models\User::first()?->id,
+                // Pastikan cabang_id diisi agar DO muncul di filter CabangScope
+                'cabang_id'    => $warehouseConfirmation->saleOrder->cabang_id
+                    ?? \Illuminate\Support\Facades\Auth::user()?->cabang_id
+                    ?? \App\Models\Cabang::first()?->id,
             ]);
 
             // Buat delivery order items dari warehouse confirmation items yang confirmed

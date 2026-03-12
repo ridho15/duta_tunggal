@@ -46,7 +46,7 @@ class SalesInvoiceResource extends Resource
     protected static ?string $modelLabel = 'Invoice Penjualan';
     protected static ?string $pluralModelLabel = 'Invoice Penjualan';
     protected static ?string $navigationGroup = 'Finance - Penjualan';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -538,13 +538,7 @@ class SalesInvoiceResource extends Resource
                                             ->indonesianMoney()
                                             ->disabled()
                                             ->columnSpan(1),
-                                        Select::make('coa_id')
-                                            ->label('COA Revenue')
-                                            ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                                return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                            }))
-                                            ->searchable()
-                                            ->preload()
+                                        Hidden::make('coa_id')
                                             ->default(function ($get) {
                                                 $productId = $get('product_id');
                                                 if ($productId) {
@@ -552,12 +546,7 @@ class SalesInvoiceResource extends Resource
                                                     return $product?->sales_coa_id;
                                                 }
                                                 return null;
-                                            })
-                                            ->required()
-                                            ->validationMessages([
-                                                'required' => 'COA revenue harus dipilih'
-                                            ])
-                                            ->columnSpan(1),
+                                            }),
                                     ])
                                     ->columns(4)
                                     ->columnSpanFull()
@@ -719,54 +708,13 @@ class SalesInvoiceResource extends Resource
                                     ->extraAttributes(['class' => 'text-lg font-bold']),
                             ]),
 
-                        // COA Selection
-                        Section::make('Pilih COA untuk Journal Entries')
-                            ->description('Pilih COA yang akan digunakan untuk journal entries invoice penjualan')
-                            ->columns(2)
-                            ->collapsed()
-                            ->collapsible()
-                            ->schema([
-                                Select::make('ar_coa_id')
-                                    ->label('COA Piutang Usaha (AR)')
-                                    ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '1120')->first()?->id;
-                                    })
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'COA piutang usaha harus dipilih'
-                                    ]),
-
-                                Select::make('revenue_coa_id')
-                                    ->label('COA Penjualan (Revenue)')
-                                    ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '4000')->first()?->id;
-                                    })
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'COA penjualan harus dipilih'
-                                    ]),
-
-                                Select::make('ppn_keluaran_coa_id')
-                                    ->label('COA PPn Keluaran')
-                                    ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '2120.06')->first()?->id;
-                                    }),
-                            ]),
+                        // COA fields — hidden from UI, auto-populated from defaults
+                        Hidden::make('ar_coa_id')
+                            ->default(fn () => \App\Models\ChartOfAccount::where('code', '1120')->first()?->id),
+                        Hidden::make('revenue_coa_id')
+                            ->default(fn () => \App\Models\ChartOfAccount::where('code', '4000')->first()?->id),
+                        Hidden::make('ppn_keluaran_coa_id')
+                            ->default(fn () => \App\Models\ChartOfAccount::where('code', '2120.06')->first()?->id),
 
                         // Hidden fields
                         Hidden::make('id'),

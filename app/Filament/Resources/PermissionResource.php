@@ -22,7 +22,7 @@ class PermissionResource extends Resource
     protected static ?string $navigationGroup = 'User Roles Management';
 
     // Ensure the Roles group appears last in the requested order
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {

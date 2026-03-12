@@ -191,6 +191,60 @@ class VendorPaymentTest extends TestCase
         $this->assertEquals(110000, $vendorPayment->getCalculatedTotalAttribute());
     }
 
+    public function test_payment_details_mapping_includes_extra_fields()
+    {
+        // create an invoice with dates and amount
+        $purchaseOrder = PurchaseOrder::factory()->create(['status'=>'completed']);
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id'=>$purchaseOrder->id,
+            'product_id'=>$this->product->id,
+            'quantity'=>5,
+            'unit_price'=>20000,
+            'tax'=>0,
+            'discount'=>0
+        ]);
+        $invoice = Invoice::factory()->create([
+            'invoice_number'=>'INV-MAP-001',
+            'from_model_type'=>PurchaseOrder::class,
+            'from_model_id'=>$purchaseOrder->id,
+            'supplier_name'=>$this->supplier->perusahaan,
+            'subtotal'=>100000,
+            'tax'=>0,
+            'total'=>100000,
+            'status'=>'draft',
+            'invoice_date'=>now()->subDays(10),
+            'due_date'=>now()->addDays(20),
+        ]);
+        InvoiceItem::factory()->create([
+            'invoice_id'=>$invoice->id,
+            'product_id'=>$this->product->id,
+            'quantity'=>5,
+            'price'=>20000,
+            'total'=>100000
+        ]);
+
+        // simulate mapping logic from resource
+        $invoices = collect([$invoice->load('accountPayable')]);
+        $paymentDetails = $invoices->map(function ($invoice) {
+            return [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                'total_invoice' => $invoice->total,
+                'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
+                'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
+            ];
+        })->toArray();
+
+        $this->assertArrayHasKey('invoice_date', $paymentDetails[0]);
+        $this->assertArrayHasKey('due_date', $paymentDetails[0]);
+        $this->assertArrayHasKey('total_invoice', $paymentDetails[0]);
+        $this->assertEquals($invoice->invoice_date->toDateString(), $paymentDetails[0]['invoice_date']);
+        $this->assertEquals($invoice->due_date->toDateString(), $paymentDetails[0]['due_date']);
+        $this->assertEquals($invoice->total, $paymentDetails[0]['total_invoice']);
+    }
+
     public function test_payment_methods_cash_bank_transfer_cheque()
     {
         $invoice = $this->createTestInvoice();
@@ -417,7 +471,6 @@ class VendorPaymentTest extends TestCase
 
         // Create partial payment
         $partialPayment = VendorPayment::factory()->create([
-            'invoice_id' => $invoice->id,
             'supplier_id' => $this->supplier->id,
             'payment_date' => now(),
             'total_payment' => 55000,
@@ -605,7 +658,6 @@ class VendorPaymentTest extends TestCase
 
         // Create payment in draft status
         $draftPayment = VendorPayment::factory()->create([
-            'invoice_id' => $invoice->id,
             'supplier_id' => $this->supplier->id,
             'payment_date' => now(),
             'total_payment' => 110000,

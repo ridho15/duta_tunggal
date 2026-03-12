@@ -41,7 +41,7 @@ class CustomerResource extends Resource
     protected static ?string $navigationGroup = 'Master Data';
 
     // Position Master Data as the 7th group
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {

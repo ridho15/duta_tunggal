@@ -13,6 +13,24 @@ use Illuminate\Support\Facades\Log;
 class SaleOrderObserver
 {
     /**
+     * Handle the SaleOrder "created" event.
+     * Diperlukan untuk menangani SO yang dibuat langsung dengan status 'approved'
+     * (misalnya SO dari Quotation yang sudah approved).
+     */
+    public function created(SaleOrder $saleOrder): void
+    {
+        // Jika SO dibuat langsung dengan status 'approved' (dari Quotation yang sudah approved),
+        // buat warehouse confirmation otomatis seperti saat SO di-approve
+        if ($saleOrder->status === 'approved') {
+            Log::info('SaleOrderObserver: SO created with approved status, creating warehouse confirmation', [
+                'sale_order_id' => $saleOrder->id,
+                'so_number' => $saleOrder->so_number,
+            ]);
+            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
+        }
+    }
+
+    /**
      * Handle the SaleOrder "updated" event.
      */
     public function updated(SaleOrder $saleOrder): void
@@ -171,7 +189,11 @@ class SaleOrderObserver
             'customer_name' => $saleOrder->customer?->name,
             'customer_phone' => $saleOrder->customer?->phone,
             'invoice_date' => now()->toDateString(),
-            'due_date' => now()->addDays(30)->toDateString(), // Default 30 hari
+            'due_date' => now()->addDays(
+                $saleOrder->tempo_pembayaran
+                    ?? $saleOrder->customer?->tempo_kredit
+                    ?? 30
+            )->toDateString(), // Gunakan tempo_pembayaran SO jika ada, lalu default customer, lalu 30 hari
             'subtotal' => $subtotal,
             'tax' => $ppnRate,         // FIX #1a: store rate (int, e.g. 11), not monetary amount
             'ppn_rate' => $ppnRate,    // FIX #1a: also populate dedicated ppn_rate field
