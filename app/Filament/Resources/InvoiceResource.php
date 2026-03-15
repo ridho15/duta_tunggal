@@ -123,7 +123,8 @@ class InvoiceResource extends Resource
                                             $purchaseOrder = PurchaseOrder::find($state);
                                             if ($purchaseOrder) {
                                                 foreach ($purchaseOrder->purchaseOrderItem as $item) {
-                                                    $price = $item->unit_price - $item->discount + $item->tax;
+                                                    $discountAmount = $item->unit_price * ($item->discount / 100);
+                                                    $price = $item->unit_price - $discountAmount;
                                                     $subtotal = $price * $item->quantity;
                                                     array_push($items, [
                                                         'product_id' => $item->product_id,
@@ -150,7 +151,8 @@ class InvoiceResource extends Resource
                                             $saleOrder = SaleOrder::find($state);
                                             if ($saleOrder) {
                                                 foreach ($saleOrder->saleOrderItem as $item) {
-                                                    $price = $item->unit_price - $item->discount + $item->tax;
+                                                    $discountAmount = $item->unit_price * ($item->discount / 100);
+                                                    $price = $item->unit_price - $discountAmount;
                                                     $subtotal = $price * $item->quantity;
                                                     array_push($items, [
                                                         'product_id' => $item->product_id,

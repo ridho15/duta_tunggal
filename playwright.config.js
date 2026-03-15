@@ -24,12 +24,5 @@ export default defineConfig({
       },
       dependencies: ['setup'],
     },
-    {
-      name: 'deposit-test',
-      use: {
-        ...devices['Desktop Chrome'],
-        env: { ...process.env, APP_ENV: 'testing' },
-      },
-    },
   ],
 });

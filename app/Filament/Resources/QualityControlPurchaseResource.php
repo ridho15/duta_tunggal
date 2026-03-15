@@ -120,13 +120,28 @@ class QualityControlPurchaseResource extends Resource
 
                                         $purchaseOrderItemId = $get('from_model_id');
                                         if ($purchaseOrderItemId) {
-                                            $item = PurchaseOrderItem::with(['product.uom', 'qualityControls'])->find($purchaseOrderItemId);
+                                            $item = PurchaseOrderItem::with(['product.uom', 'qualityControls', 'purchaseOrder.referModel'])->find($purchaseOrderItemId);
                                             if ($item) {
                                                 // Populate product information fields
                                                 $set('product_name', $item->product->name ?? '');
                                                 $set('sku', $item->product->sku ?? '');
                                                 $set('uom', $item->product->uom->name ?? '');
                                                 $set('product_id', $item->product_id ?? null);
+
+                                                // Auto-fill warehouse from PurchaseOrder, with fallback to OrderRequest
+                                                $purchaseOrder = $item->purchaseOrder;
+                                                $warehouseId = $purchaseOrder->warehouse_id ?? null;
+                                                // If PO refers to an OrderRequest, prefer its warehouse
+                                                if (
+                                                    $purchaseOrder->refer_model_type === 'App\Models\OrderRequest'
+                                                    && $purchaseOrder->refer_model_id
+                                                ) {
+                                                    $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);
+                                                    if ($orderRequest && $orderRequest->warehouse_id) {
+                                                        $warehouseId = $orderRequest->warehouse_id;
+                                                    }
+                                                }
+                                                $set('warehouse_id', $warehouseId);
 
                                                 // Calculate remaining qty based on existing QC records (partial QC support)
                                                 $alreadyInspected = $item->qualityControls->sum(
@@ -792,6 +807,7 @@ class QualityControlPurchaseResource extends Resource
                         TextEntry::make('product.name')->label('Product'),
                         TextEntry::make('product.sku')->label('SKU'),
                         TextEntry::make('warehouse.name')->label('Warehouse'),
+                        TextEntry::make('warehouse.cabang.nama')->label('Cabang'),
                         TextEntry::make('rak.name')->label('Rack'),
                         TextEntry::make('status_formatted')->label('Status')->badge(),
                         TextEntry::make('inspectedBy.name')->label('Inspected By'),
@@ -877,7 +893,7 @@ class QualityControlPurchaseResource extends Resource
                 'product.uom',
                 'fromModel.purchaseOrder.supplier',
                 'inspectedBy',
-                'warehouse',
+                'warehouse.cabang',
                 'rak'
             ]);
 

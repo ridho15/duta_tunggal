@@ -95,7 +95,7 @@ class OrderRequestService
                 'order_date'   => $data['order_date'],
                 'expected_date'=> $data['expected_date'] ?? null,
                 'note'         => $data['note'] ?? null,
-                'status'       => 'approved',
+                'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
                 'warehouse_id' => $orderRequest->warehouse_id,
                 'tempo_hutang' => $supplier->tempo_hutang ?? 0,
                 'created_by'   => Auth::id() ?? $orderRequest->created_by,
@@ -117,10 +117,7 @@ class OrderRequestService
                     'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
                     'currency_id'       => $currency->id,
                 ]);
-
-                // Update fulfilled quantity
-                $orderRequestItem->fulfilled_quantity = ($orderRequestItem->fulfilled_quantity ?? 0) + $row['quantity'];
-                $orderRequestItem->save();
+                // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
             }
         }
 
@@ -144,7 +141,7 @@ class OrderRequestService
             'order_date'   => $data['order_date'],
             'expected_date'=> $data['expected_date'] ?? null,
             'note'         => $data['note'] ?? null,
-            'status'       => 'approved',
+            'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
             'warehouse_id' => $orderRequest->warehouse_id,
             'cabang_id'    => $orderRequest->cabang_id,
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
@@ -167,8 +164,7 @@ class OrderRequestService
                 'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
                 'currency_id'       => $currency->id,
             ]);
-
-            // Observer will automatically update fulfilled_quantity
+            // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
         }
 
         return $purchaseOrder->fresh(['purchaseOrderItem']);

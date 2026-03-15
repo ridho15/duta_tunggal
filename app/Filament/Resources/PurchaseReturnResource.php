@@ -70,14 +70,14 @@ class PurchaseReturnResource extends Resource
                                 'max' => 'Nota retur maksimal 50 karakter'
                             ]),
                         Select::make('purchase_receipt_id')
-                            ->required()
+                            ->nullable()
                             ->label('Purchase Receipt')
                             ->preload()
                             ->reactive()
                             ->searchable()
                             ->relationship('purchaseReceipt', 'receipt_number', function (Builder $query) {
                                 $query->whereHas('purchaseOrder', function (Builder $query) {
-                                    $query->where('status', 'closed');
+                                    $query->whereIn('status', ['completed', 'closed']);
                                 });
                             })
                             ->afterStateUpdated(function ($set, $state) {

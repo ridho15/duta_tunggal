@@ -38,7 +38,7 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1140.01'],

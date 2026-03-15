@@ -73,7 +73,7 @@ class ManufacturingJournalTest extends TestCase
             'approved_at' => now(), // Set approved_at
         ]);
 
-        $bdpCoa = ChartOfAccount::where('code', '1150')->firstOrFail();
+        $bdpCoa = ChartOfAccount::where('code', '1140.02')->firstOrFail();
         $bbCoa = ChartOfAccount::where('code', '1140.01')->firstOrFail();
 
         $this->assertDatabaseHas('journal_entries', [

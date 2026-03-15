@@ -142,10 +142,11 @@ test('purchase order can be created through livewire create page', function () {
         ->set('data.purchaseOrderCurrency', [
             [
                 'currency_id' => $this->currency->id,
-                'nominal' => 25000.0,
+                'nominal' => 1.0, // IDR kurs terhadap IDR = 1
             ],
         ])
         ->set('data.purchaseOrderBiaya', [])
+        ->set('data.total_amount', 25000.0) // 2 qty × 12500 unit price × 1 (IDR kurs)
         ->assertSet('data.tempo_hutang', $this->supplier->tempo_hutang)
         ->call('create')
         ->assertHasNoFormErrors();

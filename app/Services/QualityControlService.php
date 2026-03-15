@@ -86,16 +86,18 @@ class QualityControlService
         }
 
         $qualityControl = QualityControl::create([
-            'qc_number' => $this->generateQcNumber(),
-            'passed_quantity' => $passedQuantity,
+            'qc_number'         => $this->generateQcNumber(),
+            'passed_quantity'   => $passedQuantity,
             'rejected_quantity' => $data['rejected_quantity'] ?? 0,
-            'status' => 0,
-            'inspected_by' => $data['inspected_by'] ?? null,
-            'warehouse_id' => $data['warehouse_id'] ?? $purchaseOrderItem->purchaseOrder->warehouse_id,
-            'product_id' => $purchaseOrderItem->product_id,
-            'rak_id' => $data['rak_id'] ?? null,
-            'from_model_type' => \App\Models\PurchaseOrderItem::class,
-            'from_model_id' => $purchaseOrderItem->id,
+            'quantity_received' => $data['quantity_received'] ?? $passedQuantity,
+            'notes'             => $data['notes'] ?? null,
+            'status'            => 0,
+            'inspected_by'      => $data['inspected_by'] ?? null,
+            'warehouse_id'      => $data['warehouse_id'] ?? $purchaseOrderItem->purchaseOrder->warehouse_id,
+            'product_id'        => $purchaseOrderItem->product_id,
+            'rak_id'            => $data['rak_id'] ?? null,
+            'from_model_type'   => \App\Models\PurchaseOrderItem::class,
+            'from_model_id'     => $purchaseOrderItem->id,
         ]);
 
         return $qualityControl;

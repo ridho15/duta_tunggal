@@ -31,6 +31,33 @@ class ViewPurchaseOrder extends ViewRecord
             EditAction::make()
                 ->icon('heroicon-o-pencil-square'),
 
+            // Setujui PO dari status draft; juga update fulfilled_quantity di Order Request terkait
+            Action::make('approve_po')
+                ->label('Setujui PO')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn ($record) => Auth::user()->can('response purchase order') && $record->status === 'draft')
+                ->requiresConfirmation()
+                ->modalHeading('Setujui Purchase Order')
+                ->modalDescription('Apakah Anda yakin ingin menyetujui PO ini? Kuantitas pada Order Request terkait akan berkurang sesuai qty PO saat ini.')
+                ->modalSubmitActionLabel('Ya, Setujui')
+                ->action(function ($record) {
+                    try {
+                        app(\App\Services\PurchaseOrderService::class)->approvePo($record);
+                        Notification::make()
+                            ->title('Purchase Order Disetujui')
+                            ->body('PO ' . $record->po_number . ' berhasil disetujui.')
+                            ->success()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Notification::make()
+                            ->title('Gagal Menyetujui PO')
+                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
+                }),
+
             // Langkah berikutnya setelah PO: buat Quality Control Purchase
             Action::make('buat_qc')
                 ->label('Buat Quality Control')

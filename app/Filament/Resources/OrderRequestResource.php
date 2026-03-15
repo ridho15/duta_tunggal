@@ -296,22 +296,37 @@ class OrderRequestResource extends Resource
                                         }
                                     })
                                     ->options(function (callable $get) {
-                                        // Task 11: Allow selecting any product regardless of supplier
-                                        return Product::orderBy('name')
-                                            ->get()
-                                            ->mapWithKeys(function ($product) {
-                                                return [$product->id => "({$product->sku}) {$product->name}"];
+                                        $supplierId = $get('../../supplier_id');
+                                        $query = Product::orderBy('name');
+                                        if ($supplierId) {
+                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
+                                                $q->where('suppliers.id', $supplierId);
                                             });
+                                        }
+                                        return $query->get()->mapWithKeys(function ($product) {
+                                            return [$product->id => "({$product->sku}) {$product->name}"];
+                                        });
                                     })
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
-                                        return Product::where('name', 'like', "%{$search}%")
-                                            ->orWhere('sku', 'like', "%{$search}%")
-                                            ->limit(50)
-                                            ->get()
-                                            ->mapWithKeys(function ($product) {
-                                                return [$product->id => "({$product->sku}) {$product->name}"];
+                                        $supplierId = $get('../../supplier_id');
+                                        $query = Product::where(function ($q) use ($search) {
+                                            $q->where('name', 'like', "%{$search}%")
+                                                ->orWhere('sku', 'like', "%{$search}%");
+                                        })->orderBy('name')->limit(50);
+                                        if ($supplierId) {
+                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
+                                                $q->where('suppliers.id', $supplierId);
                                             });
+                                        }
+                                        return $query->get()->mapWithKeys(function ($product) {
+                                            return [$product->id => "({$product->sku}) {$product->name}"];
+                                        });
                                     })
+                                    ->helperText(
+                                        fn(callable $get) => $get('../../supplier_id')
+                                            ? 'Menampilkan produk dari supplier yang dipilih'
+                                            : 'Pilih supplier untuk memfilter produk'
+                                    )
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Produk wajib dipilih.',
@@ -335,6 +350,7 @@ class OrderRequestResource extends Resource
                                         $set('subtotal', number_format((float)$subtotal, 0, ',', '.'));
                                         try {
                                             $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
+                                            $set('total', number_format($quantity * $unitPrice, 0, ',', '.'));
                                             $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
                                         } catch (\Throwable $e) {
                                             $set('tax_nominal', '0');
@@ -373,6 +389,7 @@ class OrderRequestResource extends Resource
                                         $set('subtotal', number_format((float)$subtotal, 0, ',', '.'));
                                         try {
                                             $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
+                                            $set('total', number_format($quantity * $unitPrice, 0, ',', '.'));
                                             $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
                                         } catch (\Throwable $e) {
                                             $set('tax_nominal', '0');
@@ -445,6 +462,19 @@ class OrderRequestResource extends Resource
                                         'min' => 'Tax tidak boleh negatif.',
                                         'max' => 'Tax maksimal 100%.',
                                     ]),
+                                TextInput::make('total')
+                                    ->label('Total (Harga × Qty)')
+                                    ->prefix('Rp')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $unitPrice = \App\Helpers\MoneyHelper::parse($record->unit_price ?? 0);
+                                            $total = (float)$record->quantity * $unitPrice;
+                                            $component->state(number_format($total, 0, ',', '.'));
+                                        }
+                                    }),
                                 TextInput::make('tax_nominal')
                                     ->label('Nominal Pajak (Rp)')
                                     ->prefix('Rp')

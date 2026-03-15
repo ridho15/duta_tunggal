@@ -452,12 +452,37 @@ class PurchaseOrderResource extends Resource
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->options(function (Get $get) {
-                                        // Task 11: Allow selecting any product regardless of supplier
-                                        return Product::orderBy('name')->get()->mapWithKeys(function ($product) {
-                                            return [$product->id => "{$product->sku} - {$product->name}"];
+                                        $supplierId = $get('../../supplier_id');
+                                        $query = Product::orderBy('name');
+                                        if ($supplierId) {
+                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
+                                                $q->where('suppliers.id', $supplierId);
+                                            });
+                                        }
+                                        return $query->get()->mapWithKeys(function ($product) {
+                                            return [$product->id => "({$product->sku}) {$product->name}"];
                                         });
                                     })
                                     ->searchable()
+                                    ->getSearchResultsUsing(function (string $search, Get $get) {
+                                        $supplierId = $get('../../supplier_id');
+                                        $query = Product::where(function ($q) use ($search) {
+                                            $q->where('name', 'like', "%{$search}%")
+                                              ->orWhere('sku', 'like', "%{$search}%");
+                                        })->orderBy('name')->limit(50);
+                                        if ($supplierId) {
+                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
+                                                $q->where('suppliers.id', $supplierId);
+                                            });
+                                        }
+                                        return $query->get()->mapWithKeys(function ($product) {
+                                            return [$product->id => "({$product->sku}) {$product->name}"];
+                                        });
+                                    })
+                                    ->helperText(fn (Get $get) => $get('../../supplier_id')
+                                        ? 'Menampilkan produk dari supplier yang dipilih'
+                                        : 'Pilih supplier untuk memfilter produk'
+                                    )
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         $product = Product::find($state);
@@ -581,7 +606,10 @@ class PurchaseOrderResource extends Resource
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
+                                        $qty = (float)$get('quantity');
+                                        $price = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $set('total', number_format($qty * $price, 0, ',', '.'));
+                                        $set('subtotal', HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
                                     })
                                     ->numeric(),
                                 TextInput::make('unit_price')
@@ -594,7 +622,10 @@ class PurchaseOrderResource extends Resource
                                         'required' => 'Unit price tidak boleh kosong',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
+                                        $qty = (float)$get('quantity');
+                                        $price = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $set('total', number_format($qty * $price, 0, ',', '.'));
+                                        $set('subtotal', HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
                                     })
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
@@ -605,15 +636,34 @@ class PurchaseOrderResource extends Resource
                                         return null;
                                     })
                                     ->default(0),
+                                TextInput::make('total')
+                                    ->label('Total (Harga × Qty)')
+                                    ->prefix(function ($get) {
+                                        $currency = Currency::find($get('currency_id'));
+                                        return $currency ? $currency->symbol : null;
+                                    })
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->indonesianMoney()
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $total = (float)$record->quantity * (float)$record->unit_price;
+                                            $component->state(number_format($total, 0, ',', '.'));
+                                        }
+                                    }),
                                 TextInput::make('discount')
-                                    ->label('Discount')
+                                    ->label('Discount (%)')
                                     ->reactive()
                                     ->numeric()
                                     ->required()
+                                    ->minValue(0)
                                     ->maxValue(100)
-                                    ->indonesianMoney()
                                     ->validationMessages([
-                                        'required' => 'Discount tidak boleh kosong. Minimal 0'
+                                        'required' => 'Discount tidak boleh kosong. Minimal 0',
+                                        'numeric' => 'Discount harus berupa angka.',
+                                        'min' => 'Discount tidak boleh negatif.',
+                                        'max' => 'Discount maksimal 100%.',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
                                         $set('subtotal', HelperController::hitungSubtotal((float)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
@@ -825,6 +875,47 @@ class PurchaseOrderResource extends Resource
                                     ->string()
                                     ->required()
                                     ->maxLength(255)
+                                    ->reactive()
+                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                        // Auto-suggest COA based on cost name keywords
+                                        if (empty($state)) {
+                                            return;
+                                        }
+                                        // Only suggest if COA is not already selected
+                                        if ($get('coa_id')) {
+                                            return;
+                                        }
+                                        $lower = strtolower(trim($state));
+                                        $keywords = [
+                                            'freight|pengiriman|ongkir|kirim|cargo|ekspedisi|angkut|transport' => 'Biaya Pengiriman',
+                                            'handling|bongkar|muat|loading|unloading'                         => 'Biaya Handling',
+                                            'customs|bea masuk|import|pajak impor|cukai'                      => 'Biaya Bea Masuk',
+                                            'asuransi|insurance'                                              => 'Biaya Asuransi',
+                                            'instalasi|install|pemasangan'                                    => 'Biaya Instalasi',
+                                            'konsultasi|konsultan|jasa'                                       => 'Biaya Jasa',
+                                        ];
+                                        foreach ($keywords as $pattern => $coaName) {
+                                            if (preg_match('/(' . $pattern . ')/', $lower)) {
+                                                $coa = ChartOfAccount::where('type', 'Expense')
+                                                    ->where(function ($q) use ($coaName) {
+                                                        $q->where('name', 'like', '%' . $coaName . '%')
+                                                          ->orWhere('name', 'like', '%' . explode(' ', $coaName)[1] . '%');
+                                                    })
+                                                    ->first();
+                                                if ($coa) {
+                                                    $set('coa_id', $coa->id);
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        // Fallback – pick first general purchase/expense COA
+                                        $fallback = ChartOfAccount::where('type', 'Expense')
+                                            ->whereRaw('LOWER(name) LIKE ?', ['%biaya%'])
+                                            ->first();
+                                        if ($fallback) {
+                                            $set('coa_id', $fallback->id);
+                                        }
+                                    })
                                     ->validationMessages([
                                         'required' => 'Nama biaya belum diisi',
                                         'string' => 'Nama biaya tidak valid !',
@@ -847,6 +938,7 @@ class PurchaseOrderResource extends Resource
                                     ]),
                                 Select::make('coa_id')
                                     ->label('COA Biaya')
+                                    ->helperText('Otomatis disarankan berdasarkan nama biaya. Dapat diubah secara manual.')
                                     ->preload()
                                     ->searchable()
                                     ->relationship('coa', 'name')
@@ -983,7 +1075,9 @@ class PurchaseOrderResource extends Resource
                                         if ($state) {
                                             $currency = Currency::find($state);
                                             if ($currency && (float)$currency->to_rupiah > 0) {
-                                                $set('nominal', $currency->to_rupiah);
+                                                // Cast to float to prevent indonesianMoney dehydrate from treating
+                                                // decimal strings like "1.00" as "100" (stripping the decimal dot)
+                                                $set('nominal', (float)$currency->to_rupiah);
                                             }
                                         }
                                     })

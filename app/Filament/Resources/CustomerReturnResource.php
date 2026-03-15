@@ -127,13 +127,16 @@ class CustomerReturnResource extends Resource
                             if (! $customerId) {
                                 return [];
                             }
+                            // Use relationship-based lookup to avoid fragile customer_name string match.
+                            // This correctly finds invoices even when a customer's name has been changed
+                            // after invoice creation.
                             return Invoice::query()
                                 ->where('from_model_type', 'App\\Models\\SaleOrder')
-                                ->where('customer_name', function ($q) use ($customerId) {
-                                    $q->select('name')
-                                        ->from('customers')
-                                        ->where('id', $customerId)
-                                        ->limit(1);
+                                ->whereIn('from_model_id', function ($sub) use ($customerId) {
+                                    $sub->select('id')
+                                        ->from('sale_orders')
+                                        ->where('customer_id', $customerId)
+                                        ->whereNull('deleted_at');
                                 })
                                 ->orderByDesc('invoice_date')
                                 ->get()

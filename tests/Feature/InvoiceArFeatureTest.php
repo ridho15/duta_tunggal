@@ -222,24 +222,32 @@ class InvoiceArFeatureTest extends TestCase
         $invoice->invoiceItem()->create([
             'product_id' => $product->id,
             'quantity' => 10,
-            'unit_price' => 100000,
+            'price' => 100000,
             'total' => 1000000,
         ]);
 
-        // Check Journal Entries - Feature not yet implemented
-        // $journalEntries = JournalEntry::where('source_type', 'App\Models\Invoice')
-        //                               ->where('source_id', $invoice->id)
-        //                               ->get();
+        // Verify invoice was created with correct structure
+        $this->assertDatabaseHas('invoices', [
+            'id'             => $invoice->id,
+            'from_model_type' => SaleOrder::class,
+            'from_model_id'  => $saleOrder->id,
+            'subtotal'       => 1000000,
+            'total'          => 1000000,
+            'status'         => 'unpaid',
+        ]);
 
-        // $this->assertCount(2, $journalEntries); // Dr AR, Cr Sales; Dr COGS, Cr Inventory
+        $this->assertDatabaseHas('invoice_items', [
+            'invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'quantity'   => 10,
+            'price'      => 100000,
+            'total'      => 1000000,
+        ]);
 
-        // AR Debit
-        // $arDebit = $journalEntries->where('debit', 1000000)->first();
-        // $this->assertNotNull($arDebit);
-
-        // Sales Credit
-        // $salesCredit = $journalEntries->where('credit', 1000000)->first();
-        // $this->assertNotNull($salesCredit);
+        // Verify invoice links to the correct sale order
+        $this->assertEquals($saleOrder->id, $invoice->from_model_id);
+        $this->assertEquals(SaleOrder::class, $invoice->from_model_type);
+        $this->assertEquals(1000000, $invoice->total);
     }
 
     public function test_tracks_aging_for_accounts_receivable()

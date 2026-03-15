@@ -213,29 +213,127 @@ class PurchaseOrderItemRelationManager extends RelationManager
                 ActionGroup::make([
                     // Send PO item to Quality Control (QC-before-receipt flow)
                     \Filament\Tables\Actions\Action::make('kirim_qc')
-                        ->label('Kirim QC')
+                        ->label('Kirim ke QC')
                         ->color('success')
                         ->icon('heroicon-o-paper-airplane')
-                        ->requiresConfirmation()
                         ->modalHeading('Kirim ke Quality Control')
-                        ->modalDescription('Apakah Anda yakin ingin mengirim item ini ke Quality Control? QC akan dibuat dengan quantity 0 dan dapat diedit setelahnya.')
-                        ->modalSubmitActionLabel('Ya, Kirim QC')
+                        ->modalSubmitActionLabel('Buat QC')
                         ->visible(fn ($record) => $record->purchaseOrder->status === 'approved' && !$record->qualityControl)
-                        ->action(function ($record) {
+                        ->form(function ($record) {
+                            $po = $record->purchaseOrder;
+                            $alreadyInspected = $record->qualityControls->sum(
+                                fn ($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                            );
+                            $remaining = max(0, ($record->quantity ?? 0) - $alreadyInspected);
+
+                            // Resolve default warehouse (Order Request > PO)
+                            $defaultWarehouseId = $po->warehouse_id;
+                            if ($po->refer_model_type === 'App\Models\OrderRequest' && $po->refer_model_id) {
+                                $or = \App\Models\OrderRequest::find($po->refer_model_id);
+                                if ($or && $or->warehouse_id) {
+                                    $defaultWarehouseId = $or->warehouse_id;
+                                }
+                            }
+
+                            return [
+                                \Filament\Forms\Components\Fieldset::make('Informasi Produk')
+                                    ->columns(3)
+                                    ->schema([
+                                        \Filament\Forms\Components\TextInput::make('_product_name')
+                                            ->label('Produk')
+                                            ->default($record->product->name ?? '-')
+                                            ->disabled()
+                                            ->dehydrated(false),
+                                        \Filament\Forms\Components\TextInput::make('_quantity_ordered')
+                                            ->label('Qty Dipesan')
+                                            ->default($record->quantity ?? 0)
+                                            ->disabled()
+                                            ->dehydrated(false),
+                                        \Filament\Forms\Components\TextInput::make('_warehouse_po')
+                                            ->label('Gudang PO')
+                                            ->default(optional($po->warehouse)->name ?? '-')
+                                            ->disabled()
+                                            ->dehydrated(false),
+                                    ]),
+                                \Filament\Forms\Components\Fieldset::make('Data QC')
+                                    ->columns(2)
+                                    ->schema([
+                                        \Filament\Forms\Components\Select::make('warehouse_id')
+                                            ->label('Gudang Tujuan')
+                                            ->options(\App\Models\Warehouse::where('status', 1)->get()->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"]))
+                                            ->default($defaultWarehouseId)
+                                            ->searchable()
+                                            ->required()
+                                            ->validationMessages(['required' => 'Gudang wajib dipilih']),
+                                        \Filament\Forms\Components\Select::make('inspected_by')
+                                            ->label('Diperiksa Oleh')
+                                            ->options(\App\Models\User::pluck('name', 'id'))
+                                            ->default(Auth::id())
+                                            ->required()
+                                            ->validationMessages(['required' => 'Pemeriksa wajib dipilih']),
+                                        \Filament\Forms\Components\TextInput::make('quantity_received')
+                                            ->label('Qty Diterima')
+                                            ->numeric()
+                                            ->default($remaining)
+                                            ->required()
+                                            ->minValue(1)
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($set, $get, $state) {
+                                                $received = (float) $state;
+                                                $set('passed_quantity', $received);
+                                                $set('rejected_quantity', 0);
+                                            })
+                                            ->validationMessages([
+                                                'required' => 'Qty diterima wajib diisi',
+                                                'min' => 'Qty diterima minimal 1',
+                                            ]),
+                                        \Filament\Forms\Components\TextInput::make('passed_quantity')
+                                            ->label('Qty Lulus QC')
+                                            ->numeric()
+                                            ->default($remaining)
+                                            ->required()
+                                            ->minValue(0)
+                                            ->reactive()
+                                            ->validationMessages(['required' => 'Qty lulus wajib diisi']),
+                                        \Filament\Forms\Components\TextInput::make('rejected_quantity')
+                                            ->label('Qty Ditolak')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->required()
+                                            ->minValue(0)
+                                            ->validationMessages(['required' => 'Qty ditolak wajib diisi']),
+                                        \Filament\Forms\Components\Select::make('condition')
+                                            ->label('Kondisi')
+                                            ->options([
+                                                'good'    => 'Baik',
+                                                'damaged' => 'Rusak Sebagian',
+                                                'reject'  => 'Ditolak',
+                                            ])
+                                            ->default('good')
+                                            ->required(),
+                                        \Filament\Forms\Components\Textarea::make('notes')
+                                            ->label('Catatan QC')
+                                            ->rows(2)
+                                            ->columnSpanFull(),
+                                    ]),
+                            ];
+                        })
+                        ->action(function ($record, array $data) {
                             $qualityControlService = app(QualityControlService::class);
 
                             $qc = $qualityControlService->createQCFromPurchaseOrderItem($record, [
-                                'inspected_by' => Auth::id(),
-                                'passed_quantity' => 0,
-                                'rejected_quantity' => 0,
-                                'warehouse_id' => $record->purchaseOrder->warehouse_id,
+                                'inspected_by'     => $data['inspected_by'],
+                                'passed_quantity'  => (float) ($data['passed_quantity'] ?? 0),
+                                'rejected_quantity' => (float) ($data['rejected_quantity'] ?? 0),
+                                'quantity_received' => (float) ($data['quantity_received'] ?? 0),
+                                'warehouse_id'     => $data['warehouse_id'],
+                                'notes'            => $data['notes'] ?? null,
                             ]);
 
                             if ($qc) {
-                                // Notify current user
                                 \Filament\Notifications\Notification::make()
-                                    ->title('QC Created')
-                                    ->body('Quality Control created for PO Item: ' . optional($record->product)->name)
+                                    ->title('QC Berhasil Dibuat')
+                                    ->body('Quality Control untuk ' . optional($record->product)->name . ' telah dibuat.')
                                     ->icon('heroicon-o-check-badge')
                                     ->color('success')
                                     ->send();

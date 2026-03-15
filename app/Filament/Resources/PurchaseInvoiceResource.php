@@ -201,7 +201,7 @@ class PurchaseInvoiceResource extends Resource
                                             ->tooltip('Generate Invoice Number')
                                             ->action(function ($set, $get) {
                                                 $invoiceService = app(InvoiceService::class);
-                                                $set('invoice_number', $invoiceService->generateInvoiceNumber());
+                                                $set('invoice_number', $invoiceService->generatePurchaseInvoiceNumber());
                                             })
                                     )
                                     ->maxLength(255),
@@ -347,23 +347,20 @@ class PurchaseInvoiceResource extends Resource
                                                     ->firstWhere('product_id', $item->product_id);
                                                 
                                                 if ($purchaseOrderItem) {
-                                                    // Calculate price after discount and tax (both are percentages)
-                                                    // Use local variable to avoid double accumulation bug
+                                                    // DPP = price after discount, BEFORE tax (Dasar Pengenaan Pajak)
                                                     $unitPrice = $purchaseOrderItem->unit_price;
                                                     $discountAmount = $unitPrice * ($purchaseOrderItem->discount / 100);
                                                     $afterDiscount = $unitPrice - $discountAmount;
-                                                    $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
-                                                    $finalUnitPrice = $afterDiscount + $taxAmount;
-                                                    $total = $finalUnitPrice * $item->qty_accepted;
+                                                    $total = $afterDiscount * $item->qty_accepted;
                                                     
                                                     $items[] = [
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->qty_accepted,
-                                                        'price' => $finalUnitPrice,
+                                                        'price' => $afterDiscount,
                                                         'total' => $total
                                                     ];
                                                     
-                                                    $subtotal += $total; // Only accumulate grand total
+                                                    $subtotal += $total; // Accumulate DPP (pre-tax subtotal)
                                                 }
                                             }
                                             

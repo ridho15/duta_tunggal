@@ -711,8 +711,11 @@ class SaleOrderResource extends Resource
                                         }
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
+                                        $qty = (float)($state ?? 0);
+                                        $price = (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                        $set('total', number_format($qty * $price, 0, ',', '.'));
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
-                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
+                                        $_base = $qty * $price * (1 - (float)($get('discount') ?? 0) / 100);
                                         try {
                                             $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
                                             $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
@@ -802,15 +805,30 @@ class SaleOrderResource extends Resource
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
+                                        $qty = (float)($get('quantity') ?? 0);
+                                        $price = (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                        $set('total', number_format($qty * $price, 0, ',', '.'));
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
-                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
+                                        $_base = $qty * $price * (1 - (float)($get('discount') ?? 0) / 100);
                                         try {
                                             $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
                                             $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
                                         } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                     }),
+                                TextInput::make('total')
+                                    ->label('Total (Harga × Qty)')
+                                    ->prefix('Rp')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $total = (float)$record->quantity * (float)$record->unit_price;
+                                            $component->state(number_format($total, 0, ',', '.'));
+                                        }
+                                    }),
                                 TextInput::make('discount')
-                                    ->label('Discount')
+                                    ->label('Discount (%)')
                                     ->numeric()
                                     ->default(0)
                                     ->reactive()

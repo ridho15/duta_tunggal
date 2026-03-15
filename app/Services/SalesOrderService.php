@@ -24,7 +24,7 @@ class SalesOrderService
                 $item->unit_price,
                 $item->discount,
                 $item->tax,
-                $item->tipe_pajak ?? 'Exclusive'
+                $item->tipe_pajak ?? 'Inklusif'
             );
         }
 
@@ -160,7 +160,6 @@ class SalesOrderService
             'order_date' => $data['order_date'],
             'note' => $data['note'],
             'warehouse_id' => $data['warehouse_id'],
-            'delivery_date' => $data['delivery_date'],
             'expected_date' => $data['expected_date'],
             'tempo_hutang' => $data['tempo_hutang'],
         ]);
