@@ -653,7 +653,7 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'Tax harus berupa angka'
                                     ])
                                     ->suffix('%')
-                                    ->default(0)
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $state = $state ?? 0; // Ensure it's not null
@@ -673,14 +673,7 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'PPN rate harus berupa angka'
                                     ])
                                     ->suffix('%')
-                                    ->default(function () {
-                                        $taxSetting = \App\Models\TaxSetting::where('status', true)
-                                            ->where('effective_date', '<=', now())
-                                            ->where('type', 'PPN')
-                                            ->orderByDesc('effective_date')
-                                            ->first();
-                                        return $taxSetting?->rate ?? 11;
-                                    })
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $state = $state ?? 11; // Ensure it's not null, default to 11
@@ -727,14 +720,7 @@ class SalesInvoiceResource extends Resource
                         Hidden::make('delivery_orders'),
                         Hidden::make('dpp')->default(0),
                         Hidden::make('tax')->default(0),
-                        Hidden::make('ppn_rate')->default(function () {
-                            $taxSetting = \App\Models\TaxSetting::where('status', true)
-                                ->where('effective_date', '<=', now())
-                                ->where('type', 'PPN')
-                                ->orderByDesc('effective_date')
-                                ->first();
-                            return $taxSetting?->rate ?? 11;
-                        }),
+                        Hidden::make('ppn_rate')->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
                         Hidden::make('total')->default(0),
 
                         Repeater::make('invoiceItem')

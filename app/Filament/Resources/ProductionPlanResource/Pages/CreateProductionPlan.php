@@ -43,7 +43,7 @@ class CreateProductionPlan extends CreateRecord
                 \App\Http\Controllers\HelperController::sendNotification(
                     isSuccess: true,
                     title: 'Berhasil',
-                    message: 'Rencana produksi dijadwalkan langsung dan MaterialIssue telah dibuat otomatis.'
+                    message: 'Rencana produksi dijadwalkan langsung dan MaterialIssue telah dibuat otomatis. Proses selanjutnya: Kepala Produksi perlu memulai Manufacturing Order dan memastikan bahan baku siap diproduksi.'
                 );
             } catch (\Throwable $e) {
                 report($e);

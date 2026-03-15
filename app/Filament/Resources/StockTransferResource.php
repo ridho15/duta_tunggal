@@ -291,7 +291,7 @@ class StockTransferResource extends Resource
                         ->action(function ($record) {
                             $stockTransferService = app(StockTransferService::class);
                             $stockTransferService->requestTransfer($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Berhasil mengirimkan request stock transfer");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Request stock transfer berhasil dikirimkan. Proses selanjutnya: Manajer Gudang atau Manajer Logistik perlu mereview dan menyetujui permintaan transfer stok ini.");
                         }),
                     ActionsAction::make('approve')
                         ->label('Approve')
@@ -304,7 +304,7 @@ class StockTransferResource extends Resource
                         ->action(function ($record) {
                             $stockTransferService = app(StockTransferService::class);
                             $stockTransferService->approveStockTransfer($record);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil di approve");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil diapprove. Proses selanjutnya: Tim Gudang perlu memproses dan mengirimkan barang sesuai dengan jumlah transfer yang telah disetujui.");
                         }),
                     ActionsAction::make('reject')
                         ->label('Reject')
@@ -318,7 +318,7 @@ class StockTransferResource extends Resource
                             $record->update([
                                 'status' => 'Reject'
                             ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil di reject");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock ditolak. Proses selanjutnya: Pemohon perlu merevisi permintaan transfer sesuai keterangan penolakan dan mengajukan kembali.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

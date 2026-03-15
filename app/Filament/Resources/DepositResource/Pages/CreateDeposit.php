@@ -82,7 +82,7 @@ class CreateDeposit extends CreateRecord
         HelperController::sendNotification(
             isSuccess: true, 
             title: 'Success', 
-            message: "Deposit successfully created for " . $fromName
+            message: "Deposit berhasil dibuat untuk " . $fromName . ". Proses selanjutnya: Tim Finance perlu memverifikasi deposit dan memastikan saldo awal telah tercatat dalam jurnal keuangan."
         );
     }
 

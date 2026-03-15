@@ -132,7 +132,7 @@ class PurchaseReturnResource extends Resource
                                 'rejected' => 'Rejected',
                             ])
                             ->default('draft')
-                            ->disabled(fn () => !in_array('all', Auth::user()?->manage_type ?? []))
+                            ->disabled(fn () => !Auth::user()?->hasRole('Super Admin'))
                             ->dehydrated(),
                         Textarea::make('notes')
                             ->label('Keterangan')
@@ -356,6 +356,37 @@ class PurchaseReturnResource extends Resource
                     EditAction::make()
                         ->color('success')
                         ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
+                    \Filament\Tables\Actions\Action::make('edit_status')
+                        ->label('Edit Status')
+                        ->icon('heroicon-o-pencil-square')
+                        ->color('warning')
+                        ->visible(fn ($record) => Auth::user()?->hasRole('Super Admin'))
+                        ->form([
+                            Select::make('status')
+                                ->label('Status')
+                                ->options([
+                                    'draft' => 'Draft',
+                                    'pending_approval' => 'Pending Approval',
+                                    'approved' => 'Approved',
+                                    'rejected' => 'Rejected',
+                                ])
+                                ->required()
+                                ->default(fn ($record) => $record->status),
+                            Textarea::make('notes')
+                                ->label('Catatan Perubahan Status')
+                                ->nullable(),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $record->update([
+                                'status' => $data['status'],
+                                'notes' => ($record->notes ? $record->notes . "\n\n" : '') . 'Status diubah oleh Super Admin: ' . ($data['notes'] ?? 'Tanpa catatan'),
+                            ]);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Status Purchase Return Diubah')
+                                ->body('Status berhasil diubah menjadi: ' . $data['status'])
+                                ->success()
+                                ->send();
+                        }),
                     \Filament\Tables\Actions\Action::make('submit_for_approval')
                         ->label('Submit for Approval')
                         ->icon('heroicon-o-paper-airplane')

@@ -610,7 +610,7 @@ class PurchaseOrderResource extends Resource
                                         ));
                                     })
                                     ->suffix('%')
-                                    ->default(0),
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total (termasuk pajak)')
                                     ->reactive()
@@ -1083,6 +1083,9 @@ class PurchaseOrderResource extends Resource
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->searchable(),
+                TextColumn::make('orderRequest.request_number')
+                    ->label('Request Number')
+                    ->searchable(),
                 IconColumn::make('is_import')
                     ->label('Import?')
                     ->boolean()
@@ -1500,7 +1503,7 @@ class PurchaseOrderResource extends Resource
                         ->action(function ($record) {
                             $purchaseOrderService = app(PurchaseOrderService::class);
                             $purchaseOrderService->updateTotalAmount($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total amount berhasil disinkronkan");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total amount berhasil disinkronkan. Proses selanjutnya: Pastikan semua data Purchase Order sudah benar sebelum mengajukan untuk disetujui.");
                         }),
                     Action::make('terbit_invoice')
                         ->label('Terbitkan Invoice')
@@ -1558,7 +1561,7 @@ class PurchaseOrderResource extends Resource
                             }
                             $purchaseOrderService = app(PurchaseOrderService::class);
                             $purchaseOrderService->generateInvoice($record, $data);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Generate invoice berhasil");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Generate invoice berhasil. Proses selanjutnya: Tim Finance perlu memproses pembayaran terhadap Invoice yang telah diterbitkan sesuai jatuh tempo.");
                         })
                 ])->button()
                     ->label('Action')

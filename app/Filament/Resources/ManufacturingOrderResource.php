@@ -376,7 +376,7 @@ class ManufacturingOrderResource extends Resource
                                     'status' => 'draft',
                                 ]);
 
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created");
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
                             } else {
                                 HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock material tidak mencukupi");
                             }

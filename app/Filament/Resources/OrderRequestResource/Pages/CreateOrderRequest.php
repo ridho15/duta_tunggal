@@ -30,7 +30,7 @@ class CreateOrderRequest extends CreateRecord
         HelperController::sendNotification(
             isSuccess: true,
             title: 'Order Request Created',
-            message: 'Order Request berhasil dibuat dengan nomor: ' . $this->record->request_number
+            message: 'Order Request berhasil dibuat dengan nomor: ' . $this->record->request_number . '. Proses selanjutnya: Menunggu persetujuan dari Supervisor/Manager Purchasing.'
         );
     }
 }

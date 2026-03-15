@@ -599,7 +599,7 @@ class QualityControlPurchaseResource extends Resource
                             }
 
                             $qcService->completeQualityControl($record, []);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");
                         }),
                     DeleteAction::make(),
                 ])

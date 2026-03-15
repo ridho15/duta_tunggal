@@ -114,7 +114,7 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                             })
-                            ->default(0)
+                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                             ->indonesianMoney(),
                         TextInput::make('subtotal')
                             ->label('Sub Total')

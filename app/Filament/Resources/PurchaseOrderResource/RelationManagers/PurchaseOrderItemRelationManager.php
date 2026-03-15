@@ -138,7 +138,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 $set('subtotal', $subtotal);
                             })
                             ->indonesianMoney()
-                            ->default(0),
+                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
                         TextInput::make('subtotal')
                             ->label('Sub Total')
                             ->reactive()

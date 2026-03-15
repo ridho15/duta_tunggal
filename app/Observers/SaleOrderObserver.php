@@ -6,6 +6,7 @@ use App\Models\SaleOrder;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
 use App\Models\InvoiceItem;
+use App\Models\StockReservation;
 use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
 use Illuminate\Support\Facades\Log;
@@ -53,6 +54,32 @@ class SaleOrderObserver
         if ($saleOrder->wasChanged('total_amount')) {
             $this->syncJournalEntries($saleOrder);
         }
+
+        // Jika status berubah ke 'canceled', lepaskan semua stock reservation
+        if ($originalStatus !== 'canceled' && $newStatus === 'canceled') {
+            $this->releaseStockReservations($saleOrder);
+        }
+    }
+
+    /**
+     * Release all stock reservations for a cancelled sale order.
+     */
+    protected function releaseStockReservations(SaleOrder $saleOrder): void
+    {
+        $count = StockReservation::where('sale_order_id', $saleOrder->id)->count();
+        if ($count === 0) {
+            return;
+        }
+
+        StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
+            $reservation->delete(); // triggers StockReservationObserver::deleted → restores qty_available & decrements qty_reserved
+        });
+
+        Log::info('SaleOrderObserver: Released stock reservations for canceled SO', [
+            'sale_order_id' => $saleOrder->id,
+            'so_number' => $saleOrder->so_number,
+            'reservations_released' => $count,
+        ]);
     }
 
     /**

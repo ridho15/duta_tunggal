@@ -95,7 +95,7 @@ class PaymentRequestResource extends Resource
                                     ->numeric()
                                     ->disabled()
                                     ->dehydrated(true)
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                             ]),
 
                         Section::make('Pilih Invoice yang akan Dibayar')

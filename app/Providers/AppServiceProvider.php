@@ -140,11 +140,7 @@ class AppServiceProvider extends ServiceProvider
                 ->prefix('Rp')
                 ->placeholder('500.000')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $input.map(function(value) {
-                value = value.replace(/[^\d]/g, '');
-                if (!value) return '';
-                return new Intl.NumberFormat('id-ID').format(parseInt(value, 10));
-            })
+            $money($input, ',', '.', 0)
         JS))
                 ->formatStateUsing(function ($state) {
                     if ($state === null || $state === '') {

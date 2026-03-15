@@ -45,7 +45,7 @@ class ViewDeliveryOrder extends ViewRecord
                 ->action(function ($record) {
                     $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'request_approve');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request approve");
+                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Logistik/Finance.");
                 }),
             Actions\Action::make('request_close')
                 ->label('Request Close')
@@ -60,7 +60,7 @@ class ViewDeliveryOrder extends ViewRecord
                 ->action(function ($record) {
                     $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'request_close');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Permintaan penutupan Delivery Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Logistik.");
                 }),
 
             Actions\Action::make('approve')
@@ -84,7 +84,7 @@ class ViewDeliveryOrder extends ViewRecord
                     try {
                         $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                         $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve Delivery Order");
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah disetujui. Proses selanjutnya: Pengiriman barang oleh Driver melalui Surat Jalan.");
                     } catch (\Exception $e) {
                         \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
                         throw $e;
@@ -109,7 +109,7 @@ class ViewDeliveryOrder extends ViewRecord
                 ->action(function ($record, array $data) {
                     $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'reject', comments: $data['comments'], action: 'rejected');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Delivery Order");
+                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditolak. Proses selanjutnya: Tim Logistik perlu memperbaiki data Delivery Order sesuai alasan penolakan dan mengajukan kembali untuk persetujuan.");
                 }),
             Actions\Action::make('closed')
                 ->label('Close')
@@ -124,7 +124,7 @@ class ViewDeliveryOrder extends ViewRecord
                 ->action(function ($record) {
                     $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'closed');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order Closed");
+                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan Invoice telah diterbitkan dan diselesaikan untuk Delivery Order ini.");
                 }),
 
             Actions\Action::make('sent')
@@ -144,7 +144,7 @@ class ViewDeliveryOrder extends ViewRecord
                     try {
                         $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                         $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'sent');
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Success", message: "Delivery Order marked as sent successfully");
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Success", message: "Delivery Order telah ditandai sebagai terkirim. Proses selanjutnya: Konfirmasi penerimaan oleh Tim Sales/Admin.");
                     } catch (\Exception $e) {
                         \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
                         throw $e;
@@ -166,11 +166,11 @@ class ViewDeliveryOrder extends ViewRecord
                     // Post delivery order to general ledger for HPP recognition
                     $postResult = $deliveryOrderService->postDeliveryOrder($record);
                     if ($postResult['status'] === 'posted') {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed and posted to ledger");
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai dan telah diposting ke buku besar. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
                     } elseif ($postResult['status'] === 'error') {
                         \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
                     } else {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
                     }
                 }),
 

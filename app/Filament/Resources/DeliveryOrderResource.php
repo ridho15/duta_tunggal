@@ -171,13 +171,10 @@ class DeliveryOrderResource extends Resource
                             ->nullable(),
                         TextInput::make('additional_cost')
                             ->label('Biaya Tambahan')
-                            ->numeric()
-                            ->prefix('Rp')
+                            ->indonesianMoney()
                             ->default(0)
                             ->minValue(0)
-                            ->step(0.01)
                             ->validationMessages([
-                                'numeric' => 'Biaya tambahan harus berupa angka',
                                 'min' => 'Biaya tambahan tidak boleh negatif',
                             ])
                             ->helperText('Biaya tambahan seperti ongkos kirim, asuransi, dll.')
@@ -430,6 +427,13 @@ class DeliveryOrderResource extends Resource
                         TextEntry::make('driver.name')->label('Driver'),
                         TextEntry::make('vehicle.plate')->label('Vehicle'),
                         TextEntry::make('status')->badge(),
+                        TextEntry::make('shipping_method')
+                            ->label('Metode Pengiriman')
+                            ->getStateUsing(function ($record) {
+                                $suratJalan = $record->suratJalan()->where('status', 1)->first() ?? $record->suratJalan()->first();
+                                return $suratJalan?->shipping_method ?? '-';
+                            })
+                            ->placeholder('-'),
                         TextEntry::make('notes'),
                         TextEntry::make('additional_cost')->rupiah(),
                         TextEntry::make('additional_cost_description'),
@@ -685,7 +689,7 @@ class DeliveryOrderResource extends Resource
                         ->action(function ($record) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
                             $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'request_approve');
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request approve");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Logistik/Finance.");
                         }),
                     Action::make('request_close')
                         ->label('Request Close')
@@ -699,7 +703,7 @@ class DeliveryOrderResource extends Resource
                         ->action(function ($record) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
                             $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'request_close');
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Permintaan penutupan Delivery Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Logistik.");
                         }),
                     Action::make('approve')
                         ->label('Konfirmasi Dana Diterima')
@@ -725,7 +729,7 @@ class DeliveryOrderResource extends Resource
                                 $deliveryOrderService = app(DeliveryOrderService::class);
                                 $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
 
-                                HelperController::sendNotification(isSuccess: true, title: "Dana Dikonfirmasi", message: "Pembayaran Delivery Order telah dikonfirmasi diterima.");
+                                HelperController::sendNotification(isSuccess: true, title: "Dana Dikonfirmasi", message: "Pembayaran Delivery Order telah dikonfirmasi diterima. Proses selanjutnya: Pengiriman barang oleh Driver melalui Surat Jalan.");
                             } catch (\Exception $e) {
                                 HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
                                 throw $e;
@@ -743,7 +747,7 @@ class DeliveryOrderResource extends Resource
                         ->action(function ($record) {
                             $deliveryOrderService = app(DeliveryOrderService::class);
                             $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'closed');
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order Closed");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan Invoice telah diterbitkan dan diselesaikan untuk Delivery Order ini.");
                         }),
                     Action::make('reject')
                         ->label('Reject')
@@ -771,7 +775,7 @@ class DeliveryOrderResource extends Resource
                             //     'approved_at' => now(),
                             // ]);
 
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Delivery Order");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditolak. Proses selanjutnya: Tim Logistik perlu memperbaiki data Delivery Order sesuai alasan penolakan dan mengajukan kembali untuk persetujuan.");
                         }),
                     Action::make('pdf_delivery_order')
                         ->label('Download PDF')
@@ -961,11 +965,11 @@ class DeliveryOrderResource extends Resource
                             // Post delivery order to general ledger for HPP recognition
                             $postResult = $deliveryOrderService->postDeliveryOrder($record);
                             if ($postResult['status'] === 'posted') {
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed and posted to ledger");
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai dan telah diposting ke buku besar. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
                             } elseif ($postResult['status'] === 'error') {
                                 HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
                             } else {
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
                             }
                         }),
                     Action::make('mark_delivery_failed')
@@ -982,7 +986,7 @@ class DeliveryOrderResource extends Resource
                         })
                         ->action(function ($record) {
                             $record->update(['status' => 'delivery_failed']);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order ditandai sebagai Pengiriman Gagal. Prioritaskan untuk pengiriman berikutnya.");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order ditandai sebagai Pengiriman Gagal. Proses selanjutnya: Segera koordinasikan dengan Tim Sales dan jadwalkan ulang pengiriman ke customer.");
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)

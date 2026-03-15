@@ -109,8 +109,12 @@ class StockReservationService
                 ]);
             }
 
-            // Delete reservations (this will trigger StockReservationObserver deleted method)
-            StockReservation::where('material_issue_id', $materialIssue->id)->delete();
+            // Delete each reservation individually so Eloquent fires the 'deleted'
+            // model event and StockReservationObserver restores qty_available /
+            // decrements qty_reserved. A mass-delete query bypasses observers.
+            foreach ($reservations as $reservation) {
+                $reservation->delete();
+            }
         });
     }
 

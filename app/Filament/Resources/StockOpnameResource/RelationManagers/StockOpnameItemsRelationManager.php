@@ -88,12 +88,12 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 TextInput::make('unit_cost')
                     ->label('Harga Satuan')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->default(0)
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = $state ?? 0;
+                        $unitCost = \App\Helpers\MoneyHelper::parse($state ?? 0);
                         $differenceValue = $differenceQty * $unitCost;
                         $set('difference_value', $differenceValue);
 
@@ -105,23 +105,26 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 TextInput::make('average_cost')
                     ->label('Average Cost')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->default(0)
                     ->disabled()
                     ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
                     ->helperText('Harga rata-rata berdasarkan riwayat pembelian'),
 
                 TextInput::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->disabled()
-                    ->dehydrated(),
+                    ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : ''),
 
                 TextInput::make('total_value')
                     ->label('Total Nilai')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->disabled()
                     ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
                     ->helperText('Total nilai berdasarkan qty fisik × harga satuan'),
 
                 Textarea::make('notes')

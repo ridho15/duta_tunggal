@@ -574,7 +574,7 @@ class DepositResource extends Resource
                             // Create journal entries for deposit balance addition
                             static::createDepositAdditionJournalEntries($record, $data['amount'], $data['note']);
 
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil di tambahkan");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil ditambahkan. Proses selanjutnya: Tim Finance perlu memverifikasi saldo deposit dan memastikan jurnal keuangan telah dicatat dengan benar.");
                         }),
                     Action::make('kurangiSaldo')
                         ->label('Kurangi Saldo')
@@ -638,7 +638,7 @@ class DepositResource extends Resource
                             // Create journal entries for deposit balance reduction
                             static::createDepositReductionJournalEntries($record, $data['amount'], $data['note']);
 
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil di kurangi");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil dikurangi. Proses selanjutnya: Tim Finance perlu memverifikasi saldo deposit dan memastikan jurnal keuangan telah dicatat dengan benar.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

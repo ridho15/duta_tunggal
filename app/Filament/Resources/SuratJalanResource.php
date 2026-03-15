@@ -87,9 +87,10 @@ class SuratJalanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->relationship('deliveryOrder', 'do_number', function (Builder $query) {
-                                $query->whereDoesntHave('suratJalan')
-                                      ->whereIn('status', ['draft', 'request_approve', 'approved', 'sent', 'received', 'delivery_failed']);
+                            ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get) {
+                                // Show active delivery orders (regardless of whether they already have a Surat Jalan),
+                                // so the select can correctly display the existing selection when editing.
+                                $query->whereIn('status', ['draft', 'request_approve', 'approved', 'sent', 'received', 'delivery_failed']);
                             })
                             ->multiple()
                             ->validationMessages([
@@ -335,17 +336,38 @@ class SuratJalanResource extends Resource
                     ->icon('heroicon-o-printer')
                     ->color('gray')
                     ->form([
-                        TextInput::make('sender_name')
+                        Select::make('sender_name')
                             ->label('Nama Pengirim / Driver')
-                            ->datalist(fn () => SuratJalan::whereNotNull('sender_name')
-                                ->distinct()
-                                ->pluck('sender_name')
-                                ->filter()
-                                ->values()
-                                ->toArray()
-                            )
+                            ->searchable()
+                            ->preload()
+                            ->options(function () {
+                                $senderNames = SuratJalan::whereNotNull('sender_name')
+                                    ->distinct()
+                                    ->pluck('sender_name')
+                                    ->filter()
+                                    ->values()
+                                    ->toArray();
+
+                                $driverNames = Driver::query()
+                                    ->pluck('name')
+                                    ->filter()
+                                    ->values()
+                                    ->toArray();
+
+                                $senderOptions = collect($senderNames)
+                                    ->unique()
+                                    ->sort()
+                                    ->mapWithKeys(fn ($name) => ["sender:{$name}" => "Pengirim: {$name}"]);
+
+                                $driverOptions = collect($driverNames)
+                                    ->unique()
+                                    ->sort()
+                                    ->mapWithKeys(fn ($name) => ["driver:{$name}" => "Driver: {$name}"]);
+
+                                return $senderOptions->merge($driverOptions)->toArray();
+                            })
                             ->required()
-                            ->placeholder('Ketik nama driver...'),
+                            ->placeholder('Cari nama pengirim atau driver...'),
                         DatePicker::make('rekap_date')
                             ->label('Tanggal Pengiriman')
                             ->default(now()->toDateString())
@@ -355,12 +377,32 @@ class SuratJalanResource extends Resource
                     ->modalDescription('Pilih nama driver dan tanggal untuk mencetak rekap pengiriman hari ini.')
                     ->modalSubmitActionLabel('Cetak PDF')
                     ->action(function (array $data) {
+                        $selected = $data['sender_name'] ?? '';
+
                         $suratJalans = SuratJalan::with([
                             'deliveryOrder.salesOrders.customer',
                             'deliveryOrder.deliveryOrderItem.product',
                             'deliveryOrder.salesOrders',
                         ])
-                            ->where('sender_name', $data['sender_name'])
+                            ->when($selected, function (Builder $query) use ($selected) {
+                                if (str_starts_with($selected, 'driver:')) {
+                                    $driverName = substr($selected, strlen('driver:'));
+
+                                    $query->whereHas('deliveryOrder.driver', function (Builder $query) use ($driverName) {
+                                        $query->where('name', $driverName);
+                                    });
+                                } elseif (str_starts_with($selected, 'sender:')) {
+                                    $senderName = substr($selected, strlen('sender:'));
+
+                                    $query->where('sender_name', $senderName);
+                                } else {
+                                    // Fallback: support legacy values (no prefix)
+                                    $query->where('sender_name', $selected)
+                                        ->orWhereHas('deliveryOrder.driver', function (Builder $query) use ($selected) {
+                                            $query->where('name', $selected);
+                                        });
+                                }
+                            })
                             ->whereDate('issued_at', $data['rekap_date'])
                             ->get();
 
@@ -373,6 +415,126 @@ class SuratJalanResource extends Resource
                         return response()->streamDownload(function () use ($pdf) {
                             echo $pdf->stream();
                         }, 'Rekap_Driver_' . str_replace(' ', '_', $data['sender_name']) . '_' . $data['rekap_date'] . '.pdf');
+                    }),
+                Action::make('cetak_rekap_fleksibel')
+                    ->label('Cetak Rekap Fleksibel')
+                    ->icon('heroicon-o-printer')
+                    ->color('primary')
+                    ->form([
+                        Select::make('drivers')
+                            ->label('Driver / Pengirim')
+                            ->multiple()
+                            ->searchable()
+                            ->preload()
+                            ->options(function () {
+                                $senderNames = SuratJalan::whereNotNull('sender_name')
+                                    ->distinct()
+                                    ->pluck('sender_name')
+                                    ->filter()
+                                    ->values()
+                                    ->toArray();
+
+                                $driverNames = Driver::query()
+                                    ->pluck('name')
+                                    ->filter()
+                                    ->values()
+                                    ->toArray();
+
+                                $allNames = collect($senderNames)->merge($driverNames)->unique()->sort()->values();
+
+                                return $allNames->mapWithKeys(fn ($name) => [$name => $name])->toArray();
+                            })
+                            ->placeholder('Pilih satu atau lebih driver/pengirim...'),
+                        DatePicker::make('date_from')
+                            ->label('Dari Tanggal')
+                            ->default(now()->subDays(7)->toDateString())
+                            ->required(),
+                        DatePicker::make('date_to')
+                            ->label('Sampai Tanggal')
+                            ->default(now()->toDateString())
+                            ->required(),
+                        Select::make('group_by')
+                            ->label('Kelompokkan Berdasarkan')
+                            ->options([
+                                'driver' => 'Driver / Pengirim',
+                                'date' => 'Tanggal',
+                                'none' => 'Tidak Kelompokkan',
+                            ])
+                            ->default('driver')
+                            ->required(),
+                    ])
+                    ->modalHeading('Cetak Rekap Pengiriman Fleksibel')
+                    ->modalDescription('Pilih driver dan rentang tanggal untuk mencetak rekap pengiriman yang lebih fleksibel.')
+                    ->modalSubmitActionLabel('Cetak PDF')
+                    ->action(function (array $data) {
+                        $drivers = $data['drivers'] ?? [];
+                        $dateFrom = $data['date_from'];
+                        $dateTo = $data['date_to'];
+                        $groupBy = $data['group_by'];
+
+                        $query = SuratJalan::with([
+                            'deliveryOrder.salesOrders.customer',
+                            'deliveryOrder.deliveryOrderItem.product',
+                            'deliveryOrder.salesOrders',
+                        ]);
+
+                        // Filter by date range
+                        $query->whereBetween('issued_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
+
+                        // Filter by drivers if selected
+                        if (!empty($drivers)) {
+                            $query->where(function (Builder $query) use ($drivers) {
+                                foreach ($drivers as $driver) {
+                                    $query->orWhere('sender_name', $driver)
+                                          ->orWhereHas('deliveryOrder.driver', function (Builder $query) use ($driver) {
+                                              $query->where('name', $driver);
+                                          });
+                                }
+                            });
+                        }
+
+                        $suratJalans = $query->get();
+
+                        // Group the data based on selection
+                        $groupedData = [];
+                        if ($groupBy === 'driver') {
+                            foreach ($suratJalans as $sj) {
+                                $driverName = $sj->sender_name;
+                                if (!$driverName) {
+                                    // Get driver from delivery orders
+                                    $driversInSJ = $sj->deliveryOrder->pluck('driver.name')->filter()->unique();
+                                    $driverName = $driversInSJ->isNotEmpty() ? $driversInSJ->first() : 'Tidak Diketahui';
+                                }
+                                if (!isset($groupedData[$driverName])) {
+                                    $groupedData[$driverName] = collect();
+                                }
+                                $groupedData[$driverName]->push($sj);
+                            }
+                        } elseif ($groupBy === 'date') {
+                            foreach ($suratJalans as $sj) {
+                                $dateKey = $sj->issued_at->format('Y-m-d');
+                                if (!isset($groupedData[$dateKey])) {
+                                    $groupedData[$dateKey] = collect();
+                                }
+                                $groupedData[$dateKey]->push($sj);
+                            }
+                        } else {
+                            // No grouping
+                            $groupedData['Semua'] = $suratJalans;
+                        }
+
+                        $pdf = Pdf::loadView('pdf.flexible-delivery-report', [
+                            'groupedData' => $groupedData,
+                            'drivers' => $drivers,
+                            'dateFrom' => $dateFrom,
+                            'dateTo' => $dateTo,
+                            'groupBy' => $groupBy,
+                        ])->setPaper('A4', 'portrait');
+
+                        $filename = 'Rekap_Fleksibel_' . $dateFrom . '_to_' . $dateTo . '.pdf';
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->stream();
+                        }, $filename);
                     }),
             ])
             ->actions([
@@ -422,7 +584,7 @@ class SuratJalanResource extends Resource
                                 'status' => 1
                             ]);
 
-                            HelperController::sendNotification(isSuccess: true, title: 'Surat Jalan Disetujui', message: 'Surat Jalan telah disetujui dan diterbitkan.');
+                            HelperController::sendNotification(isSuccess: true, title: 'Surat Jalan Disetujui', message: 'Surat Jalan telah disetujui dan diterbitkan. Proses selanjutnya: Driver harus mengambil dokumen Surat Jalan dan segera melakukan pengiriman ke customer sesuai jadwal.');
                         }),
                     Action::make('mark_as_sent')
                         ->label('Mark as Sent')
@@ -458,7 +620,7 @@ class SuratJalanResource extends Resource
                                 }
                             }
 
-                            HelperController::sendNotification(isSuccess: true, title: 'Terkirim', message: $marked > 0 ? "{$marked} Delivery Order berhasil ditandai sebagai Terkirim." : 'Semua DO sudah berstatus Terkirim.');
+                            HelperController::sendNotification(isSuccess: true, title: 'Terkirim', message: $marked > 0 ? "{$marked} Delivery Order berhasil ditandai sebagai Terkirim. Proses selanjutnya: Tim Finance perlu menerbitkan Invoice untuk setiap Delivery Order yang telah terkirim." : 'Semua DO sudah berstatus Terkirim. Proses selanjutnya: Tim Finance perlu menerbitkan Invoice untuk Delivery Order tersebut.');
                         }),
                     Action::make('tandai_gagal_kirim')
                         ->label('Tandai Gagal Kirim')
@@ -597,6 +759,8 @@ class SuratJalanResource extends Resource
     {
         return [
             'index' => Pages\ListSuratJalans::route('/'),
+            'create' => Pages\CreateSuratJalan::route('/create'),
+            'edit' => Pages\EditSuratJalan::route('/{record}/edit'),
         ];
     }
 }

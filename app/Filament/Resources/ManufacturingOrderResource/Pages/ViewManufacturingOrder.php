@@ -45,7 +45,7 @@ class ViewManufacturingOrder extends ViewRecord
                         'status' => 'draft',
                     ]);
 
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created");
+                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
                 }),
             EditAction::make()
                 ->icon('heroicon-o-pencil-square'),

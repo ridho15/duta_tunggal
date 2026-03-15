@@ -42,7 +42,7 @@ class ListPurchaseReturns extends ListRecords
                         HelperController::sendNotification(
                             isSuccess: true,
                             title: "Automation Completed Successfully",
-                            message: $message
+                            message: $message . ". Proses selanjutnya: Tim Purchasing perlu menghubungi supplier untuk mengatur proses pengembalian barang dan penerbitan credit note."
                         );
                     }
                 }),

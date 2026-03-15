@@ -185,7 +185,7 @@ class ProductionResource extends Resource
                             $record->update([
                                 'status' => 'finished'
                             ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished. Proses selanjutnya: Tim Quality Control (QC) perlu melakukan pemeriksaan kualitas hasil produksi sebelum barang dipindahkan ke gudang.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

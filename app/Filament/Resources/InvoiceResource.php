@@ -274,9 +274,7 @@ class InvoiceResource extends Resource
                                 $set('total', static::hitungTotal($get));
                             })
                             ->numeric()
-                            ->default(function ($get) {
-                                return 0;
-                            }),
+                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
                         TextInput::make('ppn_rate')
                             ->label('PPN Rate (%)')
                             ->validationMessages([
@@ -291,16 +289,7 @@ class InvoiceResource extends Resource
                                 $set('total', static::hitungTotal($get));
                             })
                             ->numeric()
-                            ->default(function () {
-                                $taxSetting = TaxSetting::where('status', true)
-                                    ->where('effective_date', '<=', now())
-                                    ->where('type', 'PPN')
-                                    ->orderByDesc('effective_date')
-                                    ->first();
-                                if ($taxSetting) {
-                                    return $taxSetting->rate;
-                                }
-                            }),
+                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
                         TextInput::make('total')
                             ->required()
                             ->indonesianMoney()

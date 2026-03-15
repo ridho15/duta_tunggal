@@ -40,9 +40,8 @@ class SuppliersRelationManager extends RelationManager
                     ->columnSpanFull(),
                 TextInput::make('supplier_price')
                     ->label('Harga Beli dari Supplier')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->minValue(0)
-                    ->prefix('Rp')
                     ->default(0)
                     ->columnSpanFull(),
             ])
@@ -97,14 +96,12 @@ class SuppliersRelationManager extends RelationManager
                             ->columnSpanFull(),
                         TextInput::make('supplier_price')
                             ->label('Harga Beli dari Supplier')
-                            ->numeric()
+                            ->indonesianMoney()
                             ->minValue(0)
-                            ->prefix('Rp')
                             ->default(0)
                             ->required()
                             ->validationMessages([
                                 'required' => 'Harga beli supplier harus diisi',
-                                'numeric' => 'Harga beli harus berupa angka',
                                 'min' => 'Harga beli tidak boleh negatif'
                             ])
                             ->columnSpanFull(),
@@ -116,14 +113,12 @@ class SuppliersRelationManager extends RelationManager
                     ->form([
                         TextInput::make('supplier_price')
                             ->label('Harga Beli dari Supplier')
-                            ->numeric()
+                            ->indonesianMoney()
                             ->minValue(0)
-                            ->prefix('Rp')
                             ->default(0)
                             ->required()
                             ->validationMessages([
                                 'required' => 'Harga beli supplier harus diisi',
-                                'numeric' => 'Harga beli harus berupa angka',
                                 'min' => 'Harga beli tidak boleh negatif'
                             ])
                             ->columnSpanFull(),

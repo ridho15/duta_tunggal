@@ -58,7 +58,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function ($record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->requestApprove($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request approve");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
                     }),
                 Action::make('request_close')
                     ->label('Request Close')
@@ -72,7 +72,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function ($record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->requestClose($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Permintaan penutupan Sales Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Sales.");
                     }),
                 Action::make('approve')
                     ->label('Approve')
@@ -85,7 +85,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function ($record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->approve($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan approve sale order");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
                     }),
                 Action::make('closed')
                     ->label('Close')
@@ -98,7 +98,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function ($record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->close($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Closed");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan semua Invoice terkait telah diselesaikan dan tidak ada pembayaran yang tertunggak.");
                     }),
                 Action::make('reject')
                     ->label('Reject')
@@ -111,7 +111,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function ($record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->reject($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Sale");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditolak. Proses selanjutnya: Tim Sales perlu merevisi data pesanan sesuai feedback dan mengajukan kembali untuk disetujui.");
                     }),
                 Action::make('pdf_sale_order')
                     ->label('Download PDF')
@@ -143,7 +143,7 @@ class ViewSaleOrder extends ViewRecord
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->completed($record);
 
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
                     }),
                 Action::make('btn_titip_saldo')
                     ->label('Saldo Titip Customer')
@@ -191,7 +191,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function (array $data, $record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->titipSaldo($record, $data);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Saldo Titip Customer berhasil disimpan");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Saldo Titip Customer berhasil disimpan. Proses selanjutnya: Tim Finance perlu memverifikasi saldo titip dan memastikan jurnal keuangan telah dicatat dengan benar.");
                     }),
                 Action::make('create_purchase_order')
                     ->label('Create Purchase Order')
@@ -286,7 +286,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function (array $data, $record) {
                         $salesOrderService = app(SalesOrderService::class);
                         $salesOrderService->createPurchaseOrder($record, $data);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order Created");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order berhasil dibuat dari Sales Order. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
                     }),
                 Action::make('sync_total_amount')
                     ->icon('heroicon-o-arrow-path-rounded-square')

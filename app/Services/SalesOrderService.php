@@ -2,13 +2,16 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientStockException;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
 use App\Models\InventoryStock;
 use App\Models\SaleOrder;
 use App\Models\StockReservation;
 use Carbon\Carbon;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SalesOrderService
 {
@@ -32,37 +35,67 @@ class SalesOrderService
 
     public function confirm($salesOrder)
     {
-        // Validate stock availability before reserving
-        foreach ($salesOrder->saleOrderItem as $item) {
-            $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $item->warehouse_id)
-                ->first();
+        try {
+            DB::transaction(function () use ($salesOrder) {
+                // Validate and reserve stock with pessimistic locking to prevent concurrent negative stock
+                foreach ($salesOrder->saleOrderItem as $item) {
+                    $inventoryStock = InventoryStock::where('product_id', $item->product_id)
+                        ->where('warehouse_id', $item->warehouse_id)
+                        ->lockForUpdate()
+                        ->first();
 
-            if (!$inventoryStock) {
-                throw new \Exception("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
-            }
+                    if (!$inventoryStock) {
+                        throw new InsufficientStockException("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
+                    }
 
-            $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
-            if ($availableForReservation < $item->quantity) {
-                $productName = $item->product ? $item->product->name : $item->product_id;
-                throw new \Exception("Insufficient stock for product {$productName}. Available: {$availableForReservation}, Requested: {$item->quantity}");
-            }
+                    $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
+                    if ($availableForReservation < $item->quantity) {
+                        $productName = $item->product ? $item->product->name : $item->product_id;
+                        throw new InsufficientStockException("Insufficient stock for product {$productName}. Available: {$availableForReservation}, Requested: {$item->quantity}");
+                    }
+                }
+
+                // Reserve stock for each item
+                foreach ($salesOrder->saleOrderItem as $item) {
+                    StockReservation::create([
+                        'sale_order_id' => $salesOrder->id,
+                        'product_id' => $item->product_id,
+                        'quantity' => $item->quantity,
+                        'warehouse_id' => $item->warehouse_id,
+                        'rak_id' => $item->rak_id,
+                    ]);
+                }
+
+                $salesOrder->update(['status' => 'confirmed']);
+            });
+
+            return true;
+        } catch (InsufficientStockException $e) {
+            Notification::make()
+                ->title('Stok Tidak Cukup')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            throw $e;
         }
+    }
 
-        // Reserve stock for each item
-        foreach ($salesOrder->saleOrderItem as $item) {
-            StockReservation::create([
-                'sale_order_id' => $salesOrder->id,
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'warehouse_id' => $item->warehouse_id,
-                'rak_id' => $item->rak_id,
-            ]);
-        }
+    /**
+     * Cancel a sale order and release any stock reservations.
+     */
+    public function cancel($salesOrder)
+    {
+        DB::transaction(function () use ($salesOrder) {
+            // Release all stock reservations for this SO
+            StockReservation::where('sale_order_id', $salesOrder->id)->each(function ($reservation) {
+                $reservation->delete(); // triggers StockReservationObserver::deleted → restores qty_available
+            });
 
-        return $salesOrder->update([
-            'status' => 'confirmed'
-        ]);
+            $salesOrder->update(['status' => 'canceled']);
+        });
+
+        return true;
     }
 
     public function requestApprove($saleOrder)

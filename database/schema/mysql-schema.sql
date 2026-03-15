@@ -95,6 +95,20 @@ CREATE TABLE `ageing_schedules` (
   KEY `ageing_schedules_from_model_type_from_model_id_index` (`from_model_type`,`from_model_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `app_settings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `app_settings` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `value` text COLLATE utf8mb4_unicode_ci,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `app_settings_key_unique` (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `asset_depreciations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -600,6 +614,7 @@ CREATE TABLE `customer_returns` (
   `invoice_id` bigint unsigned NOT NULL,
   `customer_id` bigint unsigned DEFAULT NULL,
   `cabang_id` bigint unsigned DEFAULT NULL,
+  `warehouse_id` bigint unsigned DEFAULT NULL,
   `return_date` date NOT NULL,
   `reason` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` enum('pending','received','qc_inspection','approved','rejected','completed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
@@ -611,6 +626,8 @@ CREATE TABLE `customer_returns` (
   `approved_at` timestamp NULL DEFAULT NULL,
   `rejected_by` bigint unsigned DEFAULT NULL,
   `rejected_at` timestamp NULL DEFAULT NULL,
+  `stock_restored_at` timestamp NULL DEFAULT NULL,
+  `completed_at` timestamp NULL DEFAULT NULL,
   `notes` text COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -620,9 +637,11 @@ CREATE TABLE `customer_returns` (
   KEY `customer_returns_invoice_id_foreign` (`invoice_id`),
   KEY `customer_returns_customer_id_foreign` (`customer_id`),
   KEY `customer_returns_cabang_id_foreign` (`cabang_id`),
+  KEY `customer_returns_warehouse_id_foreign` (`warehouse_id`),
   CONSTRAINT `customer_returns_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL,
   CONSTRAINT `customer_returns_customer_id_foreign` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `customer_returns_invoice_id_foreign` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE RESTRICT
+  CONSTRAINT `customer_returns_invoice_id_foreign` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `customer_returns_warehouse_id_foreign` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `customers`;
@@ -1824,6 +1843,7 @@ CREATE TABLE `quotations` (
   `customer_id` int NOT NULL,
   `date` date NOT NULL,
   `valid_until` date DEFAULT NULL,
+  `tempo_pembayaran` int unsigned DEFAULT NULL COMMENT 'Tempo pembayaran khusus untuk quotation ini (hari), jika berbeda dari default customer',
   `total_amount` decimal(18,2) NOT NULL DEFAULT '0.00',
   `status_payment` enum('Sudah Bayar','Belum Bayar') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Belum Bayar',
   `po_file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -2076,6 +2096,7 @@ CREATE TABLE `sale_orders` (
   `order_date` datetime NOT NULL,
   `status` enum('draft','request_approve','request_close','approved','closed','completed','partial_confirmed','confirmed','received','canceled','reject') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `delivery_date` datetime DEFAULT NULL,
+  `tempo_pembayaran` int unsigned DEFAULT NULL COMMENT 'Tempo pembayaran yang disetujui (hari), diwarisi dari quotation yang approved',
   `total_amount` decimal(18,2) NOT NULL DEFAULT '0.00',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -2183,7 +2204,7 @@ CREATE TABLE `stock_movements` (
   `warehouse_id` int NOT NULL,
   `quantity` double NOT NULL DEFAULT '0',
   `value` decimal(18,2) DEFAULT NULL,
-  `type` enum('purchase_in','sales','transfer_in','transfer_out','manufacture_in','manufacture_out','adjustment_in','adjustment_out') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('purchase_in','purchase_return','sales','customer_return','transfer_in','transfer_out','manufacture_in','manufacture_out','adjustment_in','adjustment_out') COLLATE utf8mb4_unicode_ci NOT NULL,
   `reference_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'ID Dokument terkait',
   `date` datetime NOT NULL,
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -3024,3 +3045,7 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (385,'2026_03_12_21
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (386,'2026_03_12_100000_create_customer_returns_table',10);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (387,'2026_03_12_100001_create_customer_return_items_table',11);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (388,'2026_03_12_100002_rename_branch_id_to_cabang_id_in_customer_returns',12);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (389,'2026_03_13_100000_add_warehouse_and_completion_to_customer_returns',13);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (390,'2026_03_13_100001_add_customer_return_type_to_stock_movements',14);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (391,'2026_03_13_000001_add_tempo_pembayaran_to_quotations_and_sale_orders',15);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (392,'2026_03_13_110000_create_app_settings_table',16);

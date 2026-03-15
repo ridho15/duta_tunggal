@@ -162,7 +162,12 @@ class LedgerPostingService
 
             // Calculate total other fees as: invoice_total - subtotal - ppn_amount
             // This ensures journal entries always balance with invoice total
-            $totalOtherFees = $total - $subtotal - $actualPpnAmount;
+            // Calculate other fees beyond subtotal + PPN.
+            // IMPORTANT: totalOtherFees must never be negative. If $total was stored WITHOUT PPN
+            // (e.g., total = subtotal and ppn_rate is stored separately), the naive formula
+            // ($total - $subtotal - $ppnAmount) would go negative and reduce the AP credit —
+            // causing an unbalanced journal entry. Use max(0, ...) as safety guard.
+            $totalOtherFees = max(0.0, $total - $subtotal - $actualPpnAmount);
 
             // Create journal entry for other fees if any
             if ($totalOtherFees > 0) {

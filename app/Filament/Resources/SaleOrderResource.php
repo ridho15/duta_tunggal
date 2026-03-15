@@ -120,6 +120,13 @@ class SaleOrderResource extends Resource
                                             'notes' => $item->notes,
                                             'warehouse_id' => null,
                                             'subtotal' => HelperController::hitungSubtotal($item->quantity, HelperController::parseIndonesianMoney($item->unit_price), $item->discount, $item->tax, $tipePajak),
+                                            'tax_nominal' => (function() use ($item, $tipePajak) {
+                                                $base = (float)$item->quantity * (float)HelperController::parseIndonesianMoney($item->unit_price) * (1 - (float)$item->discount / 100);
+                                                try {
+                                                    $r = \App\Services\TaxService::compute($base, (float)$item->tax, $tipePajak);
+                                                    return number_format($r['ppn'], 0, ',', '.');
+                                                } catch (\Throwable $e) { return '0'; }
+                                            })(),
                                             'rak_id' => null,
                                         ]);
                                     }
@@ -458,6 +465,11 @@ class SaleOrderResource extends Resource
                                         if ($product) {
                                             $set('unit_price', $product->sell_price);
                                             $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                            $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
+                                            try {
+                                                $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
+                                                $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
+                                            } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                         }
                                     })
                                     ->validationMessages([
@@ -700,6 +712,11 @@ class SaleOrderResource extends Resource
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
+                                        try {
+                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
+                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
+                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                     })
                                     ->suffix(function ($get) {
                                         if (!$get('product_id') || !$get('warehouse_id')) {
@@ -786,6 +803,11 @@ class SaleOrderResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
+                                        try {
+                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
+                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
+                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                     }),
                                 TextInput::make('discount')
                                     ->label('Discount')
@@ -801,6 +823,11 @@ class SaleOrderResource extends Resource
                                     ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($state ?? 0) / 100);
+                                        try {
+                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
+                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
+                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                     })
                                     ->suffix('%'),
                                 \Filament\Forms\Components\Select::make('tipe_pajak')
@@ -815,6 +842,11 @@ class SaleOrderResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $state));
+                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
+                                        try {
+                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $state ?? 'None');
+                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
+                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                     }),
                                 TextInput::make('tax')
                                     ->label('Tax')
@@ -835,9 +867,29 @@ class SaleOrderResource extends Resource
                                     ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
+                                        try {
+                                            $_r = \App\Services\TaxService::compute($_base, (float)($state ?? 0), $get('tipe_pajak') ?? 'None');
+                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
+                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                     })
-                                    ->default(0)
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->suffix('%'),
+                                TextInput::make('tax_nominal')
+                                    ->label('Nominal Pajak (Rp)')
+                                    ->prefix('Rp')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $base = (float)$record->quantity * (float)$record->unit_price * (1 - (float)$record->discount / 100);
+                                            try {
+                                                $r = \App\Services\TaxService::compute($base, (float)$record->tax, $record->tipe_pajak ?? 'None');
+                                                $component->state(number_format($r['ppn'], 0, ',', '.'));
+                                            } catch (\Throwable $e) { $component->state('0'); }
+                                        }
+                                    }),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total')
                                     ->reactive()
@@ -1135,7 +1187,7 @@ class SaleOrderResource extends Resource
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->requestApprove($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request approve");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
                         }),
                     Action::make('request_close')
                         ->label('Request Close')
@@ -1160,7 +1212,7 @@ class SaleOrderResource extends Resource
                             $record->update($data);
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->requestClose($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan request close");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Permintaan penutupan Sales Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Sales.");
                         }),
                     Action::make('approve')
                         ->label('Setujui')
@@ -1175,7 +1227,7 @@ class SaleOrderResource extends Resource
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->approve($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
                         }),
                     Action::make('closed')
                         ->label('Close')
@@ -1199,7 +1251,7 @@ class SaleOrderResource extends Resource
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->close($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Closed");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan semua Invoice terkait telah diselesaikan dan tidak ada pembayaran yang tertunggak.");
                         }),
                     Action::make('reject')
                         ->label('Reject')
@@ -1212,7 +1264,7 @@ class SaleOrderResource extends Resource
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->reject($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Melakukan Reject Sale");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditolak. Proses selanjutnya: Tim Sales perlu merevisi data pesanan sesuai feedback dan mengajukan kembali untuk disetujui.");
                         }),
                     Action::make('pdf_sale_order')
                         ->label('Download PDF')
@@ -1257,7 +1309,7 @@ class SaleOrderResource extends Resource
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->completed($record);
 
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order Completed");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
                         }),
                     Action::make('btn_titip_saldo')
                         ->label('Saldo Titip Customer')
@@ -1303,7 +1355,7 @@ class SaleOrderResource extends Resource
                         ->action(function (array $data, $record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->titipSaldo($record, $data);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Saldo Titip Customer berhasil disimpan");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Saldo Titip Customer berhasil disimpan. Proses selanjutnya: Tim Finance perlu memverifikasi saldo titip dan memastikan jurnal keuangan telah dicatat dengan benar.");
                         }),
                     Action::make('create_purchase_order')
                         ->label('Create Purchase Order')
@@ -1398,7 +1450,7 @@ class SaleOrderResource extends Resource
                         ->action(function (array $data, $record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->createPurchaseOrder($record, $data);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order Created");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order berhasil dibuat dari Sales Order. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
                         }),
                     Action::make('sync_total_amount')
                         ->icon('heroicon-o-arrow-path-rounded-square')

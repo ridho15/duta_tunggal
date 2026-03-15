@@ -63,7 +63,7 @@ class ViewQuotation extends ViewRecord
                     ->action(function ($record) {
                         $quotationService = app(QuotationService::class);
                         $quotationService->requestApprove($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Mengajukan Approve Berhasil");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Pengajuan persetujuan Quotation berhasil. Proses selanjutnya: Manajer Sales perlu mereview dan memberikan persetujuan atas Quotation ini.");
                     }),
                 Action::make('approve')
                     ->label('Approve')
@@ -76,7 +76,7 @@ class ViewQuotation extends ViewRecord
                     ->action(function ($record) {
                         $quotationService = app(QuotationService::class);
                         $quotationService->approve($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Berhasil melakukan approve quotation");
+                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Quotation berhasil disetujui. Proses selanjutnya: Tim Sales perlu membuat Sale Order berdasarkan Quotation yang telah disetujui ini.");
                     }),
                 Action::make('reject')
                     ->label('Reject')
@@ -89,7 +89,7 @@ class ViewQuotation extends ViewRecord
                     ->action(function ($record) {
                         $quotationService = app(QuotationService::class);
                         $quotationService->reject($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Danger", message: "Quotation di reject");
+                        HelperController::sendNotification(isSuccess: true, title: "Danger", message: "Quotation ditolak. Proses selanjutnya: Tim Sales perlu merevisi penawaran sesuai catatan penolakan dan mengajukan kembali untuk persetujuan.");
                     }),
                 Action::make('sync_total_amount')
                     ->icon('heroicon-o-arrow-path-rounded-square')
@@ -416,7 +416,7 @@ class ViewQuotation extends ViewRecord
                         // Update total amount
                         $salesOrderService->updateTotalAmount($saleOrder);
 
-                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat");
+                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation. Proses selanjutnya: Manajer Sales perlu menyetujui Sales Order ini sebelum diproses lebih lanjut.");
 
                         // Redirect to edit page
                         return redirect()->route('filament.admin.resources.sale-orders.edit', $saleOrder);

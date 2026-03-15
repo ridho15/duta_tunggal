@@ -43,4 +43,37 @@ class InvoiceService
 
         return $candidate;
     }
+
+    /**
+     * Generate a sequential purchase invoice number (PINV-YYYYMMDD-XXXX) unique globally.
+     */
+    public function generatePurchaseInvoiceNumber(): string
+    {
+        $date = now()->format('Ymd');
+        $prefix = 'PINV-' . $date . '-';
+
+        $max = Invoice::withoutGlobalScopes()
+            ->where('invoice_number', 'like', $prefix . '%')
+            ->max('invoice_number');
+
+        $next = 1;
+        if ($max !== null) {
+            $suffix = substr((string) $max, strlen($prefix));
+            if (is_numeric($suffix)) {
+                $next = (int) $suffix + 1;
+            }
+        }
+
+        do {
+            $candidate = $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+            $exists = Invoice::withoutGlobalScopes()
+                ->where('invoice_number', $candidate)
+                ->exists();
+            if ($exists) {
+                $next++;
+            }
+        } while ($exists);
+
+        return $candidate;
+    }
 }

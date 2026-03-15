@@ -588,7 +588,7 @@ class PurchaseInvoiceResource extends Resource
                                         'numeric' => 'Tax harus berupa angka'
                                     ])
                                     ->suffix('%')
-                                    ->default(0)
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
@@ -621,14 +621,7 @@ class PurchaseInvoiceResource extends Resource
                                         'numeric' => 'PPN rate harus berupa angka'
                                     ])
                                     ->suffix('%')
-                                    ->default(function () {
-                                        $taxSetting = \App\Models\TaxSetting::where('status', true)
-                                            ->where('effective_date', '<=', now())
-                                            ->where('type', 'PPN')
-                                            ->orderByDesc('effective_date')
-                                            ->first();
-                                        return $taxSetting?->rate ?? 11;
-                                    })
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
