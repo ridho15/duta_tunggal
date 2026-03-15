@@ -166,7 +166,12 @@ class PurchaseOrderResource extends Resource
                                                     }
                                                     $discount  = $orderRequestItem->discount ?? 0;
                                                     $tax       = $orderRequestItem->tax ?? 0;
-                                                    $tipePajak = 'Non Pajak';
+                                                    // Map order request tax_type to PO item tipe_pajak
+                                                    $tipePajak = match($orderRequest->tax_type ?? 'PPN Excluded') {
+                                                        'PPN Included' => 'Inklusif',
+                                                        'None'         => 'Non Pajak',
+                                                        default        => 'Eklusif', // 'PPN Excluded'
+                                                    };
 
                                                     // Calculate subtotal using HelperController for consistency
                                                     $subtotal = HelperController::hitungSubtotal($remainingQuantity, $unitPrice, $discount, $tax, $tipePajak);
@@ -186,6 +191,11 @@ class PurchaseOrderResource extends Resource
                                                 }
                                             }
                                         }
+                                        $set('currency_id', $defaultCurrencyId);
+                                        $set('cabang_id', $orderRequest->cabang_id ?? null);
+                                        // Map order request tax_type to PO ppn_option values
+                                        $ppnOption = ($orderRequest->tax_type === 'None') ? 'non_ppn' : 'standard';
+                                        $set('ppn_option', $ppnOption);
                                         $set('purchaseOrderItem', $items);
                                     })
                                     ->nullable(),
@@ -361,6 +371,38 @@ class PurchaseOrderResource extends Resource
                                             (float)($item['discount'] ?? 0),
                                             0,
                                             'Non Pajak'
+                                        );
+                                        return $item;
+                                    })->all();
+                                    $set('purchaseOrderItem', $items);
+                                }
+
+                                if ($state === 'standard') {
+                                    $items = collect($get('purchaseOrderItem') ?? [])->map(function ($item) {
+                                        $tipePajak = 'Inklusif';
+                                        $tax = 0;
+
+                                        if (!empty($item['product_id'])) {
+                                            $product = \App\Models\Product::find($item['product_id']);
+                                            if ($product) {
+                                                $raw = strtolower(trim((string)($product->tipe_pajak ?? 'inklusif')));
+                                                $tipePajak = match ($raw) {
+                                                    'eklusif', 'eksklusif', 'exclusive', 'ppn excluded' => 'Eklusif',
+                                                    'non pajak', 'non-pajak', 'nonpajak', 'none'        => 'Non Pajak',
+                                                    default                                              => 'Inklusif',
+                                                };
+                                                $tax = $tipePajak === 'Non Pajak' ? 0 : (float)($product->pajak ?? 0);
+                                            }
+                                        }
+
+                                        $item['tipe_pajak'] = $tipePajak;
+                                        $item['tax']        = $tax;
+                                        $item['subtotal']   = \App\Http\Controllers\HelperController::hitungSubtotal(
+                                            (float)($item['quantity'] ?? 0),
+                                            \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                            (float)($item['discount'] ?? 0),
+                                            $tax,
+                                            $tipePajak
                                         );
                                         return $item;
                                     })->all();
@@ -610,7 +652,7 @@ class PurchaseOrderResource extends Resource
                                         ));
                                     })
                                     ->suffix('%')
-                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
+                                    ->default(fn() => \App\Models\TaxSetting::activeRate('PPN')),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total (termasuk pajak)')
                                     ->reactive()
@@ -704,11 +746,11 @@ class PurchaseOrderResource extends Resource
                                     ->label('Rincian Pajak')
                                     ->columnSpanFull()
                                     ->content(function (Get $get) {
-                                        $qty        = (float)($get('quantity') ?? 0);
-                                        $unitPrice  = HelperController::parseIndonesianMoney($get('unit_price'));
-                                        $discount   = (float)($get('discount') ?? 0);
-                                        $taxRate    = (float)($get('tax') ?? 0);
-                                        $tipePajak  = $get('tipe_pajak') ?? 'Inklusif';
+                                        $qty       = (float)($get('quantity') ?? 0);
+                                        $unitPrice = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $discount  = (float)($get('discount') ?? 0);
+                                        $taxRate   = (float)($get('tax') ?? 0);
+                                        $tipePajak = $get('tipe_pajak') ?? 'Inklusif';
 
                                         if ($qty <= 0 || $unitPrice <= 0) {
                                             return new \Illuminate\Support\HtmlString(
@@ -716,39 +758,42 @@ class PurchaseOrderResource extends Resource
                                             );
                                         }
 
-                                        $gross       = $qty * $unitPrice;
-                                        $discAmt     = $gross * $discount / 100;
-                                        $afterDisc   = $gross - $discAmt;
-                                        $fmt         = fn(float $n) => MoneyHelper::rupiah($n);
+                                        $gross     = $qty * $unitPrice;
+                                        $discAmt   = $gross * $discount / 100;
+                                        $afterDisc = $gross - $discAmt;
+                                        $fmt       = fn(float $n) => MoneyHelper::rupiah($n);
 
-                                        if ($tipePajak === 'Non Pajak' || $taxRate <= 0) {
+                                        // Use TaxService for consistent results (same as hitungSubtotal)
+                                        $taxResult     = \App\Services\TaxService::compute($afterDisc, $taxRate, $tipePajak);
+                                        $normalizedType = \App\Services\TaxService::normalizeType($tipePajak);
+                                        $dpp   = $taxResult['dpp'];
+                                        $ppn   = $taxResult['ppn'];
+                                        $total = $taxResult['total'];
+
+                                        if ($normalizedType === 'Non Pajak' || $taxRate <= 0) {
                                             return new \Illuminate\Support\HtmlString(
                                                 '<div class="text-sm text-gray-600 py-1">' .
                                                     '<span class="font-semibold">&#9899; Non Pajak</span> &mdash; Tidak ada PPN. ' .
-                                                    'Total: <strong>' . $fmt($afterDisc) . '</strong>' .
+                                                    'DPP: <strong>' . $fmt($dpp) . '</strong> &nbsp;|&nbsp; PPN: <strong>Rp 0</strong> &nbsp;|&nbsp; Total: <strong>' . $fmt($total) . '</strong>' .
                                                     '</div>'
                                             );
                                         }
 
-                                        if ($tipePajak === 'Eklusif') {
-                                            $ppn   = $afterDisc * $taxRate / 100;
-                                            $total = $afterDisc + $ppn;
+                                        if ($normalizedType === 'Eksklusif') {
                                             return new \Illuminate\Support\HtmlString(
                                                 '<div class="text-sm text-orange-700 py-1">' .
                                                     '<span class="font-semibold">&#9650; Eksklusif</span> &mdash; PPN <em>ditambahkan</em> ke harga:<br>' .
-                                                    'DPP ' . $fmt($afterDisc) . ' + PPN ' . $taxRate . '% ' . $fmt($ppn) .
+                                                    'DPP <strong>' . $fmt($dpp) . '</strong> + PPN ' . $taxRate . '% <strong>' . $fmt($ppn) . '</strong>' .
                                                     ' = Total <strong>' . $fmt($total) . '</strong>' .
                                                     '</div>'
                                             );
                                         }
 
                                         // Inklusif
-                                        $dpp = $afterDisc * 100 / (100 + $taxRate);
-                                        $ppn = $afterDisc - $dpp;
                                         return new \Illuminate\Support\HtmlString(
                                             '<div class="text-sm text-green-700 py-1">' .
                                                 '<span class="font-semibold">&#9989; Inklusif</span> &mdash; PPN sudah <em>termasuk</em> dalam harga:<br>' .
-                                                'Total ' . $fmt($afterDisc) .
+                                                'Total <strong>' . $fmt($total) . '</strong>' .
                                                 ' (DPP <strong>' . $fmt($dpp) . '</strong> + PPN ' . $taxRate . '% <strong>' . $fmt($ppn) . '</strong>)' .
                                                 '</div>'
                                         );
@@ -1083,9 +1128,17 @@ class PurchaseOrderResource extends Resource
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->searchable(),
-                TextColumn::make('orderRequest.request_number')
+                TextColumn::make('referModel.request_number')
                     ->label('Request Number')
-                    ->searchable(),
+                    ->searchable(query: function (Builder $query, $search) {
+                        $query->where(function (Builder $query) use ($search) {
+                            $query->where('refer_model_type', OrderRequest::class)
+                                ->whereHasMorph('referModel', [OrderRequest::class], function (Builder $query) use ($search) {
+                                    $query->where('request_number', 'LIKE', "%{$search}%");
+                                });
+                        });
+                    })
+                    ->formatStateUsing(fn($state, $record) => $record->referModel?->request_number ?? '-'),
                 IconColumn::make('is_import')
                     ->label('Import?')
                     ->boolean()

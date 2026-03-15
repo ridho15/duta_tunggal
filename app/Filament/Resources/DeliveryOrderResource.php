@@ -13,8 +13,12 @@ use App\Models\PurchaseReceiptItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\AppSetting;
+use App\Models\Driver;
 use App\Services\DeliveryOrderService;
+use App\Exports\DeliveryOrderRecapExport;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\DatePicker;
+use Maatwebsite\Excel\Facades\Excel;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
@@ -671,6 +675,73 @@ class DeliveryOrderResource extends Resource
 
                 return $query;
             })
+            ->headerActions([
+                Action::make('rekap_driver')
+                    ->label('Rekap per Driver')
+                    ->icon('heroicon-o-document-chart-bar')
+                    ->color('info')
+                    ->form([
+                        Select::make('driver_ids')
+                            ->label('Driver')
+                            ->multiple()
+                            ->options(fn () => Driver::orderBy('name')->pluck('name', 'id'))
+                            ->required()
+                            ->searchable()
+                            ->placeholder('Pilih satu atau lebih driver...'),
+                        DatePicker::make('date_from')
+                            ->label('Dari Tanggal')
+                            ->displayFormat('d/m/Y')
+                            ->nullable(),
+                        DatePicker::make('date_to')
+                            ->label('Sampai Tanggal')
+                            ->displayFormat('d/m/Y')
+                            ->nullable(),
+                        Radio::make('format')
+                            ->label('Format Export')
+                            ->options(['excel' => 'Excel (.xlsx)', 'pdf' => 'PDF'])
+                            ->default('excel')
+                            ->inline(),
+                    ])
+                    ->action(function (array $data) {
+                        $driverIds = $data['driver_ids'];
+                        $dateFrom  = $data['date_from']  ?? null;
+                        $dateTo    = $data['date_to']    ?? null;
+                        $format    = $data['format']     ?? 'excel';
+
+                        if ($format === 'excel') {
+                            return Excel::download(
+                                new DeliveryOrderRecapExport($driverIds, $dateFrom, $dateTo),
+                                'rekap-do-driver-' . now()->format('Ymd-His') . '.xlsx'
+                            );
+                        }
+
+                        // PDF
+                        $orders = DeliveryOrder::with(['driver', 'salesOrders.customer', 'deliveryOrderItem.product'])
+                            ->whereIn('driver_id', $driverIds)
+                            ->when($dateFrom, fn ($q) => $q->whereDate('delivery_date', '>=', $dateFrom))
+                            ->when($dateTo,   fn ($q) => $q->whereDate('delivery_date', '<=', $dateTo))
+                            ->orderBy('driver_id')
+                            ->orderBy('delivery_date')
+                            ->get();
+
+                        $driverGroups = $orders->groupBy(fn ($do) => $do->driver->name ?? 'Tanpa Driver');
+                        $drivers      = Driver::whereIn('id', $driverIds)->get();
+
+                        $pdf = Pdf::loadView('pdf.delivery-order-recap', [
+                            'driverGroups' => $driverGroups,
+                            'drivers'      => $drivers,
+                            'dateFrom'     => $dateFrom,
+                            'dateTo'       => $dateTo,
+                        ])->setPaper('a4', 'landscape');
+
+                        $filename = 'rekap-do-driver-' . now()->format('Ymd-His') . '.pdf';
+
+                        return response()->streamDownload(
+                            fn () => print($pdf->output()),
+                            $filename
+                        );
+                    }),
+            ])
             ->actions([
                 ActionGroup::make([
                     ViewAction::make()

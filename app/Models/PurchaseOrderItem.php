@@ -49,6 +49,11 @@ class PurchaseOrderItem extends Model
         return $this->morphOne(QualityControl::class, 'from_model');
     }
 
+    public function qualityControls()
+    {
+        return $this->morphMany(QualityControl::class, 'from_model');
+    }
+
     public function currency()
     {
         return $this->belongsTo(Currency::class, 'currency_id')->withDefault();

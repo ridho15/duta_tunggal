@@ -16,6 +16,7 @@ class QualityControl extends Model
         'inspected_by',
         'passed_quantity',
         'rejected_quantity',
+        'quantity_received',
         'notes',
         'status',  // send to stock / send return product
         'warehouse_id',

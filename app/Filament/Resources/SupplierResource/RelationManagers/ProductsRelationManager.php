@@ -8,8 +8,11 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\DetachAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +25,8 @@ class ProductsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->defaultSort('created_at', 'desc')
+            // Ensure sorting is explicitly on the pivot table to avoid ambiguity when joining products.
+            ->defaultSort('product_supplier.created_at', 'desc')
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('sku')
@@ -101,7 +105,10 @@ class ProductsRelationManager extends RelationManager
                             ->indonesianMoney()
                             ->required(),
                     ]),
-                Tables\Actions\DissociateAction::make(),
+                DetachAction::make()
+                    ->label('Dissociate')
+                    ->requiresConfirmation()
+                    ->successNotificationTitle('Product dissociated successfully'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

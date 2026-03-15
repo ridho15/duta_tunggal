@@ -51,7 +51,8 @@ class SuppliersRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->defaultSort('created_at', 'desc')
+            // Ensure sorting is explicitly on the pivot table to avoid ambiguity when joining suppliers.
+            ->defaultSort('product_supplier.created_at', 'desc')
             ->recordTitleAttribute('perusahaan')
             ->heading('Daftar Supplier')
             ->description('Kelola supplier yang dapat menyediakan produk ini')
