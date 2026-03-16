@@ -55,7 +55,7 @@ class VendorPaymentResource extends Resource
                                 Select::make('payment_request_id')
                                     ->label('Payment Request (PR)')
                                     ->options(function () {
-                                        return PaymentRequest::where('status')
+                                        return PaymentRequest::where('status', 'approved')
                                             ->whereNull('vendor_payment_id')
                                             ->with('supplier')
                                             ->get()

@@ -532,14 +532,27 @@ class OrderRequestResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
+                        return match ($state) {
+                            'draft'           => 'DRAFT',
+                            'request_approve' => 'REQUEST APPROVE',
+                            'approved'        => 'APPROVED',
+                            'partial'         => 'PARTIAL',
+                            'complete'        => 'COMPLETE',
+                            'closed'          => 'CLOSED',
+                            'rejected'        => 'REJECTED',
+                            default           => Str::upper($state),
+                        };
                     })
                     ->color(function ($state) {
                         return match ($state) {
-                            'draft' => 'gray',
-                            'approved' => 'success',
-                            'rejected' => 'danger',
-                            'closed' => 'warning'
+                            'draft'           => 'gray',
+                            'request_approve' => 'gray',
+                            'approved'        => 'info',
+                            'partial'         => 'warning',
+                            'complete'        => 'success',
+                            'closed'          => 'danger',
+                            'rejected'        => 'danger',
+                            default           => 'gray',
                         };
                     })
                     ->badge(),
@@ -584,10 +597,13 @@ class OrderRequestResource extends Resource
                 SelectFilter::make('status')
                     ->label('Status')
                     ->options([
-                        'draft' => 'Draft',
-                        'approved' => 'Approved',
-                        'rejected' => 'Rejected',
-                        'closed' => 'Closed',
+                        'draft'           => 'Draft',
+                        'request_approve' => 'Request Approve',
+                        'approved'        => 'Approved',
+                        'partial'         => 'Partial',
+                        'complete'        => 'Complete',
+                        'rejected'        => 'Rejected',
+                        'closed'          => 'Closed',
                     ])
                     ->placeholder('All Statuses'),
                 SelectFilter::make('supplier_id')
@@ -628,6 +644,16 @@ class OrderRequestResource extends Resource
                         );
                     }),
             ])
+            ->recordClasses(fn ($record) => match ($record->status) {
+                'draft'           => '',
+                'request_approve' => 'bg-gray-100',
+                'approved'        => 'bg-blue-50',
+                'partial'         => 'bg-yellow-50',
+                'complete'        => 'bg-green-50',
+                'closed'          => 'bg-red-50',
+                'rejected'        => 'bg-red-50',
+                default           => '',
+            })
             ->actions([
                 ActionGroup::make([
                     ViewAction::make()
@@ -1086,7 +1112,7 @@ class OrderRequestResource extends Resource
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
-                            return $user && $user->hasPermissionTo('approve order request') && $record->status == 'draft';
+                            return $user && $user->hasPermissionTo('approve order request') && $record->status == 'request_approve';
                         })
                         ->action(function (array $data, $record) {
                             $orderRequestService = app(OrderRequestService::class);
