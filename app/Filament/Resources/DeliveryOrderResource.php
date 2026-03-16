@@ -152,24 +152,6 @@ class DeliveryOrderResource extends Resource
                             ->displayFormat('d/m/Y H:i')
                             ->seconds(false)
                             ->helperText('Tentukan tanggal dan waktu pengiriman yang direncanakan'),
-                        Select::make('driver_id')
-                            ->label('Driver')
-                            ->searchable()
-                            ->preload()
-                            ->validationMessages([
-                                'required' => 'Driver tidak boleh kosong',
-                            ])
-                            ->relationship('driver', 'name')
-                            ->required(),
-                        Select::make('vehicle_id')
-                            ->label('Vehicle')
-                            ->preload()
-                            ->searchable()
-                            ->validationMessages([
-                                'required' => 'Vehicle tidak boleh kosong',
-                            ])
-                            ->relationship('vehicle', 'plate')
-                            ->required(),
                         Textarea::make('notes')
                             ->label('Notes')
                             ->nullable(),
@@ -428,8 +410,6 @@ class DeliveryOrderResource extends Resource
                     ->schema([
                         TextEntry::make('do_number')->label('DO Number'),
                         TextEntry::make('delivery_date')->dateTime(),
-                        TextEntry::make('driver.name')->label('Driver'),
-                        TextEntry::make('vehicle.plate')->label('Vehicle'),
                         TextEntry::make('status')->badge(),
                         TextEntry::make('shipping_method')
                             ->label('Metode Pengiriman')
@@ -644,20 +624,10 @@ class DeliveryOrderResource extends Resource
                         'reject' => 'Reject',
                         'delivery_failed' => 'Pengiriman Gagal',
                     ]),
-                SelectFilter::make('driver_id')
-                    ->relationship('driver', 'name')
-                    ->label('Driver')
-                    ->preload()
-                    ->searchable(),
-                SelectFilter::make('vehicle_id')
-                    ->relationship('vehicle', 'plate')
-                    ->label('Vehicle')
-                    ->preload()
-                    ->searchable(),
             ])
             ->modifyQueryUsing(function (Builder $query) {
                 // Eager load relationships to prevent N+1 queries
-                $query->with(['suratJalan', 'driver', 'vehicle', 'salesOrders']);
+                $query->with(['suratJalan', 'salesOrders']);
 
                 $user = Auth::user();
 

@@ -414,6 +414,17 @@ class HelperController extends Controller
                 'request',
                 'response'
             ],
+            'delivery schedule' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'update status',
+                'rekap',
+            ],
             'return product' => [
                 'view any',
                 'view',
@@ -736,6 +747,8 @@ class HelperController extends Controller
             'delete'      => 'Menghapus %s',
             'restore'     => 'Mengembalikan %s yang dihapus',
             'force-delete'=> 'Menghapus permanen %s',
+            'update status' => 'Memperbarui status %s',
+            'rekap'          => 'Membuat rekap %s',
             'request'     => 'Mengajukan permintaan untuk %s',
             'response'    => 'Menanggapi permintaan %s',
             'submit'      => 'Mengajukan %s',

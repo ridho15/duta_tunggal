@@ -18,6 +18,8 @@ use App\Models\BankReconciliation;
 use App\Policies\BankReconciliationPolicy;
 use App\Models\VoucherRequest;
 use App\Policies\VoucherRequestPolicy;
+use App\Models\DeliverySchedule;
+use App\Policies\DeliverySchedulePolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -37,6 +39,7 @@ class AuthServiceProvider extends ServiceProvider
         CashBankTransfer::class => CashBankTransferPolicy::class,
         BankReconciliation::class => BankReconciliationPolicy::class,
         VoucherRequest::class => VoucherRequestPolicy::class,
+        DeliverySchedule::class => DeliverySchedulePolicy::class,
     ];
 
     /**
