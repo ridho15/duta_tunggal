@@ -629,8 +629,7 @@ class VendorPaymentResource extends Resource
                                                 $set('ntpn', $ntpn);
                                             })
                                     )
-                                    ->maxLength(255)
-                                    ->required(),
+                                    ->maxLength(255),
                                 Toggle::make('is_import_payment')
                                     ->label('Pembayaran mencakup pajak impor?')
                                     ->helperText('Aktifkan bila pembayaran impor melibatkan PPN/PPh/Bea. Biarkan mati jika bukan transaksi impor.')
