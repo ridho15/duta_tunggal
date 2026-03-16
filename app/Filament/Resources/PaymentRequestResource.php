@@ -113,9 +113,14 @@ class PaymentRequestResource extends Resource
                                                 ->whereIn('status', ['unpaid', 'draft', 'sent', 'overdue', 'partially_paid'])
                                                 ->get()
                                             ->mapWithKeys(function ($invoice) {
-                                                $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date)->format('d/m/Y') : '-';
+                                                try {
+                                                    $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date)->format('d/m/Y') : '-';
+                                                    $isOverdue = $invoice->due_date && Carbon::parse($invoice->due_date)->isPast();
+                                                } catch (\Exception $e) {
+                                                    $dueDate = '-';
+                                                    $isOverdue = false;
+                                                }
                                                 $total = number_format($invoice->total, 0, ',', '.');
-                                                $isOverdue = $invoice->due_date && Carbon::parse($invoice->due_date)->isPast();
                                                 $label = "{$invoice->invoice_number} - Rp {$total} (Due: {$dueDate})";
                                                 if ($isOverdue) $label .= ' ⚠ TERLAMBAT';
                                                 return [$invoice->id => $label];

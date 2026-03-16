@@ -691,6 +691,7 @@ class OrderRequestResource extends Resource
                                     'tax'          => $taxPct,
                                     'tax_nominal'  => $taxNom,
                                     'subtotal'     => $subtotal,
+                                    'max_quantity' => max(0, $remainingQty),
                                     'include'      => $remainingQty > 0,
                                 ];
                             })->values()->toArray();
@@ -781,6 +782,7 @@ class OrderRequestResource extends Resource
                                         ->reorderable(false)
                                         ->schema([
                                             Hidden::make('item_id'),
+                                            Hidden::make('max_quantity'),
                                             TextInput::make('product_name')
                                                 ->label('Nama Produk')
                                                 ->readOnly(),
@@ -789,6 +791,15 @@ class OrderRequestResource extends Resource
                                                 ->numeric()
                                                 ->minValue(0)
                                                 ->required()
+                                                ->helperText(fn ($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
+                                                ->rules([
+                                                    fn ($get) => function ($attribute, $value, $fail) use ($get) {
+                                                        $max = $get('max_quantity');
+                                                        if ($max !== null && $max !== '' && (float) $value > (float) $max) {
+                                                            $fail("Qty tidak boleh melebihi {$max}.");
+                                                        }
+                                                    },
+                                                ])
                                                 ->validationMessages([
                                                     'required' => 'Qty wajib diisi.',
                                                     'numeric' => 'Qty harus berupa angka.',
@@ -917,6 +928,7 @@ class OrderRequestResource extends Resource
                                     'tax'          => $taxPct,
                                     'tax_nominal'  => $taxNom,
                                     'subtotal'     => $subtotal,
+                                    'max_quantity' => max(0, $remainingQty),
                                     'include'      => $remainingQty > 0,
                                 ];
                             })->values()->toArray();
@@ -1017,6 +1029,7 @@ class OrderRequestResource extends Resource
                                         ->reorderable(false)
                                         ->schema([
                                             Hidden::make('item_id'),
+                                            Hidden::make('max_quantity'),
                                             TextInput::make('product_name')
                                                 ->label('Nama Produk')
                                                 ->readOnly(),
@@ -1025,6 +1038,15 @@ class OrderRequestResource extends Resource
                                                 ->numeric()
                                                 ->minValue(0)
                                                 ->required()
+                                                ->helperText(fn ($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
+                                                ->rules([
+                                                    fn ($get) => function ($attribute, $value, $fail) use ($get) {
+                                                        $max = $get('max_quantity');
+                                                        if ($max !== null && $max !== '' && (float) $value > (float) $max) {
+                                                            $fail("Qty tidak boleh melebihi {$max}.");
+                                                        }
+                                                    },
+                                                ])
                                                 ->validationMessages([
                                                     'required' => 'Qty wajib diisi.',
                                                     'numeric' => 'Qty harus berupa angka.',
@@ -1129,6 +1151,29 @@ class OrderRequestResource extends Resource
         if (empty($data['cabang_id'])) {
             $user = Auth::user();
             $data['cabang_id'] = $user?->cabang_id;
+        }
+
+        // Recalculate subtotals server-side (same as mutateFormDataBeforeSave)
+        if (isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
+            $taxType = $data['tax_type'] ?? 'PPN Excluded';
+
+            foreach ($data['orderRequestItem'] as &$item) {
+                $qty   = (float) ($item['quantity'] ?? 0);
+                $price = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
+                $disc  = (float) ($item['discount'] ?? 0);
+                $tax   = (float) ($item['tax'] ?? 0);
+
+                $base      = $qty * $price;
+                $afterDisc = $base - $base * ($disc / 100);
+
+                try {
+                    $taxResult        = \App\Services\TaxService::compute($afterDisc, $tax, $taxType);
+                    $item['subtotal'] = $taxResult['total'];
+                } catch (\Throwable $e) {
+                    $item['subtotal'] = $afterDisc;
+                }
+            }
+            unset($item);
         }
 
         return $data;

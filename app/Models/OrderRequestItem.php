@@ -13,6 +13,7 @@ class OrderRequestItem extends Model
     protected $table = 'order_request_items';
     protected $fillable = [
         'order_request_id',
+        'supplier_id',
         'product_id',
         'quantity',
         'fulfilled_quantity',
@@ -27,6 +28,11 @@ class OrderRequestItem extends Model
     public function orderRequest()
     {
         return $this->belongsTo(OrderRequest::class, 'order_request_id')->withDefault();
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
     }
 
     public function product()

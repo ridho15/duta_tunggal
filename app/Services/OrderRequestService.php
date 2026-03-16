@@ -33,8 +33,17 @@ class OrderRequestService
 
                     $qty = (float) ($row['quantity'] ?? $orderRequestItem->quantity);
 
+                    // Validate quantity does not exceed remaining unfulfilled quantity
+                    $maxQty = max(0, $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0));
+                    if ($qty > $maxQty) {
+                        $qty = $maxQty;
+                    }
+                    if ($qty <= 0) {
+                        return null;
+                    }
+
                     // Use form-provided price if given; otherwise fall back to OR item price → supplier pivot → cost_price
-                    $formPrice = isset($row['unit_price']) && $row['unit_price'] !== '' ? (float) $row['unit_price'] : null;
+                    $formPrice = isset($row['unit_price']) && $row['unit_price'] !== '' ? \App\Helpers\MoneyHelper::parse($row['unit_price']) : null;
                     if ($formPrice !== null && $formPrice >= 0) {
                         $unitPrice = $formPrice;
                     } elseif (($orderRequestItem->unit_price ?? 0) > 0) {

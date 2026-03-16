@@ -145,20 +145,44 @@ class PurchaseInvoiceResource extends Resource
                                         }
                                         
                                         return $query->get()
-                                            ->filter(function ($po) {
+                                            ->mapWithKeys(function ($po) {
                                                 $allReceiptIds = $po->purchaseReceipt()
                                                     ->where('status', 'completed')
                                                     ->pluck('id')->toArray();
-                                                if (empty($allReceiptIds)) return false;
                                                 
                                                 $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
                                                     ->whereNotNull('purchase_receipts')
                                                     ->get()->pluck('purchase_receipts')->flatten()
                                                     ->intersect($allReceiptIds)->unique()->toArray();
                                                 
-                                                return count($invoicedReceiptIds) < count($allReceiptIds);
-                                            })
-                                            ->mapWithKeys(fn ($po) => [$po->id => $po->po_number . ($po->referModel?->request_number ? ' (OR: ' . $po->referModel->request_number . ')' : '')]);
+                                                $fullyInvoiced = !empty($allReceiptIds) && count($invoicedReceiptIds) >= count($allReceiptIds);
+                                                $label = $po->po_number . ($po->referModel?->request_number ? ' (OR: ' . $po->referModel->request_number . ')' : '');
+                                                if ($fullyInvoiced) $label .= ' [Sudah di-invoice]';
+                                                
+                                                return [$po->id => $label];
+                                            });
+                                    })
+                                    ->disabledOptions(function ($get) {
+                                        $supplierId = $get('selected_supplier');
+                                        if (!$supplierId) return [];
+                                        
+                                        $pos = PurchaseOrder::where('supplier_id', $supplierId)
+                                            ->where('status', 'completed')
+                                            ->get();
+                                        
+                                        return $pos->filter(function ($po) {
+                                            $allReceiptIds = $po->purchaseReceipt()
+                                                ->where('status', 'completed')
+                                                ->pluck('id')->toArray();
+                                            if (empty($allReceiptIds)) return true;
+                                            
+                                            $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
+                                                ->whereNotNull('purchase_receipts')
+                                                ->get()->pluck('purchase_receipts')->flatten()
+                                                ->intersect($allReceiptIds)->unique()->toArray();
+                                            
+                                            return count($invoicedReceiptIds) >= count($allReceiptIds);
+                                        })->keys()->toArray();
                                     })
                                     ->columns(2)
                                     ->bulkToggleable()
@@ -304,9 +328,8 @@ class PurchaseInvoiceResource extends Resource
                                             // Recalculate total with manual other_fees only
                                             $otherFees = $get('other_fees') ?? [];
                                             $manualOtherFeeTotal = collect($otherFees)->sum('amount');
-                                            $tax = $get('tax') ?? 0;
                                             $ppnRate = $get('ppn_rate') ?? 0;
-                                            $finalTotal = $manualOtherFeeTotal + (0 * $tax / 100) + (0 * $ppnRate / 100);
+                                            $finalTotal = $manualOtherFeeTotal;
                                             $set('total', $finalTotal);
                                             $set('other_fee', $manualOtherFeeTotal);
                                             return;
@@ -417,15 +440,12 @@ class PurchaseInvoiceResource extends Resource
                                         $manualOtherFeeTotal = collect($existingOtherFees)->sum('amount');
                                         $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
                                         
-                                        // Calculate tax and total
-                                        $tax = $get('tax') ?? 0;
+                                        // Calculate total using PPN only
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
 
-                                        // Update tax and PPN amount displays
-                                        $taxAmount = $subtotal * $tax / 100;
-                                        $set('tax_amount', $taxAmount);
+                                        // Update PPN amount display
                                         $ppnAmount = $subtotal * $ppnRate / 100;
                                         $set('ppn_amount', $ppnAmount);
                                     }),
@@ -465,13 +485,7 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Harga tidak boleh kosong',
                                             ])
-                                            ->reactive()
-                                            ->afterStateUpdated(function ($set, $get, $state) {
-                                                $quantity = $get('quantity') ?? 0;
-                                                $price = HelperController::parseIndonesianMoney($state ?? 0);
-                                                $total = $quantity * $price;
-                                                $set('total', $total);
-                                            }),
+                                            ->disabled(),
                                         TextInput::make('total')
                                             ->label('Total')
                                             ->indonesianMoney()
@@ -500,21 +514,18 @@ class PurchaseInvoiceResource extends Resource
                                         }
                                         $set('subtotal', $subtotal);
                                         $set('dpp', $subtotal);
-                                        // Recalculate total with other fees
+                                        // Recalculate total with other fees using PPN only
                                         $otherFees = $get('other_fees') ?? [];
                                         $manualOtherFeeTotal = collect($otherFees)->sum('amount');
                                         $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
                                         $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
                                         $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
                                         
-                                        $tax = $get('tax') ?? 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                         
-                                        // Update tax and PPN amount displays
-                                        $taxAmount = $subtotal * $tax / 100;
-                                        $set('tax_amount', $taxAmount);
+                                        // Update PPN amount display
                                         $ppnAmount = $subtotal * $ppnRate / 100;
                                         $set('ppn_amount', $ppnAmount);
                                     }),
@@ -555,14 +566,11 @@ class PurchaseInvoiceResource extends Resource
                                         $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
                                         
                                         $subtotal = $get('subtotal') ?? 0;
-                                        $tax = $get('tax') ?? 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
 
-                                        // Update tax and PPN amount displays
-                                        $taxAmount = $subtotal * $tax / 100;
-                                        $set('tax_amount', $taxAmount);
+                                        // Update PPN amount display
                                         $ppnAmount = $subtotal * $ppnRate / 100;
                                         $set('ppn_amount', $ppnAmount);
                                     })
@@ -578,37 +586,8 @@ class PurchaseInvoiceResource extends Resource
                                     ->indonesianMoney()
                                     ->readonly(),
 
-                                TextInput::make('tax')
-                                    ->label('Tax (%)')
-                                    ->validationMessages([
-                                        'numeric' => 'Tax harus berupa angka'
-                                    ])
-                                    ->suffix('%')
-                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $otherFees = $get('other_fees') ?? [];
-                                        $manualOtherFeeTotal = collect($otherFees)->sum('amount');
-
-                                        // Include receipt biaya in total calculation
-                                        $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                        $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
-                                        $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
-
-                                        $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $state / 100) + ($subtotal * $ppnRate / 100);
-                                        $set('total', $finalTotal);
-                                        $set('other_fee', $totalOtherFee);
-
-                                        // Update tax amount display
-                                        $taxAmount = $subtotal * $state / 100;
-                                        $set('tax_amount', $taxAmount);
-
-                                        // Update PPN amount display
-                                        $ppnAmount = $subtotal * $ppnRate / 100;
-                                        $set('ppn_amount', $ppnAmount);
-                                    }),
+                                \Filament\Forms\Components\Hidden::make('tax')
+                                    ->default(0),
 
                                 TextInput::make('ppn_rate')
                                     ->label('PPN Rate (%)')
@@ -629,25 +608,14 @@ class PurchaseInvoiceResource extends Resource
                                         $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
                                         $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
 
-                                        $tax = $get('tax') ?? 0;
-                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $state / 100);
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $state / 100);
                                         $set('total', $finalTotal);
                                         $set('other_fee', $totalOtherFee);
-
-                                        // Update tax amount display
-                                        $taxAmount = $subtotal * $tax / 100;
-                                        $set('tax_amount', $taxAmount);
 
                                         // Update PPN amount display
                                         $ppnAmount = $subtotal * $state / 100;
                                         $set('ppn_amount', $ppnAmount);
                                     }),
-
-                                TextInput::make('tax_amount')
-                                    ->label('Nilai Tax (Rp)')
-                                    ->indonesianMoney()
-                                    ->readonly()
-                                    ->placeholder('0'),
 
                                 TextInput::make('ppn_amount')
                                     ->label('Nilai PPN (Rp)')
@@ -781,15 +749,13 @@ class PurchaseInvoiceResource extends Resource
                                 $manualOtherFeeTotal = collect($existingOtherFees)->sum('amount');
                                 $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
                                 
-                                // Calculate tax and total
-                                $tax = $get('tax') ?? 0;
+                                // Calculate total using PPN only
+                                $tax = 0;
                                 $ppnRate = $get('ppn_rate') ?? 0;
-                                $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                 $set('total', $finalTotal);
 
-                                // Update tax and PPN amount displays
-                                $taxAmount = $subtotal * $tax / 100;
-                                $set('tax_amount', $taxAmount);
+                                // Update PPN amount display
                                 $ppnAmount = $subtotal * $ppnRate / 100;
                                 $set('ppn_amount', $ppnAmount);
                             }),
@@ -1075,12 +1041,11 @@ class PurchaseInvoiceResource extends Resource
 
     public static function mutateFormDataBeforeFill(array $data): array
     {
-        // Calculate tax and PPN amounts for display
+        // Calculate PPN amount for display
         $subtotal = $data['subtotal'] ?? 0;
-        $tax = $data['tax'] ?? 0;
         $ppnRate = $data['ppn_rate'] ?? 0;
 
-        $data['tax_amount'] = $subtotal * $tax / 100;
+        $data['tax'] = 0; // Remove legacy tax; only PPN is used
         $data['ppn_amount'] = $subtotal * $ppnRate / 100;
 
         return $data;
@@ -1119,14 +1084,14 @@ class PurchaseInvoiceResource extends Resource
         // Remove temporary fields
         unset($data['other_fees'], $data['receiptBiayaItems']);
         
-        // Calculate totals if not set
+        // Calculate totals if not set - use PPN only (no separate tax)
         if (!isset($data['total']) || $data['total'] == 0) {
             $subtotal = $data['subtotal'] ?? 0;
             $otherFeeTotal = collect($data['other_fee'] ?? [])->sum('amount');
-            $tax = $data['tax'] ?? 0;
             $ppnRate = $data['ppn_rate'] ?? 0;
-            $data['total'] = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+            $data['total'] = $subtotal + $otherFeeTotal + ($subtotal * $ppnRate / 100);
         }
+        $data['tax'] = 0; // Always set tax to 0; only ppn_rate is used
         
         return $data;
     }
