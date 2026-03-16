@@ -135,11 +135,11 @@ class VendorPaymentResource extends Resource
                                             $isEditMode = !empty($currentSelectedInvoices) && is_array($currentSelectedInvoices);
 
                                             // Get unpaid/partial invoices for selected supplier
-                                            $query = Invoice::join('purchase_orders', function($join) use ($supplierId) {
-                                                    $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
-                                                         ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder')
-                                                         ->where('purchase_orders.supplier_id', '=', $supplierId);
-                                                })
+                                            $query = Invoice::join('purchase_orders', function ($join) use ($supplierId) {
+                                                $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
+                                                    ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder')
+                                                    ->where('purchase_orders.supplier_id', '=', $supplierId);
+                                            })
                                                 ->with(['accountPayable'])
                                                 ->select('invoices.*');
 
@@ -162,10 +162,10 @@ class VendorPaymentResource extends Resource
                                             foreach ($invoices as $invoice) {
                                                 $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
                                                 $statusText = $remaining <= 0 ? ' (SUDAH LUNAS)' : '';
-                                                
-                                        $invDate = $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : '-';
-                                        $dueDate = $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-';
-                                        $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.') . " - Due: {$dueDate}" . $statusText; 
+
+                                                $invDate = $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : '-';
+                                                $dueDate = $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-';
+                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.') . " - Due: {$dueDate}" . $statusText;
                                             }
 
                                             $set('has_invoices', !empty($options));
@@ -175,7 +175,7 @@ class VendorPaymentResource extends Resource
                                             return [];
                                         }
                                     })
-                                    ->visible(fn ($get) => !empty($get('supplier_id')))
+                                    ->visible(fn($get) => !empty($get('supplier_id')))
                                     ->helperText(function ($get) {
                                         $supplierId = $get('supplier_id');
                                         if (!$supplierId) {
@@ -202,7 +202,7 @@ class VendorPaymentResource extends Resource
                                     })
                                     ->reactive()
                                     ->live()
-                                    ->disabled(fn ($get) => $get('is_processing_invoices'))
+                                    ->disabled(fn($get) => $get('is_processing_invoices'))
                                     ->afterStateUpdated(function ($state, $set, $get) {
                                         // Set loading state to show processing indicator
                                         $set('is_processing_invoices', true);
@@ -263,7 +263,6 @@ class VendorPaymentResource extends Resource
                                                 'total_payment' => $total,
                                                 'payment_details_count' => count($paymentDetails),
                                             ]);
-
                                         } catch (\Exception $e) {
                                             \Illuminate\Support\Facades\Log::error('Error in invoice selection processing', [
                                                 'error' => $e->getMessage(),
@@ -334,16 +333,16 @@ class VendorPaymentResource extends Resource
                                             </div>
                                         </div>
                                     '))
-                                    ->visible(fn ($get) => $get('is_processing_invoices')),
+                                    ->visible(fn($get) => $get('is_processing_invoices')),
                                 Placeholder::make('loading_payment_details')
                                     ->label('')
                                     ->content('Memproses detail pembayaran...')
-                                    ->visible(fn ($get) => !empty($get('selected_invoices')) && empty($get('payment_details')) && !$get('is_processing_invoices')),
+                                    ->visible(fn($get) => !empty($get('selected_invoices')) && empty($get('payment_details')) && !$get('is_processing_invoices')),
                                 Repeater::make('payment_details')
                                     ->label('')
                                     ->reactive()
-                                    ->visible(fn ($get) => !empty($get('payment_details')) && !$get('is_processing_invoices'))
-                                    ->disabled(fn ($get) => $get('is_processing_invoices'))
+                                    ->visible(fn($get) => !empty($get('payment_details')) && !$get('is_processing_invoices'))
+                                    ->disabled(fn($get) => $get('is_processing_invoices'))
                                     ->schema([
                                         TextInput::make('invoice_number')
                                             ->label('No. Invoice')
@@ -418,7 +417,7 @@ class VendorPaymentResource extends Resource
                                     ->deletable(false)
                                     ->reorderable(false)
                                     ->default([])
-                                    ->key(fn ($get) => md5(json_encode($get('payment_details') ?? []))),
+                                    ->key(fn($get) => md5(json_encode($get('payment_details') ?? []))),
                             ]),
 
                         // Payment Details Section
@@ -446,7 +445,7 @@ class VendorPaymentResource extends Resource
                                 Placeholder::make('calculating_total')
                                     ->label('Total Pembayaran')
                                     ->content('Menghitung total pembayaran...')
-                                    ->visible(fn ($get) => !empty($get('selected_invoices')) && $get('total_payment') == 0)
+                                    ->visible(fn($get) => !empty($get('selected_invoices')) && $get('total_payment') == 0)
                                     ->columnSpan(1),
 
                                 TextInput::make('total_payment')
@@ -456,7 +455,7 @@ class VendorPaymentResource extends Resource
                                     ->reactive()
                                     ->readOnly() // Make it read-only since it's calculated automatically
                                     ->default(0)
-                                    ->visible(fn ($get) => $get('total_payment') > 0)
+                                    ->visible(fn($get) => $get('total_payment') > 0)
                                     ->afterStateUpdated(function ($set, $get) {
                                         $selectedInvoices = $get('selected_invoices') ?? [];
 
@@ -522,17 +521,17 @@ class VendorPaymentResource extends Resource
                                         $paymentMethod = $get('payment_method');
 
                                         try {
-                                            $coas = match($paymentMethod) {
+                                            $coas = match ($paymentMethod) {
                                                 'Cash' => ChartOfAccount::where('code', 'LIKE', '11%')
                                                     ->where(function ($q) {
                                                         $q->where('name', 'LIKE', '%kas%')
-                                                          ->orWhere('name', 'LIKE', '%tunai%');
+                                                            ->orWhere('name', 'LIKE', '%tunai%');
                                                     })
                                                     ->get(),
                                                 'Bank Transfer' => ChartOfAccount::where('code', 'LIKE', '11%')
                                                     ->where(function ($q) {
                                                         $q->where('name', 'LIKE', '%bank%')
-                                                          ->orWhere('name', 'LIKE', '%rekening%');
+                                                            ->orWhere('name', 'LIKE', '%rekening%');
                                                     })
                                                     ->get(),
                                                 'Credit' => ChartOfAccount::where('code', 'LIKE', '11%')
@@ -590,7 +589,7 @@ class VendorPaymentResource extends Resource
                                                 $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
                                                     ->where(function ($q) {
                                                         $q->where('name', 'LIKE', '%kas%')
-                                                          ->orWhere('name', 'LIKE', '%tunai%');
+                                                            ->orWhere('name', 'LIKE', '%tunai%');
                                                     })
                                                     ->first();
                                                 break;
@@ -598,7 +597,7 @@ class VendorPaymentResource extends Resource
                                                 $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
                                                     ->where(function ($q) {
                                                         $q->where('name', 'LIKE', '%bank%')
-                                                          ->orWhere('name', 'LIKE', '%rekening%');
+                                                            ->orWhere('name', 'LIKE', '%rekening%');
                                                     })
                                                     ->first();
                                                 break;
@@ -642,21 +641,21 @@ class VendorPaymentResource extends Resource
                                     ->label('PPN Impor')
                                     ->indonesianMoney()
                                     ->default(0)
-                                    ->disabled(fn ($get) => !$get('is_import_payment'))
+                                    ->disabled(fn($get) => !$get('is_import_payment'))
                                     ->dehydrated()
                                     ->helperText('Masukkan nilai PPN Masukan impor yang akan diakui saat pembayaran'),
                                 TextInput::make('pph22_amount')
                                     ->label('PPh 22 Impor')
                                     ->indonesianMoney()
                                     ->default(0)
-                                    ->disabled(fn ($get) => !$get('is_import_payment'))
+                                    ->disabled(fn($get) => !$get('is_import_payment'))
                                     ->dehydrated()
                                     ->helperText('Opsional: Pajak PPh 22 yang dibayarkan saat impor'),
                                 TextInput::make('bea_masuk_amount')
                                     ->label('Bea Masuk')
                                     ->indonesianMoney()
                                     ->default(0)
-                                    ->disabled(fn ($get) => !$get('is_import_payment'))
+                                    ->disabled(fn($get) => !$get('is_import_payment'))
                                     ->dehydrated()
                                     ->helperText('Opsional: biaya Bea Masuk yang dibayarkan di bea cukai'),
                             ]),
@@ -789,7 +788,7 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('payment_method')
                     ->label('Metode Pembayaran')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'Cash' => 'success',
                         'Bank Transfer' => 'info',
                         'bank_transfer' => 'info',
@@ -801,7 +800,7 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'Draft' => 'gray',
                         'Approved' => 'success',
                         'Rejected' => 'danger',
@@ -844,7 +843,7 @@ class VendorPaymentResource extends Resource
                         ->label('Journal Entries')
                         ->icon('heroicon-o-document-text')
                         ->color('info')
-                        ->url(fn ($record) => route('filament.admin.resources.journal-entries.index', [
+                        ->url(fn($record) => route('filament.admin.resources.journal-entries.index', [
                             'tableFilters[source_type][value]' => 'App\Models\VendorPayment',
                             'tableFilters[source_id][value]' => $record->id
                         ]))
@@ -862,21 +861,21 @@ class VendorPaymentResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Vendor Payment (Pembayaran Vendor/Supplier)</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Vendor Payment adalah record pembayaran kepada vendor/supplier untuk melunasi invoice pembelian yang telah diterima.</li>' .
-                            '<li><strong>Metode Pembayaran:</strong> <em>Cash</em> (tunai), <em>Bank Transfer</em> (transfer bank), <em>Check</em> (cek), <em>Giro</em> (bilyet giro), atau <em>Other</em> (metode lainnya).</li>' .
-                            '<li><strong>Komponen Utama:</strong> <em>Supplier</em> (vendor penerima pembayaran), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), <em>Payment Method</em> (metode pembayaran).</li>' .
-                            '<li><strong>Multiple Invoices:</strong> Satu vendor payment dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
-                            '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
-                            '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Supplier Match</em> - invoice harus milik supplier yang sama.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Purchase Invoice</em> (pelunasan), <em>Account Payable</em> (pengurangan hutang), <em>Journal Entry</em> (otomatis buat jurnal), <em>Cash/Bank Account</em> (pengurangan saldo), dan <em>Deposit</em> (untuk overpayment).</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail payment), <em>Edit</em> (ubah payment), <em>Delete</em> (hapus payment), <em>Print Payment</em> (cetak bukti pembayaran), <em>Generate Journal</em> (buat jurnal entry).</li>' .
-                            '<li><strong>Permissions:</strong> <em>view any vendor payment</em>, <em>create vendor payment</em>, <em>update vendor payment</em>, <em>delete vendor payment</em>, <em>restore vendor payment</em>, <em>force-delete vendor payment</em>.</li>' .
-                            '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Account Payable dan credit Cash/Bank Account. Overpayment akan dicatat sebagai vendor deposit.</li>' .
-                            '<li><strong>Reporting:</strong> Menyediakan data untuk accounts payable aging, cash disbursement journal, dan vendor payment history tracking.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Vendor Payment adalah record pembayaran kepada vendor/supplier untuk melunasi invoice pembelian yang telah diterima.</li>' .
+                    '<li><strong>Metode Pembayaran:</strong> <em>Cash</em> (tunai), <em>Bank Transfer</em> (transfer bank), <em>Check</em> (cek), <em>Giro</em> (bilyet giro), atau <em>Other</em> (metode lainnya).</li>' .
+                    '<li><strong>Komponen Utama:</strong> <em>Supplier</em> (vendor penerima pembayaran), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), <em>Payment Method</em> (metode pembayaran).</li>' .
+                    '<li><strong>Multiple Invoices:</strong> Satu vendor payment dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
+                    '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
+                    '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Supplier Match</em> - invoice harus milik supplier yang sama.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan <em>Purchase Invoice</em> (pelunasan), <em>Account Payable</em> (pengurangan hutang), <em>Journal Entry</em> (otomatis buat jurnal), <em>Cash/Bank Account</em> (pengurangan saldo), dan <em>Deposit</em> (untuk overpayment).</li>' .
+                    '<li><strong>Actions:</strong> <em>View</em> (lihat detail payment), <em>Edit</em> (ubah payment), <em>Delete</em> (hapus payment), <em>Print Payment</em> (cetak bukti pembayaran), <em>Generate Journal</em> (buat jurnal entry).</li>' .
+                    '<li><strong>Permissions:</strong> <em>view any vendor payment</em>, <em>create vendor payment</em>, <em>update vendor payment</em>, <em>delete vendor payment</em>, <em>restore vendor payment</em>, <em>force-delete vendor payment</em>.</li>' .
+                    '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Account Payable dan credit Cash/Bank Account. Overpayment akan dicatat sebagai vendor deposit.</li>' .
+                    '<li><strong>Reporting:</strong> Menyediakan data untuk accounts payable aging, cash disbursement journal, dan vendor payment history tracking.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 
