@@ -48,7 +48,6 @@ class QuotationItemRelationManager extends RelationManager
                             }),
                         TextInput::make('unit_price')
                             ->label('Unit Price')
-                            ->numeric()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $state, $get('discount'), $get('tax')));
@@ -57,7 +56,6 @@ class QuotationItemRelationManager extends RelationManager
                             ->indonesianMoney(),
                         TextInput::make('quantity')
                             ->label('Quantity')
-                            ->numeric()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($state, $get('unit_price'), $get('discount'), $get('tax')));
                             })
@@ -85,7 +83,6 @@ class QuotationItemRelationManager extends RelationManager
                             ->suffix('%'),
                         TextInput::make('total_price')
                             ->label('Total Price')
-                            ->numeric()
                             ->reactive()
                             ->default(0)
                             ->indonesianMoney(),

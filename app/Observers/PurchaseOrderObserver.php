@@ -55,9 +55,69 @@ class PurchaseOrderObserver
             $this->handleAssetPurchaseApproval($purchaseOrder);
         }
 
+        // When PO is approved, update the related OrderRequest status
+        if ($purchaseOrder->wasChanged('status') && $purchaseOrder->status === 'approved') {
+            $this->updateOrderRequestStatus($purchaseOrder);
+        }
+
         // Sync related journal entries if total amount changed
         if ($purchaseOrder->wasChanged('total_amount')) {
             $this->syncJournalEntries($purchaseOrder);
+        }
+    }
+
+    /**
+     * Update OrderRequest status based on fulfilled quantities when PO is approved.
+     */
+    protected function updateOrderRequestStatus(PurchaseOrder $purchaseOrder): void
+    {
+        // Get the referenced OrderRequest (via morphTo refer_model)
+        $orderRequest = null;
+        if (
+            $purchaseOrder->refer_model_type === 'App\\Models\\OrderRequest' &&
+            $purchaseOrder->refer_model_id
+        ) {
+            $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);
+        }
+
+        if (!$orderRequest) {
+            return;
+        }
+
+        // Reload items with fresh fulfilled_quantity values
+        $items = $orderRequest->orderRequestItem()->get();
+
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $allFulfilled = true;
+        $anyFulfilled = false;
+
+        foreach ($items as $item) {
+            $fulfilled = (float) ($item->fulfilled_quantity ?? 0);
+            $total     = (float) ($item->quantity ?? 0);
+
+            if ($fulfilled >= $total && $total > 0) {
+                $anyFulfilled = true;
+            } elseif ($fulfilled > 0) {
+                $anyFulfilled = true;
+                $allFulfilled = false;
+            } else {
+                $allFulfilled = false;
+            }
+        }
+
+        // Only update status if currently approved or partial (don't overwrite closed/rejected)
+        $currentStatus = $orderRequest->status;
+        if (!in_array($currentStatus, ['approved', 'partial', 'complete'])) {
+            return;
+        }
+
+        if ($allFulfilled) {
+            $orderRequest->update(['status' => 'complete']);
+        } elseif ($anyFulfilled) {
+            $orderRequest->update(['status' => 'partial']);
         }
     }
 

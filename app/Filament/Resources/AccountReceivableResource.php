@@ -85,17 +85,14 @@ class AccountReceivableResource extends Resource
                             ->relationship('customer', 'name'),
                         TextInput::make('total')
                             ->required()
-                            ->indonesianMoney()
-                            ->numeric(),
+                            ->indonesianMoney(),
                         TextInput::make('paid')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->default(0.00),
                         TextInput::make('remaining')
                             ->required()
-                            ->indonesianMoney()
-                            ->numeric(),
+                            ->indonesianMoney(),
                         Checkbox::make('status')
                             ->label('Lunas / Belum Lunas')
                     ])
@@ -286,11 +283,9 @@ class AccountReceivableResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
-                                    ->numeric()
                                     ->indonesianMoney(),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
-                                    ->numeric()
                                     ->indonesianMoney(),
                             ])
                     ])

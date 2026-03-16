@@ -62,6 +62,37 @@ class OrderRequest extends Model
         return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
 
+    /**
+     * Auto-transition status based on fulfilled_quantity across all items.
+     * Call this whenever a PurchaseOrderItem or PurchaseReceiptItem is saved.
+     *
+     * Transitions:
+     *  - All items fully fulfilled → complete
+     *  - At least one item partially fulfilled → partial
+     *  - Nothing fulfilled → stays at approved
+     */
+    public function syncFulfillmentStatus(): void
+    {
+        // Only auto-transition from approved/partial states; never touch draft/closed/rejected.
+        if (!in_array($this->status, ['approved', 'partial', 'complete'])) {
+            return;
+        }
+
+        $items = $this->orderRequestItem()->withoutTrashed()->get();
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $allFulfilled = $items->every(fn ($i) => ($i->fulfilled_quantity ?? 0) >= $i->quantity);
+        $anyFulfilled = $items->some(fn ($i) => ($i->fulfilled_quantity ?? 0) > 0);
+
+        if ($allFulfilled) {
+            $this->update(['status' => 'complete']);
+        } elseif ($anyFulfilled) {
+            $this->update(['status' => 'partial']);
+        }
+    }
+
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope());

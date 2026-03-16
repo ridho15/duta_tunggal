@@ -173,7 +173,6 @@ class ViewOrderRequest extends ViewRecord
                                         ->readOnly(),
                                     TextInput::make('quantity')
                                         ->label('Qty')
-                                        ->numeric()
                                         ->minValue(0)
                                         ->required(),
                                     TextInput::make('unit_price')
@@ -182,7 +181,6 @@ class ViewOrderRequest extends ViewRecord
                                         ->indonesianMoney(),
                                     TextInput::make('tax')
                                         ->label('Pajak (%)')
-                                        ->numeric()
                                         ->readOnly()
                                         ->suffix('%'),
                                     TextInput::make('tax_nominal')
@@ -342,7 +340,6 @@ class ViewOrderRequest extends ViewRecord
                                         ->columnSpan(2),
                                     TextInput::make('tax')
                                         ->label('Pajak (%)')
-                                        ->numeric()
                                         ->readOnly()
                                         ->suffix('%')
                                         ->columnSpan(1),

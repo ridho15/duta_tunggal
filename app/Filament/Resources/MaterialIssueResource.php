@@ -299,7 +299,6 @@ class MaterialIssueResource extends Resource
                                     }),
                                 Forms\Components\TextInput::make('cost_per_unit')
                                     ->label('Cost Price')
-                                    ->numeric()
                                     ->required()
                                     ->default(0)
                                     ->indonesianMoney()

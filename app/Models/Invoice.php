@@ -61,6 +61,8 @@ class Invoice extends Model
     ];
 
     protected $casts = [
+        'invoice_date' => 'date',
+        'due_date' => 'date',
         'delivery_orders' => 'array',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice

@@ -73,7 +73,6 @@ class VoucherRequestResource extends Resource
                                 Forms\Components\TextInput::make('amount')
                                     ->label('Nominal')
                                     ->required()
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->minValue(0)
                                     ->step(0.01)

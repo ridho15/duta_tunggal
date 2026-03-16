@@ -80,7 +80,6 @@ class AccountPayableResource extends Resource
                         TextInput::make('total')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->validationMessages([
                                 'required' => 'Total tidak boleh kosong',
                                 'numeric' => 'Total harus berupa angka'
@@ -114,7 +113,6 @@ class AccountPayableResource extends Resource
                         TextInput::make('paid')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->validationMessages([
                                 'required' => 'Jumlah pembayaran tidak boleh kosong',
                                 'numeric' => 'Jumlah pembayaran harus berupa angka'
@@ -129,7 +127,6 @@ class AccountPayableResource extends Resource
                         TextInput::make('remaining')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->validationMessages([
                                 'required' => 'Sisa pembayaran tidak boleh kosong',
                                 'numeric' => 'Sisa pembayaran harus berupa angka'
@@ -409,11 +406,9 @@ class AccountPayableResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
-                                    ->numeric()
                                     ->indonesianMoney(),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
-                                    ->numeric()
                                     ->indonesianMoney(),
                             ])
                     ])

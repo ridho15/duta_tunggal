@@ -45,10 +45,17 @@ class InvoiceObserver
             }
             $accountPayable = AccountPayable::create($data);
             // Create Ageing Schedule
+            try {
+                $daysOutstanding = ($invoice->invoice_date && $invoice->due_date)
+                    ? Carbon::parse($invoice->invoice_date)->diffInDays(Carbon::parse($invoice->due_date))
+                    : 0;
+            } catch (\Exception $e) {
+                $daysOutstanding = 0;
+            }
             $accountPayable->ageingSchedule()->create([
                 'invoice_date' => $invoice->invoice_date,
                 'due_date' => $invoice->due_date,
-                'days_outstanding' => Carbon::parse($invoice->invoice_date)->diffInDays($invoice->due_date),
+                'days_outstanding' => $daysOutstanding,
                 'bucket' => 'Current'
             ]);
 
@@ -73,10 +80,17 @@ class InvoiceObserver
                 'cabang_id' => $invoice->cabang_id, // FIX #5: propagate branch scope so AR is visible to branch users
             ]);
             // Create Ageing Schedule
+            try {
+                $daysOutstanding = ($invoice->invoice_date && $invoice->due_date)
+                    ? Carbon::parse($invoice->invoice_date)->diffInDays(Carbon::parse($invoice->due_date))
+                    : 0;
+            } catch (\Exception $e) {
+                $daysOutstanding = 0;
+            }
             $accountReceivable->ageingSchedule()->create([
                 'invoice_date' => $invoice->invoice_date,
                 'due_date' => $invoice->due_date,
-                'days_outstanding' => Carbon::parse($invoice->invoice_date)->diffInDays($invoice->due_date),
+                'days_outstanding' => $daysOutstanding,
                 'bucket' => 'Current'
             ]);
 

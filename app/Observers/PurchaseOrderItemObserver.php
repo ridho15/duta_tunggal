@@ -21,6 +21,11 @@ class PurchaseOrderItemObserver
             $orderRequestItem = OrderRequestItem::find($purchaseOrderItem->refer_item_model_id);
             if ($orderRequestItem) {
                 $orderRequestItem->addFulfilledQuantity($purchaseOrderItem->quantity);
+                // Sync parent OrderRequest status (approved → partial → complete)
+                $orderRequest = $orderRequestItem->orderRequest;
+                if ($orderRequest) {
+                    $orderRequest->syncFulfillmentStatus();
+                }
             }
         }
     }
@@ -50,6 +55,11 @@ class PurchaseOrderItemObserver
             $orderRequestItem = OrderRequestItem::find($purchaseOrderItem->refer_item_model_id);
             if ($orderRequestItem) {
                 $orderRequestItem->reduceFulfilledQuantity($purchaseOrderItem->quantity);
+                // Re-sync parent OrderRequest status after reduction
+                $orderRequest = $orderRequestItem->orderRequest;
+                if ($orderRequest) {
+                    $orderRequest->syncFulfillmentStatus();
+                }
             }
         }
         

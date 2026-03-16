@@ -608,7 +608,6 @@ class SalesInvoiceResource extends Resource
                                         TextInput::make('amount')
                                             ->label('Jumlah')
                                             ->indonesianMoney()
-                                            ->numeric()
                                             ->required()
                                             ->validationMessages([
                                                 'required' => 'Jumlah tidak boleh kosong',
@@ -639,7 +638,6 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('dpp')
                                     ->label('DPP (Dasar Pengenaan Pajak)')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->validationMessages([
                                         'numeric' => 'DPP harus berupa angka'
                                     ])
@@ -693,7 +691,6 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('total')
                                     ->label('')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->validationMessages([
                                         'numeric' => 'Total harus berupa angka'
                                     ])
@@ -746,7 +743,6 @@ class SalesInvoiceResource extends Resource
                                     ]),
                                 TextInput::make('price')
                                     ->label('Price')
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->required()
                                     ->validationMessages([
@@ -755,7 +751,6 @@ class SalesInvoiceResource extends Resource
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->required()
                                     ->validationMessages([

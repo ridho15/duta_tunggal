@@ -140,35 +140,27 @@ class AppServiceProvider extends ServiceProvider
                 ->prefix('Rp')
                 ->placeholder('500.000')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, ',', '.', 0)
+            $money($input, '.', ',', 0)
         JS))
                 ->formatStateUsing(function ($state) {
                     if ($state === null || $state === '') {
                         return '';
                     }
 
-                    return number_format((float) $state, 0, ',', '.');
+                    return number_format(\App\Helpers\MoneyHelper::parse($state), 0, ',', '.');
                 })
-                ->dehydrateStateUsing(function ($state) {
-
-                    if ($state === null || $state === '') {
-                        return 0;
-                    }
-
-                    // remove Rp
-                    $clean = str_replace('Rp', '', $state);
-
-                    // remove spaces
-                    $clean = trim($clean);
-
-                    // remove thousand separator
-                    $clean = str_replace('.', '', $clean);
-
-                    // replace decimal comma
-                    $clean = str_replace(',', '.', $clean);
-
-                    return (float) $clean;
-                });
+                ->rules([function () {
+                    return function ($attribute, $value, $fail) {
+                        if ($value === null || $value === '') {
+                            return;
+                        }
+                        $parsed = \App\Helpers\MoneyHelper::parse($value);
+                        if (! is_numeric($parsed)) {
+                            $fail('Nilai nominal tidak valid. Contoh format: 1.000.000');
+                        }
+                    };
+                }])
+                ->dehydrateStateUsing(fn($state) => \App\Helpers\MoneyHelper::parse($state));
         });
     }
 

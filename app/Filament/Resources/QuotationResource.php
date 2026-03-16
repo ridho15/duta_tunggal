@@ -206,7 +206,6 @@ class QuotationResource extends Resource
                                             ->label('Kredit Limit (Rp.)')
                                             ->default(0)
                                             ->required()
-                                            ->numeric()
                                             ->validationMessages([
                                                 'required' => 'Kredit limit tidak boleh kosong',
                                                 'numeric' => 'Kredit limit harus berupa angka'
@@ -430,7 +429,6 @@ class QuotationResource extends Resource
                                     ->indonesianMoney(),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
-                                    ->numeric()
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Quantity wajib diisi'
@@ -1028,7 +1026,6 @@ class QuotationResource extends Resource
                                                 }),
                                             TextInput::make('unit_price')
                                                 ->label('Unit Price')
-                                                ->numeric()
                                                 ->default(function ($get, $record) {
                                                     $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
                                                     return $quotationItem ? $quotationItem->unit_price : 0;
@@ -1122,7 +1119,6 @@ class QuotationResource extends Resource
                                                 }),
                                             TextInput::make('subtotal')
                                                 ->label('Subtotal')
-                                                ->numeric()
                                                 ->indonesianMoney()
                                                 ->readOnly()
                                                 ->default(0),

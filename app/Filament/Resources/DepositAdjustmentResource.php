@@ -102,19 +102,16 @@ class DepositAdjustmentResource extends Resource
                                     ->label('Deposit Amount')
                                     ->indonesianMoney()
                                     ->required()
-                                    ->numeric()
                                     ->default(0),
                                     
                                 TextInput::make('used_amount')
                                     ->label('Used Amount')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->default(0),
                                     
                                 TextInput::make('remaining_amount')
                                     ->label('Remaining Amount')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->default(0),
                             ]),
                             
@@ -205,7 +202,6 @@ class DepositAdjustmentResource extends Resource
                                     TextInput::make('adjustment_amount')
                                         ->label('Adjustment Amount')
                                         ->indonesianMoney()
-                                        ->numeric()
                                         ->required()
                                         ->helperText('Positive to add, negative to subtract'),
                                         

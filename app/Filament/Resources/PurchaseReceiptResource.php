@@ -185,7 +185,6 @@ class PurchaseReceiptResource extends Resource
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
-                                    ->numeric()
                                     ->reactive()
                                     ->indonesianMoney()
                                     ->prefix(function ($get) {

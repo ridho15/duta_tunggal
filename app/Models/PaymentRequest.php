@@ -31,10 +31,65 @@ class PaymentRequest extends Model
 
     protected $casts = [
         'selected_invoices' => 'array',
-        'request_date' => 'date',
-        'payment_date' => 'date',
-        'approved_at' => 'datetime',
+        // request_date and payment_date handled via accessors to guard against invalid DB values like '-'
+        'approved_at'       => 'datetime',
     ];
+
+    /**
+     * Accessor for request_date — guards against invalid DB values like '-'.
+     */
+    public function getRequestDateAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string)$value) === '' || trim((string)$value) === '-') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Mutator for request_date — converts invalid values to null before saving.
+     */
+    public function setRequestDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['request_date'] = null;
+        } else {
+            $this->attributes['request_date'] = $value;
+        }
+    }
+
+    /**
+     * Accessor for payment_date — guards against invalid DB values like '-'.
+     * Returns a Carbon instance or null. Bypasses the Eloquent date cast
+     * to prevent DateMalformedStringException on legacy records.
+     */
+    public function getPaymentDateAttribute(?string $value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim($value) === '' || trim($value) === '-') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Mutator for payment_date — converts invalid values to null before saving.
+     */
+    public function setPaymentDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['payment_date'] = null;
+        } else {
+            $this->attributes['payment_date'] = $value;
+        }
+    }
 
     // Status constants
     const STATUS_DRAFT = 'draft';

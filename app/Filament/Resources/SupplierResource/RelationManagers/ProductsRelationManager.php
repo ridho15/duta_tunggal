@@ -71,7 +71,6 @@ class ProductsRelationManager extends RelationManager
                             ]),
                         Forms\Components\TextInput::make('supplier_price')
                             ->label('Harga Beli Supplier')
-                            ->numeric()
                             ->indonesianMoney()
                             ->required()
                             ->validationMessages([
@@ -101,7 +100,6 @@ class ProductsRelationManager extends RelationManager
                     ->form([
                         Forms\Components\TextInput::make('supplier_price')
                             ->label('Harga Beli Supplier')
-                            ->numeric()
                             ->indonesianMoney()
                             ->required(),
                     ]),

@@ -325,7 +325,6 @@ class JournalEntryResource extends Resource
 
                                 Forms\Components\TextInput::make('debit')
                                     ->label('Debit')
-                                    ->numeric()
                                     ->default(0)
                                     ->required()
                                     ->indonesianMoney()
@@ -343,7 +342,6 @@ class JournalEntryResource extends Resource
 
                                 Forms\Components\TextInput::make('credit')
                                     ->label('Credit')
-                                    ->numeric()
                                     ->default(0)
                                     ->required()
                                     ->indonesianMoney()
