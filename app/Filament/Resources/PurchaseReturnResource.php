@@ -191,7 +191,6 @@ class PurchaseReturnResource extends Resource
                                     ]),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price (Rp.)')
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->default(0)
                                     ->required()

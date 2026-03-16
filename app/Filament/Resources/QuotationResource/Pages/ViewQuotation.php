@@ -233,7 +233,6 @@ class ViewQuotation extends ViewRecord
                                             }),
                                         TextInput::make('unit_price')
                                             ->label('Unit Price')
-                                            ->numeric()
                                             ->default(function ($get, $record) {
                                                 $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
                                                 return $quotationItem ? $quotationItem->unit_price : 0;
@@ -327,7 +326,6 @@ class ViewQuotation extends ViewRecord
                                             }),
                                         TextInput::make('subtotal')
                                             ->label('Subtotal')
-                                            ->numeric()
                                             ->indonesianMoney()
                                             ->readOnly()
                                             ->default(0),

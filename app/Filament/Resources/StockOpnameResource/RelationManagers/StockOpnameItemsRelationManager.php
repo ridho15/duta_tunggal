@@ -82,7 +82,6 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 TextInput::make('difference_qty')
                     ->label('Selisih Qty')
-                    ->numeric()
                     ->disabled()
                     ->dehydrated(),
 

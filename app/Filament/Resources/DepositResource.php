@@ -476,11 +476,9 @@ class DepositResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
-                                    ->numeric()
                                     ->indonesianMoney(),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
-                                    ->numeric()
                                     ->indonesianMoney(),
                             ]),
                     ])
@@ -538,7 +536,6 @@ class DepositResource extends Resource
                                         TextInput::make('amount')
                                             ->label('Total')
                                             ->indonesianMoney()
-                                            ->numeric()
                                             ->default(0)
                                             ->required()
                                             ->rules([
@@ -589,7 +586,6 @@ class DepositResource extends Resource
                                         TextInput::make('amount')
                                             ->label('Total')
                                             ->indonesianMoney()
-                                            ->numeric()
                                             ->default(0)
                                             ->required()
                                             ->rules([

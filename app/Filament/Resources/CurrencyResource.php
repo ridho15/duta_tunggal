@@ -65,7 +65,6 @@ class CurrencyResource extends Resource
                                 'numeric' => 'Nilai harus berupa angka'
                             ])
                             ->indonesianMoney()
-                            ->numeric()
                             ->default(0),
                     ])
             ]);

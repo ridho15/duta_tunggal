@@ -114,7 +114,6 @@ class AssetDisposalResource extends Resource
                             ]),
                         Forms\Components\TextInput::make('sale_price')
                             ->label('Sale Price')
-                            ->numeric()
                             ->indonesianMoney()
                             ->rules([
                                 function () {

@@ -288,7 +288,6 @@ class CustomerReceiptResource extends Resource
                                     ->label('Total Pembayaran')
                                     ->required()
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->reactive()
                                     ->disabled(false) // Allow JavaScript to update this field
                                     ->extraAttributes([

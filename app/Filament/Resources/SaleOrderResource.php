@@ -310,7 +310,6 @@ class SaleOrderResource extends Resource
                                             ->label('Kredit Limit (Rp.)')
                                             ->default(0)
                                             ->required()
-                                            ->numeric()
                                             ->indonesianMoney(),
                                         Radio::make('tipe_pembayaran')
                                             ->label('Tipe Bayar Customer')
@@ -1341,7 +1340,6 @@ class SaleOrderResource extends Resource
                             if ($record->customer->deposit->id == null) {
                                 return [
                                     TextInput::make('titip_saldo')
-                                        ->numeric()
                                         ->indonesianMoney()
                                         ->required()
                                         ->default(0),
@@ -1360,7 +1358,6 @@ class SaleOrderResource extends Resource
                             } else {
                                 return [
                                     TextInput::make('titip_saldo')
-                                        ->numeric()
                                         ->indonesianMoney()
                                         ->required()
                                         ->default(0),

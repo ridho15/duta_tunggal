@@ -95,7 +95,6 @@ class CashBankTransactionResource extends Resource
                             ]),
                         TextInput::make('amount')
                             ->label('Jumlah Total')
-                            ->numeric()
                             ->minValue(0.01)
                             ->required()
                             ->indonesianMoney()
@@ -264,7 +263,6 @@ class CashBankTransactionResource extends Resource
                                 ]),
                             TextInput::make('amount')
                                 ->label('Jumlah')
-                                ->numeric()
                                 ->minValue(-999999999)
                                 ->maxValue(999999999)
                                 ->required()

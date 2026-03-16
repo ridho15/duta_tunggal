@@ -580,7 +580,6 @@ class PurchaseInvoiceResource extends Resource
 
                                 TextInput::make('tax')
                                     ->label('Tax (%)')
-                                    ->numeric()
                                     ->validationMessages([
                                         'numeric' => 'Tax harus berupa angka'
                                     ])

@@ -31,7 +31,6 @@ class AddDepositAction
                             ->label('Deposit Amount')
                             ->indonesianMoney()
                             ->required()
-                            ->numeric()
                             ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
@@ -42,7 +41,6 @@ class AddDepositAction
                         TextInput::make('used_amount')
                             ->label('Already Used Amount')
                             ->indonesianMoney()
-                            ->numeric()
                             ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
@@ -54,7 +52,6 @@ class AddDepositAction
                 TextInput::make('remaining_amount')
                     ->label('Remaining Amount')
                     ->indonesianMoney()
-                    ->numeric()
                     ->default(0)
                     ->disabled()
                     ->dehydrated(),

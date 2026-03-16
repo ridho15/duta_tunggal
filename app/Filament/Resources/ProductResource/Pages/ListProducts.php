@@ -171,13 +171,11 @@ class ListProducts extends ListRecords
                                                 }),
                                             TextInput::make('sell_price')
                                                 ->label('Harga')
-                                                ->numeric()
                                                 ->indonesianMoney()
                                                 ->default(0)
                                                 ->required(),
                                             TextInput::make('cost_price')
                                                 ->label('Cost')
-                                                ->numeric()
                                                 ->indonesianMoney()
                                                 ->default(0)
                                                 ->required()

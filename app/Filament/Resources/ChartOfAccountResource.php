@@ -103,7 +103,6 @@ class ChartOfAccountResource extends Resource
                     ->label('Description'),
                 TextInput::make('opening_balance')
                     ->label('Saldo Awal')
-                    ->numeric()
                     ->default(0)
                     ->indonesianMoney()
                     ->validationMessages([
@@ -113,7 +112,6 @@ class ChartOfAccountResource extends Resource
                     ->maxLength(255),
                 TextInput::make('debit')
                     ->label('Debit')
-                    ->numeric()
                     ->default(0)
                     ->indonesianMoney()
                     ->validationMessages([

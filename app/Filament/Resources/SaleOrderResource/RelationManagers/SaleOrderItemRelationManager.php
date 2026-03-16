@@ -91,7 +91,6 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->default(0),
                         TextInput::make('unit_price')
                             ->label('Unit Price')
-                            ->numeric()
                             ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
@@ -100,7 +99,6 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->indonesianMoney(),
                         TextInput::make('discount')
                             ->label('Discount')
-                            ->numeric()
                             ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
@@ -109,7 +107,6 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->indonesianMoney(),
                         TextInput::make('tax')
                             ->label('Tax')
-                            ->numeric()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));

@@ -214,10 +214,8 @@ class InvoiceResource extends Resource
                             ->required(),
                         TextInput::make('subtotal')
                             ->required()
-                            ->numeric()
                             ->validationMessages([
                                 'required' => 'Subtotal tidak boleh kosong',
-                                'numeric' => 'Subtotal tidak valid !'
                             ])
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get) {
@@ -233,7 +231,6 @@ class InvoiceResource extends Resource
                                 'required' => 'DPP tidak boleh kosong',
                                 'numeric' => 'DPP tidak valid !'
                             ])
-                            ->numeric()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get) {
                                 $set('total', static::hitungTotal($get));
@@ -249,7 +246,6 @@ class InvoiceResource extends Resource
                                     ->maxLength(120),
                                 TextInput::make('amount')
                                     ->label('Jumlah')
-                                    ->numeric()
                                     ->minValue(0)
                                     ->indonesianMoney()
                                     ->reactive()
@@ -290,13 +286,11 @@ class InvoiceResource extends Resource
                             ->afterStateUpdated(function ($set, $get) {
                                 $set('total', static::hitungTotal($get));
                             })
-                            ->numeric()
                             ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
                         TextInput::make('total')
                             ->required()
                             ->indonesianMoney()
-                            ->reactive()
-                            ->numeric(),
+                            ->reactive(),
                         Repeater::make('invoiceItem')
                             ->columnSpanFull()
                             ->relationship()
@@ -315,18 +309,15 @@ class InvoiceResource extends Resource
                                     }),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
-                                    ->numeric()
                                     ->default(0)
                                     ->required(),
                                 TextInput::make('price')
                                     ->label('Price (Rp)')
                                     ->indonesianMoney()
                                     ->default(0)
-                                    ->required()
-                                    ->numeric(),
+                                    ->required(),
                                 TextInput::make('total')
                                     ->label('Total (Rp)')
-                                    ->numeric()
                                     ->default(0)
                                     ->required()
                                     ->indonesianMoney()

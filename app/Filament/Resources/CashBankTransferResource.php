@@ -65,10 +65,9 @@ class CashBankTransferResource extends Resource
                                     })
                             ),
                         DatePicker::make('date')->label('Tanggal')->required()->columnSpan(3),
-                        TextInput::make('amount')->numeric()->minValue(0.01)->required()->indonesianMoney()->columnSpan(3),
+                        TextInput::make('amount')->minValue(0.01)->required()->indonesianMoney()->columnSpan(3),
                         TextInput::make('other_costs')
                             ->label('Biaya Lainnya')
-                            ->numeric()
                             ->minValue(0)
                             ->default(0)
                             ->indonesianMoney()

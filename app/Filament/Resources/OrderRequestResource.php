@@ -483,7 +483,6 @@ class OrderRequestResource extends Resource
                                     ->default(0),
                                 TextInput::make('subtotal')
                                     ->label('Subtotal')
-                                    // ->numeric()
                                     ->default(0)
                                     ->indonesianMoney()
                                     ->disabled()

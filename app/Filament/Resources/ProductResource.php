@@ -186,7 +186,6 @@ class ProductResource extends Resource
                             ]),
                         TextInput::make('item_value')
                             ->label('Item Value (Rp)')
-                            ->numeric()
                             ->indonesianMoney()
                             ->default(0)
                             ->validationMessages([
@@ -603,11 +602,9 @@ class ProductResource extends Resource
                         Grid::make(2)->schema([
                             TextInput::make('harga_jual_min')
                                 ->label('Harga Jual Minimum')
-                                ->numeric()
                                 ->indonesianMoney(),
                             TextInput::make('harga_jual_max')
                                 ->label('Harga Jual Maximum')
-                                ->numeric()
                                 ->indonesianMoney(),
                         ])
                     ])
@@ -629,11 +626,9 @@ class ProductResource extends Resource
                         Grid::make(2)->schema([
                             TextInput::make('cost_price_min')
                                 ->label('Harga Beli Minimum')
-                                ->numeric()
                                 ->indonesianMoney(),
                             TextInput::make('cost_price_max')
                                 ->label('Harga Beli Maximum')
-                                ->numeric()
                                 ->indonesianMoney(),
                         ])
                     ])
@@ -655,11 +650,9 @@ class ProductResource extends Resource
                         Grid::make(2)->schema([
                             TextInput::make('biaya_min')
                                 ->label('Biaya Minimum')
-                                ->numeric()
                                 ->indonesianMoney(),
                             TextInput::make('biaya_max')
                                 ->label('Biaya Maximum')
-                                ->numeric()
                                 ->indonesianMoney(),
                         ])
                     ])
@@ -772,7 +765,6 @@ class ProductResource extends Resource
                                         ]),
                                     TextInput::make('item_value')
                                         ->label('Item Value (Rp)')
-                                        ->numeric()
                                         ->indonesianMoney()
                                         ->default(fn ($record) => $record->item_value)
                                         ->validationMessages([
@@ -936,7 +928,6 @@ class ProductResource extends Resource
                                         TextInput::make('biaya')
                                             ->label('Biaya (Rp)')
                                             ->indonesianMoney()
-                                            ->numeric()
                                             ->required()
                                             ->disabled()
                                             ->default(function ($record) {
@@ -969,7 +960,6 @@ class ProductResource extends Resource
                                             ->suffix('%'),
                                         TextInput::make('item_value')
                                             ->label('Item Value')
-                                            ->numeric()
                                             ->disabled()
                                             ->default(function ($record) {
                                                 return $record->item_value;

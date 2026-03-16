@@ -113,14 +113,14 @@ class ViewPaymentRequest extends ViewRecord
                     TextEntry::make('payment_date')->label('Tgl Bayar Diminta')->date('d/m/Y'),
                     TextEntry::make('total_amount')->label('Total (Rp)')->money('IDR', locale: 'id'),
                     TextEntry::make('requestedBy.name')->label('Diminta Oleh'),
-                    TextEntry::make('approvedBy.name')->label('Disetujui/Ditolak Oleh')->default('-'),
-                    TextEntry::make('approved_at')->label('Waktu Approval')->dateTime('d/m/Y H:i')->default('-'),
+                    TextEntry::make('approvedBy.name')->label('Disetujui/Ditolak Oleh'),
+                    TextEntry::make('approved_at')->label('Waktu Approval')->dateTime('d/m/Y H:i'),
                 ]),
 
             Section::make('Catatan')
                 ->schema([
-                    TextEntry::make('notes')->label('Catatan Permintaan')->default('-'),
-                    TextEntry::make('approval_notes')->label('Catatan Approval')->default('-'),
+                    TextEntry::make('notes')->label('Catatan Permintaan'),
+                    TextEntry::make('approval_notes')->label('Catatan Approval'),
                 ]),
 
             Section::make('Invoice yang Termasuk')

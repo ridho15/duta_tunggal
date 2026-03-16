@@ -610,13 +610,11 @@ class PurchaseOrderResource extends Resource
                                         $price = HelperController::parseIndonesianMoney($get('unit_price'));
                                         $set('total', number_format($qty * $price, 0, ',', '.'));
                                         $set('subtotal', HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
-                                    })
-                                    ->numeric(),
+                                    }),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->reactive()
                                     ->required()
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->validationMessages([
                                         'required' => 'Unit price tidak boleh kosong',
@@ -957,7 +955,6 @@ class PurchaseOrderResource extends Resource
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
-                                    ->numeric()
                                     ->reactive()
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
@@ -968,7 +965,6 @@ class PurchaseOrderResource extends Resource
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Total tidak boleh kosong',
-                                        'numeric' => 'Total biaya tidak valid !',
                                     ])
                                     ->default(0)
                                     ->indonesianMoney()

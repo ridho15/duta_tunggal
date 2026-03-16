@@ -149,6 +149,20 @@ class AppServiceProvider extends ServiceProvider
 
                     return number_format((float) $state, 0, ',', '.');
                 })
+                ->rules([function () {
+                    return function ($attribute, $value, $fail) {
+                        if ($value === null || $value === '') {
+                            return;
+                        }
+                        // Strip Rp prefix, spaces, and thousand-separator dots, then replace decimal comma
+                        $clean = preg_replace('/[Rp\s]/u', '', (string) $value);
+                        $clean = str_replace('.', '', $clean);
+                        $clean = str_replace(',', '.', $clean);
+                        if (! is_numeric($clean)) {
+                            $fail('Nilai nominal tidak valid. Contoh format: 1.000.000');
+                        }
+                    };
+                }])
                 ->dehydrateStateUsing(function ($state) {
 
                     if ($state === null || $state === '') {

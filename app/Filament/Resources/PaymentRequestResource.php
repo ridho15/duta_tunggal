@@ -92,7 +92,6 @@ class PaymentRequestResource extends Resource
 
                                 TextInput::make('total_amount')
                                     ->label('Total Pembayaran (Rp)')
-                                    ->numeric()
                                     ->disabled()
                                     ->dehydrated(true)
                                     ->indonesianMoney(),

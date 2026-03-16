@@ -51,9 +51,9 @@ class BankReconciliationResource extends Resource
                                     ->mapWithKeys(fn($coa) => [$coa->id => $coa->code . ' - ' . $coa->name]);
                             })
                             ->searchable()->required()->columnSpan(6),
+                        Forms\Components\TextInput::make('statement_ending_balance')->indonesianMoney()->label('Saldo Akhir Rekening Koran')->required()->columnSpan(4),
                         Forms\Components\DatePicker::make('period_start')->label('Periode Dari')->required()->columnSpan(3),
                         Forms\Components\DatePicker::make('period_end')->label('Sampai')->required()->columnSpan(3),
-                        Forms\Components\TextInput::make('statement_ending_balance')->numeric()->indonesianMoney()->label('Saldo Akhir Rekening Koran')->required()->columnSpan(4),
                         Forms\Components\Textarea::make('notes')->label('Catatan')->columnSpan(8),
                     ]),
                     Forms\Components\Section::make('Transaksi yang Belum Direkonsiliasi')
