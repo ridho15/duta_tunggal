@@ -90,7 +90,7 @@ class MaterialIssue extends Model
     public function updateTotalCost(): void
     {
         $this->total_cost = $this->calculateTotalCost();
-        $this->save();
+        $this->saveQuietly();
     }
 
     /**
@@ -178,6 +178,30 @@ class MaterialIssue extends Model
      */
     protected static function booted()
     {
+        // Guard against forbidden status regressions:
+        // Approved, completed, or cancelled statuses cannot be downgraded
+        static::saving(function (MaterialIssue $issue) {
+            $forbiddenRegressions = [
+                self::STATUS_APPROVED    => [self::STATUS_PENDING_APPROVAL, self::STATUS_DRAFT],
+                self::STATUS_COMPLETED   => [self::STATUS_APPROVED, self::STATUS_PENDING_APPROVAL, self::STATUS_DRAFT],
+            ];
+
+            $originalStatus = $issue->getOriginal('status');
+            $newStatus = $issue->status;
+
+            if ($originalStatus && $newStatus !== $originalStatus
+                && isset($forbiddenRegressions[$originalStatus])
+                && in_array($newStatus, $forbiddenRegressions[$originalStatus])) {
+                // Silently revert the status to prevent forbidden regression
+                $issue->status = $originalStatus;
+                Log::warning('MaterialIssue forbidden status regression blocked', [
+                    'material_issue_id' => $issue->id,
+                    'from' => $originalStatus,
+                    'attempted_to' => $newStatus,
+                ]);
+            }
+        });
+
         // Handle status transition updates for material fulfillment
         static::updated(function (MaterialIssue $issue) {
             Log::info('MaterialIssue booted() triggered', [

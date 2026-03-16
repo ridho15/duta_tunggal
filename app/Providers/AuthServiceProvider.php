@@ -6,6 +6,10 @@ use App\Models\CustomerReturn;
 use App\Policies\CustomerReturnPolicy;
 use App\Models\ManufacturingOrder;
 use App\Policies\ManufacturingOrderPolicy;
+use App\Models\MaterialIssue;
+use App\Policies\MaterialIssuePolicy;
+use App\Models\ProductionPlan;
+use App\Policies\ProductionPlanPolicy;
 use App\Models\CashBankTransaction;
 use App\Policies\CashBankTransactionPolicy;
 use App\Models\CashBankTransfer;
@@ -27,6 +31,8 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         CustomerReturn::class => CustomerReturnPolicy::class,
         ManufacturingOrder::class => ManufacturingOrderPolicy::class,
+        MaterialIssue::class => MaterialIssuePolicy::class,
+        ProductionPlan::class => ProductionPlanPolicy::class,
         CashBankTransaction::class => CashBankTransactionPolicy::class,
         CashBankTransfer::class => CashBankTransferPolicy::class,
         BankReconciliation::class => BankReconciliationPolicy::class,

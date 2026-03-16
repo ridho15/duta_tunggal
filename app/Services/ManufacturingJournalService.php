@@ -47,10 +47,14 @@ class ManufacturingJournalService
         }
 
         if (!$bdpCoa) {
-            // Use specific WIP COA code for consistency
-            $bdpCoa = ChartOfAccount::where('code', '1140.02')->first();
+            // If linked to manufacturing flow, prefer 1140.02; otherwise prefer 1150 for standalone issues
+            $preferredCodes = ($materialIssue->production_plan_id || $materialIssue->manufacturing_order_id)
+                ? ['1140.02', '1150', '1140.03', '1140']
+                : ['1150', '1140.02', '1140.03', '1140'];
+
+            $bdpCoa = $this->resolveCoaByCodes($preferredCodes);
             if (!$bdpCoa) {
-                $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
+                $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1150', '1140.03', '1140']);
             }
         }
 
@@ -58,9 +62,9 @@ class ManufacturingJournalService
             \Illuminate\Support\Facades\Log::error('WIP COA not found for material issue', [
                 'material_issue_id' => $materialIssue->id,
                 'production_plan_id' => $materialIssue->production_plan_id,
-                'searched_codes' => ['1140.02', '1140.03', '1140']
+                'searched_codes' => ['1140.02', '1150', '1140.03', '1140']
             ]);
-            throw new \Exception('Work in progress COA not found. Please set WIP COA in BOM or ensure COA with code 1140.02, 1140.03, or 1140 exists.');
+            throw new \Exception('Work in progress COA not found. Please set WIP COA in BOM or ensure COA with code 1140.02, 1150, 1140.03, or 1140 exists.');
         }
 
         DB::transaction(function () use ($materialIssue, $bdpCoa, $totalCost) {
@@ -176,10 +180,14 @@ class ManufacturingJournalService
         }
 
         if (!$bdpCoa) {
-            // Use specific WIP COA code for consistency
-            $bdpCoa = ChartOfAccount::where('code', '1140.02')->first();
+            // If linked to manufacturing flow, prefer 1140.02; otherwise prefer 1150 for standalone returns
+            $preferredCodes = ($materialIssue->production_plan_id || $materialIssue->manufacturing_order_id)
+                ? ['1140.02', '1150', '1140.03', '1140']
+                : ['1150', '1140.02', '1140.03', '1140'];
+
+            $bdpCoa = $this->resolveCoaByCodes($preferredCodes);
             if (!$bdpCoa) {
-                $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
+                $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1150', '1140.03', '1140']);
             }
         }
 
@@ -187,9 +195,9 @@ class ManufacturingJournalService
             \Illuminate\Support\Facades\Log::error('WIP COA not found for material return', [
                 'material_issue_id' => $materialIssue->id,
                 'production_plan_id' => $materialIssue->production_plan_id,
-                'searched_codes' => ['1140.02', '1140.03', '1140']
+                'searched_codes' => ['1140.02', '1150', '1140.03', '1140']
             ]);
-            throw new \Exception('Work in progress COA not found. Please set WIP COA in BOM or ensure COA with code 1140.02, 1140.03, or 1140 exists.');
+            throw new \Exception('Work in progress COA not found. Please set WIP COA in BOM or ensure COA with code 1140.02, 1150, 1140.03, or 1140 exists.');
         }
 
         DB::transaction(function () use ($materialIssue, $bdpCoa, $totalCost) {

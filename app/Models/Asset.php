@@ -175,8 +175,11 @@ class Asset extends Model
                 break;
                 
             case 'units_of_production':
-                // Metode Unit Produksi: akan diimplementasi nanti
-                $annualDepreciation = $depreciableAmount / $this->useful_life_years; // placeholder
+                // Metode Unit Produksi membutuhkan data unit yang belum tersedia di schema saat ini.
+                // Fallback ke straight_line agar perhitungan tetap konsisten dan tidak menghasilkan nilai placeholder ambigu.
+                $annualDepreciation = $this->useful_life_years > 0
+                    ? $depreciableAmount / $this->useful_life_years
+                    : 0;
                 break;
                 
             default:

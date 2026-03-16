@@ -24,11 +24,12 @@ class MaterialIssueObserver
             'original_status' => $materialIssue->getOriginal('status'),
         ]);
 
+        $originalStatus = $materialIssue->getOriginal('status');
+
         // Always keep total_cost in sync
-        // $materialIssue->updateTotalCost(); // Temporarily disabled for testing
+        $materialIssue->updateTotalCost();
 
         // If status transitioned to pending approval, set all items to pending approval
-        $originalStatus = $materialIssue->getOriginal('status');
         if ($originalStatus !== MaterialIssue::STATUS_PENDING_APPROVAL && $materialIssue->isPendingApproval()) {
             $this->setAllItemsToPendingApproval($materialIssue);
         }
@@ -47,6 +48,7 @@ class MaterialIssueObserver
                 $this->createStockMovements($materialIssue); // Create stock movements for record keeping
                 $this->generateJournal($materialIssue);
                 $this->createManufacturingOrder($materialIssue); // Create Manufacturing Order automatically
+                $this->createProductionCostEntry($materialIssue);
                 // Release reserved stock is now handled by StockReservationService.consumeReservedStockForMaterialIssue
                 // $this->releaseReservedStock($materialIssue);
             }
@@ -59,7 +61,7 @@ class MaterialIssueObserver
     public function created(MaterialIssue $materialIssue): void
     {
         // Initialize total cost on create
-        // $materialIssue->updateTotalCost(); // Temporarily disabled for testing
+        $materialIssue->updateTotalCost();
 
         // If created directly as completed, mirror update behavior
         if ($materialIssue->isCompleted()) {
@@ -317,6 +319,76 @@ class MaterialIssueObserver
             ]);
 
             // Don't throw exception to prevent breaking the Material Issue completion flow
+        }
+    }
+
+    protected function createProductionCostEntry(MaterialIssue $materialIssue): void
+    {
+        try {
+            if ($materialIssue->type !== 'issue') {
+                return;
+            }
+
+            $materialIssue->loadMissing('productionPlan', 'manufacturingOrder');
+            $materialCost = (float) ($materialIssue->total_cost ?? 0);
+
+            $manufacturingOrder = $materialIssue->manufacturingOrder;
+            if (! $manufacturingOrder && $materialIssue->production_plan_id) {
+                $manufacturingOrder = ManufacturingOrder::where('production_plan_id', $materialIssue->production_plan_id)->first();
+            }
+
+            $production = $manufacturingOrder?->productions()->latest('id')->first();
+            $productId = $materialIssue->productionPlan?->product_id;
+
+            if (! $productId) {
+                Log::warning('MaterialIssueObserver: product_id missing for ProductionCostEntry', [
+                    'material_issue_id' => $materialIssue->id,
+                ]);
+                return;
+            }
+
+            if ($production) {
+                $existing = \App\Models\ProductionCostEntry::where('production_id', $production->id)->first();
+
+                if ($existing) {
+                    $existing->actual_material_cost = (float) $existing->actual_material_cost + $materialCost;
+                    $existing->total_actual_cost = (float) $existing->actual_material_cost
+                        + (float) $existing->actual_labor_cost
+                        + (float) $existing->actual_overhead_cost;
+                    $existing->save();
+                    return;
+                }
+
+                \App\Models\ProductionCostEntry::create([
+                    'production_id' => $production->id,
+                    'product_id' => $productId,
+                    'quantity_produced' => (int) max(1, (float) ($production->quantity_produced ?? 1)),
+                    'actual_material_cost' => $materialCost,
+                    'actual_labor_cost' => 0,
+                    'actual_overhead_cost' => 0,
+                    'total_actual_cost' => $materialCost,
+                    'production_date' => now()->toDateString(),
+                ]);
+
+                return;
+            }
+
+            // No production record yet, keep unlinked cost entry
+            \App\Models\ProductionCostEntry::create([
+                'production_id' => null,
+                'product_id' => $productId,
+                'quantity_produced' => (int) max(1, (float) ($materialIssue->productionPlan?->quantity ?? 1)),
+                'actual_material_cost' => $materialCost,
+                'actual_labor_cost' => 0,
+                'actual_overhead_cost' => 0,
+                'total_actual_cost' => $materialCost,
+                'production_date' => now()->toDateString(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('MaterialIssueObserver: Failed to create ProductionCostEntry', [
+                'material_issue_id' => $materialIssue->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

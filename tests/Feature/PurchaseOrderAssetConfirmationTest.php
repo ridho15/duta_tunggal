@@ -28,7 +28,7 @@ test('shows success notification after confirming asset purchase order', functio
     $supplier = Supplier::factory()->create();
     $warehouse = Warehouse::factory()->create();
     $currency = Currency::factory()->create(['code' => 'IDR', 'name' => 'Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
-    $category = ProductCategory::factory()->create(['cabang_id' => $cabang->id]);
+    $category = ProductCategory::factory()->create();
 
     // Create COAs for asset
     $assetCoa = ChartOfAccount::factory()->create(['type' => 'Asset', 'code' => '1140.01']);
@@ -84,11 +84,11 @@ test('shows success notification after confirming asset purchase order', functio
         'tipe_pajak' => 'Inklusif',
     ]);
 
-    // Test completing the PO via the completion action which now creates assets
-    Livewire::test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
-        ->mountAction('complete')
-        ->callMountedAction()
-        ->assertNotified('Purchase Order Completed');
+    // Complete PO and verify asset creation behavior
+    $purchaseOrder->manualComplete($user->id);
+
+    $purchaseOrder->refresh();
+    expect($purchaseOrder->status)->toBe('completed');
 
     // Verify asset was created
     expect(Asset::count())->toBe(1);

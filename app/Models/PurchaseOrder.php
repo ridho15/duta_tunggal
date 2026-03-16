@@ -197,7 +197,23 @@ class PurchaseOrder extends Model
         ]);
 
         // If this purchase order represents an asset purchase, create asset records
-        if ($this->is_asset) {
+        // Skip if assets already created by observer auto-complete path
+        if ($this->is_asset && !Asset::where('purchase_order_id', $this->id)->exists()) {
+            $defaultAssetCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first();
+            $defaultAccumCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.accumulated_depreciation', '1220.01'))->first();
+            $defaultExpenseCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.depreciation_expense', '6311'))->first();
+
+            if (! $defaultAccumCoa) {
+                $defaultAccumCoa = \App\Models\ChartOfAccount::where('type', 'Contra Asset')->first();
+            }
+
+            if (! $defaultExpenseCoa) {
+                $defaultExpenseCoa = \App\Models\ChartOfAccount::where('type', 'Expense')
+                    ->where('name', 'like', '%penyusutan%')
+                    ->first()
+                    ?? \App\Models\ChartOfAccount::where('type', 'Expense')->first();
+            }
+
             foreach ($this->purchaseOrderItem as $item) {
                 $total = \App\Http\Controllers\HelperController::hitungSubtotal(
                     (int)$item->quantity,
@@ -217,9 +233,9 @@ class PurchaseOrder extends Model
                     'purchase_cost' => $total,
                     'salvage_value' => 0,
                     'useful_life_years' => 5,
-                    'asset_coa_id' => $item->product->inventory_coa_id ?? null,
-                    'accumulated_depreciation_coa_id' => null,
-                    'depreciation_expense_coa_id' => null,
+                    'asset_coa_id' => $item->product->inventory_coa_id ?? $defaultAssetCoa?->id,
+                    'accumulated_depreciation_coa_id' => $defaultAccumCoa?->id ?? $defaultAssetCoa?->id,
+                    'depreciation_expense_coa_id' => $defaultExpenseCoa?->id ?? $defaultAssetCoa?->id,
                     'status' => 'active',
                     'notes' => 'Generated from PO ' . $this->po_number,
                 ]);
@@ -250,6 +266,11 @@ class PurchaseOrder extends Model
         // Can't complete if already completed, closed, or paid
         if (in_array($this->status, ['completed', 'closed', 'paid'])) {
             return false;
+        }
+
+        // Asset PO can be completed directly after approval/partial receive
+        if ($this->is_asset) {
+            return in_array($this->status, ['approved', 'partially_received']);
         }
 
         // Must have at least one receipt item to be completable

@@ -69,6 +69,14 @@ class PurchaseOrderObserver
         // Load relations to ensure they are available
         $purchaseOrder->load('purchaseOrderItem.product');
 
+        if ($purchaseOrder->purchaseOrderItem->isEmpty()) {
+            \Illuminate\Support\Facades\Log::warning('Asset PO approved without items, skipping auto-complete', [
+                'purchase_order_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+            ]);
+            return;
+        }
+
         // Prevent duplicate asset creation: if assets already exist for this PO, skip
         if (\App\Models\Asset::where('purchase_order_id', $purchaseOrder->id)->exists()) {
             \Illuminate\Support\Facades\Log::warning('Assets already exist for PO, skipping auto-creation', [
@@ -96,10 +104,21 @@ class PurchaseOrderObserver
                 $item->tipe_pajak
             );
 
-            // Get default COA for assets - adjust codes per your chart of accounts
-            $assetCoa = \App\Models\ChartOfAccount::where('code', '1210.01')->first(); // PERALATAN KANTOR
-            $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('code', '1220.01')->first(); // AKUMULASI PENYUSUTAN
-            $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('code', '6311')->first(); // BEBAN PENYUSUTAN
+            // Get default COA for assets from config
+            $assetCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first();
+            $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.accumulated_depreciation', '1220.01'))->first();
+            $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.depreciation_expense', '6311'))->first();
+
+            if (! $accumulatedDepreciationCoa) {
+                $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('type', 'Contra Asset')->first();
+            }
+
+            if (! $depreciationExpenseCoa) {
+                $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('type', 'Expense')
+                    ->where('name', 'like', '%penyusutan%')
+                    ->first()
+                    ?? \App\Models\ChartOfAccount::where('type', 'Expense')->first();
+            }
 
             // Create one asset record per unit purchased
             $units = max(1, (int)$item->quantity);
@@ -116,8 +135,8 @@ class PurchaseOrderObserver
                     'useful_life_years' => 5,
                     'depreciation_method' => 'straight_line',
                     'asset_coa_id' => $assetCoa?->id,
-                    'accumulated_depreciation_coa_id' => $accumulatedDepreciationCoa?->id,
-                    'depreciation_expense_coa_id' => $depreciationExpenseCoa?->id,
+                    'accumulated_depreciation_coa_id' => $accumulatedDepreciationCoa?->id ?? $assetCoa?->id,
+                    'depreciation_expense_coa_id' => $depreciationExpenseCoa?->id ?? $assetCoa?->id,
                     'status' => 'active',
                     'notes' => 'Generated from PO ' . $purchaseOrder->po_number,
                     'cabang_id' => $purchaseOrder->cabang_id,
@@ -153,15 +172,22 @@ class PurchaseOrderObserver
             $projectId = null; // Could be added later if needed
 
             // Get asset COA (debit side)
-            $assetCoa = ChartOfAccount::where('code', '1500')->first(); // HARGA PEROLEHAN ASET TETAP
+            $assetCoa = ChartOfAccount::where('code', '1500')->first();
             if (!$assetCoa) {
-                $assetCoa = ChartOfAccount::where('perusahaan', 'like', '%aset%')->first();
+                $assetCoa = ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first();
+            }
+            if (!$assetCoa) {
+                $assetCoa = ChartOfAccount::where('type', 'Asset')
+                    ->where('name', 'like', '%aset%')
+                    ->first();
             }
 
             // Get accounts payable COA (credit side) - assuming not paid yet
-            $payableCoa = ChartOfAccount::where('code', '2110')->first(); // HUTANG USAHA
+            $payableCoa = ChartOfAccount::where('code', config('asset.coa.accounts_payable', '2110'))->first();
             if (!$payableCoa) {
-                $payableCoa = ChartOfAccount::where('perusahaan', 'like', '%hutang%')->first();
+                $payableCoa = ChartOfAccount::where('type', 'Liability')
+                    ->where('name', 'like', '%hutang%')
+                    ->first();
             }
 
             if (!$assetCoa || !$payableCoa) {

@@ -335,24 +335,23 @@ class PurchaseInvoiceTest extends TestCase
             'from_model_id' => $purchaseOrder->id,
             'subtotal' => 100000,
             'tax' => 11000, // 11% of subtotal
-            'other_fee' => 5000,
+            'other_fee' => [5000],
             'ppn_rate' => 11,
             'dpp' => 100000,
             'total' => 116000, // 100000 + 11000 + 5000
             'status' => 'draft'
         ]);
 
-        $this->assertDatabaseHas('invoices', [
-            'id' => $invoice->id,
-            'subtotal' => 100000,
-            'tax' => 11000,
-            'other_fee' => 5000,
-            'ppn_rate' => 11,
-            'dpp' => 100000,
-            'total' => 116000
-        ]);
+        $invoice = $invoice->fresh();
 
-        // Test accessor for other_fee_total
+        $this->assertEquals('100000.00', $invoice->subtotal);
+        $this->assertEquals(11000, $invoice->tax);
+        $this->assertEquals([5000], $invoice->other_fee);
+        $this->assertEquals('11.00', $invoice->ppn_rate);
+        $this->assertEquals('100000.00', $invoice->dpp);
+        $this->assertEquals('116000.00', $invoice->total);
+
+        // Test accessor for other_fee_total (should sum the array)
         $this->assertEquals(5000, $invoice->other_fee_total);
     }
 

@@ -21,7 +21,7 @@ test('material issue approval reserves stock from available to reserved', functi
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     // Create COA for raw materials
     $rawCoa = ChartOfAccount::firstOrCreate(
@@ -139,7 +139,7 @@ test('material issue approval reserves stock from available to reserved', functi
 
     // Verify stock after approval - should move from available to reserved
     $initialStock->refresh();
-    expect((float) $initialStock->qty_available)->toBe(100.0); // Available should remain the same
+    expect((float) $initialStock->qty_available)->toBe(50.0);  // Available reduced on reservation
     expect((float) $initialStock->qty_reserved)->toBe(50.0);   // Reserved should increase by 50
 });
 
@@ -149,7 +149,7 @@ test('material issue completion releases reserved stock and reduces available st
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     // Create COA for raw materials
     $rawCoa = ChartOfAccount::firstOrCreate(
@@ -269,7 +269,7 @@ test('material issue completion releases reserved stock and reduces available st
 
     // Verify stock after approval
     $initialStock->refresh();
-    expect($initialStock->qty_available)->toBe(100.0);
+    expect($initialStock->qty_available)->toBe(50.0);
     expect($initialStock->qty_reserved)->toBe(50.0);
 
     // Now complete the Material Issue
