@@ -178,7 +178,7 @@ class RoleSeeder extends Seeder
         // Role -> resource mapping: each role gets ALL permissions for the listed resources
         $roleResourceMap = [
             'Admin' => [
-                'user', 'role', 'permission', 'currency', 'chart of account', 'tax setting', 'cabang', 'asset', 'journal entry'
+                'user', 'role', 'permission', 'currency', 'chart of account', 'tax setting', 'cabang', 'asset', 'journal entry', 'delivery schedule'
             ],
             'Finance Manager' => [
                 'account payable', 'account receivable', 'vendor payment', 'vendor payment detail', 'customer receipt', 'customer receipt item', 'invoice', 'invoice item', 'deposit', 'deposit log', 'ageing schedule', 'voucher request', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
@@ -217,10 +217,10 @@ class RoleSeeder extends Seeder
                 'customer receipt', 'customer receipt item', 'invoice'
             ],
             'Customer Service' => [
-                'customer', 'quotation', 'sales order', 'delivery order', 'surat jalan'
+                'customer', 'quotation', 'sales order', 'delivery order', 'surat jalan', 'delivery schedule'
             ],
             'Delivery Driver' => [
-                'delivery order', 'delivery order item', 'vehicle', 'surat jalan'
+                'delivery order', 'delivery order item', 'vehicle', 'surat jalan', 'delivery schedule'
             ],
             'Auditor' => [], // Auditor receives only 'view any' for every resource (via special block below)
             'IT Support' => [
