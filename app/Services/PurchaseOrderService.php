@@ -87,6 +87,23 @@ class PurchaseOrderService
                     }
                 }
             }
+
+            // Update the OrderRequest status to partial or complete
+            $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);
+            if ($orderRequest) {
+                $orderRequest->loadMissing('orderRequestItem');
+                $allFulfilled = $orderRequest->orderRequestItem->every(function ($item) {
+                    return ($item->fulfilled_quantity ?? 0) >= $item->quantity;
+                });
+                $anyFulfilled = $orderRequest->orderRequestItem->contains(function ($item) {
+                    return ($item->fulfilled_quantity ?? 0) > 0;
+                });
+                if ($allFulfilled) {
+                    $orderRequest->update(['status' => 'complete']);
+                } elseif ($anyFulfilled) {
+                    $orderRequest->update(['status' => 'partial']);
+                }
+            }
         }
 
         return $purchaseOrder;

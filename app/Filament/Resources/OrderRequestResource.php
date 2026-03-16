@@ -148,14 +148,14 @@ class OrderRequestResource extends Resource
                                 'required' => 'Gudang wajib dipilih.',
                             ]),
                         Select::make('supplier_id')
-                            ->label('Supplier')
+                            ->label('Supplier (Default)')
                             ->reactive()
                             ->live()
                             ->afterStateUpdated(function ($state, callable $set) {
-                                // If supplier changes, clear existing items so product selection stays consistent
-                                $set('orderRequestItem', []);
+                                // Changing default supplier does NOT clear items; items have their own supplier selection
                             })
                             ->searchable()
+                            ->nullable()
                             ->options(function () {
                                 return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
                                     return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
@@ -170,10 +170,7 @@ class OrderRequestResource extends Resource
                                         return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                     });
                             })
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Supplier wajib dipilih.',
-                            ]),
+                            ->helperText('Opsional. Digunakan sebagai supplier default untuk item baru.'),
                         DatePicker::make('request_date')
                             ->required()
                             ->validationMessages([
@@ -263,8 +260,9 @@ class OrderRequestResource extends Resource
                                                     $set('tax', $product->pajak);
                                                 }
 
-                                                // Use supplier price from product_supplier pivot; fallback to cost_price
-                                                $supplierId = $get('../../supplier_id');
+                                                // Use supplier price: check item-level supplier_id first, then header supplier
+                                                $itemSupplierId = $get('supplier_id');
+                                                $supplierId = $itemSupplierId ?? $get('../../supplier_id');
                                                 $unitPrice = (float) $product->cost_price;
                                                 if ($supplierId) {
                                                     $supplierProduct = $product->suppliers()->where('suppliers.id', $supplierId)->first();
@@ -272,6 +270,8 @@ class OrderRequestResource extends Resource
                                                         $unitPrice = (float) $supplierProduct->pivot->supplier_price;
                                                     }
                                                 }
+                                                // Reset item-level supplier when product changes
+                                                $set('supplier_id', null);
                                                 // Store the master price as original_price; user can override unit_price
                                                 $set('original_price', number_format((float)$unitPrice, 0, ',', '.'));
                                                 $set('unit_price', number_format((float)$unitPrice, 0, ',', '.'));
@@ -296,41 +296,74 @@ class OrderRequestResource extends Resource
                                         }
                                     })
                                     ->options(function (callable $get) {
-                                        $supplierId = $get('../../supplier_id');
-                                        $query = Product::orderBy('name');
-                                        if ($supplierId) {
-                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
-                                                $q->where('suppliers.id', $supplierId);
-                                            });
-                                        }
-                                        return $query->get()->mapWithKeys(function ($product) {
+                                        return Product::orderBy('name')->get()->mapWithKeys(function ($product) {
                                             return [$product->id => "({$product->sku}) {$product->name}"];
                                         });
                                     })
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
-                                        $supplierId = $get('../../supplier_id');
-                                        $query = Product::where(function ($q) use ($search) {
+                                        return Product::where(function ($q) use ($search) {
                                             $q->where('name', 'like', "%{$search}%")
                                                 ->orWhere('sku', 'like', "%{$search}%");
-                                        })->orderBy('name')->limit(50);
-                                        if ($supplierId) {
-                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
-                                                $q->where('suppliers.id', $supplierId);
-                                            });
-                                        }
-                                        return $query->get()->mapWithKeys(function ($product) {
+                                        })->orderBy('name')->limit(50)->get()->mapWithKeys(function ($product) {
                                             return [$product->id => "({$product->sku}) {$product->name}"];
                                         });
                                     })
-                                    ->helperText(
-                                        fn(callable $get) => $get('../../supplier_id')
-                                            ? 'Menampilkan produk dari supplier yang dipilih'
-                                            : 'Pilih supplier untuk memfilter produk'
-                                    )
+                                    ->helperText('Pilih produk yang akan dipesan')
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Produk wajib dipilih.',
                                     ]),
+                                Select::make('supplier_id')
+                                    ->label('Supplier')
+                                    ->reactive()
+                                    ->searchable()
+                                    ->nullable()
+                                    ->options(function (callable $get) {
+                                        $productId = $get('product_id');
+                                        if (!$productId) {
+                                            return \App\Models\Supplier::orderBy('perusahaan')->get()
+                                                ->mapWithKeys(fn($s) => [$s->id => "({$s->code}) {$s->perusahaan}"]);
+                                        }
+                                        $product = Product::find($productId);
+                                        if (!$product) return [];
+                                        return $product->suppliers()->get()->mapWithKeys(function ($supplier) use ($product) {
+                                            $price = $product->suppliers()->where('suppliers.id', $supplier->id)->first()?->pivot?->supplier_price;
+                                            $priceLabel = $price ? ' - Rp ' . number_format((float)$price, 0, ',', '.') : '';
+                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}{$priceLabel}"];
+                                        });
+                                    })
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        if ($state) {
+                                            $productId = $get('product_id');
+                                            if ($productId) {
+                                                $product = Product::find($productId);
+                                                if ($product) {
+                                                    $supplierProduct = $product->suppliers()->where('suppliers.id', $state)->first();
+                                                    if ($supplierProduct) {
+                                                        $unitPrice = (float) $supplierProduct->pivot->supplier_price;
+                                                        $set('original_price', number_format($unitPrice, 0, ',', '.'));
+                                                        $set('unit_price', number_format($unitPrice, 0, ',', '.'));
+                                                        // Recalculate subtotal
+                                                        $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
+                                                        $quantity = (float) ($get('quantity') ?? 0);
+                                                        $discPct  = (float) ($get('discount') ?? 0);
+                                                        $taxPct   = (float) ($get('tax') ?? 0);
+                                                        $base      = $quantity * $unitPrice;
+                                                        $afterDisc = $base - $base * ($discPct / 100);
+                                                        try {
+                                                            $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
+                                                            $set('subtotal', number_format((float)$taxRes['total'], 0, ',', '.'));
+                                                            $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
+                                                        } catch (\Throwable $e) {
+                                                            $set('subtotal', number_format((float)$afterDisc, 0, ',', '.'));
+                                                            $set('tax_nominal', '0');
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    })
+                                    ->helperText('Pilih supplier untuk item ini (opsional, akan memperbarui harga)'),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
@@ -685,13 +718,14 @@ class OrderRequestResource extends Resource
                         ->modalHeading('Buat Purchase Order')
                         ->modalDescription('Isi form berikut untuk membuat Purchase Order dari Order Request yang telah disetujui.')
                         ->fillForm(function ($record) {
-                            $supplierId = $record->supplier_id;
-                            $items = $record->orderRequestItem->map(function ($item) use ($supplierId) {
+                            $defaultSupplierId = $record->supplier_id;
+                            $items = $record->orderRequestItem->map(function ($item) use ($defaultSupplierId) {
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
-                                // Use supplier price from product_supplier pivot if available
+                                // Use item-level supplier, fall back to header supplier
+                                $supplierId = $item->supplier_id ?? $defaultSupplierId;
                                 $supplierPrice = $item->unit_price ?? 0;
                                 if ($supplierId && $item->product) {
-                                    $sp = $item->product->suppliers()->wherePivot('supplier_id', $supplierId)->first();
+                                    $sp = $item->product->suppliers()->where('suppliers.id', $supplierId)->first();
                                     if ($sp && $sp->pivot->supplier_price > 0) {
                                         $supplierPrice = (float) $sp->pivot->supplier_price;
                                     }
@@ -710,15 +744,16 @@ class OrderRequestResource extends Resource
                                     $subtotal = '0';
                                 }
                                 return [
-                                    'item_id'      => $item->id,
-                                    'product_name' => "({$item->product->sku}) {$item->product->name}",
-                                    'quantity'     => max(0, $remainingQty),
-                                    'unit_price'   => $supplierPrice,
-                                    'tax'          => $taxPct,
-                                    'tax_nominal'  => $taxNom,
-                                    'subtotal'     => $subtotal,
-                                    'max_quantity' => max(0, $remainingQty),
-                                    'include'      => $remainingQty > 0,
+                                    'item_id'         => $item->id,
+                                    'item_supplier_id'=> $supplierId,
+                                    'product_name'    => "({$item->product->sku}) {$item->product->name}",
+                                    'quantity'        => max(0, $remainingQty),
+                                    'unit_price'      => $supplierPrice,
+                                    'tax'             => $taxPct,
+                                    'tax_nominal'     => $taxNom,
+                                    'subtotal'        => $subtotal,
+                                    'max_quantity'    => max(0, $remainingQty),
+                                    'include'         => $remainingQty > 0,
                                 ];
                             })->values()->toArray();
 
@@ -922,13 +957,14 @@ class OrderRequestResource extends Resource
                         ->modalDescription('Tinjau dan setujui Order Request ini. Anda dapat memilih item yang akan dibuatkan Purchase Order.')
                         ->modalSubmitActionLabel('Approve')
                         ->fillForm(function ($record) {
-                            $supplierId = $record->supplier_id;
-                            $items = $record->orderRequestItem->map(function ($item) use ($supplierId) {
+                            $defaultSupplierId = $record->supplier_id;
+                            $items = $record->orderRequestItem->map(function ($item) use ($defaultSupplierId) {
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
-                                // Use supplier price from product_supplier pivot if available
+                                // Use item-level supplier, fall back to header supplier
+                                $supplierId = $item->supplier_id ?? $defaultSupplierId;
                                 $supplierPrice = $item->unit_price ?? 0;
                                 if ($supplierId && $item->product) {
-                                    $sp = $item->product->suppliers()->wherePivot('supplier_id', $supplierId)->first();
+                                    $sp = $item->product->suppliers()->where('suppliers.id', $supplierId)->first();
                                     if ($sp && $sp->pivot->supplier_price > 0) {
                                         $supplierPrice = (float) $sp->pivot->supplier_price;
                                     }
@@ -947,15 +983,16 @@ class OrderRequestResource extends Resource
                                     $subtotal = '0';
                                 }
                                 return [
-                                    'item_id'      => $item->id,
-                                    'product_name' => "({$item->product->sku}) {$item->product->name}",
-                                    'quantity'     => max(0, $remainingQty),
-                                    'unit_price'   => $supplierPrice,
-                                    'tax'          => $taxPct,
-                                    'tax_nominal'  => $taxNom,
-                                    'subtotal'     => $subtotal,
-                                    'max_quantity' => max(0, $remainingQty),
-                                    'include'      => $remainingQty > 0,
+                                    'item_id'         => $item->id,
+                                    'item_supplier_id'=> $supplierId,
+                                    'product_name'    => "({$item->product->sku}) {$item->product->name}",
+                                    'quantity'        => max(0, $remainingQty),
+                                    'unit_price'      => $supplierPrice,
+                                    'tax'             => $taxPct,
+                                    'tax_nominal'     => $taxNom,
+                                    'subtotal'        => $subtotal,
+                                    'max_quantity'    => max(0, $remainingQty),
+                                    'include'         => $remainingQty > 0,
                                 ];
                             })->values()->toArray();
 
@@ -1129,6 +1166,20 @@ class OrderRequestResource extends Resource
                             $orderRequestService->approve($record, $data);
                             HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
                         }),
+                    Action::make('request_approve')
+                        ->label('Request Approve')
+                        ->color('gray')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->requiresConfirmation()
+                        ->modalHeading('Ajukan Persetujuan')
+                        ->modalDescription('Apakah Anda yakin ingin mengajukan order request ini untuk disetujui?')
+                        ->visible(function ($record) {
+                            return $record->status == 'draft';
+                        })
+                        ->action(function ($record) {
+                            $record->update(['status' => 'request_approve']);
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah diajukan untuk persetujuan.");
+                        }),
                     Action::make('close')
                         ->label('Close')
                         ->color('warning')
@@ -1139,7 +1190,7 @@ class OrderRequestResource extends Resource
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
-                            return $user && $user->hasPermissionTo('approve order request') && in_array($record->status, ['draft', 'approved']);
+                            return $user && $user->hasPermissionTo('approve order request') && in_array($record->status, ['draft', 'request_approve', 'approved']);
                         })
                         ->action(function ($record) {
                             $record->update(['status' => 'closed']);

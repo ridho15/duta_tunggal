@@ -424,24 +424,6 @@ class VendorPaymentResource extends Resource
                         Section::make()
                             ->columns(3)
                             ->schema([
-                                TextInput::make('ntpn')
-                                    ->label('NTPN')
-                                    ->placeholder('Masukkan NTPN atau klik ikon untuk generate')
-                                    ->suffixAction(
-                                        Action::make('generateNTPN')
-                                            ->icon('heroicon-m-arrow-path')
-                                            ->tooltip('Generate NTPN')
-                                            ->action(function ($set, $get) {
-                                                // Generate NTPN format: NTPN + YYYYMMDD + random 6 digits
-                                                $date = now()->format('Ymd');
-                                                $random = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
-                                                $ntpn = 'NTPN' . $date . $random;
-                                                $set('ntpn', $ntpn);
-                                            })
-                                    )
-                                    ->maxLength(255)
-                                    ->required(),
-
                                 Placeholder::make('calculating_total')
                                     ->label('Total Pembayaran')
                                     ->content('Menghitung total pembayaran...')
@@ -632,6 +614,23 @@ class VendorPaymentResource extends Resource
                             ->description('Isi nilai pajak impor ketika pembayaran ini mencakup PPN Impor, PPh 22, atau Bea Masuk. Nilai akan dijurnal saat pembayaran Kas/Bank.')
                             ->columns(2)
                             ->schema([
+                                TextInput::make('ntpn')
+                                    ->label('NTPN')
+                                    ->placeholder('Masukkan NTPN atau klik ikon untuk generate')
+                                    ->suffixAction(
+                                        Action::make('generateNTPN')
+                                            ->icon('heroicon-m-arrow-path')
+                                            ->tooltip('Generate NTPN')
+                                            ->action(function ($set, $get) {
+                                                // Generate NTPN format: NTPN + YYYYMMDD + random 6 digits
+                                                $date = now()->format('Ymd');
+                                                $random = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
+                                                $ntpn = 'NTPN' . $date . $random;
+                                                $set('ntpn', $ntpn);
+                                            })
+                                    )
+                                    ->maxLength(255)
+                                    ->required(),
                                 Toggle::make('is_import_payment')
                                     ->label('Pembayaran mencakup pajak impor?')
                                     ->helperText('Aktifkan bila pembayaran impor melibatkan PPN/PPh/Bea. Biarkan mati jika bukan transaksi impor.')
