@@ -81,7 +81,7 @@ class QuotationItemRelationManager extends RelationManager
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
                             })
-                            ->default(0)
+                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                             ->suffix('%'),
                         TextInput::make('total_price')
                             ->label('Total Price')

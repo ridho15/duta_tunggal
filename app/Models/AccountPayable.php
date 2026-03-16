@@ -25,6 +25,7 @@ class AccountPayable extends Model
         'paid',
         'remaining',
         'status', //Lunas / Belum Lunas
+        'cabang_id',
         'created_by'
     ];
 

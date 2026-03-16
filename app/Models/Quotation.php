@@ -6,6 +6,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Quotation extends Model
 {
@@ -24,6 +25,7 @@ class Quotation extends Model
         'customer_id',
         'date',
         'valid_until',
+        'tempo_pembayaran',
         'total_amount',
         'status_payment',
         'po_file_path',
@@ -35,7 +37,8 @@ class Quotation extends Model
         'reject_by',
         'reject_at',
         'approve_by',
-        'approve_at'
+        'approve_at',
+        'cabang_id',
     ];
 
     public function customer()
@@ -68,8 +71,20 @@ class Quotation extends Model
         return $this->belongsTo(User::class, 'approve_by')->withDefault();
     }
 
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
     protected static function booted()
     {
+        // Auto-assign cabang_id when creating so new quotations are branch-scoped
+        static::creating(function ($model) {
+            if (empty($model->cabang_id)) {
+                $model->cabang_id = Auth::user()?->cabang_id;
+            }
+        });
+
         static::deleting(function ($quotation) {
             if ($quotation->isForceDeleting()) {
                 $quotation->quotationItem()->forceDelete();

@@ -48,11 +48,22 @@ class PurchaseOrderService
         return $purchaseOrder;
     }
 
+    /**
+     * Create a Purchase Order from a Sale Order (drop-ship scenario).
+     *
+     * NOTE: The full implementation lives in SalesOrderService::createPurchaseOrder().
+     * Call that method from the SO side, which has access to the full form data
+     * (supplier_id, warehouse_id, expected_date, tempo_hutang, po_number, note).
+     *
+     * @deprecated Use SalesOrderService::createPurchaseOrder($saleOrder, $data) instead.
+     */
     public function createPoFromSo($saleOrder) {}
 
     /**
-     * Auto-approve a Purchase Order (no manual approval step needed).
+     * Approve a Purchase Order.
      * Sets status=approved, date_approved, and approved_by.
+     * If the PO was created from an OrderRequest, updates fulfilled_quantity
+     * on the linked OrderRequestItems based on the current PO item quantities.
      */
     public function approvePo(PurchaseOrder $purchaseOrder, ?int $userId = null): PurchaseOrder
     {
@@ -61,6 +72,22 @@ class PurchaseOrderService
             'date_approved' => Carbon::now(),
             'approved_by'   => $userId ?? Auth::id(),
         ]);
+
+        // Update fulfilled_quantity on linked OrderRequest items using current PO quantities
+        if ($purchaseOrder->refer_model_type === 'App\\Models\\OrderRequest') {
+            $purchaseOrder->loadMissing('purchaseOrderItem');
+            foreach ($purchaseOrder->purchaseOrderItem as $poItem) {
+                if (
+                    $poItem->refer_item_model_type === 'App\\Models\\OrderRequestItem'
+                    && $poItem->refer_item_model_id
+                ) {
+                    $orItem = \App\Models\OrderRequestItem::find($poItem->refer_item_model_id);
+                    if ($orItem) {
+                        $orItem->addFulfilledQuantity($poItem->quantity);
+                    }
+                }
+            }
+        }
 
         return $purchaseOrder;
     }
@@ -103,11 +130,28 @@ class PurchaseOrderService
         $date = now()->format('Ymd');
         $prefix = 'PO-' . $date . '-';
 
-        // pick random suffix, avoid collisions
+        // Use sequential numbering (consistent with SO/INV/QO generators)
+        $max = PurchaseOrder::withoutGlobalScopes()
+            ->where('po_number', 'like', $prefix . '%')
+            ->max('po_number');
+
+        $next = 1;
+        if ($max !== null) {
+            $suffix = substr((string) $max, strlen($prefix));
+            if (is_numeric($suffix)) {
+                $next = (int) $suffix + 1;
+            }
+        }
+
+        // Guard against concurrent inserts
         do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = PurchaseOrder::where('po_number', $candidate)->exists();
+            $candidate = $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+            $exists = PurchaseOrder::withoutGlobalScopes()
+                ->where('po_number', $candidate)
+                ->exists();
+            if ($exists) {
+                $next++;
+            }
         } while ($exists);
 
         return $candidate;

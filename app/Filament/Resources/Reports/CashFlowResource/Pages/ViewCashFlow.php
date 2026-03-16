@@ -280,6 +280,12 @@ class ViewCashFlow extends Page
                         // ignore logging errors
                     }
 
+                    \Filament\Notifications\Notification::make()
+                        ->title('Gagal Ekspor PDF Arus Kas')
+                        ->body('Tidak dapat membuat file PDF. Silakan coba ekspor ke Excel atau hubungi administrator.')
+                        ->danger()
+                        ->send();
+
                     throw $e2;
                 }
             }

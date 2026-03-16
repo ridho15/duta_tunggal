@@ -57,7 +57,10 @@ class InvoiceObserverPostSalesTest extends TestCase
             'from_model_type' => SaleOrder::class,
             'from_model_id'   => 1, // dummy – not loaded in these tests
             'subtotal'        => 100_000_000,
-            'tax'             => 11_000_000,
+            // BUG FIX: invoice->tax stores the rate (e.g. 11 for 11%), NOT the monetary amount.
+            // The old design stored 11_000_000 here which caused catastrophically wrong journals.
+            'tax'             => 11,  // 11% rate
+            'ppn_rate'        => 11,
             'total'           => 111_000_000,
             'invoice_date'    => now()->toDateString(),
         ], $overrides));
@@ -122,19 +125,21 @@ class InvoiceObserverPostSalesTest extends TestCase
         );
     }
 
-    // ─── Bug C: max() removed — invoice->tax is authoritative ───────────────
+    // ─── Bug C: sum(items.tax_amount) used as primary; rate-based fallback for item-less invoices ───
 
     /** @test */
     public function ppn_keluaran_credit_uses_stored_invoice_tax_not_derived_value(): void
     {
         $this->makeCoas();
 
-        // Force the derived value (total - subtotal) to differ from stored tax
-        // stored tax = 11,000,000  vs  derived = 111,500,000 - 100,000,000 - 0 = 11,500,000
+        // invoice->tax = 11 (rate %), subtotal = 100,000,000
+        // derived from total = 111_500_000 - 100_000_000 = 11_500_000  (deliberately different)
+        // expected PPN credit = subtotal * rate/100 = 100,000,000 * 11% = 11,000,000
+        // (rate-based, not "total - subtotal" derived)
         $invoice = $this->makeInvoice([
-            'subtotal' => 100_000_000,
-            'tax'      => 11_000_000,
-            'total'    => 111_500_000, // deliberately 500k more than subtotal + tax
+            'subtotal'  => 100_000_000,
+            'tax'       => 11,          // rate in percent (NOT monetary amount)
+            'total'     => 111_500_000, // intentional 500k discrepancy to verify derived is NOT used
         ]);
 
         $this->observer->postSalesInvoice($invoice);
@@ -145,8 +150,9 @@ class InvoiceObserverPostSalesTest extends TestCase
             ->first();
 
         $this->assertNotNull($ppnEntry, 'PPn Keluaran entry should have been created');
+        // With no invoice items, falls back to: subtotal * (tax_rate / 100) = 100,000,000 * 11% = 11,000,000
         $this->assertEquals(11_000_000, (float) $ppnEntry->credit,
-            'credit must equal invoice->tax (11,000,000), NOT max(tax, derived) = 11,500,000'
+            'credit must equal subtotal * rate/100 = 11,000,000, NOT derived (total - subtotal) = 11,500,000'
         );
     }
 

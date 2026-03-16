@@ -45,7 +45,7 @@ class ManufacturingOrderResource extends Resource
     protected static ?string $navigationGroup = 'Manufacturing Order';
 
     // Position Manufacturing Order as the 4th group
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -376,7 +376,7 @@ class ManufacturingOrderResource extends Resource
                                     'status' => 'draft',
                                 ]);
 
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created");
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
                             } else {
                                 HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock material tidak mencukupi");
                             }

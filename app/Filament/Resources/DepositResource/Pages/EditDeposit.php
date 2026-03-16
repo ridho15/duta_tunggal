@@ -85,7 +85,7 @@ class EditDeposit extends EditRecord
         HelperController::sendNotification(
             isSuccess: true, 
             title: 'Success', 
-            message: "Deposit successfully updated"
+            message: "Data deposit berhasil diperbarui. Proses selanjutnya: Pastikan perubahan data deposit telah diverifikasi oleh Supervisor Finance."
         );
     }
 

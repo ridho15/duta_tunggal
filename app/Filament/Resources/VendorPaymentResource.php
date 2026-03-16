@@ -40,7 +40,7 @@ class VendorPaymentResource extends Resource
 
     protected static ?string $navigationLabel = 'Payment Vendor';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -162,7 +162,10 @@ class VendorPaymentResource extends Resource
                                             foreach ($invoices as $invoice) {
                                                 $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
                                                 $statusText = $remaining <= 0 ? ' (SUDAH LUNAS)' : '';
-                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.') . $statusText;
+                                                
+                                        $invDate = $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : '-';
+                                        $dueDate = $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-';
+                                        $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.') . " - Due: {$dueDate}" . $statusText; 
                                             }
 
                                             $set('has_invoices', !empty($options));
@@ -269,6 +272,11 @@ class VendorPaymentResource extends Resource
                                             ]);
                                             $set('total_payment', 0);
                                             $set('payment_details', []);
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Gagal Memuat Detail Invoice')
+                                                ->body('Terjadi kesalahan saat memproses invoice yang dipilih: ' . $e->getMessage())
+                                                ->warning()
+                                                ->send();
                                         }
 
                                         // End loading state and force section re-render
@@ -341,6 +349,19 @@ class VendorPaymentResource extends Resource
                                             ->label('No. Invoice')
                                             ->readonly()
                                             ->columnSpan(1),
+                                        TextInput::make('invoice_date')
+                                            ->label('Tgl Invoice')
+                                            ->readonly()
+                                            ->columnSpan(1),
+                                        TextInput::make('due_date')
+                                            ->label('Due Date')
+                                            ->readonly()
+                                            ->columnSpan(1),
+                                        TextInput::make('total_invoice')
+                                            ->label('Total Invoice')
+                                            ->readonly()
+                                            ->indonesianMoney()
+                                            ->columnSpan(1),
                                         TextInput::make('remaining_amount')
                                             ->label('Sisa Hutang')
                                             ->readonly()
@@ -391,7 +412,7 @@ class VendorPaymentResource extends Resource
                                             ->columnSpan(1),
                                         Hidden::make('invoice_id'),
                                     ])
-                                    ->columns(3)
+                                    ->columns(6)
                                     ->columnSpanFull()
                                     ->addable(false)
                                     ->deletable(false)
@@ -688,6 +709,9 @@ class VendorPaymentResource extends Resource
                         return [
                             'invoice_id' => $invoice->id,
                             'invoice_number' => $invoice->invoice_number,
+                            'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                            'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                            'total_invoice' => $invoice->total,
                             'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
                             'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
                         ];

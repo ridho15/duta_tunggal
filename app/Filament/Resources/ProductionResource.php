@@ -36,7 +36,7 @@ class ProductionResource extends Resource
 
     protected static ?string $navigationGroup = 'Manufacturing Order';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {
@@ -185,7 +185,7 @@ class ProductionResource extends Resource
                             $record->update([
                                 'status' => 'finished'
                             ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished. Proses selanjutnya: Tim Quality Control (QC) perlu melakukan pemeriksaan kualitas hasil produksi sebelum barang dipindahkan ke gudang.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

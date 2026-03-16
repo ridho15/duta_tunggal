@@ -58,7 +58,7 @@ class ProductResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Produk';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 1;
 
     /**
      * Cache untuk daftar opsi akun (per tipe)

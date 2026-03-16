@@ -50,7 +50,7 @@ class QualityControlManufactureResource extends Resource
 
     protected static ?string $navigationLabel = 'Quality Control Manufacture';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 6;
 
     public static function form(Form $form): Form
     {
@@ -304,7 +304,7 @@ class QualityControlManufactureResource extends Resource
                         ->action(function ($record) {
                             $qcService = new QualityControlService();
                             $qcService->completeQualityControl($record, []);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Manufacture Completed");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Manufacture Completed. Proses selanjutnya: Tim Gudang perlu memindahkan barang hasil produksi ke lokasi penyimpanan dan memperbarui stok inventori.");
                         }),
                     DeleteAction::make(),
                 ])

@@ -16,95 +16,110 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
+        $roleDescriptions = HelperController::roleDescriptions();
+
         $owner = Role::updateOrCreate([
             'name' => 'Owner',
         ], [
             'name' => 'Owner',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Owner'] ?? null,
         ]);
 
         $superAdmin = Role::updateOrCreate([
             'name' => 'Super Admin',
         ], [
             'name' => 'Super Admin',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Super Admin'] ?? null,
         ]);
 
         $admin = Role::updateOrCreate([
             'name' => 'Admin',
         ], [
             'name' => 'Admin',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Admin'] ?? null,
         ]);
 
         $salesManager = Role::updateOrCreate([
             'name' => 'Sales Manager',
         ], [
             'name' => 'Sales Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Sales Manager'] ?? null,
         ]);
 
         $sales = Role::updateOrCreate([
             'name' => 'Sales',
         ], [
             'name' => 'Sales',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Sales'] ?? null,
         ]);
 
         $kasir = Role::updateOrCreate([
             'name' => 'Kasir',
         ], [
             'name' => 'Kasir',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Kasir'] ?? null,
         ]);
 
         $inventoryManager = Role::updateOrCreate([
             'name' => 'Inventory Manager',
         ], [
             'name' => 'Inventory Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Inventory Manager'] ?? null,
         ]);
 
         $adminInventory = Role::updateOrCreate([
             'name' => 'Admin Inventory',
         ], [
             'name' => 'Admin Inventory',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Admin Inventory'] ?? null,
         ]);
 
         $checker = Role::updateOrCreate([
             'name' => 'Checker',
         ], [
             'name' => 'Checker',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Checker'] ?? null,
         ]);
 
         $financeManager = Role::updateOrCreate([
             'name' => 'Finance Manager',
         ], [
             'name' => 'Finance Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Finance Manager'] ?? null,
         ]);
 
         $adminKeuangan = Role::updateOrCreate([
             'name' => 'Admin Keuangan',
         ], [
             'name' => 'Admin Keuangan',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Admin Keuangan'] ?? null,
         ]);
 
         $accounting = Role::updateOrCreate([
             'name' => 'Accounting',
         ], [
             'name' => 'Accounting',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Accounting'] ?? null,
         ]);
 
         $purchasing = Role::updateOrCreate([
             'name' => 'Purchasing',
         ], [
             'name' => 'Purchasing',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Purchasing'] ?? null,
         ]);
 
         // Additional recommended roles
@@ -112,42 +127,48 @@ class RoleSeeder extends Seeder
             'name' => 'Purchasing Manager',
         ], [
             'name' => 'Purchasing Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Purchasing Manager'] ?? null,
         ]);
 
         $warehouseStaff = Role::updateOrCreate([
             'name' => 'Warehouse Staff',
         ], [
             'name' => 'Warehouse Staff',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Warehouse Staff'] ?? null,
         ]);
 
         $deliveryDriver = Role::updateOrCreate([
             'name' => 'Delivery Driver',
         ], [
             'name' => 'Delivery Driver',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Delivery Driver'] ?? null,
         ]);
 
         $customerService = Role::updateOrCreate([
             'name' => 'Customer Service',
         ], [
             'name' => 'Customer Service',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Customer Service'] ?? null,
         ]);
 
         $auditor = Role::updateOrCreate([
             'name' => 'Auditor',
         ], [
             'name' => 'Auditor',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Auditor'] ?? null,
         ]);
 
         $itSupport = Role::updateOrCreate([
             'name' => 'IT Support',
         ], [
             'name' => 'IT Support',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['IT Support'] ?? null,
         ]);
 
 
@@ -201,7 +222,7 @@ class RoleSeeder extends Seeder
             'Delivery Driver' => [
                 'delivery order', 'delivery order item', 'vehicle', 'surat jalan'
             ],
-            'Auditor' => array_keys(HelperController::listPermission()), // auditor can view many modules; we'll grant view access in test verification
+            'Auditor' => [], // Auditor receives only 'view any' for every resource (via special block below)
             'IT Support' => [
                 'user', 'role', 'permission', 'tax setting', 'currency'
             ],

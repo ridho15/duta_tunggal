@@ -19,6 +19,18 @@ class ViewSalesInvoice extends ViewRecord
 {
     protected static string $resource = SalesInvoiceResource::class;
 
+    public function mount($record): void
+    {
+        parent::mount($record);
+        // debug log invoice whenever the page is instantiated
+        \Illuminate\Support\Facades\Log::debug('Viewing invoice for debug', [
+            'id' => $this->record->id,
+            'tax_rate' => $this->record->tax,
+            'ppn_amount' => $this->record->ppn_amount,
+            'account_payable' => optional($this->record->accountPayable)->toArray(),
+        ]);
+    }
+
     public function infolist(Infolist $infolist): Infolist
     {
         return $infolist
@@ -70,9 +82,6 @@ class ViewSalesInvoice extends ViewRecord
                                     ->rupiah(),
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
-                                    ->rupiah(),
-                                TextEntry::make('tax')
-                                    ->label('PPN Amount')
                                     ->rupiah(),
                                 TextEntry::make('ppn_rate')
                                     ->label('PPN Rate (%)')

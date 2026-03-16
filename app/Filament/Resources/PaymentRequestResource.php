@@ -35,7 +35,7 @@ class PaymentRequestResource extends Resource
     protected static ?string $modelLabel = 'Payment Request';
     protected static ?string $pluralModelLabel = 'Payment Requests';
     protected static ?string $navigationGroup = 'Finance - Pembayaran';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -49,9 +49,16 @@ class PaymentRequestResource extends Resource
                                 TextInput::make('request_number')
                                     ->label('Nomor PR')
                                     ->default(fn () => PaymentRequest::generateNumber())
-                                    ->disabled()
                                     ->dehydrated(true)
-                                    ->required(),
+                                    ->required()
+                                    ->suffixAction(
+                                        Forms\Components\Actions\Action::make('generate')
+                                            ->icon('heroicon-m-arrow-path')
+                                            ->tooltip('Generate Nomor PR')
+                                            ->action(function ($set) {
+                                                $set('request_number', PaymentRequest::generateNumber());
+                                            })
+                                    ),
 
                                 Select::make('supplier_id')
                                     ->label('Vendor / Supplier')
@@ -88,7 +95,7 @@ class PaymentRequestResource extends Resource
                                     ->numeric()
                                     ->disabled()
                                     ->dehydrated(true)
-                                    ->prefix('Rp'),
+                                    ->indonesianMoney(),
                             ]),
 
                         Section::make('Pilih Invoice yang akan Dibayar')
@@ -99,10 +106,13 @@ class PaymentRequestResource extends Resource
                                         $supplierId = $get('supplier_id');
                                         if (!$supplierId) return [];
 
-                                        return Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
-                                            ->whereHas('fromModel.supplier', fn ($q) => $q->where('id', $supplierId))
-                                            ->whereIn('status', ['unpaid', 'draft', 'sent', 'overdue', 'partially_paid'])
-                                            ->get()
+                                        // restrict to invoices issued from purchase orders belonging to the selected supplier
+                                            $poIds = \App\Models\PurchaseOrder::where('supplier_id', $supplierId)->pluck('id');
+
+                                            return Invoice::where('from_model_type', \App\Models\PurchaseOrder::class)
+                                                ->whereIn('from_model_id', $poIds)
+                                                ->whereIn('status', ['unpaid', 'draft', 'sent', 'overdue', 'partially_paid'])
+                                                ->get()
                                             ->mapWithKeys(function ($invoice) {
                                                 $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date)->format('d/m/Y') : '-';
                                                 $total = number_format($invoice->total, 0, ',', '.');

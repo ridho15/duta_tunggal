@@ -34,7 +34,7 @@ class VoucherRequestResource extends Resource
     
     protected static ?string $modelLabel = 'Pengajuan Voucher';
     
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {

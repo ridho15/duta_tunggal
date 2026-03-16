@@ -83,7 +83,7 @@ class ViewQualityControlManufacture extends ViewRecord
                 ->action(function (array $data, $record) {
                     $qualityControlService = app(QualityControlService::class);
                     $qualityControlService->completeQualityControl($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Manufacture Completed");
+                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Manufacture Completed. Proses selanjutnya: Tim Gudang perlu memindahkan barang hasil produksi ke lokasi penyimpanan dan memperbarui stok inventori.");
                     $qualityControlService->checkPenerimaanBarang($record);
                 })
         ];

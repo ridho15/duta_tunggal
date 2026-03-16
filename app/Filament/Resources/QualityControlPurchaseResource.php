@@ -32,6 +32,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
@@ -50,7 +53,7 @@ class QualityControlPurchaseResource extends Resource
 
     protected static ?string $navigationLabel = 'Quality Control Purchase';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {
@@ -66,34 +69,42 @@ class QualityControlPurchaseResource extends Resource
                                 Select::make('from_model_id')
                                     ->label('Purchase Order Item')
                                     ->options(function ($context, $get) {
-                                        $query = PurchaseOrderItem::with(['purchaseOrder.supplier', 'product']);
+                                        $query = PurchaseOrderItem::with(['purchaseOrder.supplier', 'product', 'qualityControls']);
 
                                         if ($context === 'create') {
-                                            // Hanya tampilkan item dari PO yang approved dan belum memiliki QC
+                                            // Tampilkan item dari PO yang approved (termasuk yang sudah ada QC partial)
                                             $query->whereHas('purchaseOrder', function ($q) {
                                                 $q->where('status', 'approved');
-                                            })->whereDoesntHave('qualityControl');
+                                            });
                                         }
                                         // Saat edit, tampilkan semua item dari PO
 
                                         return $query->get()
-                                            ->filter(function ($item) {
+                                            ->filter(function ($item) use ($context) {
                                                 // Filter out items with missing relationships to prevent errors
-                                                return $item->purchaseOrder &&
-                                                       $item->purchaseOrder->supplier &&
-                                                       $item->product;
+                                                if (!$item->purchaseOrder || !$item->purchaseOrder->supplier || !$item->product) {
+                                                    return false;
+                                                }
+                                                // Saat create: hanya tampilkan jika masih ada sisa qty yang perlu diinspeksi
+                                                if ($context === 'create') {
+                                                    $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
+                                                    return ($item->quantity - $inspected) > 0;
+                                                }
+                                                return true;
                                             })
                                             ->mapWithKeys(function ($item) {
-                                                $po = $item->purchaseOrder;
-                                                $supplier = $po->supplier;
-                                                $product = $item->product;
-
-                                                $poNumber = $po->po_number ?? 'N/A';
+                                                $po           = $item->purchaseOrder;
+                                                $supplier     = $po->supplier;
+                                                $product      = $item->product;
+                                                $poNumber     = $po->po_number ?? 'N/A';
                                                 $supplierName = $supplier->perusahaan ?? ($supplier->name ?? 'N/A');
-                                                $productName = $product->name ?? 'N/A';
-                                                $quantity = $item->quantity ?? 0;
+                                                $productName  = $product->name ?? 'N/A';
+                                                $ordered      = $item->quantity ?? 0;
+                                                $inspected    = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
+                                                $remaining    = max(0, $ordered - $inspected);
 
-                                                $label = "PO: {$poNumber} - {$supplierName} - {$productName} (Qty: {$quantity})";
+                                                $label = "PO: {$poNumber} - {$supplierName} - {$productName}"
+                                                       . " (Ordered: {$ordered} | Inspected: {$inspected} | Sisa: {$remaining})";
                                                 return [$item->id => $label];
                                             });
                                     })
@@ -107,31 +118,47 @@ class QualityControlPurchaseResource extends Resource
                                             return;
                                         }
 
-                                        $passed = (float) $get('passed_quantity');
-                                        $rejected = (float) $get('rejected_quantity');
-                                        $totalInspected = $passed + $rejected;
-
                                         $purchaseOrderItemId = $get('from_model_id');
                                         if ($purchaseOrderItemId) {
-                                            $item = PurchaseOrderItem::with(['product.uom'])->find($purchaseOrderItemId);
+                                            $item = PurchaseOrderItem::with(['product.uom', 'qualityControls', 'purchaseOrder.referModel'])->find($purchaseOrderItemId);
                                             if ($item) {
                                                 // Populate product information fields
                                                 $set('product_name', $item->product->name ?? '');
                                                 $set('sku', $item->product->sku ?? '');
                                                 $set('uom', $item->product->uom->name ?? '');
-                                                $set('quantity_received', $item->quantity ?? 0);
                                                 $set('product_id', $item->product_id ?? null);
 
-                                                $maxInspectable = $item->quantity ?? 0;
-
-                                                if ($maxInspectable > 0 && $totalInspected > $maxInspectable) {
-                                                    $set('passed_quantity', $maxInspectable - $rejected);
+                                                // Auto-fill warehouse from PurchaseOrder, with fallback to OrderRequest
+                                                $purchaseOrder = $item->purchaseOrder;
+                                                $warehouseId = $purchaseOrder->warehouse_id ?? null;
+                                                // If PO refers to an OrderRequest, prefer its warehouse
+                                                if (
+                                                    $purchaseOrder->refer_model_type === 'App\Models\OrderRequest'
+                                                    && $purchaseOrder->refer_model_id
+                                                ) {
+                                                    $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);
+                                                    if ($orderRequest && $orderRequest->warehouse_id) {
+                                                        $warehouseId = $orderRequest->warehouse_id;
+                                                    }
                                                 }
-                                            }
-                                        }
+                                                $set('warehouse_id', $warehouseId);
 
-                                        // Update total_inspected
-                                        $set('total_inspected', $passed + $rejected);
+                                                // Calculate remaining qty based on existing QC records (partial QC support)
+                                                $alreadyInspected = $item->qualityControls->sum(
+                                                    fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                                                );
+                                                $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
+
+                                                // Show remaining as "quantity to inspect this time"
+                                                $set('quantity_received', $remainingQty);
+                                                // Auto-fill passed_quantity with remaining so user just confirms
+                                                $set('passed_quantity', $remainingQty);
+                                                $set('rejected_quantity', 0);
+                                                $set('total_inspected', $remainingQty);
+                                            }
+                                        } else {
+                                            $set('total_inspected', 0);
+                                        }
                                     })
                                     ->required(fn ($context) => $context !== 'edit') // Required hanya saat create
                                     ->validationMessages([
@@ -190,8 +217,15 @@ class QualityControlPurchaseResource extends Resource
                                     ->dehydrated(false),
                                 TextInput::make('quantity_received')
                                     ->label('Quantity Received')
-                                    ->disabled()
-                                    ->dehydrated(false),
+                                    ->numeric()
+                                    ->required()
+                                    ->reactive()
+                                    ->helperText('Jumlah barang yang datang/diterima dari supplier')
+                                    ->validationMessages([
+                                        'required' => 'Quantity Received wajib diisi',
+                                        'numeric'  => 'Quantity Received harus berupa angka',
+                                    ])
+                                    ->dehydrated(true),
                                 \Filament\Forms\Components\Hidden::make('product_id')
                                     ->dehydrated(true),
                                 Select::make('warehouse_id')
@@ -234,12 +268,15 @@ class QualityControlPurchaseResource extends Resource
                                             return function (string $attribute, $value, \Closure $fail) use ($get) {
                                                 $purchaseOrderItemId = $get('from_model_id');
                                                 if ($purchaseOrderItemId) {
-                                                    $item = PurchaseOrderItem::find($purchaseOrderItemId);
+                                                    $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
                                                     if ($item) {
-                                                        $maxInspectable = $item->quantity ?? 0;
+                                                        $alreadyInspected = $item->qualityControls->sum(
+                                                            fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                                                        );
+                                                        $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
 
-                                                        if ((float) $value > $maxInspectable) {
-                                                            $fail("Passed quantity ({$value}) cannot exceed ordered quantity ({$maxInspectable}) in purchase order.");
+                                                        if ((float) $value > $remainingQty) {
+                                                            $fail("Passed quantity ({$value}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
                                                         }
                                                     }
                                                 }
@@ -251,23 +288,25 @@ class QualityControlPurchaseResource extends Resource
                                         'numeric' => 'Passed Quantity harus berupa angka'
                                     ])
                                     ->afterStateUpdated(function ($set, $get) {
-                                        $passed = (float) $get('passed_quantity');
+                                        $passed   = (float) $get('passed_quantity');
                                         $rejected = (float) $get('rejected_quantity');
-                                        $totalInspected = $passed + $rejected;
 
                                         $purchaseOrderItemId = $get('from_model_id');
                                         if ($purchaseOrderItemId) {
-                                            $item = PurchaseOrderItem::find($purchaseOrderItemId);
+                                            $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
                                             if ($item) {
-                                                $maxInspectable = $item->quantity ?? 0;
+                                                $alreadyInspected = $item->qualityControls->sum(
+                                                    fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                                                );
+                                                $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
 
-                                                if ($maxInspectable > 0 && $totalInspected > $maxInspectable) {
-                                                    $set('passed_quantity', $maxInspectable - $rejected);
+                                                if ($remainingQty > 0 && ($passed + $rejected) > $remainingQty) {
+                                                    $set('passed_quantity', max(0, $remainingQty - $rejected));
+                                                    $passed = max(0, $remainingQty - $rejected);
                                                 }
                                             }
                                         }
 
-                                        // Update total_inspected
                                         $set('total_inspected', $passed + $rejected);
                                     }),
                                 TextInput::make('rejected_quantity')
@@ -278,18 +317,20 @@ class QualityControlPurchaseResource extends Resource
                                     ->rules([
                                         function ($get) {
                                             return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                                $passed = (float) $get('passed_quantity');
+                                                $passed   = (float) $get('passed_quantity');
                                                 $rejected = (float) $value;
-                                                $totalInspected = $passed + $rejected;
 
                                                 $purchaseOrderItemId = $get('from_model_id');
                                                 if ($purchaseOrderItemId) {
-                                                    $item = PurchaseOrderItem::find($purchaseOrderItemId);
+                                                    $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
                                                     if ($item) {
-                                                        $maxInspectable = $item->quantity ?? 0;
+                                                        $alreadyInspected = $item->qualityControls->sum(
+                                                            fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                                                        );
+                                                        $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
 
-                                                        if ($totalInspected > $maxInspectable) {
-                                                            $fail("Total inspected quantity ({$totalInspected}) cannot exceed ordered quantity ({$maxInspectable}) in purchase order.");
+                                                        if (($passed + $rejected) > $remainingQty) {
+                                                            $fail("Total inspected ({$passed} + {$rejected}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
                                                         }
                                                     }
                                                 }
@@ -301,23 +342,25 @@ class QualityControlPurchaseResource extends Resource
                                         'numeric' => 'Rejected Quantity harus berupa angka'
                                     ])
                                     ->afterStateUpdated(function ($set, $get) {
-                                        $passed = (float) $get('passed_quantity');
+                                        $passed   = (float) $get('passed_quantity');
                                         $rejected = (float) $get('rejected_quantity');
-                                        $totalInspected = $passed + $rejected;
 
                                         $purchaseOrderItemId = $get('from_model_id');
                                         if ($purchaseOrderItemId) {
-                                            $item = PurchaseOrderItem::find($purchaseOrderItemId);
+                                            $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
                                             if ($item) {
-                                                $maxInspectable = $item->quantity ?? 0;
+                                                $alreadyInspected = $item->qualityControls->sum(
+                                                    fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                                                );
+                                                $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
 
-                                                if ($maxInspectable > 0 && $totalInspected > $maxInspectable) {
-                                                    $set('rejected_quantity', $maxInspectable - $passed);
+                                                if ($remainingQty > 0 && ($passed + $rejected) > $remainingQty) {
+                                                    $set('rejected_quantity', max(0, $remainingQty - $passed));
+                                                    $rejected = max(0, $remainingQty - $passed);
                                                 }
                                             }
                                         }
 
-                                        // Update total_inspected
                                         $set('total_inspected', $passed + $rejected);
                                     }),
                                 TextInput::make('total_inspected')
@@ -353,26 +396,38 @@ class QualityControlPurchaseResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('created_at')
+                    ->label('Tanggal')
+                    ->date('d M Y')
+                    ->sortable(),
                 TextColumn::make('qc_number')
                     ->label('QC Number')
                     ->searchable(),
-                TextColumn::make('receipt_number')
-                    ->label('Purchase Receipt')
+                TextColumn::make('supplier_name')
+                    ->label('Supplier')
                     ->getStateUsing(function ($record) {
-                        return $record->fromModel?->purchaseReceipt?->receipt_number ?? 'N/A';
+                        $supplier = $record->fromModel?->purchaseOrder?->supplier;
+                        if ($supplier) {
+                            return "({$supplier->code}) " . ($supplier->perusahaan ?? $supplier->name ?? 'N/A');
+                        }
+                        return 'N/A';
                     })
                     ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('fromModel.purchaseReceipt', function ($query) use ($search) {
-                            return $query->where('receipt_number', 'LIKE', '%' . $search . '%');
+                        return $query->whereHas('fromModel.purchaseOrder.supplier', function ($query) use ($search) {
+                            return $query->where('perusahaan', 'LIKE', '%' . $search . '%')
+                                ->orWhere('name', 'LIKE', '%' . $search . '%')
+                                ->orWhere('code', 'LIKE', '%' . $search . '%');
                         });
                     }),
                 TextColumn::make('po_number')
-                    ->label('Purchase Order')
+                    ->label('PO Number')
                     ->getStateUsing(function ($record) {
-                        return $record->fromModel?->purchaseReceipt?->purchaseOrder?->po_number ?? 'N/A';
+                        return $record->fromModel?->purchaseOrder?->po_number
+                            ?? $record->fromModel?->purchaseReceipt?->purchaseOrder?->po_number
+                            ?? 'N/A';
                     })
                     ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('fromModel.purchaseReceipt.purchaseOrder', function ($query) use ($search) {
+                        return $query->whereHas('fromModel.purchaseOrder', function ($query) use ($search) {
                             return $query->where('po_number', 'LIKE', '%' . $search . '%');
                         });
                     }),
@@ -430,6 +485,146 @@ class QualityControlPurchaseResource extends Resource
                     '</div>' .
                 '</details>'
             ))
+            ->headerActions([
+                Action::make('batch_create_qc')
+                    ->label('Batch Buat QC')
+                    ->icon('heroicon-o-plus-circle')
+                    ->color('success')
+                    ->modalWidth('5xl')
+                    ->modalHeading('Batch Pembuatan Quality Control Purchase')
+                    ->modalDescription('Pilih beberapa Purchase Order Item sekaligus untuk membuat QC secara massal. Setiap item akan menghasilkan satu QC record.')
+                    ->form([
+                        Section::make('Pilih PO Items')
+                            ->description('Menampilkan item dari PO yang sudah approved dan masih memiliki sisa qty yang perlu diinspeksi (termasuk QC partial).')
+                            ->schema([
+                                Repeater::make('qc_items')
+                                    ->label('Item yang akan di-QC')
+                                    ->addActionLabel('Tambah Item')
+                                    ->minItems(1)
+                                    ->columns(2)
+                                    ->schema([
+                                        Select::make('purchase_order_item_id')
+                                            ->label('Purchase Order Item')
+                                            ->options(function () {
+                                                return PurchaseOrderItem::with(['purchaseOrder.supplier', 'product', 'qualityControls'])
+                                                    ->whereHas('purchaseOrder', fn($q) => $q->where('status', 'approved'))
+                                                    ->get()
+                                                    ->filter(function ($item) {
+                                                        if (!$item->purchaseOrder || !$item->purchaseOrder->supplier || !$item->product) {
+                                                            return false;
+                                                        }
+                                                        $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
+                                                        return ($item->quantity - $inspected) > 0;
+                                                    })
+                                                    ->mapWithKeys(function ($item) {
+                                                        $po           = $item->purchaseOrder;
+                                                        $supplier     = $po->supplier->perusahaan ?? 'N/A';
+                                                        $product      = $item->product->name ?? 'N/A';
+                                                        $inspected    = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
+                                                        $remaining    = max(0, $item->quantity - $inspected);
+                                                        return [$item->id => "PO: {$po->po_number} | {$supplier} | {$product} (Ordered: {$item->quantity} | Sisa: {$remaining})"];
+                                                    });
+                                            })
+                                            ->searchable()
+                                            ->required()
+                                            ->validationMessages(['required' => 'PO Item harus dipilih'])
+                                            ->columnSpanFull(),
+                                        TextInput::make('passed_quantity')
+                                            ->label('Passed Qty')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->minValue(0)
+                                            ->required(),
+                                        TextInput::make('rejected_quantity')
+                                            ->label('Rejected Qty')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->minValue(0)
+                                            ->required(),
+                                    ]),
+                            ]),
+                        Section::make('Pengaturan Umum')
+                            ->description('Pengaturan ini berlaku untuk semua QC yang dibuat dalam batch ini.')
+                            ->columns(2)
+                            ->schema([
+                                Select::make('warehouse_id')
+                                    ->label('Gudang')
+                                    ->options(Warehouse::all()->mapWithKeys(fn($w) => [$w->id => "({$w->kode}) {$w->name}"]))
+                                    ->searchable()
+                                    ->required()
+                                    ->reactive()
+                                    ->validationMessages(['required' => 'Gudang harus dipilih']),
+                                Select::make('rak_id')
+                                    ->label('Rak')
+                                    ->options(function ($get) {
+                                        $warehouseId = $get('warehouse_id');
+                                        if ($warehouseId) {
+                                            return Rak::where('warehouse_id', $warehouseId)
+                                                ->get()
+                                                ->mapWithKeys(fn($rak) => [$rak->id => "({$rak->code}) {$rak->name}"]);
+                                        }
+                                        return [];
+                                    })
+                                    ->searchable(),
+                                \Filament\Forms\Components\DatePicker::make('inspection_date')
+                                    ->label('Tanggal Inspeksi')
+                                    ->default(now())
+                                    ->required(),
+                                Textarea::make('notes')
+                                    ->label('Catatan')
+                                    ->nullable()
+                                    ->columnSpanFull(),
+                            ]),
+                    ])
+                    ->action(function (array $data) {
+                        $created = 0;
+                        foreach ($data['qc_items'] ?? [] as $qcItem) {
+                            $poItemId = $qcItem['purchase_order_item_id'] ?? null;
+                            if (!$poItemId) continue;
+
+                            $poItem = PurchaseOrderItem::with(['product', 'qualityControls'])->find($poItemId);
+                            if (!$poItem) continue;
+
+                            // Check remaining qty (partial QC support)
+                            $alreadyInspected = $poItem->qualityControls->sum(
+                                fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                            );
+                            $remainingQty = max(0, $poItem->quantity - $alreadyInspected);
+                            if ($remainingQty <= 0) continue; // no more qty to inspect
+
+                            $qcNumber = HelperController::generateUniqueCode(
+                                'quality_controls', 'qc_number',
+                                'QC-P-' . date('Ymd') . '-', 4
+                            );
+
+                            $passedQty   = min((float) ($qcItem['passed_quantity'] ?? 0), $remainingQty);
+                            $rejectedQty = min((float) ($qcItem['rejected_quantity'] ?? 0), max(0, $remainingQty - $passedQty));
+
+                            QualityControl::create([
+                                'from_model_type'   => \App\Models\PurchaseOrderItem::class,
+                                'from_model_id'     => $poItemId,
+                                'qc_number'         => $qcNumber,
+                                'product_id'        => $poItem->product_id,
+                                'warehouse_id'      => $data['warehouse_id'],
+                                'rak_id'            => $data['rak_id'] ?? null,
+                                'passed_quantity'   => $passedQty,
+                                'rejected_quantity' => $rejectedQty,
+                                'quantity_received' => $passedQty + $rejectedQty,
+                                'status'            => 0,
+                                'notes'             => $data['notes'] ?? null,
+                                'date_send_stock'   => $data['inspection_date'] ?? now(),
+                            ]);
+                            $created++;
+                        }
+
+                        HelperController::sendNotification(
+                            isSuccess: true,
+                            title: 'Batch QC Berhasil',
+                            message: "{$created} Quality Control Purchase berhasil dibuat."
+                        );
+                    })
+                    ->visible(fn() => Auth::user()?->can('create quality control purchase')),
+            ])
             ->filters([
                 SelectFilter::make('status')
                     ->options([
@@ -441,10 +636,55 @@ class QualityControlPurchaseResource extends Resource
                     ->options(Warehouse::all()->mapWithKeys(function ($warehouse) {
                         return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                     })),
-                Filter::make('created_at')
+                Filter::make('supplier')
+                    ->label('Supplier')
                     ->form([
-                        DatePicker::make('created_from'),
-                        DatePicker::make('created_until'),
+                        \Filament\Forms\Components\Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->searchable()
+                            ->preload()
+                            ->options(function () {
+                                return \App\Models\Supplier::all()->mapWithKeys(function ($supplier) {
+                                    return [$supplier->id => "({$supplier->code}) " . ($supplier->perusahaan ?? $supplier->name ?? '')];
+                                });
+                            }),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['supplier_id'])) {
+                            return $query;
+                        }
+                        return $query->whereHas('fromModel.purchaseOrder', function (Builder $query) use ($data) {
+                            $query->where('supplier_id', $data['supplier_id']);
+                        });
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (empty($data['supplier_id'])) return null;
+                        $supplier = \App\Models\Supplier::find($data['supplier_id']);
+                        return $supplier ? 'Supplier: ' . ($supplier->perusahaan ?? $supplier->name) : null;
+                    }),
+                Filter::make('po_number_filter')
+                    ->label('PO Number')
+                    ->form([
+                        \Filament\Forms\Components\TextInput::make('po_number')
+                            ->label('PO Number')
+                            ->placeholder('Cari PO Number...'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (empty($data['po_number'])) {
+                            return $query;
+                        }
+                        return $query->whereHas('fromModel.purchaseOrder', function (Builder $query) use ($data) {
+                            $query->where('po_number', 'LIKE', '%' . $data['po_number'] . '%');
+                        });
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        return !empty($data['po_number']) ? 'PO: ' . $data['po_number'] : null;
+                    }),
+                Filter::make('created_at')
+                    ->label('Tanggal QC')
+                    ->form([
+                        DatePicker::make('created_from')->label('Dari Tanggal'),
+                        DatePicker::make('created_until')->label('Sampai Tanggal'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
@@ -542,7 +782,7 @@ class QualityControlPurchaseResource extends Resource
                             }
 
                             $qcService->completeQualityControl($record, []);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed");
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");
                         }),
                     DeleteAction::make(),
                 ])
@@ -567,6 +807,7 @@ class QualityControlPurchaseResource extends Resource
                         TextEntry::make('product.name')->label('Product'),
                         TextEntry::make('product.sku')->label('SKU'),
                         TextEntry::make('warehouse.name')->label('Warehouse'),
+                        TextEntry::make('warehouse.cabang.nama')->label('Cabang'),
                         TextEntry::make('rak.name')->label('Rack'),
                         TextEntry::make('status_formatted')->label('Status')->badge(),
                         TextEntry::make('inspectedBy.name')->label('Inspected By'),
@@ -574,15 +815,16 @@ class QualityControlPurchaseResource extends Resource
                     ])->columns(2),
                 InfolistSection::make('Purchase Information')
                     ->schema([
-                        TextEntry::make('fromModel.purchaseReceipt.receipt_number')->label('Receipt Number'),
-                        TextEntry::make('fromModel.purchaseReceipt.purchaseOrder.po_number')->label('PO Number'),
-                        TextEntry::make('fromModel.purchaseReceipt.purchaseOrder.supplier.name')->label('Supplier'),
-                        TextEntry::make('fromModel.qty_accepted')->label('Accepted Quantity'),
-                        TextEntry::make('fromModel.purchaseReceipt.currency.code')->label('Currency'),
+                        // QC Purchase is created from a PurchaseOrderItem, not a receipt item.
+                        TextEntry::make('fromModel.purchaseOrder.po_number')->label('PO Number'),
+                        TextEntry::make('fromModel.purchaseOrder.supplier.perusahaan')->label('Supplier'),
+                        TextEntry::make('fromModel.quantity')->label('Ordered Quantity'),
+                        TextEntry::make('fromModel.unit_price')->label('Unit Price')->formatStateUsing(fn ($state) => "Rp " . number_format($state, 0, ',', '.'))
                     ])->columns(2),
                 InfolistSection::make('Quality Control Results')
                     ->schema([
-                        TextEntry::make('fromModel.qty_received')->label('Qty Received'),
+                        TextEntry::make('fromModel.quantity')->label('Qty Order'),
+                        TextEntry::make('quantity_received')->label('Qty Received'),
                         TextEntry::make('passed_quantity')->label('Qty Accepted')->color('success'),
                         TextEntry::make('rejected_quantity')->label('Qty Rejected')->color('danger'),
                         TextEntry::make('reason_reject')->label('Rejection Reason'),
@@ -651,7 +893,7 @@ class QualityControlPurchaseResource extends Resource
                 'product.uom',
                 'fromModel.purchaseOrder.supplier',
                 'inspectedBy',
-                'warehouse',
+                'warehouse.cabang',
                 'rak'
             ]);
 

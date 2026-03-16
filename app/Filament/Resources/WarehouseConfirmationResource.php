@@ -40,7 +40,7 @@ class WarehouseConfirmationResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $label = 'Konfirmasi Gudang';
 
@@ -97,7 +97,7 @@ class WarehouseConfirmationResource extends Resource
                             ->searchable()
                             ->relationship('saleOrder', 'so_number', function (Builder $query) {
                                 $query->where('status', 'approved')
-                                      ->where('tipe_pengiriman', 'Kirim Langsung')
+                                      ->whereIn('tipe_pengiriman', ['Kirim Langsung', 'Ambil Sendiri'])
                                       ->where(function ($q) {
                                           $q->whereDoesntHave('warehouseConfirmation');
                                           // In edit context, also allow the current SO if it exists
@@ -354,7 +354,7 @@ class WarehouseConfirmationResource extends Resource
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Konfirmasi Gudang adalah proses validasi dari warehouse terhadap Sales Order atau Manufacturing Order sebelum eksekusi.</li>' .
                             '<li><strong>Status Flow:</strong> Request → Confirmed/Partial Confirmed/Rejected. Gudang memberikan konfirmasi kesiapan stok dan logistik.</li>' .
-                            '<li><strong>Related Orders:</strong> Terkait dengan Sales Order (untuk pengiriman) atau Manufacturing Order (untuk produksi internal).</li>' .
+                            '<li><strong>Related Orders:</strong> Terkait dengan Sales Order (untuk pengiriman <em>Kirim Langsung</em> maupun <em>Ambil Sendiri</em> - keduanya butuh DO sebagai bukti barang keluar gudang) atau Manufacturing Order (untuk produksi internal).</li>' .
                             '<li><strong>Actions:</strong> <em>Konfirmasi Gudang</em> untuk approve request, dengan opsi confirmed, partial confirmed, atau rejected.</li>' .
                             '<li><strong>Tracking:</strong> Mencatat siapa yang mengkonfirmasi (Confirmed By) dan kapan dikonfirmasi (Confirmed At).</li>' .
                             '<li><strong>Integration:</strong> Terintegrasi dengan Sales Order management, Manufacturing Order, dan inventory availability checking.</li>' .

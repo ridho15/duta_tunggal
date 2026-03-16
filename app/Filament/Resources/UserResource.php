@@ -39,7 +39,7 @@ class UserResource extends Resource
     protected static ?string $navigationGroup = 'User Roles Management';
 
     // Order similarly with other role/permission resources
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {

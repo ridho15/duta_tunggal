@@ -20,6 +20,7 @@ class OrderRequest extends Model
         'request_date',
         'status', // draft, approved, rejected, closed
         'note',
+        'tax_type', // PPN Included, PPN Excluded
         'created_by'
     ];
 
@@ -46,6 +47,14 @@ class OrderRequest extends Model
     public function purchaseOrder()
     {
         return $this->morphOne(PurchaseOrder::class, 'refer_model')->withDefault();
+    }
+
+    /**
+     * All Purchase Orders created from this Order Request (supports multiple POs).
+     */
+    public function purchaseOrders()
+    {
+        return $this->morphMany(PurchaseOrder::class, 'refer_model');
     }
 
     public function createdBy()

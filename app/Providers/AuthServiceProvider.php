@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\CustomerReturn;
+use App\Policies\CustomerReturnPolicy;
 use App\Models\ManufacturingOrder;
 use App\Policies\ManufacturingOrderPolicy;
 use App\Models\CashBankTransaction;
@@ -23,6 +25,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
+        CustomerReturn::class => CustomerReturnPolicy::class,
         ManufacturingOrder::class => ManufacturingOrderPolicy::class,
         CashBankTransaction::class => CashBankTransactionPolicy::class,
         CashBankTransfer::class => CashBankTransferPolicy::class,

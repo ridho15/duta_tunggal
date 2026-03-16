@@ -17,7 +17,9 @@ class SuratJalan extends Model
         'signed_by',
         'status',
         'created_by',
-        'document_path'
+        'document_path',
+        'sender_name',
+        'shipping_method',
     ];
 
     public function deliveryOrder()

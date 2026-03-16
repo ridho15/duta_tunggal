@@ -311,6 +311,14 @@ class AccountPayableResource extends Resource
                     ->sortable()
                     ->default('System'),
                     
+                TextColumn::make('invoice.fromModel.po_number')
+                    ->label('PO Number')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->default('-')
+                    ->toggleable(),
+                    
                 TextColumn::make('invoice.fromModel.createdBy.name')
                     ->label('PO Created By')
                     ->getStateUsing(function ($record) {

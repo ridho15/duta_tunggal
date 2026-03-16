@@ -29,6 +29,7 @@ class SaleOrderItemFactory extends Factory
             'unit_price'    => $this->faker->numberBetween(10000, 500000),
             'discount'      => $this->faker->numberBetween(0, 20),
             'tax'           => $this->faker->numberBetween(0, 11),
+            'tipe_pajak'    => 'Exclusive', // DB column is NOT NULL; default mirrors migration default
             'warehouse_id'  => $warehouse,
             'rak_id'        => $rak,
         ];

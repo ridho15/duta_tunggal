@@ -48,6 +48,7 @@ class SaleOrder extends Model
         'reject_at',
         'reason_close',
         'tipe_pengiriman', // Ambil Sendiri, Kirim Langsung
+        'tempo_pembayaran',
         'created_by',
         'warehouse_confirmed_at',
         'cabang_id'
@@ -173,6 +174,7 @@ class SaleOrder extends Model
             if ($saleOrder->isForceDeleting()) {
                 $saleOrder->saleOrderItem()->forceDelete();
                 $saleOrder->deliverySalesOrder()->forceDelete();
+                // Use query builder (with parens) — safe even when no record exists
                 $saleOrder->warehouseConfirmation()->forceDelete();
                 $saleOrder->purchaseOrder()->forceDelete();
                 $saleOrder->depositLog()->forceDelete();

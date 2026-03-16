@@ -18,13 +18,13 @@ class EditSaleOrder extends EditRecord
 
     // protected static string $view = 'filament.components.sale-order.form';
 
-    protected static ?string $title = 'Ubah Penjualan';
+    protected static ?string $title = 'Ubah Sales Order';
 
     protected function getHeaderActions(): array
     {
         return [
             Action::make('view_sale_order')
-                ->label('Lihat Penjualan')
+                ->label('Lihat Sales Order')
                 ->icon('heroicon-o-eye')
                 ->color('primary')
                 ->url(fn () => route('filament.admin.resources.sale-orders.view', $this->getRecord())),

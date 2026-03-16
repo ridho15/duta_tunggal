@@ -2,13 +2,16 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientStockException;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
 use App\Models\InventoryStock;
 use App\Models\SaleOrder;
 use App\Models\StockReservation;
 use Carbon\Carbon;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SalesOrderService
 {
@@ -16,7 +19,13 @@ class SalesOrderService
     {
         $total_amount = 0;
         foreach ($salesOrder->saleOrderItem as $item) {
-            $total_amount += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, 'Inklusif');
+            $total_amount += HelperController::hitungSubtotal(
+                $item->quantity,
+                $item->unit_price,
+                $item->discount,
+                $item->tax,
+                $item->tipe_pajak ?? 'Inklusif'
+            );
         }
 
         return $salesOrder->update([
@@ -26,37 +35,67 @@ class SalesOrderService
 
     public function confirm($salesOrder)
     {
-        // Validate stock availability before reserving
-        foreach ($salesOrder->saleOrderItem as $item) {
-            $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $item->warehouse_id)
-                ->first();
+        try {
+            DB::transaction(function () use ($salesOrder) {
+                // Validate and reserve stock with pessimistic locking to prevent concurrent negative stock
+                foreach ($salesOrder->saleOrderItem as $item) {
+                    $inventoryStock = InventoryStock::where('product_id', $item->product_id)
+                        ->where('warehouse_id', $item->warehouse_id)
+                        ->lockForUpdate()
+                        ->first();
 
-            if (!$inventoryStock) {
-                throw new \Exception("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
-            }
+                    if (!$inventoryStock) {
+                        throw new InsufficientStockException("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
+                    }
 
-            $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
-            if ($availableForReservation < $item->quantity) {
-                $productName = $item->product ? $item->product->name : $item->product_id;
-                throw new \Exception("Insufficient stock for product {$productName}. Available: {$availableForReservation}, Requested: {$item->quantity}");
-            }
+                    $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
+                    if ($availableForReservation < $item->quantity) {
+                        $productName = $item->product ? $item->product->name : $item->product_id;
+                        throw new InsufficientStockException("Insufficient stock for product {$productName}. Available: {$availableForReservation}, Requested: {$item->quantity}");
+                    }
+                }
+
+                // Reserve stock for each item
+                foreach ($salesOrder->saleOrderItem as $item) {
+                    StockReservation::create([
+                        'sale_order_id' => $salesOrder->id,
+                        'product_id' => $item->product_id,
+                        'quantity' => $item->quantity,
+                        'warehouse_id' => $item->warehouse_id,
+                        'rak_id' => $item->rak_id,
+                    ]);
+                }
+
+                $salesOrder->update(['status' => 'confirmed']);
+            });
+
+            return true;
+        } catch (InsufficientStockException $e) {
+            Notification::make()
+                ->title('Stok Tidak Cukup')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            throw $e;
         }
+    }
 
-        // Reserve stock for each item
-        foreach ($salesOrder->saleOrderItem as $item) {
-            StockReservation::create([
-                'sale_order_id' => $salesOrder->id,
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'warehouse_id' => $item->warehouse_id,
-                'rak_id' => $item->rak_id,
-            ]);
-        }
+    /**
+     * Cancel a sale order and release any stock reservations.
+     */
+    public function cancel($salesOrder)
+    {
+        DB::transaction(function () use ($salesOrder) {
+            // Release all stock reservations for this SO
+            StockReservation::where('sale_order_id', $salesOrder->id)->each(function ($reservation) {
+                $reservation->delete(); // triggers StockReservationObserver::deleted → restores qty_available
+            });
 
-        return $salesOrder->update([
-            'status' => 'confirmed'
-        ]);
+            $salesOrder->update(['status' => 'canceled']);
+        });
+
+        return true;
     }
 
     public function requestApprove($saleOrder)
@@ -121,7 +160,6 @@ class SalesOrderService
             'order_date' => $data['order_date'],
             'note' => $data['note'],
             'warehouse_id' => $data['warehouse_id'],
-            'delivery_date' => $data['delivery_date'],
             'expected_date' => $data['expected_date'],
             'tempo_hutang' => $data['tempo_hutang'],
         ]);
@@ -142,13 +180,30 @@ class SalesOrderService
 
     public function generateSoNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'RN-' . $date . '-';
+        $prefix = 'SO-';
 
+        // Find the highest existing sequence number globally (ignoring branch scopes)
+        $max = SaleOrder::withoutGlobalScopes()
+            ->where('so_number', 'like', $prefix . '%')
+            ->max('so_number');
+
+        $next = 1;
+        if ($max !== null) {
+            $suffix = substr((string) $max, strlen($prefix));
+            if (is_numeric($suffix)) {
+                $next = (int) $suffix + 1;
+            }
+        }
+
+        // Guard against concurrent inserts
         do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = SaleOrder::where('so_number', $candidate)->exists();
+            $candidate = $prefix . str_pad($next, 5, '0', STR_PAD_LEFT);
+            $exists = SaleOrder::withoutGlobalScopes()
+                ->where('so_number', $candidate)
+                ->exists();
+            if ($exists) {
+                $next++;
+            }
         } while ($exists);
 
         return $candidate;
@@ -222,7 +277,7 @@ class SalesOrderService
         ]);
 
         // Update warehouse confirmation status based on overall status
-        $confirmationStatus = match($overallStatus) {
+        $confirmationStatus = match ($overallStatus) {
             'confirmed' => 'confirmed',
             'partial_confirmed' => 'partial_confirmed',
             'reject' => 'rejected',
@@ -274,15 +329,29 @@ class SalesOrderService
         if (!$warehouseId) {
             throw new \Exception('Warehouse ID is required to create delivery order');
         }
+
+        // Resolve a real driver and vehicle to satisfy NOT NULL FK constraints
+        $driverId  = $deliveryData['driver_id']  ?? \App\Models\Driver::first()?->id;
+        $vehicleId = $deliveryData['vehicle_id'] ?? \App\Models\Vehicle::first()?->id;
+
+        if (!$driverId || !$vehicleId) {
+            \Filament\Notifications\Notification::make()
+                ->title('Gagal Membuat Delivery Order')
+                ->danger()
+                ->body('Tidak ditemukan driver atau kendaraan di database. Silakan pastikan data master sudah terisi untuk auto-creation Delivery Order.')
+                ->send();
+            throw new \Exception('A Driver and a Vehicle must exist before a Delivery Order can be created.');
+        }
+
         $deliveryOrder = $saleOrder->deliveryOrder()->create([
-            'do_number' => $this->generateDoNumber(),
+            'do_number'     => $this->generateDoNumber(),
             'delivery_date' => $deliveryData['delivery_date'],
-            'warehouse_id' => $warehouseId,
-            'driver_id' => 1, // Default driver for testing
-            'vehicle_id' => 1, // Default vehicle for testing
-            'status' => 'draft',
-            'notes' => $deliveryData['notes'] ?? null,
-            'created_by' => Auth::user()->id
+            'warehouse_id'  => $warehouseId,
+            'driver_id'     => $driverId,
+            'vehicle_id'    => $vehicleId,
+            'status'        => 'draft',
+            'notes'         => $deliveryData['notes'] ?? null,
+            'created_by'    => Auth::user()->id,
         ]);
 
         // Copy confirmed items to delivery order
@@ -290,10 +359,10 @@ class SalesOrderService
             if ($confirmedItem->status === 'confirmed' || $confirmedItem->status === 'partial_confirmed') {
                 $deliveryOrder->deliveryOrderItem()->create([
                     'sale_order_item_id' => $confirmedItem->sale_order_item_id,
-                    'product_id' => $confirmedItem->saleOrderItem->product_id,
-                    'qty' => $confirmedItem->confirmed_qty,
-                    'warehouse_id' => $confirmedItem->warehouse_id,
-                    'rak_id' => $confirmedItem->rak_id
+                    'product_id'         => $confirmedItem->saleOrderItem->product_id,
+                    'quantity'           => $confirmedItem->confirmed_qty,
+                    'warehouse_id'       => $confirmedItem->warehouse_id,
+                    'rak_id'             => $confirmedItem->rak_id,
                 ]);
             }
         }
@@ -303,16 +372,6 @@ class SalesOrderService
 
     public function generateDoNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'DO-' . $date . '-';
-
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = \App\Models\DeliveryOrder::where('do_number', $candidate)->exists();
-        } while ($exists);
-
-        return $candidate;
+        return \App\Services\DeliveryOrderService::generateStaticDoNumber();
     }
-
 }

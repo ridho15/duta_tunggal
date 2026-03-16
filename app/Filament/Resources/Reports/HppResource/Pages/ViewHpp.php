@@ -255,6 +255,12 @@ class ViewHpp extends Page
                             // ignore logging errors
                         }
 
+                        \Filament\Notifications\Notification::make()
+                            ->title('Gagal Ekspor PDF HPP')
+                            ->body('Tidak dapat membuat file PDF. Silakan coba ekspor ke Excel atau hubungi administrator.')
+                            ->danger()
+                            ->send();
+
                         throw $e2;
                     }
                 }
@@ -266,6 +272,12 @@ class ViewHpp extends Page
                     'report_keys' => array_keys($report),
                     'branch_count' => count($branchNames)
                 ]);
+
+                \Filament\Notifications\Notification::make()
+                    ->title('Gagal Ekspor PDF HPP')
+                    ->body('Tidak dapat membuat file PDF laporan HPP. Silakan coba ekspor ke Excel atau hubungi administrator.')
+                    ->danger()
+                    ->send();
 
                 // Return user-friendly error
                 throw new \Exception('Gagal membuat PDF: ' . $e->getMessage());

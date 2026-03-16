@@ -18,10 +18,13 @@ class OrderRequestItemFactory extends Factory
      */
     public function definition(): array
     {
+        $unitPrice = $this->faker->numberBetween(5000, 500000);
         return [
             'order_request_id' => OrderRequest::inRandomOrder()->first()->id,
             'product_id' => Product::inRandomOrder()->first()->id,
             'quantity' => random_int(1, 20),
+            'unit_price' => $unitPrice,
+            'original_price' => $unitPrice,
             'note' => $this->faker->sentence()
         ];
     }

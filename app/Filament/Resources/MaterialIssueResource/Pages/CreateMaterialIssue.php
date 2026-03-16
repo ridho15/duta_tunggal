@@ -85,7 +85,11 @@ class CreateMaterialIssue extends CreateRecord
                 // And ensure MO qty_used aggregation is up to date
                 $this->updateMoQtyUsed($mi);
             } catch (\Throwable $e) {
-                // ignore
+                \Filament\Notifications\Notification::make()
+                    ->title('Peringatan: Jurnal Otomatis Gagal')
+                    ->body('Material Issue berhasil dibuat, namun jurnal otomatis gagal dibuat: ' . $e->getMessage())
+                    ->warning()
+                    ->send();
             }
         }
     }

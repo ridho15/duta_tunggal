@@ -223,10 +223,12 @@ class SalesOrderSelfPickupToInvoiceTest extends TestCase
         $this->assertTrue($result);
 
         $saleOrder->refresh();
-        $this->assertEquals('approved', $saleOrder->status);
+        // With sufficient stock (50 available, 5 needed), WarehouseConfirmation is auto-created
+        // and immediately auto-confirmed, promoting the SO status from 'approved' to 'confirmed'.
+        $this->assertEquals('confirmed', $saleOrder->status);
 
-        // For self pickup, warehouse confirmation and stock reservation are not created (only for "Kirim Langsung")
-        // Stock will be reduced directly when completed
+        // Warehouse confirmation IS now created for Ambil Sendiri (Task 15) so that a DeliveryOrder
+        // exists for tracking purposes. Stock is reduced when SO is completed.
 
         // ==========================================
         // STEP 3: COMPLETE SALES ORDER (NO DELIVERY ORDER NEEDED)

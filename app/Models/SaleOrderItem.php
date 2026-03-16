@@ -20,8 +20,9 @@ class SaleOrderItem extends Model
         'unit_price',
         'discount',
         'tax',
+        'tipe_pajak',
         'warehouse_id',
-        'rak_id'
+        'rak_id',
     ];
 
 

@@ -48,7 +48,7 @@ class ProductionPlanResource extends Resource
 
     protected static ?string $navigationLabel = 'Rencana Produksi';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -551,10 +551,8 @@ class ProductionPlanResource extends Resource
                                         HelperController::sendNotification(
                                             isSuccess: true,
                                             title: 'Berhasil',
-                                            message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis."
+                                            message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis. Proses selanjutnya: Kepala Produksi perlu memulai Manufacturing Order dan memastikan bahan baku siap."
                                         );
-                                    } else {
-                                        // Fallback: try to create MaterialIssue manually if event didn't work
                                         $manufacturingService = app(\App\Services\ManufacturingService::class);
                                         $materialIssue = $manufacturingService->createMaterialIssueForProductionPlan($record);
 
@@ -567,7 +565,7 @@ class ProductionPlanResource extends Resource
                                             HelperController::sendNotification(
                                                 isSuccess: true,
                                                 title: 'Berhasil',
-                                                message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis."
+                                                message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis. Proses selanjutnya: Kepala Produksi perlu memulai Manufacturing Order dan memastikan bahan baku siap."
                                             );
                                         } else {
                                             HelperController::setLog(
@@ -736,7 +734,7 @@ class ProductionPlanResource extends Resource
                             \App\Http\Controllers\HelperController::sendNotification(
                                 isSuccess: true,
                                 title: "Berhasil",
-                                message: "Manufacturing Order {$mo->mo_number} berhasil dibuat dari Production Plan {$record->plan_number}{$warningMessage}"
+                                message: "Manufacturing Order {$mo->mo_number} berhasil dibuat dari Production Plan {$record->plan_number}{$warningMessage}. Proses selanjutnya: Supervisor Produksi perlu memulai dan memproses Manufacturing Order ini."
                             );
                         }),
                 ])

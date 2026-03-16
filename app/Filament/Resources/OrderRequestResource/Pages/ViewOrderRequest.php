@@ -11,11 +11,16 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Actions\Action as FormAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Get;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
 
@@ -41,64 +46,158 @@ class ViewOrderRequest extends ViewRecord
                 ->action(function ($record) {
                     $orderRequestService = app(OrderRequestService::class);
                     $orderRequestService->reject($record);
-                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order request rejected");
+                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah ditolak. Proses selanjutnya: Pemohon dapat merevisi data dan mengajukan kembali untuk mendapatkan persetujuan.");
                 }),
             Action::make('approve')
                 ->label('Approve')
                 ->color('success')
                 ->icon('heroicon-o-check-badge')
-                ->requiresConfirmation()
+                ->modalWidth('6xl')
+                ->modalHeading('Approve Order Request')
+                ->modalDescription('Tinjau dan setujui Order Request ini. Pilih item yang akan dibuatkan Purchase Order.')
+                ->modalSubmitActionLabel('Approve')
+                ->fillForm(function ($record) {
+                    $taxType = $record->tax_type ?? 'None';
+                    $items = $record->orderRequestItem->map(function ($item) use ($taxType) {
+                        $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                        $taxPct = (float)($item->tax ?? 0);
+                        $base = max(0, $remainingQty) * (float)($item->unit_price ?? 0);
+                        try {
+                            $taxRes = \App\Services\TaxService::compute($base, $taxPct, $taxType);
+                            $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
+                            $subtotal = number_format($taxRes['total'], 0, ',', '.');
+                        } catch (\Throwable $e) {
+                            $taxNom = '0';
+                            $subtotal = '0';
+                        }
+                        return [
+                            'item_id'        => $item->id,
+                            'product_name'   => "({$item->product->sku}) {$item->product->name}",
+                            'quantity'       => max(0, $remainingQty),
+                            'unit_price'     => $item->unit_price ?? 0,
+                            'tax'            => $taxPct,
+                            'tax_nominal'    => $taxNom,
+                            'subtotal'       => $subtotal,
+                            'include'        => $remainingQty > 0,
+                        ];
+                    })->values()->toArray();
+
+                    return [
+                        'supplier_id'           => $record->supplier_id,
+                        'create_purchase_order' => true,
+                        'selected_items'        => $items,
+                    ];
+                })
                 ->form([
-                    Toggle::make('create_purchase_order')
-                        ->label('Create Purchase Order')
-                        ->default(true)
-                        ->reactive(),
-                    Select::make('supplier_id')
-                        ->label('Supplier')
-                        ->preload()
-                        ->searchable()
-                        ->default(fn() => $this->resolveDefaultSupplierId())
-                        ->options(function () {
-                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                            });
-                        })
-                        ->getSearchResultsUsing(function (string $search) {
-                            return Supplier::where('perusahaan', 'like', "%{$search}%")
-                                ->orWhere('code', 'like', "%{$search}%")
-                                ->limit(50)
-                                ->get()
-                                ->mapWithKeys(function ($supplier) {
-                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                });
-                        })
-                        ->required()
-                        ->visible(fn($get) => $get('create_purchase_order')),
-                    TextInput::make('po_number')
-                        ->label('PO Number')
-                        ->string()
-                        ->maxLength(255)
-                        ->required()
-                        ->suffixAction(
-                            FormAction::make('generatePoNumber')
-                                ->icon('heroicon-o-arrow-path')
-                                ->action(function ($set) {
-                                    $set('po_number', HelperController::generatePoNumber());
+                    Section::make('Opsi Persetujuan')
+                        ->icon('heroicon-o-cog-6-tooth')
+                        ->schema([
+                            Toggle::make('create_purchase_order')
+                                ->label('Buat Purchase Order secara otomatis?')
+                                ->helperText('Aktifkan untuk langsung membuat PO setelah approval.')
+                                ->default(true)
+                                ->live()
+                                ->columnSpanFull(),
+                        ]),
+                    Section::make('Informasi Purchase Order')
+                        ->icon('heroicon-o-document-text')
+                        ->columns(2)
+                        ->visible(fn(Get $get) => $get('create_purchase_order'))
+                        ->schema([
+                            Select::make('supplier_id')
+                                ->label('Supplier')
+                                ->preload()
+                                ->searchable()
+                                ->columnSpanFull()
+                                ->options(function () {
+                                    return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                    });
                                 })
-                        )
-                        ->visible(fn($get) => $get('create_purchase_order')),
-                    DatePicker::make('order_date')
-                        ->label('Order Date')
-                        ->required()
-                        ->visible(fn($get) => $get('create_purchase_order')),
-                    DatePicker::make('expected_date')
-                        ->label('Expected Date')
-                        ->nullable()
-                        ->visible(fn($get) => $get('create_purchase_order')),
-                    Textarea::make('note')
-                        ->label('Note')
-                        ->nullable()
-                        ->visible(fn($get) => $get('create_purchase_order'))
+                                ->getSearchResultsUsing(function (string $search) {
+                                    return Supplier::where('perusahaan', 'like', "%{$search}%")
+                                        ->orWhere('code', 'like', "%{$search}%")
+                                        ->limit(50)
+                                        ->get()
+                                        ->mapWithKeys(function ($supplier) {
+                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                        });
+                                })
+                                ->required(fn(Get $get) => $get('create_purchase_order'))
+                                ->validationMessages(['required' => 'Supplier wajib dipilih.']),
+                            TextInput::make('po_number')
+                                ->label('PO Number')
+                                ->string()
+                                ->maxLength(255)
+                                ->required(fn(Get $get) => $get('create_purchase_order'))
+                                ->suffixAction(
+                                    FormAction::make('generatePoNumber')
+                                        ->icon('heroicon-o-arrow-path')
+                                        ->tooltip('Generate PO Number')
+                                        ->action(fn($set) => $set('po_number', HelperController::generatePoNumber()))
+                                )
+                                ->validationMessages(['required' => 'Nomor PO wajib diisi.']),
+                            DatePicker::make('order_date')
+                                ->label('Order Date')
+                                ->required(fn(Get $get) => $get('create_purchase_order'))
+                                ->native(false)
+                                ->displayFormat('d M Y')
+                                ->validationMessages(['required' => 'Tanggal order wajib diisi.']),
+                            DatePicker::make('expected_date')
+                                ->label('Expected Delivery Date')
+                                ->nullable()
+                                ->native(false)
+                                ->displayFormat('d M Y'),
+                            Textarea::make('note')
+                                ->label('Catatan')
+                                ->rows(3)
+                                ->columnSpanFull()
+                                ->nullable(),
+                        ]),
+                    Section::make('Pilih Item yang Akan Dibeli')
+                        ->description('Centang item yang akan dimasukkan ke PO. Harga Override dapat diubah; Harga Asli berasal dari master produk.')
+                        ->icon('heroicon-o-shopping-cart')
+                        ->collapsible()
+                        ->visible(fn(Get $get) => $get('create_purchase_order'))
+                        ->schema([
+                            Repeater::make('selected_items')
+                                ->label('')
+                                ->columns(4)
+                                ->addable(false)
+                                ->deletable(false)
+                                ->reorderable(false)
+                                ->schema([
+                                    Hidden::make('item_id'),
+                                    TextInput::make('product_name')
+                                        ->label('Nama Produk')
+                                        ->readOnly(),
+                                    TextInput::make('quantity')
+                                        ->label('Qty')
+                                        ->numeric()
+                                        ->minValue(0)
+                                        ->required(),
+                                    TextInput::make('unit_price')
+                                        ->label('Harga Override (Rp)')
+                                        ->minValue(0)
+                                        ->indonesianMoney(),
+                                    TextInput::make('tax')
+                                        ->label('Pajak (%)')
+                                        ->numeric()
+                                        ->readOnly()
+                                        ->suffix('%'),
+                                    TextInput::make('tax_nominal')
+                                        ->label('Nominal Pajak (Rp)')
+                                        ->prefix('Rp')
+                                        ->readOnly(),
+                                    TextInput::make('subtotal')
+                                        ->label('Subtotal (Rp)')
+                                        ->prefix('Rp')
+                                        ->readOnly(),
+                                    Checkbox::make('include')
+                                        ->label('Sertakan')
+                                        ->default(true),
+                                ]),
+                        ]),
                 ])
                 ->visible(function ($record) {
                     return Auth::user()->hasPermissionTo('approve order request') && $record->status == 'draft';
@@ -106,7 +205,6 @@ class ViewOrderRequest extends ViewRecord
                 ->action(function (array $data, $record) {
                     $orderRequestService = app(OrderRequestService::class);
                     if ($data['create_purchase_order']) {
-                        // Check purchase order number
                         $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                         if ($purchaseOrder) {
                             HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
@@ -115,62 +213,162 @@ class ViewOrderRequest extends ViewRecord
                     }
 
                     $orderRequestService->approve($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request Approved");
+                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
                 }),
             Action::make('create_purchase_order')
                 ->label('Create Purchase Order')
                 ->color('info')
                 ->icon('heroicon-o-document-plus')
-                ->requiresConfirmation()
+                ->modalWidth('6xl')
+                ->modalHeading('Buat Purchase Order')
+                ->modalDescription('Pilih item yang akan dimasukkan ke Purchase Order baru. Harga Override dapat diubah.')
+                ->fillForm(function ($record) {
+                    $taxType = $record->tax_type ?? 'None';
+                    $items = $record->orderRequestItem->map(function ($item) use ($taxType) {
+                        $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                        $taxPct = (float)($item->tax ?? 0);
+                        $base = max(0, $remainingQty) * (float)($item->unit_price ?? 0);
+                        try {
+                            $taxRes = \App\Services\TaxService::compute($base, $taxPct, $taxType);
+                            $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
+                        } catch (\Throwable $e) {
+                            $taxNom = '0';
+                        }
+                        return [
+                            'item_id'        => $item->id,
+                            'product_name'   => "({$item->product->sku}) {$item->product->name}",
+                            'quantity'       => max(0, $remainingQty),
+                            'original_price' => $item->original_price ?? $item->unit_price ?? 0,
+                            'unit_price'     => $item->unit_price ?? 0,
+                            'tax'            => $taxPct,
+                            'tax_nominal'    => $taxNom,
+                            'include'        => $remainingQty > 0,
+                        ];
+                    })->values()->toArray();
+
+                    return [
+                        'supplier_id'    => $record->supplier_id,
+                        'selected_items' => $items,
+                    ];
+                })
                 ->form([
-                    Select::make('supplier_id')
-                        ->label('Supplier')
-                        ->preload()
-                        ->searchable()
-                        ->default(fn() => $this->resolveDefaultSupplierId())
-                        ->options(function () {
-                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                            });
-                        })
-                        ->getSearchResultsUsing(function (string $search) {
-                            return Supplier::where('perusahaan', 'like', "%{$search}%")
-                                ->orWhere('code', 'like', "%{$search}%")
-                                ->limit(50)
-                                ->get()
-                                ->mapWithKeys(function ($supplier) {
-                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                });
-                        })
-                        ->required(),
-                    TextInput::make('po_number')
-                        ->label('PO Number')
-                        ->string()
-                        ->maxLength(255)
-                        ->required()
-                        ->suffixAction(
-                            FormAction::make('generatePoNumber')
-                                ->icon('heroicon-o-arrow-path')
-                                ->action(function ($set) {
-                                    $set('po_number', HelperController::generatePoNumber());
+                    Section::make('Informasi Purchase Order')
+                        ->icon('heroicon-o-document-text')
+                        ->columns(2)
+                        ->schema([
+                            Select::make('supplier_id')
+                                ->label('Supplier')
+                                ->preload()
+                                ->searchable()
+                                ->columnSpanFull()
+                                ->options(function () {
+                                    return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
+                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                    });
                                 })
-                        ),
-                    DatePicker::make('order_date')
-                        ->label('Order Date')
-                        ->required(),
-                    DatePicker::make('expected_date')
-                        ->label('Expected Date')
-                        ->nullable(),
-                    Textarea::make('note')
-                        ->label('Note')
-                        ->nullable()
+                                ->getSearchResultsUsing(function (string $search) {
+                                    return Supplier::where('perusahaan', 'like', "%{$search}%")
+                                        ->orWhere('code', 'like', "%{$search}%")
+                                        ->limit(50)
+                                        ->get()
+                                        ->mapWithKeys(function ($supplier) {
+                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
+                                        });
+                                })
+                                ->required()
+                                ->validationMessages(['required' => 'Supplier wajib dipilih.']),
+                            TextInput::make('po_number')
+                                ->label('PO Number')
+                                ->string()
+                                ->maxLength(255)
+                                ->required()
+                                ->suffixAction(
+                                    FormAction::make('generatePoNumber')
+                                        ->icon('heroicon-o-arrow-path')
+                                        ->tooltip('Generate PO Number')
+                                        ->action(fn($set) => $set('po_number', HelperController::generatePoNumber()))
+                                )
+                                ->validationMessages(['required' => 'Nomor PO wajib diisi.']),
+                            DatePicker::make('order_date')
+                                ->label('Order Date')
+                                ->required()
+                                ->native(false)
+                                ->displayFormat('d M Y')
+                                ->validationMessages(['required' => 'Tanggal order wajib diisi.']),
+                            DatePicker::make('expected_date')
+                                ->label('Expected Delivery Date')
+                                ->nullable()
+                                ->native(false)
+                                ->displayFormat('d M Y'),
+                            Textarea::make('note')
+                                ->label('Catatan')
+                                ->rows(3)
+                                ->columnSpanFull()
+                                ->nullable(),
+                        ]),
+                    Section::make('Pilih Item yang Akan Dibeli')
+                        ->description('Centang item yang akan dimasukkan ke dalam Purchase Order ini. Anda dapat mengubah harga override per item.')
+                        ->icon('heroicon-o-shopping-cart')
+                        ->collapsible()
+                        ->schema([
+                            Repeater::make('selected_items')
+                                ->label('')
+                                ->columns(12)
+                                ->addable(false)
+                                ->deletable(false)
+                                ->reorderable(false)
+                                ->schema([
+                                    Hidden::make('item_id'),
+                                    TextInput::make('product_name')
+                                        ->label('Nama Produk')
+                                        ->readOnly()
+                                        ->columnSpan(3),
+                                    TextInput::make('quantity')
+                                        ->label('Qty')
+                                        ->numeric()
+                                        ->minValue(0)
+                                        ->required()
+                                        ->columnSpan(1),
+                                    TextInput::make('original_price')
+                                        ->label('Harga Asli')
+                                        ->prefix('Rp')
+                                        ->readOnly()
+                                        ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
+                                        ->columnSpan(2),
+                                    TextInput::make('unit_price')
+                                        ->label('Harga Override')
+                                        ->minValue(0)
+                                        ->indonesianMoney()
+                                        ->columnSpan(2),
+                                    TextInput::make('tax')
+                                        ->label('Pajak (%)')
+                                        ->numeric()
+                                        ->readOnly()
+                                        ->suffix('%')
+                                        ->columnSpan(1),
+                                    TextInput::make('tax_nominal')
+                                        ->label('Nominal Pajak (Rp)')
+                                        ->prefix('Rp')
+                                        ->readOnly()
+                                        ->columnSpan(2),
+                                    Checkbox::make('include')
+                                        ->label('Sertakan')
+                                        ->default(true)
+                                        ->columnSpan(1),
+                                ]),
+                        ]),
                 ])
                 ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('approve order request') && $record->status == 'approved' && !$record->purchaseOrder;
+                    if (!Auth::user()->hasPermissionTo('approve order request') || $record->status !== 'approved') {
+                        return false;
+                    }
+                    // Show button as long as some items still have unfulfilled quantity
+                    return $record->orderRequestItem->contains(
+                        fn($item) => ($item->quantity - ($item->fulfilled_quantity ?? 0)) > 0
+                    );
                 })
                 ->action(function (array $data, $record) {
                     $orderRequestService = app(OrderRequestService::class);
-                    // Check purchase order number
                     $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                     if ($purchaseOrder) {
                         HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
@@ -178,31 +376,8 @@ class ViewOrderRequest extends ViewRecord
                     }
 
                     $orderRequestService->createPurchaseOrder($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order Created");
+                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
                 })
         ];
-    }
-
-    /**
-     * Resolve a default supplier id from the current order request's products.
-     * If all products share the same supplier, return that supplier id, otherwise null.
-     */
-    private function resolveDefaultSupplierId(): ?int
-    {
-        if (!isset($this->record)) {
-            return null;
-        }
-
-        $items = $this->record->orderRequestItem()->with('product')->get();
-
-        $supplierIds = $items->map(function ($item) {
-            return optional($item->product)->supplier_id;
-        })->filter()->unique()->values();
-
-        if ($supplierIds->count() === 1) {
-            return $supplierIds->first();
-        }
-
-        return null;
     }
 }

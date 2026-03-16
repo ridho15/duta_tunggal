@@ -308,4 +308,42 @@ class QcBeforeReceiptTest extends TestCase
         $this->assertEquals(0, $receiptItem->qty_accepted);
         $this->assertEquals(10, $receiptItem->qty_rejected);
     }
+
+    /**
+     * @test
+     * QC completion should not crash when the product has no COA accounts
+     * configured (relations return default models with null ids).  In that
+     * circumstance the service skips journal creation entirely.
+     */
+    public function qc_with_missing_coa_accounts_skips_journals()
+    {
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $this->product->id,
+            'quantity' => 3,
+            'unit_price' => 5000,
+        ]);
+
+        $qcService = app(QualityControlService::class);
+        $qc = $qcService->createQCFromPurchaseOrderItem($poItem, [
+            'inspected_by' => $this->user->id,
+            'passed_quantity' => 3,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        // should not throw
+        $qcService->completeQualityControl($qc, []);
+
+        $this->assertDatabaseHas('quality_controls', ['id' => $qc->id]);
+        $this->assertFalse(JournalEntry::where('source_type', QualityControl::class)
+            ->where('source_id', $qc->id)
+            ->exists(), 'No QC-related journals should be created');
+    }
 }

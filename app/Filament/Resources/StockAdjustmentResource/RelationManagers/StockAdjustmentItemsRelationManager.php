@@ -71,21 +71,22 @@ class StockAdjustmentItemsRelationManager extends RelationManager
 
                 TextInput::make('unit_cost')
                     ->label('Harga Satuan')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->default(0)
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = $state ?? 0;
+                        $unitCost = \App\Helpers\MoneyHelper::parse($state ?? 0);
                         $differenceValue = $differenceQty * $unitCost;
                         $set('difference_value', $differenceValue);
                     }),
 
                 TextInput::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->disabled()
-                    ->dehydrated(),
+                    ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : ''),
 
                 Textarea::make('notes')
                     ->label('Catatan')

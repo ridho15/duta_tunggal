@@ -523,7 +523,8 @@ test('purchase return auto created for rejected items in receipt', function () {
     // Now seed suppliers after cabang exists
     test()->seed(\Database\Seeders\SupplierSeeder::class);
 
-    $user = User::factory()->create(['cabang_id' => 1]);
+    $cabang = Cabang::first();
+    $user = User::factory()->create(['cabang_id' => $cabang->id]);
     test()->actingAs($user);
 
     // Create purchase order
@@ -535,7 +536,7 @@ test('purchase return auto created for rejected items in receipt', function () {
         'received_by' => $user->id,
         'expected_date' => now()->addDays(rand(3, 14)),
         'total_amount' => 1000000,
-        'cabang_id' => Cabang::first()->id,
+        'cabang_id' => $cabang->id,
         'warehouse_id' => 1,
         'tempo_hutang' => 30,
         'created_by' => $user->id,
@@ -558,7 +559,7 @@ test('purchase return auto created for rejected items in receipt', function () {
         'purchase_order_id' => $purchaseOrder->id,
         'receipt_number' => 'RN-' . now()->format('Ymd') . '-001',
         'receipt_date' => now(),
-        'cabang_id' => Cabang::first()->id,
+        'cabang_id' => $cabang->id,
         'received_by' => $user->id,
         'total_received' => 1000000,
         'currency_id' => 1,
@@ -606,7 +607,8 @@ test('purchase return not created when no rejected items', function () {
     // Now seed suppliers after cabang exists
     test()->seed(\Database\Seeders\SupplierSeeder::class);
 
-    $user = User::factory()->create(['cabang_id' => 1]);
+    $cabang = Cabang::first();
+    $user = User::factory()->create(['cabang_id' => $cabang->id]);
     test()->actingAs($user);
 
     // Create purchase order
@@ -618,7 +620,9 @@ test('purchase return not created when no rejected items', function () {
         'received_by' => $user->id,
         'expected_date' => now()->addDays(rand(3, 14)),
         'total_amount' => 1000000,
-        'cabang_id' => Cabang::first()->id,
+        'cabang_id' => $cabang->id,
+        'warehouse_id' => 1,
+        'tempo_hutang' => 30,
         'created_by' => $user->id,
         'approved_by' => $user->id,
         'date_approved' => now(),
@@ -631,6 +635,7 @@ test('purchase return not created when no rejected items', function () {
         'quantity' => 10,
         'unit_price' => 100000,
         'subtotal' => 1000000,
+        'currency_id' => 1,
     ]);
 
     // Create purchase receipt with NO rejected items
@@ -638,8 +643,8 @@ test('purchase return not created when no rejected items', function () {
         'purchase_order_id' => $purchaseOrder->id,
         'receipt_number' => 'RN-' . now()->format('Ymd') . '-002',
         'receipt_date' => now(),
-        'cabang_id' => Cabang::first()->id,
-        'created_by' => $user->id,
+        'cabang_id' => $cabang->id,
+        'received_by' => $user->id,
         'total_received' => 1000000,
         'currency_id' => 1,
     ]);

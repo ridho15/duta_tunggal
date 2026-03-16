@@ -86,7 +86,8 @@
                 <th>Qty</th>
                 <th>Harga Satuan</th>
                 <th>Discount</th>
-                <th>Tax</th>
+                <th>Tax (%)</th>
+                <th>Tax Amount</th>
                 <th>Subtotal</th>
             </tr>
         </thead>
@@ -94,8 +95,15 @@
             @php $total = 0; @endphp
             @foreach ($saleOrder->saleOrderItem as $index => $item)
             @php
-            $subtotal = $item->quantity * $item->unit_price - $item->discount + $item->tax;
-            $total += $subtotal;
+                // compute using TaxService for accuracy (handles inclusive/exclusive)
+                $lineBase = $item->quantity * $item->unit_price;
+                $discountAmount = $lineBase * ($item->discount / 100);
+                $afterDiscount = $lineBase - $discountAmount;
+                $taxType = $item->tipe_pajak ?? 'Eksklusif';
+                $taxResult = \App\Services\TaxService::compute($afterDiscount, (float)$item->tax, $taxType);
+                $taxAmount = $taxResult['ppn'];
+                $subtotal = $taxResult['total'];
+                $total += $subtotal;
             @endphp
             <tr>
                 <td>{{ $index + 1 }}</td>
@@ -103,12 +111,13 @@
                 <td>{{ $item->quantity }}</td>
                 <td>Rp {{ number_format($item->unit_price, 0, ',', '.') }}</td>
                 <td>Rp {{ number_format($item->discount, 0, ',', '.') }}</td>
-                <td>Rp {{ number_format($item->tax, 0, ',', '.') }}</td>
+                <td>{{ number_format($item->tax, 2) }}%</td>
+                <td>Rp {{ number_format($taxAmount, 0, ',', '.') }}</td>
                 <td>Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
             </tr>
             @endforeach
             <tr>
-                <td colspan="6" class="total">Total</td>
+                <td colspan="7" class="total">Total</td>
                 <td class="total">Rp {{ number_format($total, 0, ',', '.') }}</td>
             </tr>
         </tbody>

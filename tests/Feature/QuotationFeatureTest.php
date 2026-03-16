@@ -1,11 +1,13 @@
 <?php
 
+use App\Models\Cabang;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\SaleOrder;
+use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Services\QuotationService;
 use Carbon\Carbon;
@@ -16,6 +18,10 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->quotationService = new QuotationService();
+    // Shared Cabang and UOM used by tests that create Products.
+    // Hard-coding id=1 fails under RefreshDatabase — factories ensure the FK exists.
+    $this->cabang = Cabang::factory()->create(['kode' => 'TEST']);
+    $this->uom    = UnitOfMeasure::factory()->create();
 });
 
 test('can create quotation with customer selection and auto-number generation', function () {
@@ -77,19 +83,19 @@ test('can add product items to quotation with quantity and price', function () {
     $productCategory = ProductCategory::create([
         'name' => 'Test Category',
         'kode' => 'TC001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'kenaikan_harga' => 0,
     ]);
 
     $product = Product::create([
         'name' => 'Test Product',
         'sku' => 'PROD001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'TEST',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -145,19 +151,19 @@ test('can calculate quotation totals with subtotal discount and tax', function (
     $productCategory = ProductCategory::create([
         'name' => 'Test Category',
         'kode' => 'TC001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'kenaikan_harga' => 0,
     ]);
 
     $product1 = Product::create([
         'name' => 'Test Product 1',
         'sku' => 'PROD001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'TEST1',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -166,12 +172,12 @@ test('can calculate quotation totals with subtotal discount and tax', function (
     $product2 = Product::create([
         'name' => 'Test Product 2',
         'sku' => 'PROD002',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 200000,
         'cost_price' => 160000,
         'kode_merk' => 'TEST2',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -271,19 +277,19 @@ test('can handle customer acceptance and convert to sales order', function () {
     $productCategory = ProductCategory::create([
         'name' => 'Test Category',
         'kode' => 'TC001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'kenaikan_harga' => 0,
     ]);
 
     $product = Product::create([
         'name' => 'Test Product',
         'sku' => 'PROD001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'TEST',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -515,4 +521,141 @@ test('quotation approval workflow works correctly', function () {
     expect($quotation2->status)->toBe('reject')
         ->and($quotation2->reject_by)->toBe($user->id)
         ->and($quotation2->reject_at)->toBeInstanceOf(Carbon::class);
+});
+
+// ─── tax_type tests ──────────────────────────────────────────────────────────
+
+test('quotation item stores tax_type None by default', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0001',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 100000,
+        'discount'     => 0,
+        'tax'          => 12,
+        // tax_type omitted — DB default is 'None' (changed by migration 2026_03_12_000001)
+    ]);
+
+    $item->refresh();
+    expect($item->tax_type)->toBe('None');
+});
+
+test('quotation item stores tax_type Inclusive when explicitly set', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0002',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 2500000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'Inclusive',
+    ]);
+
+    $item->refresh();
+    expect($item->tax_type)->toBe('Inclusive');
+});
+
+test('QuotationService updateTotalAmount uses Exclusive tax_type correctly', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0003',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    // 1 qty x 2,500,000, 0% discount, 12% Exclusive -> total = 2,800,000
+    QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 2500000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'Exclusive',
+    ]);
+
+    $this->quotationService->updateTotalAmount($quotation);
+    $quotation->refresh();
+
+    // Exclusive: 2,500,000 + 12% = 2,800,000
+    expect((float) $quotation->total_amount)->toBe(2800000.0);
+});
+
+test('QuotationService updateTotalAmount uses Inclusive tax_type correctly', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0004',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    // 1 qty x 2,500,000, 0% discount, 12% Inclusive -> total stays 2,500,000
+    QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 2500000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'Inclusive',
+    ]);
+
+    $this->quotationService->updateTotalAmount($quotation);
+    $quotation->refresh();
+
+    // Inclusive: total stays at gross amount 2,500,000
+    expect((float) $quotation->total_amount)->toBe(2500000.0);
+});
+
+test('quotation item tax_type persists through update', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0005',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 100000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'Exclusive',
+    ]);
+
+    $item->update(['tax_type' => 'Inclusive']);
+    $item->refresh();
+
+    expect($item->tax_type)->toBe('Inclusive');
 });

@@ -31,14 +31,19 @@ class InvoiceObserver
         // Create AP or AR depending on source
         if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder') {
             // Create Account Payable
-            $accountPayable = AccountPayable::create([
+            $data = [
                 'invoice_id' => $invoice->id,
                 'supplier_id' => $invoice->fromModel->supplier_id,
                 'total' => $invoice->total,
                 'paid' => 0,
                 'remaining' => $invoice->total,
-                'status' => 'Belum Lunas'
-            ]);
+                'status' => 'Belum Lunas',
+            ];
+            // branch column may not exist on older installs; include only when present
+            if (\Illuminate\Support\Facades\Schema::hasColumn('account_payables', 'cabang_id')) {
+                $data['cabang_id'] = $invoice->cabang_id;
+            }
+            $accountPayable = AccountPayable::create($data);
             // Create Ageing Schedule
             $accountPayable->ageingSchedule()->create([
                 'invoice_date' => $invoice->invoice_date,
@@ -48,7 +53,14 @@ class InvoiceObserver
             ]);
 
             // Post journal entries for purchase invoice (accrual basis)
-            $this->ledger->postInvoice($invoice);
+            try {
+                $this->ledger->postInvoice($invoice);
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to post purchase invoice journal on create', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
         } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
             // Create Account Receivable
             $accountReceivable = AccountReceivable::create([
@@ -57,7 +69,8 @@ class InvoiceObserver
                 'total' => $invoice->total,
                 'paid' => 0,
                 'remaining' => $invoice->total,
-                'status' => "Belum Lunas"
+                'status' => "Belum Lunas",
+                'cabang_id' => $invoice->cabang_id, // FIX #5: propagate branch scope so AR is visible to branch users
             ]);
             // Create Ageing Schedule
             $accountReceivable->ageingSchedule()->create([
@@ -110,26 +123,47 @@ class InvoiceObserver
                 ->delete();
 
             // Re-post journal entries with new amounts
-            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
-                $this->postSalesInvoice($invoice);
-            } else {
-                $this->ledger->postInvoice($invoice);
+            try {
+                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                    $this->postSalesInvoice($invoice);
+                } else {
+                    $this->ledger->postInvoice($invoice);
+                }
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to re-post journal on update', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
             }
         }
 
         // When invoice status becomes 'paid', post to ledger (if not already posted)
         if (strtolower($invoice->status) === 'paid') {
-            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
-                $this->postSalesInvoice($invoice);
-            } else {
-                $this->ledger->postInvoice($invoice);
+            try {
+                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                    $this->postSalesInvoice($invoice);
+                } else {
+                    $this->ledger->postInvoice($invoice);
+                }
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to post on status=paid', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
             }
         }
 
         // When invoice status becomes 'approved', post sales invoice journal entries
         if ($invoice->wasChanged('status') && strtolower($invoice->status) === 'approved') {
-            if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
-                $this->postSalesInvoice($invoice);
+            try {
+                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                    $this->postSalesInvoice($invoice);
+                }
+            } catch (\Throwable $e) {
+                Log::error('InvoiceObserver: failed to post on status=approved', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
             }
         }
     }
@@ -240,11 +274,10 @@ class InvoiceObserver
         // Create detailed CREDIT entries for each invoice item
         foreach ($invoice->invoiceItem as $item) {
             $productName = $item->product->name ?? 'Unknown Product';
-            $subtotal = (float) $item->subtotal; // Revenue after discount
-            $taxAmount = (float) $item->tax_amount;
-            $discountAmount = (float) $item->discount * (float) $item->quantity;
 
             // CREDIT: Revenue/Sales for this item
+            // item->subtotal is already net of discount, so no separate discount entry is needed
+            // (using net method: revenue is recorded after discount, keeping entries balanced)
             if ($item->total > 0) {
                 $itemCoaId = $item->product->sales_coa_id ?? $revenueCoa->id;
                 \App\Models\JournalEntry::create([
@@ -253,7 +286,7 @@ class InvoiceObserver
                     'reference' => $invoice->invoice_number,
                     'description' => "Sales Invoice - Revenue: {$productName}",
                     'debit' => 0,
-                    'credit' => $item->subtotal, // Use subtotal (revenue before tax)
+                    'credit' => $item->subtotal, // Revenue net of discount
                     'journal_type' => 'sales',
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
@@ -261,27 +294,17 @@ class InvoiceObserver
                 $totalRevenue += $item->subtotal;
             }
 
-            // DEBIT: Sales Discount for this item (if any)
-            if ($discountAmount > 0 && $discountCoa) {
-                \App\Models\JournalEntry::create([
-                    'coa_id' => $discountCoa->id,
-                    'date' => $date,
-                    'reference' => $invoice->invoice_number,
-                    'description' => "Sales Invoice - Discount: {$productName}",
-                    'debit' => $discountAmount,
-                    'credit' => 0,
-                    'journal_type' => 'sales',
-                    'source_type' => Invoice::class,
-                    'source_id' => $invoice->id,
-                ]);
-                $totalDiscount += $discountAmount;
-            }
-
         }
 
-        // CREDIT: PPn Keluaran at invoice level — use the authoritative stored tax value
-        // Do NOT use max() of two independent calculations, which would cause journal imbalance
-        $totalTaxAmount = max(0.0, (float) $invoice->tax);
+        // CREDIT: PPn Keluaran at invoice level.
+        // FIX #2: Use sum of invoice items' pre-computed tax_amount as primary source.
+        // This is accurate for all tax types (Inclusive/Exclusive) and mixed-rate scenarios.
+        // Fallback to rate-based computation if items have no tax_amount (backward compat).
+        $totalTaxAmount = (float) $invoice->invoiceItem->sum('tax_amount');
+        if ($totalTaxAmount <= 0 && $invoice->tax > 0) {
+            // Fallback: invoice->tax stores the rate (e.g. 11 for 11%)
+            $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ((float) $invoice->tax / 100));
+        }
         
         if ($totalTaxAmount > 0 && $ppnKeluaranCoa) {
             \App\Models\JournalEntry::create([

@@ -37,7 +37,7 @@ class PurchaseReceiptItemResource extends Resource
     // Put Purchase Receipt Item under the Purchase Order group
     protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 6;
 
     public static function shouldRegisterNavigation(): bool
     {

@@ -102,6 +102,16 @@ class CompleteSalesFlowTest extends DuskTestCase
 
             $invoice = Invoice::latest()->first();
 
+            // verify that the admin view page shows a monetary PPN amount, not the raw rate
+            $expectedPpn = number_format(
+                $invoice->subtotal * ($invoice->ppn_rate / 100),
+                0, ',', '.'
+            );
+            $browser->visit("/admin/sales-invoices/{$invoice->id}")
+                ->assertSee('PPN Amount')
+                ->assertDontSee('Rp 11')
+                ->assertSee("Rp {$expectedPpn}");
+
             // 6. Create Customer Receipt
             $browser->visit('/admin/customer-receipts')
                 ->click('a[href="/admin/customer-receipts/create"]')

@@ -80,11 +80,13 @@ class QualityControlManufactureTest extends TestCase
             'cabang_id' => $cabang->id,
         ]);
 
+        $uom = UnitOfMeasure::first();
+
         \App\Models\BillOfMaterialItem::create([
             'bill_of_material_id' => $bom->id,
             'product_id' => $materialProduct->id,
             'quantity' => 2, // 2 units of raw material needed per finished product
-            'uom_id' => 1, // Assuming UOM ID 1 exists from seeder
+            'uom_id' => $uom->id,
         ]);
 
         // Create production plan
@@ -94,7 +96,7 @@ class QualityControlManufactureTest extends TestCase
             'source_type' => 'manual',
             'product_id' => $product->id,
             'quantity' => 10,
-            'uom_id' => 1, // Assuming UOM ID 1 exists from seeder
+            'uom_id' => $uom->id,
             'warehouse_id' => $warehouse->id,
             'bill_of_material_id' => $bom->id, // Link BOM to production plan
             'start_date' => now(),

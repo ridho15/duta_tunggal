@@ -207,6 +207,12 @@ class AccountPayableFilamentFlowTest extends TestCase
             'notes' => 'Full payment for invoice',
         ]);
 
+        // verify view page contains invoice information
+        $response = $this->get("/admin/vendor-payments/{$vendorPayment->id}");
+        $response->assertStatus(200);
+        $response->assertSee('INV-FILAMENT-TEST-001');
+        $response->assertSee($invoice->due_date->format('Y-m-d'));
+
         // === PHASE 7: Simulate Payment Status Update to 'Paid' (triggers journal entries) ===
         // This simulates clicking save/submit on the vendor payment form
         $vendorPayment->update(['status' => 'Paid']);

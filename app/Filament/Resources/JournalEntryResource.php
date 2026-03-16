@@ -37,7 +37,7 @@ class JournalEntryResource extends Resource
 
     protected static ?string $navigationGroup = 'Finance - Akuntansi';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 1;
 
     public static function getEloquentQuery(): Builder
     {

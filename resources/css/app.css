@@ -35,6 +35,18 @@ select:focus[data-flux-control] {
     @apply outline-none ring-2 ring-blue-500 ring-offset-2;
 }
 
+/* Ensure flatpickr calendar (date picker) is always on top of Filament select dropdowns */
+.flatpickr-calendar {
+    z-index: 99999 !important;
+}
+
+/* If Filament/Tom Select dropdowns overlap the date picker, keep them below */
+.ts-dropdown,
+.filament-forms-select-dropdown,
+.select2-dropdown {
+    z-index: 9999 !important;
+}
+
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */

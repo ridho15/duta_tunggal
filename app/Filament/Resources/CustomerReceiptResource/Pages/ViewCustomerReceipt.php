@@ -61,8 +61,6 @@ class ViewCustomerReceipt extends ViewRecord
                                     ->rupiah(),
                                 Infolists\Components\TextEntry::make('payment_method')
                                     ->label('Metode Pembayaran'),
-                                Infolists\Components\TextEntry::make('ntpn')
-                                    ->label('NTPN'),
                                 Infolists\Components\TextEntry::make('coa.name')
                                     ->label('Akun Pembayaran'),
                                 Infolists\Components\TextEntry::make('status')

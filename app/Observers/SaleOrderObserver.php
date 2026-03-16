@@ -6,12 +6,31 @@ use App\Models\SaleOrder;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
 use App\Models\InvoiceItem;
+use App\Models\StockReservation;
 use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
 use Illuminate\Support\Facades\Log;
 
 class SaleOrderObserver
 {
+    /**
+     * Handle the SaleOrder "created" event.
+     * Diperlukan untuk menangani SO yang dibuat langsung dengan status 'approved'
+     * (misalnya SO dari Quotation yang sudah approved).
+     */
+    public function created(SaleOrder $saleOrder): void
+    {
+        // Jika SO dibuat langsung dengan status 'approved' (dari Quotation yang sudah approved),
+        // buat warehouse confirmation otomatis seperti saat SO di-approve
+        if ($saleOrder->status === 'approved') {
+            Log::info('SaleOrderObserver: SO created with approved status, creating warehouse confirmation', [
+                'sale_order_id' => $saleOrder->id,
+                'so_number' => $saleOrder->so_number,
+            ]);
+            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
+        }
+    }
+
     /**
      * Handle the SaleOrder "updated" event.
      */
@@ -35,6 +54,32 @@ class SaleOrderObserver
         if ($saleOrder->wasChanged('total_amount')) {
             $this->syncJournalEntries($saleOrder);
         }
+
+        // Jika status berubah ke 'canceled', lepaskan semua stock reservation
+        if ($originalStatus !== 'canceled' && $newStatus === 'canceled') {
+            $this->releaseStockReservations($saleOrder);
+        }
+    }
+
+    /**
+     * Release all stock reservations for a cancelled sale order.
+     */
+    protected function releaseStockReservations(SaleOrder $saleOrder): void
+    {
+        $count = StockReservation::where('sale_order_id', $saleOrder->id)->count();
+        if ($count === 0) {
+            return;
+        }
+
+        StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
+            $reservation->delete(); // triggers StockReservationObserver::deleted → restores qty_available & decrements qty_reserved
+        });
+
+        Log::info('SaleOrderObserver: Released stock reservations for canceled SO', [
+            'sale_order_id' => $saleOrder->id,
+            'so_number' => $saleOrder->so_number,
+            'reservations_released' => $count,
+        ]);
     }
 
     /**
@@ -66,14 +111,19 @@ class SaleOrderObserver
         $invoiceItems = [];
 
         foreach ($saleOrder->saleOrderItem as $item) {
+            // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
+            // which also defaults to 'Exclusive' (normalises to 'Eksklusif').
+            // Keeping both paths consistent prevents SO total_amount diverging from invoice total.
+            $tipePajak = $item->tipe_pajak ?? 'Eksklusif';
+
             // Calculate subtotal using HelperController for consistency
-            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? null);
+            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $tipePajak);
             // Use TaxService to get correct breakdown
             $taxService = \App\Services\TaxService::class;
             $baseAmount = $item->quantity * $item->unit_price * (1 - $item->discount / 100);
             
             try {
-                $taxResult = $taxService::compute($baseAmount, $item->tax, $item->tipe_pajak ?? null);
+                $taxResult = $taxService::compute($baseAmount, $item->tax, $tipePajak);
                 $lineTax = $taxResult['ppn'];
                 $subtotalBeforeTax = $taxResult['dpp'];
             } catch (\Throwable $e) {
@@ -131,7 +181,19 @@ class SaleOrderObserver
             }
         }
 
-        $total = $subtotal + $tax + $additionalCosts;
+        // FIX #1a: $tax holds the monetary PPN sum; derive the rate to store in invoice->tax.
+        // invoice->tax column (int) must store the rate (e.g. 11 or 12), NOT the monetary amount.
+        // The monetary amount is used for the invoice->total calculation below.
+        $taxMonetaryAmount = $tax;
+        $ppnRate = 0;
+        foreach ($saleOrder->saleOrderItem as $item) {
+            if ($item->tax > 0) {
+                $ppnRate = (int) $item->tax; // Use first non-zero rate (rates normally uniform per invoice)
+                break;
+            }
+        }
+
+        $total = $subtotal + $taxMonetaryAmount + $additionalCosts;
 
         // Load customer data
         $saleOrder->load('customer');
@@ -144,19 +206,29 @@ class SaleOrderObserver
             'customer_object' => $saleOrder->customer,
         ]);
 
+        // FIX #4: Use InvoiceService for proper sequential invoice number generation.
+        $invoiceNumber = (new \App\Services\InvoiceService())->generateInvoiceNumber();
+
         $invoiceData = [
-            'invoice_number' => 'INV-' . $saleOrder->so_number . '-' . now()->format('YmdHis'),
+            'invoice_number' => $invoiceNumber,
             'from_model_type' => SaleOrder::class,
             'from_model_id' => $saleOrder->id,
             'customer_name' => $saleOrder->customer?->name,
             'customer_phone' => $saleOrder->customer?->phone,
             'invoice_date' => now()->toDateString(),
-            'due_date' => now()->addDays(30)->toDateString(), // Default 30 hari
+            'due_date' => now()->addDays(
+                $saleOrder->tempo_pembayaran
+                    ?? $saleOrder->customer?->tempo_kredit
+                    ?? 30
+            )->toDateString(), // Gunakan tempo_pembayaran SO jika ada, lalu default customer, lalu 30 hari
             'subtotal' => $subtotal,
-            'tax' => $tax,
+            'tax' => $ppnRate,         // FIX #1a: store rate (int, e.g. 11), not monetary amount
+            'ppn_rate' => $ppnRate,    // FIX #1a: also populate dedicated ppn_rate field
+            'dpp' => $subtotal,        // FIX #1a: DPP = subtotal (sum of DPP amounts)
             'total' => $total,
             'other_fee' => $otherFees, // Tambahkan biaya tambahan dari delivery orders
             'delivery_orders' => $saleOrder->deliveryOrder->pluck('id')->toArray(), // Tambahkan delivery order IDs
+            'cabang_id' => $saleOrder->cabang_id, // FIX #5: propagate branch scope
             'status' => 'unpaid', // Atau sesuai logic
             'notes' => 'Auto-generated from completed Sale Order ' . $saleOrder->so_number,
         ];
@@ -204,9 +276,10 @@ class SaleOrderObserver
             return;
         }
 
-        // Hanya buat warehouse confirmation untuk tipe pengiriman 'Kirim Langsung'
-        if ($saleOrder->tipe_pengiriman !== 'Kirim Langsung') {
-            Log::info('Skipping warehouse confirmation creation - not "Kirim Langsung" type', [
+        // Hanya buat warehouse confirmation untuk tipe pengiriman yang memerlukan DO
+        // Baik 'Kirim Langsung' maupun 'Ambil Sendiri' sekarang memerlukan DO untuk keperluan tracking
+        if (!in_array($saleOrder->tipe_pengiriman, ['Kirim Langsung', 'Ambil Sendiri'])) {
+            Log::info('Skipping warehouse confirmation creation - unrecognized delivery type', [
                 'tipe_pengiriman' => $saleOrder->tipe_pengiriman
             ]);
             return;
@@ -235,13 +308,16 @@ class SaleOrderObserver
         ]);
 
         // Buat warehouse confirmation items
+        $skippedProducts = [];
         foreach ($saleOrder->saleOrderItem as $item) {
             // Skip item yang tidak memiliki warehouse_id
             if (!$item->warehouse_id) {
+                $productName = $item->product->name ?? ('ID: ' . $item->product_id);
                 Log::warning('Skipping warehouse confirmation item - no warehouse_id', [
                     'sale_order_item_id' => $item->id,
-                    'product_name' => $item->product->name ?? 'Unknown'
+                    'product_name' => $productName,
                 ]);
+                $skippedProducts[] = $productName;
                 continue;
             }
 
@@ -263,6 +339,15 @@ class SaleOrderObserver
             'status' => $wcStatus,
             'auto_approved' => !$hasInsufficientStock,
         ]);
+
+        // Notify if some items were skipped because warehouse_id is missing
+        if (!empty($skippedProducts)) {
+            \Filament\Notifications\Notification::make()
+                ->title('Perhatian: Beberapa Item Tidak Diproses')
+                ->warning()
+                ->body('Item berikut tidak memiliki gudang sehingga tidak dimasukkan ke Warehouse Confirmation: ' . implode(', ', $skippedProducts) . '. Silakan set warehouse pada item SO tersebut.')
+                ->send();
+        }
 
         // Jika WC status adalah confirmed, buat delivery order otomatis
         if ($wcStatus === 'confirmed') {

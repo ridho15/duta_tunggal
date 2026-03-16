@@ -44,6 +44,19 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             return $order->saleOrderItem->pluck('product_id');
         })->unique()->count();
 
+        // prepare totals
+        $totalDpp = 0;
+        $orders->each(function($order) use (&$totalDpp) {
+            $orderTotalDpp = $order->saleOrderItem->sum(function($item) {
+                $lineBase = ($item->quantity ?? 0) * ($item->unit_price ?? 0);
+                $afterDiscount = $lineBase * (1 - (($item->discount ?? 0) / 100));
+                $taxRate = $item->tax ?? 0;
+                $taxResult = \App\Services\TaxService::compute($afterDiscount, $taxRate, $item->tipe_pajak ?? 'Exclusive');
+                return $taxResult['dpp'];
+            });
+            $totalDpp += $orderTotalDpp;
+        });
+
         foreach ($orders as $order) {
             // Header row for each order
             $data->push([
@@ -57,6 +70,12 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
                 'Produk' => '',
                 'Qty' => '',
                 'Harga Satuan' => '',
+                'Discount (%)' => '',
+                'Tax Rate (%)' => '',
+                'Tipe Pajak' => '',
+                'DPP' => '',
+                'Tax Amount' => '',
+                'Item Subtotal' => '',
                 'Subtotal' => '',
                 'Total SO' => 'Rp ' . number_format($order->total_amount ?? 0, 0, ',', '.'),
                 'Status' => $order->status,
@@ -65,6 +84,15 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             // Item rows
             foreach ($order->saleOrderItem as $item) {
                 if (($item->unit_price ?? 0) > 0 && ($item->quantity ?? 0) > 0) {
+                    // compute tax and discount values
+                    $lineBase = ($item->quantity ?? 0) * ($item->unit_price ?? 0);
+                    $discountPct = $item->discount ?? 0;
+                    $afterDiscount = $lineBase * (1 - $discountPct/100);
+                    $taxRate = $item->tax ?? 0;
+                    $taxResult = \App\Services\TaxService::compute($afterDiscount, $taxRate, $item->tipe_pajak ?? 'Exclusive');
+                    $taxAmount = $taxResult['ppn'];
+                    $lineSubtotal = $taxResult['total'];
+
                     $data->push([
                         'No. SO' => '',
                         'Tanggal' => '',
@@ -76,7 +104,13 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
                         'Produk' => $item->product->name ?? '-',
                         'Qty' => $item->quantity ?? 0,
                         'Harga Satuan' => 'Rp ' . number_format($item->unit_price ?? 0, 0, ',', '.'),
-                        'Subtotal' => 'Rp ' . number_format(($item->quantity ?? 0) * ($item->unit_price ?? 0), 0, ',', '.'),
+                        'Discount (%)' => number_format($discountPct,2),
+                        'Tax Rate (%)' => number_format($taxRate,2),
+                        'Tipe Pajak' => $item->tipe_pajak ?? '-',
+                        'DPP' => 'Rp ' . number_format($taxResult['dpp'] ?? 0,0,',','.'),
+                        'PPN Amount' => 'Rp ' . number_format($taxAmount,0,',','.'),
+                        'Item Subtotal' => 'Rp ' . number_format($lineSubtotal,0,',','.'),
+                        'Subtotal' => '',
                         'Total SO' => '',
                         'Status' => '',
                     ]);
@@ -113,6 +147,12 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'Produk' => '',
             'Qty' => '',
             'Harga Satuan' => '',
+            'Discount (%)' => '',
+            'Tax Rate (%)' => '',
+            'Tipe Pajak' => '',
+            'DPP' => 'Total DPP: Rp ' . number_format($totalDpp,0,',','.'),
+            'PPN Amount' => '',
+            'Item Subtotal' => '',
             'Subtotal' => '',
             'Total SO' => 'Total: Rp ' . number_format($totalAmount, 0, ',', '.'),
             'Status' => '',
@@ -129,6 +169,12 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'Produk' => 'Total Orders: ' . $totalOrders,
             'Qty' => 'Completed: ' . $completedOrders,
             'Harga Satuan' => 'Cancelled: ' . $cancelledOrders,
+            'Discount (%)' => '',
+            'Tax Rate (%)' => '',
+            'Tipe Pajak' => '',
+            'DPP' => '',
+            'PPN Amount' => '',
+            'Item Subtotal' => '',
             'Subtotal' => '',
             'Total SO' => '',
             'Status' => '',
@@ -145,6 +191,12 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'Produk' => 'Draft: ' . $draftOrders,
             'Qty' => 'Processing: ' . $processingOrders,
             'Harga Satuan' => 'Confirmed: ' . $confirmedOrders,
+            'Discount (%)' => '',
+            'Tax Rate (%)' => '',
+            'Tipe Pajak' => '',
+            'DPP' => '',
+            'PPN Amount' => '',
+            'Item Subtotal' => '',
             'Subtotal' => '',
             'Total SO' => '',
             'Status' => '',
@@ -161,6 +213,12 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'Produk' => 'Total Qty: ' . $totalQuantity,
             'Qty' => 'Avg Transaction: Rp ' . number_format($averageAmount, 0, ',', '.'),
             'Harga Satuan' => 'Unique Products: ' . $uniqueProducts,
+            'Discount (%)' => '',
+            'Tax Rate (%)' => '',
+            'Tipe Pajak' => '',
+            'DPP' => '',
+            'PPN Amount' => '',
+            'Item Subtotal' => '',
             'Subtotal' => '',
             'Total SO' => '',
             'Status' => '',
@@ -182,6 +240,12 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'Produk',
             'Qty',
             'Harga Satuan',
+            'Discount (%)',
+            'Tax Rate (%)',
+            'Tipe Pajak',
+            'DPP',
+            'PPN Amount',
+            'Item Subtotal',
             'Subtotal',
             'Total SO',
             'Status'
@@ -191,7 +255,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
     public function styles(Worksheet $sheet)
     {
         // Style for headings
-        $sheet->getStyle('A1:M1')->applyFromArray([
+        $sheet->getStyle('A1:S1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'size' => 12,
@@ -219,7 +283,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             $soValue = $sheet->getCell('A' . $row)->getValue();
             if ($soValue === 'SUMMARY') {
                 // Style for summary header
-                $sheet->getStyle('A' . $row . ':M' . $row)->applyFromArray([
+                $sheet->getStyle('A' . $row . ':S' . $row)->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'size' => 14,
@@ -244,7 +308,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
                 for ($i = 1; $i <= 3; $i++) {
                     $nextRow = $row + $i;
                     if ($nextRow <= $highestRow) {
-                        $sheet->getStyle('A' . $nextRow . ':M' . $nextRow)->applyFromArray([
+                        $sheet->getStyle('A' . $nextRow . ':S' . $nextRow)->applyFromArray([
                             'font' => [
                                 'bold' => true,
                                 'size' => 12,
@@ -265,7 +329,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
                 }
                 break; // Assuming summary is at the end
             } elseif (!empty($soValue)) {
-                $sheet->getStyle('A' . $row . ':M' . $row)->applyFromArray([
+                $sheet->getStyle('A' . $row . ':S' . $row)->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => '000000'],
@@ -315,9 +379,15 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'H' => 30, // Produk
             'I' => 8,  // Qty
             'J' => 15, // Harga Satuan
-            'K' => 15, // Subtotal
-            'L' => 15, // Total SO
-            'M' => 12, // Status
+            'K' => 15, // Discount
+            'L' => 12, // Tax Rate
+            'M' => 15, // Tipe Pajak
+            'N' => 15, // DPP
+            'O' => 15, // PPN Amount
+            'P' => 15, // Item Subtotal
+            'Q' => 15, // Subtotal
+            'R' => 15, // Total SO
+            'S' => 12, // Status
         ];
     }
 }

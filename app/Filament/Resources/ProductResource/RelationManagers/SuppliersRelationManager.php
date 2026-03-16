@@ -40,9 +40,8 @@ class SuppliersRelationManager extends RelationManager
                     ->columnSpanFull(),
                 TextInput::make('supplier_price')
                     ->label('Harga Beli dari Supplier')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->minValue(0)
-                    ->prefix('Rp')
                     ->default(0)
                     ->columnSpanFull(),
             ])
@@ -52,7 +51,8 @@ class SuppliersRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->defaultSort('created_at', 'desc')
+            // Ensure sorting is explicitly on the pivot table to avoid ambiguity when joining suppliers.
+            ->defaultSort('product_supplier.created_at', 'desc')
             ->recordTitleAttribute('perusahaan')
             ->heading('Daftar Supplier')
             ->description('Kelola supplier yang dapat menyediakan produk ini')
@@ -97,14 +97,12 @@ class SuppliersRelationManager extends RelationManager
                             ->columnSpanFull(),
                         TextInput::make('supplier_price')
                             ->label('Harga Beli dari Supplier')
-                            ->numeric()
+                            ->indonesianMoney()
                             ->minValue(0)
-                            ->prefix('Rp')
                             ->default(0)
                             ->required()
                             ->validationMessages([
                                 'required' => 'Harga beli supplier harus diisi',
-                                'numeric' => 'Harga beli harus berupa angka',
                                 'min' => 'Harga beli tidak boleh negatif'
                             ])
                             ->columnSpanFull(),
@@ -116,14 +114,12 @@ class SuppliersRelationManager extends RelationManager
                     ->form([
                         TextInput::make('supplier_price')
                             ->label('Harga Beli dari Supplier')
-                            ->numeric()
+                            ->indonesianMoney()
                             ->minValue(0)
-                            ->prefix('Rp')
                             ->default(0)
                             ->required()
                             ->validationMessages([
                                 'required' => 'Harga beli supplier harus diisi',
-                                'numeric' => 'Harga beli harus berupa angka',
                                 'min' => 'Harga beli tidak boleh negatif'
                             ])
                             ->columnSpanFull(),

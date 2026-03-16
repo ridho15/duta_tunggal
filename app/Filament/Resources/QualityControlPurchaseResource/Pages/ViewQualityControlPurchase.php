@@ -88,7 +88,7 @@ class ViewQualityControlPurchase extends ViewRecord
                 ->action(function (array $data, $record) {
                     $qualityControlService = app(QualityControlService::class);
                     $qualityControlService->completeQualityControl($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed");
+                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");
                     
                     // Only check PO completion for QC from PurchaseReceiptItem, not PurchaseOrderItem
                     if ($record->from_model_type === 'App\Models\PurchaseReceiptItem') {
@@ -103,7 +103,7 @@ class ViewQualityControlPurchase extends ViewRecord
         // Populate product information fields
         $data['product_name'] = $this->record->product->name ?? '';
         $data['sku'] = $this->record->product->sku ?? '';
-        $data['quantity_received'] = $this->record->fromModel->qty_accepted ?? 0;
+        $data['quantity_received'] = $this->record->quantity_received ?? 0;
         $data['uom'] = $this->record->product->uom->name ?? '';
         return $data;
     }

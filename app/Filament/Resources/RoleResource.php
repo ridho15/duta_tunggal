@@ -22,7 +22,7 @@ class RoleResource extends Resource
     protected static ?string $navigationGroup = 'User Roles Management';
 
     // Put roles near the end as requested
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -35,6 +35,10 @@ class RoleResource extends Resource
                         'required' => 'Nama role wajib diisi',
                         'max' => 'Nama role maksimal 255 karakter'
                     ]),
+                TextInput::make('description')
+                    ->label('Deskripsi')
+                    ->maxLength(65535)
+                    ->columnSpanFull(),
                 Select::make('id_user')
                     ->label('User')
                     ->searchable()
@@ -58,6 +62,9 @@ class RoleResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->wrap(),
                 TextColumn::make('guard_name')
                     ->searchable(),
                 TextColumn::make('permissions.name')

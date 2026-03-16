@@ -132,13 +132,14 @@ class LedgerPostingService
                 ]);
             }
 
-            // Calculate PPN amount: prefer explicit invoice->tax when present, otherwise derive from ppn_rate
+            // Calculate PPN amount from the stored percentage rate.
+            // invoice->tax stores the rate (e.g. 12 for 12%), NOT the absolute amount.
             $ppnAmount = 0;
             $actualPpnAmount = 0; // Track actual PPN amount that gets posted
             if (!empty($invoice->tax) && $invoice->tax > 0) {
-                $ppnAmount = (float)$invoice->tax;
-            } else {
-                $ppnAmount = $invoice->subtotal * ($invoice->ppn_rate ?? 0) / 100;
+                $ppnAmount = (float) $invoice->subtotal * ((float) $invoice->tax / 100);
+            } elseif (!empty($invoice->ppn_rate) && $invoice->ppn_rate > 0) {
+                $ppnAmount = (float) $invoice->subtotal * ((float) $invoice->ppn_rate / 100);
             }
 
             if ($ppnAmount > 0 && $ppnMasukanCoa) {
@@ -161,7 +162,12 @@ class LedgerPostingService
 
             // Calculate total other fees as: invoice_total - subtotal - ppn_amount
             // This ensures journal entries always balance with invoice total
-            $totalOtherFees = $total - $subtotal - $actualPpnAmount;
+            // Calculate other fees beyond subtotal + PPN.
+            // IMPORTANT: totalOtherFees must never be negative. If $total was stored WITHOUT PPN
+            // (e.g., total = subtotal and ppn_rate is stored separately), the naive formula
+            // ($total - $subtotal - $ppnAmount) would go negative and reduce the AP credit —
+            // causing an unbalanced journal entry. Use max(0, ...) as safety guard.
+            $totalOtherFees = max(0.0, $total - $subtotal - $actualPpnAmount);
 
             // Create journal entry for other fees if any
             if ($totalOtherFees > 0) {

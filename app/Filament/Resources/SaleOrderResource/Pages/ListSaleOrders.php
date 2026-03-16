@@ -16,7 +16,8 @@ class ListSaleOrders extends ListRecords
     {
         return [
             CreateAction::make()
-                ->icon('heroicon-o-plus-circle'),
+                ->icon('heroicon-o-plus-circle')
+                ->label('Buat Sales Order'),
         ];
     }
 }

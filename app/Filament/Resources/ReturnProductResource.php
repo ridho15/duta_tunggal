@@ -45,7 +45,7 @@ class ReturnProductResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 7;
 
     public static function form(Form $form): Form
     {
@@ -531,7 +531,7 @@ class ReturnProductResource extends Resource
                                 HelperController::sendNotification(
                                     isSuccess: true, 
                                     title: "Return Product Approved", 
-                                    message: "Return product {$record->return_number} berhasil diapprove. Quantity telah diperbarui sesuai aksi retur yang dipilih."
+                                    message: "Return product {$record->return_number} berhasil diapprove. Quantity telah diperbarui sesuai aksi retur yang dipilih. Proses selanjutnya: Tim Gudang perlu memproses pengembalian fisik barang dan memperbarui stok inventori."
                                 );
                             } catch (\Exception $e) {
                                 HelperController::sendNotification(

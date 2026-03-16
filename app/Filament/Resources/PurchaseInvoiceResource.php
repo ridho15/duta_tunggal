@@ -189,9 +189,11 @@ class PurchaseInvoiceResource extends Resource
                                 TextInput::make('invoice_number')
                                     ->label('Invoice Number')
                                     ->required()
+                                    ->unique(table: 'invoices', column: 'invoice_number', ignoreRecord: true)
                                     ->validationMessages([
                                         'required' => 'Nomor invoice tidak boleh kosong',
-                                        'max' => 'Nomor invoice terlalu panjang'
+                                        'max' => 'Nomor invoice terlalu panjang',
+                                        'unique' => 'Nomor invoice sudah digunakan'
                                     ])
                                     ->suffixAction(
                                         Action::make('generate')
@@ -199,7 +201,7 @@ class PurchaseInvoiceResource extends Resource
                                             ->tooltip('Generate Invoice Number')
                                             ->action(function ($set, $get) {
                                                 $invoiceService = app(InvoiceService::class);
-                                                $set('invoice_number', $invoiceService->generateInvoiceNumber());
+                                                $set('invoice_number', $invoiceService->generatePurchaseInvoiceNumber());
                                             })
                                     )
                                     ->maxLength(255),
@@ -345,23 +347,20 @@ class PurchaseInvoiceResource extends Resource
                                                     ->firstWhere('product_id', $item->product_id);
                                                 
                                                 if ($purchaseOrderItem) {
-                                                    // Calculate price after discount and tax (both are percentages)
-                                                    // Use local variable to avoid double accumulation bug
+                                                    // DPP = price after discount, BEFORE tax (Dasar Pengenaan Pajak)
                                                     $unitPrice = $purchaseOrderItem->unit_price;
                                                     $discountAmount = $unitPrice * ($purchaseOrderItem->discount / 100);
                                                     $afterDiscount = $unitPrice - $discountAmount;
-                                                    $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
-                                                    $finalUnitPrice = $afterDiscount + $taxAmount;
-                                                    $total = $finalUnitPrice * $item->qty_accepted;
+                                                    $total = $afterDiscount * $item->qty_accepted;
                                                     
                                                     $items[] = [
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->qty_accepted,
-                                                        'price' => $finalUnitPrice,
+                                                        'price' => $afterDiscount,
                                                         'total' => $total
                                                     ];
                                                     
-                                                    $subtotal += $total; // Only accumulate grand total
+                                                    $subtotal += $total; // Accumulate DPP (pre-tax subtotal)
                                                 }
                                             }
                                             
@@ -586,7 +585,7 @@ class PurchaseInvoiceResource extends Resource
                                         'numeric' => 'Tax harus berupa angka'
                                     ])
                                     ->suffix('%')
-                                    ->default(0)
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
@@ -619,14 +618,7 @@ class PurchaseInvoiceResource extends Resource
                                         'numeric' => 'PPN rate harus berupa angka'
                                     ])
                                     ->suffix('%')
-                                    ->default(function () {
-                                        $taxSetting = \App\Models\TaxSetting::where('status', true)
-                                            ->where('effective_date', '<=', now())
-                                            ->where('type', 'PPN')
-                                            ->orderByDesc('effective_date')
-                                            ->first();
-                                        return $taxSetting?->rate ?? 11;
-                                    })
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
@@ -698,6 +690,8 @@ class PurchaseInvoiceResource extends Resource
                         Section::make('Pemilihan COA (Chart of Account)')
                             ->description('Pilih COA yang sesuai untuk pencatatan journal entry')
                             ->columns(2)
+                            ->collapsed()
+                            ->collapsible()
                             ->schema([
                                 Select::make('accounts_payable_coa_id')
                                     ->label('COA Hutang Supplier (Accounts Payable)')

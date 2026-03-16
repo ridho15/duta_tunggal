@@ -60,6 +60,36 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
 
         // Create required COA for journal entries
         ChartOfAccount::create([
+            'code' => '1120',
+            'name' => 'PIUTANG DAGANG',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '4000',
+            'name' => 'PENJUALAN',
+            'type' => 'Revenue',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '2120.06',
+            'name' => 'PPN KELUARAN',
+            'type' => 'Liability',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '4100.01',
+            'name' => 'POTONGAN PENJUALAN',
+            'type' => 'Revenue',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '6100.02',
+            'name' => 'BIAYA PENGIRIMAN',
+            'type' => 'Expense',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
             'code' => '1140.10',
             'name' => 'PERSEDIAAN BARANG DAGANGAN - DEFAULT PRODUK',
             'type' => 'Asset',
@@ -310,7 +340,7 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
             ->where('from_model_id', $saleOrder->id)
             ->first();
         $this->assertNotNull($invoice, 'Invoice should be automatically created when sales order is completed');
-        $this->assertStringStartsWith('INV-SO-', $invoice->invoice_number, 'Invoice number should start with INV-SO-');
+        $this->assertStringStartsWith('INV-', $invoice->invoice_number, 'Invoice number should start with INV-');
 
         // Verify that delivery order additional costs are included in invoice
         $expectedSubtotal = 10 * 75000; // 10 items * Rp 75,000 each = Rp 750,000

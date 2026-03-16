@@ -60,6 +60,36 @@ class CompleteDeliveryOrderFlowTest extends TestCase
 
         // Create required COA for journal entries
         ChartOfAccount::create([
+            'code' => '1120',
+            'name' => 'PIUTANG DAGANG',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '4000',
+            'name' => 'PENJUALAN',
+            'type' => 'Revenue',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '2120.06',
+            'name' => 'PPN KELUARAN',
+            'type' => 'Liability',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '4100.01',
+            'name' => 'POTONGAN PENJUALAN',
+            'type' => 'Revenue',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
+            'code' => '6100.02',
+            'name' => 'BIAYA PENGIRIMAN',
+            'type' => 'Expense',
+            'is_active' => true,
+        ]);
+        ChartOfAccount::create([
             'code' => '1140.10',
             'name' => 'PERSEDIAAN BARANG DAGANGAN - DEFAULT PRODUK',
             'type' => 'Asset',

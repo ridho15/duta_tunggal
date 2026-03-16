@@ -523,4 +523,112 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals('sales', $stockMovements[1]->type);
         $this->assertEquals(20, $stockMovements[1]->quantity); // Quantity stored as positive
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Task 19: SJ berlaku untuk semua jenis customer (termasuk direct selling)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** @test */
+    public function it_can_create_delivery_order_for_ambil_sendiri_sale_order()
+    {
+        // Create a 'Ambil Sendiri' (self-pickup / direct selling) SO
+        $selfPickupSO = SaleOrder::create([
+            'customer_id'       => $this->customer->id,
+            'so_number'         => 'SO-SELFPICKUP-001',
+            'order_date'        => now(),
+            'status'            => 'confirmed',
+            'delivery_date'     => now()->addDays(1),
+            'total_amount'      => 500000,
+            'tipe_pengiriman'   => 'Ambil Sendiri',
+            'created_by'        => $this->user->id,
+            'warehouse_confirmed_at' => now(),
+        ]);
+
+        SaleOrderItem::create([
+            'sale_order_id' => $selfPickupSO->id,
+            'product_id'    => $this->product->id,
+            'quantity'      => 5,
+            'unit_price'    => 100000,
+            'discount'      => 0,
+            'tax'           => 0,
+            'warehouse_id'  => $this->warehouse->id,
+        ]);
+
+        // DO can be created for Ambil Sendiri SO (no restriction on tipe_pengiriman)
+        $deliveryOrder = DeliveryOrder::create([
+            'do_number'     => 'DO-SELFPICKUP-001',
+            'delivery_date' => now()->addDays(1)->toDateString(),
+            'driver_id'     => $this->driver->id,
+            'vehicle_id'    => $this->vehicle->id,
+            'warehouse_id'  => $this->warehouse->id,
+            'status'        => 'draft',
+            'created_by'    => $this->user->id,
+            'cabang_id'     => $this->cabang->id,
+        ]);
+
+        $deliveryOrder->salesOrders()->attach($selfPickupSO->id);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $deliveryOrder->id,
+            'sale_order_item_id'=> SaleOrderItem::where('sale_order_id', $selfPickupSO->id)->first()->id,
+            'product_id'        => $this->product->id,
+            'quantity'          => 5,
+        ]);
+
+        // Assert DO was created and linked to Ambil Sendiri SO
+        $this->assertDatabaseHas('delivery_orders', ['id' => $deliveryOrder->id, 'status' => 'draft']);
+        $this->assertDatabaseHas('delivery_sales_orders', [
+            'delivery_order_id' => $deliveryOrder->id,
+            'sales_order_id'    => $selfPickupSO->id,
+        ]);
+        $this->assertEquals('Ambil Sendiri', $selfPickupSO->tipe_pengiriman);
+    }
+
+    /** @test */
+    public function it_can_generate_surat_jalan_for_ambil_sendiri_delivery_order()
+    {
+        // Create Ambil Sendiri SO
+        $selfPickupSO = SaleOrder::create([
+            'customer_id'       => $this->customer->id,
+            'so_number'         => 'SO-SELFPICKUP-002',
+            'order_date'        => now(),
+            'status'            => 'confirmed',
+            'delivery_date'     => now()->addDays(1),
+            'total_amount'      => 300000,
+            'tipe_pengiriman'   => 'Ambil Sendiri',
+            'created_by'        => $this->user->id,
+            'warehouse_confirmed_at' => now(),
+        ]);
+
+        // Create DO for that SO
+        $deliveryOrder = DeliveryOrder::create([
+            'do_number'     => 'DO-SELFPICKUP-002',
+            'delivery_date' => now()->addDays(1)->toDateString(),
+            'driver_id'     => $this->driver->id,
+            'vehicle_id'    => $this->vehicle->id,
+            'warehouse_id'  => $this->warehouse->id,
+            'status'        => 'draft',
+            'created_by'    => $this->user->id,
+            'cabang_id'     => $this->cabang->id,
+        ]);
+        $deliveryOrder->salesOrders()->attach($selfPickupSO->id);
+
+        // Create SJ and link to DO — this must work regardless of tipe_pengiriman
+        $suratJalan = SuratJalan::create([
+            'sj_number'  => 'SJ-SELFPICKUP-001',
+            'issued_at'  => now(),
+            'created_by' => $this->user->id,
+            'status'     => 0,
+        ]);
+        $suratJalan->deliveryOrder()->attach($deliveryOrder->id);
+
+        // Assert SJ is linked to the DO for Ambil Sendiri
+        $this->assertDatabaseHas('surat_jalan_delivery_orders', [
+            'surat_jalan_id'    => $suratJalan->id,
+            'delivery_order_id' => $deliveryOrder->id,
+        ]);
+
+        $linked = $suratJalan->deliveryOrder()->where('delivery_order_id', $deliveryOrder->id)->exists();
+        $this->assertTrue($linked, 'SJ must be linkable to a DO for Ambil Sendiri SO');
+    }
 }

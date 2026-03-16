@@ -118,6 +118,8 @@ class QualityControlWorkflowTest extends TestCase
         ]);
 
         $this->assertNotNull($qualityControl);
+
+        // remaining validation from the original test
         $this->assertStringStartsWith('QC-' . now()->format('Ymd'), $qualityControl->qc_number);
         $this->assertEquals($context['purchaseOrderItem']->quantity, $qualityControl->passed_quantity);
         $this->assertEquals(0, $qualityControl->rejected_quantity);
@@ -127,6 +129,43 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertEquals($context['purchaseOrder']->warehouse_id, $qualityControl->warehouse_id);
         $this->assertEquals(PurchaseOrderItem::class, $qualityControl->from_model_type);
         $this->assertEquals($context['purchaseOrderItem']->id, $qualityControl->from_model_id);
+    }
+
+    /**
+     * If the product and fallback codes do not provide any COA, completing
+     * quality control should not crash nor attempt to insert an entry with a
+     * null coa_id.  The guard in
+     * QualityControlService::createJournalEntriesAndInventoryForQC handles this
+     * by returning early; we assert that no journal entries are written.
+     */
+    public function test_complete_qc_skips_journal_when_coa_missing(): void
+    {
+        // remove typical inventory/temporary procurement/unbilled purchase codes
+        \App\Models\ChartOfAccount::whereIn('code', [
+            '1140.10','1140.01','1180.01','1400.01','2100.10','2190.10',
+        ])->delete();
+
+        // ensure a clean slate
+        $this->assertDatabaseCount('journal_entries', 0);
+
+        $context = $this->createPurchaseReceiptContext();
+        $service = app(QualityControlService::class);
+        $qc = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
+            'inspected_by' => $this->user->id,
+            'passed_quantity' => 5,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+        $this->assertNotNull($qc);
+
+        // complete the QC record – should not throw
+        $service->completeQualityControl($qc, []);
+
+        $qc->refresh();
+        $this->assertEquals(1, $qc->status);
+
+        // journal entries should still be zero because posting was skipped
+        $this->assertDatabaseCount('journal_entries', 0);
     }
 
     public function test_quality_control_completion_creates_stock_movement_and_marks_processed(): void

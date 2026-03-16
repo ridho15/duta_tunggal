@@ -17,6 +17,7 @@ class OrderRequestItem extends Model
         'quantity',
         'fulfilled_quantity',
         'unit_price',
+        'original_price',
         'discount',
         'tax',
         'subtotal',
