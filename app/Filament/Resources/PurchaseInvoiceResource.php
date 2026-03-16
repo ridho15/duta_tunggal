@@ -468,7 +468,8 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Produk harus dipilih'
                                             ])
-                                            ->disabled(),
+                                            ->disabled()
+                                            ->dehydrated(true),
                                         TextInput::make('quantity')
                                             ->label('Qty')
                                             ->numeric()
@@ -477,7 +478,8 @@ class PurchaseInvoiceResource extends Resource
                                                 'required' => 'Qty tidak boleh kosong',
                                                 'numeric' => 'Qty harus berupa angka'
                                             ])
-                                            ->disabled(),
+                                            ->disabled()
+                                            ->dehydrated(true),
                                         TextInput::make('price')
                                             ->label('Harga')
                                             ->indonesianMoney()
@@ -485,7 +487,8 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Harga tidak boleh kosong',
                                             ])
-                                            ->disabled(),
+                                            ->disabled()
+                                            ->dehydrated(true),
                                         TextInput::make('total')
                                             ->label('Total')
                                             ->indonesianMoney()
@@ -493,7 +496,8 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Total tidak boleh kosong',
                                             ])
-                                            ->disabled(),
+                                            ->disabled()
+                                            ->dehydrated(true),
                                     ])
                                     ->columns(4)
                                     ->disableItemCreation()
@@ -543,7 +547,8 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Nama biaya tidak boleh kosong'
                                             ])
-                                            ->default('Biaya Lain'),
+                                            ->default('Biaya Lain')
+                                            ->disabled(fn ($operation) => $operation === 'edit'),
                                         TextInput::make('amount')
                                             ->label('Jumlah')
                                             ->indonesianMoney()
@@ -552,10 +557,14 @@ class PurchaseInvoiceResource extends Resource
                                                 'required' => 'Jumlah tidak boleh kosong',
                                             ])
                                             ->default(0)
-                                            ->reactive(),
+                                            ->reactive()
+                                            ->disabled(fn ($operation) => $operation === 'edit')
+                                            ->dehydrated(true),
                                     ])
                                     ->columns(2)
                                     ->defaultItems(0)
+                                    ->disableItemCreation(fn ($operation) => $operation === 'edit')
+                                    ->disableItemDeletion(fn ($operation) => $operation === 'edit')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $manualOtherFeeTotal = collect($state ?? [])->sum('amount');
                                         $set('other_fee', $manualOtherFeeTotal);
@@ -598,6 +607,8 @@ class PurchaseInvoiceResource extends Resource
                                     ->suffix('%')
                                     ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
+                                    ->disabled(fn ($operation) => $operation === 'edit')
+                                    ->dehydrated(fn ($operation) => $operation !== 'edit')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $subtotal = $get('subtotal') ?? 0;
                                         $otherFees = $get('other_fees') ?? [];
@@ -831,11 +842,6 @@ class PurchaseInvoiceResource extends Resource
                         Infolists\Components\TextEntry::make('subtotal')
                             ->label('Subtotal')
                             ->rupiah(),
-                        Infolists\Components\TextEntry::make('tax')
-                            ->label('Tax (%)')
-                            ->state(function (Invoice $record) {
-                                return $record->tax ? $record->tax . '%' : '0%';
-                            }),
                         Infolists\Components\TextEntry::make('ppn_rate')
                             ->label('PPN Rate (%)')
                             ->state(function (Invoice $record) {

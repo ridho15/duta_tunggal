@@ -21,6 +21,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -55,8 +56,8 @@ class VendorPaymentResource extends Resource
                                 Select::make('payment_request_id')
                                     ->label('Payment Request (PR)')
                                     ->options(function () {
+                                        // Show all approved PRs including those partially paid (not fully paid).
                                         return PaymentRequest::where('status', 'approved')
-                                            ->whereNull('vendor_payment_id')
                                             ->with('supplier')
                                             ->get()
                                             ->mapWithKeys(function ($pr) {
@@ -66,13 +67,29 @@ class VendorPaymentResource extends Resource
                                     ->searchable()
                                     ->required()
                                     ->reactive()
-                                    ->helperText('Pilih Payment Request yang sudah disetujui. Vendor Payment wajib mengacu pada Payment Request yang telah diapprove.')
+                                    ->helperText('Pilih Payment Request yang sudah disetujui. Invoice yang ditampilkan hanya berasal dari Payment Request yang dipilih.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        if (!$state) return;
+                                        if (!$state) {
+                                            $set('supplier_id', null);
+                                            $set('selected_invoices', []);
+                                            $set('total_payment', 0);
+                                            $set('payment_details', []);
+                                            return;
+                                        }
                                         $pr = PaymentRequest::with('supplier')->find($state);
                                         if ($pr) {
                                             $set('supplier_id', $pr->supplier_id);
+                                            // Pre-select all invoices from the payment request
                                             $set('selected_invoices', $pr->selected_invoices ?? []);
+                                            // Calculate total from PR invoices
+                                            $prInvoiceIds = $pr->selected_invoices ?? [];
+                                            if (!empty($prInvoiceIds)) {
+                                                $invoices = Invoice::whereIn('id', $prInvoiceIds)->with('accountPayable')->get();
+                                                $total = $invoices->sum(function ($invoice) {
+                                                    return $invoice->accountPayable->remaining ?? $invoice->total;
+                                                });
+                                                $set('total_payment', $total);
+                                            }
                                         }
                                     }),
                             ])
@@ -92,13 +109,19 @@ class VendorPaymentResource extends Resource
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
+                                    ->disabled(fn($get) => !empty($get('payment_request_id')))
+                                    ->dehydrated(true)
+                                    ->helperText(fn($get) => !empty($get('payment_request_id')) ? 'Vendor otomatis terisi dari Payment Request.' : null)
                                     ->validationMessages([
                                         'required' => 'Supplier belum dipilih'
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('selected_invoices', []);
-                                        $set('total_payment', 0);
-                                        $set('payment_details', []);
+                                        // Only reset if no payment_request_id is selected
+                                        if (empty($get('payment_request_id'))) {
+                                            $set('selected_invoices', []);
+                                            $set('total_payment', 0);
+                                            $set('payment_details', []);
+                                        }
                                     })
                                     ->required(),
 
@@ -123,40 +146,56 @@ class VendorPaymentResource extends Resource
                                 CheckboxList::make('selected_invoices')
                                     ->label('Pilih Invoice')
                                     ->options(function ($get, $set) {
+                                        $paymentRequestId = $get('payment_request_id');
                                         $supplierId = $get('supplier_id');
+
                                         if (!$supplierId) {
                                             $set('has_invoices', false);
                                             return [];
                                         }
 
                                         try {
-                                            // Check if we're in edit mode by checking if selected_invoices already has values
                                             $currentSelectedInvoices = $get('selected_invoices') ?? [];
-                                            $isEditMode = !empty($currentSelectedInvoices) && is_array($currentSelectedInvoices);
 
-                                            // Get unpaid/partial invoices for selected supplier
-                                            $query = Invoice::join('purchase_orders', function ($join) use ($supplierId) {
-                                                $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
-                                                    ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder')
-                                                    ->where('purchase_orders.supplier_id', '=', $supplierId);
-                                            })
-                                                ->with(['accountPayable'])
-                                                ->select('invoices.*');
+                                            // If a payment request is selected, only show invoices from that PR
+                                            if ($paymentRequestId) {
+                                                $pr = PaymentRequest::find($paymentRequestId);
+                                                $prInvoiceIds = $pr ? ($pr->selected_invoices ?? []) : [];
 
-                                            // In edit mode, include previously selected invoices even if paid
-                                            if ($isEditMode) {
-                                                $query->where(function ($q) use ($currentSelectedInvoices) {
-                                                    $q->whereHas('accountPayable', function ($query) {
-                                                        $query->where('remaining', '>', 0);
-                                                    })->orWhereIn('invoices.id', $currentSelectedInvoices);
-                                                });
+                                                if (empty($prInvoiceIds)) {
+                                                    $set('has_invoices', false);
+                                                    return [];
+                                                }
+
+                                                $invoices = Invoice::whereIn('id', $prInvoiceIds)
+                                                    ->with(['accountPayable'])
+                                                    ->get();
                                             } else {
-                                                $query->whereHas('accountPayable', function ($query) {
-                                                    $query->where('remaining', '>', 0);
-                                                });
-                                            }
+                                                // No PR: show all unpaid invoices for supplier
+                                                $isEditMode = !empty($currentSelectedInvoices) && is_array($currentSelectedInvoices);
 
-                                            $invoices = $query->get();
+                                                $query = Invoice::join('purchase_orders', function ($join) use ($supplierId) {
+                                                    $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
+                                                        ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder')
+                                                        ->where('purchase_orders.supplier_id', '=', $supplierId);
+                                                })
+                                                    ->with(['accountPayable'])
+                                                    ->select('invoices.*');
+
+                                                if ($isEditMode) {
+                                                    $query->where(function ($q) use ($currentSelectedInvoices) {
+                                                        $q->whereHas('accountPayable', function ($query) {
+                                                            $query->where('remaining', '>', 0);
+                                                        })->orWhereIn('invoices.id', $currentSelectedInvoices);
+                                                    });
+                                                } else {
+                                                    $query->whereHas('accountPayable', function ($query) {
+                                                        $query->where('remaining', '>', 0);
+                                                    });
+                                                }
+
+                                                $invoices = $query->get();
+                                            }
 
                                             $options = [];
                                             foreach ($invoices as $invoice) {
@@ -371,6 +410,19 @@ class VendorPaymentResource extends Resource
                                             ->indonesianMoney()
                                             ->reactive()
                                             ->required()
+                                            ->helperText(fn ($get) => $get('remaining_amount')
+                                                ? 'Maks: Rp ' . number_format(\App\Helpers\MoneyHelper::parse($get('remaining_amount') ?? 0), 0, ',', '.')
+                                                : null
+                                            )
+                                            ->rules([function (Get $get) {
+                                                return function ($attribute, $value, $fail) use ($get) {
+                                                    $remaining = \App\Helpers\MoneyHelper::parse($get('remaining_amount') ?? 0);
+                                                    $paid = \App\Helpers\MoneyHelper::parse($value ?? 0);
+                                                    if ($paid > $remaining + 0.01) { // 0.01 tolerance for float rounding
+                                                        $fail('Jumlah pembayaran tidak boleh melebihi sisa hutang (Rp ' . number_format($remaining, 0, ',', '.') . ').');
+                                                    }
+                                                };
+                                            }])
                                             ->placeholder(function ($get) {
                                                 $selectedInvoices = $get('../../selected_invoices');
                                                 if (!empty($selectedInvoices)) {
@@ -426,20 +478,10 @@ class VendorPaymentResource extends Resource
                             ->schema([
                                 TextInput::make('ntpn')
                                     ->label('NTPN')
-                                    ->placeholder('Masukkan NTPN atau klik ikon untuk generate')
-                                    ->suffixAction(
-                                        Action::make('generateNTPN')
-                                            ->icon('heroicon-m-arrow-path')
-                                            ->tooltip('Generate NTPN')
-                                            ->action(function ($set, $get) {
-                                                // Generate NTPN format: NTPN + YYYYMMDD + random 6 digits
-                                                $date = now()->format('Ymd');
-                                                $random = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
-                                                $ntpn = 'NTPN' . $date . $random;
-                                                $set('ntpn', $ntpn);
-                                            })
-                                    )
-                                    ->maxLength(255),
+                                    ->placeholder('Masukkan NTPN (opsional, untuk pembayaran impor)')
+                                    ->nullable()
+                                    ->maxLength(255)
+                                    ->helperText('NTPN hanya diisi untuk pembayaran impor. Input manual, tidak dapat digenerate.'),
                                 Placeholder::make('calculating_total')
                                     ->label('Total Pembayaran')
                                     ->content('Menghitung total pembayaran...')

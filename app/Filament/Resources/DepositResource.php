@@ -128,9 +128,10 @@ class DepositResource extends Resource
                             ->live(onBlur: true)  // onBlur avoids Livewire round-trips mid-keystroke that break the Alpine.js mask
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 try {
-                                    $usedAmount = $get('used_amount') ?? 0;
+                                    $usedAmount   = $get('used_amount') ?? 0;
                                     $parsedAmount = MoneyHelper::parse($state);
-                                    $set('remaining_amount', $parsedAmount - $usedAmount);
+                                    $parsedUsed   = MoneyHelper::parse($usedAmount);
+                                    $set('remaining_amount', $parsedAmount - $parsedUsed);
                                 } catch (\Exception $e) {
                                     \Illuminate\Support\Facades\Log::error('Deposit amount calculation error: ' . $e->getMessage(), [
                                         'state' => $state,
@@ -247,7 +248,7 @@ class DepositResource extends Resource
                 Hidden::make('used_amount')->default(0),
                 Hidden::make('remaining_amount')
                     ->default(function ($get) {
-                        return $get('amount') ?? 0;
+                        return \App\Helpers\MoneyHelper::parse($get('amount') ?? 0);
                     }),
                 Hidden::make('status')->default(true),
             ]);

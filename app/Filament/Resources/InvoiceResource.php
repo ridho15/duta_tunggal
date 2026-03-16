@@ -258,21 +258,9 @@ class InvoiceResource extends Resource
                                 $set('total', static::hitungTotal($get));
                             })
                             ->columnSpanFull(),
-                        TextInput::make('tax')
-                            ->label('Tax (%)')
-                            ->validationMessages([
-                                'required' => 'Tax tidak boleh kosong',
-                                'numeric' => 'Tax tidak valid'
-                            ])
-                            ->maxValue(100)
-                            ->required()
-                            ->suffix('%')
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $get) {
-                                $set('total', static::hitungTotal($get));
-                            })
-                            ->numeric()
-                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
+                        // Legacy `tax` column kept for historical data — hidden, synced from ppn_rate.
+                        \Filament\Forms\Components\Hidden::make('tax')
+                            ->dehydrateStateUsing(fn ($state, $get) => (float) $get('ppn_rate')),
                         TextInput::make('ppn_rate')
                             ->label('PPN Rate (%)')
                             ->validationMessages([
@@ -341,32 +329,47 @@ class InvoiceResource extends Resource
         }
     }
 
-    public static function hitungTotal($get)
+    public static function hitungTotal($get): float
     {
-        $otherFee = static::sumOtherFee($get);
-        $subtotal = (int) $get('subtotal');
-        $taxRate = (int) $get('tax');
-        $totalTax = ($subtotal + $otherFee) * ($taxRate / 100);
-        return $subtotal + $otherFee + $totalTax;
+        $otherFee   = static::sumOtherFee($get);
+        // Always parse through MoneyHelper so Indonesian-formatted strings like "20.000.000" are read correctly.
+        $subtotal   = (float) \App\Helpers\MoneyHelper::parse($get('subtotal'));
+        // ppn_rate is a numeric percentage (e.g. 12) — no money parsing needed.
+        $ppnRate    = (float) $get('ppn_rate');
+        // ppn_option: 'non_ppn' | 'standard' (Eksklusif) | 'inclusive' (Inklusif)
+        $ppnOption  = $get('ppn_option') ?? 'standard';
+
+        if ($ppnOption === 'non_ppn' || $ppnRate <= 0) {
+            return round($subtotal + $otherFee, 0);
+        }
+
+        if ($ppnOption === 'inclusive') {
+            // PPN already embedded in subtotal — no extra addition.
+            return round($subtotal + $otherFee, 0);
+        }
+
+        // Eksklusif (default): total = subtotal + other_fee + PPN
+        $ppn = round(($subtotal + $otherFee) * ($ppnRate / 100.0), 0);
+        return round($subtotal + $otherFee + $ppn, 0);
     }
 
-    protected static function sumOtherFee($get): int
+    protected static function sumOtherFee($get): float
     {
         $fees = $get('other_fee');
-        if (!$fees) return 0;
-        // Accept either array of numbers or array of {amount}
+        if (!$fees) return 0.0;
+        // Accept either array of numbers or array of {amount: "1.000.000"}
         if (is_array($fees)) {
-            $sum = 0;
+            $sum = 0.0;
             foreach ($fees as $fee) {
                 if (is_array($fee)) {
-                    $sum += (int) ($fee['amount'] ?? 0);
+                    $sum += (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0);
                 } else {
-                    $sum += (int) $fee;
+                    $sum += (float) \App\Helpers\MoneyHelper::parse($fee);
                 }
             }
             return $sum;
         }
-        return (int) $fees;
+        return (float) \App\Helpers\MoneyHelper::parse($fees);
     }
 
     public static function table(Table $table): Table

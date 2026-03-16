@@ -35,9 +35,11 @@ class AddDepositAction
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $usedAmount = $get('used_amount') ?? 0;
-                                $set('remaining_amount', $state - $usedAmount);
+                                $parsed     = \App\Helpers\MoneyHelper::parse($state);
+                                $parsedUsed = \App\Helpers\MoneyHelper::parse($usedAmount);
+                                $set('remaining_amount', $parsed - $parsedUsed);
                             }),
-                            
+
                         TextInput::make('used_amount')
                             ->label('Already Used Amount')
                             ->indonesianMoney()
@@ -45,7 +47,9 @@ class AddDepositAction
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $totalAmount = $get('amount') ?? 0;
-                                $set('remaining_amount', $totalAmount - $state);
+                                $parsedTotal = \App\Helpers\MoneyHelper::parse($totalAmount);
+                                $parsedUsed  = \App\Helpers\MoneyHelper::parse($state);
+                                $set('remaining_amount', $parsedTotal - $parsedUsed);
                             }),
                     ]),
                     
