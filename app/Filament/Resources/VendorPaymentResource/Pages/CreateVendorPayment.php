@@ -8,6 +8,8 @@ use Filament\Resources\Pages\CreateRecord;
 use App\Models\Invoice;
 use App\Models\Deposit;
 use App\Models\PaymentRequest;
+use App\Models\VendorPayment;
+use App\Helpers\MoneyHelper;
 use Filament\Notifications\Notification;
 
 class CreateVendorPayment extends CreateRecord
@@ -42,7 +44,7 @@ class CreateVendorPayment extends CreateRecord
             }
 
             // Calculate total payment amount
-            $totalPaymentAmount = $data['total_payment'] ?? 0;
+            $totalPaymentAmount = MoneyHelper::parse($data['total_payment'] ?? 0);
 
             $totalAvailableDeposit = $availableDeposits->sum('remaining_amount');
             if ($totalAvailableDeposit < $totalPaymentAmount) {
@@ -62,7 +64,8 @@ class CreateVendorPayment extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Determine payment status based on total payment vs total invoice amounts
-        $totalPayment = $data['total_payment'] ?? 0;
+        $totalPayment = MoneyHelper::parse($data['total_payment'] ?? 0);
+        $data['total_payment'] = $totalPayment;
 
         if ($totalPayment > 0) {
             // If we have selected_invoices, calculate based on remaining amounts
@@ -110,13 +113,24 @@ class CreateVendorPayment extends CreateRecord
 
     protected function afterCreate(): void
     {
-        // Update linked PaymentRequest: set status to 'paid' and link vendor_payment_id
+        // Update linked PaymentRequest status based on cumulative paid amount.
         $paymentRequestId = $this->record->payment_request_id;
         if ($paymentRequestId) {
-            PaymentRequest::where('id', $paymentRequestId)->update([
-                'status' => PaymentRequest::STATUS_PAID,
-                'vendor_payment_id' => $this->record->id,
-            ]);
+            $pr = PaymentRequest::find($paymentRequestId);
+            if ($pr) {
+                $paidSoFar = (float) VendorPayment::where('payment_request_id', $paymentRequestId)
+                    ->sum('total_payment');
+                $requestTotal = MoneyHelper::parse($pr->total_amount ?? 0);
+
+                $newStatus = $paidSoFar >= ($requestTotal - 0.01)
+                    ? PaymentRequest::STATUS_PAID
+                    : PaymentRequest::STATUS_APPROVED;
+
+                $pr->update([
+                    'status' => $newStatus,
+                    'vendor_payment_id' => $this->record->id,
+                ]);
+            }
         }
     }
 }

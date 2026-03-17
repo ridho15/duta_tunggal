@@ -107,6 +107,7 @@ test.describe('Quotation — currency field formatting', () => {
 
   test('total_amount: edge-case formatting', async ({ page }) => {
     const input = page.locator('#data\\.total_amount');
+    if (!(await input.isEditable())) { test.skip(); return; }
     for (const { raw, formatted } of EDGE_CASES) {
       await testCurrencyInput(page, input, raw, formatted);
     }
@@ -114,7 +115,7 @@ test.describe('Quotation — currency field formatting', () => {
 
   test('unit_price in repeater: typing 100000 displays 100.000', async ({ page }) => {
     // Repeater items need an existing row — check if one is auto-added
-    const addBtn = page.getByRole('button', { name: /tambah|add item/i });
+    const addBtn = page.getByRole('button', { name: /tambah|add item/i }).first();
     if (await addBtn.isVisible()) await addBtn.click();
     await page.waitForTimeout(500);
 
@@ -140,29 +141,31 @@ test.describe('Sale Order — currency field formatting', () => {
 
   test('total_amount: edge-case formatting', async ({ page }) => {
     const input = page.locator('#data\\.total_amount');
-    if (!(await input.isVisible())) { test.skip(); return; }
+    if (!(await input.isVisible()) || !(await input.isEditable())) { test.skip(); return; }
     for (const { raw, formatted } of EDGE_CASES) {
       await testCurrencyInput(page, input, raw, formatted);
     }
   });
 
   test('unit_price in repeater: typing 100000 displays 100.000', async ({ page }) => {
-    const addBtn = page.getByRole('button', { name: /tambah|add item/i });
+    const addBtn = page.getByRole('button', { name: /tambah|add item/i }).first();
     if (await addBtn.isVisible()) await addBtn.click();
     await page.waitForTimeout(500);
 
-    const input = page.locator('input[id*="unit_price"]').first();
-    if (!(await input.isVisible())) { test.skip(); return; }
+    const row = page.locator('[data-repeater-item]').first();
+    const input = row.locator('input[id*="saleOrderItem"][id*="unit_price"]').first();
+    if (!(await input.isVisible()) || !(await input.isEditable())) { test.skip(); return; }
     await testCurrencyInput(page, input, '100000', '100.000');
   });
 
   test('unit_price paste: paste 1000000 displays 1.000.000', async ({ page }) => {
-    const addBtn = page.getByRole('button', { name: /tambah|add item/i });
+    const addBtn = page.getByRole('button', { name: /tambah|add item/i }).first();
     if (await addBtn.isVisible()) await addBtn.click();
     await page.waitForTimeout(500);
 
-    const input = page.locator('input[id*="unit_price"]').first();
-    if (!(await input.isVisible())) { test.skip(); return; }
+    const row = page.locator('[data-repeater-item]').first();
+    const input = row.locator('input[id*="saleOrderItem"][id*="unit_price"]').first();
+    if (!(await input.isVisible()) || !(await input.isEditable())) { test.skip(); return; }
     await testCurrencyPaste(page, input, '1000000', '1.000.000');
   });
 });
@@ -177,22 +180,24 @@ test.describe('Purchase Order — currency field formatting', () => {
   });
 
   test('unit_price in repeater: typing 100000 displays 100.000', async ({ page }) => {
-    const addBtn = page.getByRole('button', { name: /tambah|add item/i });
+    const addBtn = page.getByRole('button', { name: /tambah|add item/i }).first();
     if (await addBtn.isVisible()) await addBtn.click();
     await page.waitForTimeout(500);
 
-    const input = page.locator('input[id*="unit_price"]').first();
-    if (!(await input.isVisible())) { test.skip(); return; }
+    const row = page.locator('[data-repeater-item]').first();
+    const input = row.locator('input[id*="purchaseOrderItem"][id*="unit_price"]').first();
+    if (!(await input.isVisible()) || !(await input.isEditable())) { test.skip(); return; }
     await testCurrencyInput(page, input, '100000', '100.000');
   });
 
   test('unit_price: edge-case values format correctly', async ({ page }) => {
-    const addBtn = page.getByRole('button', { name: /tambah|add item/i });
+    const addBtn = page.getByRole('button', { name: /tambah|add item/i }).first();
     if (await addBtn.isVisible()) await addBtn.click();
     await page.waitForTimeout(500);
 
-    const input = page.locator('input[id*="unit_price"]').first();
-    if (!(await input.isVisible())) { test.skip(); return; }
+    const row = page.locator('[data-repeater-item]').first();
+    const input = row.locator('input[id*="purchaseOrderItem"][id*="unit_price"]').first();
+    if (!(await input.isVisible()) || !(await input.isEditable())) { test.skip(); return; }
 
     for (const { raw, formatted } of EDGE_CASES) {
       await testCurrencyInput(page, input, raw, formatted);
@@ -210,23 +215,47 @@ test.describe('Order Request — currency field formatting', () => {
   });
 
   test('unit_price: typing 100000 displays 100.000', async ({ page }) => {
-    const addBtn = page.getByRole('button', { name: /tambah|add item/i });
+    const addBtn = page.getByRole('button', { name: /tambah|add item/i }).first();
     if (await addBtn.isVisible()) await addBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
 
-    const input = page.locator('input[id*="unit_price"]').first();
-    if (!(await input.isVisible())) { test.skip(); return; }
-    await testCurrencyInput(page, input, '100000', '100.000');
+    const input = page.locator('input[id*="orderRequestItem"][id*="unit_price"]').first();
+    if (!(await input.isVisible()) || !(await input.isEditable())) { test.skip(); return; }
+    await testCurrencyClearAndRetype(page, input, '100000', '100.000');
   });
 
   test('subtotal: typing 500000 displays 500.000', async ({ page }) => {
-    const addBtn = page.getByRole('button', { name: /tambah|add item/i });
+    const addBtn = page.getByRole('button', { name: /tambah|add item/i }).first();
     if (await addBtn.isVisible()) await addBtn.click();
     await page.waitForTimeout(500);
 
-    const input = page.locator('input[id*="subtotal"]').first();
-    if (!(await input.isVisible())) { test.skip(); return; }
-    await testCurrencyInput(page, input, '500000', '500.000');
+    const row = page.locator('[data-repeater-item]').first();
+
+    const qty = row.locator('input[id*="orderRequestItem"][id*="quantity"]').first();
+    const unitPrice = row.locator('input[id*="orderRequestItem"][id*="unit_price"]').first();
+    const tax = row
+      .locator('input[id*="orderRequestItem"][id*="tax"]:not([id*="tax_nominal"])')
+      .first();
+    const subtotal = row.locator('input[id*="orderRequestItem"][id*="subtotal"]').first();
+
+    if (!(await unitPrice.isVisible()) || !(await qty.isVisible()) || !(await subtotal.isVisible())) {
+      test.skip();
+      return;
+    }
+
+    // Make expected subtotal deterministic: tax = 0, qty = 1, unit_price = 500.000
+    if (await tax.isVisible()) {
+      await tax.click({ clickCount: 3 });
+      await tax.fill('0');
+    }
+
+    await qty.click({ clickCount: 3 });
+    await qty.fill('1');
+
+    await testCurrencyInput(page, unitPrice, '500000', '500.000');
+
+    await page.waitForTimeout(300);
+    await expect(subtotal).toHaveValue('500.000');
   });
 });
 

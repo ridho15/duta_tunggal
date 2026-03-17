@@ -311,13 +311,19 @@ class InvoiceObserver
         }
 
         // CREDIT: PPn Keluaran at invoice level.
-        // FIX #2: Use sum of invoice items' pre-computed tax_amount as primary source.
-        // This is accurate for all tax types (Inclusive/Exclusive) and mixed-rate scenarios.
-        // Fallback to rate-based computation if items have no tax_amount (backward compat).
+        // Use sum of invoice items' pre-computed tax_amount as primary source.
+        // Fallback to ppn_rate-based computation (preferred for sales invoices which store ppn_rate only).
+        // Legacy fallback: if neither items nor ppn_rate provide a value, use invoice->tax as rate.
+        // NOTE: We deliberately do NOT combine ppn_rate + invoice->tax to avoid double PPN.
         $totalTaxAmount = (float) $invoice->invoiceItem->sum('tax_amount');
-        if ($totalTaxAmount <= 0 && $invoice->tax > 0) {
-            // Fallback: invoice->tax stores the rate (e.g. 11 for 11%)
-            $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ((float) $invoice->tax / 100));
+        if ($totalTaxAmount <= 0) {
+            $ppnRateVal = (float) ($invoice->ppn_rate ?? 0);
+            if ($ppnRateVal > 0) {
+                $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ($ppnRateVal / 100));
+            } elseif ((float) $invoice->tax > 0) {
+                // Legacy: tax stores percentage rate (e.g. 11 for 11%)
+                $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ((float) $invoice->tax / 100));
+            }
         }
         
         if ($totalTaxAmount > 0 && $ppnKeluaranCoa) {

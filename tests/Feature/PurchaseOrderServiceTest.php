@@ -122,3 +122,50 @@ test('generateInvoice creates invoice with correct totals and items', function (
         ->and((int) $firstLine->quantity)->toBe(2)
         ->and((float) $firstLine->price)->toBe(10000.0);
 });
+
+test('order request approval clamps PO qty to remaining order request qty', function () {
+    // Setup an order request with a single item (qty 10)
+    $orderRequest = \App\Models\OrderRequest::create([
+        'request_number' => 'OR-TEST-CLAMP',
+        'warehouse_id' => $this->warehouse->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'request_date' => now()->toDateString(),
+        'status' => 'draft',
+        'created_by' => $this->user->id,
+    ]);
+
+    $orderRequestItem = \App\Models\OrderRequestItem::create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 10,
+    ]);
+
+    $service = app(\App\Services\OrderRequestService::class);
+
+    $orderRequest = $service->approve($orderRequest, [
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-OR-CLAMP-001',
+        'order_date' => now()->toDateString(),
+        'expected_date' => now()->addDays(7)->toDateString(),
+        'note' => 'Testing clamp',
+        'selected_items' => [
+            [
+                'item_id' => $orderRequestItem->id,
+                'include' => true,
+                'quantity' => 11,
+                'unit_price' => 10000,
+            ],
+        ],
+    ]);
+
+    // Find the created PO and verify item quantity is clamped
+    $purchaseOrder = $orderRequest->purchaseOrders()->first();
+    expect($purchaseOrder)->not->toBeNull();
+
+    $poItem = $purchaseOrder->purchaseOrderItem->first();
+    expect((float) $poItem->quantity)->toBe(10.0);
+
+    // OR should be marked approved by the service
+    expect($orderRequest->fresh()->status)->toBe('approved');
+});

@@ -109,8 +109,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
-                            ->indonesianMoney()
-                            ->default(0),
+                            ->indonesianMoney(),
                         TextInput::make('discount')
                             ->label('Discount')
                             ->reactive()

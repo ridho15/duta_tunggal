@@ -367,10 +367,10 @@ class SalesInvoiceResource extends Resource
                                         $set('delivery_order_items', $deliveryOrderItems);
 
                                         // Calculate tax and total
-                                        $tax = $get('tax') ?? 0;
+                                        $tax = 0;
                                         $otherFee = 0; // Initialize as 0
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     }),
 
@@ -461,10 +461,10 @@ class SalesInvoiceResource extends Resource
                                         }
 
                                         // Calculate tax and total
-                                        $tax = $get('tax') ?? 0;
+                                        $tax = 0;
                                         $otherFee = 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     }),
                             ]),
@@ -509,7 +509,7 @@ class SalesInvoiceResource extends Resource
                                             ->reactive()
                                             ->afterStateUpdated(function ($set, $get) {
                                                 $quantity = (float) ($get('invoice_quantity') ?? 0);
-                                                $price = (float) str_replace(['.', ','], ['', '.'], $get('unit_price') ?? '0');
+                                                $price = (float) \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
                                                 $set('total_price', $quantity * $price);
                                             })
                                             ->columnSpan(1),
@@ -517,6 +517,7 @@ class SalesInvoiceResource extends Resource
                                             ->label('Harga Satuan')
                                             ->indonesianMoney()
                                             ->required()
+                                            ->readOnly()
                                             ->default(function ($get) {
                                                 return $get('original_price') ?? 0;
                                             })
@@ -529,7 +530,7 @@ class SalesInvoiceResource extends Resource
                                             ->reactive()
                                             ->afterStateUpdated(function ($set, $get) {
                                                 $quantity = (float) ($get('invoice_quantity') ?? 0);
-                                                $price = (float) str_replace(['.', ','], ['', '.'], $get('unit_price') ?? '0');
+                                                $price = (float) \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
                                                 $set('total_price', $quantity * $price);
                                             })
                                             ->columnSpan(1),
@@ -563,7 +564,7 @@ class SalesInvoiceResource extends Resource
 
                                         foreach ($deliveryOrderItems as $item) {
                                             $quantity = (float) ($item['invoice_quantity'] ?? 0);
-                                            $price = (float) ($item['unit_price'] ?? 0);
+                                            $price = (float) \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
                                             $total = $quantity * $price;
 
                                             $invoiceItems[] = [
@@ -582,11 +583,11 @@ class SalesInvoiceResource extends Resource
                                         $set('dpp', $subtotal);
 
                                         // Recalculate total
-                                        $tax = $get('tax') ?? 0;
+                                        $tax = 0;
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = collect($otherFees)->sum('amount');
-                                        $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                         $set('other_fee', $otherFeeTotal);
                                     }),
@@ -619,13 +620,13 @@ class SalesInvoiceResource extends Resource
                                     ->columns(2)
                                     ->defaultItems(0)
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $totalOtherFee = collect($state ?? [])->sum('amount');
+                                        $totalOtherFee = (float) collect($state ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
                                         $set('other_fee', $totalOtherFee);
 
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $tax = $get('tax') ?? 0;
-                                        $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
+                                        $tax = 0;
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     })
                                     ->collapsible(),
@@ -644,25 +645,8 @@ class SalesInvoiceResource extends Resource
                                     ->default(0)
                                     ->readonly(),
 
-                                TextInput::make('tax')
-                                    ->label('Tax (%)')
-                                    ->numeric()
-                                    ->validationMessages([
-                                        'numeric' => 'Tax harus berupa angka'
-                                    ])
-                                    ->suffix('%')
-                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        $state = $state ?? 0; // Ensure it's not null
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = collect($otherFees)->sum('amount');
-                                        $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $state / 100) + ($subtotal * $ppnRate / 100);
-                                        $set('total', $finalTotal);
-                                        $set('other_fee', $otherFeeTotal);
-                                    }),
+                                \Filament\Forms\Components\Hidden::make('tax')
+                                    ->default(0),
 
                                 TextInput::make('ppn_rate')
                                     ->label('PPN Rate (%)')
@@ -675,11 +659,11 @@ class SalesInvoiceResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $state = $state ?? 11; // Ensure it's not null, default to 11
-                                        $subtotal = $get('subtotal') ?? 0;
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
                                         $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = collect($otherFees)->sum('amount');
-                                        $tax = $get('tax') ?? 0;
-                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $state / 100);
+                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                        $tax = 0;
+                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $state / 100);
                                         $set('total', $finalTotal);
                                         $set('other_fee', $otherFeeTotal);
                                     }),
@@ -716,8 +700,6 @@ class SalesInvoiceResource extends Resource
                         Hidden::make('status')->default('draft'),
                         Hidden::make('delivery_orders'),
                         Hidden::make('dpp')->default(0),
-                        Hidden::make('tax')->default(0),
-                        Hidden::make('ppn_rate')->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
                         Hidden::make('total')->default(0),
 
                         Repeater::make('invoiceItem')
@@ -744,6 +726,7 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('price')
                                     ->label('Price')
                                     ->indonesianMoney()
+                                    ->readOnly()
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Harga tidak boleh kosong',

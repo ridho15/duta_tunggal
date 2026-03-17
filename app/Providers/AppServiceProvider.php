@@ -140,7 +140,7 @@ class AppServiceProvider extends ServiceProvider
                 ->prefix('Rp')
                 ->placeholder('500.000')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, '.', ',', 0)
+            $money($input, ',', '.', 0)
         JS))
                 ->formatStateUsing(function ($state) {
                     if ($state === null || $state === '') {
@@ -160,7 +160,13 @@ class AppServiceProvider extends ServiceProvider
                         }
                     };
                 }])
-                ->dehydrateStateUsing(fn($state) => \App\Helpers\MoneyHelper::parse($state));
+                ->dehydrateStateUsing(function ($state) {
+                    if ($state === null || $state === '') {
+                        return null;
+                    }
+
+                    return \App\Helpers\MoneyHelper::parse($state);
+                });
         });
     }
 

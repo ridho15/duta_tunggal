@@ -508,6 +508,15 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'production plan' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
             'vendor payment' => [
                 'view any',
                 'view',
@@ -608,6 +617,15 @@ class HelperController extends Controller
                 'force-delete',
             ],
             'bill of material item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'material issue' => [
                 'view any',
                 'view',
                 'create',

@@ -83,6 +83,11 @@ class PurchaseOrderService
                 ) {
                     $orItem = \App\Models\OrderRequestItem::find($poItem->refer_item_model_id);
                     if ($orItem) {
+                        $remaining = max(0, (float) $orItem->quantity - (float) ($orItem->fulfilled_quantity ?? 0));
+                        if ((float) $poItem->quantity > $remaining + 0.000001) {
+                            throw new \RuntimeException("Qty PO untuk item {$orItem->id} melebihi sisa Order Request ({$remaining}).");
+                        }
+
                         $orItem->addFulfilledQuantity($poItem->quantity);
                     }
                 }

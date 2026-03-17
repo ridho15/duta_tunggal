@@ -132,12 +132,19 @@ class LedgerPostingService
                 ]);
             }
 
-            // Calculate PPN amount from the stored percentage rate.
-            // invoice->tax stores the rate (e.g. 12 for 12%), NOT the absolute amount.
+            // Calculate PPN amount robustly.
+            // `invoice->tax` may be stored either as absolute tax amount (preferred)
+            // or as legacy tax rate percentage.
             $ppnAmount = 0;
             $actualPpnAmount = 0; // Track actual PPN amount that gets posted
-            if (!empty($invoice->tax) && $invoice->tax > 0) {
-                $ppnAmount = (float) $invoice->subtotal * ((float) $invoice->tax / 100);
+            $taxValue = (float) ($invoice->tax ?? 0);
+            if ($taxValue > 0) {
+                $subtotalAmount = (float) ($invoice->subtotal ?? 0);
+                $expectedByRate = round($subtotalAmount * ($taxValue / 100), 2);
+                $looksLikeLegacyRate = $taxValue <= 100
+                    && abs(((float) $invoice->total) - ($subtotalAmount + $expectedByRate)) < 1;
+
+                $ppnAmount = $looksLikeLegacyRate ? $expectedByRate : $taxValue;
             } elseif (!empty($invoice->ppn_rate) && $invoice->ppn_rate > 0) {
                 $ppnAmount = (float) $invoice->subtotal * ((float) $invoice->ppn_rate / 100);
             }

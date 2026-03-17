@@ -373,8 +373,8 @@ class AssetResource extends Resource
                         Forms\Components\Placeholder::make('depreciable_amount')
                             ->label('Nilai yang Dapat Disusutkan')
                             ->content(function (Get $get) {
-                                $purchaseCost = (float) str_replace(',', '', $get('purchase_cost') ?? 0);
-                                $salvageValue = (float) str_replace(',', '', $get('salvage_value') ?? 0);
+                                $purchaseCost = (float) MoneyHelper::parse($get('purchase_cost') ?? 0);
+                                $salvageValue = (float) MoneyHelper::parse($get('salvage_value') ?? 0);
                                 $depreciable = $purchaseCost - $salvageValue;
                                 return MoneyHelper::rupiah($depreciable);
                             }),
@@ -397,14 +397,14 @@ class AssetResource extends Resource
                         Forms\Components\Placeholder::make('annual_depreciation_display')
                             ->label('Penyusutan Per Tahun')
                             ->content(function (Get $get) {
-                                $annual = (float) str_replace(',', '', $get('annual_depreciation') ?? 0);
+                                $annual = (float) MoneyHelper::parse($get('annual_depreciation') ?? 0);
                                 return MoneyHelper::rupiah($annual);
                             }),
 
                         Forms\Components\Placeholder::make('monthly_depreciation_display')
                             ->label('Penyusutan Per Bulan')
                             ->content(function (Get $get) {
-                                $monthly = (float) str_replace(',', '', $get('monthly_depreciation') ?? 0);
+                                $monthly = (float) MoneyHelper::parse($get('monthly_depreciation') ?? 0);
                                 return MoneyHelper::rupiah($monthly);
                             }),
 
@@ -439,8 +439,8 @@ class AssetResource extends Resource
 
     protected static function calculateDepreciation(Get $get, Set $set): void
     {
-        $purchaseCost = (float) str_replace(',', '', $get('purchase_cost') ?? 0);
-        $salvageValue = (float) str_replace(',', '', $get('salvage_value') ?? 0);
+        $purchaseCost = (float) MoneyHelper::parse($get('purchase_cost') ?? 0);
+        $salvageValue = (float) MoneyHelper::parse($get('salvage_value') ?? 0);
         $usefulLife = (float) $get('useful_life_years') ?? 1;
         $depreciationMethod = $get('depreciation_method') ?? 'straight_line';
 
@@ -498,7 +498,7 @@ class AssetResource extends Resource
             isset($data['product_id']) && isset($data['depreciation_method']) &&
             isset($data['purchase_cost']) && isset($data['useful_life_years'])
         ) {
-            $purchaseCost = (float) str_replace(',', '', $data['purchase_cost'] ?? 0);
+            $purchaseCost = (float) MoneyHelper::parse($data['purchase_cost'] ?? 0);
             if ($purchaseCost > 0) {
                 $data['salvage_value'] = number_format($purchaseCost * 0.05, 2, '.', '');
             }
@@ -541,7 +541,7 @@ class AssetResource extends Resource
     {
         $productId = $get('product_id');
         $depreciationMethod = $get('depreciation_method');
-        $purchaseCost = (float) str_replace(',', '', $get('purchase_cost') ?? 0);
+        $purchaseCost = (float) MoneyHelper::parse($get('purchase_cost') ?? 0);
         $usefulLifeYears = (float) $get('useful_life_years') ?? 0;
 
         // Only calculate salvage value if all required fields are filled

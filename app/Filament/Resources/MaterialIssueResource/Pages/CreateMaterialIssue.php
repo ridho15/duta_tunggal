@@ -153,12 +153,7 @@ class CreateMaterialIssue extends CreateRecord
                 $warehouseId = $item['warehouse_id'] ?? null;
 
                 // Normalize quantity (handle formatted strings like "1.000,00")
-                $rawQuantity = $item['quantity'] ?? 0;
-                if (is_string($rawQuantity)) {
-                    $rawQuantity = str_replace('.', '', $rawQuantity);
-                    $rawQuantity = str_replace(',', '.', $rawQuantity);
-                }
-                $quantity = (float) $rawQuantity;
+                $quantity = (float) \App\Helpers\MoneyHelper::parse($item['quantity'] ?? 0);
 
                 if (!$productId || !$warehouseId) {
                     throw ValidationException::withMessages([
@@ -179,19 +174,9 @@ class CreateMaterialIssue extends CreateRecord
                 }
 
                 // Normalize cost_per_unit and total_cost (handle formatted strings)
-                $rawCostPerUnit = $item['cost_per_unit'] ?? 0;
-                if (is_string($rawCostPerUnit)) {
-                    $rawCostPerUnit = str_replace('.', '', $rawCostPerUnit);
-                    $rawCostPerUnit = str_replace(',', '.', $rawCostPerUnit);
-                }
-                $costPerUnit = (float) $rawCostPerUnit;
+                $costPerUnit = (float) \App\Helpers\MoneyHelper::parse($item['cost_per_unit'] ?? 0);
 
-                $rawItemTotal = $item['total_cost'] ?? ($quantity * $costPerUnit);
-                if (is_string($rawItemTotal)) {
-                    $rawItemTotal = str_replace('.', '', $rawItemTotal);
-                    $rawItemTotal = str_replace(',', '.', $rawItemTotal);
-                }
-                $itemTotalCost = (float) $rawItemTotal;
+                $itemTotalCost = (float) \App\Helpers\MoneyHelper::parse($item['total_cost'] ?? ($quantity * $costPerUnit));
 
                 // Ensure the item values stored are numeric (so DB receives correct types)
                 $data['items'][$index]['quantity'] = $quantity;

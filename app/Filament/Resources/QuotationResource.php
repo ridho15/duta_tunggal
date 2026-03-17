@@ -425,7 +425,6 @@ class QuotationResource extends Resource
                                         }
                                         $livewire->data['total_amount'] = $grandTotal;
                                     })
-                                    ->default(0)
                                     ->indonesianMoney(),
                                 TextInput::make('quantity')
                                     ->label('Quantity')

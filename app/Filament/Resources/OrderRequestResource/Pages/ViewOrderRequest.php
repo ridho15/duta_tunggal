@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\OrderRequestResource\Pages;
 
 use App\Filament\Resources\OrderRequestResource;
+use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
@@ -60,8 +61,12 @@ class ViewOrderRequest extends ViewRecord
                     $taxType = $record->tax_type ?? 'None';
                     $items = $record->orderRequestItem->map(function ($item) use ($taxType) {
                         $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                        $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
+                        $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
+                        $totalCost = max(0, $remainingQty) * $unitPrice;
+
                         $taxPct = (float)($item->tax ?? 0);
-                        $base = max(0, $remainingQty) * (float)($item->unit_price ?? 0);
+                        $base = $totalCost;
                         try {
                             $taxRes = \App\Services\TaxService::compute($base, $taxPct, $taxType);
                             $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
@@ -74,9 +79,11 @@ class ViewOrderRequest extends ViewRecord
                             'item_id'        => $item->id,
                             'product_name'   => "({$item->product->sku}) {$item->product->name}",
                             'quantity'       => max(0, $remainingQty),
-                            'unit_price'     => $item->unit_price ?? 0,
+                            'original_price' => $originalPrice,
+                            'unit_price'     => $unitPrice,
                             'tax'            => $taxPct,
                             'tax_nominal'    => $taxNom,
+                            'total_cost'     => $totalCost,
                             'subtotal'       => $subtotal,
                             'include'        => $remainingQty > 0,
                         ];
@@ -175,6 +182,10 @@ class ViewOrderRequest extends ViewRecord
                                         ->label('Qty')
                                         ->minValue(0)
                                         ->required(),
+                                    TextInput::make('original_price')
+                                        ->label('Harga Asli (Rp)')
+                                        ->minValue(0)
+                                        ->indonesianMoney(),
                                     TextInput::make('unit_price')
                                         ->label('Harga Override (Rp)')
                                         ->minValue(0)
@@ -186,6 +197,17 @@ class ViewOrderRequest extends ViewRecord
                                     TextInput::make('tax_nominal')
                                         ->label('Nominal Pajak (Rp)')
                                         ->prefix('Rp')
+                                        ->readOnly(),
+                                    TextInput::make('total_cost')
+                                        ->label('Total (Harga × Qty)')
+                                        ->prefix('Rp')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format((float)$state, 0, ',', '.') : '')
+                                        ->rules([
+                                            'regex:/^[0-9\.,]+$/',
+                                        ])
+                                        ->validationMessages([
+                                            'regex' => 'Total harus berupa angka (contoh: 12.000.000).',
+                                        ])
                                         ->readOnly(),
                                     TextInput::make('subtotal')
                                         ->label('Subtotal (Rp)')
@@ -224,8 +246,12 @@ class ViewOrderRequest extends ViewRecord
                     $taxType = $record->tax_type ?? 'None';
                     $items = $record->orderRequestItem->map(function ($item) use ($taxType) {
                         $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
+                        $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
+                        $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
+                        $totalCost = max(0, $remainingQty) * $unitPrice;
+
                         $taxPct = (float)($item->tax ?? 0);
-                        $base = max(0, $remainingQty) * (float)($item->unit_price ?? 0);
+                        $base = $totalCost;
                         try {
                             $taxRes = \App\Services\TaxService::compute($base, $taxPct, $taxType);
                             $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
@@ -236,10 +262,11 @@ class ViewOrderRequest extends ViewRecord
                             'item_id'        => $item->id,
                             'product_name'   => "({$item->product->sku}) {$item->product->name}",
                             'quantity'       => max(0, $remainingQty),
-                            'original_price' => $item->original_price ?? $item->unit_price ?? 0,
-                            'unit_price'     => $item->unit_price ?? 0,
+                            'original_price' => $originalPrice,
+                            'unit_price'     => $unitPrice,
                             'tax'            => $taxPct,
                             'tax_nominal'    => $taxNom,
+                            'total_cost'     => $totalCost,
                             'include'        => $remainingQty > 0,
                         ];
                     })->values()->toArray();
@@ -331,7 +358,7 @@ class ViewOrderRequest extends ViewRecord
                                         ->label('Harga Asli')
                                         ->prefix('Rp')
                                         ->readOnly()
-                                        ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
                                         ->columnSpan(2),
                                     TextInput::make('unit_price')
                                         ->label('Harga Override')

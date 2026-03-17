@@ -55,6 +55,56 @@
 
         @filamentStyles
 
+        <script data-navigate-once>
+            // Polyfill for the Alpine `x-mask:dynamic` money helper.
+            // The real helper returns a MASK PATTERN (e.g. `9.999.999`), not a formatted value.
+            // Without a global `$money`, `x-mask:dynamic="$money(...)"` silently fails.
+            // NOTE: In `x-mask:dynamic`, Alpine passes `$input` as the current input *value* (string).
+            // This polyfill intentionally matches Alpine Mask's `formatMoney(input, delimiter, thousands, precision)`.
+            window.$money ??= function (input, delimiter = '.', thousands, precision = 2) {
+                if (input === '-') return '-';
+                if (/^\D+$/.test(input)) return '9';
+
+                if (thousands === null || thousands === undefined) {
+                    thousands = delimiter === ',' ? '.' : ',';
+                }
+
+                const addThousands = (template, thousandsSeparator) => {
+                    let output = '';
+                    let counter = 0;
+
+                    for (let i = template.length - 1; i >= 0; i--) {
+                        if (template[i] === thousandsSeparator) continue;
+
+                        if (counter === 3) {
+                            output = template[i] + thousandsSeparator + output;
+                            counter = 0;
+                        } else {
+                            output = template[i] + output;
+                        }
+                        counter++;
+                    }
+
+                    return output;
+                };
+
+                const minus = String(input).startsWith('-') ? '-' : '';
+                const strippedInput = String(input).replaceAll(new RegExp(`[^0-9\\${delimiter}]`, 'g'), '');
+
+                let template = Array.from({ length: strippedInput.split(delimiter)[0].length })
+                    .fill('9')
+                    .join('');
+
+                template = `${minus}${addThousands(template, thousands)}`;
+
+                if (precision > 0 && String(input).includes(delimiter)) {
+                    template += `${delimiter}` + '9'.repeat(precision);
+                }
+
+                return template;
+            };
+        </script>
+
         {{-- @vite(['resources/css/app.css', 'resources/js/app.js']) --}}
 
         {{ filament()->getTheme()->getHtml() }}

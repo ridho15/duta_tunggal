@@ -839,6 +839,7 @@ class PurchaseReceiptService
             'supplier_name' => $supplier ? $supplier->perusahaan : null,
             'supplier_phone' => $supplier ? $supplier->phone : null,
             'purchase_receipts' => [$receipt->id],
+            'cabang_id' => $receipt->cabang_id,
         ]);
 
         // Create invoice items

@@ -796,7 +796,6 @@ class SaleOrderResource extends Resource
                                     ->default(0),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
-                                    ->default(0)
                                     ->indonesianMoney()
                                     ->validationMessages([
                                         'required' => 'Unit Price harus diisi',

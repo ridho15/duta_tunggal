@@ -89,6 +89,22 @@ class VendorPaymentResource extends Resource
                                                     return $invoice->accountPayable->remaining ?? $invoice->total;
                                                 });
                                                 $set('total_payment', $total);
+
+                                                $paymentDetails = $invoices->map(function ($invoice) {
+                                                    return [
+                                                        'invoice_id' => $invoice->id,
+                                                        'invoice_number' => $invoice->invoice_number,
+                                                        'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                                                        'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                                                        'total_invoice' => $invoice->total,
+                                                        'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
+                                                        'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
+                                                    ];
+                                                })->toArray();
+
+                                                $set('payment_details', $paymentDetails);
+                                            } else {
+                                                $set('payment_details', []);
                                             }
                                         }
                                     }),
@@ -147,55 +163,24 @@ class VendorPaymentResource extends Resource
                                     ->label('Pilih Invoice')
                                     ->options(function ($get, $set) {
                                         $paymentRequestId = $get('payment_request_id');
-                                        $supplierId = $get('supplier_id');
 
-                                        if (!$supplierId) {
+                                        if (!$paymentRequestId) {
                                             $set('has_invoices', false);
                                             return [];
                                         }
 
                                         try {
-                                            $currentSelectedInvoices = $get('selected_invoices') ?? [];
+                                            $pr = PaymentRequest::find($paymentRequestId);
+                                            $prInvoiceIds = $pr ? ($pr->selected_invoices ?? []) : [];
 
-                                            // If a payment request is selected, only show invoices from that PR
-                                            if ($paymentRequestId) {
-                                                $pr = PaymentRequest::find($paymentRequestId);
-                                                $prInvoiceIds = $pr ? ($pr->selected_invoices ?? []) : [];
-
-                                                if (empty($prInvoiceIds)) {
-                                                    $set('has_invoices', false);
-                                                    return [];
-                                                }
-
-                                                $invoices = Invoice::whereIn('id', $prInvoiceIds)
-                                                    ->with(['accountPayable'])
-                                                    ->get();
-                                            } else {
-                                                // No PR: show all unpaid invoices for supplier
-                                                $isEditMode = !empty($currentSelectedInvoices) && is_array($currentSelectedInvoices);
-
-                                                $query = Invoice::join('purchase_orders', function ($join) use ($supplierId) {
-                                                    $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
-                                                        ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder')
-                                                        ->where('purchase_orders.supplier_id', '=', $supplierId);
-                                                })
-                                                    ->with(['accountPayable'])
-                                                    ->select('invoices.*');
-
-                                                if ($isEditMode) {
-                                                    $query->where(function ($q) use ($currentSelectedInvoices) {
-                                                        $q->whereHas('accountPayable', function ($query) {
-                                                            $query->where('remaining', '>', 0);
-                                                        })->orWhereIn('invoices.id', $currentSelectedInvoices);
-                                                    });
-                                                } else {
-                                                    $query->whereHas('accountPayable', function ($query) {
-                                                        $query->where('remaining', '>', 0);
-                                                    });
-                                                }
-
-                                                $invoices = $query->get();
+                                            if (empty($prInvoiceIds)) {
+                                                $set('has_invoices', false);
+                                                return [];
                                             }
+
+                                            $invoices = Invoice::whereIn('id', $prInvoiceIds)
+                                                ->with(['accountPayable'])
+                                                ->get();
 
                                             $options = [];
                                             foreach ($invoices as $invoice) {
@@ -216,28 +201,17 @@ class VendorPaymentResource extends Resource
                                     })
                                     ->visible(fn($get) => !empty($get('supplier_id')))
                                     ->helperText(function ($get) {
-                                        $supplierId = $get('supplier_id');
-                                        if (!$supplierId) {
-                                            return 'Pilih supplier terlebih dahulu untuk melihat invoice yang tersedia.';
+                                        $paymentRequestId = $get('payment_request_id');
+                                        if (!$paymentRequestId) {
+                                            return 'Pilih Payment Request terlebih dahulu untuk melihat invoice yang tersedia.';
                                         }
 
                                         $hasInvoices = $get('has_invoices');
                                         if ($hasInvoices === false) {
-                                            return 'Tidak ada invoice yang tersedia untuk vendor ini. Pastikan vendor memiliki invoice dengan sisa pembayaran.';
+                                            return 'Tidak ada invoice yang tersedia pada Payment Request ini.';
                                         }
 
-                                        $selectedInvoices = $get('selected_invoices') ?? [];
-                                        $isEditMode = !empty($selectedInvoices) && is_array($selectedInvoices);
-
-                                        if ($isEditMode) {
-                                            return 'Menampilkan invoice yang sudah dipilih sebelumnya dan invoice dengan sisa pembayaran. Invoice yang sudah lunas ditandai dengan "(SUDAH LUNAS)".';
-                                        }
-
-                                        if (empty($selectedInvoices)) {
-                                            return 'Pilih invoice yang akan dibayar. Hanya menampilkan invoice dengan sisa pembayaran.';
-                                        }
-
-                                        return 'Pilih invoice yang akan dibayar. Hanya menampilkan invoice dengan sisa pembayaran.';
+                                        return 'Pilih invoice dari Payment Request ini untuk diproses pembayarannya.';
                                     })
                                     ->reactive()
                                     ->live()
@@ -292,6 +266,9 @@ class VendorPaymentResource extends Resource
                                                 return [
                                                     'invoice_id' => $invoice->id,
                                                     'invoice_number' => $invoice->invoice_number,
+                                                    'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                                                    'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                                                    'total_invoice' => $invoice->total,
                                                     'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
                                                     'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
                                                 ];
@@ -444,9 +421,9 @@ class VendorPaymentResource extends Resource
                                                     foreach ($paymentDetails as $detail) {
                                                         $amount = 0;
                                                         if (is_array($detail) && isset($detail['payment_amount'])) {
-                                                            $amount = \App\Http\Controllers\HelperController::parseIndonesianMoney($detail['payment_amount'] ?? 0);
+                                                            $amount = \App\Helpers\MoneyHelper::parse($detail['payment_amount'] ?? 0);
                                                         } elseif (is_object($detail) && isset($detail->payment_amount)) {
-                                                            $amount = \App\Http\Controllers\HelperController::parseIndonesianMoney($detail->payment_amount ?? 0);
+                                                            $amount = \App\Helpers\MoneyHelper::parse($detail->payment_amount ?? 0);
                                                         }
                                                         $totalPayment += $amount;
                                                     }
@@ -538,6 +515,9 @@ class VendorPaymentResource extends Resource
                                                 return [
                                                     'invoice_id' => $invoice->id,
                                                     'invoice_number' => $invoice->invoice_number,
+                                                    'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                                                    'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                                                    'total_invoice' => $invoice->total,
                                                     'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
                                                     'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
                                                 ];

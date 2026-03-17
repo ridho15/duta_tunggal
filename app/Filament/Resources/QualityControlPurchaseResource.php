@@ -142,6 +142,7 @@ class QualityControlPurchaseResource extends Resource
                                                     }
                                                 }
                                                 $set('warehouse_id', $warehouseId);
+                                                $set('cabang_id', $purchaseOrder->cabang_id ?? null);
 
                                                 // Calculate remaining qty based on existing QC records (partial QC support)
                                                 $alreadyInspected = $item->qualityControls->sum(
@@ -166,6 +167,8 @@ class QualityControlPurchaseResource extends Resource
                                     ]),
                                 \Filament\Forms\Components\Hidden::make('from_model_type')
                                     ->default('App\Models\PurchaseOrderItem')
+                                    ->dehydrated(true),
+                                \Filament\Forms\Components\Hidden::make('cabang_id')
                                     ->dehydrated(true),
                                 TextInput::make('qc_number')
                                     ->label('QC Number')
@@ -613,6 +616,7 @@ class QualityControlPurchaseResource extends Resource
                                 'status'            => 0,
                                 'notes'             => $data['notes'] ?? null,
                                 'date_send_stock'   => $data['inspection_date'] ?? now(),
+                                'cabang_id'         => $poItem->purchaseOrder->cabang_id ?? Auth::user()?->cabang_id,
                             ]);
                             $created++;
                         }

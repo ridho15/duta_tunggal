@@ -91,7 +91,6 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->default(0),
                         TextInput::make('unit_price')
                             ->label('Unit Price')
-                            ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state, $get('tipe_pajak') ?? null));

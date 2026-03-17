@@ -70,6 +70,14 @@ class SaleOrder extends Model
         return $this->hasMany(SaleOrderItem::class, 'sale_order_id');
     }
 
+    /**
+     * Alias for saleOrderItem() to support legacy/consumers expecting ->items
+     */
+    public function items()
+    {
+        return $this->saleOrderItem();
+    }
+
     public function requestApproveBy()
     {
         return $this->belongsTo(User::class, 'request_approve_by')->withDefault();

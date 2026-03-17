@@ -98,6 +98,7 @@ class QualityControlService
             'rak_id'            => $data['rak_id'] ?? null,
             'from_model_type'   => \App\Models\PurchaseOrderItem::class,
             'from_model_id'     => $purchaseOrderItem->id,
+            'cabang_id'         => $purchaseOrderItem->purchaseOrder->cabang_id ?? Auth::user()?->cabang_id,
         ]);
 
         return $qualityControl;

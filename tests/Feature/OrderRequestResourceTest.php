@@ -57,33 +57,34 @@ beforeEach(function () {
 });
 
 it('creates an order request through the Filament create page', function () {
-    $payload = [
+    $headerPayload = [
         'request_number' => 'OR-TEST-'.uniqid(),
         'cabang_id' => $this->cabang->id,
         'supplier_id' => $this->supplier->id,
         'warehouse_id' => $this->warehouse->id,
         'request_date' => now()->format('Y-m-d'),
         'note' => 'Order request dari test',
-        'orderRequestItem' => [
-            [
-                'product_id' => $this->product->id,
-                'quantity' => 2,
-                'unit_price' => $this->product->cost_price,
-                // supply nonzero percentages to ensure calculation logic is exercised
-                'discount' => 10, // 10%
-                'tax' => 5,       // 5%
-                // compute expected subtotal using percentage formula
-                'subtotal' => round(
-                    ((2 * $this->product->cost_price) * (1 - 0.10)) * (1 + 0.05),
-                    2
-                ),
-            ],
-        ],
     ];
+
+    $itemsPayload = [[
+        'product_id' => $this->product->id,
+        'quantity' => 2,
+        'original_price' => $this->product->cost_price,
+        'unit_price' => $this->product->cost_price,
+        // supply nonzero percentages to ensure calculation logic is exercised
+        'discount' => 10, // 10%
+        'tax' => 5,       // 5%
+        // compute expected subtotal using percentage formula
+        'subtotal' => round(
+            ((2 * $this->product->cost_price) * (1 - 0.10)) * (1 + 0.05),
+            2
+        ),
+    ]];
 
     $component = Livewire::actingAs($this->user)
         ->test(CreateOrderRequest::class)
-        ->fillForm($payload)
+        ->fillForm($headerPayload)
+        ->set('data.orderRequestItem', $itemsPayload)
         ->call('create');
 
     $component->assertHasNoFormErrors();
@@ -96,6 +97,38 @@ it('creates an order request through the Filament create page', function () {
     expect($or->warehouse_id)->toBe($this->warehouse->id);
     expect($or->orderRequestItem()->count())->toBe(1);
     expect($or->created_by)->toBe($this->user->id);
+});
+
+it('stores formatted unit_price as numeric value in database', function () {
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-FMT-'.uniqid(),
+            'cabang_id' => $this->cabang->id,
+            'supplier_id' => $this->supplier->id,
+            'warehouse_id' => $this->warehouse->id,
+            'request_date' => now()->format('Y-m-d'),
+            'note' => 'Order request format nominal test',
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+            'original_price' => '1.250.000',
+            'unit_price' => '1.250.000',
+            'discount' => 0,
+            'tax' => 0,
+            'subtotal' => '1.250.000',
+        ]])
+        ->call('create');
+
+    $component->assertHasNoFormErrors();
+
+    $or = OrderRequest::latest('id')->first();
+    $item = $or->orderRequestItem()->latest('id')->first();
+
+    expect($item)->not->toBeNull();
+    expect((float) $item->unit_price)->toBe(1250000.0);
+    expect((float) $item->original_price)->toBe(1250000.0);
 });
 
 it('lists order requests on the index page', function () {

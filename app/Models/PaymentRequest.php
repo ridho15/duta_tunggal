@@ -31,9 +31,35 @@ class PaymentRequest extends Model
 
     protected $casts = [
         'selected_invoices' => 'array',
-        // request_date and payment_date handled via accessors to guard against invalid DB values like '-'
-        'approved_at'       => 'datetime',
+        // request_date, payment_date, and approved_at handled via accessors to guard against invalid DB values like '-'
     ];
+
+    /**
+     * Accessor for approved_at — guards against invalid DB values like '-'.
+     */
+    public function getApprovedAtAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string)$value) === '' || trim((string)$value) === '-') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Mutator for approved_at — converts invalid values to null before saving.
+     */
+    public function setApprovedAtAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['approved_at'] = null;
+        } else {
+            $this->attributes['approved_at'] = $value;
+        }
+    }
 
     /**
      * Accessor for request_date — guards against invalid DB values like '-'.

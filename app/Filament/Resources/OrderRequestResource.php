@@ -364,6 +364,26 @@ class OrderRequestResource extends Resource
                                         }
                                     })
                                     ->helperText('Pilih supplier untuk item ini (opsional, akan memperbarui harga)'),
+                                Placeholder::make('supplier_recommendation')
+                                    ->label('Rekomendasi Supplier')
+                                    ->content(function (callable $get) {
+                                        $productId = $get('product_id');
+                                        if (!$productId) {
+                                            return 'Pilih produk untuk melihat rekomendasi supplier.';
+                                        }
+
+                                        $product = Product::with('suppliers')->find($productId);
+                                        if (!$product || $product->suppliers->isEmpty()) {
+                                            return 'Tidak ada supplier terdaftar untuk produk ini.';
+                                        }
+
+                                        $recommended = $product->suppliers
+                                            ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
+                                            ->first();
+
+                                        $price = (float) ($recommended?->pivot->supplier_price ?? 0);
+                                        return "{$recommended->perusahaan} (Rp " . number_format($price, 0, ',', '.') . ')';
+                                    }),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
@@ -402,12 +422,13 @@ class OrderRequestResource extends Resource
                                     ->default(0)
                                     ->readOnly()
                                     ->dehydrated()
+                                    ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(\App\Helpers\MoneyHelper::parse($state), 0, ',', '.') : '')
                                     ->helperText('Harga dari master produk'),
                                 TextInput::make('unit_price')
                                     ->label('Harga Override')
                                     ->indonesianMoney()
-                                    ->default(0)
                                     ->reactive()
+                                    ->live(onBlur: true)
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
                                         $quantity  = (float) ($get('quantity') ?? 0);
@@ -501,6 +522,7 @@ class OrderRequestResource extends Resource
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
+                                    ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(\App\Helpers\MoneyHelper::parse($state), 0, ',', '.') : '')
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
                                             $unitPrice = \App\Helpers\MoneyHelper::parse($record->unit_price ?? 0);
@@ -677,7 +699,7 @@ class OrderRequestResource extends Resource
                         );
                     }),
             ])
-            ->recordClasses(fn ($record) => match ($record->status) {
+            ->recordClasses(fn($record) => match ($record->status) {
                 'draft'           => '',
                 'request_approve' => 'bg-gray-100',
                 'approved'        => 'bg-blue-50',
@@ -745,7 +767,7 @@ class OrderRequestResource extends Resource
                                 }
                                 return [
                                     'item_id'         => $item->id,
-                                    'item_supplier_id'=> $supplierId,
+                                    'item_supplier_id' => $supplierId,
                                     'product_name'    => "({$item->product->sku}) {$item->product->name}",
                                     'quantity'        => max(0, $remainingQty),
                                     'unit_price'      => $supplierPrice,
@@ -852,9 +874,9 @@ class OrderRequestResource extends Resource
                                                 ->numeric()
                                                 ->minValue(0)
                                                 ->required()
-                                                ->helperText(fn ($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
+                                                ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                                                 ->rules([
-                                                    fn ($get) => function ($attribute, $value, $fail) use ($get) {
+                                                    fn($get) => function ($attribute, $value, $fail) use ($get) {
                                                         $max = $get('max_quantity');
                                                         if ($max !== null && $max !== '' && (float) $value > (float) $max) {
                                                             $fail("Qty tidak boleh melebihi {$max}.");
@@ -984,12 +1006,14 @@ class OrderRequestResource extends Resource
                                 }
                                 return [
                                     'item_id'         => $item->id,
-                                    'item_supplier_id'=> $supplierId,
+                                    'item_supplier_id' => $supplierId,
                                     'product_name'    => "({$item->product->sku}) {$item->product->name}",
                                     'quantity'        => max(0, $remainingQty),
+                                    'original_price'  => number_format((float)($item->original_price ?? $supplierPrice), 0, ',', '.'),
                                     'unit_price'      => $supplierPrice,
                                     'tax'             => $taxPct,
                                     'tax_nominal'     => $taxNom,
+                                    'total_cost'      => number_format(max(0, $remainingQty) * (float)$supplierPrice, 0, ',', '.'),
                                     'subtotal'        => $subtotal,
                                     'max_quantity'    => max(0, $remainingQty),
                                     'include'         => $remainingQty > 0,
@@ -1101,9 +1125,9 @@ class OrderRequestResource extends Resource
                                                 ->numeric()
                                                 ->minValue(0)
                                                 ->required()
-                                                ->helperText(fn ($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
+                                                ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                                                 ->rules([
-                                                    fn ($get) => function ($attribute, $value, $fail) use ($get) {
+                                                    fn($get) => function ($attribute, $value, $fail) use ($get) {
                                                         $max = $get('max_quantity');
                                                         if ($max !== null && $max !== '' && (float) $value > (float) $max) {
                                                             $fail("Qty tidak boleh melebihi {$max}.");
@@ -1114,6 +1138,18 @@ class OrderRequestResource extends Resource
                                                     'required' => 'Qty wajib diisi.',
                                                     'numeric' => 'Qty harus berupa angka.',
                                                     'min' => 'Qty minimal 0.',
+                                                ]),
+                                            TextInput::make('original_price')
+                                                ->label('Original Price (Rp)')
+                                                ->required()
+                                                ->indonesianMoney()
+                                                ->rules([
+                                                    'required',
+                                                    'regex:/^[0-9\.,]+$/',
+                                                ])
+                                                ->validationMessages([
+                                                    'required' => 'Harga asli wajib diisi.',
+                                                    'regex' => 'Harga asli harus berupa angka (contoh: 12.000.000).',
                                                 ]),
                                             TextInput::make('unit_price')
                                                 ->label('Harga Satuan (Rp)')
@@ -1135,6 +1171,16 @@ class OrderRequestResource extends Resource
                                             TextInput::make('tax_nominal')
                                                 ->label('Nominal Pajak (Rp)')
                                                 ->prefix('Rp')
+                                                ->readOnly(),
+                                            TextInput::make('total_cost')
+                                                ->label('Total (Harga × Qty)')
+                                                ->prefix('Rp')
+                                                ->rules([
+                                                    'regex:/^[0-9\.,]+$/',
+                                                ])
+                                                ->validationMessages([
+                                                    'regex' => 'Total harus berupa angka (contoh: 12.000.000).',
+                                                ])
                                                 ->readOnly(),
                                             TextInput::make('subtotal')
                                                 ->label('Subtotal (Rp)')

@@ -27,6 +27,7 @@ class QualityControl extends Model
         'from_model_id',
         'from_model_type',
         'purchase_return_processed',
+        'cabang_id',
     ];
 
     protected $appends = [
@@ -85,6 +86,11 @@ class QualityControl extends Model
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     public function purchaseReceipt()

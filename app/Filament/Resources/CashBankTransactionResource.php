@@ -299,14 +299,14 @@ class CashBankTransactionResource extends Resource
                         ->collapsible()
                         ->itemLabel(fn(array $state): ?string => $state['description'] ?? ChartOfAccount::find($state['chart_of_account_id'] ?? null)?->name ?? 'Rincian Baru')
                         ->afterStateUpdated(function ($state, callable $set) {
-                            $total = collect($state ?? [])->sum('amount');
+                            $total = (float) collect($state ?? [])->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['amount'] ?? 0));
                             if ($total > 0) {
                                 $set('../../amount', abs($total)); // Use absolute value for main amount
                             }
                         })
                         ->rules([
                             fn (): \Closure => function (string $attribute, $value, \Closure $fail) {
-                                $total = collect($value ?? [])->sum('amount');
+                                $total = (float) collect($value ?? [])->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['amount'] ?? 0));
                                 if ($total == 0) {
                                     $fail('Total rincian tidak boleh 0');
                                 }

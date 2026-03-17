@@ -162,27 +162,39 @@ class PurchaseInvoiceResource extends Resource
                                                 return [$po->id => $label];
                                             });
                                     })
-                                    ->disabledOptions(function ($get) {
+                                    ->disableOptionWhen(function ($value, $get) {
                                         $supplierId = $get('selected_supplier');
-                                        if (!$supplierId) return [];
-                                        
-                                        $pos = PurchaseOrder::where('supplier_id', $supplierId)
+                                        if (!$supplierId) {
+                                            return false;
+                                        }
+
+                                        $po = PurchaseOrder::where('supplier_id', $supplierId)
                                             ->where('status', 'completed')
-                                            ->get();
-                                        
-                                        return $pos->filter(function ($po) {
-                                            $allReceiptIds = $po->purchaseReceipt()
-                                                ->where('status', 'completed')
-                                                ->pluck('id')->toArray();
-                                            if (empty($allReceiptIds)) return true;
-                                            
-                                            $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
-                                                ->whereNotNull('purchase_receipts')
-                                                ->get()->pluck('purchase_receipts')->flatten()
-                                                ->intersect($allReceiptIds)->unique()->toArray();
-                                            
-                                            return count($invoicedReceiptIds) >= count($allReceiptIds);
-                                        })->keys()->toArray();
+                                            ->find($value);
+
+                                        if (!$po) {
+                                            return false;
+                                        }
+
+                                        $allReceiptIds = $po->purchaseReceipt()
+                                            ->where('status', 'completed')
+                                            ->pluck('id')
+                                            ->toArray();
+
+                                        if (empty($allReceiptIds)) {
+                                            return true;
+                                        }
+
+                                        $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
+                                            ->whereNotNull('purchase_receipts')
+                                            ->get()
+                                            ->pluck('purchase_receipts')
+                                            ->flatten()
+                                            ->intersect($allReceiptIds)
+                                            ->unique()
+                                            ->toArray();
+
+                                        return count($invoicedReceiptIds) >= count($allReceiptIds);
                                     })
                                     ->columns(2)
                                     ->bulkToggleable()
@@ -201,6 +213,10 @@ class PurchaseInvoiceResource extends Resource
                                                 $invoiceDate = $get('invoice_date') ?: now();
                                                 $dueDate = \Carbon\Carbon::parse($invoiceDate)->addDays($po->tempo_hutang);
                                                 $set('due_date', $dueDate->toDateString());
+                                            }
+
+                                            if ($po && $po->cabang_id) {
+                                                $set('cabang_id', $po->cabang_id);
                                             }
                                         }
                                     }),
@@ -303,12 +319,10 @@ class PurchaseInvoiceResource extends Resource
                                                     if ($purchaseOrderItem) {
                                                         $subtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
                                                         $discountAmount = $subtotal * ($purchaseOrderItem->discount / 100);
-                                                        $afterDiscount = $subtotal - $discountAmount;
-                                                        $taxAmount = $afterDiscount * ($purchaseOrderItem->tax / 100);
-                                                        return $afterDiscount + $taxAmount;
+                                                        return $subtotal - $discountAmount;
                                                     }
                                                     return 0;
-                                                }) + $receipt->purchaseReceiptBiaya->sum('total');
+                                                }) + $receipt->purchaseReceiptBiaya->sum(fn ($biaya) => (float) \App\Helpers\MoneyHelper::parse($biaya->total ?? 0));
                                                 
                                                 $label = "[{$purchaseOrder->po_number}] {$receipt->receipt_number} - Rp. " . number_format($total, 0, ',', '.');
                                                 if ($isInvoiced) $label .= ' (Sudah di-invoice)';
@@ -327,8 +341,8 @@ class PurchaseInvoiceResource extends Resource
                                             
                                             // Recalculate total with manual other_fees only
                                             $otherFees = $get('other_fees') ?? [];
-                                            $manualOtherFeeTotal = collect($otherFees)->sum('amount');
-                                            $ppnRate = $get('ppn_rate') ?? 0;
+                                            $manualOtherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                            $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                             $finalTotal = $manualOtherFeeTotal;
                                             $set('total', $finalTotal);
                                             $set('other_fee', $manualOtherFeeTotal);
@@ -436,12 +450,12 @@ class PurchaseInvoiceResource extends Resource
                                         
                                         // Calculate total including receipt biaya and manual other_fees
                                         $existingOtherFees = $get('other_fees') ?? [];
-                                        $receiptBiayaTotal = collect($updatedBiaya)->sum('total');
-                                        $manualOtherFeeTotal = collect($existingOtherFees)->sum('amount');
+                                        $receiptBiayaTotal = (float) collect($updatedBiaya)->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['total'] ?? 0));
+                                        $manualOtherFeeTotal = (float) collect($existingOtherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
                                         $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
                                         
                                         // Calculate total using PPN only
-                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
 
@@ -487,8 +501,7 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Harga tidak boleh kosong',
                                             ])
-                                            ->disabled()
-                                            ->dehydrated(true),
+                                            ->readOnly(),
                                         TextInput::make('total')
                                             ->label('Total')
                                             ->indonesianMoney()
@@ -496,8 +509,7 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Total tidak boleh kosong',
                                             ])
-                                            ->disabled()
-                                            ->dehydrated(true),
+                                            ->readOnly(),
                                     ])
                                     ->columns(4)
                                     ->disableItemCreation()
@@ -520,12 +532,12 @@ class PurchaseInvoiceResource extends Resource
                                         $set('dpp', $subtotal);
                                         // Recalculate total with other fees using PPN only
                                         $otherFees = $get('other_fees') ?? [];
-                                        $manualOtherFeeTotal = collect($otherFees)->sum('amount');
+                                        $manualOtherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
                                         $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                        $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
+                                        $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['total'] ?? 0));
                                         $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
                                         
-                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                         
@@ -566,16 +578,16 @@ class PurchaseInvoiceResource extends Resource
                                     ->disableItemCreation(fn ($operation) => $operation === 'edit')
                                     ->disableItemDeletion(fn ($operation) => $operation === 'edit')
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $manualOtherFeeTotal = collect($state ?? [])->sum('amount');
+                                        $manualOtherFeeTotal = (float) collect($state ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
                                         $set('other_fee', $manualOtherFeeTotal);
                                         
                                         // Include receipt biaya in total calculation
                                         $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                        $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
+                                        $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['total'] ?? 0));
                                         $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
                                         
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $ppnRate = $get('ppn_rate') ?? 0;
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
 
@@ -610,13 +622,13 @@ class PurchaseInvoiceResource extends Resource
                                     ->disabled(fn ($operation) => $operation === 'edit')
                                     ->dehydrated(fn ($operation) => $operation !== 'edit')
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $subtotal = $get('subtotal') ?? 0;
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
                                         $otherFees = $get('other_fees') ?? [];
-                                        $manualOtherFeeTotal = collect($otherFees)->sum('amount');
+                                        $manualOtherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
 
                                         // Include receipt biaya in total calculation
                                         $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                        $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
+                                        $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['total'] ?? 0));
                                         $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
 
                                         $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $state / 100);
@@ -753,16 +765,16 @@ class PurchaseInvoiceResource extends Resource
                             ->collapsed()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 // Recalculate total when receiptBiayaItems changes
-                                $subtotal = $get('subtotal') ?? 0;
+                                $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
                                 $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                $receiptBiayaTotal = collect($receiptBiayaItems)->sum('total');
+                                $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['total'] ?? 0));
                                 $existingOtherFees = $get('other_fees') ?? [];
-                                $manualOtherFeeTotal = collect($existingOtherFees)->sum('amount');
+                                $manualOtherFeeTotal = (float) collect($existingOtherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
                                 $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
                                 
                                 // Calculate total using PPN only
                                 $tax = 0;
-                                $ppnRate = $get('ppn_rate') ?? 0;
+                                $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                 $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                 $set('total', $finalTotal);
 
@@ -1083,7 +1095,7 @@ class PurchaseInvoiceResource extends Resource
         $data['other_fee'] = collect($otherFees)->map(function ($fee) {
             return [
                 'name' => $fee['nama_biaya'] ?? $fee['name'] ?? 'Biaya Lain',
-                'amount' => (float) ($fee['total'] ?? $fee['amount'] ?? 0),
+                'amount' => (float) \App\Helpers\MoneyHelper::parse($fee['total'] ?? $fee['amount'] ?? 0),
             ];
         })->toArray();
         
@@ -1093,7 +1105,7 @@ class PurchaseInvoiceResource extends Resource
         // Calculate totals if not set - use PPN only (no separate tax)
         if (!isset($data['total']) || $data['total'] == 0) {
             $subtotal = $data['subtotal'] ?? 0;
-            $otherFeeTotal = collect($data['other_fee'] ?? [])->sum('amount');
+            $otherFeeTotal = (float) collect($data['other_fee'] ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
             $ppnRate = $data['ppn_rate'] ?? 0;
             $data['total'] = $subtotal + $otherFeeTotal + ($subtotal * $ppnRate / 100);
         }

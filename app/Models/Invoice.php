@@ -61,12 +61,56 @@ class Invoice extends Model
     ];
 
     protected $casts = [
-        'invoice_date' => 'date',
-        'due_date' => 'date',
         'delivery_orders' => 'array',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
     ];
+
+    public function getInvoiceDateAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string) $value) === '' || trim((string) $value) === '-') {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function setInvoiceDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['invoice_date'] = null;
+            return;
+        }
+
+        $this->attributes['invoice_date'] = $value;
+    }
+
+    public function getDueDateAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string) $value) === '' || trim((string) $value) === '-') {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function setDueDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['due_date'] = null;
+            return;
+        }
+
+        $this->attributes['due_date'] = $value;
+    }
 
     /**
      * Ensure other_fee always returns an array even when stored as integer 0 or null in DB.

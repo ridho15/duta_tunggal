@@ -653,8 +653,7 @@ class PurchaseOrderResource extends Resource
                                         }
 
                                         return null;
-                                    })
-                                    ->default(0),
+                                    }),
                                 TextInput::make('total')
                                     ->label('Total (Harga × Qty)')
                                     ->prefix(function ($get) {

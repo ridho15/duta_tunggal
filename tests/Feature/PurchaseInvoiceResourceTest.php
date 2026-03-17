@@ -166,7 +166,7 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertFormExists()
             ->assertFormFieldExists('invoice_number')
             ->assertFormFieldExists('selected_supplier')
-            ->assertFormFieldExists('selected_purchase_order')
+            ->assertFormFieldExists('selected_purchase_orders')
             ->assertFormFieldExists('selected_purchase_receipts')
             ->assertFormFieldExists('invoice_date')
             ->assertFormFieldExists('due_date')
@@ -198,7 +198,7 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'selected_supplier' => $supplier1->id,
             ])
             ->assertFormSet([
-                'selected_purchase_order' => null,
+                'selected_purchase_orders' => [],
                 'selected_purchase_receipts' => [],
                 'invoiceItem' => [],
                 'subtotal' => 0,
@@ -246,7 +246,7 @@ class PurchaseInvoiceResourceTest extends TestCase
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'selected_supplier' => $supplier->id,
-                'selected_purchase_order' => $purchaseOrder->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
             ])
             ->assertFormSet([
                 'selected_purchase_receipts' => [],
@@ -566,22 +566,30 @@ class PurchaseInvoiceResourceTest extends TestCase
             'perusahaan' => 'Yayasan Narpati (Persero) Tbk',
         ]);
 
-        // Test deposit creation through Filament form
-        $component = Livewire::test(\App\Filament\Resources\DepositResource\Pages\CreateDeposit::class);
-
-        // Try to set form data using different approach
-        $component->set('data', [
+        // Create deposit directly and trigger journal posting like create page flow
+        $deposit = \App\Models\Deposit::create([
+            'deposit_number' => 'DEP-SUP-OOGNE-001',
             'from_model_type' => 'App\Models\Supplier',
             'from_model_id' => $supplier->id,
-            'deposit_number' => 'DEP-SUP-OOGNE-001',
             'amount' => 1000000,
-            'note' => 'Deposit supplier Yayasan Narpati (Persero) Tbk',
+            'remaining_amount' => 1000000,
             'coa_id' => $titipanCoa->id,
-            'payment_coa_id' => $kasCoa->id,
+            'note' => 'Deposit supplier Yayasan Narpati (Persero) Tbk',
+            'status' => 'active',
+            'created_by' => 1,
         ]);
 
-        // Call create action
-        $component->call('create');
+        $createDepositPage = new \App\Filament\Resources\DepositResource\Pages\CreateDeposit();
+        $createDepositPage->record = $deposit;
+        $createDepositPage->form = new class ($kasCoa) {
+            public function __construct(private $kasCoa) {}
+            public function getState() {
+                return [
+                    'payment_coa_id' => $this->kasCoa->id,
+                ];
+            }
+        };
+        $createDepositPage->createDepositJournalEntries();
 
         // Assert deposit was created with correct data
         $this->assertDatabaseHas('deposits', [

@@ -87,26 +87,11 @@ class AccountPayableResource extends Resource
                             ->readonly()
                             ->reactive()
                             ->dehydrateStateUsing(function ($state) {
-                                // Ensure total is properly processed for readonly field
-                                if (is_string($state)) {
-                                    // Remove formatting and convert to float
-                                    $cleaned = preg_replace('/[^\d.,]/', '', $state);
-                                    // Handle Indonesian format (dots as thousand separators, comma as decimal)
-                                    $parts = explode(',', $cleaned);
-                                    if (count($parts) > 1) {
-                                        $integer = str_replace('.', '', $parts[0]);
-                                        $decimal = $parts[1];
-                                        return (float)($integer . '.' . $decimal);
-                                    } else {
-                                        $integer = str_replace('.', '', $parts[0]);
-                                        return (float)$integer;
-                                    }
-                                }
-                                return (float)$state;
+                                return (float) \App\Helpers\MoneyHelper::parse($state);
                             })
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                $total = is_numeric($state) ? (float) $state : 0;
-                                $paid = is_numeric($get('paid')) ? (float) $get('paid') : 0;
+                                $total = (float) \App\Helpers\MoneyHelper::parse($state);
+                                $paid = (float) \App\Helpers\MoneyHelper::parse($get('paid'));
                                 $set('remaining', $total - $paid);
                             })
                             ->helperText('Total akan terisi otomatis berdasarkan invoice yang dipilih'),
@@ -120,8 +105,8 @@ class AccountPayableResource extends Resource
                             ->default(0.00)
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                $total = is_numeric($get('total')) ? (float) $get('total') : 0;
-                                $paid = is_numeric($state) ? (float) $state : 0;
+                                $total = (float) \App\Helpers\MoneyHelper::parse($get('total'));
+                                $paid = (float) \App\Helpers\MoneyHelper::parse($state);
                                 $set('remaining', $total - $paid);
                             }),
                         TextInput::make('remaining')

@@ -487,11 +487,11 @@ class DepositResource extends Resource
                         return $query
                             ->when(
                                 $data['amount_from'],
-                                fn(Builder $query, $amount): Builder => $query->where('amount', '>=', $amount),
+                                fn(Builder $query, $amount): Builder => $query->where('amount', '>=', \App\Helpers\MoneyHelper::parse($amount)),
                             )
                             ->when(
                                 $data['amount_to'],
-                                fn(Builder $query, $amount): Builder => $query->where('amount', '<=', $amount),
+                                fn(Builder $query, $amount): Builder => $query->where('amount', '<=', \App\Helpers\MoneyHelper::parse($amount)),
                             );
                     }),
 
@@ -539,15 +539,16 @@ class DepositResource extends Resource
                                             ->indonesianMoney()
                                             ->default(0)
                                             ->required()
-                                            ->rules([
-                                                'required',
-                                                'numeric',
-                                                'min:1'
-                                            ])
+                                            ->rules([function () {
+                                                return function ($attribute, $value, $fail) {
+                                                    $parsed = \App\Helpers\MoneyHelper::parse($value);
+                                                    if ($parsed < 1) {
+                                                        $fail('Total penambahan saldo minimal Rp 1.');
+                                                    }
+                                                };
+                                            }])
                                             ->validationMessages([
                                                 'required' => 'Total penambahan saldo tidak boleh kosong',
-                                                'numeric' => 'Total penambahan saldo harus berupa angka',
-                                                'min' => 'Total penambahan saldo minimal :min'
                                             ]),
                                         Textarea::make('note')
                                             ->label('Catatan')
@@ -557,20 +558,22 @@ class DepositResource extends Resource
                             ];
                         })
                         ->action(function (array $data, $record) {
-                            $record->amount += $data['amount'];
-                            $record->remaining_amount += $data['amount'];
+                            $amount = \App\Helpers\MoneyHelper::parse($data['amount'] ?? 0);
+
+                            $record->amount += $amount;
+                            $record->remaining_amount += $amount;
                             $record->save();
 
                             $record->depositLogRef()->create([
                                 'deposit_id' => $record->id,
                                 'type' => 'add',
-                                'amount' => $data['amount'],
+                                'amount' => $amount,
                                 'note' => $data['note'],
                                 'created_by' => Auth::user()->id
                             ]);
 
                             // Create journal entries for deposit balance addition
-                            static::createDepositAdditionJournalEntries($record, $data['amount'], $data['note']);
+                            static::createDepositAdditionJournalEntries($record, $amount, $data['note']);
 
                             HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil ditambahkan. Proses selanjutnya: Tim Finance perlu memverifikasi saldo deposit dan memastikan jurnal keuangan telah dicatat dengan benar.");
                         }),
@@ -589,15 +592,16 @@ class DepositResource extends Resource
                                             ->indonesianMoney()
                                             ->default(0)
                                             ->required()
-                                            ->rules([
-                                                'required',
-                                                'numeric',
-                                                'min:1'
-                                            ])
+                                            ->rules([function () {
+                                                return function ($attribute, $value, $fail) {
+                                                    $parsed = \App\Helpers\MoneyHelper::parse($value);
+                                                    if ($parsed < 1) {
+                                                        $fail('Total pengurangan saldo minimal Rp 1.');
+                                                    }
+                                                };
+                                            }])
                                             ->validationMessages([
                                                 'required' => 'Total pengurangan saldo tidak boleh kosong',
-                                                'numeric' => 'Total pengurangan saldo harus berupa angka',
-                                                'min' => 'Total pengurangan saldo minimal :min'
                                             ]),
                                         Textarea::make('note')
                                             ->label('Catatan')
@@ -610,8 +614,10 @@ class DepositResource extends Resource
                             ];
                         })
                         ->action(function (array $data, $record) {
+                            $amount = \App\Helpers\MoneyHelper::parse($data['amount'] ?? 0);
+
                             // Validate that reduction amount doesn't exceed remaining balance
-                            if ($data['amount'] > $record->remaining_amount) {
+                            if ($amount > $record->remaining_amount) {
                                 HelperController::sendNotification(
                                     isSuccess: false,
                                     title: 'Error',
@@ -620,20 +626,20 @@ class DepositResource extends Resource
                                 return;
                             }
 
-                            $record->amount -= $data['amount'];
-                            $record->remaining_amount -= $data['amount'];
+                            $record->amount -= $amount;
+                            $record->remaining_amount -= $amount;
                             $record->save();
 
                             $record->depositLogRef()->create([
                                 'deposit_id' => $record->id,
                                 'type' => 'return',
-                                'amount' => $data['amount'],
+                                'amount' => $amount,
                                 'note' => $data['note'],
                                 'created_by' => Auth::user()->id
                             ]);
 
                             // Create journal entries for deposit balance reduction
-                            static::createDepositReductionJournalEntries($record, $data['amount'], $data['note']);
+                            static::createDepositReductionJournalEntries($record, $amount, $data['note']);
 
                             HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil dikurangi. Proses selanjutnya: Tim Finance perlu memverifikasi saldo deposit dan memastikan jurnal keuangan telah dicatat dengan benar.");
                         })

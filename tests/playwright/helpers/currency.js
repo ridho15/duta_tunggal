@@ -24,10 +24,10 @@ import { expect } from '@playwright/test';
 export async function testCurrencyInput(page, locator, rawValue, expectedFormatted) {
   // Clear current value
   await locator.click({ clickCount: 3 });
-  await locator.press('Control+a');
-  await locator.press('Delete');
+  await locator.fill('');
+  await locator.focus();
 
-  // Simulate real keystrokes so Alpine mask fires on every input event
+  // Simulate real keystrokes so Alpine mask fires on every input event.
   await locator.pressSequentially(rawValue, { delay: 40 });
 
   // Small wait for Alpine/Livewire to process
@@ -45,17 +45,17 @@ export async function testCurrencyInput(page, locator, rawValue, expectedFormatt
 export async function testCurrencyClearAndRetype(page, locator, rawValue, expectedFormatted) {
   // First entry
   await locator.click({ clickCount: 3 });
-  await locator.press('Control+a');
-  await locator.press('Delete');
+  await locator.fill('');
+  await locator.focus();
   await locator.pressSequentially(rawValue, { delay: 40 });
   await page.waitForTimeout(200);
 
   // Clear
-  await locator.press('Control+a');
-  await locator.press('Delete');
+  await locator.fill('');
   await page.waitForTimeout(100);
 
   // Second entry
+  await locator.focus();
   await locator.pressSequentially(rawValue, { delay: 40 });
   await page.waitForTimeout(300);
 
@@ -70,8 +70,11 @@ export async function testCurrencyClearAndRetype(page, locator, rawValue, expect
  */
 export async function testCurrencyPaste(page, locator, rawValue, expectedFormatted) {
   await locator.click({ clickCount: 3 });
-  await page.evaluate((v) => navigator.clipboard.writeText(v), rawValue);
-  await locator.press('Control+v');
+  await locator.fill('');
+  await locator.focus();
+  // Avoid `navigator.clipboard.writeText()` permissions in CI/local runs.
+  // `insertText()` fires input events, which is enough for Alpine/Mask to format.
+  await page.keyboard.insertText(rawValue);
   await page.waitForTimeout(400);
 
   await expect(locator).toHaveValue(expectedFormatted, {
