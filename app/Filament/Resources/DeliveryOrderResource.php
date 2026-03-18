@@ -9,7 +9,6 @@ use App\Models\Cabang;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderApprovalLog;
 use App\Models\Product;
-use App\Models\PurchaseReceiptItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\AppSetting;
@@ -83,20 +82,6 @@ class DeliveryOrderResource extends Resource
                                 'unique' => 'DO number sudah digunakan'
                             ])
                             ->unique(ignoreRecord: true),
-                        Select::make('cabang_id')
-                            ->label('Cabang')
-                            ->searchable()
-                            ->preload()
-                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
-                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
-                            }))
-                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Cabang wajib dipilih',
-                            ])
-                            ->helperText('Pilih cabang untuk delivery order ini'),
                         Select::make('salesOrders')
                             ->label('From Sales')
                             ->statePath('salesOrders') // Explicit state path
@@ -123,6 +108,11 @@ class DeliveryOrderResource extends Resource
                                 $listSaleOrder = SaleOrder::whereIn('id', $state)->get();
                                 $deliveryItems = [];
 
+                                // H1: auto-set cabang_id from the first selected SO
+                                if ($listSaleOrder->isNotEmpty()) {
+                                    $set('cabang_id', $listSaleOrder->first()->cabang_id);
+                                }
+
                                 foreach ($listSaleOrder as $saleOrder) {
                                     foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
                                         $remainingQty = $saleOrderItem->remaining_quantity;
@@ -141,6 +131,20 @@ class DeliveryOrderResource extends Resource
 
                                 $set('deliveryOrderItem', $deliveryItems);
                             }),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->searchable()
+                            ->preload()
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih',
+                            ])
+                            ->helperText('Diisi otomatis dari Sales Order. Dapat diubah bila perlu.'),
                         DateTimePicker::make('delivery_date')
                             ->label('Tanggal Pengiriman')
                             ->required()
@@ -249,7 +253,6 @@ class DeliveryOrderResource extends Resource
                                             ->inlineLabel()
                                             ->options([
                                                 '0' => 'None',
-                                                '1' => 'From Receipt Item',
                                                 '2' => 'From Sales Order Item'
                                             ])->default(function ($get, $set) {
                                                 $listSalesOrderId = $get('../../salesOrders');
@@ -259,24 +262,6 @@ class DeliveryOrderResource extends Resource
                                                 }
                                                 return 0;
                                             }),
-                                        Select::make('purchase_receipt_item_id')
-                                            ->label('Purchase Receipt Item')
-                                            ->preload()
-                                            ->reactive()
-                                            ->visible(function ($set, $get) {
-                                                return $get('options_from') == 1;
-                                            })
-                                            ->afterStateUpdated(function ($set, $get, $state) {
-                                                $purchaseReceiptItem = PurchaseReceiptItem::find($state);
-                                                $set('product_id', $purchaseReceiptItem->product_id);
-                                                $set('quantity', $purchaseReceiptItem->quantity);
-                                            })
-                                            ->searchable()
-                                            ->relationship('purchaseReceiptItem', 'id')
-                                            ->getOptionLabelFromRecordUsing(function (PurchaseReceiptItem $purchaseReceiptItem) {
-                                                return "({$purchaseReceiptItem->product->sku}) {$purchaseReceiptItem->product->name}";
-                                            })
-                                            ->nullable(),
                                         Select::make('sale_order_item_id')
                                             ->label('Sales Order Item')
                                             ->preload()
@@ -490,6 +475,29 @@ class DeliveryOrderResource extends Resource
                     ->visible(function ($record) {
                         return $record->journalEntries()->exists();
                     }),
+
+                Section::make('Status Konfirmasi Gudang')
+                    ->schema([
+                        RepeatableEntry::make('warehouseConfirmations')
+                            ->label('')
+                            ->schema([
+                                TextEntry::make('id')->label('WC #'),
+                                TextEntry::make('status')
+                                    ->badge()
+                                    ->color(fn ($state) => match (strtolower((string) $state)) {
+                                        'confirmed'        => 'success',
+                                        'rejected'         => 'danger',
+                                        'partial_confirmed' => 'warning',
+                                        default            => 'info',
+                                    }),
+                                TextEntry::make('rejection_reason')
+                                    ->label('Alasan Tolak')
+                                    ->placeholder('-')
+                                    ->visible(fn ($record) => ! empty($record->rejection_reason)),
+                                TextEntry::make('user.name')->label('Diproses Oleh')->placeholder('-'),
+                            ])->columns(4),
+                    ])
+                    ->visible(fn ($record) => $record->warehouseConfirmations()->exists()),
             ]);
     }
 

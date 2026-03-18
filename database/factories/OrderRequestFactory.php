@@ -23,7 +23,6 @@ class OrderRequestFactory extends Factory
         return [
             'request_number' => $this->faker->unique()->word(),
             'warehouse_id' => Warehouse::inRandomOrder()->first()->id,
-            'supplier_id' => Supplier::inRandomOrder()->first()->id,
             'cabang_id' => function () {
                 return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
             },

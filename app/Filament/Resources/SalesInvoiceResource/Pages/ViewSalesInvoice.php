@@ -83,12 +83,26 @@ class ViewSalesInvoice extends ViewRecord
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
                                     ->rupiah(),
+                                TextEntry::make('tipe_pajak')
+                                    ->label('Tipe Pajak')
+                                    ->badge()
+                                    ->color(fn ($state) => match ($state) {
+                                        'None' => 'gray',
+                                        'Inklusif' => 'info',
+                                        'Eklusif' => 'warning',
+                                        default => 'gray',
+                                    }),
                                 TextEntry::make('ppn_rate')
                                     ->label('PPN Rate (%)')
-                                    ->suffix('%'),
+                                    ->suffix('%')
+                                    ->visible(fn ($record) => ($record->tipe_pajak ?? 'None') !== 'None'),
                             ]),
-                        Grid::make(2)
+                        Grid::make(4)
                             ->schema([
+                                TextEntry::make('ppn_amount')
+                                    ->label('Nominal PPN (Rp)')
+                                    ->rupiah()
+                                    ->visible(fn ($record) => ($record->tipe_pajak ?? 'None') !== 'None' && $record->ppn_amount > 0),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
                                     ->rupiah(),

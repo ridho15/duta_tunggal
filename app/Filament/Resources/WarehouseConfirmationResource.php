@@ -262,6 +262,12 @@ class WarehouseConfirmationResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('deliveryOrder.do_number')
+                    ->label('Delivery Order')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('-'),
+
                 TextColumn::make('manufacturingOrder.mo_number')
                     ->label('Manufacturing Order')
                     ->searchable()

@@ -147,30 +147,6 @@ class OrderRequestResource extends Resource
                             ->validationMessages([
                                 'required' => 'Gudang wajib dipilih.',
                             ]),
-                        Select::make('supplier_id')
-                            ->label('Supplier (Default)')
-                            ->reactive()
-                            ->live()
-                            ->afterStateUpdated(function ($state, callable $set) {
-                                // Changing default supplier does NOT clear items; items have their own supplier selection
-                            })
-                            ->searchable()
-                            ->nullable()
-                            ->options(function () {
-                                return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                });
-                            })
-                            ->getSearchResultsUsing(function (string $search) {
-                                return Supplier::where('perusahaan', 'like', "%{$search}%")
-                                    ->orWhere('code', 'like', "%{$search}%")
-                                    ->limit(50)
-                                    ->get()
-                                    ->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                    });
-                            })
-                            ->helperText('Opsional. Digunakan sebagai supplier default untuk item baru.'),
                         DatePicker::make('request_date')
                             ->required()
                             ->validationMessages([
@@ -260,14 +236,16 @@ class OrderRequestResource extends Resource
                                                     $set('tax', $product->pajak);
                                                 }
 
-                                                // Use supplier price: check item-level supplier_id first, then header supplier
+                                                // Use item-level supplier price if available
                                                 $itemSupplierId = $get('supplier_id');
-                                                $supplierId = $itemSupplierId ?? $get('../../supplier_id');
                                                 $unitPrice = (float) $product->cost_price;
-                                                if ($supplierId) {
-                                                    $supplierProduct = $product->suppliers()->where('suppliers.id', $supplierId)->first();
+                                                if ($itemSupplierId) {
+                                                    $supplierProduct = $product->suppliers()->where('suppliers.id', $itemSupplierId)->first();
                                                     if ($supplierProduct) {
-                                                        $unitPrice = (float) $supplierProduct->pivot->supplier_price;
+                                                        $supplierPrice = $supplierProduct->pivot->supplier_price;
+                                                        $unitPrice = $supplierPrice !== null
+                                                            ? (float) $supplierPrice
+                                                            : (float) $product->cost_price;
                                                     }
                                                 }
                                                 // Reset item-level supplier when product changes
@@ -275,6 +253,7 @@ class OrderRequestResource extends Resource
                                                 // Store the master price as original_price; user can override unit_price
                                                 $set('original_price', number_format((float)$unitPrice, 0, ',', '.'));
                                                 $set('unit_price', number_format((float)$unitPrice, 0, ',', '.'));
+                                                $set('unit', $product->uom?->abbreviation ?? '-');
                                                 // Recalculate subtotal
                                                 $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
                                                 $quantity = (float) ($get('quantity') ?? 0);
@@ -313,6 +292,16 @@ class OrderRequestResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Produk wajib dipilih.',
                                     ]),
+                                TextInput::make('unit')
+                                    ->label('Satuan')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default('-')
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record?->product) {
+                                            $component->state($record->product->uom?->abbreviation ?? '-');
+                                        }
+                                    }),
                                 Select::make('supplier_id')
                                     ->label('Supplier')
                                     ->reactive()
@@ -339,25 +328,27 @@ class OrderRequestResource extends Resource
                                                 $product = Product::find($productId);
                                                 if ($product) {
                                                     $supplierProduct = $product->suppliers()->where('suppliers.id', $state)->first();
-                                                    if ($supplierProduct) {
+                                                    $unitPrice = \App\Helpers\MoneyHelper::parse($get('unit_price') ?? $product->cost_price);
+                                                    if ($supplierProduct && $supplierProduct->pivot->supplier_price !== null) {
                                                         $unitPrice = (float) $supplierProduct->pivot->supplier_price;
-                                                        $set('original_price', number_format($unitPrice, 0, ',', '.'));
-                                                        $set('unit_price', number_format($unitPrice, 0, ',', '.'));
-                                                        // Recalculate subtotal
-                                                        $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
-                                                        $quantity = (float) ($get('quantity') ?? 0);
-                                                        $discPct  = (float) ($get('discount') ?? 0);
-                                                        $taxPct   = (float) ($get('tax') ?? 0);
-                                                        $base      = $quantity * $unitPrice;
-                                                        $afterDisc = $base - $base * ($discPct / 100);
-                                                        try {
-                                                            $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
-                                                            $set('subtotal', number_format((float)$taxRes['total'], 0, ',', '.'));
-                                                            $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
-                                                        } catch (\Throwable $e) {
-                                                            $set('subtotal', number_format((float)$afterDisc, 0, ',', '.'));
-                                                            $set('tax_nominal', '0');
-                                                        }
+                                                    }
+
+                                                    $set('original_price', number_format($unitPrice, 0, ',', '.'));
+                                                    $set('unit_price', number_format($unitPrice, 0, ',', '.'));
+                                                    // Recalculate subtotal
+                                                    $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
+                                                    $quantity = (float) ($get('quantity') ?? 0);
+                                                    $discPct  = (float) ($get('discount') ?? 0);
+                                                    $taxPct   = (float) ($get('tax') ?? 0);
+                                                    $base      = $quantity * $unitPrice;
+                                                    $afterDisc = $base - $base * ($discPct / 100);
+                                                    try {
+                                                        $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
+                                                        $set('subtotal', number_format((float)$taxRes['total'], 0, ',', '.'));
+                                                        $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
+                                                    } catch (\Throwable $e) {
+                                                        $set('subtotal', number_format((float)$afterDisc, 0, ',', '.'));
+                                                        $set('tax_nominal', '0');
                                                     }
                                                 }
                                             }
@@ -577,10 +568,6 @@ class OrderRequestResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
-                TextColumn::make('supplier.perusahaan')
-                    ->label('Supplier')
-                    ->searchable()
-                    ->placeholder('No Supplier'),
                 TextColumn::make('request_date')
                     ->date()
                     ->sortable(),
@@ -662,13 +649,20 @@ class OrderRequestResource extends Resource
                     ])
                     ->placeholder('All Statuses'),
                 SelectFilter::make('supplier_id')
-                    ->label('Supplier')
-                    ->relationship('supplier', 'perusahaan')
-                    ->getOptionLabelFromRecordUsing(function ($record) {
-                        return "({$record->code}) {$record->name}";
+                    ->label('Supplier (per Item)')
+                    ->options(function () {
+                        return Supplier::select(['id', 'perusahaan', 'code'])->orderBy('perusahaan')->get()
+                            ->mapWithKeys(fn($s) => [$s->id => "({$s->code}) {$s->perusahaan}"]);
                     })
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->query(function (Builder $query, array $data): void {
+                        if (!empty($data['value'])) {
+                            $query->whereHas('orderRequestItem', function ($q) use ($data) {
+                                $q->where('supplier_id', $data['value']);
+                            });
+                        }
+                    }),
                 SelectFilter::make('warehouse_id')
                     ->label('Gudang')
                     ->relationship('warehouse', 'name')
@@ -740,22 +734,24 @@ class OrderRequestResource extends Resource
                         ->modalHeading('Buat Purchase Order')
                         ->modalDescription('Isi form berikut untuk membuat Purchase Order dari Order Request yang telah disetujui.')
                         ->fillForm(function ($record) {
-                            $defaultSupplierId = $record->supplier_id;
-                            $items = $record->orderRequestItem->map(function ($item) use ($defaultSupplierId) {
+                            $items = $record->orderRequestItem->map(function ($item) {
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
-                                // Use item-level supplier, fall back to header supplier
-                                $supplierId = $item->supplier_id ?? $defaultSupplierId;
-                                $supplierPrice = $item->unit_price ?? 0;
-                                if ($supplierId && $item->product) {
+                                // Use item-level supplier only
+                                $supplierId = $item->supplier_id;
+                                // Priority: item->unit_price (user override) > catalog supplier_price > cost_price
+                                $itemUnitPrice = (float)($item->unit_price ?? 0);
+                                if ($itemUnitPrice > 0) {
+                                    $supplierPrice = $itemUnitPrice;
+                                } elseif ($supplierId && $item->product) {
                                     $sp = $item->product->suppliers()->where('suppliers.id', $supplierId)->first();
-                                    if ($sp && $sp->pivot->supplier_price > 0) {
-                                        $supplierPrice = (float) $sp->pivot->supplier_price;
-                                    }
+                                    $supplierPrice = ($sp && $sp->pivot->supplier_price > 0) ? (float)$sp->pivot->supplier_price : (float)($item->product->cost_price ?? 0);
+                                } else {
+                                    $supplierPrice = (float)($item->product->cost_price ?? 0);
                                 }
                                 $taxPct = (float)($item->tax ?? 0);
                                 try {
                                     $taxRes = \App\Services\TaxService::compute(
-                                        max(0, $remainingQty) * (float)$supplierPrice,
+                                        max(0, $remainingQty) * $supplierPrice,
                                         $taxPct,
                                         $item->orderRequest->tax_type ?? 'None'
                                     );
@@ -765,22 +761,36 @@ class OrderRequestResource extends Resource
                                     $taxNom = '0';
                                     $subtotal = '0';
                                 }
+
+                                $supplierName = $supplierId
+                                    ? (function () use ($supplierId) {
+                                        $s = \App\Models\Supplier::find($supplierId);
+                                        return $s ? "({$s->code}) {$s->perusahaan}" : '-';
+                                    })()
+                                    : '-';
+                                $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
+
                                 return [
-                                    'item_id'         => $item->id,
+                                    'item_id'          => $item->id,
                                     'item_supplier_id' => $supplierId,
-                                    'product_name'    => "({$item->product->sku}) {$item->product->name}",
-                                    'quantity'        => max(0, $remainingQty),
-                                    'unit_price'      => $supplierPrice,
-                                    'tax'             => $taxPct,
-                                    'tax_nominal'     => $taxNom,
-                                    'subtotal'        => $subtotal,
-                                    'max_quantity'    => max(0, $remainingQty),
-                                    'include'         => $remainingQty > 0,
+                                    'product_name'     => "({$item->product->sku}) {$item->product->name}",
+                                    'supplier_name'    => $supplierName,
+                                    'uom'              => $uom,
+                                    'quantity'         => max(0, $remainingQty),
+                                    'unit_price'       => $supplierPrice,
+                                    'tax'              => $taxPct,
+                                    'tax_nominal'      => $taxNom,
+                                    'subtotal'         => $subtotal,
+                                    'max_quantity'     => max(0, $remainingQty),
+                                    'include'          => $remainingQty > 0,
                                 ];
                             })->values()->toArray();
 
+                            // Pre-fill supplier from first item that has one
+                            $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+
                             return [
-                                'supplier_id'           => $record->supplier_id,
+                                'supplier_id'           => $firstSupplierId,
                                 'create_purchase_order' => true,
                                 'selected_items'        => $items,
                             ];
@@ -792,7 +802,8 @@ class OrderRequestResource extends Resource
                                 ->visible(fn(Get $get) => $get('create_purchase_order'))
                                 ->schema([
                                     Select::make('supplier_id')
-                                        ->label('Supplier')
+                                        ->label('Supplier (untuk PO)')
+                                        ->helperText('Supplier utama untuk Purchase Order. Setiap item memiliki supplier masing-masing (lihat di tabel item).')
                                         ->preload()
                                         ->searchable()
                                         ->columnSpanFull()
@@ -866,8 +877,15 @@ class OrderRequestResource extends Resource
                                         ->schema([
                                             Hidden::make('item_id'),
                                             Hidden::make('max_quantity'),
+                                            Hidden::make('item_supplier_id'),
                                             TextInput::make('product_name')
                                                 ->label('Nama Produk')
+                                                ->readOnly(),
+                                            TextInput::make('supplier_name')
+                                                ->label('Supplier')
+                                                ->readOnly()
+,                                            TextInput::make('uom')
+                                                ->label('Satuan')
                                                 ->readOnly(),
                                             TextInput::make('quantity')
                                                 ->label('Qty')
@@ -979,22 +997,24 @@ class OrderRequestResource extends Resource
                         ->modalDescription('Tinjau dan setujui Order Request ini. Anda dapat memilih item yang akan dibuatkan Purchase Order.')
                         ->modalSubmitActionLabel('Approve')
                         ->fillForm(function ($record) {
-                            $defaultSupplierId = $record->supplier_id;
-                            $items = $record->orderRequestItem->map(function ($item) use ($defaultSupplierId) {
+                            $items = $record->orderRequestItem->map(function ($item) {
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
-                                // Use item-level supplier, fall back to header supplier
-                                $supplierId = $item->supplier_id ?? $defaultSupplierId;
-                                $supplierPrice = $item->unit_price ?? 0;
-                                if ($supplierId && $item->product) {
+                                // Use item-level supplier only (no OR-level fallback)
+                                $supplierId = $item->supplier_id;
+                                // Priority: item->unit_price (user override) > catalog supplier_price > cost_price
+                                $itemUnitPrice = (float)($item->unit_price ?? 0);
+                                if ($itemUnitPrice > 0) {
+                                    $supplierPrice = $itemUnitPrice;
+                                } elseif ($supplierId && $item->product) {
                                     $sp = $item->product->suppliers()->where('suppliers.id', $supplierId)->first();
-                                    if ($sp && $sp->pivot->supplier_price > 0) {
-                                        $supplierPrice = (float) $sp->pivot->supplier_price;
-                                    }
+                                    $supplierPrice = ($sp && $sp->pivot->supplier_price > 0) ? (float)$sp->pivot->supplier_price : (float)($item->product->cost_price ?? 0);
+                                } else {
+                                    $supplierPrice = (float)($item->product->cost_price ?? 0);
                                 }
                                 $taxPct = (float)($item->tax ?? 0);
                                 try {
                                     $taxRes = \App\Services\TaxService::compute(
-                                        max(0, $remainingQty) * (float)$supplierPrice,
+                                        max(0, $remainingQty) * $supplierPrice,
                                         $taxPct,
                                         $item->orderRequest->tax_type ?? 'None'
                                     );
@@ -1004,25 +1024,41 @@ class OrderRequestResource extends Resource
                                     $taxNom = '0';
                                     $subtotal = '0';
                                 }
+
+                                $supplierName = $supplierId
+                                    ? (function () use ($supplierId) {
+                                        $s = \App\Models\Supplier::find($supplierId);
+                                        return $s ? "({$s->code}) {$s->perusahaan}" : '-';
+                                    })()
+                                    : '-';
+                                $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
+
                                 return [
-                                    'item_id'         => $item->id,
+                                    'item_id'          => $item->id,
                                     'item_supplier_id' => $supplierId,
-                                    'product_name'    => "({$item->product->sku}) {$item->product->name}",
-                                    'quantity'        => max(0, $remainingQty),
-                                    'original_price'  => number_format((float)($item->original_price ?? $supplierPrice), 0, ',', '.'),
-                                    'unit_price'      => $supplierPrice,
-                                    'tax'             => $taxPct,
-                                    'tax_nominal'     => $taxNom,
-                                    'total_cost'      => number_format(max(0, $remainingQty) * (float)$supplierPrice, 0, ',', '.'),
-                                    'subtotal'        => $subtotal,
-                                    'max_quantity'    => max(0, $remainingQty),
-                                    'include'         => $remainingQty > 0,
+                                    'product_name'     => "({$item->product->sku}) {$item->product->name}",
+                                    'supplier_name'    => $supplierName,
+                                    'uom'              => $uom,
+                                    'quantity'         => max(0, $remainingQty),
+                                    'original_price'   => number_format((float)($item->original_price ?? $supplierPrice), 0, ',', '.'),
+                                    'unit_price'       => $supplierPrice,
+                                    'tax'              => $taxPct,
+                                    'tax_nominal'      => $taxNom,
+                                    'total_cost'       => number_format(max(0, $remainingQty) * $supplierPrice, 0, ',', '.'),
+                                    'subtotal'         => $subtotal,
+                                    'max_quantity'     => max(0, $remainingQty),
+                                    'include'          => $remainingQty > 0,
                                 ];
                             })->values()->toArray();
 
+                            // Detect multi-supplier: items have different item_supplier_id values
+                            $uniqueSuppliers = collect($items)->pluck('item_supplier_id')->filter()->unique();
+                            $isMultiSupplier = $uniqueSuppliers->count() > 1;
+
                             return [
-                                'supplier_id'           => $record->supplier_id,
+                                'supplier_id'           => $isMultiSupplier ? null : $uniqueSuppliers->first(),
                                 'create_purchase_order' => true,
+                                'multi_supplier'        => $isMultiSupplier,
                                 'selected_items'        => $items,
                             ];
                         })
@@ -1036,6 +1072,12 @@ class OrderRequestResource extends Resource
                                         ->default(true)
                                         ->live()
                                         ->columnSpanFull(),
+                                    \Filament\Forms\Components\Placeholder::make('multi_supplier_notice')
+                                        ->label('')
+                                        ->content('Item dalam OR ini memiliki beberapa supplier berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
+                                        ->visible(fn(Get $get) => $get('create_purchase_order') && $get('multi_supplier'))
+                                        ->columnSpanFull(),
+                                    Hidden::make('multi_supplier'),
                                 ]),
                             Section::make('Informasi Purchase Order')
                                 ->icon('heroicon-o-document-text')
@@ -1061,7 +1103,8 @@ class OrderRequestResource extends Resource
                                                     return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                                 });
                                         })
-                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
                                         ->validationMessages([
                                             'required' => 'Supplier wajib dipilih.',
                                         ]),
@@ -1069,7 +1112,8 @@ class OrderRequestResource extends Resource
                                         ->label('PO Number')
                                         ->string()
                                         ->maxLength(255)
-                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
                                         ->suffixAction(
                                             FormAction::make('generatePoNumber')
                                                 ->icon('heroicon-o-arrow-path')
@@ -1117,8 +1161,15 @@ class OrderRequestResource extends Resource
                                         ->schema([
                                             Hidden::make('item_id'),
                                             Hidden::make('max_quantity'),
+                                            Hidden::make('item_supplier_id'),
                                             TextInput::make('product_name')
                                                 ->label('Nama Produk')
+                                                ->readOnly(),
+                                            TextInput::make('supplier_name')
+                                                ->label('Supplier')
+                                                ->readOnly(),
+                                            TextInput::make('uom')
+                                                ->label('Satuan')
                                                 ->readOnly(),
                                             TextInput::make('quantity')
                                                 ->label('Qty')
@@ -1201,7 +1252,36 @@ class OrderRequestResource extends Resource
                             $orderRequestService = app(OrderRequestService::class);
 
                             if ($data['create_purchase_order']) {
-                                // Check purchase order number only if creating PO
+                                if (!empty($data['multi_supplier'])) {
+                                    // Multi-supplier: group items by item_supplier_id and create one PO each
+                                    $includedItems = collect($data['selected_items'])->filter(fn($i) => $i['include'] ?? false);
+                                    if ($includedItems->isEmpty()) {
+                                        HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                        return;
+                                    }
+                                    $groups = $includedItems->groupBy('item_supplier_id');
+                                    $created = 0;
+                                    foreach ($groups as $supplierId => $groupItems) {
+                                        if (empty($supplierId)) continue;
+                                        $poNumber = HelperController::generatePoNumber();
+                                        while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
+                                            $poNumber = HelperController::generatePoNumber();
+                                        }
+                                        $poData = array_merge($data, [
+                                            'supplier_id'    => $supplierId,
+                                            'po_number'      => $poNumber,
+                                            'selected_items' => $groupItems->values()->toArray(),
+                                            'multi_supplier' => false,
+                                        ]);
+                                        $orderRequestService->createPurchaseOrder($record, $poData);
+                                        $created++;
+                                    }
+                                    $record->update(['status' => 'approved']);
+                                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
+                                    return;
+                                }
+
+                                // Single supplier mode — check PO number uniqueness
                                 $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                                 if ($purchaseOrder) {
                                     HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");

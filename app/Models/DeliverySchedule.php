@@ -17,8 +17,11 @@ class DeliverySchedule extends Model
     protected $fillable = [
         'schedule_number',
         'scheduled_date',
+        'delivery_method',
         'driver_id',
         'vehicle_id',
+        'driver_name',
+        'vehicle_info',
         'status', // pending, on_the_way, delivered, partial_delivered, failed, cancelled
         'notes',
         'created_by',

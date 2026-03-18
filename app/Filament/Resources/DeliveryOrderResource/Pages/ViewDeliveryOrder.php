@@ -32,6 +32,46 @@ class ViewDeliveryOrder extends ViewRecord
                         $record->status == 'draft';
                 }),
 
+            Actions\Action::make('request_stock')
+                ->label('Request Stock ke Gudang')
+                ->requiresConfirmation()
+                ->modalHeading('Request Stock ke Gudang')
+                ->modalDescription('Ini akan membuat Konfirmasi Gudang untuk setiap item dan mengubah status DO menjadi Request Stock.')
+                ->color('warning')
+                ->icon('heroicon-o-building-storefront')
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('request delivery order') &&
+                        $record->status === 'draft';
+                })
+                ->action(function ($record) {
+                    $record->load('deliveryOrderItem.product');
+                    // Create one WC covering all DO items
+                    $wc = \App\Models\WarehouseConfirmation::create([
+                        'delivery_order_id' => $record->id,
+                        'confirmation_type' => 'sales_order',
+                        'status' => 'request',
+                        'confirmed_by' => Auth::id(),
+                        'note' => 'Auto-created dari DO ' . $record->do_number,
+                    ]);
+                    foreach ($record->deliveryOrderItem as $item) {
+                        $wc->warehouseConfirmationItems()->create([
+                            'sale_order_item_id' => $item->sale_order_item_id,
+                            'product_name' => $item->product->name ?? '-',
+                            'requested_qty' => $item->quantity,
+                            'confirmed_qty' => $item->quantity,
+                            'warehouse_id' => null,
+                            'status' => 'request',
+                        ]);
+                    }
+                    $record->update(['status' => 'request_stock']);
+                    \App\Http\Controllers\HelperController::sendNotification(
+                        isSuccess: true,
+                        title: 'Information',
+                        message: 'Request Stock telah dikirim ke Gudang. Proses selanjutnya: Konfirmasi oleh Staf Gudang.'
+                    );
+                }),
+
             Actions\Action::make('request_approve')
                 ->label('Request Approve')
                 ->requiresConfirmation()

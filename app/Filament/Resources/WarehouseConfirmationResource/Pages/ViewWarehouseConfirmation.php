@@ -45,7 +45,47 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                     $this->redirect($this->getResource()::getUrl('view', ['record' => $record]));
                 })
-                ->visible(fn() => strtolower($this->record->status) === 'request'),
+                ->visible(fn() => strtolower($this->record->status) === 'request' && ! $this->record->delivery_order_id),
+
+            // H4/I1: Approve action for DO-linked WC
+            Actions\Action::make('approve_do_wc')
+                ->label('Approve')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Approve Konfirmasi Gudang')
+                ->modalDescription('Approve konfirmasi ini dan update status Delivery Order.')
+                ->action(function () {
+                    $this->record->update([
+                        'status'       => 'confirmed',
+                        'confirmed_by' => Auth::id(),
+                        'confirmed_at' => now(),
+                    ]);
+                    $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
+                })
+                ->visible(fn () => $this->record->delivery_order_id && strtolower($this->record->status) === 'request'),
+
+            // H4/I1: Reject action for DO-linked WC
+            Actions\Action::make('reject_do_wc')
+                ->label('Tolak')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->form([
+                    \Filament\Forms\Components\Textarea::make('rejection_reason')
+                        ->label('Alasan Penolakan')
+                        ->required()
+                        ->rows(3),
+                ])
+                ->action(function (array $data) {
+                    $this->record->update([
+                        'status'           => 'rejected',
+                        'rejection_reason' => $data['rejection_reason'],
+                        'confirmed_by'     => Auth::id(),
+                        'confirmed_at'     => now(),
+                    ]);
+                    $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
+                })
+                ->visible(fn () => $this->record->delivery_order_id && strtolower($this->record->status) === 'request'),
         ];
     }
 
@@ -99,6 +139,32 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
+
+                // I2: DO information section (visible when WC is linked to a DO)
+                Infolists\Components\Section::make('Informasi Delivery Order')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('deliveryOrder.do_number')
+                            ->label('Nomor DO'),
+                        Infolists\Components\TextEntry::make('deliveryOrder.delivery_date')
+                            ->label('Tanggal Pengiriman')
+                            ->date(),
+                        Infolists\Components\TextEntry::make('deliveryOrder.status')
+                            ->label('Status DO')
+                            ->badge()
+                            ->color(fn ($state) => match (strtolower((string) $state)) {
+                                'approved'      => 'success',
+                                'rejected', 'reject' => 'danger',
+                                'request_stock' => 'warning',
+                                'draft'         => 'gray',
+                                default         => 'info',
+                            }),
+                        Infolists\Components\TextEntry::make('rejection_reason')
+                            ->label('Alasan Penolakan')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => strtolower($record->status) === 'rejected'),
+                    ])
+                    ->columns(2)
+                    ->visible(fn ($record) => ! empty($record->delivery_order_id)),
 
                 Infolists\Components\Section::make('Sales Order Information')
                     ->schema([
@@ -283,6 +349,7 @@ class ViewWarehouseConfirmation extends ViewRecord
     {
         return parent::getEloquentQuery()
             ->with([
+                'deliveryOrder',
                 'saleOrder.customer',
                 'saleOrder.saleOrderItem.product',
                 'saleOrder.saleOrderItem.warehouse',

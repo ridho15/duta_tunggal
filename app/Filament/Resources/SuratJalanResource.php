@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
 use App\Models\Customer;
+use App\Models\Cabang;
 use App\Models\Driver;
 use App\Models\Vehicle;
 
@@ -88,13 +89,33 @@ class SuratJalanResource extends Resource
                             ->preload()
                             ->required()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get) {
-                                // Show active delivery orders (regardless of whether they already have a Surat Jalan),
-                                // so the select can correctly display the existing selection when editing.
-                                $query->whereIn('status', ['draft', 'request_approve', 'approved', 'sent', 'received', 'delivery_failed']);
+                                // J1: Only show approved DOs for new SJ creation.
+                                // Also include sent/received to correctly display already-linked DOs when editing.
+                                $query->whereIn('status', ['approved', 'sent', 'received']);
                             })
                             ->multiple()
+                            ->afterStateUpdated(function ($set, $state) {
+                                $deliveryOrders = DeliveryOrder::whereIn('id', $state ?? [])->get();
+                                if ($deliveryOrders->isNotEmpty()) {
+                                    $set('cabang_id', $deliveryOrders->first()->cabang_id);
+                                }
+                            })
                             ->validationMessages([
                                 'required' => 'Delivery Order harus dipilih'
+                            ]),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->searchable()
+                            ->preload()
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->required()
+                            ->helperText('Diisi otomatis dari Delivery Order. Dapat diubah bila perlu.')
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih'
                             ]),
                         FileUpload::make('document_path')
                             ->label('Upload Document')
@@ -106,22 +127,8 @@ class SuratJalanResource extends Resource
                                 'acceptedFileTypes' => 'File harus berupa PDF, JPG, atau PNG',
                                 'maxSize' => 'Ukuran file maksimal 5MB'
                             ]),
-                        TextInput::make('sender_name')
-                            ->label('Nama Pengirim')
-                            ->maxLength(255)
-                            ->helperText('Nama orang yang mengirimkan barang'),
-                        Select::make('shipping_method')
-                            ->label('Metode Pengiriman')
-                            ->options([
-                                'Ekspedisi' => 'Ekspedisi',
-                                'Kurir Internal' => 'Kurir Internal',
-                                'Ambil Sendiri' => 'Ambil Sendiri',
-                                'Lainnya' => 'Lainnya',
-                            ])
-                            ->searchable()
-                            ->helperText('Metode pengiriman yang digunakan'),
                         Hidden::make('status')
-                            ->default(0), // 0 = Draft, 1 = Terbit
+                            ->default(1), // J2: auto-terbit, tidak perlu approval
                         Hidden::make('created_by')
                             ->default(fn () => Auth::id())
                     ])
@@ -181,6 +188,10 @@ class SuratJalanResource extends Resource
                         });
                     })
                     ->wrap(),
+                TextColumn::make('cabang.nama')
+                    ->label('Cabang')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('driver_info')
                     ->label('Driver')
                     ->getStateUsing(function (SuratJalan $record): string {
@@ -331,91 +342,6 @@ class SuratJalanResource extends Resource
                     }),
             ])
             ->headerActions([
-                Action::make('cetak_rekap_driver')
-                    ->label('Cetak Rekap Driver')
-                    ->icon('heroicon-o-printer')
-                    ->color('gray')
-                    ->form([
-                        Select::make('sender_name')
-                            ->label('Nama Pengirim / Driver')
-                            ->searchable()
-                            ->preload()
-                            ->options(function () {
-                                $senderNames = SuratJalan::whereNotNull('sender_name')
-                                    ->distinct()
-                                    ->pluck('sender_name')
-                                    ->filter()
-                                    ->values()
-                                    ->toArray();
-
-                                $driverNames = Driver::query()
-                                    ->pluck('name')
-                                    ->filter()
-                                    ->values()
-                                    ->toArray();
-
-                                $senderOptions = collect($senderNames)
-                                    ->unique()
-                                    ->sort()
-                                    ->mapWithKeys(fn ($name) => ["sender:{$name}" => "Pengirim: {$name}"]);
-
-                                $driverOptions = collect($driverNames)
-                                    ->unique()
-                                    ->sort()
-                                    ->mapWithKeys(fn ($name) => ["driver:{$name}" => "Driver: {$name}"]);
-
-                                return $senderOptions->merge($driverOptions)->toArray();
-                            })
-                            ->required()
-                            ->placeholder('Cari nama pengirim atau driver...'),
-                        DatePicker::make('rekap_date')
-                            ->label('Tanggal Pengiriman')
-                            ->default(now()->toDateString())
-                            ->required(),
-                    ])
-                    ->modalHeading('Cetak Rekap Pengiriman Driver')
-                    ->modalDescription('Pilih nama driver dan tanggal untuk mencetak rekap pengiriman hari ini.')
-                    ->modalSubmitActionLabel('Cetak PDF')
-                    ->action(function (array $data) {
-                        $selected = $data['sender_name'] ?? '';
-
-                        $suratJalans = SuratJalan::with([
-                            'deliveryOrder.salesOrders.customer',
-                            'deliveryOrder.deliveryOrderItem.product',
-                            'deliveryOrder.salesOrders',
-                        ])
-                            ->when($selected, function (Builder $query) use ($selected) {
-                                if (str_starts_with($selected, 'driver:')) {
-                                    $driverName = substr($selected, strlen('driver:'));
-
-                                    $query->whereHas('deliveryOrder.driver', function (Builder $query) use ($driverName) {
-                                        $query->where('name', $driverName);
-                                    });
-                                } elseif (str_starts_with($selected, 'sender:')) {
-                                    $senderName = substr($selected, strlen('sender:'));
-
-                                    $query->where('sender_name', $senderName);
-                                } else {
-                                    // Fallback: support legacy values (no prefix)
-                                    $query->where('sender_name', $selected)
-                                        ->orWhereHas('deliveryOrder.driver', function (Builder $query) use ($selected) {
-                                            $query->where('name', $selected);
-                                        });
-                                }
-                            })
-                            ->whereDate('issued_at', $data['rekap_date'])
-                            ->get();
-
-                        $pdf = Pdf::loadView('pdf.driver-delivery-report', [
-                            'suratJalans' => $suratJalans,
-                            'driver' => $data['sender_name'],
-                            'date' => $data['rekap_date'],
-                        ])->setPaper('A4', 'portrait');
-
-                        return response()->streamDownload(function () use ($pdf) {
-                            echo $pdf->stream();
-                        }, 'Rekap_Driver_' . str_replace(' ', '_', $data['sender_name']) . '_' . $data['rekap_date'] . '.pdf');
-                    }),
                 Action::make('cetak_rekap_fleksibel')
                     ->label('Cetak Rekap Fleksibel')
                     ->icon('heroicon-o-printer')
@@ -569,23 +495,6 @@ class SuratJalanResource extends Resource
                                 echo $pdf->stream();
                             }, 'Surat_Jalan_' . $record->sj_number . '.pdf');
                         }),
-                    Action::make('terbit')
-                        ->label('Setujui')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->modalHeading('Setujui & Terbitkan Surat Jalan')
-                        ->modalDescription('Surat Jalan akan diterbitkan. Gunakan tombol "Mark as Sent" setelah barang benar-benar dikirim untuk menandai Delivery Order sebagai Terkirim.')
-                        ->icon('heroicon-o-clipboard-document-list')
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response surat jalan') && $record->status == 0;
-                        })->action(function ($record) {
-                            $record->update([
-                                'signed_by' => Auth::user()->id,
-                                'status' => 1
-                            ]);
-
-                            HelperController::sendNotification(isSuccess: true, title: 'Surat Jalan Disetujui', message: 'Surat Jalan telah disetujui dan diterbitkan. Proses selanjutnya: Driver harus mengambil dokumen Surat Jalan dan segera melakukan pengiriman ke customer sesuai jadwal.');
-                        }),
                     Action::make('mark_as_sent')
                         ->label('Mark as Sent')
                         ->color('primary')
@@ -595,7 +504,7 @@ class SuratJalanResource extends Resource
                         ->modalDescription('Semua Delivery Order dalam Surat Jalan ini akan ditandai sebagai Terkirim. Lakukan ini setelah barang benar-benar dikirim ke customer.')
                         ->modalSubmitActionLabel('Ya, Tandai Terkirim')
                         ->visible(function ($record) {
-                            return $record->status == 1;
+                            return $record->status >= 1; // J2: available for all published SJs
                         })
                         ->action(function ($record) {
                             $record->loadMissing('deliveryOrder');
@@ -622,94 +531,6 @@ class SuratJalanResource extends Resource
 
                             HelperController::sendNotification(isSuccess: true, title: 'Terkirim', message: $marked > 0 ? "{$marked} Delivery Order berhasil ditandai sebagai Terkirim. Proses selanjutnya: Tim Finance perlu menerbitkan Invoice untuk setiap Delivery Order yang telah terkirim." : 'Semua DO sudah berstatus Terkirim. Proses selanjutnya: Tim Finance perlu menerbitkan Invoice untuk Delivery Order tersebut.');
                         }),
-                    Action::make('tandai_gagal_kirim')
-                        ->label('Tandai Gagal Kirim')
-                        ->color('danger')
-                        ->icon('heroicon-o-x-circle')
-                        ->visible(function ($record) {
-                            // Hanya tersedia untuk SJ yang sudah terbit (status=1)
-                            return $record->status == 1;
-                        })
-                        ->form(function ($record) {
-                            $record->loadMissing('deliveryOrder');
-                            $doOptions = $record->deliveryOrder
-                                ->whereIn('status', ['sent', 'approved'])
-                                ->mapWithKeys(fn($do) => [$do->id => $do->do_number])
-                                ->toArray();
-
-                            return [
-                                \Filament\Forms\Components\Fieldset::make('Informasi Kegagalan Pengiriman')
-                                    ->schema([
-                                        \Filament\Forms\Components\CheckboxList::make('failed_do_ids')
-                                            ->label('Pilih DO yang Gagal Terkirim')
-                                            ->options($doOptions)
-                                            ->required()
-                                            ->validationMessages([
-                                                'required' => 'Pilih minimal satu DO yang gagal'
-                                            ])
-                                            ->helperText('DO yang dipilih akan ditandai sebagai "Gagal Kirim" dan dapat diprioritaskan untuk pengiriman berikutnya.'),
-                                        \Filament\Forms\Components\Textarea::make('catatan_gagal')
-                                            ->label('Catatan Kegagalan')
-                                            ->placeholder('Contoh: Customer tidak di tempat, alamat tidak ditemukan, dll.')
-                                            ->required()
-                                            ->validationMessages([
-                                                'required' => 'Catatan kegagalan wajib diisi'
-                                            ]),
-                                    ]),
-                            ];
-                        })
-                        ->action(function ($record, array $data) {
-                            $failedDoIds = $data['failed_do_ids'] ?? [];
-                            $catatan = $data['catatan_gagal'] ?? '';
-
-                            if (empty($failedDoIds)) {
-                                HelperController::sendNotification(isSuccess: false, title: 'Gagal', message: 'Tidak ada DO yang dipilih');
-                                return;
-                            }
-
-                            $record->loadMissing('deliveryOrder');
-                            $failedDos = $record->deliveryOrder->whereIn('id', $failedDoIds);
-
-                            foreach ($failedDos as $do) {
-                                $do->update([
-                                    'status' => 'delivery_failed',
-                                    'notes' => ($do->notes ? $do->notes . "\n" : '') . '[GAGAL KIRIM - ' . now()->format('d/m/Y H:i') . '] ' . $catatan,
-                                ]);
-
-                                // Log the failed delivery
-                                \Illuminate\Support\Facades\Log::info('SuratJalan: DO marked as delivery_failed', [
-                                    'surat_jalan_id' => $record->id,
-                                    'do_id' => $do->id,
-                                    'do_number' => $do->do_number,
-                                    'catatan' => $catatan,
-                                ]);
-                            }
-
-                            // Kirim notifikasi ke semua user di cabang yang sama
-                            $failedDoNumbers = $failedDos->pluck('do_number')->implode(', ');
-                            $notifBody = "DO yang gagal terkirim: {$failedDoNumbers}. Catatan: {$catatan}. Perlu diprioritaskan untuk pengiriman berikutnya.";
-
-                            // Notifikasi Filament untuk user yang sedang login dan user lain di cabang
-                            $cabangId = Auth::user()->cabang_id;
-                            $recipients = \App\Models\User::where('cabang_id', $cabangId)->get();
-                            foreach ($recipients as $user) {
-                                \Filament\Notifications\Notification::make()
-                                    ->title('⚠️ Pengiriman Gagal - Perlu Prioritas Ulang')
-                                    ->body($notifBody)
-                                    ->danger()
-                                    ->sendToDatabase($user);
-                            }
-
-                            HelperController::sendNotification(
-                                isSuccess: false,
-                                title: 'Pengiriman Gagal Dicatat',
-                                message: count($failedDoIds) . ' DO ditandai gagal kirim. Notifikasi telah dikirim. DO ini dapat dipilih kembali saat membuat Surat Jalan baru.'
-                            );
-                        })
-                        ->modalHeading('Tandai Pengiriman Gagal')
-                        ->modalDescription('Tandai DO yang tidak berhasil dikirim. DO tersebut akan diprioritaskan untuk pengiriman berikutnya dan notifikasi akan dikirim ke tim gudang.')
-                        ->modalSubmitActionLabel('Tandai Gagal Kirim')
-                        ->modalCancelActionLabel('Batal'),
                 ])
             ], position: ActionsPosition::BeforeCells)
             ->bulkActions([
@@ -723,11 +544,10 @@ class SuratJalanResource extends Resource
                     '<div class="mt-2 text-sm">' .
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order dalam satu perjalanan.</li>' .
-                            '<li><strong>Status:</strong> <em>Draft</em> (belum terbit) dan <em>Terbit</em> (sudah resmi). Hanya Surat Jalan terbit yang dapat digunakan untuk pengiriman.</li>' .
-                            '<li><strong>Actions:</strong> <em>Edit</em> (draft only), <em>Delete</em> (draft only), <em>Download Document</em> (jika ada file), <em>Download Surat</em> (PDF terbit), <em>Terbitkan</em> (ubah ke status terbit), <em>Tandai Gagal Kirim</em> (untuk DO yang gagal dikirim - DO akan diprioritaskan ulang).</li>' .
+                            '<li><strong>Status:</strong> <em>Terbit</em> (otomatis saat dibuat). Surat Jalan langsung aktif dan siap digunakan untuk pengiriman.</li>' .
+                            '<li><strong>Actions:</strong> <em>Edit</em> (draft only), <em>Delete</em> (draft only), <em>Download Document</em> (jika ada file), <em>Download Surat</em> (PDF terbit), <em>Tandai Terkirim</em> (konfirmasi pengiriman berhasil).</li>' .
                             '<li><strong>Grouping:</strong> Satu Surat Jalan dapat mencakup multiple Delivery Order untuk efisiensi pengiriman ke customer yang sama.</li>' .
-                            '<li><strong>Persyaratan Terbit:</strong> Surat Jalan hanya dapat diterbitkan oleh user dengan permission <em>response surat jalan</em>.</li>' .
-                            '<li><strong>PDF:</strong> Download PDF Surat Jalan tersedia setelah status terbit untuk keperluan pengiriman.</li>' .
+                            '<li><strong>PDF:</strong> Download PDF Surat Jalan tersedia untuk keperluan pengiriman.</li>' .
                         '</ul>' .
                     '</div>' .
                 '</details>'

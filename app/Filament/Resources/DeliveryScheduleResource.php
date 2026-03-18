@@ -127,12 +127,26 @@ class DeliveryScheduleResource extends Resource
                             ->helperText('Tentukan tanggal dan waktu keberangkatan pengiriman')
                             ->validationMessages(['required' => 'Tanggal keberangkatan wajib diisi']),
 
+                        Select::make('delivery_method')
+                            ->label('Metode Pengiriman')
+                            ->options([
+                                'internal'       => 'Internal (Driver Perusahaan)',
+                                'kurir_internal' => 'Kurir Internal',
+                                'ekspedisi'      => 'Ekspedisi / Pihak Ketiga',
+                            ])
+                            ->default('internal')
+                            ->required()
+                            ->reactive()
+                            ->helperText('Pilih metode pengiriman untuk jadwal ini')
+                            ->validationMessages(['required' => 'Metode pengiriman wajib dipilih']),
+
                         Select::make('driver_id')
                             ->label('Driver')
                             ->searchable()
                             ->preload()
                             ->relationship('driver', 'name')
-                            ->required()
+                            ->visible(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
+                            ->required(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->validationMessages(['required' => 'Driver wajib dipilih']),
 
                         Select::make('vehicle_id')
@@ -140,8 +154,23 @@ class DeliveryScheduleResource extends Resource
                             ->searchable()
                             ->preload()
                             ->relationship('vehicle', 'plate')
-                            ->required()
+                            ->visible(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
+                            ->required(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->validationMessages(['required' => 'Kendaraan wajib dipilih']),
+
+                        TextInput::make('driver_name')
+                            ->label('Nama Driver / Ekspedisi')
+                            ->maxLength(255)
+                            ->visible(fn ($get) => $get('delivery_method') === 'ekspedisi')
+                            ->required(fn ($get) => $get('delivery_method') === 'ekspedisi')
+                            ->helperText('Nama driver atau nama ekspedisi')
+                            ->validationMessages(['required' => 'Nama driver/ekspedisi wajib diisi']),
+
+                        TextInput::make('vehicle_info')
+                            ->label('Info Kendaraan / Resi')
+                            ->maxLength(255)
+                            ->visible(fn ($get) => $get('delivery_method') === 'ekspedisi')
+                            ->helperText('Plat kendaraan, nama ekspedisi, atau nomor resi'),
 
                         Select::make('suratJalans')
                             ->label('Surat Jalan')
@@ -188,8 +217,30 @@ class DeliveryScheduleResource extends Resource
                     ->schema([
                         TextEntry::make('schedule_number')->label('Nomor Jadwal'),
                         TextEntry::make('scheduled_date')->label('Tanggal Keberangkatan')->dateTime('d/m/Y H:i'),
-                        TextEntry::make('driver.name')->label('Driver'),
-                        TextEntry::make('vehicle.plate')->label('Kendaraan'),
+                        TextEntry::make('delivery_method')
+                            ->label('Metode Pengiriman')
+                            ->formatStateUsing(fn ($state) => match ($state) {
+                                'internal'       => 'Internal (Driver Perusahaan)',
+                                'kurir_internal' => 'Kurir Internal',
+                                'ekspedisi'      => 'Ekspedisi / Pihak Ketiga',
+                                default          => $state ?? '-',
+                            }),
+                        TextEntry::make('driver.name')
+                            ->label('Driver')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+                        TextEntry::make('vehicle.plate')
+                            ->label('Kendaraan')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+                        TextEntry::make('driver_name')
+                            ->label('Nama Driver / Ekspedisi')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => $record?->delivery_method === 'ekspedisi'),
+                        TextEntry::make('vehicle_info')
+                            ->label('Info Kendaraan / Resi')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => $record?->delivery_method === 'ekspedisi'),
                         TextEntry::make('status')
                             ->label('Status')
                             ->badge()
@@ -237,10 +288,27 @@ class DeliveryScheduleResource extends Resource
                     ->sortable(),
                 TextColumn::make('driver.name')
                     ->label('Driver')
-                    ->searchable(),
+                    ->searchable()
+                    ->placeholder('-'),
                 TextColumn::make('vehicle.plate')
                     ->label('Kendaraan')
-                    ->searchable(),
+                    ->searchable()
+                    ->placeholder('-'),
+                TextColumn::make('delivery_method')
+                    ->label('Metode')
+                    ->badge()
+                    ->color(fn ($state) => match ($state) {
+                        'ekspedisi' => 'warning',
+                        'kurir_internal' => 'info',
+                        default => 'primary',
+                    })
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'internal'       => 'Internal',
+                        'kurir_internal' => 'Kurir Internal',
+                        'ekspedisi'      => 'Ekspedisi',
+                        default          => '-',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('suratJalans.sj_number')
                     ->label('Surat Jalan')
                     ->badge()

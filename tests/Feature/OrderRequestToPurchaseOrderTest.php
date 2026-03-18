@@ -60,7 +60,6 @@ beforeEach(function () {
     $this->orderRequest = OrderRequest::factory()->create([
         'warehouse_id' => $this->warehouse->id,
         'cabang_id'    => $this->cabang->id,
-        'supplier_id'  => $this->supplier->id,
         'created_by'   => $this->user->id,
         'status'       => 'draft',
         'request_date' => Carbon::today()->toDateString(),

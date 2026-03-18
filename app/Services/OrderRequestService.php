@@ -6,6 +6,7 @@ use App\Models\Currency;
 use App\Models\OrderRequestItem;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class OrderRequestService
 {
@@ -36,6 +37,12 @@ class OrderRequestService
                     // Validate quantity does not exceed remaining unfulfilled quantity
                     $maxQty = max(0, $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0));
                     if ($qty > $maxQty) {
+                        Log::warning('OrderRequest qty clamped to remaining quantity.', [
+                            'order_request_id' => $orderRequest->id,
+                            'order_request_item_id' => $orderRequestItem->id,
+                            'requested_qty' => $qty,
+                            'remaining_qty' => $maxQty,
+                        ]);
                         $qty = $maxQty;
                     }
                     if ($qty <= 0) {

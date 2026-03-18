@@ -56,8 +56,8 @@ class VendorPaymentResource extends Resource
                                 Select::make('payment_request_id')
                                     ->label('Payment Request (PR)')
                                     ->options(function () {
-                                        // Show all approved PRs including those partially paid (not fully paid).
-                                        return PaymentRequest::where('status', 'approved')
+                                        // Show approved and partially-paid PRs (exclude fully paid).
+                                        return PaymentRequest::whereIn('status', [PaymentRequest::STATUS_APPROVED, PaymentRequest::STATUS_PARTIAL])
                                             ->with('supplier')
                                             ->get()
                                             ->mapWithKeys(function ($pr) {
@@ -79,12 +79,17 @@ class VendorPaymentResource extends Resource
                                         $pr = PaymentRequest::with('supplier')->find($state);
                                         if ($pr) {
                                             $set('supplier_id', $pr->supplier_id);
-                                            // Pre-select all invoices from the payment request
-                                            $set('selected_invoices', $pr->selected_invoices ?? []);
-                                            // Calculate total from PR invoices
+                                            // Pre-select only invoices that still have remaining payable
                                             $prInvoiceIds = $pr->selected_invoices ?? [];
+                                            $eligibleInvoices = empty($prInvoiceIds)
+                                                ? collect()
+                                                : Invoice::whereIn('id', $prInvoiceIds)->with('accountPayable')->get()
+                                                    ->filter(fn ($invoice) => ((float)($invoice->accountPayable->remaining ?? $invoice->total)) > 0);
+
+                                            $set('selected_invoices', $eligibleInvoices->pluck('id')->values()->toArray());
+                                            // Calculate total from PR invoices
                                             if (!empty($prInvoiceIds)) {
-                                                $invoices = Invoice::whereIn('id', $prInvoiceIds)->with('accountPayable')->get();
+                                                $invoices = $eligibleInvoices;
                                                 $total = $invoices->sum(function ($invoice) {
                                                     return $invoice->accountPayable->remaining ?? $invoice->total;
                                                 });
@@ -198,6 +203,29 @@ class VendorPaymentResource extends Resource
                                             $set('has_invoices', false);
                                             return [];
                                         }
+                                    })
+                                    ->disableOptionWhen(function ($value, $get) {
+                                        $paymentRequestId = $get('payment_request_id');
+                                        if (!$paymentRequestId) {
+                                            return false;
+                                        }
+
+                                        $pr = PaymentRequest::find($paymentRequestId);
+                                        $prInvoiceIds = $pr ? ($pr->selected_invoices ?? []) : [];
+                                        if (empty($prInvoiceIds)) {
+                                            return false;
+                                        }
+
+                                        $invoice = Invoice::whereIn('id', $prInvoiceIds)
+                                            ->with('accountPayable')
+                                            ->find((int)$value);
+
+                                        if (!$invoice) {
+                                            return false;
+                                        }
+
+                                        $remaining = (float) ($invoice->accountPayable->remaining ?? $invoice->total);
+                                        return $remaining <= 0;
                                     })
                                     ->visible(fn($get) => !empty($get('supplier_id')))
                                     ->helperText(function ($get) {

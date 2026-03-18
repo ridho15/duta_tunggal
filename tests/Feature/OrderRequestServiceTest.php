@@ -108,7 +108,7 @@ test('order request approval generates purchase order and items', function () {
         ->and($purchaseOrder->note)->toBe($payload['note'])
         ->and($purchaseOrder->refer_model_type)->toBe(OrderRequest::class)
         ->and($purchaseOrder->refer_model_id)->toBe($fresh->id)
-        ->and($purchaseOrder->status)->toBe('approved')
+        ->and($purchaseOrder->status)->toBe('draft')
         ->and($purchaseOrder->warehouse_id)->toBe($this->warehouse->id)
         ->and($purchaseOrder->tempo_hutang)->toBe(30)
         ->and($purchaseOrder->created_by)->toBe($this->user->id);

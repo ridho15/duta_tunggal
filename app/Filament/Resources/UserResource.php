@@ -145,18 +145,11 @@ class UserResource extends Resource
                         Select::make('warehouse_id')
                             ->label('Gudang')
                             ->preload()
-                            ->helperText("Untuk mengaktifkan gudang silahkan pilih gudang pada kelola")
+                            ->helperText("Pilih gudang untuk staff gudang (aktif jika Kelola = Gudang)")
                             ->searchable()
                             ->reactive()
-                            ->disabled(function ($set, $get) {
-                                if (in_array('all', $get('manage_type'))) {
-                                    return true;
-                                } elseif (in_array('warehouse', $get('manage_type'))) {
-                                    return false;
-                                }
-
-                                return true;
-                            })
+                            // S4: show warehouse field only when manage_type includes 'warehouse'
+                            ->visible(fn ($get) => in_array('warehouse', (array) ($get('manage_type') ?? [])))
                             ->relationship('warehouse', 'name', function (Builder $query, $get) {
                                 $query->where('cabang_id', $get('cabang_id'));
                             })

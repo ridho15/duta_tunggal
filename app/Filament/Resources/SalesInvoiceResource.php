@@ -366,6 +366,16 @@ class SalesInvoiceResource extends Resource
                                         }
                                         $set('delivery_order_items', $deliveryOrderItems);
 
+                                        // L1: Auto-fill tipe_pajak from SO items
+                                        $soForTax = SaleOrder::with('saleOrderItem')->find($saleOrderId);
+                                        if ($soForTax && $soForTax->saleOrderItem->isNotEmpty()) {
+                                            $tipePajak = $soForTax->saleOrderItem->first()->tipe_pajak ?? 'None';
+                                            $set('tipe_pajak', $tipePajak);
+                                            if ($tipePajak === 'None') {
+                                                $set('ppn_rate', 0);
+                                            }
+                                        }
+
                                         // Calculate tax and total
                                         $tax = 0;
                                         $otherFee = 0; // Initialize as 0
@@ -458,6 +468,15 @@ class SalesInvoiceResource extends Resource
                                                 }
                                             }
                                             $set('delivery_order_items', $deliveryOrderItems);
+                                        }
+
+                                        // L1: Auto-fill tipe_pajak from SO items
+                                        if ($saleOrder && $saleOrder->saleOrderItem->isNotEmpty()) {
+                                            $tipePajak = $saleOrder->saleOrderItem->first()->tipe_pajak ?? 'None';
+                                            $set('tipe_pajak', $tipePajak);
+                                            if ($tipePajak === 'None') {
+                                                $set('ppn_rate', 0);
+                                            }
                                         }
 
                                         // Calculate tax and total
@@ -648,6 +667,33 @@ class SalesInvoiceResource extends Resource
                                 \Filament\Forms\Components\Hidden::make('tax')
                                     ->default(0),
 
+                                Select::make('tipe_pajak')
+                                    ->label('Tipe Pajak')
+                                    ->options([
+                                        'None'     => 'Tidak Kena Pajak (None)',
+                                        'Inklusif' => 'PPN Inklusif (sudah termasuk harga)',
+                                        'Eklusif'  => 'PPN Eksklusif (ditambah ke harga)',
+                                    ])
+                                    ->default('None')
+                                    ->reactive()
+                                    ->helperText('Diisi otomatis dari Sales Order. Dapat diubah bila perlu.')
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        // If None, set ppn_rate to 0
+                                        if ($state === 'None') {
+                                            $set('ppn_rate', 0);
+                                            $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
+                                            $otherFees = $get('other_fees') ?? [];
+                                            $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                            $set('total', $subtotal + $otherFeeTotal);
+                                        } else {
+                                            // Set ppn_rate to active rate if not already set
+                                            $currentRate = (float) ($get('ppn_rate') ?? 0);
+                                            if ($currentRate === 0.0) {
+                                                $set('ppn_rate', \App\Models\TaxSetting::activeRate('PPN'));
+                                            }
+                                        }
+                                    }),
+
                                 TextInput::make('ppn_rate')
                                     ->label('PPN Rate (%)')
                                     ->numeric()
@@ -657,6 +703,7 @@ class SalesInvoiceResource extends Resource
                                     ->suffix('%')
                                     ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
+                                    ->visible(fn ($get) => $get('tipe_pajak') !== 'None')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $state = $state ?? 11; // Ensure it's not null, default to 11
                                         $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);

@@ -17,9 +17,11 @@ class WarehouseConfirmation extends Model
     protected $fillable = [
         'sale_order_id',
         'manufacturing_order_id',
+        'delivery_order_id',  // H4: link to DO when auto-created from request_stock
         'confirmation_type',
         'note',
-        'status', // Confirmed / Rejected / Request
+        'rejection_reason',   // I1: reason when WC is rejected
+        'status', // Confirmed / Rejected / Request / confirmed / rejected / partial_confirmed
         'confirmed_by',
         'confirmed_at'
     ];
@@ -32,6 +34,12 @@ class WarehouseConfirmation extends Model
     public function saleOrder()
     {
         return $this->belongsTo(SaleOrder::class, 'sale_order_id')->withDefault();
+    }
+
+    // H4: WC created from DO's request_stock action
+    public function deliveryOrder()
+    {
+        return $this->belongsTo(DeliveryOrder::class, 'delivery_order_id')->withDefault();
     }
 
     public function user()
@@ -69,6 +77,11 @@ class WarehouseConfirmation extends Model
         static::updating(function ($warehouseConfirmation) {
             $originalStatus = $warehouseConfirmation->getOriginal('status');
             $newStatus = $warehouseConfirmation->status;
+
+            // H4/I1: when this WC is DO-linked and status changes → update DO status
+            if ($warehouseConfirmation->isDirty('status') && $warehouseConfirmation->delivery_order_id) {
+                $warehouseConfirmation->_triggerDoStatusUpdate = true;
+            }
 
             // When parent status changes to confirmed, update all warehouse confirmation items
             if ($warehouseConfirmation->isDirty('status') && $warehouseConfirmation->status === 'confirmed') {
@@ -153,11 +166,16 @@ class WarehouseConfirmation extends Model
         });
 
         static::restoring(function ($warehouseConfirmation) {
-            // When warehouse confirmation is restored, we might need to update sale order status
-            // But this depends on the business logic - for now, we'll leave it as is
-            // since the sale order status should be managed separately
-
             $warehouseConfirmation->warehouseConfirmationItems()->withTrashed()->restore();
+        });
+
+        // H4/I1: after status saved, update linked DO status
+        static::updated(function ($warehouseConfirmation) {
+            if (! empty($warehouseConfirmation->_triggerDoStatusUpdate)
+                && $warehouseConfirmation->delivery_order_id) {
+                $do = DeliveryOrder::find($warehouseConfirmation->delivery_order_id);
+                $do?->updateStatusFromWarehouseConfirmations();
+            }
         });
     }
 

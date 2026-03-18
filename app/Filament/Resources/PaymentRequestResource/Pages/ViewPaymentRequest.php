@@ -88,7 +88,8 @@ class ViewPaymentRequest extends ViewRecord
                 ->label('Buat Vendor Payment')
                 ->icon('heroicon-o-banknotes')
                 ->color('primary')
-                ->visible(fn () => $this->record->status === 'approved' && !$this->record->vendor_payment_id)
+                ->visible(fn () => in_array($this->record->status, [PaymentRequest::STATUS_APPROVED, PaymentRequest::STATUS_PARTIAL], true)
+                    && ((float) $this->record->remaining_amount) > 0)
                 ->url(fn () => route('filament.admin.resources.vendor-payments.create', [
                     'payment_request_id' => $this->record->id,
                     'supplier_id' => $this->record->supplier_id,
@@ -112,6 +113,8 @@ class ViewPaymentRequest extends ViewRecord
                     TextEntry::make('request_date')->label('Tanggal Request')->date('d/m/Y'),
                     TextEntry::make('payment_date')->label('Tgl Bayar Diminta')->date('d/m/Y'),
                     TextEntry::make('total_amount')->label('Total (Rp)')->money('IDR', locale: 'id'),
+                    TextEntry::make('paid_amount')->label('Sudah Dibayar (Rp)')->money('IDR', locale: 'id'),
+                    TextEntry::make('remaining_amount')->label('Sisa Bayar (Rp)')->money('IDR', locale: 'id'),
                     TextEntry::make('requestedBy.name')->label('Diminta Oleh'),
                     TextEntry::make('approvedBy.name')->label('Disetujui/Ditolak Oleh'),
                     TextEntry::make('approved_at')->label('Waktu Approval')->dateTime('d/m/Y H:i'),

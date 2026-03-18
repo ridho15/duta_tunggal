@@ -92,8 +92,7 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     await page.waitForTimeout(800);
     await selectFirstChoicesOption(page, 'Gudang');
 
-    // 3. Supplier
-    await selectFirstChoicesOption(page, 'Supplier');
+    // 3. No header supplier selected — unit_price should fall back to product.cost_price
 
     // 4. Request date
     const dateInput = page.locator('input[id*="request_date"]').first();
@@ -160,14 +159,16 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
       `subtotal should be formatted with dots, but got "${subtotalValue}".`
     ).toMatch(/^\d{1,3}(\.\d{3})*$/);
 
-    // Subtotal should equal 2 × unit_price (no discount, no tax in this test)
+    // Subtotal = 2 × unit_price × (1 + tax/100)
+    // Product FG-SEED-001 has pajak=11%, so subtotal = 2 × 8500000 × 1.11
     const parsedUnitPrice = parseInt(unitPriceValue.replace(/\./g, ''), 10);
+    const taxRate = 11; // product.pajak=11
+    const expectedSubtotal = Math.round(2 * parsedUnitPrice * (1 + taxRate / 100));
     const parsedSubtotal  = parseInt(subtotalValue.replace(/\./g, ''), 10);
-    const expectedSubtotal = 2 * parsedUnitPrice;
 
     expect(
       parsedSubtotal,
-      `subtotal (${parsedSubtotal}) should equal 2 × unit_price (2 × ${parsedUnitPrice} = ${expectedSubtotal}). ` +
+      `subtotal (${parsedSubtotal}) should equal 2 × unit_price × 1.11 = ${expectedSubtotal}. ` +
       `If subtotal is 1 or tiny, it means PHP parsed "8.500.000" as 8.5 instead of 8500000.`
     ).toBe(expectedSubtotal);
 
@@ -187,11 +188,10 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     await page.goto('/admin/order-requests/create');
     await page.waitForLoadState('networkidle');
 
-    // Fill required fields quickly
+    // Fill required fields quickly — no header supplier, uses cost_price fallback
     await selectFirstChoicesOption(page, 'Cabang', 'Cabang Pusat');
     await page.waitForTimeout(600);
     await selectFirstChoicesOption(page, 'Gudang');
-    await selectFirstChoicesOption(page, 'Supplier');
 
     // Add repeater item and select product
     const addBtns = page.locator('.fi-fo-repeater').getByRole('button');
@@ -216,8 +216,10 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     const subtotalValue = await subtotalInput.inputValue();
     const parsedSubtotal = parseInt(subtotalValue.replace(/\./g, ''), 10);
 
-    // 3 × 8,500,000 = 25,500,000
-    expect(parsedSubtotal, `3 × 8.500.000 should = 25.500.000, but got "${subtotalValue}"`).toBe(25_500_000);
+    // 3 × 8,500,000 = 25,500,000 base; with product.pajak=11% → 25,500,000 × 1.11 = 28,305,000
+    // (PPN Excluded mode: subtotal = base + base × tax%)
+    const expectedSubtotal = Math.round(3 * 8_500_000 * 1.11);
+    expect(parsedSubtotal, `3 × 8.500.000 × 1.11 should = ${expectedSubtotal.toLocaleString()}, but got "${subtotalValue}"`).toBe(expectedSubtotal);
 
     console.log(`✅ subtotal after qty=3: "${subtotalValue}" = ${parsedSubtotal}`);
   });

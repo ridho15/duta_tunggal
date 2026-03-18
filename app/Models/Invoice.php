@@ -41,6 +41,7 @@ class Invoice extends Model
         'due_date',
         'status', // draft, sent, paid, partially_paid, overdue
         'ppn_rate',
+        'tipe_pajak',
         'dpp', //Dasar penggunaan pajak,
         'customer_name',
         'customer_phone',
@@ -156,6 +157,16 @@ class Invoice extends Model
             }
         }
         return $sum;
+    }
+
+    /**
+     * Computed PPN amount (nominal PPN in IDR) = DPP × ppn_rate / 100
+     */
+    public function getPpnAmountAttribute(): float
+    {
+        $dpp = (float) ($this->dpp ?? $this->subtotal ?? 0);
+        $rate = (float) ($this->ppn_rate ?? 0);
+        return $rate > 0 ? round($dpp * $rate / 100, 2) : 0.0;
     }
 
     public function invoiceItem()

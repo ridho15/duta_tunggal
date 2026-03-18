@@ -29,6 +29,11 @@ class CreatePurchaseInvoice extends CreateRecord
         $data['ppn_masukan_coa_id'] = $data['ppn_masukan_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1170.06')->first()?->id;
         $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
         $data['expense_coa_id'] = $data['expense_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
+
+        $subtotal = (float) ($data['subtotal'] ?? 0);
+        $ppnRate = (float) ($data['ppn_rate'] ?? 0);
+        $data['tax'] = isset($data['tax']) ? (float) $data['tax'] : ($subtotal * $ppnRate / 100);
+
         $data['other_fee'] = $data['other_fees'] ?? [];
         return $data;
     }

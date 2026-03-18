@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\DeliveryOrder;
 use App\Models\DeliverySchedule;
+use Illuminate\Support\Facades\Log;
 
 class DeliveryScheduleService
 {
@@ -29,5 +31,55 @@ class DeliveryScheduleService
         }
 
         return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * K3: When delivery schedule is delivered, mark all related DOs to completed.
+     *
+     * Transition strategy:
+     * - approved/request_approve/draft/request_stock => sent => completed
+     * - sent/received/partial => completed
+     */
+    public function completeRelatedDeliveryOrders(DeliverySchedule $schedule): int
+    {
+        $schedule->loadMissing('suratJalans.deliveryOrder');
+
+        $deliveryOrders = $schedule->suratJalans
+            ->flatMap(fn ($sj) => $sj->deliveryOrder)
+            ->unique('id')
+            ->values();
+
+        $completedCount = 0;
+
+        foreach ($deliveryOrders as $deliveryOrder) {
+            if (!$deliveryOrder instanceof DeliveryOrder) {
+                continue;
+            }
+
+            if (in_array($deliveryOrder->status, ['completed', 'closed'])) {
+                continue;
+            }
+
+            try {
+                if (in_array($deliveryOrder->status, ['approved', 'request_approve', 'draft', 'request_stock'])) {
+                    $deliveryOrder->update(['status' => 'sent']);
+                    $deliveryOrder->refresh();
+                }
+
+                if (in_array($deliveryOrder->status, ['sent', 'received', 'partial', 'approved', 'request_stock'])) {
+                    $deliveryOrder->update(['status' => 'completed']);
+                    $completedCount++;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('DeliveryScheduleService: failed to complete related DO', [
+                    'delivery_schedule_id' => $schedule->id,
+                    'delivery_order_id' => $deliveryOrder->id,
+                    'do_number' => $deliveryOrder->do_number,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $completedCount;
     }
 }

@@ -28,12 +28,12 @@
 
 import { test, expect } from '@playwright/test';
 
-const OR2_REQUEST_NUMBER = 'OR-20260317-2993';
-// item data from DB: qty=10, original_price=180000, supplier_unit_price=180000
-// total_cost = qty × supplier_unit_price = 10 × 180.000 = 1.800.000
-const EXPECTED_ORIGINAL_PRICE = '180.000';
-const EXPECTED_TOTAL_COST     = '1.800.000';
-const EXPECTED_UNIT_PRICE     = '180.000';
+// OR-TEST-B-APPROVE: qty=10, unit_price=130000 (user override), original_price=150000 (catalog)
+// total_cost = 10 × 130.000 = 1.300.000
+const OR2_REQUEST_NUMBER = 'OR-TEST-B-APPROVE';
+const EXPECTED_ORIGINAL_PRICE = '150.000';
+const EXPECTED_TOTAL_COST     = '1.300.000';
+const EXPECTED_UNIT_PRICE     = '130.000';
 
 /**
  * Open the Approve dropdown item for the given row and return the opened modal.
@@ -49,14 +49,20 @@ async function openApproveModal(page, targetRow) {
   await dropdownTrigger.click();
 
   // Wait for dropdown panel to become visible (Alpine removes display:none)
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(600);
 
-  // Find the "Approve" dropdown item.
-  // Use .fi-dropdown-list-item-label with exact text to avoid matching "Request Approve".
-  // The panel is teleported to body — search globally for the visible item.
-  const approveItem = page.locator('.fi-dropdown-list-item').filter({
+  // Find the visible "Approve" dropdown item.
+  // The panel is teleported to body — use :visible pseudo-class to only match shown items.
+  // Filter by exact label text to avoid matching "Request Approve".
+  let approveItem = page.locator('.fi-dropdown-list-item:visible').filter({
     has: page.locator('.fi-dropdown-list-item-label', { hasText: /^\s*Approve\s*$/ }),
   }).first();
+
+  // Fallback: find any visible dropdown item labeled "Approve"
+  const count = await approveItem.count();
+  if (count === 0) {
+    approveItem = page.getByRole('button', { name: /^\s*Approve\s*$/, exact: false }).filter({ hasText: /^\s*Approve\s*$/ }).first();
+  }
 
   await approveItem.waitFor({ state: 'visible', timeout: 10_000 });
   await approveItem.click();
@@ -169,7 +175,7 @@ test.describe('Order Request Approve Modal — field pre-fill', () => {
     // product_name is a readonly text input — must contain item name
     const productNameVal = await modal.locator('input[id*="product_name"]').first().inputValue();
     console.log('product_name:', productNameVal);
-    expect(productNameVal.trim()).toContain('Keyboard Mechanical');
+    expect(productNameVal.trim()).toContain('Panel Kontrol Industri');
 
     // unit_price must be pre-populated (supplier catalog price = 180.000)
     const unitPriceVal = await modal.locator('input[id*="unit_price"]').first().inputValue();

@@ -122,9 +122,13 @@ class CreateVendorPayment extends CreateRecord
                     ->sum('total_payment');
                 $requestTotal = MoneyHelper::parse($pr->total_amount ?? 0);
 
-                $newStatus = $paidSoFar >= ($requestTotal - 0.01)
-                    ? PaymentRequest::STATUS_PAID
-                    : PaymentRequest::STATUS_APPROVED;
+                if ($paidSoFar >= ($requestTotal - 0.01)) {
+                    $newStatus = PaymentRequest::STATUS_PAID;
+                } elseif ($paidSoFar > 0) {
+                    $newStatus = PaymentRequest::STATUS_PARTIAL;
+                } else {
+                    $newStatus = PaymentRequest::STATUS_APPROVED;
+                }
 
                 $pr->update([
                     'status' => $newStatus,

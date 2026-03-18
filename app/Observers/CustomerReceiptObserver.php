@@ -11,9 +11,25 @@ class CustomerReceiptObserver
 {
     protected $ledger;
 
+    /**
+     * Track receipt IDs for which AR was already updated in afterCreate().
+     * Prevents double-counting when the observer fires on the status update
+     * triggered by CustomerReceiptItemObserver.
+     */
+    protected static array $arUpdatedInCreate = [];
+
     public function __construct()
     {
         $this->ledger = new LedgerPostingService();
+    }
+
+    /**
+     * Called by CreateCustomerReceipt::afterCreate() once AR has been updated
+     * in the page handler. Prevents the observer from double-counting.
+     */
+    public static function markArUpdatedInCreate(int $receiptId): void
+    {
+        self::$arUpdatedInCreate[$receiptId] = true;
     }
 
     public function updated(CustomerReceipt $receipt)
@@ -32,8 +48,12 @@ class CustomerReceiptObserver
                 $this->ledger->postCustomerReceipt($receipt);
             }
 
-            // Update AR and invoice status when receipt status changes to Paid or Partial
-            $this->updateAccountReceivables($receipt);
+            // Update AR only if afterCreate() did NOT already handle it.
+            // This prevents double-counting when status is set by CustomerReceiptItemObserver
+            // right after items are created in the same request.
+            if (!isset(self::$arUpdatedInCreate[$receipt->id])) {
+                $this->updateAccountReceivables($receipt);
+            }
         }
     }
 
@@ -45,72 +65,51 @@ class CustomerReceiptObserver
             if (!$receipt->journalEntries()->exists()) {
                 $this->ledger->postCustomerReceipt($receipt);
             }
-
-            // Note: AR updates are handled in updated() method when status changes
         }
     }
 
     private function updateAccountReceivables(CustomerReceipt $receipt)
     {
         foreach ($receipt->customerReceiptItem as $item) {
-            Log::info('Processing item ID: ' . $item->id . ', selected_invoices: ' . json_encode($item->selected_invoices));
             // If selected_invoices exists, update AR for each invoice
             if (!empty($item->selected_invoices)) {
                 foreach ($item->selected_invoices as $invoiceId) {
-                    Log::info('Updating AR for invoice ID: ' . $invoiceId);
                     $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
                     if ($accountReceivable) {
-                        Log::info('Found AR, current paid: ' . $accountReceivable->paid . ', remaining: ' . $accountReceivable->remaining);
-                        // Only update if not already updated (avoid double updates)
-                        $accountReceivable->paid = $accountReceivable->paid + $item->amount;
+                        $accountReceivable->paid      = $accountReceivable->paid + $item->amount;
                         $accountReceivable->remaining = $accountReceivable->remaining - $item->amount;
                         $accountReceivable->save();
-                        Log::info('Updated AR, new paid: ' . $accountReceivable->paid . ', remaining: ' . $accountReceivable->remaining);
 
-                        // Update status based on remaining amount
-                        if ($accountReceivable->remaining == 0) {
-                            Log::info('Updating invoice status to paid for invoice ID: ' . $accountReceivable->invoice_id);
-                            $accountReceivable->invoice->update(['status' => 'paid']);
-                            $accountReceivable->update(['status' => 'Lunas']);
-                            if ($accountReceivable->ageingSchedule) {
-                                $accountReceivable->ageingSchedule->delete();
-                            }
-                        } elseif ($accountReceivable->paid > 0 && $accountReceivable->total > $accountReceivable->remaining) {
-                            Log::info('Updating invoice status to partially_paid for invoice ID: ' . $accountReceivable->invoice_id);
-                            $accountReceivable->invoice->update(['status' => 'partially_paid']);
-                        }
-                    } else {
-                        Log::info('AR not found for invoice ID: ' . $invoiceId);
+                        // Update invoice and AR status
+                        $this->syncArStatus($accountReceivable);
                     }
                 }
             } else {
-                Log::info('No selected_invoices for item ID: ' . $item->id);
-                // Fallback to old logic
+                // Fallback: use item's own invoice_id or receipt's invoice_id
                 $invoiceId = $item->invoice_id ?? $receipt->invoice_id;
-                Log::info('Fallback to invoice ID: ' . $invoiceId);
                 $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
 
                 if ($accountReceivable) {
-                    Log::info('Found AR with fallback, current paid: ' . $accountReceivable->paid . ', remaining: ' . $accountReceivable->remaining);
-                    $accountReceivable->paid = $accountReceivable->paid + $item->amount;
+                    $accountReceivable->paid      = $accountReceivable->paid + $item->amount;
                     $accountReceivable->remaining = $accountReceivable->remaining - $item->amount;
                     $accountReceivable->save();
-                    Log::info('Updated AR with fallback, new paid: ' . $accountReceivable->paid . ', remaining: ' . $accountReceivable->remaining);
 
-                    // Update status based on remaining amount
-                    if ($accountReceivable->remaining == 0) {
-                        $accountReceivable->invoice->update(['status' => 'paid']);
-                        $accountReceivable->update(['status' => 'Lunas']);
-                        if ($accountReceivable->ageingSchedule) {
-                            $accountReceivable->ageingSchedule->delete();
-                        }
-                    } elseif ($accountReceivable->paid > 0 && $accountReceivable->total > $accountReceivable->remaining) {
-                        $accountReceivable->invoice->update(['status' => 'partially_paid']);
-                    }
-                } else {
-                    Log::info('AR not found with fallback for invoice ID: ' . $invoiceId);
+                    $this->syncArStatus($accountReceivable);
                 }
             }
+        }
+    }
+
+    private function syncArStatus(AccountReceivable $ar): void
+    {
+        if ($ar->remaining <= 0) {
+            $ar->invoice?->update(['status' => 'paid']);
+            $ar->update(['status' => 'Lunas']);
+            if ($ar->ageingSchedule) {
+                $ar->ageingSchedule->delete();
+            }
+        } elseif ($ar->paid > 0) {
+            $ar->invoice?->update(['status' => 'partially_paid']);
         }
     }
 }

@@ -342,6 +342,8 @@ class QuotationResource extends Resource
                                             // Format unit_price as Indonesian money for proper display
                                             $numericUnit = (float)$product->sell_price;
                                             $set('unit_price', number_format($numericUnit, 0, ',', '.'));
+                                            // F2: auto-fill unit/satuan from product UOM
+                                            $set('unit', $product->uom?->abbreviation ?? '-');
                                             $qty = (float)($get('quantity') ?? 0);
                                             $discPct = (float)($get('discount') ?? 0);
                                             $taxPct = (float)($get('tax') ?? 0);
@@ -387,6 +389,18 @@ class QuotationResource extends Resource
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
+                                    }),
+                                // F2: satuan produk (read-only, auto-filled from product)
+                                TextInput::make('unit')
+                                    ->label('Satuan')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default('-')
+                                    ->extraAttributes(['title' => 'Satuan produk (otomatis)'])
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record?->product) {
+                                            $component->state($record->product->uom?->abbreviation ?? '-');
+                                        }
                                     }),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')

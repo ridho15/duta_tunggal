@@ -20,6 +20,7 @@ class SuratJalan extends Model
         'document_path',
         'sender_name',
         'shipping_method',
+        'cabang_id',
     ];
 
     public function deliveryOrder()
@@ -35,6 +36,11 @@ class SuratJalan extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     // Helper method to get customers through delivery orders and sales orders

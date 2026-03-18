@@ -835,6 +835,69 @@ class CustomerReceiptResource extends Resource
                     ->columns(1)
                     ->visible(fn ($record) => $record->customerReceiptItem->count() > 0),
 
+                InfoSection::make('Journal Entries')
+                    ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('journal_entries_display')
+                            ->label('Jurnal Akuntansi')
+                            ->formatStateUsing(function ($state, $record) {
+                                $entries = \App\Models\JournalEntry::where(function ($q) use ($record) {
+                                        $q->where('source_type', \App\Models\CustomerReceipt::class)
+                                          ->where('source_id', $record->id);
+                                    })
+                                    ->orWhere(function ($q) use ($record) {
+                                        $q->where('source_type', \App\Models\CustomerReceiptItem::class)
+                                          ->whereIn('source_id', $record->customerReceiptItem->pluck('id'));
+                                    })
+                                    ->orderBy('date')
+                                    ->get();
+
+                                if ($entries->isEmpty()) {
+                                    return '<p class="text-gray-400 italic text-sm">Belum ada journal entry tercatat untuk receipt ini. <a href="/admin/journal-entries" class="text-primary-600 underline">Lihat semua jurnal →</a></p>';
+                                }
+
+                                $html  = '<div class="overflow-x-auto">';
+                                $html .= '<table class="w-full text-sm border-collapse">';
+                                $html .= '<thead><tr class="bg-gray-100 text-gray-700">';
+                                $html .= '<th class="text-left p-2 border border-gray-200">Tanggal</th>';
+                                $html .= '<th class="text-left p-2 border border-gray-200">Akun</th>';
+                                $html .= '<th class="text-left p-2 border border-gray-200">Keterangan</th>';
+                                $html .= '<th class="text-right p-2 border border-gray-200">Debit (Rp)</th>';
+                                $html .= '<th class="text-right p-2 border border-gray-200">Kredit (Rp)</th>';
+                                $html .= '</tr></thead><tbody>';
+
+                                $totalDebit  = 0;
+                                $totalCredit = 0;
+                                foreach ($entries as $entry) {
+                                    $accountCode = $entry->coa?->code ?? '-';
+                                    $accountName = $entry->coa?->name ?? '-';
+                                    $debit  = (float) ($entry->debit ?? 0);
+                                    $credit = (float) ($entry->credit ?? 0);
+                                    $totalDebit  += $debit;
+                                    $totalCredit += $credit;
+
+                                    $html .= '<tr class="hover:bg-gray-50">';
+                                    $html .= '<td class="p-2 border border-gray-200">' . ($entry->date ? \Carbon\Carbon::parse($entry->date)->format('d M Y') : '-') . '</td>';
+                                    $html .= '<td class="p-2 border border-gray-200 font-medium">' . $accountCode . ' — ' . $accountName . '</td>';
+                                    $html .= '<td class="p-2 border border-gray-200 text-gray-600">' . e($entry->description ?? '') . '</td>';
+                                    $html .= '<td class="p-2 border border-gray-200 text-right">' . ($debit > 0 ? 'Rp ' . number_format($debit, 0, ',', '.') : '-') . '</td>';
+                                    $html .= '<td class="p-2 border border-gray-200 text-right">' . ($credit > 0 ? 'Rp ' . number_format($credit, 0, ',', '.') : '-') . '</td>';
+                                    $html .= '</tr>';
+                                }
+
+                                $html .= '<tr class="bg-gray-50 font-semibold">';
+                                $html .= '<td colspan="3" class="p-2 border border-gray-200 text-right">Total</td>';
+                                $html .= '<td class="p-2 border border-gray-200 text-right">Rp ' . number_format($totalDebit, 0, ',', '.') . '</td>';
+                                $html .= '<td class="p-2 border border-gray-200 text-right">Rp ' . number_format($totalCredit, 0, ',', '.') . '</td>';
+                                $html .= '</tr>';
+
+                                $html .= '</tbody></table></div>';
+                                return $html;
+                            })
+                            ->html()
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(1),
+
             ]);
     }
 

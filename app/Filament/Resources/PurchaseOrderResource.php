@@ -167,7 +167,7 @@ class PurchaseOrderResource extends Resource
                                                     $discount  = $orderRequestItem->discount ?? 0;
                                                     $tax       = $orderRequestItem->tax ?? 0;
                                                     // Map order request tax_type to PO item tipe_pajak
-                                                    $tipePajak = match($orderRequest->tax_type ?? 'PPN Excluded') {
+                                                    $tipePajak = match ($orderRequest->tax_type ?? 'PPN Excluded') {
                                                         'PPN Included' => 'Inklusif',
                                                         'None'         => 'Non Pajak',
                                                         default        => 'Eklusif', // 'PPN Excluded'
@@ -276,6 +276,7 @@ class PurchaseOrderResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->helperText('Diisi otomatis dari Order Request saat referensi dipilih. Dapat diubah bila perlu.')
                             ->validationMessages([
                                 'required' => 'Cabang wajib dipilih'
                             ]),
@@ -468,7 +469,7 @@ class PurchaseOrderResource extends Resource
                                         $supplierId = $get('../../supplier_id');
                                         $query = Product::where(function ($q) use ($search) {
                                             $q->where('name', 'like', "%{$search}%")
-                                              ->orWhere('sku', 'like', "%{$search}%");
+                                                ->orWhere('sku', 'like', "%{$search}%");
                                         })->orderBy('name')->limit(50);
                                         if ($supplierId) {
                                             $query->whereHas('suppliers', function ($q) use ($supplierId) {
@@ -479,9 +480,10 @@ class PurchaseOrderResource extends Resource
                                             return [$product->id => "({$product->sku}) {$product->name}"];
                                         });
                                     })
-                                    ->helperText(fn (Get $get) => $get('../../supplier_id')
-                                        ? 'Menampilkan produk dari supplier yang dipilih'
-                                        : 'Pilih supplier untuk memfilter produk'
+                                    ->helperText(
+                                        fn(Get $get) => $get('../../supplier_id')
+                                            ? 'Menampilkan produk dari supplier yang dipilih'
+                                            : 'Pilih supplier untuk memfilter produk'
                                     )
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
@@ -506,6 +508,7 @@ class PurchaseOrderResource extends Resource
                                                 }
                                             }
                                             $set('unit_price', $newUnitPrice);
+                                            $set('unit', $product->uom?->abbreviation ?? '-');
                                             $set('discount', 0);
                                             $set('tax', $newTax);
                                             $set('tipe_pajak', $newTipePajak);
@@ -528,6 +531,16 @@ class PurchaseOrderResource extends Resource
                                         }
                                     })
                                     ->required(),
+                                TextInput::make('unit')
+                                    ->label('Satuan')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default('-')
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record?->product) {
+                                            $component->state($record->product->uom?->abbreviation ?? '-');
+                                        }
+                                    }),
                                 Select::make('currency_id')
                                     ->label('Mata Uang')
                                     ->preload()
@@ -917,7 +930,7 @@ class PurchaseOrderResource extends Resource
                                                 $coa = ChartOfAccount::where('type', 'Expense')
                                                     ->where(function ($q) use ($coaName) {
                                                         $q->where('name', 'like', '%' . $coaName . '%')
-                                                          ->orWhere('name', 'like', '%' . explode(' ', $coaName)[1] . '%');
+                                                            ->orWhere('name', 'like', '%' . explode(' ', $coaName)[1] . '%');
                                                     })
                                                     ->first();
                                                 if ($coa) {

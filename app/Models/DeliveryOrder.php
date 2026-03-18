@@ -128,4 +128,34 @@ class DeliveryOrder extends Model
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
+
+    // H4: WC records created when DO requests stock
+    public function warehouseConfirmations()
+    {
+        return $this->hasMany(WarehouseConfirmation::class, 'delivery_order_id');
+    }
+
+    /**
+     * H4: Update DO status based on all linked WC outcomes.
+     * - ALL confirmed  → approved
+     * - ANY rejected   → rejected (partial still counts as rejected)
+     * - others         → stays request_stock
+     */
+    public function updateStatusFromWarehouseConfirmations(): void
+    {
+        $wcs = $this->warehouseConfirmations()->get();
+        if ($wcs->isEmpty()) {
+            return;
+        }
+
+        $allConfirmed = $wcs->every(fn($wc) => strtolower($wc->status) === 'confirmed');
+        $anyRejected  = $wcs->contains(fn($wc) => strtolower($wc->status) === 'rejected');
+
+        if ($allConfirmed) {
+            $this->update(['status' => 'approved']);
+        } elseif ($anyRejected) {
+            $this->update(['status' => 'reject']);
+        }
+        // else: still waiting for remaining confirmations → stay at request_stock
+    }
 }

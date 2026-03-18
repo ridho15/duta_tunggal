@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Helpers\MoneyHelper;
 
 class PaymentRequest extends Model
 {
@@ -121,6 +122,7 @@ class PaymentRequest extends Model
     const STATUS_DRAFT = 'draft';
     const STATUS_PENDING = 'pending_approval';
     const STATUS_APPROVED = 'approved';
+    const STATUS_PARTIAL = 'partial';
     const STATUS_REJECTED = 'rejected';
     const STATUS_PAID = 'paid';
 
@@ -128,6 +130,7 @@ class PaymentRequest extends Model
         self::STATUS_DRAFT => 'Draft',
         self::STATUS_PENDING => 'Menunggu Persetujuan',
         self::STATUS_APPROVED => 'Disetujui',
+        self::STATUS_PARTIAL => 'Dibayar Sebagian',
         self::STATUS_REJECTED => 'Ditolak',
         self::STATUS_PAID => 'Dibayar',
     ];
@@ -136,6 +139,7 @@ class PaymentRequest extends Model
         self::STATUS_DRAFT => 'gray',
         self::STATUS_PENDING => 'warning',
         self::STATUS_APPROVED => 'success',
+        self::STATUS_PARTIAL => 'info',
         self::STATUS_REJECTED => 'danger',
         self::STATUS_PAID => 'primary',
     ];
@@ -192,5 +196,16 @@ class PaymentRequest extends Model
         }
 
         return $prefix . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function getPaidAmountAttribute(): float
+    {
+        return (float) VendorPayment::where('payment_request_id', $this->id)->sum('total_payment');
+    }
+
+    public function getRemainingAmountAttribute(): float
+    {
+        $total = MoneyHelper::parse($this->total_amount ?? 0);
+        return max(0, $total - $this->paid_amount);
     }
 }

@@ -15,6 +15,7 @@ use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -49,6 +50,20 @@ class ViewOrderRequest extends ViewRecord
                     $orderRequestService->reject($record);
                     HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah ditolak. Proses selanjutnya: Pemohon dapat merevisi data dan mengajukan kembali untuk mendapatkan persetujuan.");
                 }),
+            Action::make('request_approve')
+                ->label('Request Approve')
+                ->color('primary')
+                ->icon('heroicon-o-paper-airplane')
+                ->requiresConfirmation()
+                ->modalHeading('Ajukan Persetujuan')
+                ->modalDescription('Apakah Anda yakin ingin mengajukan order request ini untuk disetujui?')
+                ->visible(function ($record) {
+                    return $record->status == 'draft';
+                })
+                ->action(function ($record) {
+                    $record->update(['status' => 'request_approve']);
+                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah diajukan untuk persetujuan.");
+                }),
             Action::make('approve')
                 ->label('Approve')
                 ->color('success')
@@ -75,23 +90,40 @@ class ViewOrderRequest extends ViewRecord
                             $taxNom = '0';
                             $subtotal = '0';
                         }
+
+                        $supplierName = $item->supplier_id
+                            ? ("({$item->supplier->code}) {$item->supplier->perusahaan}")
+                            : '-';
+                        $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
+
                         return [
-                            'item_id'        => $item->id,
-                            'product_name'   => "({$item->product->sku}) {$item->product->name}",
-                            'quantity'       => max(0, $remainingQty),
-                            'original_price' => $originalPrice,
-                            'unit_price'     => $unitPrice,
-                            'tax'            => $taxPct,
-                            'tax_nominal'    => $taxNom,
-                            'total_cost'     => $totalCost,
-                            'subtotal'       => $subtotal,
-                            'include'        => $remainingQty > 0,
+                            'item_id'          => $item->id,
+                            'item_supplier_id' => $item->supplier_id,
+                            'product_name'     => "({$item->product->sku}) {$item->product->name}",
+                            'supplier_name'    => $supplierName,
+                            'uom'              => $uom,
+                            'quantity'         => max(0, $remainingQty),
+                            'original_price'   => $originalPrice,
+                            'unit_price'       => $unitPrice,
+                            'tax'              => $taxPct,
+                            'tax_nominal'      => $taxNom,
+                            'total_cost'       => $totalCost,
+                            'subtotal'         => $subtotal,
+                            'max_quantity'     => max(0, $remainingQty),
+                            'include'          => $remainingQty > 0,
                         ];
                     })->values()->toArray();
 
+                    $uniqueSuppliers = collect($items)->pluck('item_supplier_id')->filter()->unique();
+                    $isMultiSupplier = $uniqueSuppliers->count() > 1;
+
+                    // Pre-fill supplier from the first item that has a supplier
+                    $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+
                     return [
-                        'supplier_id'           => $record->supplier_id,
+                        'supplier_id'           => $firstSupplierId,
                         'create_purchase_order' => true,
+                        'multi_supplier'        => $isMultiSupplier,
                         'selected_items'        => $items,
                     ];
                 })
@@ -105,6 +137,12 @@ class ViewOrderRequest extends ViewRecord
                                 ->default(true)
                                 ->live()
                                 ->columnSpanFull(),
+                            Placeholder::make('multi_supplier_notice')
+                                ->label('')
+                                ->content('Item dalam OR ini memiliki beberapa supplier berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
+                                ->visible(fn(Get $get) => $get('create_purchase_order') && $get('multi_supplier'))
+                                ->columnSpanFull(),
+                            Hidden::make('multi_supplier'),
                         ]),
                     Section::make('Informasi Purchase Order')
                         ->icon('heroicon-o-document-text')
@@ -112,7 +150,9 @@ class ViewOrderRequest extends ViewRecord
                         ->visible(fn(Get $get) => $get('create_purchase_order'))
                         ->schema([
                             Select::make('supplier_id')
-                                ->label('Supplier')
+                                ->label('Supplier (untuk PO)')
+                                ->helperText('Supplier utama untuk Purchase Order. Setiap item memiliki supplier masing-masing (lihat di tabel item).')
+                                ->visible(fn(Get $get) => !$get('multi_supplier'))
                                 ->preload()
                                 ->searchable()
                                 ->columnSpanFull()
@@ -130,13 +170,14 @@ class ViewOrderRequest extends ViewRecord
                                             return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                         });
                                 })
-                                ->required(fn(Get $get) => $get('create_purchase_order'))
+                                ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
                                 ->validationMessages(['required' => 'Supplier wajib dipilih.']),
                             TextInput::make('po_number')
                                 ->label('PO Number')
                                 ->string()
                                 ->maxLength(255)
-                                ->required(fn(Get $get) => $get('create_purchase_order'))
+                                ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
                                 ->suffixAction(
                                     FormAction::make('generatePoNumber')
                                         ->icon('heroicon-o-arrow-path')
@@ -175,13 +216,35 @@ class ViewOrderRequest extends ViewRecord
                                 ->reorderable(false)
                                 ->schema([
                                     Hidden::make('item_id'),
+                                    Hidden::make('item_supplier_id'),
+                                    Hidden::make('max_quantity'),
                                     TextInput::make('product_name')
                                         ->label('Nama Produk')
                                         ->readOnly(),
+                                    TextInput::make('supplier_name')
+                                        ->label('Supplier')
+                                        ->readOnly(),
+                                    TextInput::make('uom')
+                                        ->label('Satuan')
+                                        ->readOnly()
+                                        ->columnSpan(1),
                                     TextInput::make('quantity')
                                         ->label('Qty')
                                         ->minValue(0)
-                                        ->required(),
+                                        ->required()
+                                        ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
+                                        ->rules([
+                                            fn($get) => function ($attribute, $value, $fail) use ($get) {
+                                                $max = $get('max_quantity');
+                                                if ($max !== null && $max !== '' && (float) $value > (float) $max) {
+                                                    $fail("Qty tidak boleh melebihi {$max}.");
+                                                }
+                                            },
+                                        ])
+                                        ->validationMessages([
+                                            'required' => 'Qty wajib diisi.',
+                                            'min' => 'Qty minimal 0.',
+                                        ]),
                                     TextInput::make('original_price')
                                         ->label('Harga Asli (Rp)')
                                         ->minValue(0)
@@ -193,7 +256,8 @@ class ViewOrderRequest extends ViewRecord
                                     TextInput::make('tax')
                                         ->label('Pajak (%)')
                                         ->readOnly()
-                                        ->suffix('%'),
+                                        ->suffix('%')
+                                        ->columnSpan(1),
                                     TextInput::make('tax_nominal')
                                         ->label('Nominal Pajak (Rp)')
                                         ->prefix('Rp')
@@ -220,11 +284,45 @@ class ViewOrderRequest extends ViewRecord
                         ]),
                 ])
                 ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('approve order request') && $record->status == 'draft';
+                    return $record->status == 'request_approve' && Auth::user()->hasPermissionTo('approve order request');
                 })
                 ->action(function (array $data, $record) {
                     $orderRequestService = app(OrderRequestService::class);
                     if ($data['create_purchase_order']) {
+                        if (!empty($data['multi_supplier'])) {
+                            $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                            if ($includedItems->isEmpty()) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                return;
+                            }
+
+                            $groups = $includedItems->groupBy('item_supplier_id');
+                            $created = 0;
+                            foreach ($groups as $supplierId => $groupItems) {
+                                if (empty($supplierId)) {
+                                    continue;
+                                }
+                                $poNumber = HelperController::generatePoNumber();
+                                while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
+                                    $poNumber = HelperController::generatePoNumber();
+                                }
+
+                                $poData = array_merge($data, [
+                                    'supplier_id'    => $supplierId,
+                                    'po_number'      => $poNumber,
+                                    'selected_items' => $groupItems->values()->toArray(),
+                                    'multi_supplier' => false,
+                                ]);
+
+                                $orderRequestService->createPurchaseOrder($record, $poData);
+                                $created++;
+                            }
+
+                            $record->update(['status' => 'approved']);
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
+                            return;
+                        }
+
                         $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                         if ($purchaseOrder) {
                             HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
@@ -258,21 +356,38 @@ class ViewOrderRequest extends ViewRecord
                         } catch (\Throwable $e) {
                             $taxNom = '0';
                         }
+
+                        $supplierName = $item->supplier_id
+                            ? ("({$item->supplier->code}) {$item->supplier->perusahaan}")
+                            : '-';
+                        $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
+
                         return [
-                            'item_id'        => $item->id,
-                            'product_name'   => "({$item->product->sku}) {$item->product->name}",
-                            'quantity'       => max(0, $remainingQty),
-                            'original_price' => $originalPrice,
-                            'unit_price'     => $unitPrice,
-                            'tax'            => $taxPct,
-                            'tax_nominal'    => $taxNom,
-                            'total_cost'     => $totalCost,
-                            'include'        => $remainingQty > 0,
+                            'item_id'          => $item->id,
+                            'item_supplier_id' => $item->supplier_id,
+                            'product_name'     => "({$item->product->sku}) {$item->product->name}",
+                            'supplier_name'    => $supplierName,
+                            'uom'              => $uom,
+                            'quantity'         => max(0, $remainingQty),
+                            'original_price'   => $originalPrice,
+                            'unit_price'       => $unitPrice,
+                            'tax'              => $taxPct,
+                            'tax_nominal'      => $taxNom,
+                            'total_cost'       => $totalCost,
+                            'max_quantity'     => max(0, $remainingQty),
+                            'include'          => $remainingQty > 0,
                         ];
                     })->values()->toArray();
 
+                    $uniqueSuppliers = collect($items)->pluck('item_supplier_id')->filter()->unique();
+                    $isMultiSupplier = $uniqueSuppliers->count() > 1;
+
+                    // Pre-fill supplier from the first item that has one
+                    $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+
                     return [
-                        'supplier_id'    => $record->supplier_id,
+                        'supplier_id'    => $firstSupplierId,
+                        'multi_supplier' => $isMultiSupplier,
                         'selected_items' => $items,
                     ];
                 })
@@ -281,8 +396,15 @@ class ViewOrderRequest extends ViewRecord
                         ->icon('heroicon-o-document-text')
                         ->columns(2)
                         ->schema([
+                            Placeholder::make('multi_supplier_notice')
+                                ->label('')
+                                ->content('Item dalam OR ini memiliki beberapa supplier berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
+                                ->visible(fn(Get $get) => $get('multi_supplier'))
+                                ->columnSpanFull(),
+                            Hidden::make('multi_supplier'),
                             Select::make('supplier_id')
                                 ->label('Supplier')
+                                ->visible(fn(Get $get) => !$get('multi_supplier'))
                                 ->preload()
                                 ->searchable()
                                 ->columnSpanFull()
@@ -300,13 +422,14 @@ class ViewOrderRequest extends ViewRecord
                                             return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                         });
                                 })
-                                ->required()
+                                ->required(fn(Get $get) => !$get('multi_supplier'))
                                 ->validationMessages(['required' => 'Supplier wajib dipilih.']),
                             TextInput::make('po_number')
                                 ->label('PO Number')
                                 ->string()
                                 ->maxLength(255)
-                                ->required()
+                                ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                ->required(fn(Get $get) => !$get('multi_supplier'))
                                 ->suffixAction(
                                     FormAction::make('generatePoNumber')
                                         ->icon('heroicon-o-arrow-path')
@@ -344,16 +467,40 @@ class ViewOrderRequest extends ViewRecord
                                 ->reorderable(false)
                                 ->schema([
                                     Hidden::make('item_id'),
+                                    Hidden::make('item_supplier_id'),
+                                    Hidden::make('max_quantity'),
                                     TextInput::make('product_name')
                                         ->label('Nama Produk')
                                         ->readOnly()
                                         ->columnSpan(3),
+                                    TextInput::make('supplier_name')
+                                        ->label('Supplier')
+                                        ->readOnly()
+                                        ->columnSpan(2),
+                                    TextInput::make('uom')
+                                        ->label('Satuan')
+                                        ->readOnly()
+                                        ->columnSpan(1),
                                     TextInput::make('quantity')
                                         ->label('Qty')
                                         ->numeric()
                                         ->minValue(0)
                                         ->required()
-                                        ->columnSpan(1),
+                                        ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
+                                        ->columnSpan(1)
+                                        ->rules([
+                                            fn($get) => function ($attribute, $value, $fail) use ($get) {
+                                                $max = $get('max_quantity');
+                                                if ($max !== null && $max !== '' && (float) $value > (float) $max) {
+                                                    $fail("Qty tidak boleh melebihi {$max}.");
+                                                }
+                                            },
+                                        ])
+                                        ->validationMessages([
+                                            'required' => 'Qty wajib diisi.',
+                                            'numeric' => 'Qty harus berupa angka.',
+                                            'min' => 'Qty minimal 0.',
+                                        ]),
                                     TextInput::make('original_price')
                                         ->label('Harga Asli')
                                         ->prefix('Rp')
@@ -393,6 +540,39 @@ class ViewOrderRequest extends ViewRecord
                 })
                 ->action(function (array $data, $record) {
                     $orderRequestService = app(OrderRequestService::class);
+                    if (!empty($data['multi_supplier'])) {
+                        $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                        if ($includedItems->isEmpty()) {
+                            HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                            return;
+                        }
+
+                        $groups = $includedItems->groupBy('item_supplier_id');
+                        $created = 0;
+                        foreach ($groups as $supplierId => $groupItems) {
+                            if (empty($supplierId)) {
+                                continue;
+                            }
+                            $poNumber = HelperController::generatePoNumber();
+                            while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
+                                $poNumber = HelperController::generatePoNumber();
+                            }
+
+                            $poData = array_merge($data, [
+                                'supplier_id'    => $supplierId,
+                                'po_number'      => $poNumber,
+                                'selected_items' => $groupItems->values()->toArray(),
+                                'multi_supplier' => false,
+                            ]);
+
+                            $orderRequestService->createPurchaseOrder($record, $poData);
+                            $created++;
+                        }
+
+                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: "{$created} Purchase Order berhasil dibuat per supplier.");
+                        return;
+                    }
+
                     $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                     if ($purchaseOrder) {
                         HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");

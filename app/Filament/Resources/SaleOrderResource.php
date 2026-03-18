@@ -33,6 +33,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
@@ -132,6 +133,7 @@ class SaleOrderResource extends Resource
                                     }
                                     $set('total_amount', $quotation->total_amount);
                                     $set('customer_id', $quotation->customer_id);
+                                    $set('cabang_id', $quotation->cabang_id);
                                     $set('shipped_to', $quotation->customer->address);
                                     $set('saleOrderItem', $items);
                                 }
@@ -169,6 +171,7 @@ class SaleOrderResource extends Resource
                                     }
                                     $set('total_amount', $saleOrder->total_amount);
                                     $set('customer_id', $saleOrder->customer_id);
+                                    $set('cabang_id', $saleOrder->cabang_id);
                                     $set('shipped_to', $saleOrder->customer->address);
                                 }
                                 $set('saleOrderItem', $items);
@@ -215,6 +218,10 @@ class SaleOrderResource extends Resource
                                 $customer = Customer::find($state);
                                 if ($customer) {
                                     $set('shipped_to', $customer->address);
+                                    // G3: auto-fill tempo pembayaran dari customer
+                                    if ($customer->tempo_kredit) {
+                                        $set('tempo_pembayaran', (int)$customer->tempo_kredit);
+                                    }
                                 }
                             })
                             ->relationship('customer', 'name')
@@ -435,8 +442,7 @@ class SaleOrderResource extends Resource
                             ->label('Tempo Pembayaran (Hari)')
                             ->numeric()
                             ->nullable()
-                            ->readOnly()
-                            ->helperText('Tempo pembayaran yang telah disetujui di Quotation. Digunakan sebagai jatuh tempo invoice.')
+                            ->helperText('Diisi otomatis dari data customer (tempo kredit). Dapat diubah bila perlu.')
                             ->suffix('Hari'),
                         Repeater::make('saleOrderItem')
                             ->relationship()
@@ -462,7 +468,8 @@ class SaleOrderResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::find($state);
                                         if ($product) {
-                                            $set('unit_price', $product->sell_price);
+                                            $set('unit_price', number_format((float)$product->sell_price, 0, ',', '.'));
+                                            $set('unit', $product->uom?->abbreviation ?? '-');
                                             $set('subtotal', HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                                             $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
                                             try {
@@ -508,6 +515,17 @@ class SaleOrderResource extends Resource
                                     ->relationship('product', 'name')
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
+                                    }),
+                                TextInput::make('unit')
+                                    ->label('Satuan')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default('-')
+                                    ->extraAttributes(['title' => 'Satuan produk (otomatis)'])
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record?->product) {
+                                            $component->state($record->product->uom?->abbreviation ?? '-');
+                                        }
                                     }),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
@@ -853,7 +871,6 @@ class SaleOrderResource extends Resource
                                         'Exclusive' => 'Exclusive (PPN di luar harga)',
                                         'Inclusive' => 'Inclusive (PPN sudah termasuk)',
                                     ])
-                                    ->hidden(true)
                                     ->default('None')
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
@@ -1510,6 +1527,44 @@ class SaleOrderResource extends Resource
         return [
             SaleOrderItemRelationManager::class
         ];
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                \Filament\Infolists\Components\Section::make('Informasi Sales Order')
+                    ->columns(3)
+                    ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('so_number')
+                            ->label('SO Number'),
+                        \Filament\Infolists\Components\TextEntry::make('customer.name')
+                            ->label('Customer')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('status')
+                            ->label('Status')
+                            ->badge(),
+                        \Filament\Infolists\Components\TextEntry::make('order_date')
+                            ->label('Order Date')
+                            ->dateTime('d/m/Y'),
+                        \Filament\Infolists\Components\TextEntry::make('delivery_date')
+                            ->label('Delivery Date')
+                            ->dateTime('d/m/Y')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('tempo_pembayaran')
+                            ->label('Tempo Pembayaran')
+                            ->formatStateUsing(fn ($state) => $state ? $state . ' Hari' : '-'),
+                        \Filament\Infolists\Components\TextEntry::make('total_amount')
+                            ->label('Total Amount')
+                            ->rupiah(),
+                        \Filament\Infolists\Components\TextEntry::make('tipe_pengiriman')
+                            ->label('Tipe Pengiriman')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('shipped_to')
+                            ->label('Shipped To')
+                            ->placeholder('-'),
+                    ]),
+            ]);
     }
 
     public static function getEloquentQuery(): Builder
