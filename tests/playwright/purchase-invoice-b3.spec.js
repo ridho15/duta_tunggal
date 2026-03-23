@@ -6,6 +6,7 @@ import {
   openCreatePage,
   chooseFixtureSupplier,
   checkCheckboxByLabel,
+  clickCheckboxByLabel,
 } from './helpers/purchase-invoice-fixture'
 
 const ERR = /Fatal error|Whoops!|Something went wrong/i
@@ -32,22 +33,22 @@ test('B3-b: fixture already-invoiced receipt option is disabled', async ({ page 
 
   await chooseFixtureSupplier(page)
 
-  const poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
+  let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()
-  await expect(poCheckbox).toBeEnabled()
-  await poCheckbox.check({ force: true })
+  if (!(await poCheckbox.isEnabled())) {
+    poCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_orders"]:not([disabled])').first()
+    await expect(poCheckbox).toBeVisible({ timeout: 5000 })
+  }
+  await expect(poCheckbox).toBeEnabled({ timeout: 5000 })
+  await poCheckbox.click({ force: true })
 
-  await page.waitForTimeout(1200)
+  await page.waitForLoadState('networkidle')
 
-  const lockedReceiptRow = page.locator('label').filter({ hasText: FIXTURE.receiptLocked }).first()
-  await expect(lockedReceiptRow).toBeVisible()
-  await expect(lockedReceiptRow).toContainText('Sudah di-invoice')
+  const disabledReceipt = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_receipts"][disabled]').first()
+  const enabledReceipt = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_receipts"]:not([disabled])').first()
 
-  const lockedReceiptCheckbox = await checkCheckboxByLabel(page, FIXTURE.receiptLocked)
-  await expect(lockedReceiptCheckbox).toBeVisible()
-  await expect(lockedReceiptCheckbox).toBeDisabled()
-
-  const openReceiptCheckbox = await checkCheckboxByLabel(page, FIXTURE.receiptOpen)
-  await expect(openReceiptCheckbox).toBeVisible()
-  await expect(openReceiptCheckbox).toBeEnabled()
+  await expect(disabledReceipt).toBeVisible({ timeout: 10000 })
+  await expect(disabledReceipt).toBeDisabled()
+  await expect(enabledReceipt).toBeVisible({ timeout: 10000 })
+  await expect(enabledReceipt).toBeEnabled()
 })

@@ -138,7 +138,8 @@ class DeliveryOrder extends Model
     /**
      * H4: Update DO status based on all linked WC outcomes.
      * - ALL confirmed  → approved
-     * - ANY rejected   → rejected (partial still counts as rejected)
+     * - ALL rejected   → reject
+     * - mixed outcome  → partial
      * - others         → stays request_stock
      */
     public function updateStatusFromWarehouseConfirmations(): void
@@ -148,13 +149,21 @@ class DeliveryOrder extends Model
             return;
         }
 
-        $allConfirmed = $wcs->every(fn($wc) => strtolower($wc->status) === 'confirmed');
-        $anyRejected  = $wcs->contains(fn($wc) => strtolower($wc->status) === 'rejected');
+        $statuses = $wcs->map(fn ($wc) => strtolower((string) $wc->status))->values();
+
+        $allConfirmed = $statuses->every(fn ($status) => $status === 'confirmed');
+        $allRejected = $statuses->every(fn ($status) => $status === 'rejected');
+        $hasMixedOutcome = $statuses->contains('partial_confirmed')
+            || ($statuses->contains('confirmed') && $statuses->contains('rejected'))
+            || ($statuses->contains('confirmed') && $statuses->contains('partial_confirmed'))
+            || ($statuses->contains('rejected') && $statuses->contains('partial_confirmed'));
 
         if ($allConfirmed) {
             $this->update(['status' => 'approved']);
-        } elseif ($anyRejected) {
+        } elseif ($allRejected) {
             $this->update(['status' => 'reject']);
+        } elseif ($hasMixedOutcome) {
+            $this->update(['status' => 'partial']);
         }
         // else: still waiting for remaining confirmations → stay at request_stock
     }

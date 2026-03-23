@@ -266,7 +266,7 @@ class SaleOrderObserver
         ]);
 
         // Load relationships
-        $saleOrder->loadMissing('saleOrderItem.product');
+        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
 
         // Cek apakah sudah ada warehouse confirmation untuk sale order ini
         $existingWC = WarehouseConfirmation::where('sale_order_id', $saleOrder->id)->first();
@@ -310,6 +310,24 @@ class SaleOrderObserver
         // Buat warehouse confirmation items
         $skippedProducts = [];
         foreach ($saleOrder->saleOrderItem as $item) {
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                foreach ($allocations as $allocation) {
+                    WarehouseConfirmationItem::create([
+                        'warehouse_confirmation_id' => $warehouseConfirmation->id,
+                        'sale_order_item_id' => $item->id,
+                        'product_name' => $item->product->name ?? 'Unknown Product',
+                        'requested_qty' => $allocation->quantity,
+                        'confirmed_qty' => $allocation->quantity,
+                        'warehouse_id' => $allocation->warehouse_id,
+                        'rak_id' => null,
+                        'status' => $itemStatus,
+                    ]);
+                }
+                continue;
+            }
+
             // Skip item yang tidak memiliki warehouse_id
             if (!$item->warehouse_id) {
                 $productName = $item->product->name ?? ('ID: ' . $item->product_id);
@@ -416,8 +434,8 @@ class SaleOrderObserver
             'so_number' => $saleOrder->so_number,
         ]);
 
-        // Load sale order items with product data
-        $saleOrder->loadMissing('saleOrderItem.product');
+        // Load sale order items with product data AND warehouse allocations for multi-warehouse support
+        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
 
         $date = $saleOrder->order_date ?? now()->toDateString();
 
@@ -433,24 +451,51 @@ class SaleOrderObserver
                 continue;
             }
 
-            // Skip if warehouse_id is null
-            if (!$item->warehouse_id) {
-                continue;
-            }
-
-            // Create sales stock movement to reduce physical inventory
             $productService = app(\App\Services\ProductService::class);
-            $productService->createStockMovement(
-                product_id: $product->id,
-                warehouse_id: $item->warehouse_id,
-                quantity: $qtySold,
-                type: 'sales',
-                date: $date,
-                notes: "Self-pickup sales for SO {$saleOrder->so_number}",
-                rak_id: $item->rak_id,
-                fromModel: null,
-                value: $product->cost_price * $qtySold
-            );
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                // Multi-warehouse mode: create stock movement per allocation
+                foreach ($allocations as $allocation) {
+                    $allocationQty = max(0, (float) $allocation->quantity);
+                    if ($allocationQty <= 0 || !$allocation->warehouse_id) {
+                        continue;
+                    }
+
+                    $productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $allocation->warehouse_id,
+                        quantity: $allocationQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Self-pickup sales (multi-gudang) for SO {$saleOrder->so_number}",
+                        rak_id: null,
+                        fromModel: null,
+                        value: $product->cost_price * $allocationQty
+                    );
+                }
+            } else {
+                // Single warehouse mode
+                if (!$item->warehouse_id) {
+                    Log::warning('SaleOrderObserver: Skipping stock reduction for self-pickup — item has no warehouse_id and no allocations', [
+                        'sale_order_item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                    ]);
+                    continue;
+                }
+
+                $productService->createStockMovement(
+                    product_id: $product->id,
+                    warehouse_id: $item->warehouse_id,
+                    quantity: $qtySold,
+                    type: 'sales',
+                    date: $date,
+                    notes: "Self-pickup sales for SO {$saleOrder->so_number}",
+                    rak_id: $item->rak_id,
+                    fromModel: null,
+                    value: $product->cost_price * $qtySold
+                );
+            }
         }
     }
 }

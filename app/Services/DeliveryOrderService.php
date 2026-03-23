@@ -92,6 +92,8 @@ class DeliveryOrderService
     {
         $errors = [];
 
+        $deliveryOrder->loadMissing('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
+
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             $qtyRequested = max(0, $item->quantity ?? 0);
             if ($qtyRequested <= 0) {
@@ -101,6 +103,51 @@ class DeliveryOrderService
             $product = $item->product;
             if (!$product) {
                 $errors[] = "Product not found for delivery item";
+                continue;
+            }
+
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                $totalSourceQty = (float) $sources->sum(function ($source) {
+                    return (float) ($source->quantity ?? 0);
+                });
+
+                if (abs($totalSourceQty - $qtyRequested) > 0.0001) {
+                    $errors[] = "Source quantity mismatch for product '{$product->name}'. Source total: {$totalSourceQty}, Item qty: {$qtyRequested}";
+                    continue;
+                }
+
+                foreach ($sources as $source) {
+                    $sourceWarehouseId = $source->warehouse_id;
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+
+                    if (!$sourceWarehouseId || $sourceQty <= 0) {
+                        $errors[] = "Invalid warehouse source configuration for product '{$product->name}'";
+                        continue;
+                    }
+
+                    $inventoryQuery = InventoryStock::where('product_id', $product->id)
+                        ->where('warehouse_id', $sourceWarehouseId);
+
+                    if (!empty($source->rak_id)) {
+                        $inventoryQuery->where('rak_id', $source->rak_id);
+                    }
+
+                    $inventoryStock = $inventoryQuery->first();
+
+                    if (!$inventoryStock) {
+                        $errors[] = "No inventory stock found for product '{$product->name}' in selected source warehouse";
+                        continue;
+                    }
+
+                    $availableForDelivery = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
+
+                    if ($availableForDelivery < $sourceQty) {
+                        $errors[] = "Insufficient stock for product '{$product->name}' in source warehouse. " .
+                            "Available: {$availableForDelivery}, Requested: {$sourceQty}";
+                    }
+                }
+
                 continue;
             }
 
@@ -141,6 +188,8 @@ class DeliveryOrderService
      */
     public function postDeliveryOrder(DeliveryOrder $deliveryOrder): array
     {
+        $deliveryOrder->loadMissing('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
+
         // Check if stock movements already exist for this delivery order
         $deliveryOrderItemIds = $deliveryOrder->deliveryOrderItem()->pluck('id');
         $existingStockMovements = \App\Models\StockMovement::where('from_model_type', \App\Models\DeliveryOrderItem::class)
@@ -176,6 +225,30 @@ class DeliveryOrderService
 
             $product = $item->product;
             if (!$product) {
+                continue;
+            }
+
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    if ($sourceQty <= 0 || !$source->warehouse_id) {
+                        continue;
+                    }
+
+                    $this->productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $source->warehouse_id,
+                        quantity: $sourceQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Sales delivery for DO {$deliveryOrder->do_number}",
+                        rak_id: $source->rak_id,
+                        fromModel: $item,
+                        value: $product->cost_price * $sourceQty
+                    );
+                }
+
                 continue;
             }
 
@@ -228,6 +301,8 @@ class DeliveryOrderService
      */
     public function releaseStockReservations(DeliveryOrder $deliveryOrder): void
     {
+        $deliveryOrder->loadMissing('salesOrders', 'deliveryOrderItem.warehouseSources');
+
         // Get all sale orders linked to this delivery order
         $saleOrderIds = $deliveryOrder->salesOrders->pluck('id')->toArray();
 
@@ -238,6 +313,51 @@ class DeliveryOrderService
         foreach ($deliveryOrder->deliveryOrderItem as $deliveryItem) {
             $qtyDelivered = max(0, $deliveryItem->quantity ?? 0);
             if ($qtyDelivered <= 0) {
+                continue;
+            }
+
+            $sources = $deliveryItem->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    if ($sourceQty <= 0 || !$source->warehouse_id) {
+                        continue;
+                    }
+
+                    $reservations = StockReservation::whereIn('sale_order_id', $saleOrderIds)
+                        ->where('product_id', $deliveryItem->product_id)
+                        ->where('warehouse_id', $source->warehouse_id)
+                        ->when(!empty($source->rak_id), function ($query) use ($source) {
+                            $query->where('rak_id', $source->rak_id);
+                        })
+                        ->get();
+
+                    $remainingToRelease = $sourceQty;
+
+                    foreach ($reservations as $reservation) {
+                        if ($remainingToRelease <= 0) {
+                            break;
+                        }
+
+                        $releaseQty = min($remainingToRelease, $reservation->quantity);
+                        $remainingToRelease -= $releaseQty;
+
+                        if ($releaseQty >= $reservation->quantity) {
+                            $reservation->delete();
+                        } else {
+                            $reservation->quantity -= $releaseQty;
+                            $reservation->save();
+
+                            $inventoryStock = InventoryStock::where('product_id', $reservation->product_id)
+                                ->where('warehouse_id', $reservation->warehouse_id)
+                                ->first();
+                            if ($inventoryStock) {
+                                $inventoryStock->decrement('qty_reserved', $releaseQty);
+                            }
+                        }
+                    }
+                }
+
                 continue;
             }
 

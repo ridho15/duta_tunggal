@@ -22,6 +22,7 @@ use App\Services\SalesOrderService;
 use App\Services\CreditValidationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
@@ -111,30 +112,29 @@ class SaleOrderResource extends Resource
                                 if ($quotation) {
                                     foreach ($quotation->quotationItem as $item) {
                                         $tipePajak = $item->tax_type ?? 'Exclusive';
+                                        $unitPrice = (float) HelperController::parseIndonesianMoney($item->unit_price);
                                         array_push($items, [
                                             'product_id' => $item->product_id,
                                             'quantity' => $item->quantity,
-                                            'unit_price' => HelperController::parseIndonesianMoney($item->unit_price),
+                                            'unit_price' => number_format($unitPrice, 0, ',', '.'),
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
                                             'tipe_pajak' => $tipePajak,
                                             'notes' => $item->notes,
                                             'warehouse_id' => null,
-                                            'subtotal' => HelperController::hitungSubtotal($item->quantity, HelperController::parseIndonesianMoney($item->unit_price), $item->discount, $item->tax, $tipePajak),
-                                            'tax_nominal' => (function() use ($item, $tipePajak) {
-                                                $base = (float)$item->quantity * (float)HelperController::parseIndonesianMoney($item->unit_price) * (1 - (float)$item->discount / 100);
-                                                try {
-                                                    $r = \App\Services\TaxService::compute($base, (float)$item->tax, $tipePajak);
-                                                    return number_format($r['ppn'], 0, ',', '.');
-                                                } catch (\Throwable $e) { return '0'; }
-                                            })(),
+                                            'subtotal' => HelperController::hitungSubtotal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak),
+                                            'tax_nominal' => number_format(HelperController::hitungTaxNominal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak), 0, ',', '.'),
                                             'rak_id' => null,
                                         ]);
                                     }
-                                    $set('total_amount', $quotation->total_amount);
+                                    $set('total_amount', (float) HelperController::parseIndonesianMoney($quotation->total_amount ?? 0));
                                     $set('customer_id', $quotation->customer_id);
                                     $set('cabang_id', $quotation->cabang_id);
                                     $set('shipped_to', $quotation->customer->address);
+                                    // Warisi tempo pembayaran dari quotation yang sudah disetujui
+                                    if ($quotation->tempo_pembayaran) {
+                                        $set('tempo_pembayaran', (int) $quotation->tempo_pembayaran);
+                                    }
                                     $set('saleOrderItem', $items);
                                 }
                             })
@@ -162,14 +162,17 @@ class SaleOrderResource extends Resource
                                     foreach ($saleOrder->saleOrderItem as $item) {
                                         array_push($items, [
                                             'product_id' => $item->product_id,
-                                            'unit_price' => (int) $item->unit_price,
+                                            'unit_price' => number_format((float) $item->unit_price, 0, ',', '.'),
                                             'quantity' => $item->quantity,
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
+                                            'tipe_pajak' => $item->tipe_pajak ?? 'None',
+                                            'subtotal' => HelperController::hitungSubtotal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? 'None'),
+                                            'tax_nominal' => number_format(HelperController::hitungTaxNominal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? 'None'), 0, ',', '.'),
                                             'notes' => $item->notes,
                                         ]);
                                     }
-                                    $set('total_amount', $saleOrder->total_amount);
+                                    $set('total_amount', (float) HelperController::parseIndonesianMoney($saleOrder->total_amount ?? 0));
                                     $set('customer_id', $saleOrder->customer_id);
                                     $set('cabang_id', $saleOrder->cabang_id);
                                     $set('shipped_to', $saleOrder->customer->address);
@@ -412,21 +415,25 @@ class SaleOrderResource extends Resource
                                 'required' => 'Total amount wajib diisi',
                                 'numeric' => 'Total amount harus berupa angka'
                             ])
-                            ->rule(function ($get) {
-                                return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                    $customerId = $get('customer_id');
-                                    if (!$customerId || !$value) return;
+                            ->helperText(function ($state, $get) {
+                                $customerId = $get('customer_id');
+                                if (!$customerId || !$state) return null;
 
-                                    $customer = Customer::find($customerId);
-                                    if (!$customer) return;
+                                $customer = Customer::find($customerId);
+                                if (!$customer || $customer->tipe_pembayaran !== 'Kredit') return null;
 
-                                    $creditService = app(CreditValidationService::class);
-                                    $validation = $creditService->canCustomerMakePurchase($customer, (float)$value);
+                                $creditService = app(CreditValidationService::class);
+                                $validation = $creditService->canCustomerMakePurchase($customer, (float)$state);
 
-                                    if (!$validation['can_purchase']) {
-                                        $fail(implode(' ', $validation['messages']));
-                                    }
-                                };
+                                if (!$validation['can_purchase']) {
+                                    return '⚠️ Peringatan: ' . implode(' | ', $validation['messages']);
+                                }
+
+                                if (!empty($validation['warnings'])) {
+                                    return '⚠️ ' . implode(' | ', $validation['warnings']);
+                                }
+
+                                return null;
                             }),
                         Radio::make('tipe_pengiriman')
                             ->label('Tipe Pengiriman Ke Customer')
@@ -527,8 +534,42 @@ class SaleOrderResource extends Resource
                                             $component->state($record->product->uom?->abbreviation ?? '-');
                                         }
                                     }),
+                                Repeater::make('warehouseAllocations')
+                                    ->relationship('warehouseAllocations')
+                                    ->label('Alokasi Gudang (Mode Multi-Gudang)')
+                                    ->helperText('Isi ini jika ingin membagi stok dari beberapa gudang. Jika diisi, kolom "Gudang" dan "Rak" di bawah tidak wajib diisi dan tidak akan dipakai untuk Warehouse Confirmation.')
+                                    ->schema([
+                                        Select::make('warehouse_id')
+                                            ->label('Gudang')
+                                            ->options(function () {
+                                                $user = Auth::user();
+                                                $manageType = $user?->manage_type ?? [];
+
+                                                $query = Warehouse::query();
+                                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                                    $query->where('cabang_id', $user?->cabang_id);
+                                                }
+
+                                                return $query->get()->mapWithKeys(function ($warehouse) {
+                                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                                });
+                                            })
+                                            ->searchable()
+                                            ->preload()
+                                            ->required(),
+                                        TextInput::make('quantity')
+                                            ->label('Qty Alokasi')
+                                            ->numeric()
+                                            ->required(),
+                                    ])
+                                    ->columns(2)
+                                    ->collapsed()
+                                    ->reactive(),
                                 Select::make('warehouse_id')
-                                    ->label('Gudang')
+                                    ->label(fn ($get) => !empty($get('warehouseAllocations'))
+                                        ? 'Gudang Utama (Mode Multi-Gudang Aktif — Opsional)'
+                                        : 'Gudang'
+                                    )
                                     ->options(function ($get) {
                                         $user = Auth::user();
                                         $manageType = $user?->manage_type ?? [];
@@ -566,13 +607,17 @@ class SaleOrderResource extends Resource
                                     })
                                     ->preload()
                                     ->reactive()
-                                    ->required()
+                                    ->required(fn ($get) => empty($get('warehouseAllocations')))
                                     ->validationMessages([
                                         'required' => 'Gudang belum dipilih'
                                     ])
                                     ->helperText(function ($get) {
+                                        if (!empty($get('warehouseAllocations'))) {
+                                            return '📦 Mode multi-gudang aktif: digunakan dari "Alokasi Gudang" di atas. Kolom ini opsional (tidak dipakai untuk Warehouse Confirmation).';
+                                        }
+
                                         if (!$get('product_id') || !$get('warehouse_id')) {
-                                            return null;
+                                            return '💡 Mode gudang tunggal. Isi ini untuk menentukan gudang sumber stok.';
                                         }
 
                                         $warehouseStock = InventoryStock::where('product_id', $get('product_id'))
@@ -696,6 +741,40 @@ class SaleOrderResource extends Resource
                                             return function (string $attribute, $value, \Closure $fail) use ($get) {
                                                 if (!$value || $value <= 0) {
                                                     return; // Skip validation if quantity is empty or zero
+                                                }
+
+                                                $allocations = collect($get('warehouseAllocations') ?? []);
+                                                if ($allocations->isNotEmpty()) {
+                                                    $allocationQty = (float) $allocations->sum(function ($row) {
+                                                        return (float) ($row['quantity'] ?? 0);
+                                                    });
+
+                                                    if (abs($allocationQty - (float) $value) > 0.0001) {
+                                                        $fail('Total qty alokasi gudang harus sama dengan quantity item.');
+                                                        return;
+                                                    }
+
+                                                    foreach ($allocations as $allocation) {
+                                                        $allocationWarehouseId = $allocation['warehouse_id'] ?? null;
+                                                        $allocationItemQty = (float) ($allocation['quantity'] ?? 0);
+
+                                                        if (!$allocationWarehouseId || $allocationItemQty <= 0) {
+                                                            $fail('Setiap alokasi wajib memiliki gudang dan qty > 0.');
+                                                            return;
+                                                        }
+
+                                                        $productId = $get('product_id');
+                                                        $availableStock = InventoryStock::where('product_id', $productId)
+                                                            ->where('warehouse_id', $allocationWarehouseId)
+                                                            ->sum('qty_available');
+
+                                                        if ((float) $availableStock < $allocationItemQty) {
+                                                            $fail('Stock tidak mencukupi pada salah satu alokasi gudang.');
+                                                            return;
+                                                        }
+                                                    }
+
+                                                    return;
                                                 }
 
                                                 $productId = $get('product_id');
@@ -1070,6 +1149,17 @@ class SaleOrderResource extends Resource
                     ->numeric()
                     ->rupiah()
                     ->sortable(),
+                TextColumn::make('item_units')
+                    ->label('Satuan')
+                    ->state(function (SaleOrder $record) {
+                        return $record->saleOrderItem
+                            ->map(fn($item) => $item->product?->uom?->abbreviation ?? '-')
+                            ->filter()
+                            ->unique()
+                            ->implode(', ');
+                    })
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('stock_status')
                     ->label('Status Stok')
                     ->badge()
@@ -1393,11 +1483,40 @@ class SaleOrderResource extends Resource
                         ->color('success')
                         ->icon('heroicon-o-document-duplicate')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('create purchase order');
+                            if (!Auth::user()->hasPermissionTo('create purchase order')) {
+                                return false;
+                            }
+
+                            return $record->saleOrderItem()
+                                ->whereDoesntHave('purchaseOrderItem')
+                                ->exists();
                         })
                         ->form([
                             Fieldset::make("Form")
                                 ->schema([
+                                    CheckboxList::make('selected_sale_order_item_ids')
+                                        ->label('Pilih Item Sales Order')
+                                        ->options(function ($record) {
+                                            return $record->saleOrderItem()
+                                                ->with(['product'])
+                                                ->whereDoesntHave('purchaseOrderItem')
+                                                ->get()
+                                                ->mapWithKeys(function ($item) {
+                                                    $productName = $item->product?->name ?? 'Produk';
+                                                    $sku = $item->product?->sku ?? '-';
+                                                    $unit = $item->product?->uom?->abbreviation ?? '-';
+
+                                                    return [
+                                                        $item->id => "({$sku}) {$productName} | Qty: {$item->quantity} {$unit}",
+                                                    ];
+                                                })
+                                                ->toArray();
+                                        })
+                                        ->required()
+                                        ->columns(1)
+                                        ->validationMessages([
+                                            'required' => 'Minimal satu item Sales Order harus dipilih',
+                                        ]),
                                     Select::make('supplier_id')
                                         ->label('Supplier')
                                         ->preload()
@@ -1479,9 +1598,13 @@ class SaleOrderResource extends Resource
                                 ])
                         ])
                         ->action(function (array $data, $record) {
-                            $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->createPurchaseOrder($record, $data);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order berhasil dibuat dari Sales Order. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
+                            try {
+                                $salesOrderService = app(SalesOrderService::class);
+                                $salesOrderService->createPurchaseOrder($record, $data);
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Purchase Order berhasil dibuat dari Sales Order. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
+                            } catch (\Throwable $e) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Information', message: $e->getMessage());
+                            }
                         }),
                     Action::make('sync_total_amount')
                         ->icon('heroicon-o-arrow-path-rounded-square')
@@ -1563,6 +1686,88 @@ class SaleOrderResource extends Resource
                         \Filament\Infolists\Components\TextEntry::make('shipped_to')
                             ->label('Shipped To')
                             ->placeholder('-'),
+                    ]),
+                \Filament\Infolists\Components\Section::make('Item Sales Order')
+                    ->columnSpanFull()
+                    ->schema([
+                        \Filament\Infolists\Components\RepeatableEntry::make('saleOrderItem')
+                            ->label('')
+                            ->columnSpanFull()
+                            ->columns(4)
+                            ->schema([
+                                \Filament\Infolists\Components\TextEntry::make('product.name')
+                                    ->label('Produk')
+                                    ->columnSpan(2),
+                                \Filament\Infolists\Components\TextEntry::make('quantity')
+                                    ->label('Qty'),
+                                \Filament\Infolists\Components\TextEntry::make('unit_price')
+                                    ->label('Harga Satuan')
+                                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.')),
+                                \Filament\Infolists\Components\TextEntry::make('discount')
+                                    ->label('Diskon (%)')
+                                    ->formatStateUsing(fn ($state) => $state . '%'),
+                                \Filament\Infolists\Components\TextEntry::make('tax')
+                                    ->label('Pajak (%)')
+                                    ->getStateUsing(function ($record) {
+                                        $taxType = $record->tipe_pajak ?? 'Inklusif';
+                                        return $record->tax . '% (' . $taxType . ')';
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('subtotal_display')
+                                    ->label('Sub Total')
+                                    ->columnSpan(2)
+                                    ->getStateUsing(function ($record) {
+                                        $subtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
+                                            $record->quantity,
+                                            (float) $record->unit_price,
+                                            $record->discount,
+                                            $record->tax,
+                                            $record->tipe_pajak ?? null
+                                        );
+                                        return 'Rp ' . number_format($subtotal, 0, ',', '.');
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('stock_tersedia')
+                                    ->label('Stock Tersedia (Semua Gudang)')
+                                    ->columnSpan(2)
+                                    ->getStateUsing(function ($record) {
+                                        $stocks = \App\Models\InventoryStock::where('product_id', $record->product_id)
+                                            ->with('warehouse')
+                                            ->get();
+                                        $total = $stocks->sum('qty_available');
+                                        $perWh = $stocks->groupBy('warehouse_id')
+                                            ->map(fn ($s) => ($s->first()->warehouse?->name ?? 'Wh#' . $s->first()->warehouse_id) . ': ' . number_format((float) $s->sum('qty_available'), 0, ',', '.'))
+                                            ->values()->implode(' | ');
+                                        return $total > 0
+                                            ? '📦 ' . number_format((float) $total, 0, ',', '.') . ($perWh ? " ({$perWh})" : '')
+                                            : '⚠️ Habis';
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('warehouse_mode')
+                                    ->label('Mode Gudang')
+                                    ->columnSpan(2)
+                                    ->getStateUsing(function ($record) {
+                                        $allocCount = $record->warehouseAllocations()->count();
+                                        if ($allocCount > 0) {
+                                            return "📦 Multi-Gudang ({$allocCount} gudang)";
+                                        }
+                                        return $record->warehouse
+                                            ? '🏪 Single: ' . $record->warehouse->name
+                                            : '⚠️ Belum diset';
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('warehouse_allocations_summary')
+                                    ->label('Alokasi Order (Qty per Gudang)')
+                                    ->columnSpan(2)
+                                    ->getStateUsing(function ($record) {
+                                        $allocations = $record->warehouseAllocations()->with('warehouse')->get();
+                                        if ($allocations->isEmpty()) {
+                                            return $record->warehouse
+                                                ? ($record->warehouse->name . ' — qty: ' . $record->quantity)
+                                                : '-';
+                                        }
+                                        return $allocations->map(function ($alloc) {
+                                            $wh = $alloc->warehouse?->name ?? "Gudang #{$alloc->warehouse_id}";
+                                            return "{$wh}: " . number_format((float) $alloc->quantity, 0, ',', '.');
+                                        })->implode(' | ');
+                                    }),
+                            ]),
                     ]),
             ]);
     }

@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Customer;
+use App\Models\Currency;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Quotation;
@@ -197,6 +200,231 @@ test('can create sales order directly', function () {
         ->and($salesOrder->status)->toBe('draft')
         ->and($salesOrder->tipe_pengiriman)->toBe('Ambil Sendiri')
         ->and($salesOrder->saleOrderItem)->toHaveCount(1);
+});
+
+test('createPurchaseOrder only includes selected SO items that are not linked to existing PO', function () {
+    $currency = Currency::factory()->create([
+        'code' => 'IDR',
+        'name' => 'Rupiah',
+        'symbol' => 'Rp',
+    ]);
+
+    $supplier = Supplier::factory()->create([
+        'tempo_hutang' => 30,
+    ]);
+
+    $customer = Customer::create([
+        'name' => 'PT G6 Customer',
+        'code' => 'CUST-G6',
+        'address' => 'Jl. G6 No. 1',
+        'telephone' => '021-5555555',
+        'phone' => '081255555555',
+        'email' => 'g6@customer.com',
+        'perusahaan' => 'PT G6 Customer',
+        'tipe' => 'PKP',
+        'fax' => '021-5555556',
+        'nik_npwp' => '1234512345123456',
+        'tempo_kredit' => 30,
+        'kredit_limit' => 50000000,
+        'tipe_pembayaran' => 'Kredit',
+        'keterangan' => 'G6 test customer',
+    ]);
+
+    $product1 = Product::create([
+        'name' => 'G6 Product 1',
+        'sku' => 'G6P001',
+        'cabang_id' => null,
+        'product_category_id' => $this->productCategory->id,
+        'sell_price' => 110000,
+        'cost_price' => 90000,
+        'kode_merk' => 'G6',
+        'uom_id' => 1,
+        'is_active' => true,
+        'is_manufacture' => false,
+        'is_raw_material' => false,
+    ]);
+
+    $product2 = Product::create([
+        'name' => 'G6 Product 2',
+        'sku' => 'G6P002',
+        'cabang_id' => null,
+        'product_category_id' => $this->productCategory->id,
+        'sell_price' => 125000,
+        'cost_price' => 95000,
+        'kode_merk' => 'G6',
+        'uom_id' => 1,
+        'is_active' => true,
+        'is_manufacture' => false,
+        'is_raw_material' => false,
+    ]);
+
+    $salesOrder = SaleOrder::create([
+        'so_number' => 'SO-G6-0001',
+        'customer_id' => $customer->id,
+        'order_date' => now(),
+        'delivery_date' => now()->addDays(3),
+        'status' => 'approved',
+        'tipe_pengiriman' => 'Kirim Langsung',
+        'created_by' => 1,
+    ]);
+
+    $item1 = SaleOrderItem::create([
+        'sale_order_id' => $salesOrder->id,
+        'product_id' => $product1->id,
+        'quantity' => 5,
+        'unit_price' => 110000,
+        'discount' => 0,
+        'tax' => 0,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => $this->rak->id,
+    ]);
+
+    $item2 = SaleOrderItem::create([
+        'sale_order_id' => $salesOrder->id,
+        'product_id' => $product2->id,
+        'quantity' => 4,
+        'unit_price' => 125000,
+        'discount' => 0,
+        'tax' => 0,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => $this->rak->id,
+    ]);
+
+    $existingPo = $salesOrder->purchaseOrder()->create([
+        'po_number' => 'PO-G6-EXISTING',
+        'supplier_id' => $supplier->id,
+        'order_date' => now()->toDateString(),
+        'warehouse_id' => $this->warehouse->id,
+        'expected_date' => now()->addDays(7)->toDateString(),
+        'tempo_hutang' => 30,
+        'note' => 'Existing PO for item2',
+    ]);
+
+    $item2->purchaseOrderItem()->create([
+        'purchase_order_id' => $existingPo->id,
+        'product_id' => $item2->product_id,
+        'quantity' => $item2->quantity,
+        'currency_id' => $currency->id,
+        'unit_price' => $item2->unit_price,
+        'discount' => 0,
+        'tax' => 0,
+    ]);
+
+    $result = $this->salesOrderService->createPurchaseOrder($salesOrder, [
+        'selected_sale_order_item_ids' => [$item1->id, $item2->id],
+        'po_number' => 'PO-G6-NEW',
+        'supplier_id' => $supplier->id,
+        'order_date' => now()->toDateString(),
+        'note' => 'PO from selected SO items',
+        'warehouse_id' => $this->warehouse->id,
+        'expected_date' => now()->addDays(10)->toDateString(),
+        'tempo_hutang' => 30,
+    ]);
+
+    expect($result->id)->toBe($salesOrder->id);
+
+    $newPo = PurchaseOrder::where('po_number', 'PO-G6-NEW')->first();
+    expect($newPo)->not->toBeNull();
+
+    $createdItems = $newPo->purchaseOrderItem()->get();
+    expect($createdItems)->toHaveCount(1)
+        ->and((int) $createdItems->first()->refer_item_model_id)->toBe($item1->id)
+        ->and($createdItems->first()->refer_item_model_type)->toBe(SaleOrderItem::class);
+});
+
+test('createPurchaseOrder throws when selected SO items are already linked to PO', function () {
+    $currency = Currency::factory()->create([
+        'code' => 'IDR',
+        'name' => 'Rupiah',
+        'symbol' => 'Rp',
+    ]);
+
+    $supplier = Supplier::factory()->create([
+        'tempo_hutang' => 21,
+    ]);
+
+    $customer = Customer::create([
+        'name' => 'PT G6 Exception Customer',
+        'code' => 'CUST-G6X',
+        'address' => 'Jl. G6 Exception No. 2',
+        'telephone' => '021-6666666',
+        'phone' => '081266666666',
+        'email' => 'g6x@customer.com',
+        'perusahaan' => 'PT G6 Exception Customer',
+        'tipe' => 'PKP',
+        'fax' => '021-6666667',
+        'nik_npwp' => '1234512345123457',
+        'tempo_kredit' => 30,
+        'kredit_limit' => 30000000,
+        'tipe_pembayaran' => 'Kredit',
+        'keterangan' => 'G6 exception customer',
+    ]);
+
+    $product = Product::create([
+        'name' => 'G6 Product Linked',
+        'sku' => 'G6PLINK',
+        'cabang_id' => null,
+        'product_category_id' => $this->productCategory->id,
+        'sell_price' => 130000,
+        'cost_price' => 100000,
+        'kode_merk' => 'G6',
+        'uom_id' => 1,
+        'is_active' => true,
+        'is_manufacture' => false,
+        'is_raw_material' => false,
+    ]);
+
+    $salesOrder = SaleOrder::create([
+        'so_number' => 'SO-G6-0002',
+        'customer_id' => $customer->id,
+        'order_date' => now(),
+        'delivery_date' => now()->addDays(4),
+        'status' => 'approved',
+        'tipe_pengiriman' => 'Kirim Langsung',
+        'created_by' => 1,
+    ]);
+
+    $item = SaleOrderItem::create([
+        'sale_order_id' => $salesOrder->id,
+        'product_id' => $product->id,
+        'quantity' => 2,
+        'unit_price' => 130000,
+        'discount' => 0,
+        'tax' => 0,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => $this->rak->id,
+    ]);
+
+    $existingPo = $salesOrder->purchaseOrder()->create([
+        'po_number' => 'PO-G6-EXISTING-2',
+        'supplier_id' => $supplier->id,
+        'order_date' => now()->toDateString(),
+        'warehouse_id' => $this->warehouse->id,
+        'expected_date' => now()->addDays(6)->toDateString(),
+        'tempo_hutang' => 21,
+        'note' => 'Existing PO for linked item',
+    ]);
+
+    $item->purchaseOrderItem()->create([
+        'purchase_order_id' => $existingPo->id,
+        'product_id' => $item->product_id,
+        'quantity' => $item->quantity,
+        'currency_id' => $currency->id,
+        'unit_price' => $item->unit_price,
+        'discount' => 0,
+        'tax' => 0,
+    ]);
+
+    expect(fn() => $this->salesOrderService->createPurchaseOrder($salesOrder, [
+        'selected_sale_order_item_ids' => [$item->id],
+        'po_number' => 'PO-G6-NEW-2',
+        'supplier_id' => $supplier->id,
+        'order_date' => now()->toDateString(),
+        'note' => 'Should fail because selected item already linked',
+        'warehouse_id' => $this->warehouse->id,
+        'expected_date' => now()->addDays(8)->toDateString(),
+        'tempo_hutang' => 21,
+    ]))->toThrow(RuntimeException::class);
 });
 
 test('sales order approval workflow works correctly', function () {

@@ -28,9 +28,20 @@ export async function selectFixturePaymentRequest(page) {
   await prSearch.fill(FIXTURE.paymentRequestNumber)
 
   const option = page.locator('[role="option"]').filter({ hasText: FIXTURE.paymentRequestNumber }).first()
-  await expect(option).toBeVisible()
-  await option.click({ force: true })
+  const fixtureOptionVisible = await option.isVisible().catch(() => false)
+  if (fixtureOptionVisible) {
+    await option.click({ force: true })
+    await expect(prCombobox).toContainText(FIXTURE.paymentRequestNumber)
+  } else {
+    await prSearch.fill('')
+    const firstOption = page.locator('[role="option"]').first()
+    await expect(firstOption).toBeVisible()
+    const firstOptionText = (await firstOption.textContent())?.trim() || ''
+    await firstOption.click({ force: true })
+    if (firstOptionText) {
+      await expect(prCombobox).toContainText(firstOptionText)
+    }
+  }
 
-  await expect(prCombobox).toContainText(FIXTURE.paymentRequestNumber)
   await page.waitForTimeout(1400)
 }

@@ -373,6 +373,12 @@ class DeliveryScheduleResource extends Resource
                 ActionGroup::make([
                     ViewAction::make(),
                     EditAction::make(),
+                    Action::make('print_surat_kerja')
+                        ->label('Print Surat Kerja')
+                        ->icon('heroicon-o-printer')
+                        ->color('primary')
+                        ->visible(fn (DeliverySchedule $record) => in_array($record->delivery_method, ['internal', 'kurir_internal']))
+                        ->action(fn (DeliverySchedule $record) => static::streamWorkOrderPdf($record)),
                     // Quick status change actions
                     Action::make('set_on_the_way')
                         ->label('Mulai Pengiriman')
@@ -505,5 +511,31 @@ class DeliveryScheduleResource extends Resource
             'view'   => Pages\ViewDeliverySchedule::route('/{record}'),
             'edit'   => Pages\EditDeliverySchedule::route('/{record}/edit'),
         ];
+    }
+
+    public static function streamWorkOrderPdf(DeliverySchedule $record)
+    {
+        $record->loadMissing([
+            'driver',
+            'vehicle',
+            'suratJalans.deliveryOrder.deliveryOrderItem.product.uom',
+            'suratJalans.deliveryOrder.salesOrders.customer',
+            'cabang',
+        ]);
+
+        $deliveryOrders = $record->suratJalans
+            ->flatMap(fn ($sj) => $sj->deliveryOrder)
+            ->unique('id')
+            ->values();
+
+        $pdf = Pdf::loadView('pdf.delivery-schedule-work-order', [
+            'schedule' => $record,
+            'deliveryOrders' => $deliveryOrders,
+        ])->setPaper('a4', 'portrait');
+
+        return response()->streamDownload(
+            fn () => print($pdf->output()),
+            'surat-kerja-' . ($record->schedule_number ?? 'delivery-schedule') . '.pdf'
+        );
     }
 }

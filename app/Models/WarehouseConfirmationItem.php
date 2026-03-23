@@ -50,33 +50,41 @@ class WarehouseConfirmationItem extends Model
                 $warehouseConfirmation = $warehouseConfirmationItem->warehouseConfirmation;
 
                 if ($warehouseConfirmation) {
-                    // Check if all items are confirmed (including the current item being updated)
-                    $totalItems = $warehouseConfirmation->warehouseConfirmationItems()->count();
-                    $confirmedItems = $warehouseConfirmation->warehouseConfirmationItems()
-                        ->where('status', 'confirmed')
-                        ->where('id', '!=', $warehouseConfirmationItem->id) // Exclude current item
-                        ->count();
+                    $statuses = $warehouseConfirmation->warehouseConfirmationItems()
+                        ->get(['id', 'status'])
+                        ->mapWithKeys(function ($item) {
+                            return [$item->id => strtolower((string) $item->status)];
+                        })
+                        ->toArray();
 
-                    // Add 1 if the current item is being set to confirmed
-                    if ($warehouseConfirmationItem->status === 'confirmed') {
-                        $confirmedItems++;
-                    }
+                    $statuses[$warehouseConfirmationItem->id] = strtolower((string) $warehouseConfirmationItem->status);
+                    $statusValues = collect(array_values($statuses));
 
-                    $allConfirmed = $confirmedItems === $totalItems;
+                    $allConfirmed = $statusValues->every(fn ($status) => $status === 'confirmed');
+                    $allRejected = $statusValues->every(fn ($status) => $status === 'rejected');
+                    $hasPartial = $statusValues->contains('partial_confirmed');
+                    $hasConfirmed = $statusValues->contains('confirmed');
+                    $hasRejected = $statusValues->contains('rejected');
 
-                    // Update parent status based on item statuses
+                    $parentStatus = 'request';
                     if ($allConfirmed) {
-                        $warehouseConfirmation->update([
-                            'status' => 'Confirmed', // Use the correct enum value
-                            'confirmed_by' => \Illuminate\Support\Facades\Auth::id(),
-                            'confirmed_at' => now()
-                        ]);
-                    } else {
-                        // If not all items are confirmed, keep status as 'Request'
-                        $warehouseConfirmation->update([
-                            'status' => 'Request'
-                        ]);
+                        $parentStatus = 'confirmed';
+                    } elseif ($allRejected) {
+                        $parentStatus = 'rejected';
+                    } elseif ($hasPartial || ($hasConfirmed && $hasRejected)) {
+                        $parentStatus = 'partial_confirmed';
                     }
+
+                    $updatePayload = [
+                        'status' => $parentStatus,
+                    ];
+
+                    if (in_array($parentStatus, ['confirmed', 'partial_confirmed', 'rejected'])) {
+                        $updatePayload['confirmed_by'] = \Illuminate\Support\Facades\Auth::id();
+                        $updatePayload['confirmed_at'] = now();
+                    }
+
+                    $warehouseConfirmation->update($updatePayload);
                 }
             }
         });

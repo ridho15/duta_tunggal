@@ -37,33 +37,75 @@ class SalesOrderService
     {
         try {
             DB::transaction(function () use ($salesOrder) {
-                // Validate and reserve stock with pessimistic locking to prevent concurrent negative stock
+                // Load relationships needed for multi-warehouse support
+                $salesOrder->load('saleOrderItem.warehouseAllocations', 'saleOrderItem.product');
+
+                // Validate stock availability with pessimistic locking
                 foreach ($salesOrder->saleOrderItem as $item) {
-                    $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                        ->where('warehouse_id', $item->warehouse_id)
-                        ->lockForUpdate()
-                        ->first();
+                    $allocations = $item->warehouseAllocations;
 
-                    if (!$inventoryStock) {
-                        throw new InsufficientStockException("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
-                    }
+                    if ($allocations->isNotEmpty()) {
+                        // Multi-warehouse mode: validate each allocation separately
+                        foreach ($allocations as $allocation) {
+                            $inventoryStock = InventoryStock::where('product_id', $item->product_id)
+                                ->where('warehouse_id', $allocation->warehouse_id)
+                                ->lockForUpdate()
+                                ->first();
 
-                    $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
-                    if ($availableForReservation < $item->quantity) {
-                        $productName = $item->product ? $item->product->name : $item->product_id;
-                        throw new InsufficientStockException("Insufficient stock for product {$productName}. Available: {$availableForReservation}, Requested: {$item->quantity}");
+                            if (!$inventoryStock) {
+                                throw new InsufficientStockException("No inventory stock found for product {$item->product_id} in warehouse {$allocation->warehouse_id}");
+                            }
+
+                            $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
+                            if ($availableForReservation < (float) $allocation->quantity) {
+                                $productName = $item->product?->name ?? $item->product_id;
+                                throw new InsufficientStockException("Stok tidak cukup untuk produk {$productName} di gudang {$allocation->warehouse_id}. Tersedia: {$availableForReservation}, Diminta: {$allocation->quantity}");
+                            }
+                        }
+                    } else {
+                        // Single warehouse mode
+                        $inventoryStock = InventoryStock::where('product_id', $item->product_id)
+                            ->where('warehouse_id', $item->warehouse_id)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if (!$inventoryStock) {
+                            throw new InsufficientStockException("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
+                        }
+
+                        $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
+                        if ($availableForReservation < $item->quantity) {
+                            $productName = $item->product?->name ?? $item->product_id;
+                            throw new InsufficientStockException("Stok tidak cukup untuk produk {$productName}. Tersedia: {$availableForReservation}, Diminta: {$item->quantity}");
+                        }
                     }
                 }
 
                 // Reserve stock for each item
                 foreach ($salesOrder->saleOrderItem as $item) {
-                    StockReservation::create([
-                        'sale_order_id' => $salesOrder->id,
-                        'product_id' => $item->product_id,
-                        'quantity' => $item->quantity,
-                        'warehouse_id' => $item->warehouse_id,
-                        'rak_id' => $item->rak_id,
-                    ]);
+                    $allocations = $item->warehouseAllocations;
+
+                    if ($allocations->isNotEmpty()) {
+                        // Multi-warehouse mode: create reservation per allocation
+                        foreach ($allocations as $allocation) {
+                            StockReservation::create([
+                                'sale_order_id' => $salesOrder->id,
+                                'product_id' => $item->product_id,
+                                'quantity' => $allocation->quantity,
+                                'warehouse_id' => $allocation->warehouse_id,
+                                'rak_id' => null,
+                            ]);
+                        }
+                    } else {
+                        // Single warehouse mode
+                        StockReservation::create([
+                            'sale_order_id' => $salesOrder->id,
+                            'product_id' => $item->product_id,
+                            'quantity' => $item->quantity,
+                            'warehouse_id' => $item->warehouse_id,
+                            'rak_id' => $item->rak_id,
+                        ]);
+                    }
                 }
 
                 $salesOrder->update(['status' => 'confirmed']);
@@ -153,6 +195,18 @@ class SalesOrderService
 
     public function createPurchaseOrder($saleOrder, $data)
     {
+        $selectedItemIds = collect($data['selected_sale_order_item_ids'] ?? [])->filter()->values();
+        $itemsQuery = $saleOrder->saleOrderItem()->whereDoesntHave('purchaseOrderItem');
+
+        if ($selectedItemIds->isNotEmpty()) {
+            $itemsQuery->whereIn('id', $selectedItemIds->all());
+        }
+
+        $saleOrderItems = $itemsQuery->with('product')->get();
+        if ($saleOrderItems->isEmpty()) {
+            throw new \RuntimeException('Tidak ada item Sales Order yang valid untuk dibuatkan Purchase Order.');
+        }
+
         // Create Purchase order
         $purchaseOrder = $saleOrder->purchaseOrder()->create([
             'po_number' => $data['po_number'],
@@ -164,12 +218,14 @@ class SalesOrderService
             'tempo_hutang' => $data['tempo_hutang'],
         ]);
 
-        foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
+        $rupiahCurrencyId = Currency::where('name', 'Rupiah')->value('id');
+
+        foreach ($saleOrderItems as $saleOrderItem) {
             $saleOrderItem->purchaseOrderItem()->create([
                 'purchase_order_id' => $purchaseOrder->id,
                 'product_id' => $saleOrderItem->product_id,
                 'quantity' => $saleOrderItem->quantity,
-                'currency_id' => Currency::where('name', 'Rupiah')->first()->id,
+                'currency_id' => $rupiahCurrencyId,
                 'unit_price' => $saleOrderItem->product->sell_price,
                 'discount' => 0,
                 'tax' => 0,

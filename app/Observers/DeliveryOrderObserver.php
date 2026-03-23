@@ -57,9 +57,39 @@ class DeliveryOrderObserver
             'do_number' => $deliveryOrder->do_number,
         ]);
 
+        $deliveryOrder->loadMissing('deliveryOrderItem.warehouseSources');
+
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             $quantity = max(0, $item->quantity ?? 0);
             if ($quantity <= 0) {
+                continue;
+            }
+
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    $sourceWarehouseId = $source->warehouse_id;
+
+                    if ($sourceQty <= 0 || !$sourceWarehouseId) {
+                        Log::error('DeliveryOrderObserver: invalid source warehouse configuration', [
+                            'delivery_order_id' => $deliveryOrder->id,
+                            'item_id' => $item->id,
+                            'product_id' => $item->product_id,
+                        ]);
+                        throw new \Exception('Warehouse source configuration is required for stock reservation');
+                    }
+
+                    StockReservation::create([
+                        'sale_order_id' => $item->saleOrderItem->sale_order_id ?? null,
+                        'product_id' => $item->product_id,
+                        'warehouse_id' => $sourceWarehouseId,
+                        'rak_id' => $source->rak_id,
+                        'quantity' => $sourceQty,
+                        'delivery_order_id' => $deliveryOrder->id,
+                    ]);
+                }
+
                 continue;
             }
 
@@ -140,7 +170,7 @@ class DeliveryOrderObserver
         ]);
 
         // Load delivery order items with related data for stock movements
-        $deliveryOrder->load('deliveryOrderItem.product');
+        $deliveryOrder->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
 
         $date = $deliveryOrder->delivery_date ?? now()->toDateString();
 
@@ -153,6 +183,31 @@ class DeliveryOrderObserver
 
             $product = $item->product;
             if (!$product) {
+                continue;
+            }
+
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    if ($sourceQty <= 0 || !$source->warehouse_id) {
+                        continue;
+                    }
+
+                    $productService = app(\App\Services\ProductService::class);
+                    $productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $source->warehouse_id,
+                        quantity: $sourceQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Sales delivery for DO {$deliveryOrder->do_number}",
+                        rak_id: $source->rak_id,
+                        fromModel: $item,
+                        value: $product->cost_price * $sourceQty
+                    );
+                }
+
                 continue;
             }
 

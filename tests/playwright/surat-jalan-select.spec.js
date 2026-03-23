@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { execSync } from 'node:child_process';
+
+const SJ_FIXTURE_NUMBER = 'SJ-TEST-SJ-SELECT'
+
+test.beforeAll(() => {
+  execSync('php scripts/setup_surat_jalan_playwright_data.php', { stdio: 'inherit' })
+})
 
 test('Surat Jalan edit should preload delivery order select values', async ({ page }) => {
   const consoleErrors = [];
@@ -7,7 +14,7 @@ test('Surat Jalan edit should preload delivery order select values', async ({ pa
   });
   page.on('pageerror', (err) => consoleErrors.push(err.message));
 
-  await page.goto('/admin/surat-jalans/2/edit');
+  await page.goto('/admin/surat-jalans');
 
   // If redirected to login, perform login
   if (page.url().includes('/login')) {
@@ -15,9 +22,21 @@ test('Surat Jalan edit should preload delivery order select values', async ({ pa
     await page.locator('#data\\.password').fill('ridho123');
     await page.locator('form').getByRole('button', { name: /masuk|login|sign in/i }).click();
     await page.waitForFunction(() => !window.location.pathname.endsWith('/login'), { timeout: 30000 });
-    await page.goto('/admin/surat-jalans/2/edit');
+    await page.goto('/admin/surat-jalans');
   }
 
+  await page.waitForLoadState('networkidle');
+
+  const fixtureRow = page.locator('tr, .fi-ta-row').filter({ hasText: SJ_FIXTURE_NUMBER }).first()
+  await expect(fixtureRow).toBeVisible({ timeout: 10000 })
+
+  const editHref = await fixtureRow
+    .locator('a[href*="/admin/surat-jalans/"][href$="/edit"]')
+    .first()
+    .getAttribute('href')
+
+  expect(editHref).toBeTruthy()
+  await page.goto(String(editHref));
   await page.waitForLoadState('networkidle');
 
   const label = await page.locator('text=Delivery Order').first();

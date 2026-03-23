@@ -604,6 +604,17 @@ class OrderRequestResource extends Resource
                         return "({$state->product->sku}) {$state->product->name}";
                     })
                     ->badge(),
+                TextColumn::make('item_units')
+                    ->label('Satuan')
+                    ->state(function ($record) {
+                        return $record->orderRequestItem
+                            ->map(fn($item) => $item->product?->uom?->abbreviation ?? '-')
+                            ->filter()
+                            ->unique()
+                            ->implode(', ');
+                    })
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('createdBy.name')
                     ->label('Created By')
                     ->searchable()

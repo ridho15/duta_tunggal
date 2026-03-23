@@ -56,6 +56,11 @@ class SaleOrderItem extends Model
         return $this->hasMany(DeliveryOrderItem::class, 'sale_order_item_id');
     }
 
+    public function warehouseAllocations()
+    {
+        return $this->hasMany(SaleOrderItemWarehouseAllocation::class, 'sale_order_item_id');
+    }
+
     public function getRemainingQuantityAttribute()
     {
         return $this->quantity - $this->delivered_quantity;

@@ -35,8 +35,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
 use App\Models\Customer;
 use App\Models\Cabang;
-use App\Models\Driver;
-use App\Models\Vehicle;
 
 class SuratJalanResource extends Resource
 {
@@ -89,9 +87,13 @@ class SuratJalanResource extends Resource
                             ->preload()
                             ->required()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get) {
-                                // J1: Only show approved DOs for new SJ creation.
-                                // Also include sent/received to correctly display already-linked DOs when editing.
-                                $query->whereIn('status', ['approved', 'sent', 'received']);
+                                // J1: create => only approved DOs, edit => allow linked sent/received for compatibility.
+                                $isCreatePage = str_ends_with((string) request()->path(), 'surat-jalans/create');
+                                if ($isCreatePage) {
+                                    $query->where('status', 'approved');
+                                } else {
+                                    $query->whereIn('status', ['approved', 'sent', 'received']);
+                                }
                             })
                             ->multiple()
                             ->afterStateUpdated(function ($set, $state) {
@@ -160,14 +162,6 @@ class SuratJalanResource extends Resource
                     ->tooltip(function (SuratJalan $record): string {
                         return $record->deliveryOrder->pluck('do_number')->implode(', ');
                     }),
-                TextColumn::make('failed_deliveries')
-                    ->label('Gagal Kirim')
-                    ->getStateUsing(function (SuratJalan $record): int {
-                        return $record->deliveryOrder->where('status', 'delivery_failed')->count();
-                    })
-                    ->badge()
-                    ->color(fn ($state): string => $state > 0 ? 'danger' : 'success')
-                    ->formatStateUsing(fn ($state): string => $state > 0 ? "{$state} DO" : 'Aman'),
                 TextColumn::make('customers')
                     ->label('Customer')
                     ->getStateUsing(function (SuratJalan $record): string {
@@ -215,20 +209,6 @@ class SuratJalanResource extends Resource
                     ->description('Tanggal Surat Jalan dibuat')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('sender_name')
-                    ->label('Pengirim')
-                    ->searchable()
-                    ->placeholder('-'),
-                TextColumn::make('shipping_method')
-                    ->label('Metode Kirim')
-                    ->badge()
-                    ->color(fn ($state) => match ($state) {
-                        'Ekspedisi'      => 'info',
-                        'Kurir Internal' => 'primary',
-                        'Ambil Sendiri'  => 'success',
-                        default          => 'gray',
-                    })
-                    ->placeholder('-'),
                 TextColumn::make('createdBy.name')
                     ->label('Created By')
                     ->searchable(),
@@ -282,7 +262,6 @@ class SuratJalanResource extends Resource
                 SelectFilter::make('status')
                     ->label('Filter Status')
                     ->options([
-                        '0' => 'Draft',
                         '1' => 'Terbit'
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -313,156 +292,8 @@ class SuratJalanResource extends Resource
                             );
                     }),
                     
-                SelectFilter::make('driver')
-                    ->label('Filter Driver')
-                    ->options(Driver::all()->pluck('name', 'id'))
-                    ->query(function (Builder $query, array $data): Builder {
-                        if (empty($data['value'])) {
-                            return $query;
-                        }
-                        
-                        return $query->whereHas('deliveryOrder', function (Builder $query) use ($data) {
-                            $query->where('driver_id', $data['value']);
-                        });
-                    }),
-                    
-                SelectFilter::make('vehicle')
-                    ->label('Filter Kendaraan')
-                    ->options(Vehicle::all()->mapWithKeys(function ($vehicle) {
-                        return [$vehicle->id => "{$vehicle->license_plate} - {$vehicle->vehicle_type}"];
-                    }))
-                    ->query(function (Builder $query, array $data): Builder {
-                        if (empty($data['value'])) {
-                            return $query;
-                        }
-                        
-                        return $query->whereHas('deliveryOrder', function (Builder $query) use ($data) {
-                            $query->where('vehicle_id', $data['value']);
-                        });
-                    }),
             ])
-            ->headerActions([
-                Action::make('cetak_rekap_fleksibel')
-                    ->label('Cetak Rekap Fleksibel')
-                    ->icon('heroicon-o-printer')
-                    ->color('primary')
-                    ->form([
-                        Select::make('drivers')
-                            ->label('Driver / Pengirim')
-                            ->multiple()
-                            ->searchable()
-                            ->preload()
-                            ->options(function () {
-                                $senderNames = SuratJalan::whereNotNull('sender_name')
-                                    ->distinct()
-                                    ->pluck('sender_name')
-                                    ->filter()
-                                    ->values()
-                                    ->toArray();
-
-                                $driverNames = Driver::query()
-                                    ->pluck('name')
-                                    ->filter()
-                                    ->values()
-                                    ->toArray();
-
-                                $allNames = collect($senderNames)->merge($driverNames)->unique()->sort()->values();
-
-                                return $allNames->mapWithKeys(fn ($name) => [$name => $name])->toArray();
-                            })
-                            ->placeholder('Pilih satu atau lebih driver/pengirim...'),
-                        DatePicker::make('date_from')
-                            ->label('Dari Tanggal')
-                            ->default(now()->subDays(7)->toDateString())
-                            ->required(),
-                        DatePicker::make('date_to')
-                            ->label('Sampai Tanggal')
-                            ->default(now()->toDateString())
-                            ->required(),
-                        Select::make('group_by')
-                            ->label('Kelompokkan Berdasarkan')
-                            ->options([
-                                'driver' => 'Driver / Pengirim',
-                                'date' => 'Tanggal',
-                                'none' => 'Tidak Kelompokkan',
-                            ])
-                            ->default('driver')
-                            ->required(),
-                    ])
-                    ->modalHeading('Cetak Rekap Pengiriman Fleksibel')
-                    ->modalDescription('Pilih driver dan rentang tanggal untuk mencetak rekap pengiriman yang lebih fleksibel.')
-                    ->modalSubmitActionLabel('Cetak PDF')
-                    ->action(function (array $data) {
-                        $drivers = $data['drivers'] ?? [];
-                        $dateFrom = $data['date_from'];
-                        $dateTo = $data['date_to'];
-                        $groupBy = $data['group_by'];
-
-                        $query = SuratJalan::with([
-                            'deliveryOrder.salesOrders.customer',
-                            'deliveryOrder.deliveryOrderItem.product',
-                            'deliveryOrder.salesOrders',
-                        ]);
-
-                        // Filter by date range
-                        $query->whereBetween('issued_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
-
-                        // Filter by drivers if selected
-                        if (!empty($drivers)) {
-                            $query->where(function (Builder $query) use ($drivers) {
-                                foreach ($drivers as $driver) {
-                                    $query->orWhere('sender_name', $driver)
-                                          ->orWhereHas('deliveryOrder.driver', function (Builder $query) use ($driver) {
-                                              $query->where('name', $driver);
-                                          });
-                                }
-                            });
-                        }
-
-                        $suratJalans = $query->get();
-
-                        // Group the data based on selection
-                        $groupedData = [];
-                        if ($groupBy === 'driver') {
-                            foreach ($suratJalans as $sj) {
-                                $driverName = $sj->sender_name;
-                                if (!$driverName) {
-                                    // Get driver from delivery orders
-                                    $driversInSJ = $sj->deliveryOrder->pluck('driver.name')->filter()->unique();
-                                    $driverName = $driversInSJ->isNotEmpty() ? $driversInSJ->first() : 'Tidak Diketahui';
-                                }
-                                if (!isset($groupedData[$driverName])) {
-                                    $groupedData[$driverName] = collect();
-                                }
-                                $groupedData[$driverName]->push($sj);
-                            }
-                        } elseif ($groupBy === 'date') {
-                            foreach ($suratJalans as $sj) {
-                                $dateKey = $sj->issued_at->format('Y-m-d');
-                                if (!isset($groupedData[$dateKey])) {
-                                    $groupedData[$dateKey] = collect();
-                                }
-                                $groupedData[$dateKey]->push($sj);
-                            }
-                        } else {
-                            // No grouping
-                            $groupedData['Semua'] = $suratJalans;
-                        }
-
-                        $pdf = Pdf::loadView('pdf.flexible-delivery-report', [
-                            'groupedData' => $groupedData,
-                            'drivers' => $drivers,
-                            'dateFrom' => $dateFrom,
-                            'dateTo' => $dateTo,
-                            'groupBy' => $groupBy,
-                        ])->setPaper('A4', 'portrait');
-
-                        $filename = 'Rekap_Fleksibel_' . $dateFrom . '_to_' . $dateTo . '.pdf';
-                        return response()->streamDownload(function () use ($pdf) {
-                            echo $pdf->stream();
-                        }, $filename);
-                    }),
-            ])
+            ->headerActions([])
             ->actions([
                 ActionGroup::make([
                     EditAction::make()
@@ -510,7 +341,7 @@ class SuratJalanResource extends Resource
                             $record->loadMissing('deliveryOrder');
                             $marked = 0;
                             foreach ($record->deliveryOrder as $do) {
-                                if (in_array($do->status, ['approved', 'draft', 'request_approve'])) {
+                                if (in_array($do->status, ['approved', 'request_stock', 'partial'])) {
                                     try {
                                         app(\App\Services\DeliveryOrderService::class)->updateStatus(deliveryOrder: $do, status: 'sent');
                                         $marked++;

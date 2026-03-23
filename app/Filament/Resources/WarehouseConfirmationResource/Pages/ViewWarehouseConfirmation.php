@@ -9,6 +9,7 @@ use Filament\Infolists;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
+use Filament\Forms\Components\Textarea;
 use Illuminate\Support\Facades\Auth;
 
 class ViewWarehouseConfirmation extends ViewRecord
@@ -19,36 +20,7 @@ class ViewWarehouseConfirmation extends ViewRecord
     {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil')->label('Edit Confirmation'),
-            Actions\Action::make('confirm')
-                ->label('Konfirmasi Gudang')
-                ->icon('heroicon-o-check-badge')
-                ->color('success')
-                ->requiresConfirmation()
-                ->modalHeading('Konfirmasi Gudang')
-                ->modalDescription('This will confirm the warehouse confirmation and update the sales order status.')
-                ->action(function () {
-                    $record = $this->record;
-                    // Update warehouse confirmation status
-                    $record->update([
-                        'status' => 'confirmed',
-                        'confirmed_by' => Auth::id(),
-                        'confirmed_at' => now(),
-                    ]);
-
-                    // Update sales order status if needed
-                    if ($record->saleOrder) {
-                        $record->saleOrder->update([
-                            'status' => 'confirmed',
-                            'warehouse_confirmed_at' => now(),
-                        ]);
-                    }
-
-                    $this->redirect($this->getResource()::getUrl('view', ['record' => $record]));
-                })
-                ->visible(fn() => strtolower($this->record->status) === 'request' && ! $this->record->delivery_order_id),
-
-            // H4/I1: Approve action for DO-linked WC
-            Actions\Action::make('approve_do_wc')
+            Actions\Action::make('approve_wc')
                 ->label('Approve')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
@@ -58,20 +30,20 @@ class ViewWarehouseConfirmation extends ViewRecord
                 ->action(function () {
                     $this->record->update([
                         'status'       => 'confirmed',
+                        'rejection_reason' => null,
                         'confirmed_by' => Auth::id(),
                         'confirmed_at' => now(),
                     ]);
                     $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
                 })
-                ->visible(fn () => $this->record->delivery_order_id && strtolower($this->record->status) === 'request'),
+                ->visible(fn () => strtolower($this->record->status) === 'request'),
 
-            // H4/I1: Reject action for DO-linked WC
-            Actions\Action::make('reject_do_wc')
+            Actions\Action::make('reject_wc')
                 ->label('Tolak')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->form([
-                    \Filament\Forms\Components\Textarea::make('rejection_reason')
+                    Textarea::make('rejection_reason')
                         ->label('Alasan Penolakan')
                         ->required()
                         ->rows(3),
@@ -85,7 +57,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                     ]);
                     $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
                 })
-                ->visible(fn () => $this->record->delivery_order_id && strtolower($this->record->status) === 'request'),
+                ->visible(fn () => strtolower($this->record->status) === 'request'),
         ];
     }
 
@@ -148,6 +120,20 @@ class ViewWarehouseConfirmation extends ViewRecord
                         Infolists\Components\TextEntry::make('deliveryOrder.delivery_date')
                             ->label('Tanggal Pengiriman')
                             ->date(),
+                        Infolists\Components\TextEntry::make('delivery_order_customer')
+                            ->label('Customer')
+                            ->getStateUsing(function ($record) {
+                                return $record->deliveryOrder?->salesOrders?->first()?->customer?->name
+                                    ?? $record->saleOrder?->customer?->name
+                                    ?? '-';
+                            }),
+                        Infolists\Components\TextEntry::make('delivery_order_total_items')
+                            ->label('Total Item')
+                            ->getStateUsing(function ($record) {
+                                $count = $record->warehouseConfirmationItems->count();
+                                $qty = (float) $record->warehouseConfirmationItems->sum('requested_qty');
+                                return "{$count} baris / qty {$qty}";
+                            }),
                         Infolists\Components\TextEntry::make('deliveryOrder.status')
                             ->label('Status DO')
                             ->badge()
@@ -166,45 +152,6 @@ class ViewWarehouseConfirmation extends ViewRecord
                     ->columns(2)
                     ->visible(fn ($record) => ! empty($record->delivery_order_id)),
 
-                Infolists\Components\Section::make('Sales Order Information')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('saleOrder.so_number')
-                            ->label('SO Number'),
-
-                        Infolists\Components\TextEntry::make('saleOrder.customer.name')
-                            ->label('Customer'),
-
-                        Infolists\Components\TextEntry::make('saleOrder.order_date')
-                            ->label('Order Date')
-                            ->date(),
-
-                        Infolists\Components\TextEntry::make('saleOrder.delivery_date')
-                            ->label('Delivery Date')
-                            ->date()
-                            ->placeholder('Not set')
-                            ->visible(fn($record) => $record->sale_order_id !== null),
-
-                        Infolists\Components\TextEntry::make('saleOrder.total_amount')
-                            ->label('Total Amount')
-                            ->rupiah(),
-
-                        Infolists\Components\TextEntry::make('saleOrder.status')
-                            ->label('SO Status')
-                            ->badge()
-                            ->color(fn(string $state): string => match (strtolower($state)) {
-                                'confirmed' => 'success',
-                                'partial_confirmed' => 'warning',
-                                'rejected' => 'danger',
-                                'request' => 'info',
-                                'approved' => 'success',
-                                'draft' => 'gray',
-                                'cancelled' => 'danger',
-                                default => 'gray',
-                            }),
-                    ])
-                    ->columns(3)
-                    ->visible(fn($record) => $record->sale_order_id !== null),
-
                 Infolists\Components\Section::make('Manufacturing Order Information')
                     ->schema([
                         Infolists\Components\TextEntry::make('manufacturingOrder.mo_number')
@@ -221,46 +168,6 @@ class ViewWarehouseConfirmation extends ViewRecord
                     ->columns(3)
                     ->visible(fn($record) => $record->manufacturing_order_id !== null),
 
-                Infolists\Components\Section::make('Sales Order Items')
-                    ->schema([
-                        Infolists\Components\RepeatableEntry::make('saleOrder.saleOrderItem')
-                            ->label('')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('product')
-                                    ->label('Product')
-                                    ->formatStateUsing(function ($state) {
-                                        return "(" . $state['sku'] . ") " . $state['name'];
-                                    })
-                                    ->columnSpan(2),
-
-                                Infolists\Components\TextEntry::make('quantity')
-                                    ->label('Quantity')
-                                    ->numeric(),
-
-                                Infolists\Components\TextEntry::make('unit_price')
-                                    ->label('Price')
-                                    ->rupiah(),
-
-                                Infolists\Components\TextEntry::make('total_amount')
-                                    ->label('Total')
-                                    ->rupiah()
-                                    ->state(function ($record) {
-                                        return $record->unit_price * $record->quantity;
-                                    }),
-
-                                Infolists\Components\TextEntry::make('warehouse')
-                                    ->label('Gudang')
-                                    ->formatStateUsing(function ($state) {
-                                        return "(" . $state['kode'] . ") " . $state['name'];
-                                    })
-                                    ->columnSpan(2),
-
-                                Infolists\Components\TextEntry::make('rak.name')
-                                    ->label('Rak'),
-                            ])
-                            ->columns(8),
-                    ]),
-
                 Infolists\Components\Section::make('Warehouse Confirmations')
                     ->schema([
                         // Show warehouse confirmation items
@@ -276,10 +183,6 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                                 Infolists\Components\TextEntry::make('requested_qty')
                                     ->label('Requested Qty')
-                                    ->numeric(),
-
-                                Infolists\Components\TextEntry::make('confirmed_qty')
-                                    ->label('Confirmed Qty')
                                     ->numeric(),
 
                                 Infolists\Components\TextEntry::make('warehouse')
@@ -301,44 +204,8 @@ class ViewWarehouseConfirmation extends ViewRecord
                                         'request' => 'info',
                                         default => 'gray',
                                     }),
-
-                                Infolists\Components\Actions::make([
-                                    Infolists\Components\Actions\Action::make('confirm_item')
-                                        ->label('Confirm')
-                                        ->icon('heroicon-o-check-badge')
-                                        ->color('success')
-                                        ->requiresConfirmation()
-                                        ->modalHeading('Confirm Item')
-                                        ->modalDescription('Are you sure you want to confirm this warehouse confirmation item?')
-                                        ->action(function ($record) {
-                                            $record->update([
-                                                'status' => 'confirmed',
-                                                'confirmed_qty' => $record->requested_qty,
-                                                'confirmed_by' => Auth::id(),
-                                                'confirmed_at' => now(),
-                                            ]);
-
-                                            $warehouseConfirmation = $record->warehouseConfirmation;
-
-                                            // Check if all items are confirmed to update main status
-                                            $allConfirmed = $warehouseConfirmation->warehouseConfirmationItems()
-                                                ->where('status', '!=', 'confirmed')
-                                                ->count() === 0;
-
-                                            if ($allConfirmed) {
-                                                $warehouseConfirmation->update([
-                                                    'status' => 'confirmed',
-                                                    'confirmed_by' => Auth::id(),
-                                                    'confirmed_at' => now(),
-                                                ]);
-                                            }
-
-                                            $this->redirect($this->getResource()::getUrl('view', ['record' => $warehouseConfirmation]));
-                                        })
-                                        ->visible(fn($record) => strtolower($record->status) === 'request'),
-                                ]),
                             ])
-                            ->columns(9)
+                            ->columns(6)
                             ->visible(fn($record) => $record->warehouseConfirmationItems->count() > 0),
                     ])
                     ->columns(1),

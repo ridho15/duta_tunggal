@@ -543,7 +543,6 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Harga tidak boleh kosong',
                                             ])
-                                            ->disabled()
                                             ->dehydrated(true)
                                             ->readOnly(),
                                         TextInput::make('total')
@@ -553,7 +552,6 @@ class PurchaseInvoiceResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Total tidak boleh kosong',
                                             ])
-                                            ->disabled()
                                             ->dehydrated(true)
                                             ->readOnly(),
                                     ])

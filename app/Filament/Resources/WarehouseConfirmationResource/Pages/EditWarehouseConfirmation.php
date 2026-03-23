@@ -5,7 +5,9 @@ namespace App\Filament\Resources\WarehouseConfirmationResource\Pages;
 use App\Filament\Resources\WarehouseConfirmationResource;
 use Filament\Actions;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Textarea;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Facades\Auth;
 
 class EditWarehouseConfirmation extends EditRecord
 {
@@ -15,7 +17,44 @@ class EditWarehouseConfirmation extends EditRecord
     {
         return [
             ViewAction::make()->icon('heroicon-o-eye')->label('View')->color('primary'),
-           Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\Action::make('approve_wc')
+                ->label('Approve')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->visible(fn () => strtolower((string) $this->record->status) === 'request')
+                ->action(function () {
+                    $this->record->update([
+                        'status' => 'confirmed',
+                        'rejection_reason' => null,
+                        'confirmed_by' => Auth::id(),
+                        'confirmed_at' => now(),
+                    ]);
+
+                    $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
+                }),
+            Actions\Action::make('reject_wc')
+                ->label('Reject')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->form([
+                    Textarea::make('rejection_reason')
+                        ->label('Alasan Penolakan')
+                        ->required()
+                        ->rows(3),
+                ])
+                ->visible(fn () => strtolower((string) $this->record->status) === 'request')
+                ->action(function (array $data) {
+                    $this->record->update([
+                        'status' => 'rejected',
+                        'rejection_reason' => $data['rejection_reason'],
+                        'confirmed_by' => Auth::id(),
+                        'confirmed_at' => now(),
+                    ]);
+
+                    $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
+                }),
+            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
         ];
     }
 

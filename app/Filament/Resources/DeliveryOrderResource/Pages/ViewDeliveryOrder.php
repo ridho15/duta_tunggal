@@ -23,7 +23,7 @@ class ViewDeliveryOrder extends ViewRecord
                 ->visible(function () {
                     $record = $this->record;
                     return Auth::user()->hasPermissionTo('update delivery order') &&
-                        in_array($record->status, ['draft', 'request_approve', 'request_close']);
+                        in_array($record->status, ['draft', 'request_stock', 'request_approve', 'request_close']);
                 }),
             DeleteAction::make()
                 ->visible(function () {
@@ -45,25 +45,70 @@ class ViewDeliveryOrder extends ViewRecord
                         $record->status === 'draft';
                 })
                 ->action(function ($record) {
-                    $record->load('deliveryOrderItem.product');
-                    // Create one WC covering all DO items
-                    $wc = \App\Models\WarehouseConfirmation::create([
-                        'delivery_order_id' => $record->id,
-                        'confirmation_type' => 'sales_order',
-                        'status' => 'request',
-                        'confirmed_by' => Auth::id(),
-                        'note' => 'Auto-created dari DO ' . $record->do_number,
-                    ]);
+                    $record->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
+
+                    $groupedItemsByWarehouse = [];
                     foreach ($record->deliveryOrderItem as $item) {
-                        $wc->warehouseConfirmationItems()->create([
+                        $sources = $item->warehouseSources;
+                        if ($sources->isNotEmpty()) {
+                            foreach ($sources as $source) {
+                                if (empty($source->warehouse_id) || (float) ($source->quantity ?? 0) <= 0) {
+                                    continue;
+                                }
+
+                                $groupedItemsByWarehouse[$source->warehouse_id][] = [
+                                    'sale_order_item_id' => $item->sale_order_item_id,
+                                    'product_name' => $item->product->name ?? '-',
+                                    'requested_qty' => (float) $source->quantity,
+                                    'confirmed_qty' => (float) $source->quantity,
+                                    'warehouse_id' => $source->warehouse_id,
+                                    'rak_id' => $source->rak_id,
+                                    'status' => 'request',
+                                ];
+                            }
+
+                            continue;
+                        }
+
+                        $fallbackWarehouseId = $record->warehouse_id;
+                        if (empty($fallbackWarehouseId) || (float) ($item->quantity ?? 0) <= 0) {
+                            continue;
+                        }
+
+                        $groupedItemsByWarehouse[$fallbackWarehouseId][] = [
                             'sale_order_item_id' => $item->sale_order_item_id,
                             'product_name' => $item->product->name ?? '-',
-                            'requested_qty' => $item->quantity,
-                            'confirmed_qty' => $item->quantity,
-                            'warehouse_id' => null,
+                            'requested_qty' => (float) $item->quantity,
+                            'confirmed_qty' => (float) $item->quantity,
+                            'warehouse_id' => $fallbackWarehouseId,
+                            'rak_id' => $item->rak_id,
                             'status' => 'request',
-                        ]);
+                        ];
                     }
+
+                    if (empty($groupedItemsByWarehouse)) {
+                        \App\Http\Controllers\HelperController::sendNotification(
+                            isSuccess: false,
+                            title: 'Error',
+                            message: 'Tidak dapat request stock karena sumber gudang item belum terdefinisi.'
+                        );
+                        return;
+                    }
+
+                    foreach ($groupedItemsByWarehouse as $warehouseId => $items) {
+                        $wc = \App\Models\WarehouseConfirmation::create([
+                            'delivery_order_id' => $record->id,
+                            'confirmation_type' => 'sales_order',
+                            'status' => 'request',
+                            'confirmed_by' => Auth::id(),
+                            'note' => 'Auto-created dari DO ' . $record->do_number . ' (Warehouse #' . $warehouseId . ')',
+                        ]);
+
+                        foreach ($items as $itemData) {
+                            $wc->warehouseConfirmationItems()->create($itemData);
+                        }
+                    }
+
                     $record->update(['status' => 'request_stock']);
                     \App\Http\Controllers\HelperController::sendNotification(
                         isSuccess: true,

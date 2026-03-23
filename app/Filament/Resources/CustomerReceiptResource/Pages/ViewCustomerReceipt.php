@@ -13,6 +13,9 @@ use Filament\Infolists\Infolist;
 use Filament\Tables;
 use Filament\Tables\Table;
 use App\Models\JournalEntry;
+use App\Models\CustomerReceiptItem;
+use App\Models\CustomerReceipt;
+use App\Services\LedgerPostingService;
 use Filament\Infolists\Components\RepeatableEntry;
 
 class ViewCustomerReceipt extends ViewRecord
@@ -31,6 +34,65 @@ class ViewCustomerReceipt extends ViewRecord
     {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil')->color('warning'),
+            Action::make('generate_journal')
+                ->label('Generate Journal')
+                ->icon('heroicon-o-plus-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Generate Journal Customer Receipt')
+                ->modalDescription('Gunakan aksi ini hanya jika jurnal belum terbentuk otomatis.')
+                ->visible(function () {
+                    $receiptId = $this->record->id;
+                    $itemIds = $this->record->customerReceiptItem()->pluck('id')->all();
+
+                    $hasReceiptJournal = JournalEntry::where('source_type', CustomerReceipt::class)
+                        ->where('source_id', $receiptId)
+                        ->exists();
+
+                    $hasItemJournal = !empty($itemIds) && JournalEntry::where('source_type', CustomerReceiptItem::class)
+                        ->whereIn('source_id', $itemIds)
+                        ->exists();
+
+                    return !($hasReceiptJournal || $hasItemJournal);
+                })
+                ->action(function () {
+                    $receiptId = $this->record->id;
+                    $itemIds = $this->record->customerReceiptItem()->pluck('id')->all();
+
+                    $hasReceiptJournal = JournalEntry::where('source_type', CustomerReceipt::class)
+                        ->where('source_id', $receiptId)
+                        ->exists();
+
+                    $hasItemJournal = !empty($itemIds) && JournalEntry::where('source_type', CustomerReceiptItem::class)
+                        ->whereIn('source_id', $itemIds)
+                        ->exists();
+
+                    if ($hasReceiptJournal || $hasItemJournal) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Jurnal sudah ada')
+                            ->body('Jurnal terkait Customer Receipt ini sudah terbentuk, aksi dibatalkan untuk mencegah duplikasi.')
+                            ->send();
+                        return;
+                    }
+
+                    $result = app(LedgerPostingService::class)->postCustomerReceipt($this->record->fresh());
+
+                    if (($result['status'] ?? null) === 'success') {
+                        Notification::make()
+                            ->success()
+                            ->title('Jurnal berhasil dibuat')
+                            ->body('Journal entries Customer Receipt berhasil digenerate.')
+                            ->send();
+                        return;
+                    }
+
+                    Notification::make()
+                        ->warning()
+                        ->title('Generate jurnal tidak dijalankan')
+                        ->body($result['message'] ?? 'Tidak ada jurnal yang dibuat.')
+                        ->send();
+                }),
             Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-document-text')

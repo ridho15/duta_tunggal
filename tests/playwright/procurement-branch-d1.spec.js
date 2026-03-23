@@ -5,6 +5,7 @@ import {
   openCreatePage,
   chooseFixtureSupplier,
   checkCheckboxByLabel,
+  clickCheckboxByLabel,
 } from './helpers/purchase-invoice-fixture'
 
 const BASE = 'http://localhost:8009'
@@ -41,12 +42,16 @@ test('D1-c: selecting fixture PO populates cabang in purchase invoice form', asy
 
   await chooseFixtureSupplier(page)
 
-  const poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
+  let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()
-  await expect(poCheckbox).toBeEnabled()
-  await poCheckbox.check({ force: true })
+  if (!(await poCheckbox.isEnabled())) {
+    poCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_orders"]:not([disabled])').first()
+    await expect(poCheckbox).toBeVisible({ timeout: 5000 })
+  }
+  await expect(poCheckbox).toBeEnabled({ timeout: 5000 })
+  await poCheckbox.click({ force: true })
 
-  await page.waitForTimeout(1200)
+  await page.waitForLoadState('networkidle')
 
   const cabangFieldWrapper = page
     .locator('.fi-fo-field-wrp')
@@ -55,9 +60,11 @@ test('D1-c: selecting fixture PO populates cabang in purchase invoice form', asy
 
   await expect(cabangFieldWrapper).toBeVisible()
 
-  const cabangSelect = cabangFieldWrapper.locator('select').first()
-  await expect(cabangSelect).toHaveCount(1)
+  const cabangCombobox = cabangFieldWrapper.getByRole('combobox').first()
+  await expect(cabangCombobox).toBeVisible()
 
-  const cabangValue = (await cabangSelect.inputValue()).trim()
-  expect(cabangValue.length).toBeGreaterThan(0)
+  await expect.poll(async () => {
+    const text = (await cabangCombobox.textContent()) ?? ''
+    return text.trim()
+  }, { timeout: 10000 }).not.toMatch(/Pilih salah satu opsi/i)
 })

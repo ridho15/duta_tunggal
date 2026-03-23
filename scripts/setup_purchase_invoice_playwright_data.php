@@ -27,6 +27,19 @@ $fixture = [
     'invoice_number' => 'INV-TEST-INV-LOCKED',
 ];
 
+// Skip setup if all fixture data already exists with correct state (idempotent guard)
+$existingPo = DB::table('purchase_orders')->where('po_number', $fixture['po_number'])->where('status', 'completed')->first();
+$existingLocked = DB::table('purchase_receipts')->where('receipt_number', $fixture['receipt_locked'])->where('status', 'completed')->first();
+$existingOpen = DB::table('purchase_receipts')->where('receipt_number', $fixture['receipt_open'])->where('status', 'completed')->first();
+$existingInvoice = DB::table('invoices')->where('invoice_number', $fixture['invoice_number'])->first();
+
+if ($existingPo && $existingLocked && $existingOpen && $existingInvoice
+    && $existingLocked->purchase_order_id === $existingPo->id
+    && $existingOpen->purchase_order_id === $existingPo->id) {
+    echo "Fixture data already exists and is valid — skipping setup\n";
+    exit(0);
+}
+
 DB::transaction(function () use ($now, $fixture) {
     $testUser = DB::table('users')->where('email', 'ralamzah@gmail.com')->first();
     $userId = $testUser?->id ?? DB::table('users')->value('id') ?? 1;

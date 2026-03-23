@@ -1400,6 +1400,17 @@ class PurchaseOrderResource extends Resource
                     ->label('Product')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->badge(),
+                TextColumn::make('item_units')
+                    ->label('Satuan')
+                    ->state(function ($record) {
+                        return $record->purchaseOrderItem
+                            ->map(fn($item) => $item->product?->uom?->abbreviation ?? '-')
+                            ->filter()
+                            ->unique()
+                            ->implode(', ');
+                    })
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

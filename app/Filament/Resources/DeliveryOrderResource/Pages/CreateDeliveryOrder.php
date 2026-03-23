@@ -4,6 +4,7 @@ namespace App\Filament\Resources\DeliveryOrderResource\Pages;
 
 use App\Filament\Resources\DeliveryOrderResource;
 use App\Models\DeliveryOrder;
+use App\Models\InventoryStock;
 use App\Services\DeliveryOrderItemService;
 use App\Services\DeliveryOrderService;
 use Filament\Notifications\Notification;
@@ -114,7 +115,11 @@ class CreateDeliveryOrder extends CreateRecord
             if ($firstSalesOrder) {
                 $firstItem = $firstSalesOrder->saleOrderItem()->first();
                 if ($firstItem && !isset($data['warehouse_id'])) {
-                    $data['warehouse_id'] = $firstItem->warehouse_id;
+                    $fallbackWarehouseId = $firstItem->warehouse_id;
+                    if (empty($fallbackWarehouseId)) {
+                        $fallbackWarehouseId = $firstItem->warehouseAllocations()->value('warehouse_id');
+                    }
+                    $data['warehouse_id'] = $fallbackWarehouseId;
                 }
             }
         }
@@ -132,11 +137,23 @@ class CreateDeliveryOrder extends CreateRecord
                     $remainingQty = $saleOrderItem->remaining_quantity;
                     // Only add items that still have remaining quantity
                     if ($remainingQty > 0) {
+                        $warehouseSources = $saleOrderItem->warehouseAllocations
+                            ->map(function ($allocation) {
+                                return [
+                                    'warehouse_id' => $allocation->warehouse_id,
+                                    'quantity' => (float) $allocation->quantity,
+                                    'rak_id' => null,
+                                ];
+                            })
+                            ->values()
+                            ->toArray();
+
                         $deliveryItems[] = [
                             'options_from' => 2,
                             'sale_order_item_id' => $saleOrderItem->id,
                             'product_id' => $saleOrderItem->product_id,
                             'quantity' => $remainingQty,
+                            'warehouseSources' => $warehouseSources,
                             'reason' => '',
                         ];
                     }
@@ -239,6 +256,40 @@ class CreateDeliveryOrder extends CreateRecord
                     $validator = Validator::make([], []);
                     $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).");
                     throw new ValidationException($validator);
+                }
+
+                $warehouseSources = collect($item['warehouseSources'] ?? []);
+                if ($warehouseSources->isNotEmpty()) {
+                    $sourceQty = (float) $warehouseSources->sum(function ($source) {
+                        return (float) ($source['quantity'] ?? 0);
+                    });
+
+                    if (abs($sourceQty - $quantity) > 0.0001) {
+                        $validator = Validator::make([], []);
+                        $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Total qty sumber gudang harus sama dengan quantity item.");
+                        throw new ValidationException($validator);
+                    }
+
+                    foreach ($warehouseSources as $sourceIndex => $source) {
+                        $sourceWarehouseId = $source['warehouse_id'] ?? null;
+                        $sourceQtyItem = (float) ($source['quantity'] ?? 0);
+
+                        if (!$sourceWarehouseId || $sourceQtyItem <= 0) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: gudang dan qty > 0 wajib diisi.");
+                            throw new ValidationException($validator);
+                        }
+
+                        $availableStock = InventoryStock::where('product_id', $item['product_id'] ?? null)
+                            ->where('warehouse_id', $sourceWarehouseId)
+                            ->sum('qty_available');
+
+                        if ((float) $availableStock < $sourceQtyItem) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: stok tidak mencukupi di gudang sumber.");
+                            throw new ValidationException($validator);
+                        }
+                    }
                 }
             }
 

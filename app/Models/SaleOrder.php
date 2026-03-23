@@ -139,13 +139,32 @@ class SaleOrder extends Model
     public function hasInsufficientStock()
     {
         foreach ($this->saleOrderItem as $item) {
-            $availableStock = InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $item->warehouse_id)
-                ->where('rak_id', $item->rak_id)
-                ->sum('qty_available');
-            
-            if ($availableStock < $item->quantity) {
-                return true;
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                $allocatedTotal = (float) $allocations->sum('quantity');
+                if (abs($allocatedTotal - (float) $item->quantity) > 0.0001) {
+                    return true;
+                }
+
+                foreach ($allocations as $allocation) {
+                    $availableStock = InventoryStock::where('product_id', $item->product_id)
+                        ->where('warehouse_id', $allocation->warehouse_id)
+                        ->sum('qty_available');
+
+                    if ((float) $availableStock < (float) $allocation->quantity) {
+                        return true;
+                    }
+                }
+            } else {
+                $availableStock = InventoryStock::where('product_id', $item->product_id)
+                    ->where('warehouse_id', $item->warehouse_id)
+                    ->where('rak_id', $item->rak_id)
+                    ->sum('qty_available');
+
+                if ($availableStock < $item->quantity) {
+                    return true;
+                }
             }
         }
         return false;
@@ -158,17 +177,47 @@ class SaleOrder extends Model
     {
         $insufficientItems = [];
         foreach ($this->saleOrderItem as $item) {
-            $availableStock = InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $item->warehouse_id)
-                ->where('rak_id', $item->rak_id)
-                ->sum('qty_available');
-            if ($availableStock < $item->quantity) {
-                $insufficientItems[] = [
-                    'item' => $item,
-                    'available' => $availableStock,
-                    'needed' => $item->quantity,
-                    'shortage' => $item->quantity - $availableStock
-                ];
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                $allocatedTotal = (float) $allocations->sum('quantity');
+                if (abs($allocatedTotal - (float) $item->quantity) > 0.0001) {
+                    $insufficientItems[] = [
+                        'item' => $item,
+                        'available' => $allocatedTotal,
+                        'needed' => $item->quantity,
+                        'shortage' => $item->quantity - $allocatedTotal
+                    ];
+                    continue;
+                }
+
+                foreach ($allocations as $allocation) {
+                    $availableStock = InventoryStock::where('product_id', $item->product_id)
+                        ->where('warehouse_id', $allocation->warehouse_id)
+                        ->sum('qty_available');
+
+                    if ((float) $availableStock < (float) $allocation->quantity) {
+                        $insufficientItems[] = [
+                            'item' => $item,
+                            'available' => $availableStock,
+                            'needed' => $allocation->quantity,
+                            'shortage' => (float) $allocation->quantity - (float) $availableStock
+                        ];
+                    }
+                }
+            } else {
+                $availableStock = InventoryStock::where('product_id', $item->product_id)
+                    ->where('warehouse_id', $item->warehouse_id)
+                    ->where('rak_id', $item->rak_id)
+                    ->sum('qty_available');
+                if ($availableStock < $item->quantity) {
+                    $insufficientItems[] = [
+                        'item' => $item,
+                        'available' => $availableStock,
+                        'needed' => $item->quantity,
+                        'shortage' => $item->quantity - $availableStock
+                    ];
+                }
             }
         }
         return $insufficientItems;

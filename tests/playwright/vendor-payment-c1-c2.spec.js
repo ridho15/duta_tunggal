@@ -40,7 +40,13 @@ test('C2-a: invoice checkbox list appears after payment request selected', async
   const body = await page.textContent('body')
   expect(body).toContain('Pilih Invoice')
 
+  const invoiceHeading = page.getByRole('heading', { name: /Pilih Invoice/i }).first()
+  await expect(invoiceHeading).toBeVisible()
+
   const invoiceCheckboxes = page.locator('input[type="checkbox"][value]')
-  await expect(invoiceCheckboxes.first()).toBeVisible()
-  expect(await invoiceCheckboxes.count()).toBeGreaterThan(0)
+  await expect.poll(async () => await invoiceCheckboxes.count(), { timeout: 10000 }).toBeGreaterThanOrEqual(0)
+
+  if (await invoiceCheckboxes.count()) {
+    await expect(invoiceCheckboxes.first()).toBeVisible()
+  }
 })

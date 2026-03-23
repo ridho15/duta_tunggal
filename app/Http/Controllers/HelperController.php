@@ -1003,6 +1003,40 @@ class HelperController extends Controller
         }
     }
 
+    public static function hitungTaxNominal($quantity, $unit_price, $discount, $tax, $taxType = null)
+    {
+        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
+            $unit_price = self::parseIndonesianMoney($unit_price);
+        }
+
+        $quantity  = max(0.0, (float) $quantity);
+        $unit_price = max(0.0, (float) $unit_price);
+        $discount  = max(0.0, min(100.0, (float) $discount));
+        $tax       = max(0.0, min(100.0, (float) $tax));
+        $taxType   = (is_string($taxType) && trim($taxType) !== '') ? $taxType : 'Inklusif';
+
+        $baseAmount = $quantity * $unit_price * (1 - ($discount / 100));
+
+        try {
+            $service = \App\Services\TaxService::class;
+            $result = $service::compute($baseAmount, $tax, $taxType);
+            return round((float) ($result['ppn'] ?? 0), 2);
+        } catch (\Throwable $e) {
+            if (function_exists('app') && app()->bound('log')) {
+                \Illuminate\Support\Facades\Log::error('hitungTaxNominal: TaxService exception, falling back to exclusive', [
+                    'quantity'   => $quantity,
+                    'unit_price' => $unit_price,
+                    'discount'   => $discount,
+                    'tax'        => $tax,
+                    'taxType'    => $taxType,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
+
+            return round($baseAmount * ($tax / 100.0), 2);
+        }
+    }
+
     public static function sendNotification($isSuccess = false, $title = "", $message = "")
     {
         if ($isSuccess) {

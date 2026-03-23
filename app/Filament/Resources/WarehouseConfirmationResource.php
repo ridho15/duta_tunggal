@@ -294,9 +294,14 @@ class WarehouseConfirmationResource extends Resource
                     ->dateTime()
                     ->sortable(),
 
-                TextColumn::make('notes')
+                TextColumn::make('note')
                     ->label('Notes')
                     ->limit(50),
+
+                TextColumn::make('rejection_reason')
+                    ->label('Rejection Reason')
+                    ->limit(60)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -321,28 +326,39 @@ class WarehouseConfirmationResource extends Resource
                 ActionGroup::make([
                     ViewAction::make()->color('primary'),
                     EditAction::make()->color('success'),
-                    Action::make('confirm')
-                        ->label('Konfirmasi Gudang')
-                        ->icon('heroicon-o-check-badge')
+                    Action::make('approve')
+                        ->label('Approve')
+                        ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->requiresConfirmation()
-                        ->modalHeading('Konfirmasi Gudang')
-                        ->modalDescription('This will confirm the warehouse confirmation and update the sales order status.')
+                        ->modalHeading('Approve Konfirmasi Gudang')
+                        ->modalDescription('Setujui konfirmasi gudang ini.')
                         ->action(function (WarehouseConfirmation $record) {
-                            // Update warehouse confirmation status
                             $record->update([
                                 'status' => 'confirmed',
+                                'rejection_reason' => null,
                                 'confirmed_by' => Auth::id(),
                                 'confirmed_at' => now(),
                             ]);
-
-                            // Update sales order status if needed
-                            if ($record->saleOrder) {
-                                $record->saleOrder->update([
-                                    'status' => 'confirmed',
-                                    'warehouse_confirmed_at' => now(),
-                                ]);
-                            }
+                        })
+                        ->visible(fn (WarehouseConfirmation $record): bool => strtolower($record->status) === 'request'),
+                    Action::make('reject')
+                        ->label('Reject')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->form([
+                            Textarea::make('rejection_reason')
+                                ->label('Alasan Penolakan')
+                                ->required()
+                                ->rows(3),
+                        ])
+                        ->action(function (WarehouseConfirmation $record, array $data) {
+                            $record->update([
+                                'status' => 'rejected',
+                                'rejection_reason' => $data['rejection_reason'],
+                                'confirmed_by' => Auth::id(),
+                                'confirmed_at' => now(),
+                            ]);
                         })
                         ->visible(fn (WarehouseConfirmation $record): bool => strtolower($record->status) === 'request'),
                     DeleteAction::make(),
@@ -360,11 +376,11 @@ class WarehouseConfirmationResource extends Resource
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Konfirmasi Gudang adalah proses validasi dari warehouse terhadap Sales Order atau Manufacturing Order sebelum eksekusi.</li>' .
                             '<li><strong>Status Flow:</strong> Request → Confirmed/Partial Confirmed/Rejected. Gudang memberikan konfirmasi kesiapan stok dan logistik.</li>' .
-                            '<li><strong>Related Orders:</strong> Terkait dengan Sales Order (untuk pengiriman <em>Kirim Langsung</em> maupun <em>Ambil Sendiri</em> - keduanya butuh DO sebagai bukti barang keluar gudang) atau Manufacturing Order (untuk produksi internal).</li>' .
-                            '<li><strong>Actions:</strong> <em>Konfirmasi Gudang</em> untuk approve request, dengan opsi confirmed, partial confirmed, atau rejected.</li>' .
+                            '<li><strong>Related Orders:</strong> Untuk flow DO baru, WC dibuat otomatis dari Delivery Order saat request stock dan diproses manual oleh gudang.</li>' .
+                            '<li><strong>Actions:</strong> Gunakan aksi <em>Approve</em> atau <em>Reject</em> untuk memproses request. Reject wajib isi alasan.</li>' .
                             '<li><strong>Tracking:</strong> Mencatat siapa yang mengkonfirmasi (Confirmed By) dan kapan dikonfirmasi (Confirmed At).</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan Sales Order management, Manufacturing Order, dan inventory availability checking.</li>' .
-                            '<li><strong>Notes:</strong> Field notes digunakan untuk memberikan informasi tambahan atau alasan penolakan konfirmasi.</li>' .
+                            '<li><strong>Integration:</strong> Status WC otomatis menyinkronkan status Delivery Order terkait.</li>' .
+                            '<li><strong>Notes:</strong> Field notes untuk catatan umum; alasan tolak disimpan di Rejection Reason.</li>' .
                         '</ul>' .
                     '</div>' .
                 '</details>'

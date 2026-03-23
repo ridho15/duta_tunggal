@@ -717,6 +717,17 @@ class QuotationResource extends Resource
                     ->label('Product')
                     ->searchable()
                     ->badge(),
+                TextColumn::make('item_units')
+                    ->label('Satuan')
+                    ->state(function ($record) {
+                        return $record->quotationItem
+                            ->map(fn($item) => $item->product?->uom?->abbreviation ?? '-')
+                            ->filter()
+                            ->unique()
+                            ->implode(', ');
+                    })
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('createdBy.name')
                     ->label('Created By')
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -1006,6 +1017,7 @@ class QuotationResource extends Resource
                                         ->label('Item Sales Order')
                                         ->schema([
                                             Hidden::make('product_id'),
+                                            Hidden::make('tax_type')->default('None'),
                                             Placeholder::make('product_info')
                                                 ->label('Produk')
                                                 ->content(function ($get, $record) {
@@ -1034,14 +1046,18 @@ class QuotationResource extends Resource
                                                     $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
                                                     $discount = $get('discount') ?? 0;
                                                     $tax = $get('tax') ?? 0;
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                    $taxType = $get('tax_type') ?? 'None';
+                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                     $set('subtotal', $subtotal);
+                                                    $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                                 }),
                                             TextInput::make('unit_price')
                                                 ->label('Unit Price')
                                                 ->default(function ($get, $record) {
                                                     $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
-                                                    return $quotationItem ? $quotationItem->unit_price : 0;
+                                                    return $quotationItem
+                                                        ? number_format((float) $quotationItem->unit_price, 0, ',', '.')
+                                                        : 0;
                                                 })
                                                 ->required()
                                                 ->indonesianMoney()
@@ -1055,8 +1071,10 @@ class QuotationResource extends Resource
                                                     $unitPrice = HelperController::parseIndonesianMoney($state ?? 0);
                                                     $discount = $get('discount') ?? 0;
                                                     $tax = $get('tax') ?? 0;
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                    $taxType = $get('tax_type') ?? 'None';
+                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                     $set('subtotal', $subtotal);
+                                                    $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                                 }),
                                             Select::make('warehouse_id')
                                                 ->label('Gudang')
@@ -1109,8 +1127,10 @@ class QuotationResource extends Resource
                                                     $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
                                                     $discount = $state ?? 0;
                                                     $tax = $get('tax') ?? 0;
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                    $taxType = $get('tax_type') ?? 'None';
+                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                     $set('subtotal', $subtotal);
+                                                    $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                                 }),
                                             TextInput::make('tax')
                                                 ->label('Tax (%)')
@@ -1127,9 +1147,16 @@ class QuotationResource extends Resource
                                                     $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
                                                     $discount = $get('discount') ?? 0;
                                                     $tax = $state ?? 0;
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                    $taxType = $get('tax_type') ?? 'None';
+                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                     $set('subtotal', $subtotal);
+                                                    $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                                 }),
+                                            TextInput::make('tax_nominal')
+                                                ->label('Tax Amount')
+                                                ->indonesianMoney()
+                                                ->readOnly()
+                                                ->default(0),
                                             TextInput::make('subtotal')
                                                 ->label('Subtotal')
                                                 ->indonesianMoney()
@@ -1151,12 +1178,26 @@ class QuotationResource extends Resource
                                                     $items[] = [
                                                         'product_id' => $quotationItem->product_id,
                                                         'quantity' => $quotationItem->quantity,
-                                                        'unit_price' => $quotationItem->unit_price,
+                                                        'unit_price' => number_format((float) $quotationItem->unit_price, 0, ',', '.'),
                                                         'discount' => $quotationItem->discount,
                                                         'tax' => $quotationItem->tax,
+                                                        'tax_type' => $quotationItem->tax_type ?? 'None',
                                                         'warehouse_id' => null,
                                                         'rak_id' => null,
-                                                        'subtotal' => $quotationItem->quantity * ($quotationItem->unit_price + $quotationItem->tax - $quotationItem->discount)
+                                                        'tax_nominal' => HelperController::hitungTaxNominal(
+                                                            $quotationItem->quantity,
+                                                            (float) $quotationItem->unit_price,
+                                                            $quotationItem->discount,
+                                                            $quotationItem->tax,
+                                                            $quotationItem->tax_type ?? 'None'
+                                                        ),
+                                                        'subtotal' => HelperController::hitungSubtotal(
+                                                            $quotationItem->quantity,
+                                                            (float) $quotationItem->unit_price,
+                                                            $quotationItem->discount,
+                                                            $quotationItem->tax,
+                                                            $quotationItem->tax_type ?? 'None'
+                                                        )
                                                     ];
                                                 }
                                                 return $items;
@@ -1181,6 +1222,7 @@ class QuotationResource extends Resource
                             $saleOrder = SaleOrder::create([
                                 'customer_id' => $record->customer_id,
                                 'quotation_id' => $record->id,
+                                'cabang_id' => $record->cabang_id, // Warisi cabang dari quotation
                                 'so_number' => $data['so_number'],
                                 'order_date' => $data['order_date'],
                                 'delivery_date' => $data['delivery_date'],
@@ -1203,6 +1245,7 @@ class QuotationResource extends Resource
                                         'unit_price' => HelperController::parseIndonesianMoney($item['unit_price']),
                                         'discount' => $item['discount'] ?? 0,
                                         'tax' => $item['tax'] ?? 0,
+                                        'tipe_pajak' => $item['tax_type'] ?? 'None',
                                         'warehouse_id' => $item['warehouse_id'],
                                         'rak_id' => $item['rak_id'] ?? null,
                                     ]);
@@ -1216,6 +1259,7 @@ class QuotationResource extends Resource
                                         'unit_price' => $quotationItem->unit_price,
                                         'discount' => $quotationItem->discount,
                                         'tax' => $quotationItem->tax,
+                                        'tipe_pajak' => $quotationItem->tax_type ?? 'None',
                                         'warehouse_id' => 1, // Default warehouse
                                         'rak_id' => null,
                                     ]);

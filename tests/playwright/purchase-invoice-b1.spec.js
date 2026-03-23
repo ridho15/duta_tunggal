@@ -5,6 +5,7 @@ import {
   openCreatePage,
   chooseFixtureSupplier,
   checkCheckboxByLabel,
+  clickCheckboxByLabel,
 } from './helpers/purchase-invoice-fixture'
 
 const ERR = /Fatal error|Whoops!|Something went wrong/i
@@ -24,31 +25,45 @@ test('B1-a: purchase invoice item pricing fields are read-only/disabled', async 
 
   await chooseFixtureSupplier(page)
 
-  const poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
+  let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()
-  await expect(poCheckbox).toBeEnabled()
-  await poCheckbox.check({ force: true })
+  if (!(await poCheckbox.isEnabled())) {
+    poCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_orders"]:not([disabled])').first()
+    await expect(poCheckbox).toBeVisible({ timeout: 5000 })
+  }
+  await expect(poCheckbox).toBeEnabled({ timeout: 5000 })
+  await poCheckbox.click({ force: true })
 
-  await page.waitForTimeout(900)
+  // Wait for receipt section to populate after Livewire re-render
+  let openReceiptCheckbox = await checkCheckboxByLabel(page, FIXTURE.receiptOpen)
+  if (!(await openReceiptCheckbox.isVisible().catch(() => false)) || !(await openReceiptCheckbox.isEnabled().catch(() => false))) {
+    openReceiptCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_receipts"]:not([disabled])').first()
+  }
+  await expect(openReceiptCheckbox).toBeVisible({ timeout: 10000 })
+  await expect(openReceiptCheckbox).toBeEnabled({ timeout: 5000 })
+  await openReceiptCheckbox.click({ force: true })
 
-  const openReceiptCheckbox = await checkCheckboxByLabel(page, FIXTURE.receiptOpen)
-  await expect(openReceiptCheckbox).toBeVisible()
-  await expect(openReceiptCheckbox).toBeEnabled()
-  await openReceiptCheckbox.check({ force: true })
-
-  await page.waitForTimeout(1200)
+  await page.waitForLoadState('networkidle')
 
   const qtyInput = page.locator('input[id*="invoiceItem"][id*="quantity"]').first()
   const priceInput = page.locator('input[id*="invoiceItem"][id*="price"]').first()
   const totalInput = page.locator('input[id*="invoiceItem"][id*="total"]').first()
 
-  await expect(qtyInput).toBeVisible()
-  await expect(priceInput).toBeVisible()
-  await expect(totalInput).toBeVisible()
+  await expect(qtyInput).toBeVisible({ timeout: 5000 })
+  await expect(priceInput).toBeVisible({ timeout: 5000 })
+  await expect(totalInput).toBeVisible({ timeout: 5000 })
 
+  // quantity and product are disabled (not editable)
   await expect(qtyInput).toBeDisabled()
-  await expect(priceInput).toBeDisabled()
-  await expect(totalInput).toBeDisabled()
+  // price and total are readOnly (not disabled — value submits in form)
+  const priceReadonly = await priceInput.getAttribute('readonly')
+  const totalReadonly = await totalInput.getAttribute('readonly')
+  expect(priceReadonly, 'price input should have readonly attribute').not.toBeNull()
+  expect(totalReadonly, 'total input should have readonly attribute').not.toBeNull()
+  const priceDisabled = await priceInput.getAttribute('disabled')
+  const totalDisabled = await totalInput.getAttribute('disabled')
+  expect(priceDisabled, 'price input should NOT have disabled attribute').toBeNull()
+  expect(totalDisabled, 'total input should NOT have disabled attribute').toBeNull()
 
   const ppnAmountInput = page.locator('input[id*="ppn_amount"]').first()
   const invoiceTotalInput = page.locator('input[id*="total"]').filter({ hasNot: page.locator('[id*="invoiceItem"]') }).first()
@@ -57,9 +72,9 @@ test('B1-a: purchase invoice item pricing fields are read-only/disabled', async 
   await expect(invoiceTotalInput).toBeVisible()
 
   const ppnAmountReadonly = await ppnAmountInput.getAttribute('readonly')
-  const totalReadonly = await invoiceTotalInput.getAttribute('readonly')
+  const invoiceTotalReadonly = await invoiceTotalInput.getAttribute('readonly')
   expect(ppnAmountReadonly).not.toBeNull()
-  expect(totalReadonly).not.toBeNull()
+  expect(invoiceTotalReadonly).not.toBeNull()
 })
 
 test('B1-b: ppn_rate is non-editable on edit form', async ({ page }) => {

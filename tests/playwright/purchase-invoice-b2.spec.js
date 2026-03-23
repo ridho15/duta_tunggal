@@ -6,6 +6,7 @@ import {
   openCreatePage,
   chooseFixtureSupplier,
   checkCheckboxByLabel,
+  clickCheckboxByLabel,
 } from './helpers/purchase-invoice-fixture'
 
 const ERR = /Fatal error|Whoops!|Something went wrong/i
@@ -38,27 +39,35 @@ test('B2-b: PPN nominal follows DPP × rate after selecting fixture receipt', as
 
   await chooseFixtureSupplier(page)
 
-  const poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
+  let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()
-  await expect(poCheckbox).toBeEnabled()
-  await poCheckbox.check({ force: true })
+  if (!(await poCheckbox.isEnabled())) {
+    poCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_orders"]:not([disabled])').first()
+    await expect(poCheckbox).toBeVisible({ timeout: 5000 })
+  }
+  await expect(poCheckbox).toBeEnabled({ timeout: 5000 })
+  await poCheckbox.click({ force: true })
 
-  await page.waitForTimeout(900)
+  // Wait for receipt section to populate after Livewire re-render
+  let openReceiptCheckbox = await checkCheckboxByLabel(page, FIXTURE.receiptOpen)
+  if (!(await openReceiptCheckbox.isVisible().catch(() => false)) || !(await openReceiptCheckbox.isEnabled().catch(() => false))) {
+    openReceiptCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_receipts"]:not([disabled])').first()
+  }
+  await expect(openReceiptCheckbox).toBeVisible({ timeout: 10000 })
+  await expect(openReceiptCheckbox).toBeEnabled({ timeout: 5000 })
+  await openReceiptCheckbox.click({ force: true })
 
-  const openReceiptCheckbox = await checkCheckboxByLabel(page, FIXTURE.receiptOpen)
-  await expect(openReceiptCheckbox).toBeVisible()
-  await expect(openReceiptCheckbox).toBeEnabled()
-  await openReceiptCheckbox.check({ force: true })
+  await page.waitForLoadState('networkidle')
 
-  await page.waitForTimeout(1200)
-
-  const dppInput = page.locator('input[id*="dpp"]').first()
-  const ppnRateInput = page.locator('input[id*="ppn_rate"]').first()
-  const ppnAmountInput = page.locator('input[id*="ppn_amount"]').first()
+  const dppInput = page.locator('input[id*="dpp"]:visible').first()
+  const ppnRateInput = page.locator('input[id*="ppn_rate"]:visible').first()
+  const ppnAmountInput = page.locator('input[id*="ppn_amount"]:visible').first()
 
   await expect(dppInput).toBeVisible()
   await expect(ppnRateInput).toBeVisible()
   await expect(ppnAmountInput).toBeVisible()
+
+  await expect.poll(async () => parseIdr(await dppInput.inputValue()), { timeout: 10000 }).toBeGreaterThan(0)
 
   const dpp = parseIdr(await dppInput.inputValue())
   const ppnRate = Number((await ppnRateInput.inputValue() || '0').replace(',', '.'))

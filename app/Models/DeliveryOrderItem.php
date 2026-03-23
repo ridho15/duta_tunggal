@@ -14,7 +14,6 @@ class DeliveryOrderItem extends Model
     protected $table = 'delivery_order_items';
     protected $fillable = [
         'delivery_order_id',
-        'purchase_receipt_item_id',
         'sale_order_item_id',
         'product_id',
         'quantity',
@@ -31,11 +30,6 @@ class DeliveryOrderItem extends Model
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
     }
 
-    public function purchaseReceiptItem()
-    {
-        return $this->belongsTo(PurchaseReceiptItem::class, 'purchase_receipt_item_id')->withDefault();
-    }
-
     public function saleOrderItem()
     {
         return $this->belongsTo(SaleOrderItem::class, 'sale_order_item_id')->withDefault();
@@ -44,6 +38,11 @@ class DeliveryOrderItem extends Model
     public function stockMovement()
     {
         return $this->morphOne(StockMovement::class, 'from_model')->withDefault();
+    }
+
+    public function warehouseSources()
+    {
+        return $this->hasMany(DeliveryOrderItemWarehouseSource::class, 'delivery_order_item_id');
     }
 
     protected static function booted()
@@ -85,6 +84,18 @@ class DeliveryOrderItem extends Model
                     }
                 }
             }
+        });
+
+        static::deleting(function ($deliveryOrderItem) {
+            if ($deliveryOrderItem->isForceDeleting()) {
+                $deliveryOrderItem->warehouseSources()->forceDelete();
+            } else {
+                $deliveryOrderItem->warehouseSources()->delete();
+            }
+        });
+
+        static::restoring(function ($deliveryOrderItem) {
+            $deliveryOrderItem->warehouseSources()->withTrashed()->restore();
         });
 
         static::saving(function ($deliveryOrderItem) {
@@ -199,8 +210,34 @@ class DeliveryOrderItem extends Model
             if ($quantity <= 0) continue;
             
             $product = $item->product;
-            if (!$product || !$deliveryOrder->warehouse_id) continue;
-            
+            if (!$product) continue;
+
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    if ($sourceQty <= 0 || !$source->warehouse_id) {
+                        continue;
+                    }
+
+                    $productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $source->warehouse_id,
+                        quantity: $sourceQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Sales delivery for DO {$deliveryOrder->do_number}",
+                        rak_id: $source->rak_id,
+                        fromModel: $item,
+                        value: $product->cost_price * $sourceQty
+                    );
+                }
+
+                continue;
+            }
+
+            if (!$deliveryOrder->warehouse_id) continue;
+
             $productService->createStockMovement(
                 product_id: $product->id,
                 warehouse_id: $deliveryOrder->warehouse_id,

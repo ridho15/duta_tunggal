@@ -55,16 +55,26 @@ async function selectRepeaterChoicesByLabel(page, labelText, searchText) {
 
   const searchInput = wrapper.locator('.choices__input--cloned, .choices__input[type="search"]').first()
   await searchInput.fill(searchText)
-  await page.waitForTimeout(350)
+  await page.waitForTimeout(600)
 
+  // Prefer active (visible after filter) items that match search text
   let option = wrapper
-    .locator('.choices__list--dropdown .choices__item--choice:not(.choices__placeholder):not(.is-disabled)')
+    .locator('.choices__list--dropdown .choices__item--choice.is-active:not(.choices__placeholder):not(.is-disabled)')
     .filter({ hasText: searchText || /.+/ })
     .first()
 
   if ((await option.count()) === 0) {
+    // Fallback: any active non-disabled option
+    option = wrapper
+      .locator('.choices__list--dropdown .choices__item--choice.is-active:not(.choices__placeholder):not(.is-disabled)')
+      .first()
+  }
+
+  if ((await option.count()) === 0) {
+    // Last resort: any non-disabled option
     option = wrapper
       .locator('.choices__list--dropdown .choices__item--choice:not(.choices__placeholder):not(.is-disabled)')
+      .filter({ hasText: searchText || /.+/ })
       .first()
   }
 
