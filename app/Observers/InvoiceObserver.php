@@ -285,6 +285,7 @@ class InvoiceObserver
             'journal_type' => 'sales',
             'source_type' => Invoice::class,
             'source_id' => $invoice->id,
+            'cabang_id' => $invoice->cabang_id,
         ]);
 
         // Create detailed CREDIT entries for each invoice item
@@ -306,6 +307,7 @@ class InvoiceObserver
                     'journal_type' => 'sales',
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
+                    'cabang_id' => $invoice->cabang_id,
                 ]);
                 $totalRevenue += $item->subtotal;
             }
@@ -339,6 +341,7 @@ class InvoiceObserver
                 'journal_type' => 'sales',
                 'source_type' => Invoice::class,
                 'source_id' => $invoice->id,
+                'cabang_id' => $invoice->cabang_id,
             ]);
         }
 
@@ -354,6 +357,7 @@ class InvoiceObserver
                 'journal_type' => 'sales',
                 'source_type' => Invoice::class,
                 'source_id' => $invoice->id,
+                'cabang_id' => $invoice->cabang_id,
             ]);
         }
 
@@ -424,6 +428,7 @@ class InvoiceObserver
                 'journal_type' => 'sales',
                 'source_type' => Invoice::class,
                 'source_id' => $invoice->id,
+                'cabang_id' => $invoice->cabang_id,
             ]);
         }
 
@@ -438,6 +443,7 @@ class InvoiceObserver
                 'journal_type' => 'sales',
                 'source_type' => Invoice::class,
                 'source_id' => $invoice->id,
+                'cabang_id' => $invoice->cabang_id,
             ]);
         }
     }

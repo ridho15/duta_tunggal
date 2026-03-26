@@ -159,6 +159,7 @@ class CustomerReturnService
             'journal_type' => 'customer_return',
             'source_type'  => CustomerReturn::class,
             'source_id'    => $customerReturn->id,
+            'cabang_id'    => $customerReturn->cabang_id,
         ]);
 
         // Credit COGS reversal – cost of goods is no longer "sold"
@@ -172,6 +173,7 @@ class CustomerReturnService
             'journal_type' => 'customer_return',
             'source_type'  => CustomerReturn::class,
             'source_id'    => $customerReturn->id,
+            'cabang_id'    => $customerReturn->cabang_id,
         ]);
 
         Log::info('CustomerReturn journal entries created', [

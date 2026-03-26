@@ -142,6 +142,14 @@ class Invoice extends Model
         // to fire twice, resulting in duplicate AccountReceivable/AccountPayable records
         // and doubled journal entries on every invoice event.
         // DO NOT add static::observe(InvoiceObserver::class) here.
+
+        // Auto-populate dpp from subtotal when not explicitly provided.
+        // Prevents null dpp on programmatically created invoices (old records, seeder, API, etc.).
+        static::creating(function (Invoice $invoice): void {
+            if ($invoice->dpp === null) {
+                $invoice->dpp = $invoice->subtotal ?? 0;
+            }
+        });
     }
 
     public function getOtherFeeTotalAttribute(): int

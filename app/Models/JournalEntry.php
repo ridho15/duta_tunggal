@@ -60,6 +60,21 @@ class JournalEntry extends Model
         static::addGlobalScope(new CabangScope);
 
         static::creating(function (JournalEntry $entry): void {
+            // Safety-net: auto-resolve cabang_id via JournalBranchResolver when the
+            // caller forgot to pass it. Uses source_type/source_id when available.
+            if (! $entry->cabang_id && $entry->source_type && $entry->source_id) {
+                try {
+                    $source = ($entry->source_type)::find($entry->source_id);
+                    if ($source) {
+                        $resolved = app(\App\Services\JournalBranchResolver::class)->resolve($source);
+                        if ($resolved) {
+                            $entry->cabang_id = $resolved;
+                        }
+                    }
+                } catch (\Throwable) {
+                    // Silently ignore — cabang_id stays null rather than blocking the save
+                }
+            }
             AccountingPeriod::ensureDateIsOpen($entry->date ?? now(), $entry->cabang_id);
         });
 

@@ -479,6 +479,7 @@ class DeliveryOrderObserver
                     'journal_type' => 'sales',
                     'source_type' => \App\Models\DeliveryOrder::class,
                     'source_id' => $deliveryOrder->id,
+                    'cabang_id' => $deliveryOrder->cabang_id,
                 ]);
             }
 
@@ -493,6 +494,7 @@ class DeliveryOrderObserver
                     'journal_type' => 'sales',
                     'source_type' => \App\Models\DeliveryOrder::class,
                     'source_id' => $deliveryOrder->id,
+                    'cabang_id' => $deliveryOrder->cabang_id,
                 ]);
             }
         }

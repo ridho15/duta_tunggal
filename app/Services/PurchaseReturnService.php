@@ -298,6 +298,7 @@ class PurchaseReturnService
                     'journal_type' => 'purchase_return',
                     'source_type' => PurchaseReturn::class,
                     'source_id' => $purchaseReturn->id,
+                    'cabang_id' => $purchaseReturn->cabang_id,
                 ]);
 
                 // Credit Inventory (reduce inventory value)
@@ -311,6 +312,7 @@ class PurchaseReturnService
                     'journal_type' => 'purchase_return',
                     'source_type' => PurchaseReturn::class,
                     'source_id' => $purchaseReturn->id,
+                    'cabang_id' => $purchaseReturn->cabang_id,
                 ]);
 
                 Log::info('Purchase return journal entries created', [
