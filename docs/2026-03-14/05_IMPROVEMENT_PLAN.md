@@ -19,6 +19,35 @@ Dokumen ini berisi rencana perbaikan terperinci berdasarkan hasil audit sistem t
 
 ---
 
+## UPDATE PROGRES TERKINI (26 Maret 2026)
+
+Bagian ini adalah audit progres aktual terhadap rencana di dokumen ini, berdasarkan implementasi yang sudah diverifikasi lewat code review dan test terfokus.
+
+### Status Ringkas
+
+| Item | Status | Catatan Verifikasi |
+|------|--------|--------------------|
+| P1-001 — Nonaktifkan Dusk Routes di Production | ✅ Selesai | `laravel/dusk` dikeluarkan dari auto-discovery lalu diregister manual hanya untuk `local/testing`; verifikasi `APP_ENV=production php artisan route:list` tidak menampilkan `_dusk/*`; `DuskTestCase` ditambah guard skip untuk production.
+| P1-002 — Rate Limiting Endpoints Sensitif | ✅ Selesai | Endpoint report sensitif dipindah ke middleware `auth + throttle:60,1`; route `login` diberi `throttle:login`; limiter `RateLimiter::for('login')` ditetapkan 5 request/menit per email+IP.
+| P1-003 — Database-Level Locking Stock Operations | ✅ Selesai | Locking sudah diterapkan pada item plan spesifik: `StockMovementObserver` (adjust stock via transaction + `lockForUpdate`) dan `StockReservationService` (reserve/release/consume dengan row lock). Observer reservasi juga diperkuat untuk konsistensi concurrency.
+| P2-001 — E2E Customer Return Test | ⬜ Belum | Belum ada suite E2E baru sesuai skenario lengkap.
+| P2-002 — Journal Reversal UI | ⬜ Belum | Belum ada action reversal UI yang selesai end-to-end.
+| P2-003 — Optimasi N+1 List Resources | ⬜ Belum | Optimasi sudah dilakukan di report service keuangan, namun belum pada daftar resource yang tercantum di plan ini.
+| P2-004 — Accounting Period Closing | 🟡 Parsial | Fondasi sudah terpasang: migration `accounting_periods`, guard create/update/delete pada `JournalEntry` saat periode `closed`, dan service close/reopen + posting closing entries. Opening balance carry forward belum diimplementasikan.
+| P2-005 — Status Enum Classes | ⬜ Belum | Belum ada implementasi enum lintas modul secara penuh.
+| P2-006 — Query Caching Reports | ⬜ Belum | Belum ada cache layer report yang terpasang menyeluruh.
+| P2-007 — Input Validation Hardening | 🟡 Parsial | Sudah ada penguatan di beberapa resource, namun belum diaudit global sesuai ruang lingkup plan.
+| **P2-008 — Hardening Error Notification + Structured Logging** | ✅ Selesai | Sudah diterapkan di Purchase, Sales, Finance, Asset, dan Manufacturing; termasuk notifikasi user-friendly + `Log::error`/`Log::warning` bercontext.
+
+### Detail P2-008 (Selesai)
+
+- Notifikasi gagal dan logging terstruktur sudah diterapkan pada aksi kritis modul Purchase/Sales/Finance.
+- Diperluas ke modul Asset dan Manufacturing (aksi UI + service critical path), dengan context log: id dokumen, user id, status, payload penting, dan pesan error.
+- Validasi teknis: syntax check file terkait lulus.
+- Test terfokus modul Asset/Manufacturing: **22 passed, 0 failed**.
+
+---
+
 ## FASE 1 — PERBAIKAN KRITIS (1-2 HARI)
 
 ### P1-001: Nonaktifkan Dusk Routes di Production
@@ -57,8 +86,8 @@ public static function setUpBeforeClass(): void
 ```
 
 **Test Verifikasi:**
-- [ ] `php artisan route:list` tidak menampilkan `_dusk/` routes ketika `APP_ENV=production`
-- [ ] Dusk tests tetap berjalan di environment `testing`
+- [x] `php artisan route:list` tidak menampilkan `_dusk/` routes ketika `APP_ENV=production`
+- [x] Dusk tests tetap berjalan di environment `testing`
 
 ---
 
@@ -246,6 +275,18 @@ protected static function booted(): void
     });
 }
 ```
+
+**Update Implementasi (26 Maret 2026):**
+
+- [x] Migration `accounting_periods` ditambahkan (status, closed_by, closed_at, cabang_id).
+- [x] Guard periode tertutup di `JournalEntry` untuk operasi create/update/delete.
+- [x] `AccountingPeriodService` ditambahkan untuk create period, close/reopen period, dan posting closing entries (Revenue/Expense ke Retained Earnings).
+- [ ] Opening balance carry forward ke periode baru.
+
+**Verifikasi Test Terfokus:**
+
+- [x] `tests/Feature/AccountingPeriodClosingTest.php` → 4 passed, 0 failed.
+- [x] `tests/Feature/JournalEntryTest.php` → 13 passed, 0 failed.
 
 ---
 
@@ -651,19 +692,19 @@ Schema::table('invoices', function (Blueprint $table) {
 
 **Target Selesai: 15 Maret 2026**
 
-- [ ] **P1-001** — Nonaktifkan Dusk Routes di production
-  - [ ] Update environment check
-  - [ ] Verify dengan `route:list`
+- [x] **P1-001** — Nonaktifkan Dusk Routes di production
+    - [x] Update environment check
+    - [x] Verify dengan `route:list`
   - [ ] Deploy ke production
 
-- [ ] **P1-002** — Tambahkan Rate Limiting
-  - [ ] Update `routes/web.php`
-  - [ ] Test throttle behavior
+- [x] **P1-002** — Tambahkan Rate Limiting
+    - [x] Update `routes/web.php`
+    - [x] Test throttle behavior
   
-- [ ] **P1-003** — Database-level Locking untuk Stock
-  - [ ] Update `StockMovementObserver`
-  - [ ] Update `StockReservationService`
-  - [ ] Run existing stock tests untuk verifikasi
+- [x] **P1-003** — Database-level Locking untuk Stock
+    - [x] Update `StockMovementObserver`
+    - [x] Update `StockReservationService`
+    - [x] Run existing stock tests untuk verifikasi
 
 ---
 
@@ -678,6 +719,7 @@ Schema::table('invoices', function (Blueprint $table) {
 - [ ] **P2-005** — Status Enum classes
 - [ ] **P2-006** — Query caching untuk reports
 - [ ] **P2-007** — Input validation hardening
+- [x] **P2-008** — Hardening error notification + structured logging (Purchase, Sales, Finance, Asset, Manufacturing)
 
 ---
 

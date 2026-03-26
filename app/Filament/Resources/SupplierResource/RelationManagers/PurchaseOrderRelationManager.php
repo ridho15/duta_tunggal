@@ -35,10 +35,10 @@ class PurchaseOrderRelationManager extends RelationManager
                     ->searchable(query: function (Builder $query, $search) {
                         $query->whereHas('supplier', function ($query) use ($search) {
                             $query->where('code', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                                ->orWhere('perusahaan', 'LIKE', '%' . $search . '%');
                         });
                     })->formatStateUsing(function ($state) {
-                        return "({$state->code}) {$state->name}";
+                        return "({$state->code}) {$state->perusahaan}";
                     }),
                 TextColumn::make('po_number')
                     ->label('PO Number')

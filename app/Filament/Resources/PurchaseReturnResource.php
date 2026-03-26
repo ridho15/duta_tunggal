@@ -35,6 +35,7 @@ use App\Models\PurchaseReturn;
 use App\Services\PurchaseReturnService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseReturnResource extends Resource
 {
@@ -393,11 +394,26 @@ class PurchaseReturnResource extends Resource
                         ->visible(fn ($record) => $record->status === 'draft')
                         ->action(function ($record) {
                             $service = app(PurchaseReturnService::class);
-                            $service->submitForApproval($record);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Purchase Return submitted for approval')
-                                ->success()
-                                ->send();
+                            try {
+                                $service->submitForApproval($record);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Purchase Return Diajukan')
+                                    ->body('Retur pembelian berhasil diajukan untuk persetujuan.')
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Log::error('PurchaseReturn submit_for_approval failed', [
+                                    'purchase_return_id' => $record->id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Mengajukan Retur')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
                     \Filament\Tables\Actions\Action::make('approve')
                         ->label('Approve')
@@ -411,11 +427,27 @@ class PurchaseReturnResource extends Resource
                         ])
                         ->action(function ($record, array $data) {
                             $service = app(PurchaseReturnService::class);
-                            $service->approve($record, $data);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Purchase Return approved')
-                                ->success()
-                                ->send();
+                            try {
+                                $service->approve($record, $data);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Retur Pembelian Disetujui')
+                                    ->body('Retur pembelian berhasil disetujui. Jurnal akuntansi dan penyesuaian stok telah diproses.')
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Log::error('PurchaseReturn approve failed', [
+                                    'purchase_return_id' => $record->id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'approval_notes' => $data['approval_notes'] ?? null,
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Menyetujui Retur')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
                     \Filament\Tables\Actions\Action::make('reject')
                         ->label('Reject')
@@ -429,11 +461,27 @@ class PurchaseReturnResource extends Resource
                         ])
                         ->action(function ($record, array $data) {
                             $service = app(PurchaseReturnService::class);
-                            $service->reject($record, $data);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Purchase Return rejected')
-                                ->danger()
-                                ->send();
+                            try {
+                                $service->reject($record, $data);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Retur Pembelian Ditolak')
+                                    ->body('Retur pembelian telah ditolak.')
+                                    ->danger()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Log::error('PurchaseReturn reject failed', [
+                                    'purchase_return_id' => $record->id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'rejection_notes' => $data['rejection_notes'] ?? null,
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Menolak Retur')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
                     DeleteAction::make()
                         ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
@@ -485,7 +533,7 @@ class PurchaseReturnResource extends Resource
                         TextEntry::make('qualityControl.fromModel.purchaseOrder.po_number')
                             ->label('PO Number')
                             ->visible(fn ($record) => $record->isQcReturn()),
-                        TextEntry::make('qualityControl.fromModel.purchaseOrder.supplier.name')
+                        TextEntry::make('qualityControl.fromModel.purchaseOrder.supplier.perusahaan')
                             ->label('Supplier')
                             ->visible(fn ($record) => $record->isQcReturn()),
                     ]),

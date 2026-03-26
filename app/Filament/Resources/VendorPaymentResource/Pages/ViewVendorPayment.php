@@ -51,7 +51,7 @@ class ViewVendorPayment extends ViewRecord
                     ->schema([
                         Infolists\Components\Grid::make(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('supplier.name')
+                                Infolists\Components\TextEntry::make('supplier.perusahaan')
                                     ->label('Supplier'),
                                 Infolists\Components\TextEntry::make('payment_date')
                                     ->label('Tanggal Pembayaran')

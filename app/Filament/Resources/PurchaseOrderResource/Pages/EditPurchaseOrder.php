@@ -10,8 +10,10 @@ use Carbon\Carbon;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class EditPurchaseOrder extends EditRecord
 {
@@ -33,11 +35,31 @@ class EditPurchaseOrder extends EditRecord
                 ->icon('heroicon-o-check-badge')
                 ->color('success')
                 ->action(function ($record) {
-                    $record->update([
-                        'status' => 'approved',
-                        'date_approved' => Carbon::now(),
-                        'approved_by' => Auth::user()->id,
-                    ]);
+                    try {
+                        $record->update([
+                            'status' => 'approved',
+                            'date_approved' => Carbon::now(),
+                            'approved_by' => Auth::user()->id,
+                        ]);
+                        Notification::make()
+                            ->title('Purchase Order Dikonfirmasi')
+                            ->body('PO ' . $record->po_number . ' berhasil disetujui.')
+                            ->success()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Log::error('EditPurchaseOrder konfirmasi failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'status' => $record->status,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        Notification::make()
+                            ->title('Gagal Mengkonfirmasi PO')
+                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
                 }),
             Action::make('tolak')
                 ->label('Tolak')
@@ -48,9 +70,29 @@ class EditPurchaseOrder extends EditRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->action(function ($record) {
-                    $record->update([
-                        'status' => 'draft'
-                    ]);
+                    try {
+                        $record->update([
+                            'status' => 'draft'
+                        ]);
+                        Notification::make()
+                            ->title('Purchase Order Ditolak')
+                            ->body('PO dikembalikan ke status Draft.')
+                            ->warning()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Log::error('EditPurchaseOrder tolak failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'status' => $record->status,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        Notification::make()
+                            ->title('Gagal Menolak PO')
+                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
                 }),
             Action::make('request_close')
                 ->label('Request Close')
@@ -61,9 +103,29 @@ class EditPurchaseOrder extends EditRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->action(function ($record) {
-                    $record->update([
-                        'status' => 'request_close'
-                    ]);
+                    try {
+                        $record->update([
+                            'status' => 'request_close'
+                        ]);
+                        Notification::make()
+                            ->title('Permintaan Penutupan Diajukan')
+                            ->body('Permintaan penutupan PO menunggu konfirmasi Manager.')
+                            ->warning()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Log::error('EditPurchaseOrder request_close failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'status' => $record->status,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        Notification::make()
+                            ->title('Gagal Request Close')
+                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
                 }),
             Action::make('cetak_pdf')
                 ->label('Cetak PDF')

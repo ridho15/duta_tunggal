@@ -115,8 +115,31 @@ class DeliveryScheduleResource extends Resource
                             ->options(Cabang::all()->mapWithKeys(fn ($c) => [$c->id => "({$c->kode}) {$c->nama}"]))
                             ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
                             ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                // Clear any previously selected Surat Jalan when cabang changes
+                                $set('suratJalans', []);
+                            })
                             ->required()
                             ->validationMessages(['required' => 'Cabang wajib dipilih']),
+
+                        Select::make('suratJalans')
+                            ->label('Surat Jalan')
+                            ->searchable()
+                            ->multiple()
+                            ->required()
+                            ->reactive()
+                            ->disabled(fn($get) => empty($get('cabang_id')))
+                            ->relationship(
+                                name: 'suratJalans',
+                                titleAttribute: 'sj_number',
+                                modifyQueryUsing: fn(Builder $query, \Filament\Forms\Get $get) =>
+                                    $get('cabang_id')
+                                        ? $query->where('cabang_id', $get('cabang_id'))->orderBy('sj_number')
+                                        : $query->whereRaw('1=0')
+                            )
+                            ->helperText(fn($get) => empty($get('cabang_id')) ? 'Pilih Cabang terlebih dahulu untuk menampilkan Surat Jalan.' : 'Pilih satu atau lebih Surat Jalan untuk jadwal ini')
+                            ->validationMessages(['required' => 'Minimal satu Surat Jalan wajib dipilih']),
 
                         DateTimePicker::make('scheduled_date')
                             ->label('Tanggal Keberangkatan')
@@ -172,15 +195,7 @@ class DeliveryScheduleResource extends Resource
                             ->visible(fn ($get) => $get('delivery_method') === 'ekspedisi')
                             ->helperText('Plat kendaraan, nama ekspedisi, atau nomor resi'),
 
-                        Select::make('suratJalans')
-                            ->label('Surat Jalan')
-                            ->searchable()
-                            ->preload()
-                            ->multiple()
-                            ->required()
-                            ->relationship('suratJalans', 'sj_number')
-                            ->helperText('Pilih satu atau lebih Surat Jalan untuk jadwal ini')
-                            ->validationMessages(['required' => 'Minimal satu Surat Jalan wajib dipilih']),
+                        
 
                         Select::make('status')
                             ->label('Status')
@@ -229,8 +244,18 @@ class DeliveryScheduleResource extends Resource
                             ->label('Driver')
                             ->placeholder('-')
                             ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+
+                        TextEntry::make('driver.license')
+                            ->label('Kode Driver')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
                         TextEntry::make('vehicle.plate')
-                            ->label('Kendaraan')
+                            ->label('Kendaraan (Plat)')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+
+                        TextEntry::make('vehicle.type')
+                            ->label('Tipe Kendaraan')
                             ->placeholder('-')
                             ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
                         TextEntry::make('driver_name')
@@ -262,12 +287,15 @@ class DeliveryScheduleResource extends Resource
                                 'cancelled'         => 'Dibatalkan',
                                 default             => ucfirst($state),
                             }),
+                        TextEntry::make('cabang.kode')->label('Kode Cabang'),
                         TextEntry::make('cabang.nama')->label('Cabang'),
                         TextEntry::make('notes')->label('Catatan')->placeholder('-'),
                         TextEntry::make('suratJalans.sj_number')
                             ->label('Surat Jalan')
                             ->badge()
-                            ->color('primary'),
+                            ->color('primary')
+                            ->separator(',')
+                            ->placeholder('-'),
                     ])
                     ->columns(2),
             ]);

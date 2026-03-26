@@ -7,6 +7,7 @@ use App\Models\AssetDepreciation;
 use App\Models\JournalEntry;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AssetDepreciationService
 {
@@ -76,6 +77,12 @@ class AssetDepreciationService
             return $depreciation;
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('AssetDepreciationService generateMonthlyDepreciation failed', [
+                'asset_id' => $asset->id,
+                'asset_name' => $asset->name,
+                'date' => $date->toDateString(),
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }
@@ -100,6 +107,12 @@ class AssetDepreciationService
                 $this->generateMonthlyDepreciation($asset, $date);
                 $results['success']++;
             } catch (\Exception $e) {
+                Log::error('AssetDepreciationService generateAllMonthlyDepreciation item failed', [
+                    'asset_id' => $asset->id,
+                    'asset_name' => $asset->name,
+                    'date' => $date->toDateString(),
+                    'error' => $e->getMessage(),
+                ]);
                 $results['failed']++;
                 $results['errors'][] = [
                     'asset' => $asset->name,
@@ -186,6 +199,11 @@ class AssetDepreciationService
             return true;
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('AssetDepreciationService reverseDepreciation failed', [
+                'asset_depreciation_id' => $depreciation->id,
+                'asset_id' => $depreciation->asset_id,
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }

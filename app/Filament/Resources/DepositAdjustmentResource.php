@@ -84,14 +84,14 @@ class DepositAdjustmentResource extends Resource
                                     ->searchable()
                                     ->options(function ($get) {
                                         if ($get('from_model_type') == 'App\Models\Supplier') {
-                                            return Supplier::get()->pluck('name', 'id');
+                                            return Supplier::get()->pluck('perusahaan', 'id');
                                         } elseif ($get('from_model_type') == 'App\Models\Customer') {
                                             return Customer::get()->pluck('name', 'id');
                                         }
                                         return [];
                                     })
                                     ->getOptionLabelFromRecordUsing(function ($record) {
-                                        return "({$record->code}) {$record->name}";
+                                        return "({$record->code}) " . ($record->perusahaan ?? $record->name ?? '');
                                     })
                                     ->reactive(),
                             ]),

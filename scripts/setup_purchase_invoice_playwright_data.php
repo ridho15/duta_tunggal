@@ -33,9 +33,19 @@ $existingLocked = DB::table('purchase_receipts')->where('receipt_number', $fixtu
 $existingOpen = DB::table('purchase_receipts')->where('receipt_number', $fixture['receipt_open'])->where('status', 'completed')->first();
 $existingInvoice = DB::table('invoices')->where('invoice_number', $fixture['invoice_number'])->first();
 
+$openReceiptAlreadyInvoiced = false;
+if ($existingOpen) {
+    $openReceiptAlreadyInvoiced = DB::table('invoices')
+        ->whereNotNull('purchase_receipts')
+        ->whereRaw('JSON_VALID(purchase_receipts)')
+        ->whereRaw('JSON_CONTAINS(purchase_receipts, ?)', [json_encode((int) $existingOpen->id)])
+        ->exists();
+}
+
 if ($existingPo && $existingLocked && $existingOpen && $existingInvoice
     && $existingLocked->purchase_order_id === $existingPo->id
-    && $existingOpen->purchase_order_id === $existingPo->id) {
+    && $existingOpen->purchase_order_id === $existingPo->id
+    && !$openReceiptAlreadyInvoiced) {
     echo "Fixture data already exists and is valid — skipping setup\n";
     exit(0);
 }
@@ -80,6 +90,27 @@ DB::transaction(function () use ($now, $fixture) {
         ->whereIn('receipt_number', [$fixture['receipt_locked'], $fixture['receipt_open']])
         ->pluck('id')
         ->toArray();
+
+    // Remove any invoices (not only INV-TEST-INV-*) that already reference
+    // the fixture receipts, so receipt_open remains selectable deterministically.
+    if (!empty($existingReceiptIds)) {
+        $referencingInvoiceIds = DB::table('invoices')
+            ->whereNotNull('purchase_receipts')
+            ->whereRaw('JSON_VALID(purchase_receipts)')
+            ->where(function ($query) use ($existingReceiptIds) {
+                foreach ($existingReceiptIds as $receiptId) {
+                    $query->orWhereRaw('JSON_CONTAINS(purchase_receipts, ?)', [json_encode((int) $receiptId)]);
+                }
+            })
+            ->pluck('id')
+            ->toArray();
+
+        if (!empty($referencingInvoiceIds)) {
+            DB::table('invoice_items')->whereIn('invoice_id', $referencingInvoiceIds)->delete();
+            DB::table('invoices')->whereIn('id', $referencingInvoiceIds)->delete();
+        }
+    }
+
     if (!empty($existingReceiptIds)) {
         DB::table('purchase_receipt_biayas')->whereIn('purchase_receipt_id', $existingReceiptIds)->delete();
         DB::table('purchase_receipt_items')->whereIn('purchase_receipt_id', $existingReceiptIds)->delete();

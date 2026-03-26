@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\InventoryStock;
 use App\Models\StockMovement;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StockMovementObserver
@@ -15,19 +16,6 @@ class StockMovementObserver
      */
     public function created(StockMovement $stockMovement): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-        if (!$inventoryStock) {
-            $inventoryStock = InventoryStock::create([
-                'product_id' => $stockMovement->product_id,
-                'warehouse_id' => $stockMovement->warehouse_id,
-                'rak_id' => $stockMovement->rak_id,
-                'qty_available' => 0,
-                'qty_reserved' => 0,
-            ]);
-        }
-
         $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
         $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
 
@@ -37,11 +25,9 @@ class StockMovementObserver
         }
 
         if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, (float) $stockMovement->quantity);
         } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $stockMovement->quantity;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, -1 * (float) $stockMovement->quantity);
         }
     }
 
@@ -78,15 +64,6 @@ class StockMovementObserver
             return;
         }
 
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-
-        if (!$inventoryStock) {
-            unset(self::$originalQuantities[$stockMovement->id]);
-            return;
-        }
-
         $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
         $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
 
@@ -99,11 +76,9 @@ class StockMovementObserver
         $quantityDiff = $currentQuantity - $originalQuantity;
 
         if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $quantityDiff;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, (float) $quantityDiff);
         } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $quantityDiff;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, -1 * (float) $quantityDiff);
         }
 
         unset(self::$originalQuantities[$stockMovement->id]);
@@ -114,14 +89,6 @@ class StockMovementObserver
      */
     public function deleted(StockMovement $stockMovement): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-
-        if (!$inventoryStock) {
-            return;
-        }
-
         $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
         $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
 
@@ -132,11 +99,9 @@ class StockMovementObserver
 
         // Reverse the stock movement effect when deleted
         if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $stockMovement->quantity;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, -1 * (float) $stockMovement->quantity);
         } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, (float) $stockMovement->quantity);
         }
     }
 
@@ -145,20 +110,6 @@ class StockMovementObserver
      */
     public function restored(StockMovement $stockMovement): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-
-        if (!$inventoryStock) {
-            $inventoryStock = InventoryStock::create([
-                'product_id' => $stockMovement->product_id,
-                'warehouse_id' => $stockMovement->warehouse_id,
-                'rak_id' => $stockMovement->rak_id,
-                'qty_available' => 0,
-                'qty_reserved' => 0,
-            ]);
-        }
-
         $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
         $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
 
@@ -169,12 +120,33 @@ class StockMovementObserver
 
         // Re-apply the stock movement effect when restored
         if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, (float) $stockMovement->quantity);
         } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $stockMovement->quantity;
-            $inventoryStock->save();
+            $this->adjustAvailableStock($stockMovement, -1 * (float) $stockMovement->quantity);
         }
+    }
+
+    private function adjustAvailableStock(StockMovement $stockMovement, float $delta): void
+    {
+        DB::transaction(function () use ($stockMovement, $delta) {
+            $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
+                ->where('warehouse_id', $stockMovement->warehouse_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$inventoryStock) {
+                $inventoryStock = InventoryStock::create([
+                    'product_id' => $stockMovement->product_id,
+                    'warehouse_id' => $stockMovement->warehouse_id,
+                    'rak_id' => $stockMovement->rak_id,
+                    'qty_available' => 0,
+                    'qty_reserved' => 0,
+                ]);
+            }
+
+            $inventoryStock->qty_available = (float) $inventoryStock->qty_available + $delta;
+            $inventoryStock->save();
+        });
     }
 
     /**

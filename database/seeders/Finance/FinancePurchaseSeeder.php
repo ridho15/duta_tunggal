@@ -140,7 +140,7 @@ class FinancePurchaseSeeder extends Seeder
                     'other_fee' => 0,
                     'total' => $total,
                     'status' => $purchase['invoice']['status'],
-                    'supplier_name' => $supplier->name,
+                    'supplier_name' => $supplier->perusahaan ?? null,
                     'supplier_phone' => $supplier->phone,
                 ]
             );
@@ -183,14 +183,14 @@ class FinancePurchaseSeeder extends Seeder
                     [
                         'amount' => $paymentData['amount'],
                         'coa_id' => optional($this->context->getCoa('1112.01'))->id,
-                        'notes' => 'Pembayaran ke ' . $supplier->name,
+                        'notes' => 'Pembayaran ke ' . ($supplier->perusahaan ?? ''),
                     ]
                 );
 
                 $payment->recalculateTotalPayment();
                 $paid += $paymentData['amount'];
                 $paymentsSummary[] = [
-                    'entity' => $supplier->name,
+                    'entity' => $supplier->perusahaan ?? '',
                     'amount' => $paymentData['amount'],
                     'date' => $paymentData['date']->copy(),
                 ];

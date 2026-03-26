@@ -3,6 +3,9 @@
 namespace App\Filament\Resources\WarehouseConfirmationResource\Pages;
 
 use App\Filament\Resources\WarehouseConfirmationResource;
+use App\Models\DeliveryOrder;
+use App\Models\ManufacturingOrder;
+use App\Models\SaleOrder;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists;
@@ -34,6 +37,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                         'confirmed_by' => Auth::id(),
                         'confirmed_at' => now(),
                     ]);
+                    $this->record->getLinkedDeliveryOrder()?->updateStatusFromWarehouseConfirmations();
                     $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
                 })
                 ->visible(fn () => strtolower($this->record->status) === 'request'),
@@ -55,6 +59,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                         'confirmed_by'     => Auth::id(),
                         'confirmed_at'     => now(),
                     ]);
+                    $this->record->getLinkedDeliveryOrder()?->updateStatusFromWarehouseConfirmations();
                     $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
                 })
                 ->visible(fn () => strtolower($this->record->status) === 'request'),
@@ -115,16 +120,20 @@ class ViewWarehouseConfirmation extends ViewRecord
                 // I2: DO information section (visible when WC is linked to a DO)
                 Infolists\Components\Section::make('Informasi Delivery Order')
                     ->schema([
-                        Infolists\Components\TextEntry::make('deliveryOrder.do_number')
-                            ->label('Nomor DO'),
-                        Infolists\Components\TextEntry::make('deliveryOrder.delivery_date')
+                        Infolists\Components\TextEntry::make('do_number_display')
+                            ->label('Nomor DO')
+                            ->getStateUsing(fn ($record) => $record->getLinkedDeliveryOrder()?->do_number ?? '-'),
+                        Infolists\Components\TextEntry::make('do_delivery_date_display')
                             ->label('Tanggal Pengiriman')
-                            ->date(),
+                            ->getStateUsing(fn ($record) => $record->getLinkedDeliveryOrder()?->delivery_date
+                                ? \Carbon\Carbon::parse($record->getLinkedDeliveryOrder()->delivery_date)->format('d/m/Y')
+                                : '-'),
                         Infolists\Components\TextEntry::make('delivery_order_customer')
                             ->label('Customer')
                             ->getStateUsing(function ($record) {
-                                return $record->deliveryOrder?->salesOrders?->first()?->customer?->name
-                                    ?? $record->saleOrder?->customer?->name
+                                $do = $record->getLinkedDeliveryOrder();
+                                return $do?->salesOrders?->first()?->customer?->name
+                                    ?? $record->getLinkedSaleOrder()?->customer?->name
                                     ?? '-';
                             }),
                         Infolists\Components\TextEntry::make('delivery_order_total_items')
@@ -134,8 +143,9 @@ class ViewWarehouseConfirmation extends ViewRecord
                                 $qty = (float) $record->warehouseConfirmationItems->sum('requested_qty');
                                 return "{$count} baris / qty {$qty}";
                             }),
-                        Infolists\Components\TextEntry::make('deliveryOrder.status')
+                        Infolists\Components\TextEntry::make('do_status_display')
                             ->label('Status DO')
+                            ->getStateUsing(fn ($record) => $record->getLinkedDeliveryOrder()?->status ?? '-')
                             ->badge()
                             ->color(fn ($state) => match (strtolower((string) $state)) {
                                 'approved'      => 'success',
@@ -150,23 +160,27 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->visible(fn ($record) => strtolower($record->status) === 'rejected'),
                     ])
                     ->columns(2)
-                    ->visible(fn ($record) => ! empty($record->delivery_order_id)),
+                    ->visible(fn ($record) => $record->confirmable_type === DeliveryOrder::class),
 
                 Infolists\Components\Section::make('Manufacturing Order Information')
                     ->schema([
-                        Infolists\Components\TextEntry::make('manufacturingOrder.mo_number')
-                            ->label('MO Number'),
+                        Infolists\Components\TextEntry::make('mo_number_display')
+                            ->label('MO Number')
+                            ->getStateUsing(fn ($record) => $record->confirmable?->mo_number ?? '-'),
 
-                        Infolists\Components\TextEntry::make('manufacturingOrder.status')
+                        Infolists\Components\TextEntry::make('mo_status_display')
                             ->label('MO Status')
+                            ->getStateUsing(fn ($record) => $record->confirmable?->status ?? '-')
                             ->badge(),
 
-                        Infolists\Components\TextEntry::make('manufacturingOrder.created_at')
+                        Infolists\Components\TextEntry::make('mo_created_at_display')
                             ->label('Created Date')
-                            ->date(),
+                            ->getStateUsing(fn ($record) => $record->confirmable?->created_at
+                                ? \Carbon\Carbon::parse($record->confirmable->created_at)->format('d/m/Y')
+                                : '-'),
                     ])
                     ->columns(3)
-                    ->visible(fn($record) => $record->manufacturing_order_id !== null),
+                    ->visible(fn ($record) => $record->confirmable_type === ManufacturingOrder::class),
 
                 Infolists\Components\Section::make('Warehouse Confirmations')
                     ->schema([
@@ -216,12 +230,7 @@ class ViewWarehouseConfirmation extends ViewRecord
     {
         return parent::getEloquentQuery()
             ->with([
-                'deliveryOrder',
-                'saleOrder.customer',
-                'saleOrder.saleOrderItem.product',
-                'saleOrder.saleOrderItem.warehouse',
-                'saleOrder.saleOrderItem.rak',
-                'manufacturingOrder',
+                'confirmable',
                 'warehouseConfirmationItems.saleOrderItem.product',
                 'warehouseConfirmationItems.warehouse',
                 'warehouseConfirmationItems.rak',

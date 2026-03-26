@@ -161,22 +161,30 @@ class PurchaseReturnService
     {
         $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
 
-        // Clamp so qty doesn't go negative
-        $newQty = max(0, $poItem->quantity - $totalRejected);
-        $poItem->update(['quantity' => $newQty]);
+        // Lock the PO item row to prevent concurrent returns from reading stale qty.
+        DB::transaction(function () use ($purchaseReturn, $poItem, $totalRejected) {
+            $lockedPoItem = PurchaseOrderItem::where('id', $poItem->id)
+                ->lockForUpdate()
+                ->first();
 
-        $purchaseReturn->update([
-            'tracking_notes' => ($purchaseReturn->tracking_notes ?? '')
-                . "\n[Approved] PO item qty reduced from {$poItem->quantity} to {$newQty}.",
-        ]);
+            // Clamp so qty doesn't go negative
+            $oldQty = $lockedPoItem->quantity;
+            $newQty = max(0, $oldQty - $totalRejected);
+            $lockedPoItem->update(['quantity' => $newQty]);
 
-        Log::info('QC return resolved: reduce_stock', [
-            'return_id'   => $purchaseReturn->id,
-            'po_item_id'  => $poItem->id,
-            'old_qty'     => $poItem->quantity,
-            'new_qty'     => $newQty,
-            'rejected_qty'=> $totalRejected,
-        ]);
+            $purchaseReturn->update([
+                'tracking_notes' => ($purchaseReturn->tracking_notes ?? '')
+                    . "\n[Approved] PO item qty reduced from {$oldQty} to {$newQty}.",
+            ]);
+
+            Log::info('QC return resolved: reduce_stock', [
+                'return_id'    => $purchaseReturn->id,
+                'po_item_id'   => $lockedPoItem->id,
+                'old_qty'      => $oldQty,
+                'new_qty'      => $newQty,
+                'rejected_qty' => $totalRejected,
+            ]);
+        });
     }
 
     /**
@@ -274,7 +282,7 @@ class PurchaseReturnService
                         'purchase_return' => $purchaseReturnCoa?->id,
                         'accounts_payable' => $accountsPayableCoa?->id
                     ]);
-                    return;
+                    throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur pembelian. Diperlukan: Persediaan (1101.01), Retur Pembelian (5120.10), Hutang Dagang (2101.01).');
                 }
 
                 $entries = [];
@@ -331,9 +339,11 @@ class PurchaseReturnService
         try {
             DB::transaction(function () use ($purchaseReturn) {
                 foreach ($purchaseReturn->purchaseReturnItem as $item) {
-                    // Update inventory stock
+                    // Lock the inventory stock row to prevent concurrent returns
+                    // from both reading the same qty and each decrementing incorrectly.
                     $inventoryStock = InventoryStock::where('product_id', $item->product_id)
                         ->where('warehouse_id', $purchaseReturn->purchaseReceipt->warehouse_id ?? 1)
+                        ->lockForUpdate()
                         ->first();
 
                     if ($inventoryStock) {
@@ -479,8 +489,12 @@ class PurchaseReturnService
                 $this->executeQcResolution($purchaseReturn);
             } else {
                 // Standard receipt-based return: reverse inventory and create journal entries.
-                $this->createJournalEntry($purchaseReturn);
-                $this->adjustStock($purchaseReturn);
+                if (!$this->createJournalEntry($purchaseReturn)) {
+                    throw new \Exception('Gagal membuat jurnal akuntansi retur pembelian. Silakan periksa konfigurasi akun COA (1101.01, 5120.10, 2101.01).');
+                }
+                if (!$this->adjustStock($purchaseReturn)) {
+                    throw new \Exception('Gagal menyesuaikan stok untuk retur pembelian. Silakan coba lagi atau hubungi administrator.');
+                }
             }
         });
 

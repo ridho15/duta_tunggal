@@ -65,7 +65,10 @@ use App\Observers\CashBankTransferObserver;
 use App\Observers\OtherSaleObserver;
 use App\Helpers\MoneyHelper;
 use Barryvdh\Debugbar\Facades\Debugbar;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\AliasLoader;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
@@ -84,6 +87,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $loader = AliasLoader::getInstance();
         $loader->alias('Debugbar', Debugbar::class);
+
+        if ($this->app->environment(['local', 'testing']) && class_exists(\Laravel\Dusk\DuskServiceProvider::class)) {
+            $this->app->register(\Laravel\Dusk\DuskServiceProvider::class);
+        }
 
         // Ensure Filament classes are loaded before registering macros
         class_exists(\Filament\Forms\Components\TextInput::class);
@@ -177,6 +184,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('login', function (Request $request) {
+            $email = (string) $request->input('email', 'guest');
+            return Limit::perMinute(5)->by(strtolower($email) . '|' . $request->ip());
+        });
+
         StockMovement::observe(StockMovementObserver::class);
         StockReservation::observe(StockReservationObserver::class);
         ManufacturingOrder::observe(ObserversManufacturingOrder::class);

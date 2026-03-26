@@ -34,6 +34,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ManufacturingOrderResource extends Resource
@@ -358,27 +359,44 @@ class ManufacturingOrderResource extends Resource
                             return Auth::user()->hasPermissionTo('request manufacturing order') && $record->status == 'draft';
                         })
                         ->action(function ($record) {
-                            // Policy guard: transition draft -> in_progress
-                            abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
-                            $manufacturingService = app(ManufacturingService::class);
-                            $status = $manufacturingService->checkStockMaterial($record);
-                            if ($status) {
-                                $record->update([
-                                    'status' => 'in_progress'
-                                ]);
+                            try {
+                                // Policy guard: transition draft -> in_progress
+                                abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
+                                $manufacturingService = app(ManufacturingService::class);
+                                $status = $manufacturingService->checkStockMaterial($record);
+                                if ($status) {
+                                    $record->update([
+                                        'status' => 'in_progress'
+                                    ]);
 
-                                // Create Production record automatically
-                                $productionService = app(\App\Services\ProductionService::class);
-                                \App\Models\Production::create([
-                                    'production_number' => $productionService->generateProductionNumber(),
+                                    // Create Production record automatically
+                                    $productionService = app(\App\Services\ProductionService::class);
+                                    \App\Models\Production::create([
+                                        'production_number' => $productionService->generateProductionNumber(),
+                                        'manufacturing_order_id' => $record->id,
+                                        'production_date' => now()->toDateString(),
+                                        'status' => 'draft',
+                                    ]);
+
+                                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
+                                } else {
+                                    Log::warning('ManufacturingOrder start blocked: insufficient material stock', [
+                                        'manufacturing_order_id' => $record->id,
+                                        'mo_number' => $record->mo_number,
+                                        'status' => $record->status,
+                                        'user_id' => Auth::id(),
+                                    ]);
+                                    HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock material tidak mencukupi");
+                                }
+                            } catch (\Throwable $e) {
+                                Log::error('ManufacturingOrder start production failed', [
                                     'manufacturing_order_id' => $record->id,
-                                    'production_date' => now()->toDateString(),
-                                    'status' => 'draft',
+                                    'mo_number' => $record->mo_number,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
                                 ]);
-
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
-                            } else {
-                                HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock material tidak mencukupi");
+                                HelperController::sendNotification(isSuccess: false, title: "Gagal Memulai Produksi", message: "Terjadi kesalahan saat memulai produksi: " . $e->getMessage());
                             }
                         })
                 ])

@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test'
 import {
-  BASE,
   FIXTURE,
   ensurePurchaseInvoiceFixture,
   openCreatePage,
@@ -42,20 +41,29 @@ test('B2-b: PPN nominal follows DPP × rate after selecting fixture receipt', as
   let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()
   if (!(await poCheckbox.isEnabled())) {
-    poCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_orders"]:not([disabled])').first()
+    poCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live*="selected_purchase_orders"]:not([disabled])').first()
     await expect(poCheckbox).toBeVisible({ timeout: 5000 })
   }
   await expect(poCheckbox).toBeEnabled({ timeout: 5000 })
   await poCheckbox.click({ force: true })
-
-  // Wait for receipt section to populate after Livewire re-render
-  let openReceiptCheckbox = await checkCheckboxByLabel(page, FIXTURE.receiptOpen)
-  if (!(await openReceiptCheckbox.isVisible().catch(() => false)) || !(await openReceiptCheckbox.isEnabled().catch(() => false))) {
-    openReceiptCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live="data.selected_purchase_receipts"]:not([disabled])').first()
+  if (!(await poCheckbox.isChecked().catch(() => false))) {
+    await clickCheckboxByLabel(page, FIXTURE.poNumber)
   }
-  await expect(openReceiptCheckbox).toBeVisible({ timeout: 10000 })
+  await expect(poCheckbox).toBeChecked({ timeout: 5000 })
+  await page.waitForTimeout(1000)
+
+  // Wait for receipt section to populate and find the open receipt by its label text
+  // Note: Filament renders checkboxes with wire:model.live (not wire:model), so we use
+  // label-based selection which is both more reliable and attribute-agnostic.
+  const receiptLabel = page.locator('label').filter({ hasText: FIXTURE.receiptOpen })
+  await expect(receiptLabel).toBeVisible({ timeout: 10000 })
+  const openReceiptCheckbox = receiptLabel.locator('input[type="checkbox"]').first()
   await expect(openReceiptCheckbox).toBeEnabled({ timeout: 5000 })
   await openReceiptCheckbox.click({ force: true })
+  if (!(await openReceiptCheckbox.isChecked().catch(() => false))) {
+    await clickCheckboxByLabel(page, FIXTURE.receiptOpen)
+  }
+  await expect(openReceiptCheckbox).toBeChecked({ timeout: 5000 })
 
   await page.waitForLoadState('networkidle')
 

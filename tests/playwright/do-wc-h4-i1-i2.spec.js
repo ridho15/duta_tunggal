@@ -92,28 +92,22 @@ test('I1-b  WC view page loads and has correct action buttons', async ({ page })
   expect(body).not.toMatch(ERR)
 
   // Filament row actions are in a dropdown; find the first record's view link in DOM
-  const viewLinks = page.locator('a[href*="/admin/warehouse-confirmations/"][href$="/view"], a[href*="/admin/warehouse-confirmations/"][href*="/view"]')
-  const directLinks = page.locator('a[href*="/admin/warehouse-confirmations/"]').filter({ hasNot: page.locator('[href$="/create"]') })
-
-  // Try to find any numeric ID record link
+  // The view route is /{record} (no /view suffix) in this resource
   const allLinks = await page.locator('a[href*="/admin/warehouse-confirmations/"]').all()
   let wcViewHref = null
   for (const link of allLinks) {
     const href = await link.getAttribute('href')
-    if (href && /\/admin\/warehouse-confirmations\/\d+/.test(href)) {
+    // Match numeric ID links but exclude /create and /edit
+    if (href && /\/admin\/warehouse-confirmations\/\d+$/.test(href)) {
       wcViewHref = href
       break
     }
   }
 
   if (!wcViewHref) {
+    // No WC records in DB – just check the list page rendered OK
     expect(body).toMatch(/warehouse confirmation|konfirmasi gudang/i)
     return
-  }
-
-  // Ensure we go to the view page (add /view suffix if not present)
-  if (!wcViewHref.includes('/view')) {
-    wcViewHref = wcViewHref.replace(/\/$/, '') + '/view'
   }
 
   await page.goto(wcViewHref)

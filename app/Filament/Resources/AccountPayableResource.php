@@ -176,13 +176,13 @@ class AccountPayableResource extends Resource
                     
                 TextColumn::make('supplier')
                     ->formatStateUsing(function ($state) {
-                        return "({$state->code}) {$state->name}";
+                        return "({$state->code}) {$state->perusahaan}";
                     })
                     ->label('Supplier')
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('supplier', function (Builder $query) use ($search) {
                             $query->where('code', 'like', "%{$search}%")
-                                  ->orWhere('name', 'like', "%{$search}%");
+                                  ->orWhere('perusahaan', 'like', "%{$search}%");
                         });
                     })
                     ->sortable(),
@@ -331,7 +331,7 @@ class AccountPayableResource extends Resource
             ])
             ->defaultSort('invoice.due_date', 'desc')
             ->groups([
-                Tables\Grouping\Group::make('supplier.name')
+                Tables\Grouping\Group::make('supplier.perusahaan')
                     ->label('Supplier')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {

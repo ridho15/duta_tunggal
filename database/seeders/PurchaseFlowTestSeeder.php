@@ -184,7 +184,7 @@ class PurchaseFlowTestSeeder extends Seeder
                 'other_fee' => 0,
                 'total' => $purchaseOrder->total_amount,
                 'status' => 'sent',
-                'supplier_name' => $supplier->name,
+                'supplier_name' => $supplier->perusahaan ?? null,
                 'supplier_phone' => $supplier->phone,
             ]);
 

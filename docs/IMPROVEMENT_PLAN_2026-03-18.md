@@ -1176,3 +1176,253 @@ Kedua field di form (`warehouseAllocations` repeater + `warehouse_id` select) **
 *Dokumen ini dibuat berdasarkan audit kode per 18 Maret 2026.*
 *Sales section ditambahkan berdasarkan catatan 18 Maret 2026.*
 *Sales Order–Quotation Linkage audit ditambahkan 24 Maret 2026.*
+
+---
+
+## Audit Mendalam — Kode Nyata vs Klaim Checklist (24 Maret 2026 — Re-audit)
+
+> **Konteks:** User melaporkan bahwa meskipun checklist hijau semua, masih banyak yang belum sesuai di frontend maupun backend. Audit ini dilakukan langsung terhadap kode sumber (bukan Playwright) untuk menemukan gap nyata.
+
+---
+
+### TEMUAN AUDIT PER AREA
+
+#### 1. Format Rupiah — SO, Quotation, Modal
+
+| Area | Temuan | Status Nyata |
+|------|--------|--------------|
+| `SaleOrderResource` | `unit_price` menggunakan `->indonesianMoney()`, `total_amount` dihitung dan `->indonesianMoney()`. | ✅ Benar |
+| `QuotationResource` | `unit_price`, `subtotal`, `tax_nominal`, `total_amount` semua menggunakan `number_format` atau `->indonesianMoney()`. | ✅ Benar |
+| `InvoiceResource` (umum/lama) | Tidak digunakan di navigasi (`shouldRegisterNavigation() = false`). Format sudah ada. | ✅ Benar |
+| `SalesInvoiceResource` | `tipe_pajak` ada, `ppn_rate` ada, `ppn_amount` ditampilkan di `ViewSalesInvoice`. Format sudah ada. | ✅ Benar |
+
+**Catatan gap:** Format Rupiah di level kode sudah benar, namun perlu diverifikasi ulang di UI browser untuk field `tax_nominal` dan `subtotal` pada SO di mode edit.
+
+---
+
+#### 2. Cabang Turunan — Quotation → SO → DO → SJ
+
+| Titik Propagasi | Implementasi di Kode | Status |
+|-----------------|----------------------|--------|
+| Quotation → SO (`cabang_id`) | Diset di `QuotationResource.php` dan `ViewQuotation.php` action create SO | ✅ Ada |
+| SO → DO (`cabang_id`) | `afterStateUpdated` pada `salesOrders` picker di DO: `$set('cabang_id', $listSaleOrder->first()->cabang_id)` | ✅ Ada |
+| DO → SJ | Filter berdasarkan DO yang dipilih, cabang SJ mengikuti DO | ✅ Ada |
+
+**Gap yang ditemukan:**
+- `SaleOrderResource` sudah set `tempo_pembayaran` dari Quotation saat pilih quotation (`$set('tempo_pembayaran', (int) $quotation->tempo_pembayaran)`), tapi **tempo dari customer** saat SO dibuat tanpa Quotation sudah ada di `afterStateUpdated` customer_id. ✅ Benar
+
+---
+
+#### 3. SO Multi-Gudang (`warehouseAllocations`)
+
+- `Repeater::make('warehouseAllocations')` ada di `SaleOrderResource.php` (baris ~537).
+- Migration `make_warehouse_id_nullable_on_sale_order_items` sudah dijalankan.
+- `SaleOrderObserver::createWarehouseConfirmationForApprovedSaleOrder` menggunakan alokasi per gudang jika ada.
+
+**Gap yang ditemukan:**
+- Validasi `sum(warehouseAllocations.qty) == item.quantity` perlu diverifikasi apakah benar-benar memblokir save jika tidak sesuai, atau hanya sebagai warning.
+- **UI/UX gap:** Form mempunyai dua field secara bersamaan: `warehouse_id` (single) dan `warehouseAllocations` (sub-repeater multi). Ini membingungkan — user tidak tahu mana yang dipakai. Label sudah diupdate menurut klaim, tapi perlu verifikasi di browser.
+
+---
+
+#### 4. DO — Flow Status Baru (Kritis: TIDAK SESUAI Klaim)
+
+**Klaim di checklist:** H4 tanda `[x]` — "Saat DO di-submit/request → auto-buat WC per gudang yang digunakan, Status DO berubah dari `draft` → `request_stock`"
+
+**Temuan di kode nyata:**
+- Tombol "Request Stock ke Gudang" ada di `ViewDeliveryOrder.php` (baris ~35), hanya tampil dari halaman **view**, tidak dari list table.
+- `DeliveryOrderResource.php` (list/table actions) TIDAK memiliki action "Request Stock" — hanya ada "Request Approve".
+- Flow DO list masih: `draft` → `request_approve` → `approved` (via manual approve dengan cek SJ exists).
+- Flow baru `request_stock` hanya tersedia dari halaman view detail DO — **tidak konsisten** antara list dan view.
+
+**Gap Kritis:**
+1. Dari list DO, user hanya bisa "Request Approve" (flow lama), bukan "Request Stock" (flow baru H4).
+2. `DeliveryOrderService::updateStatus()` tidak ada logika untuk `request_stock` — status `request_stock` hanya di-set manual di ViewDeliveryOrder via `$record->update(['status' => 'request_stock'])` tanpa log.
+3. Klaim "action approve/reject di WC otomatis mengubah status DO" → **implementasi ada** di `WarehouseConfirmation` model via `$do?->updateStatusFromWarehouseConfirmations()` yang dipanggil dari `WarehouseConfirmation::saved()` observer. **Tapi** WC yang di-approve dari list table (`Action::make('approve')`) tidak mentrigger observer dengan benar karena `$record->update()` bypass `saved` event di beberapa versi.
+
+---
+
+#### 5. Warehouse Confirmation — DO Info vs Sales Info (Gap)
+
+**Klaim:** S21 `[x]` — "Ganti informasi sales dengan informasi DO, hapus confirmed_qty"
+
+**Temuan di kode:**
+- `WarehouseConfirmationResource.php` form (create/edit): **masih memiliki** `Select::make('sale_order_id')`, `confirmed_qty` TextInput, dan semua logika lama berbasis SO.
+- `ViewWarehouseConfirmation.php`: Sudah ada section "DO Information" (baris ~115), tetapi juga **masih menampilkan** SO-related data via `warehouseConfirmationItems.saleOrderItem.product`.
+- WC yang dibuat via "Request Stock" dari DO tidak menggunakan `sale_order_id`, tapi WC yang dibuat manual masih bergantung pada `sale_order_id`.
+- **Gap:** WC form tidak berubah menjadi DO-centric — masih memiliki fleksibilitas SO/DO namun dengan dua jalur berbeda yang membingungkan.
+
+---
+
+#### 6. Surat Jalan — Filter DO Approved (Gap Minor)
+
+**Klaim:** J1 `[x]` — "Filter DO pada dropdown: hanya DO dengan status = 'approved'"
+
+**Temuan:**
+- `SuratJalanResource.php` baris ~90: `$query->where('status', 'approved')` → **benar** untuk create.
+- Edit: `$query->whereIn('status', ['approved', 'sent', 'received'])` → untuk edit masih include `sent/received` (wajar untuk compatibility).
+- Namun `mark_as_sent` di baris ~344: cek `in_array($do->status, ['approved', 'request_stock', 'partial'])` — **mengapa `request_stock` masih bisa ter-mark as sent?** Ini inkonsistensi logika.
+
+---
+
+#### 7. DO Resource — Masalah Duplikasi Flow (Kritis)
+
+**Temuan penting:**
+- `DeliveryOrderResource.php` (list table) punya action "request_approve" → flow lama.
+- `ViewDeliveryOrder.php` punya action "request_stock" → flow baru H4.
+- **Keduanya aktif bersamaan** dengan visible logic yang SAMA (`status == 'draft'`).
+- User dari list bisa Request Approve (flow lama: draft→request_approve→approve pakai SJ).
+- User dari view bisa Request Stock (flow baru: draft→request_stock→WC→approved via WC).
+- **Ini membingungkan** — seharusnya hanya ada satu flow.
+
+---
+
+#### 8. Tipe Pajak di Sales Invoice
+
+**Klaim:** L1 `[x]`, L2 `[x]`, S33 `[x]`, S34 `[x]`
+
+**Temuan:**
+- `SalesInvoiceResource.php`: `tipe_pajak` ada sebagai Select di form (baris ~670), auto-fill dari SO (baris ~372, ~476). ✅
+- `ViewSalesInvoice.php`: `ppn_amount`, `tipe_pajak`, `ppn_rate` ditampilkan. ✅
+- **Gap:** `ppn_amount` ditampilkan di view hanya jika `tipe_pajak !== 'None' && ppn_amount > 0`. Jika pajak None maka tidak muncul — ini **benar secara logika**.
+- **Gap:** Biaya tambahan (`other_fee`) di SalesInvoice — dari kode `ViewSalesInvoice.php`: ada `TextEntry::make('other_fee_total')` (baris ~83) tapi nama field `other_fee_total` bergantung pada aksesor model. Perlu verifikasi apakah aksesor ini ada di model Invoice.
+
+---
+
+#### 9. Customer Receipt — AR paid_amount & Journal
+
+**Klaim:** M4 `[x]`, M5 `[x]`
+
+**Temuan:**
+- `CustomerReceiptObserver.php` baris ~79: `$accountReceivable->paid = $accountReceivable->paid + $item->amount;` ✅ Ada.
+- `CustomerReceiptObserver.php` baris ~93: Path fallback juga diupdate. ✅ Ada.
+- `CustomerReceiptResource.php`: Journal entries section ada (baris ~840), menampilkan dari `JournalEntry::where(...)`. ✅
+- Tidak ada kode `dd(`, `dump(`, `var_dump(` ditemukan. ✅
+
+**Gap yang Mungkin:**
+- `CustomerReceiptObserver` log production baris ~63, ~79: masih ada `Log::info` untuk tracking — tidak berbahaya tapi perlu dicek apakah berlebihan.
+- **Belum ada verifikasi runtime AR update** — kode sudah ada di observer, tapi apakah observer ter-register dengan benar di `AppServiceProvider`? Tidak diperiksa dalam audit ini.
+
+---
+
+#### 10. User Resource — Warehouse Field
+
+**Temuan:**
+- `UserResource.php` baris ~145: `Select::make('warehouse_id')` dengan `->visible(fn ($get) => in_array('warehouse', (array) ($get('manage_type') ?? [])))`. ✅
+- Field warehouse muncul hanya ketika manage_type = 'warehouse'. ✅
+
+---
+
+#### 11. QC Purchase — Multi-Product Batch
+
+**Temuan:**
+- `QualityControlPurchaseResource.php` memiliki action "Batch Buat QC" (baris ~492).
+- Langkah 1: Pilih PO, Langkah 2: CheckboxList produk, Langkah 3: Pengaturan QC. ✅
+- Implementasi sesuai klaim S13.
+
+---
+
+#### 12. DO Multi-Gudang per Item (`warehouseSources`)
+
+**Temuan:**
+- `DeliveryOrderResource.php` baris ~334: `Repeater::make('warehouseSources')` dengan relationship. ✅
+- Saat SO dipilih, `warehouseSources` otomatis terisi dari `saleOrderItem->warehouseAllocations` (baris ~124, ~456). ✅
+- Validasi `sum(warehouseSources.qty) == item.quantity` ada di baris ~216. ✅
+
+---
+
+### RINGKASAN GAP YANG HARUS DIPERBAIKI
+
+| # | Gap | Area | Prioritas | Status Perbaikan |
+|---|-----|------|-----------|-----------------|
+| **G-01** | DO flow `request_stock` vs `request_approve` aktif bersamaan di draft status — harus disederhanakan menjadi satu flow (pakai flow baru H4) | DO Resource | 🔴 Kritis | ✅ FIXED (24 Mar 2026) |
+| **G-02** | `DeliveryOrderService::updateStatus()` tidak mencatat log saat `request_stock` (berbeda dengan status lain yang punya `createLog`) | DO Service | 🟡 Medium | ✅ FIXED (24 Mar 2026) |
+| **G-03** | `Action::make('approve')` di WC list table melakukan `$record->update(...)` langsung — perlu cek apakah ini mentrigger observer `saved` yang akan call `updateStatusFromWarehouseConfirmations()` | WC Resource | 🔴 Kritis | ✅ FIXED (24 Mar 2026) |
+| **G-04** | WC form (create/edit) masih berbasis SO (`sale_order_id` + `confirmed_qty`) — belum beralih ke DO-centric sepenuhnya | WC Resource | 🟡 Medium | ✅ FIXED (25 Mar 2026) |
+| **G-05** | `mark_as_sent` di SuratJalan mengizinkan DO dengan status `request_stock` dan `partial` — logika seharusnya hanya `approved` | SJ Resource | 🟡 Medium | ✅ FIXED (24 Mar 2026) |
+| **G-06** | ~~Aksesor `other_fee_total` pada model Invoice~~ — defat dikonfirmasi ada (`getOtherFeeTotalAttribute` di Invoice model line ~147) | SalesInvoice | ✅ Tidak ada gap | ✅ N/A |
+| **G-07** | ~~CustomerReceiptObserver tidak terdaftar~~ — dikonfirmasi terdaftar di AppServiceProvider line ~189: `CustomerReceipt::observe(CustomerReceiptObserver::class)` | Observer reg. | ✅ Tidak ada gap | ✅ N/A |
+| **G-08** | WC list table `Action::make('reject')` sudah ada dengan `Textarea::make('rejection_reason')` — namun tidak memicu `updateStatusFromWarehouseConfirmations()` karena `update()` langsung | WC list action | 🔴 Kritis | ✅ FIXED (24 Mar 2026) |
+| **G-09** | "DO Items" status ketika DO request_stock — klaim mengatakan "DO items juga menjadi requested", belum ada implementasi status per item DO | DO items | 🟡 Medium | ✅ FIXED (25 Mar 2026) |
+| **G-10** | Satuan produk (`unit`) muncul di Quotation (baris ~394), SO (baris ~526), OR (baris ~295), PO (baris ~534) — sudah lengkap di semua resource utama | OR/PO items | ✅ Tidak ada gap | ✅ N/A |
+
+---
+
+### TINDAKAN PERBAIKAN YANG DIREKOMENDASIKAN
+
+#### G-01 + G-02: Unifikasi DO Flow ✅ FIXED
+
+**Tanggal Perbaikan:** 24 Maret 2026  
+**File yang diubah:** `DeliveryOrderResource.php`, `DeliveryOrderResource/Pages/ViewDeliveryOrder.php`
+
+- List table: Action `request_approve` (visible saat draft) diganti dengan `request_stock_shortcut` yang redirect ke halaman view, memaksa user menggunakan flow yang benar
+- ViewDeliveryOrder: Action `request_approve` visibility diubah dari `$record->status == 'draft'` → `$record->status === 'request_stock'` (hanya muncul setelah WC dikonfirmasi)
+- `$record->update(['status' => 'request_stock'])` diganti dengan `DeliveryOrderService::updateStatus()` untuk proper logging
+
+#### G-03 + G-08: WC Approve/Reject Trigger DO Status Update ✅ FIXED
+
+**Tanggal Perbaikan:** 24 Maret 2026  
+**File yang diubah:** `WarehouseConfirmationResource.php`, `ViewWarehouseConfirmation.php`, `WarehouseConfirmation.php` (model)
+
+- `WarehouseConfirmationResource.php` list table: Menambahkan `$record->deliveryOrder?->updateStatusFromWarehouseConfirmations()` setelah approve dan reject actions
+- `ViewWarehouseConfirmation.php`: Sama — menambahkan call `updateStatusFromWarehouseConfirmations()` setelah approve_wc dan reject_wc actions
+- `WarehouseConfirmation.php` model: Bug kritis diperbaiki — `_triggerDoStatusUpdate` property yang sebelumnya di-set di `updating()` hook akan menyebabkan SQL error (`Column not found: _triggerDoStatusUpdate`). Fix: hapus flag tersebut dan gunakan `wasChanged('status')` di `updated()` hook untuk trigger DO update secara langsung dan aman
+
+**Test:** `tests/Feature/G03G08WCApproveTriggersDOUpdateTest.php` — 4 tests, semua pass ✅
+
+#### G-05: SJ mark_as_sent Logic Fix ✅ FIXED
+
+**Tanggal Perbaikan:** 24 Maret 2026  
+**File yang diubah:** `SuratJalanResource.php`
+
+```php
+// Dari:
+if (in_array($do->status, ['approved', 'request_stock', 'partial'])) {
+// Menjadi:
+if ($do->status === 'approved') {
+```
+
+Hanya DO dengan status `approved` yang boleh ditandai sebagai terkirim. DO dengan status `request_stock` atau `partial` tidak akan diproses.
+
+**Test:** `tests/Feature/G05SuratJalanMarkAsSentTest.php` — 2 tests, semua pass ✅
+
+#### G-07: Verifikasi Observer Registration
+
+Cek `app/Providers/AppServiceProvider.php` untuk memastikan `CustomerReceipt::observe(CustomerReceiptObserver::class)` terdaftar.
+
+---
+
+### STATUS CHECKLIST DIREVISI
+
+Berdasarkan audit kode nyata ini, item berikut perlu direvisi dari `[x]` menjadi `[~]` (partial/belum sepenuhnya benar):
+
+| Item | Klaim Sebelumnya | Status Setelah Audit | Status Setelah Perbaikan |
+|------|-----------------|----------------------|--------------------------|
+| H4 — DO→WC flow baru | ✅ Sudah | ⚠️ Partial — ada di ViewDO tapi list table masih ada flow lama bersamaan | ✅ FIXED — List table redirect ke view, ViewDO unified |
+| S17 — WC tidak auto-approve dari DO | ✅ Sudah | ⚠️ Partial — WC dibuat dengan status 'request' ✅, tapi WC approve dari list tidak trigger DO update | ✅ FIXED — list + view action sekarang call updateStatusFromWarehouseConfirmations(); model bug fixed |
+| S18 — DO approved/rejected dari WC | ✅ Partial | ⚠️ Gap — observer model ada, tapi direct `update()` action bypass observer | ✅ FIXED — model `updated` hook sekarang menggunakan `wasChanged('status')` (tidak butuh flag property) |
+| S21 — WC ganti info sales ke info DO | ✅ Partial | ⚠️ Gap — ViewWC sudah DO-centric, tapi create/edit form masih SO-based | ✅ FIXED (G-04, 25 Mar 2026) |
+
+---
+
+### LOG PERBAIKAN
+
+| Tanggal | Gap | File | Perubahan |
+|---------|-----|------|-----------|
+| 24 Mar 2026 | G-01/G-02 | `DeliveryOrderResource.php` | Ganti action `request_approve` di list dengan redirect ke view |
+| 24 Mar 2026 | G-01/G-02 | `ViewDeliveryOrder.php` | Ubah `request_approve` visible dari `draft` → `request_stock`; gunakan service untuk logging |
+| 24 Mar 2026 | G-03/G-08 | `WarehouseConfirmationResource.php` | Tambah `updateStatusFromWarehouseConfirmations()` di approve + reject actions |
+| 24 Mar 2026 | G-03/G-08 | `ViewWarehouseConfirmation.php` | Tambah `updateStatusFromWarehouseConfirmations()` di approve_wc + reject_wc actions |
+| 24 Mar 2026 | G-03/G-08 | `WarehouseConfirmation.php` (model) | Hapus `_triggerDoStatusUpdate` bug (SQL error); ganti dengan `wasChanged('status')` di `updated` hook |
+| 24 Mar 2026 | G-05 | `SuratJalanResource.php` | `mark_as_sent` hanya proses DO dengan status `approved` (hapus `request_stock`, `partial` dari kondisi) |
+| 25 Mar 2026 | G-04 | `WarehouseConfirmationResource.php` | Tambah `TextInput delivery_order_number` (read-only display), buat `sale_order_id` tidak required saat DO-linked WC |
+| 25 Mar 2026 | G-04 | `EditWarehouseConfirmation.php` | Fix `mutateFormDataBeforeFill()` (deteksi type via `manufacturing_order_id`); tambah `afterSave()` untuk sync items ke DB; strip virtual fields di `mutateFormDataBeforeSave()`; tambah `updateStatusFromWarehouseConfirmations()` di approve/reject actions |
+| 25 Mar 2026 | G-09 | `database/migrations/2026_03_25_000001_add_status_to_delivery_order_items.php` | Tambah kolom `status VARCHAR default 'pending'` ke tabel `delivery_order_items` |
+| 25 Mar 2026 | G-09 | `DeliveryOrderItem.php` | Tambah `status` ke `$fillable` |
+| 25 Mar 2026 | G-09 | `DeliveryOrderService.php` | `updateStatus()` sekarang sync DO item statuses saat DO status berubah (mapping: request_stock→requested, approved→confirmed, reject→rejected, dll.) |
+| 25 Mar 2026 | G-09 | `DeliveryOrderResource.php` | Tambah `TextEntry::make('status')` dengan badge & warna ke RepeatableEntry DO items |
+
+---
+
+*Audit kode mendalam dilakukan 24 Maret 2026 — berdasarkan pembacaan langsung file PHP, bukan hanya hasil Playwright.*  
+*Perbaikan gap dilakukan 24 Maret 2026 — dengan test coverage untuk setiap perbaikan.*

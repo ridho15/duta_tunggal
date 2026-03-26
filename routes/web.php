@@ -34,7 +34,7 @@ Route::middleware('auth')->group(function () {
 // and third-party packages that call route('login') can redirect guests
 // to the Filament admin sign-in page. This route simply redirects to
 // the Filament admin base path which serves the login UI.
-Route::get('/login', function () {
+Route::middleware('throttle:login')->get('/login', function () {
     return redirect('/admin');
 })->name('login');
 
@@ -59,7 +59,7 @@ Route::get('exports/download/{filename}', function ($filename) {
 })->name('exports.download');
 
 // Reports preview routes
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::get('/reports/stock-report/preview', [StockReportController::class, 'preview'])
         ->name('reports.stock-report.preview');
 

@@ -116,7 +116,7 @@ class PaymentRequestResource extends Resource
                                                 try {
                                                     $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date)->format('d/m/Y') : '-';
                                                     $isOverdue = $invoice->due_date && Carbon::parse($invoice->due_date)->isPast();
-                                                } catch (\Exception $e) {
+                                                } catch (\Throwable $e) {
                                                     $dueDate = '-';
                                                     $isOverdue = false;
                                                 }

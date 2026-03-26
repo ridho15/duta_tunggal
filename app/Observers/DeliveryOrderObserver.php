@@ -6,6 +6,7 @@ use App\Models\DeliveryOrder;
 use App\Models\StockReservation;
 use App\Models\SaleOrder;
 use App\Services\ProductService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DeliveryOrderObserver
@@ -138,22 +139,29 @@ class DeliveryOrderObserver
             $reservation->delete();
         }
 
-        // Update delivered_quantity untuk semua sale order items yang terkait
+        // Update delivered_quantity untuk semua sale order items yang terkait.
+        // Wrapped in a transaction with lockForUpdate to prevent race conditions
+        // when multiple DOs for the same SO are sent concurrently.
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->sum('quantity');
+                DB::transaction(function () use ($item) {
+                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
+                    if ($saleOrderItem) {
+                        // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
+                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                            ->whereHas('deliveryOrder', function ($query) {
+                                $query->whereIn('status', ['sent', 'received', 'completed']);
+                            })
+                            ->sum('quantity');
+
+                        $saleOrderItem->update([
+                            'delivered_quantity' => $totalDelivered
+                        ]);
+                    }
+                });
             }
         }
     }
@@ -251,22 +259,28 @@ class DeliveryOrderObserver
             }
         }
 
-        // Update delivered_quantity untuk semua sale order items yang terkait
+        // Update delivered_quantity untuk semua sale order items yang terkait.
+        // Lock to prevent concurrent DO completions from corrupting the total.
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->sum('quantity');
+                DB::transaction(function () use ($item) {
+                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
+                    if ($saleOrderItem) {
+                        // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
+                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                            ->whereHas('deliveryOrder', function ($query) {
+                                $query->whereIn('status', ['sent', 'received', 'completed']);
+                            })
+                            ->sum('quantity');
+
+                        $saleOrderItem->update([
+                            'delivered_quantity' => $totalDelivered
+                        ]);
+                    }
+                });
             }
         }
     }
@@ -302,25 +316,30 @@ class DeliveryOrderObserver
             $reservation->delete();
         }
 
-        // Update delivered_quantity for related sale order items (set to 0 since DO is deleted)
+        // Update delivered_quantity for related sale order items (set to 0 since DO is deleted).
+        // Lock to prevent concurrent updates.
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Recalculate total delivered quantity excluding this deleted delivery order
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->whereHas('deliveryOrder', function ($query) use ($deliveryOrder) {
-                            $query->where('id', '!=', $deliveryOrder->id); // Exclude this deleted DO
-                        })
-                        ->sum('quantity');
+                $deletedDoId = $deliveryOrder->id;
+                DB::transaction(function () use ($item, $deletedDoId) {
+                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
+                    if ($saleOrderItem) {
+                        // Recalculate total delivered quantity excluding this deleted delivery order
+                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                            ->whereHas('deliveryOrder', function ($query) use ($deletedDoId) {
+                                $query->whereIn('status', ['sent', 'received', 'completed'])
+                                      ->where('id', '!=', $deletedDoId);
+                            })
+                            ->sum('quantity');
+
+                        $saleOrderItem->update([
+                            'delivered_quantity' => $totalDelivered
+                        ]);
+                    }
+                });
             }
         }
     }
@@ -368,22 +387,28 @@ class DeliveryOrderObserver
         // Recreate journal entries with updated quantities
         $this->createJournalEntriesForDelivery($deliveryOrder);
 
-        // Update delivered_quantity for related sale order items
+        // Update delivered_quantity for related sale order items.
+        // Lock to prevent concurrent qty updates from corrupting totals.
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Recalculate total delivered quantity from all delivery orders that are sent/completed
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->sum('quantity');
+                DB::transaction(function () use ($item) {
+                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
+                    if ($saleOrderItem) {
+                        // Recalculate total delivered quantity from all delivery orders that are sent/completed
+                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
+                            ->whereHas('deliveryOrder', function ($query) {
+                                $query->whereIn('status', ['sent', 'received', 'completed']);
+                            })
+                            ->sum('quantity');
+
+                        $saleOrderItem->update([
+                            'delivered_quantity' => $totalDelivered
+                        ]);
+                    }
+                });
             }
         }
     }
@@ -426,11 +451,12 @@ class DeliveryOrderObserver
             $goodsDeliveryCoa = $product?->goodsDeliveryCoa?->id ? $product->goodsDeliveryCoa : $defaultGoodsDeliveryCoa;
 
             if (!$inventoryCoa || !$goodsDeliveryCoa) {
-                Log::warning('Skipping journal entry due to missing COA', [
-                    'inventory_coa_null' => is_null($inventoryCoa),
-                    'goods_delivery_coa_null' => is_null($goodsDeliveryCoa),
-                ]);
-                continue;
+                throw new \Exception(
+                    'Akun COA untuk produk "' . ($product?->name ?? 'tidak diketahui') . '" tidak ditemukan. '
+                    . 'Diperlukan: Persediaan (' . ($inventoryCoa ? '\u2713' : '1140.10') . ') dan '
+                    . 'Penyerahan Barang (' . ($goodsDeliveryCoa ? '\u2713' : '1140.20') . '). '
+                    . 'Silakan konfigurasi COA produk tersebut sebelum mengirim Delivery Order.'
+                );
             }
 
             $debitTotals[$goodsDeliveryCoa->id]['coa'] = $goodsDeliveryCoa;

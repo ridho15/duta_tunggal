@@ -482,7 +482,11 @@ class SaleOrderResource extends Resource
                                             try {
                                                 $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
                                                 $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                            } catch (\Throwable $e) { $set('tax_nominal', '0'); }
+                                            } catch (\Throwable $e) {
+                                                $set('tax_nominal', '0');
+                                                \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
+                                                Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
+                                            }
                                         }
                                     })
                                     ->validationMessages([
@@ -815,9 +819,11 @@ class SaleOrderResource extends Resource
                                         try {
                                             $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
                                             $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
-                                    })
-                                    ->suffix(function ($get) {
+                                        } catch (\Throwable $e) {
+                                            $set('tax_nominal', '0');
+                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
+                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
+                                        }
                                         if (!$get('product_id') || !$get('warehouse_id')) {
                                             return null;
                                         }
@@ -908,7 +914,11 @@ class SaleOrderResource extends Resource
                                         try {
                                             $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
                                             $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
+                                        } catch (\Throwable $e) {
+                                            $set('tax_nominal', '0');
+                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
+                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
+                                        }
                                     }),
                                 TextInput::make('total')
                                     ->label('Total (Harga × Qty)')
@@ -940,7 +950,11 @@ class SaleOrderResource extends Resource
                                         try {
                                             $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
                                             $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
+                                        } catch (\Throwable $e) {
+                                            $set('tax_nominal', '0');
+                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
+                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
+                                        }
                                     })
                                     ->suffix('%'),
                                 \Filament\Forms\Components\Select::make('tipe_pajak')
@@ -958,7 +972,11 @@ class SaleOrderResource extends Resource
                                         try {
                                             $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $state ?? 'None');
                                             $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
+                                        } catch (\Throwable $e) {
+                                            $set('tax_nominal', '0');
+                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
+                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
+                                        }
                                     }),
                                 TextInput::make('tax')
                                     ->label('Tax')
@@ -983,7 +1001,11 @@ class SaleOrderResource extends Resource
                                         try {
                                             $_r = \App\Services\TaxService::compute($_base, (float)($state ?? 0), $get('tipe_pajak') ?? 'None');
                                             $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
+                                        } catch (\Throwable $e) {
+                                            $set('tax_nominal', '0');
+                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
+                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
+                                        }
                                     })
                                     ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->suffix('%'),
@@ -999,7 +1021,10 @@ class SaleOrderResource extends Resource
                                             try {
                                                 $r = \App\Services\TaxService::compute($base, (float)$record->tax, $record->tipe_pajak ?? 'None');
                                                 $component->state(number_format($r['ppn'], 0, ',', '.'));
-                                            } catch (\Throwable $e) { $component->state('0'); }
+                                            } catch (\Throwable $e) {
+                                                $component->state('0');
+                                                \Illuminate\Support\Facades\Log::warning('TaxService gagal saat mengisi formulir: ' . $e->getMessage());
+                                            }
                                         }
                                     }),
                                 TextInput::make('subtotal')
@@ -1664,6 +1689,9 @@ class SaleOrderResource extends Resource
                         \Filament\Infolists\Components\TextEntry::make('customer.name')
                             ->label('Customer')
                             ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('cabang.nama')
+                            ->label('Cabang')
+                            ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('status')
                             ->label('Status')
                             ->badge(),
@@ -1703,6 +1731,13 @@ class SaleOrderResource extends Resource
                                 \Filament\Infolists\Components\TextEntry::make('unit_price')
                                     ->label('Harga Satuan')
                                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.')),
+                                \Filament\Infolists\Components\TextEntry::make('line_total')
+                                    ->label('Harga Satuan x Qty')
+                                    ->getStateUsing(function ($record) {
+                                        $price = (float) ($record->unit_price ?? 0);
+                                        $qty = (float) ($record->quantity ?? 0);
+                                        return 'Rp ' . number_format($price * $qty, 0, ',', '.');
+                                    }),
                                 \Filament\Infolists\Components\TextEntry::make('discount')
                                     ->label('Diskon (%)')
                                     ->formatStateUsing(fn ($state) => $state . '%'),
@@ -1711,6 +1746,17 @@ class SaleOrderResource extends Resource
                                     ->getStateUsing(function ($record) {
                                         $taxType = $record->tipe_pajak ?? 'Inklusif';
                                         return $record->tax . '% (' . $taxType . ')';
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('tax_nominal')
+                                    ->label('Nominal Pajak')
+                                    ->getStateUsing(function ($record) {
+                                        $unitPrice = (float) ($record->unit_price ?? 0);
+                                        $qty = (float) ($record->quantity ?? 0);
+                                        $discount = (float) ($record->discount ?? 0);
+                                        $tax = (float) ($record->tax ?? 0);
+                                        $tipePajak = $record->tipe_pajak ?? null;
+                                        $taxNominal = \App\Http\Controllers\HelperController::hitungTaxNominal($qty, $unitPrice, $discount, $tax, $tipePajak);
+                                        return 'Rp ' . number_format($taxNominal, 0, ',', '.');
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('subtotal_display')
                                     ->label('Sub Total')

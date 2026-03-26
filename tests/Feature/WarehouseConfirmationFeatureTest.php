@@ -95,8 +95,9 @@ describe('Warehouse Confirmation Feature', function () {
 
         // Check if warehouse confirmation record exists
         $this->assertDatabaseHas('warehouse_confirmations', [
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'confirmed'
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'confirmed'
         ]);
     });
 
@@ -140,8 +141,9 @@ describe('Warehouse Confirmation Feature', function () {
         expect($saleOrder->fresh()->status)->toBe('confirmed');
 
         $this->assertDatabaseHas('warehouse_confirmations', [
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'confirmed'
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'confirmed'
         ]);
     });
 
@@ -185,8 +187,9 @@ describe('Warehouse Confirmation Feature', function () {
         expect($saleOrder->fresh()->status)->toBe('reject');
 
         $this->assertDatabaseHas('warehouse_confirmations', [
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'rejected'
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'rejected'
         ]);
     });
 
@@ -291,10 +294,11 @@ describe('Warehouse Confirmation Feature', function () {
 
         // Create warehouse confirmation for the SO
         $warehouseConfirmation = WarehouseConfirmation::factory()->create([
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'confirmed',
-            'confirmed_by' => 1,
-            'confirmed_at' => now()
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'confirmed',
+            'confirmed_by'     => 1,
+            'confirmed_at'     => now()
         ]);
 
         WarehouseConfirmationItem::factory()->create([

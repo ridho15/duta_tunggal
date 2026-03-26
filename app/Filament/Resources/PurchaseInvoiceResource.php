@@ -836,7 +836,7 @@ class PurchaseInvoiceResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('fromModel.po_number')
                             ->label('PO Number'),
-                        Infolists\Components\TextEntry::make('fromModel.supplier.name')
+                        Infolists\Components\TextEntry::make('fromModel.supplier.perusahaan')
                             ->label('Supplier'),
                         Infolists\Components\TextEntry::make('fromModel.supplier.phone')
                             ->label('Supplier Phone'),

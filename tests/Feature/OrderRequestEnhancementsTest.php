@@ -52,7 +52,6 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequest = OrderRequest::factory()->create([
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
-            'supplier_id' => $this->supplier->id,
             'status' => 'draft',
             'created_by' => $this->user->id,
         ]);
@@ -84,7 +83,6 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequest = OrderRequest::factory()->create([
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
-            'supplier_id' => $this->supplier->id,
             'status' => 'draft',
             'created_by' => $this->user->id,
         ]);
@@ -106,7 +104,6 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequest = OrderRequest::factory()->create([
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
-            'supplier_id' => $this->supplier->id,
             'status' => 'approved',
             'created_by' => $this->user->id,
         ]);
@@ -159,7 +156,6 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequest = OrderRequest::factory()->create([
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
-            'supplier_id' => $this->supplier->id,
             'status' => 'approved',
             'created_by' => $this->user->id,
         ]);
@@ -167,6 +163,7 @@ class OrderRequestEnhancementsTest extends TestCase
         OrderRequestItem::create([
             'order_request_id' => $orderRequest->id,
             'product_id' => $this->product->id,
+            'supplier_id' => $this->supplier->id,
             'quantity' => 50,
             'unit_price' => 12000,
         ]);
@@ -196,7 +193,6 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequest = OrderRequest::factory()->create([
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
-            'supplier_id' => $this->supplier->id,
             'status' => 'approved',
             'created_by' => $this->user->id,
         ]);
@@ -208,6 +204,7 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequestItem = OrderRequestItem::create([
             'order_request_id' => $orderRequest->id,
             'product_id' => $this->product->id,
+            'supplier_id' => $this->supplier->id,
             'quantity' => 20,
             'unit_price' => $customPrice,
             'discount' => $customDiscount,
@@ -237,7 +234,6 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequest = OrderRequest::factory()->create([
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
-            'supplier_id' => $this->supplier->id,
             'status' => 'approved',
             'created_by' => $this->user->id,
         ]);
@@ -245,6 +241,7 @@ class OrderRequestEnhancementsTest extends TestCase
         $orderRequestItem = OrderRequestItem::create([
             'order_request_id' => $orderRequest->id,
             'product_id' => $this->product->id,
+            'supplier_id' => $this->supplier->id,
             'quantity' => 100,
             'unit_price' => 10000,
             'fulfilled_quantity' => 0,

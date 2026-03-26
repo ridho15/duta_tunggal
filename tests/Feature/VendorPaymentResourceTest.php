@@ -178,7 +178,7 @@ class VendorPaymentResourceTest extends TestCase
             ->assertHasFormErrors(['payment_date' => 'required']);
     }
 
-    public function test_ntpn_is_required()
+    public function test_ntpn_is_optional()
     {
         Livewire::test(VendorPaymentResource\Pages\CreateVendorPayment::class)
             ->fillForm([
@@ -189,7 +189,7 @@ class VendorPaymentResourceTest extends TestCase
                 'payment_method' => 'Cash',
             ])
             ->call('create')
-            ->assertHasFormErrors(['ntpn' => 'required']);
+            ->assertHasNoFormErrors(['ntpn']);
     }
 
     public function test_coa_selection_is_required()

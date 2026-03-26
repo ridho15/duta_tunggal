@@ -163,7 +163,13 @@ class ManufacturingService
                 ->body('Failed to create Material Issue for Production Plan: ' . $e->getMessage())
                 ->danger()
                 ->send();
-            Log::error("Error creating MaterialIssue for ProductionPlan {$productionPlan->id}: " . $e->getMessage());
+            Log::error('ManufacturingService createMaterialIssueForProductionPlan failed', [
+                'production_plan_id' => $productionPlan->id,
+                'warehouse_id' => $productionPlan->warehouse_id,
+                'quantity' => $productionPlan->quantity,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
     }

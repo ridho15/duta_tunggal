@@ -194,7 +194,8 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         // Build a WarehouseConfirmation — create as 'request' first so the observer
         // does not fire DO creation before WC items are added (race condition)
         $wc = WarehouseConfirmation::create([
-            'sale_order_id'     => $saleOrder->id,
+            'confirmable_type'  => \App\Models\SaleOrder::class,
+            'confirmable_id'    => $saleOrder->id,
             'confirmation_type' => 'sales_order',
             'status'            => 'request',
             'confirmed_by'      => $user->id,
@@ -212,7 +213,7 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         ]);
 
         // Reload WC with items before calling the creation helper
-        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'saleOrder');
+        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'confirmable');
 
         // Directly invoke the protected method via a test-accessible call
         $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
@@ -258,7 +259,8 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         ]);
 
         $wc = WarehouseConfirmation::create([
-            'sale_order_id'     => $saleOrder->id,
+            'confirmable_type'  => \App\Models\SaleOrder::class,
+            'confirmable_id'    => $saleOrder->id,
             'confirmation_type' => 'sales_order',
             'status'            => 'confirmed',
             'confirmed_by'      => $user->id,
@@ -275,7 +277,7 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
             'status'                    => 'confirmed',
         ]);
 
-        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'saleOrder');
+        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'confirmable');
         $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
 
         // DO IS now created even without driver/vehicle (nullable driver_id/vehicle_id)
@@ -314,7 +316,8 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
         ]);
 
         $wc = WarehouseConfirmation::create([
-            'sale_order_id'     => $saleOrder->id,
+            'confirmable_type'  => \App\Models\SaleOrder::class,
+            'confirmable_id'    => $saleOrder->id,
             'confirmation_type' => 'sales_order',
             'status'            => 'confirmed',
             'confirmed_by'      => $user->id,
@@ -331,7 +334,7 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
             'status'                    => 'confirmed',
         ]);
 
-        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'saleOrder');
+        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'confirmable');
         $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
 
         // Task 15: DO IS now created for Ambil Sendiri as proof of goods leaving warehouse

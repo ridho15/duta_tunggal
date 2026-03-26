@@ -11,6 +11,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\Deposit;
 use App\Models\Supplier;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Traits\JournalValidationTrait;
 
@@ -22,8 +23,15 @@ class LedgerPostingService
      */
     public function postInvoice(Invoice $invoice): array
     {
-        // prevent duplicate posting
-        if (JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->exists()) {
+        // Atomic duplicate-posting guard: lock a sentinel row (or gap lock) so that two
+        // concurrent requests cannot both pass the exists() check before either commits.
+        $alreadyPosted = DB::transaction(function () use ($invoice) {
+            return JournalEntry::where('source_type', Invoice::class)
+                ->where('source_id', $invoice->id)
+                ->lockForUpdate()
+                ->exists();
+        });
+        if ($alreadyPosted) {
             Log::info('Invoice already posted, skipping', ['invoice_id' => $invoice->id]);
             return ['status' => 'skipped', 'message' => 'Invoice already posted to ledger'];
         }
@@ -132,24 +140,27 @@ class LedgerPostingService
                 ]);
             }
 
-            // Calculate PPN amount robustly.
-            // `invoice->tax` may be stored either as absolute tax amount (preferred)
-            // or as legacy tax rate percentage.
+            // Calculate PPN amount — prefer ppn_rate (percentage) as single source of truth.
+            // Fall back to legacy `tax` field for older records that stored it as a rate or absolute amount.
             $ppnAmount = 0;
             $actualPpnAmount = 0; // Track actual PPN amount that gets posted
-            $taxValue = (float) ($invoice->tax ?? 0);
-            if ($taxValue > 0) {
-                $subtotalAmount = (float) ($invoice->subtotal ?? 0);
+            $subtotalAmount = (float) ($invoice->subtotal ?? 0);
+            $ppnRateVal = (float) ($invoice->ppn_rate ?? 0);
+            if ($ppnRateVal > 0) {
+                // Primary: ppn_rate stores the percentage (e.g. 11 for 11%)
+                $ppnAmount = round($subtotalAmount * ($ppnRateVal / 100), 2);
+            } elseif ((float) ($invoice->tax ?? 0) > 0) {
+                // Legacy fallback: tax field may store absolute IDR amount or legacy percentage rate
+                $taxValue = (float) $invoice->tax;
                 $expectedByRate = round($subtotalAmount * ($taxValue / 100), 2);
                 $looksLikeLegacyRate = $taxValue <= 100
                     && abs(((float) $invoice->total) - ($subtotalAmount + $expectedByRate)) < 1;
-
                 $ppnAmount = $looksLikeLegacyRate ? $expectedByRate : $taxValue;
-            } elseif (!empty($invoice->ppn_rate) && $invoice->ppn_rate > 0) {
-                $ppnAmount = (float) $invoice->subtotal * ((float) $invoice->ppn_rate / 100);
             }
 
-            if ($ppnAmount > 0 && $ppnMasukanCoa) {
+            // Import purchase invoices should not post PPN Masukan at invoice stage.
+            // PPN impor is posted at payment stage (VendorPayment) when applicable.
+            if (! $isImportPurchase && $ppnAmount > 0 && $ppnMasukanCoa) {
                 $entries[] = JournalEntry::create([
                     'coa_id' => $ppnMasukanCoa->id,
                     'date' => $date,
@@ -221,7 +232,7 @@ class LedgerPostingService
                     'utangCoa_exists' => $utangCoa ? true : false
                 ]);
 
-                return ['status' => 'error', 'message' => 'Missing accounts payable COA'];
+                throw new \Exception('Akun Hutang Dagang (COA 2101.01) tidak ditemukan. Jurnal invoice tidak dapat dibuat. Silakan konfigurasi akun tersebut di Chart of Accounts.');
             }
         }
 
@@ -247,7 +258,14 @@ class LedgerPostingService
      */
     public function postDeposit(\App\Models\Deposit $deposit): array
     {
-        if (\App\Models\JournalEntry::where('source_type', \App\Models\Deposit::class)->where('source_id', $deposit->id)->exists()) {
+        // Atomic duplicate-posting guard.
+        $alreadyPosted = DB::transaction(function () use ($deposit) {
+            return \App\Models\JournalEntry::where('source_type', \App\Models\Deposit::class)
+                ->where('source_id', $deposit->id)
+                ->lockForUpdate()
+                ->exists();
+        });
+        if ($alreadyPosted) {
             return ['status' => 'skipped', 'message' => 'Deposit already posted to ledger'];
         }
 
@@ -346,11 +364,20 @@ class LedgerPostingService
      */
     public function postVendorPayment(VendorPayment $payment): array
     {
-        if (JournalEntry::where('source_type', VendorPayment::class)->where('source_id', $payment->id)->exists()) {
+        // Atomic duplicate-posting guard.
+        $alreadyPosted = DB::transaction(function () use ($payment) {
+            return JournalEntry::where('source_type', VendorPayment::class)
+                ->where('source_id', $payment->id)
+                ->lockForUpdate()
+                ->exists();
+        });
+        if ($alreadyPosted) {
             return ['status' => 'skipped', 'message' => 'VendorPayment already posted to ledger'];
         }
 
-        $date = $payment->payment_date ?? Carbon::now()->toDateString();
+        $rawPaymentDate = $payment->payment_date; // goes through accessor → Carbon or null
+        $date = ($rawPaymentDate instanceof \Carbon\Carbon ? $rawPaymentDate->toDateString() : null)
+            ?? Carbon::now()->toDateString();
         $details = $payment->vendorPaymentDetail()->get();
 
         $total = (float) ($details->sum('amount') ?: $payment->total_payment);
@@ -453,7 +480,7 @@ class LedgerPostingService
                         'coaKey' => $coaKey,
                         'group' => $group->toArray()
                     ]);
-                    continue;
+                    throw new \Exception('Akun COA untuk metode pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal pembayaran tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
                 }
 
                 $entries[] = JournalEntry::create([
@@ -495,6 +522,7 @@ class LedgerPostingService
                     'defaultBankCoa_exists' => $defaultBankCoa ? true : false,
                     'payment_coa_id' => $payment->coa_id
                 ]);
+                throw new \Exception('Akun Bank/Kas tidak dikonfigurasi. Jurnal pembayaran tidak dapat diseimbangkan. Silakan hubungi administrator keuangan.');
             }
         }
 
@@ -586,7 +614,14 @@ class LedgerPostingService
 
     public function postCustomerReceipt(\App\Models\CustomerReceipt $receipt): array
     {
-        if (JournalEntry::where('source_type', \App\Models\CustomerReceipt::class)->where('source_id', $receipt->id)->exists()) {
+        // Atomic duplicate-posting guard.
+        $alreadyPosted = DB::transaction(function () use ($receipt) {
+            return JournalEntry::where('source_type', \App\Models\CustomerReceipt::class)
+                ->where('source_id', $receipt->id)
+                ->lockForUpdate()
+                ->exists();
+        });
+        if ($alreadyPosted) {
             return ['status' => 'skipped', 'message' => 'CustomerReceipt already posted to ledger'];
         }
 
@@ -682,7 +717,7 @@ class LedgerPostingService
                         'coaKey' => $coaKey,
                         'group' => $group->toArray()
                     ]);
-                    continue;
+                    throw new \Exception('Akun COA untuk metode penerimaan pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal penerimaan tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
                 }
 
                 $entries[] = JournalEntry::create([
@@ -718,6 +753,7 @@ class LedgerPostingService
                     'defaultBankCoa_exists' => $defaultBankCoa ? true : false,
                     'receipt_coa_id' => $receipt->coa_id
                 ]);
+                throw new \Exception('Akun Bank/Kas tidak dikonfigurasi untuk penerimaan pembayaran. Jurnal tidak dapat diseimbangkan. Silakan hubungi administrator keuangan.');
             }
         }
 

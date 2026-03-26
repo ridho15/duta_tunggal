@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 
 class AssetDisposalResource extends Resource
@@ -249,24 +250,40 @@ class AssetDisposalResource extends Resource
                     ->visible(fn ($record) => $record->status === 'pending')
                     ->requiresConfirmation()
                     ->action(function ($record) {
-                        $record->update([
-                            'status' => 'completed',
-                            'approved_by' => \Illuminate\Support\Facades\Auth::id(),
-                            'approved_at' => now(),
-                        ]);
+                        try {
+                            $record->update([
+                                'status' => 'completed',
+                                'approved_by' => \Illuminate\Support\Facades\Auth::id(),
+                                'approved_at' => now(),
+                            ]);
 
-                        // Update asset status
-                        $record->asset->update(['status' => 'disposed']);
+                            // Update asset status
+                            $record->asset->update(['status' => 'disposed']);
 
-                        // Post journal entries
-                        $disposalService = app(\App\Services\AssetDisposalService::class);
-                        $disposalService->postDisposalJournalEntries($record->asset, $record);
+                            // Post journal entries
+                            $disposalService = app(\App\Services\AssetDisposalService::class);
+                            $disposalService->postDisposalJournalEntries($record->asset, $record);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Asset disposal berhasil diproses')
-                            ->body("Asset {$record->asset->name} telah didisposal dan jurnal telah dipost")
-                            ->success()
-                            ->send();
+                            \Filament\Notifications\Notification::make()
+                                ->title('Asset disposal berhasil diproses')
+                                ->body("Asset {$record->asset->name} telah didisposal dan jurnal telah dipost")
+                                ->success()
+                                ->send();
+                        } catch (\Throwable $e) {
+                            Log::error('AssetDisposal approve failed', [
+                                'asset_disposal_id' => $record->id,
+                                'asset_id' => $record->asset_id,
+                                'asset_name' => $record->asset?->name,
+                                'status' => $record->status,
+                                'user_id' => \Illuminate\Support\Facades\Auth::id(),
+                                'error' => $e->getMessage(),
+                            ]);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Gagal Memproses Disposal Aset')
+                                ->body('Proses disposal belum berhasil. Silakan periksa data disposal atau hubungi tim IT/keuangan.')
+                                ->danger()
+                                ->send();
+                        }
                     }),
             ])
             ->bulkActions([

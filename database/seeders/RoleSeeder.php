@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 class RoleSeeder extends Seeder
 {
@@ -237,6 +238,7 @@ class RoleSeeder extends Seeder
 
             $permsToAssign = [];
             $allDefined = HelperController::listPermission();
+            $missingResources = [];
             foreach ($resources as $res) {
                 // If mapping contains full list key (like auditor), handle separately
                 if (is_int($res)) {
@@ -266,7 +268,19 @@ class RoleSeeder extends Seeder
 
                             $permsToAssign[] = $action . ' ' . $res;
                         }
+                    } else {
+                        // collect missing mapping for logging/alerting
+                        if (!in_array($res, ['AUDITOR_ALL'], true) && !is_int($res)) {
+                            $missingResources[] = $res;
+                        }
                     }
+            }
+
+            if (!empty($missingResources)) {
+                Log::warning('RoleSeeder: unknown resources referenced in roleResourceMap', [
+                    'role' => $roleName,
+                    'missing_resources' => array_values(array_unique($missingResources)),
+                ]);
             }
 
             // Special: Auditor — grant view any for all resources
@@ -283,6 +297,11 @@ class RoleSeeder extends Seeder
             $existingPerms = Permission::whereIn('name', $permsToAssign)->get();
             if ($existingPerms->count()) {
                 $role->syncPermissions($existingPerms);
+            } else {
+                Log::info('RoleSeeder: no existing permissions found to assign for role', [
+                    'role' => $roleName,
+                    'requested_permissions' => $permsToAssign,
+                ]);
             }
         }
     }

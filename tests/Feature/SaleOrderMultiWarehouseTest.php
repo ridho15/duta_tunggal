@@ -302,16 +302,19 @@ test('8. createWarehouseConfirmation membuat WC items terpisah per alokasi', fun
     $f = mwFixtures();
     $data = makeSoWithAllocations($f);
 
-    // Approve the SO → observer triggers createWarehouseConfirmationForApprovedSaleOrder
-    $so = SaleOrder::find($data['so']->id);
-    $so->update([
-        'status' => 'approved',
-        'approve_by' => 1,
-        'approve_at' => now(),
-    ]);
+    $so = SaleOrder::with('saleOrderItem.warehouseAllocations')->find($data['so']->id);
+    $so->status = 'approved';
+    $so->approve_by = 1;
+    $so->approve_at = now();
 
-    // Wait for observer to run (it runs synchronously on update)
-    $wc = WarehouseConfirmation::where('sale_order_id', $so->id)->first();
+    // Call the protected method directly via Reflection
+    $observer = new \App\Observers\SaleOrderObserver();
+    $method = new \ReflectionMethod(\App\Observers\SaleOrderObserver::class, 'createWarehouseConfirmationForApprovedSaleOrder');
+    $method->setAccessible(true);
+    $method->invoke($observer, $so);
+
+    $wc = WarehouseConfirmation::where('confirmable_type', \App\Models\SaleOrder::class)
+        ->where('confirmable_id', $so->id)->first();
     expect($wc)->not->toBeNull();
 
     $wcItems = WarehouseConfirmationItem::where('warehouse_confirmation_id', $wc->id)->get();
@@ -352,9 +355,19 @@ test('9. createWarehouseConfirmation membuat 1 WC item untuk single-gudang', fun
         'rak_id' => null,
     ]);
 
-    $so->update(['status' => 'approved', 'approve_by' => 1, 'approve_at' => now()]);
+    $freshSo = SaleOrder::with('saleOrderItem.warehouseAllocations')->find($so->id);
+    $freshSo->status = 'approved';
+    $freshSo->approve_by = 1;
+    $freshSo->approve_at = now();
 
-    $wc = WarehouseConfirmation::where('sale_order_id', $so->id)->first();
+    // Call the protected method directly via Reflection
+    $observer = new \App\Observers\SaleOrderObserver();
+    $method = new \ReflectionMethod(\App\Observers\SaleOrderObserver::class, 'createWarehouseConfirmationForApprovedSaleOrder');
+    $method->setAccessible(true);
+    $method->invoke($observer, $freshSo);
+
+    $wc = WarehouseConfirmation::where('confirmable_type', \App\Models\SaleOrder::class)
+        ->where('confirmable_id', $so->id)->first();
     expect($wc)->not->toBeNull();
 
     $wcItems = WarehouseConfirmationItem::where('warehouse_confirmation_id', $wc->id)->get();

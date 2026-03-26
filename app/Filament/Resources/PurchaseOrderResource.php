@@ -120,48 +120,49 @@ class PurchaseOrderResource extends Resource
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $items = [];
+                                        $defaultCurrencyId = Currency::query()->first()?->id;
+
                                         if ($get('refer_model_type') == 'App\Models\SaleOrder') {
                                             $saleOrder = SaleOrder::find($state);
-                                            foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
-                                                // Calculate subtotal using HelperController for consistency
-                                                $subtotal = HelperController::hitungSubtotal($saleOrderItem->quantity, $saleOrderItem->unit_price, $saleOrderItem->discount, $saleOrderItem->tax, null);
-                                                array_push($items, [
-                                                    'product_id' => $saleOrderItem->product_id,
-                                                    'quantity' => $saleOrderItem->quantity,
-                                                    'unit_price' => (function () use ($saleOrderItem, $get) {
-                                                        $supplierId = $get('supplier_id');
-                                                        if ($supplierId) {
-                                                            $sp = $saleOrderItem->product->suppliers()->where('suppliers.id', $supplierId)->first();
-                                                            if ($sp) return (float) $sp->pivot->supplier_price;
-                                                        }
-                                                        return (float) $saleOrderItem->product->cost_price;
-                                                    })(),
-                                                    'discount' => 0,
-                                                    'tax' => 0,
-                                                    'subtotal' => $subtotal
-                                                ]);
+                                            if ($saleOrder) {
+                                                foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
+                                                    // Calculate subtotal using HelperController for consistency
+                                                    $subtotal = HelperController::hitungSubtotal($saleOrderItem->quantity, $saleOrderItem->unit_price, $saleOrderItem->discount, $saleOrderItem->tax, null);
+                                                    array_push($items, [
+                                                        'product_id' => $saleOrderItem->product_id,
+                                                        'quantity' => $saleOrderItem->quantity,
+                                                        'unit_price' => (function () use ($saleOrderItem, $get) {
+                                                            $supplierId = $get('supplier_id');
+                                                            if ($supplierId) {
+                                                                $sp = $saleOrderItem->product->suppliers()->where('suppliers.id', $supplierId)->first();
+                                                                if ($sp) return (float) $sp->pivot->supplier_price;
+                                                            }
+                                                            return (float) $saleOrderItem->product->cost_price;
+                                                        })(),
+                                                        'discount' => 0,
+                                                        'tax' => 0,
+                                                        'subtotal' => $subtotal,
+                                                        'unit' => $saleOrderItem->product->uom?->abbreviation ?? '-',
+                                                    ]);
+                                                }
+                                                $set('cabang_id', $saleOrder->cabang_id ?? null);
                                             }
                                         } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
                                             $orderRequest = OrderRequest::find($state);
                                             if ($orderRequest) {
-                                                $set('supplier_id', $orderRequest->supplier_id);
                                                 $set('warehouse_id', $orderRequest->warehouse_id);
-                                                if ($orderRequest->supplier) {
-                                                    $set('tempo_hutang', $orderRequest->supplier->tempo_hutang);
-                                                }
-                                                // Resolve the default currency dynamically (first available, typically IDR)
-                                                $defaultCurrency = Currency::query()->first();
-                                                $defaultCurrencyId = $defaultCurrency?->id;
-
                                                 foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
                                                     // Calculate remaining quantity (not yet fulfilled)
                                                     $remainingQuantity = $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0);
-                                                    // Use unit_price from OrderRequestItem if available, otherwise use supplier price from pivot, fallback to cost_price
+                                                    // Use unit_price from OrderRequestItem if available, otherwise use item supplier price from pivot, fallback to cost_price
                                                     if (($orderRequestItem->unit_price ?? 0) > 0) {
                                                         $unitPrice = $orderRequestItem->unit_price;
                                                     } else {
                                                         $product = $orderRequestItem->product;
-                                                        $supplierProduct = $product ? $product->suppliers()->where('suppliers.id', $orderRequest->supplier_id)->first() : null;
+                                                        $supplierId = $orderRequestItem->supplier_id;
+                                                        $supplierProduct = ($product && $supplierId)
+                                                            ? $product->suppliers()->where('suppliers.id', $supplierId)->first()
+                                                            : null;
                                                         $unitPrice = $supplierProduct ? (float) $supplierProduct->pivot->supplier_price : ($product->cost_price ?? 0);
                                                     }
                                                     $discount  = $orderRequestItem->discount ?? 0;
@@ -187,15 +188,16 @@ class PurchaseOrderResource extends Resource
                                                         'currency_id'           => $defaultCurrencyId,
                                                         'refer_item_model_type' => \App\Models\OrderRequestItem::class,
                                                         'refer_item_model_id'   => $orderRequestItem->id,
+                                                        'unit' => $orderRequestItem->product->uom?->abbreviation ?? '-',
                                                     ]);
                                                 }
+                                                $set('cabang_id', $orderRequest->cabang_id ?? null);
+                                                // Map order request tax_type to PO ppn_option values
+                                                $ppnOption = ($orderRequest->tax_type === 'None') ? 'non_ppn' : 'standard';
+                                                $set('ppn_option', $ppnOption);
                                             }
                                         }
                                         $set('currency_id', $defaultCurrencyId);
-                                        $set('cabang_id', $orderRequest->cabang_id ?? null);
-                                        // Map order request tax_type to PO ppn_option values
-                                        $ppnOption = ($orderRequest->tax_type === 'None') ? 'non_ppn' : 'standard';
-                                        $set('ppn_option', $ppnOption);
                                         $set('purchaseOrderItem', $items);
                                     })
                                     ->nullable(),
@@ -1232,10 +1234,10 @@ class PurchaseOrderResource extends Resource
                     ->searchable(query: function (Builder $query, $search) {
                         $query->whereHas('supplier', function ($query) use ($search) {
                             $query->where('code', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                                ->orWhere('perusahaan', 'LIKE', '%' . $search . '%');
                         });
                     })->formatStateUsing(function ($state) {
-                        return "({$state->code}) {$state->name}";
+                        return "({$state->code}) {$state->perusahaan}";
                     }),
                 TextColumn::make('cabang')
                     ->label('Cabang')

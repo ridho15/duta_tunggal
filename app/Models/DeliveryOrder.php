@@ -129,18 +129,17 @@ class DeliveryOrder extends Model
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
-    // H4: WC records created when DO requests stock
+    // WC records linked to this DO via polymorphic relationship (DO-centric flow)
     public function warehouseConfirmations()
     {
-        return $this->hasMany(WarehouseConfirmation::class, 'delivery_order_id');
+        return $this->morphMany(WarehouseConfirmation::class, 'confirmable');
     }
 
     /**
-     * H4: Update DO status based on all linked WC outcomes.
-     * - ALL confirmed  → approved
-     * - ALL rejected   → reject
-     * - mixed outcome  → partial
-     * - others         → stays request_stock
+     * Update DO status based on all linked WC outcomes.
+     * - ALL confirmed  → approved (auto)
+     * - ANY rejected   → reject (auto)
+     * - still pending  → stays request_stock
      */
     public function updateStatusFromWarehouseConfirmations(): void
     {
@@ -152,19 +151,13 @@ class DeliveryOrder extends Model
         $statuses = $wcs->map(fn ($wc) => strtolower((string) $wc->status))->values();
 
         $allConfirmed = $statuses->every(fn ($status) => $status === 'confirmed');
-        $allRejected = $statuses->every(fn ($status) => $status === 'rejected');
-        $hasMixedOutcome = $statuses->contains('partial_confirmed')
-            || ($statuses->contains('confirmed') && $statuses->contains('rejected'))
-            || ($statuses->contains('confirmed') && $statuses->contains('partial_confirmed'))
-            || ($statuses->contains('rejected') && $statuses->contains('partial_confirmed'));
+        $anyRejected  = $statuses->contains('rejected');
 
         if ($allConfirmed) {
             $this->update(['status' => 'approved']);
-        } elseif ($allRejected) {
+        } elseif ($anyRejected) {
             $this->update(['status' => 'reject']);
-        } elseif ($hasMixedOutcome) {
-            $this->update(['status' => 'partial']);
         }
-        // else: still waiting for remaining confirmations → stay at request_stock
+        // else: one or more WCs still pending → stay at request_stock
     }
 }

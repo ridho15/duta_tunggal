@@ -32,106 +32,9 @@ class ViewDeliveryOrder extends ViewRecord
                         $record->status == 'draft';
                 }),
 
-            Actions\Action::make('request_stock')
-                ->label('Request Stock ke Gudang')
-                ->requiresConfirmation()
-                ->modalHeading('Request Stock ke Gudang')
-                ->modalDescription('Ini akan membuat Konfirmasi Gudang untuk setiap item dan mengubah status DO menjadi Request Stock.')
-                ->color('warning')
-                ->icon('heroicon-o-building-storefront')
-                ->visible(function () {
-                    $record = $this->record;
-                    return Auth::user()->hasPermissionTo('request delivery order') &&
-                        $record->status === 'draft';
-                })
-                ->action(function ($record) {
-                    $record->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
-
-                    $groupedItemsByWarehouse = [];
-                    foreach ($record->deliveryOrderItem as $item) {
-                        $sources = $item->warehouseSources;
-                        if ($sources->isNotEmpty()) {
-                            foreach ($sources as $source) {
-                                if (empty($source->warehouse_id) || (float) ($source->quantity ?? 0) <= 0) {
-                                    continue;
-                                }
-
-                                $groupedItemsByWarehouse[$source->warehouse_id][] = [
-                                    'sale_order_item_id' => $item->sale_order_item_id,
-                                    'product_name' => $item->product->name ?? '-',
-                                    'requested_qty' => (float) $source->quantity,
-                                    'confirmed_qty' => (float) $source->quantity,
-                                    'warehouse_id' => $source->warehouse_id,
-                                    'rak_id' => $source->rak_id,
-                                    'status' => 'request',
-                                ];
-                            }
-
-                            continue;
-                        }
-
-                        $fallbackWarehouseId = $record->warehouse_id;
-                        if (empty($fallbackWarehouseId) || (float) ($item->quantity ?? 0) <= 0) {
-                            continue;
-                        }
-
-                        $groupedItemsByWarehouse[$fallbackWarehouseId][] = [
-                            'sale_order_item_id' => $item->sale_order_item_id,
-                            'product_name' => $item->product->name ?? '-',
-                            'requested_qty' => (float) $item->quantity,
-                            'confirmed_qty' => (float) $item->quantity,
-                            'warehouse_id' => $fallbackWarehouseId,
-                            'rak_id' => $item->rak_id,
-                            'status' => 'request',
-                        ];
-                    }
-
-                    if (empty($groupedItemsByWarehouse)) {
-                        \App\Http\Controllers\HelperController::sendNotification(
-                            isSuccess: false,
-                            title: 'Error',
-                            message: 'Tidak dapat request stock karena sumber gudang item belum terdefinisi.'
-                        );
-                        return;
-                    }
-
-                    foreach ($groupedItemsByWarehouse as $warehouseId => $items) {
-                        $wc = \App\Models\WarehouseConfirmation::create([
-                            'delivery_order_id' => $record->id,
-                            'confirmation_type' => 'sales_order',
-                            'status' => 'request',
-                            'confirmed_by' => Auth::id(),
-                            'note' => 'Auto-created dari DO ' . $record->do_number . ' (Warehouse #' . $warehouseId . ')',
-                        ]);
-
-                        foreach ($items as $itemData) {
-                            $wc->warehouseConfirmationItems()->create($itemData);
-                        }
-                    }
-
-                    $record->update(['status' => 'request_stock']);
-                    \App\Http\Controllers\HelperController::sendNotification(
-                        isSuccess: true,
-                        title: 'Information',
-                        message: 'Request Stock telah dikirim ke Gudang. Proses selanjutnya: Konfirmasi oleh Staf Gudang.'
-                    );
-                }),
-
-            Actions\Action::make('request_approve')
-                ->label('Request Approve')
-                ->requiresConfirmation()
-                ->color('success')
-                ->icon('heroicon-o-arrow-uturn-up')
-                ->visible(function () {
-                    $record = $this->record;
-                    return Auth::user()->hasPermissionTo('request delivery order') &&
-                        $record->status == 'draft';
-                })
-                ->action(function ($record) {
-                    $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                    $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'request_approve');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Logistik/Finance.");
-                }),
+            // request_stock and request_approve actions removed:
+            // WC is now auto-created at DO creation (sets status to request_stock).
+            // DO auto-approves when ALL WCs confirm, auto-rejects when ANY WC rejects.
             Actions\Action::make('request_close')
                 ->label('Request Close')
                 ->requiresConfirmation()
@@ -176,25 +79,53 @@ class ViewDeliveryOrder extends ViewRecord
                     }
                 }),
             Actions\Action::make('reject')
-                ->label('Reject Delivery Order')
+                ->label('Tolak / Cancel DO')
                 ->requiresConfirmation()
                 ->color('danger')
                 ->icon('heroicon-o-x-circle')
                 ->visible(function () {
                     $record = $this->record;
                     return Auth::user()->hasPermissionTo('response delivery order') &&
-                        $record->status == 'request_approve';
+                        in_array($record->status, ['request_stock', 'request_approve']);
                 })
                 ->form([
                     \Filament\Forms\Components\Textarea::make('comments')
-                        ->label('Rejection Reason')
-                        ->placeholder('Please provide reason for rejection...')
+                        ->label('Alasan Penolakan')
+                        ->placeholder('Berikan alasan penolakan...')
                         ->required()
                 ])
                 ->action(function ($record, array $data) {
                     $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'reject', comments: $data['comments'], action: 'rejected');
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditolak. Proses selanjutnya: Tim Logistik perlu memperbaiki data Delivery Order sesuai alasan penolakan dan mengajukan kembali untuk persetujuan.");
+                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditolak.");
+                }),
+            // Legacy manual approve (for request_approve status, backward compat with existing records)
+            Actions\Action::make('approve')
+                ->label('Approve Delivery Order')
+                ->requiresConfirmation()
+                ->color('success')
+                ->icon('heroicon-o-check-badge')
+                ->visible(function () {
+                    $record = $this->record;
+                    return Auth::user()->hasPermissionTo('response delivery order') &&
+                        $record->status == 'request_approve' &&
+                        $record->suratJalan()->exists();
+                })
+                ->form([
+                    \Filament\Forms\Components\Textarea::make('comments')
+                        ->label('Comments')
+                        ->placeholder('Optional approval comments...')
+                        ->nullable()
+                ])
+                ->action(function ($record, array $data) {
+                    try {
+                        $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
+                        $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah disetujui.");
+                    } catch (\Exception $e) {
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
+                        throw $e;
+                    }
                 }),
             Actions\Action::make('closed')
                 ->label('Close')

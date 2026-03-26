@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Currency;
 use App\Models\OrderRequestItem;
 use App\Models\Supplier;
+use App\Services\PurchaseOrderService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -73,7 +74,13 @@ class OrderRequestService
         }
 
         // No selection provided — use all items with remaining quantity
-        return $orderRequest->orderRequestItem->map(function ($orderRequestItem) use ($supplier) {
+        return $orderRequest->orderRequestItem
+            ->map(function ($orderRequestItem) use ($supplier) {
+            $remainingQty = max(0, (float) $orderRequestItem->quantity - (float) ($orderRequestItem->fulfilled_quantity ?? 0));
+            if ($remainingQty <= 0) {
+                return null;
+            }
+
             if (($orderRequestItem->unit_price ?? 0) > 0) {
                 $unitPrice = (float) $orderRequestItem->unit_price;
             } else {
@@ -84,12 +91,13 @@ class OrderRequestService
 
             return [
                 'order_request_item' => $orderRequestItem,
-                'quantity'           => (float) $orderRequestItem->quantity,
+                'quantity'           => $remainingQty,
                 'unit_price'         => $unitPrice,
                 'discount'           => $orderRequestItem->discount ?? 0,
                 'tax'                => $orderRequestItem->tax ?? 0,
             ];
-        });
+        })
+            ->filter();
     }
 
     public function approve($orderRequest, $data)
@@ -135,6 +143,9 @@ class OrderRequestService
                 ]);
                 // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
             }
+
+            // Auto-approve PO when created from Order Request approval flow.
+            app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
         }
 
         $orderRequest->update(['status' => 'approved']);

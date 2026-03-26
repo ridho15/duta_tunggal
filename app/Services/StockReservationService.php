@@ -27,6 +27,8 @@ class StockReservationService
         ]);
 
         DB::transaction(function () use ($materialIssue) {
+            MaterialIssue::where('id', $materialIssue->id)->lockForUpdate()->first();
+
             // Check if reservations already exist for this material issue
             $existingCount = StockReservation::where('material_issue_id', $materialIssue->id)->count();
             if ($existingCount > 0) {
@@ -47,6 +49,19 @@ class StockReservationService
                 ]);
                 $warehouseId = $item->warehouse_id ?? $materialIssue->warehouse_id;
 
+                $inventoryStock = InventoryStock::where('product_id', $item->product_id)
+                    ->where('warehouse_id', $warehouseId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$inventoryStock) {
+                    throw new \Exception("Stock untuk produk {$item->product_id} di warehouse {$warehouseId} tidak ditemukan");
+                }
+
+                if ((float) $inventoryStock->qty_available < (float) $item->quantity) {
+                    throw new \Exception("Stock tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$inventoryStock->qty_available}, dibutuhkan: {$item->quantity}");
+                }
+
                 StockReservation::create([
                     'material_issue_id' => $materialIssue->id,
                     'product_id' => $item->product_id,
@@ -54,11 +69,6 @@ class StockReservationService
                     'warehouse_id' => $warehouseId,
                     'rak_id' => $item->rak_id,
                 ]);
-
-                // Update inventory stock qty_reserved
-                $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $warehouseId)
-                    ->first();
 
                 if ($inventoryStock) {
                     Log::info('Before increment check', [
@@ -95,6 +105,8 @@ class StockReservationService
     public function releaseStockReservationsForMaterialIssue(MaterialIssue $materialIssue): void
     {
         DB::transaction(function () use ($materialIssue) {
+            MaterialIssue::where('id', $materialIssue->id)->lockForUpdate()->first();
+
             $reservations = StockReservation::where('material_issue_id', $materialIssue->id)->get();
 
             foreach ($reservations as $reservation) {
@@ -113,6 +125,10 @@ class StockReservationService
             // model event and StockReservationObserver restores qty_available /
             // decrements qty_reserved. A mass-delete query bypasses observers.
             foreach ($reservations as $reservation) {
+                InventoryStock::where('product_id', $reservation->product_id)
+                    ->where('warehouse_id', $reservation->warehouse_id)
+                    ->lockForUpdate()
+                    ->first();
                 $reservation->delete();
             }
         });
@@ -133,12 +149,15 @@ class StockReservationService
         ]);
 
         DB::transaction(function () use ($materialIssue) {
+            MaterialIssue::where('id', $materialIssue->id)->lockForUpdate()->first();
+
             $reservations = StockReservation::where('material_issue_id', $materialIssue->id)->get();
 
             foreach ($reservations as $reservation) {
                 // Manually update inventory stock since observer may not fire inside transaction
                 $inventoryStock = InventoryStock::where('product_id', $reservation->product_id)
                     ->where('warehouse_id', $reservation->warehouse_id)
+                    ->lockForUpdate()
                     ->first();
 
                 if ($inventoryStock) {

@@ -138,15 +138,20 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->label('Quantity')
                     ->badge()
                     ->color(function ($state, $record) {
-                        $inventoryStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
-                            ->where(function ($query) use ($record) {
-                                $query->where('warehouse_id', $record->warehouse_id)
-                                      ->orWhere('rak_id', $record->rak_id);
-                            })
-                            ->first();
-                        
-                        $availableStock = $inventoryStock ? $inventoryStock->qty_available : 0;
-                        
+                        if ($record->warehouse_id) {
+                            $inventoryStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
+                                ->where(function ($query) use ($record) {
+                                    $query->where('warehouse_id', $record->warehouse_id)
+                                          ->orWhere('rak_id', $record->rak_id);
+                                })
+                                ->first();
+
+                            $availableStock = $inventoryStock ? $inventoryStock->qty_available : 0;
+                        } else {
+                            $availableStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
+                                ->sum('qty_available');
+                        }
+
                         if ($availableStock < $state) {
                             return 'danger'; // Red if quantity exceeds available stock
                         }
@@ -156,14 +161,21 @@ class SaleOrderItemRelationManager extends RelationManager
                 TextColumn::make('available_stock')
                     ->label('Stock Tersedia')
                     ->getStateUsing(function ($record) {
-                        $inventoryStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
-                            ->where(function ($query) use ($record) {
-                                $query->where('warehouse_id', $record->warehouse_id)
-                                      ->orWhere('rak_id', $record->rak_id);
-                            })
-                            ->first();
-                        
-                        return $inventoryStock ? $inventoryStock->qty_available : 0;
+                        if ($record->warehouse_id) {
+                            $inventoryStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
+                                ->where(function ($query) use ($record) {
+                                    $query->where('warehouse_id', $record->warehouse_id)
+                                          ->orWhere('rak_id', $record->rak_id);
+                                })
+                                ->first();
+
+                            return $inventoryStock ? $inventoryStock->qty_available : 0;
+                        }
+
+                        // Multi-warehouse / no specific warehouse: return total available across all warehouses
+                        $stocks = \App\Models\InventoryStock::where('product_id', $record->product_id)
+                            ->get();
+                        return (int) $stocks->sum('qty_available');
                     })
                     ->badge()
                     ->color(function ($state, $record) {

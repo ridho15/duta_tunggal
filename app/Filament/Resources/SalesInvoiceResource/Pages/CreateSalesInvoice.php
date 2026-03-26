@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\SalesInvoiceResource\Pages;
 
 use App\Filament\Resources\SalesInvoiceResource;
+use App\Models\SaleOrder;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -12,6 +13,15 @@ class CreateSalesInvoice extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        // Enforce branch inheritance from Sale Order
+        $saleOrderId = $data['selected_sale_order'] ?? $data['from_model_id'] ?? null;
+        if (!empty($saleOrderId)) {
+            $saleOrder = SaleOrder::find($saleOrderId);
+            if ($saleOrder && !empty($saleOrder->cabang_id)) {
+                $data['cabang_id'] = $saleOrder->cabang_id;
+            }
+        }
+
         // Remove temporary fields
         unset($data['selected_customer']);
         unset($data['selected_sale_order']);

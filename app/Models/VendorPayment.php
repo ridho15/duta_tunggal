@@ -39,7 +39,35 @@ class VendorPayment extends Model
         'pph22_amount' => 'float',
         'bea_masuk_amount' => 'float',
         'is_import_payment' => 'boolean',
+        // payment_date handled via accessor/mutator to guard against invalid DB values like '-'
     ];
+
+    /**
+     * Accessor for payment_date — guards against invalid DB values like '-'.
+     */
+    public function getPaymentDateAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string) $value) === '' || trim((string) $value) === '-') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Mutator for payment_date — converts invalid values to null before saving.
+     */
+    public function setPaymentDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['payment_date'] = null;
+        } else {
+            $this->attributes['payment_date'] = $value instanceof \Illuminate\Support\Carbon ? $value->toDateString() : $value;
+        }
+    }
 
     public function paymentRequest()
     {

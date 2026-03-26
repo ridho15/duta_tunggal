@@ -41,6 +41,20 @@ class DeliveryOrderService
             'status' => $status
         ]);
 
+        // G-09: sync DO item statuses whenever DO status changes
+        $itemStatus = match ($status) {
+            'request_stock'           => 'requested',
+            'approved'                => 'confirmed',
+            'reject', 'rejected'      => 'rejected',
+            'partial'                 => 'partial',
+            'sent'                    => 'sent',
+            'received', 'completed'   => 'received',
+            default                   => null,
+        };
+        if ($itemStatus !== null) {
+            $deliveryOrder->deliveryOrderItem()->update(['status' => $itemStatus]);
+        }
+
         $this->createLog(delivery_order_id: $deliveryOrder->id, status: $status, comments: $comments, action: $action);
     }
 

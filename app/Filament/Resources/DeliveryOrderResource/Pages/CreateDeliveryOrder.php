@@ -71,6 +71,7 @@ class CreateDeliveryOrder extends CreateRecord
 
         // Validate warehouse confirmation for all selected sales orders
         if (!empty($salesOrderIds)) {
+            $sourceCabangIds = [];
             foreach ($salesOrderIds as $salesOrderId) {
                 $salesOrder = \App\Models\SaleOrder::find($salesOrderId);
                 if (!$salesOrder) {
@@ -85,29 +86,45 @@ class CreateDeliveryOrder extends CreateRecord
                     throw new ValidationException($validator);
                 }
 
-                if ($salesOrder->status !== 'confirmed') {
+                if ($salesOrder->status === 'canceled' || $salesOrder->status === 'closed') {
                     \Filament\Notifications\Notification::make()
                         ->title('Validation Error')
-                        ->body("Sales Order {$salesOrder->so_number} belum dikonfirmasi warehouse (status: {$salesOrder->status}).")
+                        ->body("Sales Order {$salesOrder->so_number} sudah {$salesOrder->status} dan tidak bisa digunakan untuk membuat Delivery Order.")
                         ->danger()
                         ->send();
 
                     $validator = Validator::make([], []);
-                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} belum dikonfirmasi warehouse (status: {$salesOrder->status}).");
+                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} sudah {$salesOrder->status}.");
                     throw new ValidationException($validator);
                 }
 
-                if (!$salesOrder->warehouse_confirmed_at) {
+                if (!in_array($salesOrder->status, ['approved', 'confirmed', 'completed'])) {
                     \Filament\Notifications\Notification::make()
                         ->title('Validation Error')
-                        ->body("Sales Order {$salesOrder->so_number} belum memiliki tanggal konfirmasi warehouse.")
+                        ->body("Sales Order {$salesOrder->so_number} belum di-approve (status: {$salesOrder->status}).")
                         ->danger()
                         ->send();
 
                     $validator = Validator::make([], []);
-                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} belum memiliki tanggal konfirmasi warehouse.");
+                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} belum di-approve (status: {$salesOrder->status}).");
                     throw new ValidationException($validator);
                 }
+
+                if (!empty($salesOrder->cabang_id)) {
+                    $sourceCabangIds[] = (int) $salesOrder->cabang_id;
+                }
+            }
+
+            $sourceCabangIds = array_values(array_unique($sourceCabangIds));
+            if (count($sourceCabangIds) > 1) {
+                $validator = Validator::make([], []);
+                $validator->errors()->add('salesOrders', 'Semua Sales Order yang dipilih harus berasal dari cabang yang sama.');
+                throw new ValidationException($validator);
+            }
+
+            if (!empty($sourceCabangIds)) {
+                // Enforce branch inheritance from source Sales Order(s)
+                $data['cabang_id'] = $sourceCabangIds[0];
             }
             
             // Set warehouse_id from the first sales order item (assuming all items from same warehouse)
@@ -321,7 +338,71 @@ class CreateDeliveryOrder extends CreateRecord
             $deliveryOrder->salesOrders()->sync($this->processedSalesOrderIds);
         }
 
-        // Note: Delivery order items are now saved automatically by Filament relationship repeater
-        // This allows for approval/review before committing to inventory reduction
+        // Auto-create one WC per warehouse based on DO items' warehouse sources
+        $deliveryOrder->load('deliveryOrderItem.warehouseSources', 'deliveryOrderItem.product');
+
+        $groupedItemsByWarehouse = [];
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    if (empty($source->warehouse_id) || (float)($source->quantity ?? 0) <= 0) {
+                        continue;
+                    }
+                    $groupedItemsByWarehouse[$source->warehouse_id][] = [
+                        'sale_order_item_id' => $item->sale_order_item_id,
+                        'product_name'       => $item->product->name ?? '-',
+                        'requested_qty'      => (float)$source->quantity,
+                        'confirmed_qty'      => (float)$source->quantity,
+                        'warehouse_id'       => $source->warehouse_id,
+                        'rak_id'             => $source->rak_id,
+                        'status'             => 'request',
+                    ];
+                }
+            } else {
+                // Fallback: no warehouse sources — use DO-level warehouse_id
+                $fallbackWarehouseId = $deliveryOrder->warehouse_id;
+                if (empty($fallbackWarehouseId) || (float)($item->quantity ?? 0) <= 0) {
+                    continue;
+                }
+                $groupedItemsByWarehouse[$fallbackWarehouseId][] = [
+                    'sale_order_item_id' => $item->sale_order_item_id,
+                    'product_name'       => $item->product->name ?? '-',
+                    'requested_qty'      => (float)$item->quantity,
+                    'confirmed_qty'      => (float)$item->quantity,
+                    'warehouse_id'       => $fallbackWarehouseId,
+                    'rak_id'             => $item->rak_id,
+                    'status'             => 'request',
+                ];
+            }
+        }
+
+        if (!empty($groupedItemsByWarehouse)) {
+            foreach ($groupedItemsByWarehouse as $warehouseId => $items) {
+                $wc = \App\Models\WarehouseConfirmation::create([
+                    'confirmable_type'  => \App\Models\DeliveryOrder::class,
+                    'confirmable_id'    => $deliveryOrder->id,
+                    'confirmation_type' => 'delivery_order',
+                    'status'            => 'request',
+                    'note'              => 'Auto-created dari DO ' . $deliveryOrder->do_number . ' (Gudang #' . $warehouseId . ')',
+                ]);
+                foreach ($items as $itemData) {
+                    $wc->warehouseConfirmationItems()->create($itemData);
+                }
+            }
+
+            // Advance DO status to request_stock (waiting for warehouse confirmations)
+            app(\App\Services\DeliveryOrderService::class)->updateStatus(
+                deliveryOrder: $deliveryOrder,
+                status: 'request_stock',
+                comments: 'WC otomatis dibuat untuk ' . count($groupedItemsByWarehouse) . ' gudang.',
+            );
+
+            \Filament\Notifications\Notification::make()
+                ->title('Delivery Order Dibuat')
+                ->success()
+                ->body('WC otomatis dikirim ke ' . count($groupedItemsByWarehouse) . ' gudang. Status: Request Stock.')
+                ->send();
+        }
     }
 }

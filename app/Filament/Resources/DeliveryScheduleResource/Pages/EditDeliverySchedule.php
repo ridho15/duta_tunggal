@@ -14,8 +14,8 @@ class EditDeliverySchedule extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            ViewAction::make(),
-            DeleteAction::make(),
+            ViewAction::make()->icon('heroicon-o-eye')->label('Lihat Jadwal'),
+            DeleteAction::make()->icon('heroicon-o-trash')->label('Hapus Jadwal'),
         ];
     }
 }

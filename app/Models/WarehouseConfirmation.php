@@ -13,33 +13,31 @@ use Illuminate\Support\Facades\DB;
 class WarehouseConfirmation extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
+
     protected $table = 'warehouse_confirmations';
+
     protected $fillable = [
-        'sale_order_id',
-        'manufacturing_order_id',
-        'delivery_order_id',  // H4: link to DO when auto-created from request_stock
+        'confirmable_type',
+        'confirmable_id',
         'confirmation_type',
         'note',
-        'rejection_reason',   // I1: reason when WC is rejected
-        'status', // Confirmed / Rejected / Request / confirmed / rejected / partial_confirmed
+        'rejection_reason',
+        'status',
         'confirmed_by',
-        'confirmed_at'
+        'confirmed_at',
     ];
 
-    public function manufacturingOrder()
-    {
-        return $this->belongsTo(ManufacturingOrder::class, 'manufacturing_order_id')->withDefault();
-    }
+    // ─────────────────────────── Relationships ───────────────────────────
 
-    public function saleOrder()
+    /**
+     * Polymorphic source of this WC:
+     *  - App\Models\SaleOrder          (legacy SO-linked flow)
+     *  - App\Models\ManufacturingOrder (MO confirmation)
+     *  - App\Models\DeliveryOrder      (DO-centric flow — default for new WCs)
+     */
+    public function confirmable()
     {
-        return $this->belongsTo(SaleOrder::class, 'sale_order_id')->withDefault();
-    }
-
-    // H4: WC created from DO's request_stock action
-    public function deliveryOrder()
-    {
-        return $this->belongsTo(DeliveryOrder::class, 'delivery_order_id')->withDefault();
+        return $this->morphTo();
     }
 
     public function user()
@@ -52,158 +50,206 @@ class WarehouseConfirmation extends Model
         return $this->hasMany(WarehouseConfirmationItem::class);
     }
 
+    // ─────────────────────────── Helpers ─────────────────────────────────
+
+    /** Return the linked SaleOrder when confirmable is SaleOrder, else null. */
+    public function getLinkedSaleOrder(): ?SaleOrder
+    {
+        if ($this->confirmable_type === SaleOrder::class) {
+            return $this->confirmable instanceof SaleOrder ? $this->confirmable : null;
+        }
+        return null;
+    }
+
+    /** Return the linked DeliveryOrder when confirmable is DeliveryOrder, else null. */
+    public function getLinkedDeliveryOrder(): ?DeliveryOrder
+    {
+        if ($this->confirmable_type === DeliveryOrder::class) {
+            return $this->confirmable instanceof DeliveryOrder ? $this->confirmable : null;
+        }
+        return null;
+    }
+
+    /**
+     * Human-readable label for the source record shown in table columns.
+     * Accessor: $wc->source_label
+     */
+    public function getSourceLabelAttribute(): string
+    {
+        $model = $this->confirmable;
+        if (!$model) {
+            return '-';
+        }
+        return match ($this->confirmable_type) {
+            SaleOrder::class          => $model->so_number ?? 'SO #' . $this->confirmable_id,
+            ManufacturingOrder::class => $model->mo_number ?? 'MO #' . $this->confirmable_id,
+            DeliveryOrder::class      => $model->do_number ?? 'DO #' . $this->confirmable_id,
+            default                   => '#' . $this->confirmable_id,
+        };
+    }
+
+    /** Short type label: "Sales Order", "Manufacturing Order", or "Delivery Order". */
+    public function getConfirmableTypeLabelAttribute(): string
+    {
+        return match ($this->confirmable_type) {
+            SaleOrder::class          => 'Sales Order',
+            ManufacturingOrder::class => 'Manufacturing Order',
+            DeliveryOrder::class      => 'Delivery Order',
+            default                   => $this->confirmable_type ?? '-',
+        };
+    }
+
+    // ─────────────────────────── Model Hooks ─────────────────────────────
+
     protected static function booted()
     {
-        static::created(function ($warehouseConfirmation) {
-            // Load relationships first
-            $warehouseConfirmation->load(['saleOrder', 'warehouseConfirmationItems.saleOrderItem.product']);
+        static::created(function ($wc) {
+            $wc->load(['confirmable', 'warehouseConfirmationItems.saleOrderItem.product']);
 
-            // If warehouse confirmation is created with confirmed status, update sale order immediately
-            if ($warehouseConfirmation->status === 'confirmed' && $warehouseConfirmation->saleOrder) {
-                $warehouseConfirmation->saleOrder->update([
-                    'status' => 'confirmed',
-                    'warehouse_confirmed_at' => now()
-                ]);
-
-                Log::info('Sale Order status and warehouse_confirmed_at updated after warehouse confirmation auto-approval', [
-                    'sale_order_id' => $warehouseConfirmation->sale_order_id,
-                    'warehouse_confirmation_id' => $warehouseConfirmation->id
-                ]);
-
-                // Note: Delivery order creation is now handled in SaleOrderObserver after WC items are created
+            // SO-linked WC created as already confirmed: update SO status immediately
+            if ($wc->status === 'confirmed' && $wc->confirmable_type === SaleOrder::class) {
+                $so = $wc->confirmable;
+                if ($so) {
+                    $so->update([
+                        'status'                 => 'confirmed',
+                        'warehouse_confirmed_at' => now(),
+                    ]);
+                    Log::info('SO status updated after WC created as confirmed', [
+                        'wc_id' => $wc->id,
+                        'so_id' => $wc->confirmable_id,
+                    ]);
+                }
             }
         });
 
-        static::updating(function ($warehouseConfirmation) {
-            $originalStatus = $warehouseConfirmation->getOriginal('status');
-            $newStatus = $warehouseConfirmation->status;
+        static::updating(function ($wc) {
+            $originalStatus = $wc->getOriginal('status');
+            $newStatus      = $wc->status;
 
-            // H4/I1: when this WC is DO-linked and status changes → update DO status
-            if ($warehouseConfirmation->isDirty('status') && $warehouseConfirmation->delivery_order_id) {
-                $warehouseConfirmation->_triggerDoStatusUpdate = true;
-            }
-
-            // When parent status changes to confirmed, update all warehouse confirmation items
-            if ($warehouseConfirmation->isDirty('status') && $warehouseConfirmation->status === 'confirmed') {
-                // Update direct warehouse confirmation items
-                $warehouseConfirmation->warehouseConfirmationItems()->update([
-                    'status' => 'confirmed',
+            if ($wc->isDirty('status') && $newStatus === 'confirmed') {
+                // Bulk-confirm all WC items
+                $wc->warehouseConfirmationItems()->update([
+                    'status'        => 'confirmed',
                     'confirmed_qty' => DB::raw('requested_qty'),
                 ]);
 
-                // Update sale order warehouse_confirmed_at if this is a sales order confirmation
-                if ($warehouseConfirmation->saleOrder) {
-                    $warehouseConfirmation->saleOrder->update([
-                        'status' => 'confirmed',
-                        'warehouse_confirmed_at' => now()
-                    ]);
+                // SO-linked WC confirmed → update SO status (legacy flow)
+                if ($wc->confirmable_type === SaleOrder::class) {
+                    $so = $wc->confirmable;
+                    if ($so) {
+                        $so->update([
+                            'status'                 => 'confirmed',
+                            'warehouse_confirmed_at' => now(),
+                        ]);
+                        Log::info('SO status updated after WC confirmed', [
+                            'wc_id' => $wc->id,
+                            'so_id' => $wc->confirmable_id,
+                        ]);
 
-                    Log::info('Sale Order status and warehouse_confirmed_at updated after warehouse confirmation approval', [
-                        'sale_order_id' => $warehouseConfirmation->sale_order_id,
-                        'warehouse_confirmation_id' => $warehouseConfirmation->id
-                    ]);
-                }
-
-                // Create delivery order automatically for sales order confirmations (after items are updated)
-                if ($warehouseConfirmation->saleOrder) {
-                    // Refresh the model to get updated relationships
-                    $warehouseConfirmation->refresh();
-                    $warehouseConfirmation->load('warehouseConfirmationItems.saleOrderItem.product');
-
-                    static::createDeliveryOrderForConfirmedWarehouseConfirmation($warehouseConfirmation);
+                        // Legacy flow: auto-create DO from confirmed SO-linked WC
+                        $wc->refresh();
+                        $wc->load('warehouseConfirmationItems.saleOrderItem.product');
+                        static::createDeliveryOrderForConfirmedWarehouseConfirmation($wc);
+                    }
                 }
             }
 
-            // When status changes from confirmed to request, delete associated delivery order
-            if (strtolower($originalStatus) === 'confirmed' && strtolower($newStatus) === 'request' && $warehouseConfirmation->saleOrder) {
-                $existingDO = $warehouseConfirmation->saleOrder->deliveryOrder()->first();
-
-                if ($existingDO) {
-                    $existingDO->delete();
-
-                    Log::info('Delivery Order deleted due to warehouse confirmation status change to request', [
-                        'delivery_order_id' => $existingDO->id,
-                        'warehouse_confirmation_id' => $warehouseConfirmation->id,
-                        'sale_order_id' => $warehouseConfirmation->sale_order_id
-                    ]);
+            // SO-linked WC reverts confirmed → request: delete the auto-created DO
+            if (strtolower($originalStatus) === 'confirmed'
+                && strtolower($newStatus) === 'request'
+                && $wc->confirmable_type === SaleOrder::class) {
+                $so = $wc->confirmable;
+                if ($so) {
+                    $existingDO = $so->deliveryOrder()->first();
+                    if ($existingDO) {
+                        $existingDO->delete();
+                        Log::info('DO deleted due to WC revert to request', [
+                            'do_id' => $existingDO->id,
+                            'wc_id' => $wc->id,
+                        ]);
+                    }
                 }
             }
         });
 
-        static::deleting(function ($warehouseConfirmation) {
-            // Delete associated delivery order when warehouse confirmation is deleted
-            if ($warehouseConfirmation->saleOrder) {
-                $existingDO = $warehouseConfirmation->saleOrder->deliveryOrder()->first();
-
-                if ($existingDO) {
-                    $existingDO->delete();
-
-                    Log::info('Delivery Order deleted due to warehouse confirmation deletion', [
-                        'delivery_order_id' => $existingDO->id,
-                        'warehouse_confirmation_id' => $warehouseConfirmation->id,
-                        'sale_order_id' => $warehouseConfirmation->sale_order_id
+        static::deleting(function ($wc) {
+            // SO-linked WC deleted: cascade delete linked DO & revert SO status
+            if ($wc->confirmable_type === SaleOrder::class) {
+                $so = $wc->confirmable;
+                if ($so) {
+                    $existingDO = $so->deliveryOrder()->first();
+                    if ($existingDO) {
+                        $existingDO->delete();
+                        Log::info('DO deleted due to WC deletion', [
+                            'do_id' => $existingDO->id,
+                            'wc_id' => $wc->id,
+                        ]);
+                    }
+                    $so->update([
+                        'status'                 => 'request_approve',
+                        'warehouse_confirmed_at' => null,
+                    ]);
+                    Log::info('SO reverted to request_approve after WC deletion', [
+                        'so_id' => $wc->confirmable_id,
+                        'wc_id' => $wc->id,
                     ]);
                 }
-
-                // Update sale order status back to request_approve when warehouse confirmation is deleted
-                // This requires re-approval process since warehouse confirmation was cancelled
-                $warehouseConfirmation->saleOrder->update([
-                    'status' => 'request_approve',
-                    'warehouse_confirmed_at' => null
-                ]);
-
-                Log::info('Sale Order status updated to request_approve after warehouse confirmation deletion', [
-                    'sale_order_id' => $warehouseConfirmation->sale_order_id,
-                    'warehouse_confirmation_id' => $warehouseConfirmation->id
-                ]);
             }
 
-            if ($warehouseConfirmation->isForceDeleting()) {
-                $warehouseConfirmation->warehouseConfirmationItems()->forceDelete();
+            if ($wc->isForceDeleting()) {
+                $wc->warehouseConfirmationItems()->forceDelete();
             } else {
-                $warehouseConfirmation->warehouseConfirmationItems()->delete();
+                $wc->warehouseConfirmationItems()->delete();
             }
         });
 
-        static::restoring(function ($warehouseConfirmation) {
-            $warehouseConfirmation->warehouseConfirmationItems()->withTrashed()->restore();
+        static::restoring(function ($wc) {
+            $wc->warehouseConfirmationItems()->withTrashed()->restore();
         });
 
-        // H4/I1: after status saved, update linked DO status
-        static::updated(function ($warehouseConfirmation) {
-            if (! empty($warehouseConfirmation->_triggerDoStatusUpdate)
-                && $warehouseConfirmation->delivery_order_id) {
-                $do = DeliveryOrder::find($warehouseConfirmation->delivery_order_id);
+        // DO-linked WC status changed → re-evaluate DO's overall status
+        static::updated(function ($wc) {
+            if ($wc->wasChanged('status') && $wc->confirmable_type === DeliveryOrder::class) {
+                $do = DeliveryOrder::find($wc->confirmable_id);
                 $do?->updateStatusFromWarehouseConfirmations();
             }
         });
     }
 
+    // ─── Legacy helper: auto-create DO when a SO-linked WC gets confirmed ────
+
     /**
-     * Create delivery order automatically when warehouse confirmation is approved
+     * Create a Delivery Order automatically when a SO-linked WC is confirmed (legacy flow).
+     * In the new DO-centric flow, DOs are created first and WCs are auto-generated per warehouse.
      */
-    protected static function createDeliveryOrderForConfirmedWarehouseConfirmation(WarehouseConfirmation $warehouseConfirmation): void
+    protected static function createDeliveryOrderForConfirmedWarehouseConfirmation(WarehouseConfirmation $wc): void
     {
-        Log::info('WarehouseConfirmation: Creating delivery order for confirmed warehouse confirmation', [
-            'warehouse_confirmation_id' => $warehouseConfirmation->id,
-            'sale_order_id' => $warehouseConfirmation->sale_order_id,
+        if ($wc->confirmable_type !== SaleOrder::class) {
+            return;
+        }
+
+        $so = $wc->confirmable;
+        if (!$so) {
+            return;
+        }
+
+        Log::info('WC: Creating DO for confirmed SO-linked WC', [
+            'wc_id' => $wc->id,
+            'so_id' => $wc->confirmable_id,
         ]);
 
-        // Load relationships
-        $warehouseConfirmation->loadMissing('saleOrder.customer', 'warehouseConfirmationItems.saleOrderItem.product');
+        $wc->loadMissing('confirmable.customer', 'warehouseConfirmationItems.saleOrderItem.product');
 
-        // Cek apakah sudah ada delivery order untuk sale order ini
-        $existingDO = $warehouseConfirmation->saleOrder->deliveryOrder()->first();
-
+        // Don't create a second DO if one already exists for this SO
+        $existingDO = $so->deliveryOrder()->first();
         if ($existingDO) {
-            // If the existing DO has no items, try to populate it (can happen if observer fired before WC items were created)
-            if ($existingDO->deliveryOrderItem()->count() === 0 && $warehouseConfirmation->warehouseConfirmationItems->isNotEmpty()) {
+            if ($existingDO->deliveryOrderItem()->count() === 0 && $wc->warehouseConfirmationItems->isNotEmpty()) {
                 Log::info('Existing DO has no items — adding items now', ['do_id' => $existingDO->id]);
-                foreach ($warehouseConfirmation->warehouseConfirmationItems as $wcItem) {
+                foreach ($wc->warehouseConfirmationItems as $wcItem) {
                     if ($wcItem->status === 'confirmed' && $wcItem->confirmed_qty > 0) {
                         try {
                             DeliveryOrderItem::create([
-                                'delivery_order_id' => $existingDO->id,
+                                'delivery_order_id'  => $existingDO->id,
                                 'sale_order_item_id' => $wcItem->sale_order_item_id,
                                 'product_id'         => $wcItem->saleOrderItem->product_id ?? null,
                                 'quantity'           => $wcItem->confirmed_qty,
@@ -218,61 +264,47 @@ class WarehouseConfirmation extends Model
                     }
                 }
             } else {
-                Log::info('Delivery order already exists for sale order', ['do_id' => $existingDO->id]);
+                Log::info('DO already exists for SO — skipping creation', ['do_id' => $existingDO->id]);
                 \Filament\Notifications\Notification::make()
                     ->title('Gagal Membuat Delivery Order')
                     ->danger()
-                    ->body('Delivery Order sudah ada untuk Sale Order ini. Tidak boleh membuat lebih dari satu Delivery Order untuk satu Sale Order.')
+                    ->body('Delivery Order sudah ada untuk Sales Order ini.')
                     ->send();
             }
             return;
         }
 
-        // Hanya buat delivery order untuk tipe pengiriman yang relevan
-        // Both 'Kirim Langsung' and 'Ambil Sendiri' now get DOs for tracking purposes
-        if (!in_array($warehouseConfirmation->saleOrder->tipe_pengiriman, ['Kirim Langsung', 'Ambil Sendiri'])) {
-            Log::info('Skipping delivery order creation - unrecognized tipe_pengiriman', [
-                'tipe_pengiriman' => $warehouseConfirmation->saleOrder->tipe_pengiriman
+        if (!in_array($so->tipe_pengiriman, ['Kirim Langsung', 'Ambil Sendiri'])) {
+            Log::info('Skipping DO creation — unrecognized tipe_pengiriman', [
+                'tipe_pengiriman' => $so->tipe_pengiriman,
             ]);
             return;
         }
 
-        // Resolve warehouse from WC items (nullable in schema, so null is safe)
-        $warehouseId = $warehouseConfirmation->warehouseConfirmationItems->first()?->warehouse_id;
-
-        // Resolve driver and vehicle — these are optional at auto-creation time.
-        // driver_id and vehicle_id are nullable (migration 2026_03_11_030000) so that
-        // the DO can be created without master data and filled in by the user later.
-        $driver  = \App\Models\Driver::first();
-        $vehicle = \App\Models\Vehicle::first();
-
-        // Generate a collision-safe DO number
-        $doNumber = \App\Services\DeliveryOrderService::generateStaticDoNumber();
+        $warehouseId = $wc->warehouseConfirmationItems->first()?->warehouse_id;
+        $driver      = \App\Models\Driver::first();
+        $vehicle     = \App\Models\Vehicle::first();
+        $doNumber    = \App\Services\DeliveryOrderService::generateStaticDoNumber();
 
         try {
-            // Buat delivery order
             $deliveryOrder = DeliveryOrder::create([
-                'do_number'    => $doNumber,
+                'do_number'     => $doNumber,
                 'delivery_date' => now()->toDateString(),
-                'driver_id'    => $driver?->id,
-                'vehicle_id'   => $vehicle?->id,
-                'warehouse_id' => $warehouseId,
-                'status'       => 'draft',
-                'notes'        => 'Auto-generated from confirmed Warehouse Confirmation ' . $warehouseConfirmation->id,
-                'created_by'   => $warehouseConfirmation->confirmed_by
-                    ?? $warehouseConfirmation->saleOrder->approve_by
-                    ?? \App\Models\User::first()?->id,
-                // Pastikan cabang_id diisi agar DO muncul di filter CabangScope
-                'cabang_id'    => $warehouseConfirmation->saleOrder->cabang_id
-                    ?? \Illuminate\Support\Facades\Auth::user()?->cabang_id
+                'driver_id'     => $driver?->id,
+                'vehicle_id'    => $vehicle?->id,
+                'warehouse_id'  => $warehouseId,
+                'status'        => 'draft',
+                'notes'         => 'Auto-generated from confirmed WC #' . $wc->id,
+                'created_by'    => $wc->confirmed_by ?? $so->approve_by ?? \App\Models\User::first()?->id,
+                'cabang_id'     => $so->cabang_id
+                    ?? Auth::user()?->cabang_id
                     ?? \App\Models\Cabang::first()?->id,
             ]);
 
-            // Buat delivery order items dari warehouse confirmation items yang confirmed
-            foreach ($warehouseConfirmation->warehouseConfirmationItems as $wcItem) {
+            foreach ($wc->warehouseConfirmationItems as $wcItem) {
                 if ($wcItem->status === 'confirmed' && $wcItem->confirmed_qty > 0) {
                     DeliveryOrderItem::create([
-                        'delivery_order_id' => $deliveryOrder->id,
+                        'delivery_order_id'  => $deliveryOrder->id,
                         'sale_order_item_id' => $wcItem->sale_order_item_id,
                         'product_id'         => $wcItem->saleOrderItem->product_id ?? null,
                         'quantity'           => $wcItem->confirmed_qty,
@@ -281,26 +313,25 @@ class WarehouseConfirmation extends Model
                 }
             }
 
-            // Hubungkan delivery order dengan sale order melalui pivot table
-            $warehouseConfirmation->saleOrder->deliveryOrder()->attach($deliveryOrder->id);
+            $so->deliveryOrder()->attach($deliveryOrder->id);
 
-            Log::info('Delivery order created successfully', [
-                'do_id'                    => $deliveryOrder->id,
-                'do_number'                => $deliveryOrder->do_number,
-                'warehouse_confirmation_id' => $warehouseConfirmation->id,
-                'sale_order_id'            => $warehouseConfirmation->sale_order_id,
+            Log::info('DO created from confirmed SO-linked WC', [
+                'do_id'     => $deliveryOrder->id,
+                'do_number' => $deliveryOrder->do_number,
+                'wc_id'     => $wc->id,
+                'so_id'     => $wc->confirmable_id,
             ]);
         } catch (\Throwable $e) {
-            Log::error('WarehouseConfirmation: Failed to auto-create Delivery Order', [
-                'warehouse_confirmation_id' => $warehouseConfirmation->id,
-                'sale_order_id'             => $warehouseConfirmation->sale_order_id,
-                'error'                     => $e->getMessage(),
-                'trace'                     => $e->getTraceAsString(),
+            Log::error('WC: Failed to auto-create DO', [
+                'wc_id' => $wc->id,
+                'so_id' => $wc->confirmable_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             \Filament\Notifications\Notification::make()
                 ->title('Gagal Membuat Delivery Order')
                 ->danger()
-                ->body('Terjadi kesalahan otomatis saat membuat Delivery Order. Silakan cek log untuk detail.')
+                ->body('Terjadi kesalahan saat membuat Delivery Order otomatis. Silakan cek log.')
                 ->send();
         }
     }

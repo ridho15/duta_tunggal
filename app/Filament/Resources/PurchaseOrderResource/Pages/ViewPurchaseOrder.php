@@ -21,6 +21,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ViewPurchaseOrder extends ViewRecord
 {
@@ -50,6 +51,12 @@ class ViewPurchaseOrder extends ViewRecord
                             ->success()
                             ->send();
                     } catch (\Exception $e) {
+                        Log::error('ViewPurchaseOrder approve_po failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
                         Notification::make()
                             ->title('Gagal Menyetujui PO')
                             ->body('Terjadi kesalahan: ' . $e->getMessage())
@@ -86,6 +93,12 @@ class ViewPurchaseOrder extends ViewRecord
                             ->success()
                             ->send();
                     } catch (\Exception $e) {
+                        Log::error('ViewPurchaseOrder complete failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
                         Notification::make()
                             ->title('Failed to Complete Purchase Order')
                             ->body($e->getMessage())
@@ -118,13 +131,34 @@ class ViewPurchaseOrder extends ViewRecord
                     return null;
                 })
                 ->action(function (array $data, $record) {
-                    if ($record->status == 'request_close') {
-                        $record->update([
-                            'close_reason' => $data['close_reason'],
-                            'status' => 'closed',
-                            'closed_at' => Carbon::now(),
-                            'closed_by' => Auth::user()->id,
+                    try {
+                        if ($record->status == 'request_close') {
+                            $record->update([
+                                'close_reason' => $data['close_reason'],
+                                'status' => 'closed',
+                                'closed_at' => Carbon::now(),
+                                'closed_by' => Auth::user()->id,
+                            ]);
+                        }
+                        Notification::make()
+                            ->title('Purchase Order Dikonfirmasi')
+                            ->body('Status Purchase Order berhasil diperbarui.')
+                            ->success()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Log::error('ViewPurchaseOrder konfirmasi failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'status' => $record->status,
+                            'user_id' => Auth::id(),
+                            'payload' => $data,
+                            'error' => $e->getMessage(),
                         ]);
+                        Notification::make()
+                            ->title('Gagal Mengkonfirmasi')
+                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
                     }
                 }),
             Action::make('tolak')
@@ -136,9 +170,29 @@ class ViewPurchaseOrder extends ViewRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->action(function ($record) {
-                    $record->update([
-                        'status' => 'draft'
-                    ]);
+                    try {
+                        $record->update([
+                            'status' => 'draft'
+                        ]);
+                        Notification::make()
+                            ->title('Purchase Order Ditolak')
+                            ->body('PO ' . $record->po_number . ' dikembalikan ke status Draft.')
+                            ->warning()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Log::error('ViewPurchaseOrder tolak failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'status' => $record->status,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        Notification::make()
+                            ->title('Gagal Menolak PO')
+                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
                 }),
 
             Action::make('request_close')
@@ -150,9 +204,29 @@ class ViewPurchaseOrder extends ViewRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->action(function ($record) {
-                    $record->update([
-                        'status' => 'request_close'
-                    ]);
+                    try {
+                        $record->update([
+                            'status' => 'request_close'
+                        ]);
+                        Notification::make()
+                            ->title('Permintaan Penutupan Diajukan')
+                            ->body('PO ' . $record->po_number . ' menunggu konfirmasi penutupan.')
+                            ->warning()
+                            ->send();
+                    } catch (\Exception $e) {
+                        Log::error('ViewPurchaseOrder request_close failed', [
+                            'purchase_order_id' => $record->id,
+                            'po_number' => $record->po_number,
+                            'status' => $record->status,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        Notification::make()
+                            ->title('Gagal Request Close')
+                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
                 }),
             Action::make('cetak_pdf')
                 ->label('Cetak PDF')

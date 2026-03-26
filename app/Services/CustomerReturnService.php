@@ -140,12 +140,12 @@ class CustomerReturnService
                      ?? ChartOfAccount::where('code', '5000')->first();
 
         if (! $inventoryCoa || ! $cogsCoa) {
-            Log::warning('CustomerReturnService: COA account(s) not found — skipping journal entries', [
+            Log::warning('CustomerReturnService: COA account(s) not found — cannot create journal entries', [
                 'return_id'    => $customerReturn->id,
                 'inventory_ok' => (bool) $inventoryCoa,
                 'cogs_ok'      => (bool) $cogsCoa,
             ]);
-            return;
+            throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur customer. Diperlukan: Persediaan (1101.01) dan COGS (5100.10). Silakan hubungi administrator untuk mengkonfigurasi akun tersebut.');
         }
 
         // Debit Inventory – goods physically back at warehouse

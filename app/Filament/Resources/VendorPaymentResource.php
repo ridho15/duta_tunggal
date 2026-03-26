@@ -201,6 +201,12 @@ class VendorPaymentResource extends Resource
                                             return $options;
                                         } catch (\Exception $e) {
                                             $set('has_invoices', false);
+                                            \Illuminate\Support\Facades\Log::warning('VendorPaymentResource: gagal memuat daftar invoice: ' . $e->getMessage());
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Gagal Memuat Daftar Invoice')
+                                                ->body('Terjadi kesalahan saat mengambil daftar invoice supplier. Coba pilih ulang supplier atau refresh halaman.')
+                                                ->warning()
+                                                ->send();
                                             return [];
                                         }
                                     })
@@ -555,6 +561,12 @@ class VendorPaymentResource extends Resource
                                         } catch (\Exception $e) {
                                             $set('total_payment', 0);
                                             $set('payment_details', []);
+                                            \Illuminate\Support\Facades\Log::warning('VendorPaymentResource: gagal menghitung total pembayaran: ' . $e->getMessage());
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Gagal Menghitung Total Pembayaran')
+                                                ->body('Terjadi kesalahan saat memproses invoice. Pastikan semua invoice memiliki data yang lengkap.')
+                                                ->warning()
+                                                ->send();
                                         }
                                     })
                                     ->extraAttributes([
@@ -766,7 +778,10 @@ class VendorPaymentResource extends Resource
                     $data['payment_details'] = [];
                 }
             } catch (\Exception $e) {
-                // If there's an error, just continue without payment_details
+                // If there's an error, log and continue without payment_details
+                \Illuminate\Support\Facades\Log::warning('VendorPaymentResource: gagal mengisi detail pembayaran: ' . $e->getMessage(), [
+                    'vendor_payment_id' => $data['id'] ?? null,
+                ]);
                 $data['payment_details'] = [];
                 $data['selected_invoices'] = [];
             }
@@ -784,12 +799,12 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('supplier')
                     ->label('Supplier')
                     ->formatStateUsing(function ($state) {
-                        return "({$state->code}) {$state->name}";
+                        return "({$state->code}) {$state->perusahaan}";
                     })
                     ->searchable(query: function (Builder $query, $search) {
                         $query->whereHas('supplier', function ($query) use ($search) {
                             $query->where('code', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                                ->orWhere('perusahaan', 'LIKE', '%' . $search . '%');
                         });
                     }),
 

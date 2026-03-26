@@ -24,6 +24,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class ViewSaleOrder extends ViewRecord
@@ -56,9 +57,20 @@ class ViewSaleOrder extends ViewRecord
                         return Auth::user()->hasPermissionTo('request sales order') && $record->status == 'draft';
                     })
                     ->action(function ($record) {
-                        $salesOrderService = app(SalesOrderService::class);
-                        $salesOrderService->requestApprove($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->requestApprove($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
+                        } catch (\Exception $e) {
+                            Log::error('ViewSaleOrder request_approve failed', [
+                                'sale_order_id' => $record->id,
+                                'so_number' => $record->so_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'error' => $e->getMessage(),
+                            ]);
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Mengajukan Persetujuan", message: "Terjadi kesalahan: " . $e->getMessage());
+                        }
                     }),
                 Action::make('request_close')
                     ->label('Request Close')
@@ -70,9 +82,20 @@ class ViewSaleOrder extends ViewRecord
                                in_array($record->status, ['approved', 'confirmed', 'completed']);
                     })
                     ->action(function ($record) {
-                        $salesOrderService = app(SalesOrderService::class);
-                        $salesOrderService->requestClose($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Permintaan penutupan Sales Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Sales.");
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->requestClose($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Permintaan penutupan Sales Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Sales.");
+                        } catch (\Exception $e) {
+                            Log::error('ViewSaleOrder request_close failed', [
+                                'sale_order_id' => $record->id,
+                                'so_number' => $record->so_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'error' => $e->getMessage(),
+                            ]);
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Request Close", message: "Terjadi kesalahan: " . $e->getMessage());
+                        }
                     }),
                 Action::make('approve')
                     ->label('Approve')
@@ -83,9 +106,20 @@ class ViewSaleOrder extends ViewRecord
                         return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
                     })
                     ->action(function ($record) {
-                        $salesOrderService = app(SalesOrderService::class);
-                        $salesOrderService->approve($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->approve($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
+                        } catch (\Exception $e) {
+                            Log::error('ViewSaleOrder approve failed', [
+                                'sale_order_id' => $record->id,
+                                'so_number' => $record->so_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'error' => $e->getMessage(),
+                            ]);
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui SO", message: "Terjadi kesalahan: " . $e->getMessage());
+                        }
                     }),
                 Action::make('closed')
                     ->label('Close')
@@ -96,9 +130,20 @@ class ViewSaleOrder extends ViewRecord
                         return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_close');
                     })
                     ->action(function ($record) {
-                        $salesOrderService = app(SalesOrderService::class);
-                        $salesOrderService->close($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan semua Invoice terkait telah diselesaikan dan tidak ada pembayaran yang tertunggak.");
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->close($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan semua Invoice terkait telah diselesaikan dan tidak ada pembayaran yang tertunggak.");
+                        } catch (\Exception $e) {
+                            Log::error('ViewSaleOrder closed failed', [
+                                'sale_order_id' => $record->id,
+                                'so_number' => $record->so_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'error' => $e->getMessage(),
+                            ]);
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Menutup SO", message: "Terjadi kesalahan: " . $e->getMessage());
+                        }
                     }),
                 Action::make('reject')
                     ->label('Reject')
@@ -109,9 +154,20 @@ class ViewSaleOrder extends ViewRecord
                         return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
                     })
                     ->action(function ($record) {
-                        $salesOrderService = app(SalesOrderService::class);
-                        $salesOrderService->reject($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditolak. Proses selanjutnya: Tim Sales perlu merevisi data pesanan sesuai feedback dan mengajukan kembali untuk disetujui.");
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->reject($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah ditolak. Proses selanjutnya: Tim Sales perlu merevisi data pesanan sesuai feedback dan mengajukan kembali untuk disetujui.");
+                        } catch (\Exception $e) {
+                            Log::error('ViewSaleOrder reject failed', [
+                                'sale_order_id' => $record->id,
+                                'so_number' => $record->so_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'error' => $e->getMessage(),
+                            ]);
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Menolak SO", message: "Terjadi kesalahan: " . $e->getMessage());
+                        }
                     }),
                 Action::make('pdf_sale_order')
                     ->label('Download PDF')
@@ -140,10 +196,20 @@ class ViewSaleOrder extends ViewRecord
                     })
                     ->color('success')
                     ->action(function ($record) {
-                        $salesOrderService = app(SalesOrderService::class);
-                        $salesOrderService->completed($record);
-
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->completed($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
+                        } catch (\Exception $e) {
+                            Log::error('ViewSaleOrder completed failed', [
+                                'sale_order_id' => $record->id,
+                                'so_number' => $record->so_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'error' => $e->getMessage(),
+                            ]);
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Menyelesaikan SO", message: "Terjadi kesalahan: " . $e->getMessage());
+                        }
                     }),
                 Action::make('btn_titip_saldo')
                     ->label('Saldo Titip Customer')
@@ -187,9 +253,21 @@ class ViewSaleOrder extends ViewRecord
                     })
                     ->modalSubmitActionLabel("Simpan")
                     ->action(function (array $data, $record) {
-                        $salesOrderService = app(SalesOrderService::class);
-                        $salesOrderService->titipSaldo($record, $data);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Saldo Titip Customer berhasil disimpan. Proses selanjutnya: Tim Finance perlu memverifikasi saldo titip dan memastikan jurnal keuangan telah dicatat dengan benar.");
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->titipSaldo($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Saldo Titip Customer berhasil disimpan. Proses selanjutnya: Tim Finance perlu memverifikasi saldo titip dan memastikan jurnal keuangan telah dicatat dengan benar.");
+                        } catch (\Exception $e) {
+                            Log::error('ViewSaleOrder titip_saldo failed', [
+                                'sale_order_id' => $record->id,
+                                'so_number' => $record->so_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'payload' => $data,
+                                'error' => $e->getMessage(),
+                            ]);
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Simpan Saldo Titip", message: "Terjadi kesalahan: " . $e->getMessage());
+                        }
                     }),
                 Action::make('create_purchase_order')
                     ->label('Create Purchase Order')

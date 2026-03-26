@@ -9,6 +9,7 @@ use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ViewManufacturingOrder extends ViewRecord
 {
@@ -28,24 +29,35 @@ class ViewManufacturingOrder extends ViewRecord
                 })
                 ->action(function () {
                     $record = $this->getRecord();
-                    // Policy guard: transition draft -> in_progress
-                    abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
-                    
-                    // Stock sudah diverifikasi saat Material Issue completed, langsung set ke in_progress
-                    $record->update([
-                        'status' => 'in_progress'
-                    ]);
+                    try {
+                        // Policy guard: transition draft -> in_progress
+                        abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
 
-                    // Create Production record automatically
-                    $productionService = app(\App\Services\ProductionService::class);
-                    \App\Models\Production::create([
-                        'production_number' => $productionService->generateProductionNumber(),
-                        'manufacturing_order_id' => $record->id,
-                        'production_date' => now()->toDateString(),
-                        'status' => 'draft',
-                    ]);
+                        // Stock sudah diverifikasi saat Material Issue completed, langsung set ke in_progress
+                        $record->update([
+                            'status' => 'in_progress'
+                        ]);
 
-                    \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
+                        // Create Production record automatically
+                        $productionService = app(\App\Services\ProductionService::class);
+                        \App\Models\Production::create([
+                            'production_number' => $productionService->generateProductionNumber(),
+                            'manufacturing_order_id' => $record->id,
+                            'production_date' => now()->toDateString(),
+                            'status' => 'draft',
+                        ]);
+
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
+                    } catch (\Throwable $e) {
+                        Log::error('ViewManufacturingOrder start production failed', [
+                            'manufacturing_order_id' => $record->id,
+                            'mo_number' => $record->mo_number,
+                            'status' => $record->status,
+                            'user_id' => Auth::id(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Gagal Memulai Produksi", message: "Terjadi kesalahan saat memulai produksi: " . $e->getMessage());
+                    }
                 }),
             EditAction::make()
                 ->icon('heroicon-o-pencil-square'),

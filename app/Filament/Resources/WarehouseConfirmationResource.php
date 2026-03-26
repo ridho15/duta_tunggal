@@ -8,9 +8,7 @@ use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\Warehouse;
 use App\Models\Rak;
-use App\Services\SalesOrderService;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -29,7 +27,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 class WarehouseConfirmationResource extends Resource
@@ -78,63 +75,80 @@ class WarehouseConfirmationResource extends Resource
                 Fieldset::make('Form Warehouse Confirmation')
                     ->schema([
                         Radio::make('confirmation_type')
-                            ->label('Confirmation Type')
+                            ->label('Tipe Konfirmasi')
                             ->options([
-                                'sales_order' => 'Sales Order Confirmation',
-                                'manufacturing_order' => 'Manufacturing Order Confirmation'
+                                'sales_order'          => 'Sales Order',
+                                'manufacturing_order'  => 'Manufacturing Order',
+                                'delivery_order'       => 'Delivery Order',
                             ])
                             ->default('sales_order')
                             ->required()
                             ->validationMessages([
-                                'required' => 'Tipe konfirmasi harus dipilih'
+                                'required' => 'Tipe konfirmasi harus dipilih',
                             ])
                             ->reactive(),
 
-                        // Sales Order Section
-                        Select::make('sale_order_id')
+                        // Virtual field: shows DO number when WC is DO-linked (read-only on edit)
+                        TextInput::make('source_number_display')
+                            ->label('Sumber Konfirmasi')
+                            ->disabled()
+                            ->placeholder('-')
+                            ->visible(function ($livewire) {
+                                if (! ($livewire instanceof \Filament\Resources\Pages\EditRecord)) {
+                                    return false;
+                                }
+                                return $livewire->record?->confirmable_type === \App\Models\DeliveryOrder::class;
+                            })
+                            ->helperText('WC ini dibuat otomatis dari Delivery Order — tidak dapat diubah.'),
+
+                        // Sales Order picker — shown when type = sales_order
+                        Select::make('so_id_virtual')
                             ->label('Sales Order')
                             ->preload()
                             ->searchable()
-                            ->relationship('saleOrder', 'so_number', function (Builder $query) {
-                                $query->where('status', 'approved')
-                                      ->whereIn('tipe_pengiriman', ['Kirim Langsung', 'Ambil Sendiri'])
-                                      ->where(function ($q) {
-                                          $q->whereDoesntHave('warehouseConfirmation');
-                                          // In edit context, also allow the current SO if it exists
-                                          if (request()->route('record')) {
-                                              $wc = WarehouseConfirmation::find(request()->route('record'));
-                                              if ($wc && $wc->sale_order_id) {
-                                                  $q->orWhere('id', $wc->sale_order_id);
-                                              }
-                                          }
-                                      });
+                            ->options(function ($livewire) {
+                                $query = SaleOrder::with('customer')
+                                    ->where('status', 'approved')
+                                    ->whereIn('tipe_pengiriman', ['Kirim Langsung', 'Ambil Sendiri']);
+                                // In edit context, also include the currently-linked SO
+                                if ($livewire instanceof \Filament\Resources\Pages\EditRecord
+                                    && $livewire->record?->confirmable_type === SaleOrder::class) {
+                                    $currentSoId = $livewire->record->confirmable_id;
+                                    $query = SaleOrder::with('customer')
+                                        ->where(function ($q) use ($currentSoId) {
+                                            $q->where('status', 'approved')
+                                              ->whereIn('tipe_pengiriman', ['Kirim Langsung', 'Ambil Sendiri'])
+                                              ->orWhere('id', $currentSoId);
+                                        });
+                                }
+                                return $query->get()->mapWithKeys(fn ($so) =>
+                                    [$so->id => $so->so_number . ' — ' . ($so->customer?->name ?? '-')]
+                                );
                             })
-                            ->getOptionLabelFromRecordUsing(function (SaleOrder $saleOrder) {
-                                return $saleOrder->so_number . ' - ' . $saleOrder->customer->name;
-                            })
-                            ->visible(function ($get) {
+                            ->visible(fn ($get) => $get('confirmation_type') === 'sales_order')
+                            ->required(function ($livewire, $get) {
+                                if ($livewire instanceof \Filament\Resources\Pages\EditRecord) {
+                                    // Not required if the WC is DO-linked (managed separately)
+                                    return $livewire->record?->confirmable_type === SaleOrder::class;
+                                }
                                 return $get('confirmation_type') === 'sales_order';
                             })
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Sales Order harus dipilih'
-                            ])
+                            ->validationMessages(['required' => 'Sales Order harus dipilih'])
                             ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
+                            ->afterStateUpdated(function ($set, $state) {
                                 if ($state) {
                                     $saleOrder = SaleOrder::with('saleOrderItem.product')->find($state);
                                     if ($saleOrder) {
-                                        // Create confirmation items directly
                                         $confirmationItems = [];
                                         foreach ($saleOrder->saleOrderItem as $item) {
                                             $confirmationItems[] = [
                                                 'sale_order_item_id' => $item->id,
-                                                'product_name' => $item->product->name ?? 'Unknown Product',
-                                                'requested_qty' => $item->quantity,
-                                                'confirmed_qty' => $item->quantity,
-                                                'warehouse_id' => $item->warehouse_id,
-                                                'rak_id' => $item->rak_id,
-                                                'status' => 'request'
+                                                'product_name'       => $item->product->name ?? 'Unknown Product',
+                                                'requested_qty'      => $item->quantity,
+                                                'confirmed_qty'      => $item->quantity,
+                                                'warehouse_id'       => $item->warehouse_id,
+                                                'rak_id'             => $item->rak_id,
+                                                'status'             => 'request',
                                             ];
                                         }
                                         $set('confirmation_items', $confirmationItems);
@@ -142,19 +156,25 @@ class WarehouseConfirmationResource extends Resource
                                 }
                             }),
 
-                        // Manufacturing Order Section (existing)
-                        Select::make('manufacturing_order_id')
+                        // Manufacturing Order picker
+                        Select::make('mo_id_virtual')
                             ->label('Manufacturing Order')
                             ->preload()
                             ->searchable()
-                            ->relationship('manufacturingOrder', 'mo_number')
-                            ->visible(function ($get) {
-                                return $get('confirmation_type') === 'manufacturing_order';
-                            })
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Manufacturing Order harus dipilih'
-                            ]),
+                            ->options(fn () => \App\Models\ManufacturingOrder::pluck('mo_number', 'id'))
+                            ->visible(fn ($get) => $get('confirmation_type') === 'manufacturing_order')
+                            ->required(fn ($get) => $get('confirmation_type') === 'manufacturing_order')
+                            ->validationMessages(['required' => 'Manufacturing Order harus dipilih']),
+
+                        // Delivery Order picker — for manually linking to a DO
+                        Select::make('do_id_virtual')
+                            ->label('Delivery Order')
+                            ->preload()
+                            ->searchable()
+                            ->options(fn () => \App\Models\DeliveryOrder::pluck('do_number', 'id'))
+                            ->visible(fn ($get) => $get('confirmation_type') === 'delivery_order')
+                            ->required(fn ($get) => $get('confirmation_type') === 'delivery_order')
+                            ->validationMessages(['required' => 'Delivery Order harus dipilih']),
 
                         // Confirmation Items for Sales Order
                         Repeater::make('confirmation_items')
@@ -257,21 +277,22 @@ class WarehouseConfirmationResource extends Resource
         return $table
             ->defaultSort('created_at', 'desc')
             ->columns([
-                TextColumn::make('saleOrder.so_number')
-                    ->label('Sales Order')
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('source_label')
+                    ->label('Sumber')
+                    ->searchable(false)
+                    ->sortable(false)
+                    ->getStateUsing(fn ($record) => $record->source_label),
 
-                TextColumn::make('deliveryOrder.do_number')
-                    ->label('Delivery Order')
-                    ->searchable()
-                    ->sortable()
-                    ->placeholder('-'),
-
-                TextColumn::make('manufacturingOrder.mo_number')
-                    ->label('Manufacturing Order')
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('confirmable_type_label')
+                    ->label('Tipe')
+                    ->badge()
+                    ->color(fn ($record) => match ($record->confirmable_type) {
+                        \App\Models\SaleOrder::class          => 'success',
+                        \App\Models\ManufacturingOrder::class => 'warning',
+                        \App\Models\DeliveryOrder::class      => 'info',
+                        default                               => 'gray',
+                    })
+                    ->getStateUsing(fn ($record) => $record->confirmable_type_label),
 
                 TextColumn::make('status')
                     ->badge()
@@ -340,6 +361,7 @@ class WarehouseConfirmationResource extends Resource
                                 'confirmed_by' => Auth::id(),
                                 'confirmed_at' => now(),
                             ]);
+                            $record->getLinkedDeliveryOrder()?->updateStatusFromWarehouseConfirmations();
                         })
                         ->visible(fn (WarehouseConfirmation $record): bool => strtolower($record->status) === 'request'),
                     Action::make('reject')
@@ -359,6 +381,7 @@ class WarehouseConfirmationResource extends Resource
                                 'confirmed_by' => Auth::id(),
                                 'confirmed_at' => now(),
                             ]);
+                            $record->getLinkedDeliveryOrder()?->updateStatusFromWarehouseConfirmations();
                         })
                         ->visible(fn (WarehouseConfirmation $record): bool => strtolower($record->status) === 'request'),
                     DeleteAction::make(),

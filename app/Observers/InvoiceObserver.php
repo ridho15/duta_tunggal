@@ -67,6 +67,8 @@ class InvoiceObserver
                     'invoice_id' => $invoice->id,
                     'error'      => $e->getMessage(),
                 ]);
+                // Re-throw so Filament surfaces this as a visible error to the user
+                throw $e;
             }
         } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
             // Create Account Receivable

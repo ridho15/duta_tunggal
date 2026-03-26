@@ -681,15 +681,28 @@ class ProductionPlanResource extends Resource
                             // Create Manufacturing Order from Production Plan
                             $manufacturingService = app(\App\Services\ManufacturingService::class);
 
+                            $record->loadMissing(['saleOrder', 'warehouse', 'billOfMaterial.items']);
+                            $inheritedCabangId = $record->saleOrder?->cabang_id
+                                ?? $record->warehouse?->cabang_id
+                                ?? null;
+
                             // Find a suitable warehouse that has stock for the materials
-                            $defaultWarehouseId = null;
-                            if ($record->billOfMaterial && $record->billOfMaterial->items->count() > 0) {
+                            // Priority: use Production Plan warehouse first to keep branch flow consistent
+                            $defaultWarehouseId = $record->warehouse_id;
+                            if (!$defaultWarehouseId && $record->billOfMaterial && $record->billOfMaterial->items->count() > 0) {
                                 $firstMaterialId = $record->billOfMaterial->items->first()->product_id;
-                                $warehouseWithStock = \App\Models\InventoryStock::where('product_id', $firstMaterialId)
-                                    ->where('qty_available', '>', 0)
-                                    ->first();
+                                $warehouseWithStockQuery = \App\Models\InventoryStock::where('product_id', $firstMaterialId)
+                                    ->where('qty_available', '>', 0);
+                                if (!empty($inheritedCabangId)) {
+                                    $warehouseWithStockQuery->whereHas('warehouse', function ($q) use ($inheritedCabangId) {
+                                        $q->where('cabang_id', $inheritedCabangId);
+                                    });
+                                }
+                                $warehouseWithStock = $warehouseWithStockQuery->first();
                                 $defaultWarehouseId = $warehouseWithStock ? $warehouseWithStock->warehouse_id : 1; // Default to Gudang Utama
-                            } else {
+                            }
+
+                            if (!$defaultWarehouseId) {
                                 $defaultWarehouseId = 1; // Default to Gudang Utama
                             }
 
@@ -704,15 +717,21 @@ class ProductionPlanResource extends Resource
                                 'uom_id' => $record->uom_id,
                                 'warehouse_id' => $defaultWarehouseId,
                                 'rak_id' => null,
+                                'cabang_id' => $inheritedCabangId,
                             ]);
 
                             // Create MO materials from BOM if applicable
                             if ($record->billOfMaterial) {
                                 foreach ($record->billOfMaterial->items as $item) {
                                     // Find warehouse that has stock for this specific material
-                                    $materialWarehouse = \App\Models\InventoryStock::where('product_id', $item->product_id)
-                                        ->where('qty_available', '>', 0)
-                                        ->first();
+                                    $materialWarehouseQuery = \App\Models\InventoryStock::where('product_id', $item->product_id)
+                                        ->where('qty_available', '>', 0);
+                                    if (!empty($inheritedCabangId)) {
+                                        $materialWarehouseQuery->whereHas('warehouse', function ($q) use ($inheritedCabangId) {
+                                            $q->where('cabang_id', $inheritedCabangId);
+                                        });
+                                    }
+                                    $materialWarehouse = $materialWarehouseQuery->first();
 
                                     ManufacturingOrderMaterial::create([
                                         'manufacturing_order_id' => $mo->id,

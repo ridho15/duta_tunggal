@@ -86,6 +86,7 @@ class SuratJalanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->reactive()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get) {
                                 // J1: create => only approved DOs, edit => allow linked sent/received for compatibility.
                                 $isCreatePage = str_ends_with((string) request()->path(), 'surat-jalans/create');
@@ -96,8 +97,9 @@ class SuratJalanResource extends Resource
                                 }
                             })
                             ->multiple()
-                            ->afterStateUpdated(function ($set, $state) {
-                                $deliveryOrders = DeliveryOrder::whereIn('id', $state ?? [])->get();
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $ids = is_array($state) ? $state : (empty($state) ? [] : [$state]);
+                                $deliveryOrders = DeliveryOrder::whereIn('id', $ids)->get();
                                 if ($deliveryOrders->isNotEmpty()) {
                                     $set('cabang_id', $deliveryOrders->first()->cabang_id);
                                 }
@@ -189,7 +191,15 @@ class SuratJalanResource extends Resource
                 TextColumn::make('driver_info')
                     ->label('Driver')
                     ->getStateUsing(function (SuratJalan $record): string {
-                        $drivers = $record->deliveryOrder->pluck('driver.name')->filter()->unique();
+                        $drivers = $record->deliveryOrder->map(function ($deliveryOrder) {
+                            $driver = $deliveryOrder->driver;
+                            if ($driver) {
+                                $code = $driver->license ? "({$driver->license}) " : '';
+                                return $code . $driver->name;
+                            }
+                            return null;
+                        })->filter()->unique();
+
                         return $drivers->implode(', ') ?: '-';
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -198,7 +208,12 @@ class SuratJalanResource extends Resource
                     ->getStateUsing(function (SuratJalan $record): string {
                         $vehicles = $record->deliveryOrder->map(function ($deliveryOrder) {
                             if ($deliveryOrder->vehicle) {
-                                return "{$deliveryOrder->vehicle->license_plate} ({$deliveryOrder->vehicle->vehicle_type})";
+                                $plate = $deliveryOrder->vehicle->plate ?? $deliveryOrder->vehicle->license_plate ?? null;
+                                $type = $deliveryOrder->vehicle->type ?? $deliveryOrder->vehicle->vehicle_type ?? null;
+                                if ($plate && $type) {
+                                    return "{$plate} ({$type})";
+                                }
+                                return $plate ?? $type;
                             }
                             return null;
                         })->filter()->unique();
@@ -341,7 +356,7 @@ class SuratJalanResource extends Resource
                             $record->loadMissing('deliveryOrder');
                             $marked = 0;
                             foreach ($record->deliveryOrder as $do) {
-                                if (in_array($do->status, ['approved', 'request_stock', 'partial'])) {
+                                if ($do->status === 'approved') {
                                     try {
                                         app(\App\Services\DeliveryOrderService::class)->updateStatus(deliveryOrder: $do, status: 'sent');
                                         $marked++;

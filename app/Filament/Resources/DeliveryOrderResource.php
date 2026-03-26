@@ -97,8 +97,7 @@ class DeliveryOrderResource extends Resource
                                 return is_array($state) ? $state : [];
                             })
                             ->options(function () {
-                                return SaleOrder::whereIn('status', ['confirmed', 'completed'])
-                                    ->whereNotNull('warehouse_confirmed_at')
+                                return SaleOrder::whereIn('status', ['approved', 'confirmed', 'completed'])
                                     ->pluck('so_number', 'id');
                             })
                             ->multiple()
@@ -106,7 +105,7 @@ class DeliveryOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Minimal satu Sales Order wajib dipilih',
                             ])
-                            ->helperText('Sales Order yang sudah dikonfirmasi warehouse dapat dipilih untuk membuat Delivery Order (berlaku untuk semua jenis pengiriman).')
+                            ->helperText('Sales Order yang sudah di-approve dapat dipilih untuk membuat Delivery Order. WC per gudang akan dibuat otomatis.')
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $listSaleOrder = SaleOrder::whereIn('id', $state)->get();
                                 $deliveryItems = [];
@@ -564,8 +563,10 @@ class DeliveryOrderResource extends Resource
                             ->schema([
                                 TextEntry::make('so_number')->label('SO Number'),
                                 TextEntry::make('createdBy.name')->label('Sales'),
-                            ])->columns(2),
-                    ])->columns(2),
+                                TextEntry::make('customer.perusahaan')->label('Customer')->placeholder('-'),
+                                TextEntry::make('status')->label('SO Status')->placeholder('-'),
+                            ])->columns(4),
+                    ]),
                 Section::make('Delivery Order Items')
                     ->schema([
                         RepeatableEntry::make('deliveryOrderItem')
@@ -575,9 +576,28 @@ class DeliveryOrderResource extends Resource
                                     ->formatStateUsing(function ($state, $record) {
                                         return "({$record->product->sku}) {$state}";
                                     }),
-                                TextEntry::make('quantity'),
+                                TextEntry::make('quantity')
+                                    ->label('Quantity')
+                                    ->formatStateUsing(function ($state, $record) {
+                                        $unit = $record->product->uom->abbreviation ?? $record->product->uom->name ?? null;
+                                        return $state . ($unit ? " {$unit}" : '');
+                                    }),
+                                TextEntry::make('product.uom.name')->label('Satuan')->placeholder(function ($record) {
+                                    return $record->product->uom->abbreviation ?? $record->product->uom->name ?? '-';
+                                }),
                                 TextEntry::make('reason'),
-                            ])->columns(3)
+                                TextEntry::make('status')
+                                    ->badge()
+                                    ->color(fn ($state) => match ($state) {
+                                        'confirmed'  => 'success',
+                                        'requested'  => 'warning',
+                                        'rejected'   => 'danger',
+                                        'partial'    => 'info',
+                                        'sent'       => 'primary',
+                                        'received'   => 'success',
+                                        default      => 'gray',
+                                    }),
+                            ])->columns(4)
                             ->columnSpanFull(),
                     ])->columns(2),
                 Section::make('Journal Entries')
@@ -617,28 +637,51 @@ class DeliveryOrderResource extends Resource
                     }),
 
                 Section::make('Status Konfirmasi Gudang')
+                    ->description('Setiap kartu mewakili satu gudang. DO di-approve otomatis jika semua gudang mengkonfirmasi; DO ditolak otomatis jika ada satu gudang yang menolak.')
                     ->schema([
                         RepeatableEntry::make('warehouseConfirmations')
                             ->label('')
                             ->schema([
-                                TextEntry::make('id')->label('WC #'),
                                 TextEntry::make('warehouseConfirmationItems.0.warehouse.name')
                                     ->label('Gudang')
-                                    ->placeholder('-'),
+                                    ->placeholder('-')
+                                    ->weight(\Filament\Support\Enums\FontWeight::Bold),
                                 TextEntry::make('status')
+                                    ->label('Status WC')
                                     ->badge()
                                     ->color(fn($state) => match (strtolower((string) $state)) {
-                                        'confirmed'        => 'success',
-                                        'rejected'         => 'danger',
+                                        'confirmed'         => 'success',
+                                        'rejected'          => 'danger',
                                         'partial_confirmed' => 'warning',
-                                        default            => 'info',
+                                        'request'           => 'info',
+                                        default             => 'gray',
                                     }),
+                                TextEntry::make('items_summary')
+                                    ->label('Item yang Diminta')
+                                    ->getStateUsing(fn($record) =>
+                                        $record->warehouseConfirmationItems
+                                            ->map(fn($item) =>
+                                                ($item->product_name ?? '-') . ': ' .
+                                                (int)$item->confirmed_qty . ' / ' .
+                                                (int)$item->requested_qty . ' ' .
+                                                ($item->status === 'confirmed' ? '✓' : ($item->status === 'rejected' ? '✗' : '…'))
+                                            )
+                                            ->join("\n")
+                                    )
+                                    ->html(false),
                                 TextEntry::make('rejection_reason')
                                     ->label('Alasan Tolak')
                                     ->placeholder('-')
-                                    ->visible(fn($record) => ! empty($record->rejection_reason)),
-                                TextEntry::make('user.name')->label('Diproses Oleh')->placeholder('-'),
-                            ])->columns(5),
+                                    ->color('danger'),
+                                TextEntry::make('user.name')
+                                    ->label('Diproses Oleh')
+                                    ->placeholder('Belum diproses'),
+                                TextEntry::make('confirmed_at')
+                                    ->label('Waktu Konfirmasi')
+                                    ->dateTime('d M Y H:i')
+                                    ->placeholder('-'),
+                            ])->columns(3)
+                              ->columnSpanFull(),
                     ])
                     ->visible(fn($record) => $record->warehouseConfirmations()->exists()),
             ]);
@@ -874,13 +917,20 @@ class DeliveryOrderResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
+                    // G-01: For draft DOs, guide user to View page where the
+                    // canonical "Request Stock ke Gudang" action lives (H4 flow).
+                    // "Request Approve" from list is intentionally removed for draft to
+                    // avoid dual-flow confusion. Request Approve still available on
+                    // request_stock status DOs (waiting for finance approval after WC confirmed).
                     Action::make('request_approve')
                         ->label('Request Approve')
                         ->requiresConfirmation()
                         ->color('success')
                         ->icon('heroicon-o-arrow-uturn-up')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request delivery order') && $record->status == 'draft';
+                            // Only visible for request_stock (after WC confirmed flow),
+                            // NOT for draft (use "Request Stock" on view page instead).
+                            return Auth::user()->hasPermissionTo('request delivery order') && $record->status == 'request_stock';
                         })
                         ->action(function ($record) {
                             $deliveryOrderService = app(DeliveryOrderService::class);

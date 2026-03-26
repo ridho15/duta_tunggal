@@ -58,5 +58,17 @@ class JournalEntry extends Model
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);
+
+        static::creating(function (JournalEntry $entry): void {
+            AccountingPeriod::ensureDateIsOpen($entry->date ?? now(), $entry->cabang_id);
+        });
+
+        static::updating(function (JournalEntry $entry): void {
+            AccountingPeriod::ensureDateIsOpen($entry->date ?? now(), $entry->cabang_id);
+        });
+
+        static::deleting(function (JournalEntry $entry): void {
+            AccountingPeriod::ensureDateIsOpen($entry->date ?? now(), $entry->cabang_id);
+        });
     }
 }

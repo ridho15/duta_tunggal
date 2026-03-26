@@ -1,7 +1,6 @@
 import { execSync } from 'node:child_process'
 import { expect } from '@playwright/test'
 
-export const BASE = 'http://localhost:8009'
 export const FIXTURE = {
   paymentRequestNumber: 'PR-TEST-VP-APPROVED',
   supplierCode: 'SUPP001',
@@ -13,7 +12,7 @@ export function ensureVendorPaymentFixture() {
 }
 
 export async function openVendorPaymentCreatePage(page) {
-  await page.goto(`${BASE}/admin/vendor-payments/create`)
+  await page.goto('/admin/vendor-payments/create')
   await page.waitForLoadState('networkidle')
   await expect(page).not.toHaveURL(/login/)
 }

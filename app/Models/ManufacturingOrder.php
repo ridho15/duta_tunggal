@@ -24,6 +24,11 @@ class ManufacturingOrder extends Model
         'cabang_id'
     ];
 
+    public function warehouseConfirmations()
+    {
+        return $this->morphMany(\App\Models\WarehouseConfirmation::class, 'confirmable');
+    }
+
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',

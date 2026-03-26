@@ -553,7 +553,12 @@ class OrderRequestResource extends Resource
                     ->searchable(),
                 TextColumn::make('cabang')
                     ->label('Cabang')
-                    ->searchable()
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('cabang', function ($query) use ($search) {
+                            return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        });
+                    })
                     ->formatStateUsing(function ($state) {
                         return "({$state->kode}) {$state->nama}";
                     }),

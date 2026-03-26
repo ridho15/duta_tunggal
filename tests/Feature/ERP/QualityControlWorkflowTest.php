@@ -152,7 +152,7 @@ class QualityControlWorkflowTest extends TestCase
         $supplier = $loadedQc->fromModel?->purchaseReceipt?->purchaseOrder?->supplier;
         $this->assertNotNull($supplier, 'Supplier must be reachable from QC record');
         $this->assertNotEmpty(
-            $supplier->perusahaan ?? $supplier->name,
+            $supplier->perusahaan,
             'Supplier name must not be empty'
         );
     }

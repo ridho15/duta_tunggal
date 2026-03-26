@@ -9,6 +9,7 @@ use App\Services\CreditValidationService;
 use App\Models\Customer;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\Quotation;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
@@ -41,6 +42,14 @@ class CreateSaleOrder extends CreateRecord
     {
         // Set created_by to current user
         $data['created_by'] = Auth::id();
+
+        // Enforce branch inheritance from quotation when SO is created from quotation
+        if (!empty($data['quotation_id'])) {
+            $quotation = Quotation::find($data['quotation_id']);
+            if ($quotation && !empty($quotation->cabang_id)) {
+                $data['cabang_id'] = $quotation->cabang_id;
+            }
+        }
         
         // Validate credit limit and overdue credits before creating sale order
         if (isset($data['customer_id']) && isset($data['total_amount'])) {

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Models\PurchaseOrder;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -18,6 +19,18 @@ class CreatePurchaseInvoice extends CreateRecord
         
         // Task 14: Move selected POs to purchase_order_ids, remove form temp fields
         $data['purchase_order_ids'] = $data['selected_purchase_orders'] ?? [];
+
+        // Enforce branch inheritance from selected Purchase Order (first PO as source)
+        if (!empty($data['purchase_order_ids']) && is_array($data['purchase_order_ids'])) {
+            $firstPoId = collect($data['purchase_order_ids'])->filter()->first();
+            if ($firstPoId) {
+                $purchaseOrder = PurchaseOrder::find($firstPoId);
+                if ($purchaseOrder && !empty($purchaseOrder->cabang_id)) {
+                    $data['cabang_id'] = $purchaseOrder->cabang_id;
+                }
+            }
+        }
+
         unset($data['selected_purchase_orders']);
         unset($data['selected_purchase_receipts']);
         
@@ -32,7 +45,8 @@ class CreatePurchaseInvoice extends CreateRecord
 
         $subtotal = (float) ($data['subtotal'] ?? 0);
         $ppnRate = (float) ($data['ppn_rate'] ?? 0);
-        $data['tax'] = isset($data['tax']) ? (float) $data['tax'] : ($subtotal * $ppnRate / 100);
+        // Always store tax as the IDR amount (ppn_rate % of DPP), never store a percentage rate in this field.
+        $data['tax'] = round($subtotal * $ppnRate / 100, 2);
 
         $data['other_fee'] = $data['other_fees'] ?? [];
         return $data;

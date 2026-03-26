@@ -306,12 +306,15 @@ class SalesOrderService
             throw new \Exception('Sales Order must be approved before warehouse confirmation');
         }
 
-        // Create warehouse confirmation record
-        $confirmation = $saleOrder->warehouseConfirmation()->create([
-            'status' => $confirmationData['status'] ?? 'confirmed',
-            'notes' => $confirmationData['notes'] ?? null,
-            'confirmed_by' => Auth::user()->id,
-            'confirmed_at' => Carbon::now()
+        // Create warehouse confirmation record (polymorphic confirmable)
+        $confirmation = \App\Models\WarehouseConfirmation::create([
+            'confirmable_type' => SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'confirmation_type' => 'sales_order',
+            'status'           => $confirmationData['status'] ?? 'confirmed',
+            'note'             => $confirmationData['notes'] ?? null,
+            'confirmed_by'     => Auth::user()->id,
+            'confirmed_at'     => Carbon::now(),
         ]);
 
         // Process each item
@@ -411,15 +414,18 @@ class SalesOrderService
         ]);
 
         // Copy confirmed items to delivery order
-        foreach ($saleOrder->warehouseConfirmation->warehouseConfirmationItems as $confirmedItem) {
-            if ($confirmedItem->status === 'confirmed' || $confirmedItem->status === 'partial_confirmed') {
-                $deliveryOrder->deliveryOrderItem()->create([
-                    'sale_order_item_id' => $confirmedItem->sale_order_item_id,
-                    'product_id'         => $confirmedItem->saleOrderItem->product_id,
-                    'quantity'           => $confirmedItem->confirmed_qty,
-                    'warehouse_id'       => $confirmedItem->warehouse_id,
-                    'rak_id'             => $confirmedItem->rak_id,
-                ]);
+        $wc = $saleOrder->warehouseConfirmation()->where('status', 'confirmed')->latest()->first();
+        if ($wc) {
+            foreach ($wc->warehouseConfirmationItems as $confirmedItem) {
+                if ($confirmedItem->status === 'confirmed' || $confirmedItem->status === 'partial_confirmed') {
+                    $deliveryOrder->deliveryOrderItem()->create([
+                        'sale_order_item_id' => $confirmedItem->sale_order_item_id,
+                        'product_id'         => $confirmedItem->saleOrderItem->product_id,
+                        'quantity'           => $confirmedItem->confirmed_qty,
+                        'warehouse_id'       => $confirmedItem->warehouse_id,
+                        'rak_id'             => $confirmedItem->rak_id,
+                    ]);
+                }
             }
         }
 

@@ -20,15 +20,8 @@ class SaleOrderObserver
      */
     public function created(SaleOrder $saleOrder): void
     {
-        // Jika SO dibuat langsung dengan status 'approved' (dari Quotation yang sudah approved),
-        // buat warehouse confirmation otomatis seperti saat SO di-approve
-        if ($saleOrder->status === 'approved') {
-            Log::info('SaleOrderObserver: SO created with approved status, creating warehouse confirmation', [
-                'sale_order_id' => $saleOrder->id,
-                'so_number' => $saleOrder->so_number,
-            ]);
-            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
-        }
+        // WC and DO are no longer auto-created on SO approval.
+        // They are created manually by the user when creating a Delivery Order.
     }
 
     /**
@@ -39,10 +32,7 @@ class SaleOrderObserver
         $originalStatus = $saleOrder->getOriginal('status');
         $newStatus = $saleOrder->status;
 
-        // Jika status berubah ke 'approved', buat warehouse confirmation otomatis
-        if ($originalStatus !== 'approved' && $newStatus === 'approved') {
-            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
-        }
+        // WC and DO creation is now triggered when a Delivery Order is created.
 
         // Jika status berubah ke 'completed', buat invoice otomatis dan kurangi stock untuk Ambil Sendiri
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
@@ -269,7 +259,9 @@ class SaleOrderObserver
         $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
 
         // Cek apakah sudah ada warehouse confirmation untuk sale order ini
-        $existingWC = WarehouseConfirmation::where('sale_order_id', $saleOrder->id)->first();
+        $existingWC = WarehouseConfirmation::where('confirmable_type', SaleOrder::class)
+            ->where('confirmable_id', $saleOrder->id)
+            ->first();
 
         if ($existingWC) {
             Log::info('Warehouse confirmation already exists for sale order', ['wc_id' => $existingWC->id]);
@@ -297,14 +289,15 @@ class SaleOrderObserver
             'item_status' => $itemStatus,
         ]);
 
-        // Buat warehouse confirmation dengan status sesuai stock availability
+        // Buat warehouse confirmation dengan status sesuai stock availability (polymorphic confirmable)
         $warehouseConfirmation = WarehouseConfirmation::create([
-            'sale_order_id' => $saleOrder->id,
+            'confirmable_type'  => SaleOrder::class,
+            'confirmable_id'    => $saleOrder->id,
             'confirmation_type' => 'sales_order',
-            'status' => $wcStatus,
-            'note' => 'Auto-generated from approved Sale Order ' . $saleOrder->so_number,
-            'confirmed_by' => $hasInsufficientStock ? null : $saleOrder->approve_by, // Set confirmed_by jika auto-approved
-            'confirmed_at' => $hasInsufficientStock ? null : now(),
+            'status'            => $wcStatus,
+            'note'              => 'Auto-generated from approved Sale Order ' . $saleOrder->so_number,
+            'confirmed_by'      => $hasInsufficientStock ? null : $saleOrder->approve_by,
+            'confirmed_at'      => $hasInsufficientStock ? null : now(),
         ]);
 
         // Buat warehouse confirmation items

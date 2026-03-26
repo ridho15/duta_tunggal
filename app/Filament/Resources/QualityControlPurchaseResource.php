@@ -96,7 +96,7 @@ class QualityControlPurchaseResource extends Resource
                                                 $supplier     = $po->supplier;
                                                 $product      = $item->product;
                                                 $poNumber     = $po->po_number ?? 'N/A';
-                                                $supplierName = $supplier->perusahaan ?? ($supplier->name ?? 'N/A');
+                                                $supplierName = $supplier->perusahaan ?? 'N/A';
                                                 $productName  = $product->name ?? 'N/A';
                                                 $ordered      = $item->quantity ?? 0;
                                                 $inspected    = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
@@ -410,14 +410,13 @@ class QualityControlPurchaseResource extends Resource
                     ->getStateUsing(function ($record) {
                         $supplier = $record->fromModel?->purchaseOrder?->supplier;
                         if ($supplier) {
-                            return "({$supplier->code}) " . ($supplier->perusahaan ?? $supplier->name ?? 'N/A');
+                            return "({$supplier->code}) " . ($supplier->perusahaan ?? 'N/A');
                         }
                         return 'N/A';
                     })
                     ->searchable(query: function (Builder $query, $search) {
                         return $query->whereHas('fromModel.purchaseOrder.supplier', function ($query) use ($search) {
                             return $query->where('perusahaan', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%')
                                 ->orWhere('code', 'LIKE', '%' . $search . '%');
                         });
                     }),
@@ -506,7 +505,7 @@ class QualityControlPurchaseResource extends Resource
                                             ->where('status', 'approved')
                                             ->get()
                                             ->mapWithKeys(function ($po) {
-                                                $supplier = $po->supplier->perusahaan ?? $po->supplier->name ?? 'N/A';
+                                                $supplier = $po->supplier->perusahaan ?? 'N/A';
                                                 return [$po->id => "PO: {$po->po_number} | {$supplier}"];
                                             });
                                     })
@@ -652,7 +651,7 @@ class QualityControlPurchaseResource extends Resource
                             ->preload()
                             ->options(function () {
                                 return \App\Models\Supplier::all()->mapWithKeys(function ($supplier) {
-                                    return [$supplier->id => "({$supplier->code}) " . ($supplier->perusahaan ?? $supplier->name ?? '')];
+                                    return [$supplier->id => "({$supplier->code}) " . ($supplier->perusahaan ?? '')];
                                 });
                             }),
                     ])
@@ -667,7 +666,7 @@ class QualityControlPurchaseResource extends Resource
                     ->indicateUsing(function (array $data): ?string {
                         if (empty($data['supplier_id'])) return null;
                         $supplier = \App\Models\Supplier::find($data['supplier_id']);
-                        return $supplier ? 'Supplier: ' . ($supplier->perusahaan ?? $supplier->name) : null;
+                        return $supplier ? 'Supplier: ' . ($supplier->perusahaan ?? '') : null;
                     }),
                 Filter::make('po_number_filter')
                     ->label('PO Number')
@@ -756,7 +755,7 @@ class QualityControlPurchaseResource extends Resource
                                             })
                                             ->limit(50)
                                             ->get()
-                                            ->mapWithKeys(fn ($po) => [$po->id => "{$po->po_number} ({$po->supplier?->name})"])
+                                            ->mapWithKeys(fn ($po) => [$po->id => "{$po->po_number} ({$po->supplier?->perusahaan})"])
                                             ->toArray();
                                     })
                                     ->visible(fn ($get) => $get('failed_qc_action') === PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER)

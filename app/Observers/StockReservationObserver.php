@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\InventoryStock;
 use App\Models\StockReservation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StockReservationObserver
@@ -70,30 +71,33 @@ class StockReservationObserver
      */
     private function updateReservedStock(StockReservation $stockReservation, string $operation, ?float $quantity = null): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockReservation->product_id)
-            ->where('warehouse_id', $stockReservation->warehouse_id)
-            ->first();
+        DB::transaction(function () use ($stockReservation, $operation, $quantity) {
+            $inventoryStock = InventoryStock::where('product_id', $stockReservation->product_id)
+                ->where('warehouse_id', $stockReservation->warehouse_id)
+                ->lockForUpdate()
+                ->first();
 
-        if (!$inventoryStock) {
-            // Create inventory stock if it doesn't exist
-            $inventoryStock = InventoryStock::create([
-                'product_id' => $stockReservation->product_id,
-                'warehouse_id' => $stockReservation->warehouse_id,
-                'rak_id' => $stockReservation->rak_id,
-                'qty_available' => 0,
-                'qty_reserved' => 0,
-                'qty_min' => 0,
-            ]);
-        }
+            if (!$inventoryStock) {
+                // Create inventory stock if it doesn't exist
+                $inventoryStock = InventoryStock::create([
+                    'product_id' => $stockReservation->product_id,
+                    'warehouse_id' => $stockReservation->warehouse_id,
+                    'rak_id' => $stockReservation->rak_id,
+                    'qty_available' => 0,
+                    'qty_reserved' => 0,
+                    'qty_min' => 0,
+                ]);
+            }
 
-        $qtyToUpdate = $quantity ?? $stockReservation->quantity;
+            $qtyToUpdate = (float) ($quantity ?? $stockReservation->quantity);
 
-        if ($operation === 'increment') {
-            $inventoryStock->increment('qty_reserved', $qtyToUpdate);
-            $inventoryStock->decrement('qty_available', $qtyToUpdate); // Kurangi qty_available saat reservation dibuat
-        } elseif ($operation === 'decrement') {
-            $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
-            $inventoryStock->increment('qty_available', $qtyToUpdate); // Tambah kembali qty_available saat reservation dihapus
-        }
+            if ($operation === 'increment') {
+                $inventoryStock->increment('qty_reserved', $qtyToUpdate);
+                $inventoryStock->decrement('qty_available', $qtyToUpdate); // Kurangi qty_available saat reservation dibuat
+            } elseif ($operation === 'decrement') {
+                $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
+                $inventoryStock->increment('qty_available', $qtyToUpdate); // Tambah kembali qty_available saat reservation dihapus
+            }
+        });
     }
 }

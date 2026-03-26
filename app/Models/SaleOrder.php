@@ -118,9 +118,19 @@ class SaleOrder extends Model
         return $this->hasMany(DeliverySalesOrder::class, 'sales_order_id');
     }
 
+    /**
+     * Warehouse confirmations linked to this SO via polymorphic relationship.
+     * Previously hasOne('sale_order_id') — now morphMany so multiple WCs per SO are supported.
+     */
+    public function warehouseConfirmations()
+    {
+        return $this->morphMany(WarehouseConfirmation::class, 'confirmable');
+    }
+
+    /** Alias for backward-compatible single-record access. */
     public function warehouseConfirmation()
     {
-        return $this->hasOne(WarehouseConfirmation::class, 'sale_order_id');
+        return $this->morphMany(WarehouseConfirmation::class, 'confirmable');
     }
 
     public function purchaseOrder()

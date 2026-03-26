@@ -226,7 +226,6 @@ describe('OrderRequest status enum migration', function () {
     it('accepts request_approve status', function () {
         $or = OrderRequest::factory()->create([
             'status'       => 'draft',
-            'supplier_id'  => $this->supplier->id,
             'warehouse_id' => $this->warehouse->id,
             'created_by'   => $this->user->id,
         ]);
@@ -238,7 +237,6 @@ describe('OrderRequest status enum migration', function () {
     it('accepts partial status', function () {
         $or = OrderRequest::factory()->create([
             'status'       => 'approved',
-            'supplier_id'  => $this->supplier->id,
             'warehouse_id' => $this->warehouse->id,
             'created_by'   => $this->user->id,
         ]);
@@ -250,7 +248,6 @@ describe('OrderRequest status enum migration', function () {
     it('accepts complete status', function () {
         $or = OrderRequest::factory()->create([
             'status'       => 'approved',
-            'supplier_id'  => $this->supplier->id,
             'warehouse_id' => $this->warehouse->id,
             'created_by'   => $this->user->id,
         ]);
@@ -262,13 +259,11 @@ describe('OrderRequest status enum migration', function () {
     it('retains existing draft and approved statuses', function () {
         $draft = OrderRequest::factory()->create([
             'status'       => 'draft',
-            'supplier_id'  => $this->supplier->id,
             'warehouse_id' => $this->warehouse->id,
             'created_by'   => $this->user->id,
         ]);
         $approved = OrderRequest::factory()->create([
             'status'       => 'approved',
-            'supplier_id'  => $this->supplier->id,
             'warehouse_id' => $this->warehouse->id,
             'created_by'   => $this->user->id,
         ]);
@@ -289,7 +284,6 @@ describe('order_request_items supplier_id column', function () {
         $this->or        = OrderRequest::factory()->create([
             'status'       => 'draft',
             'cabang_id'    => $this->cabang->id,
-            'supplier_id'  => $this->supplier->id,
             'warehouse_id' => $this->warehouse->id,
             'created_by'   => $this->user->id,
         ]);

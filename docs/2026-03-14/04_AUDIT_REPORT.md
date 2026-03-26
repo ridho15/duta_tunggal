@@ -1,51 +1,268 @@
 # DUTA TUNGGAL ERP — System Audit Report
-**Tanggal Audit:** 14 Maret 2026  
+**Tanggal Audit Awal:** 14 Maret 2026 | **Tanggal Re-Audit:** 26 Maret 2026  
 **Auditor:** GitHub Copilot AI  
-**Metode:** Code review, architecture analysis, security assessment, test coverage analysis  
+**Metode:** Code review menyeluruh, architecture analysis, security assessment, test coverage analysis  
+**Fokus Re-Audit:** Modul Purchase, Sales, dan Finance (code-level deep dive)
 
 ---
 
 ## RINGKASAN EKSEKUTIF
 
-Sistem Duta Tunggal ERP adalah implementasi ERP yang **substansial dan fungsional** dengan cakupan modul yang komprehensif. Audit ini menemukan beberapa area perhatian yang perlu ditangani untuk memastikan stabilitas, keamanan, dan kemudahan pemeliharaan jangka panjang.
+Sistem Duta Tunggal ERP adalah implementasi ERP yang **substansial dan fungsional** dengan cakupan modul yang komprehensif. Re-audit pada 26 Maret 2026 dengan fokus pada modul Purchase, Sales, dan Finance menemukan **12 issue kritis/tinggi baru** yang perlu segera ditangani, terutama seputar N+1 query di laporan keuangan, race condition di operasi stok dan kredit limit, serta ketiadaan mekanisme period closing akuntansi.
 
-### Skor Audit Keseluruhan
+### Skor Audit Keseluruhan (Update 26 Maret 2026)
 
-| Domain | Skor | Rating |
-|--------|------|--------|
-| Fungsionalitas Bisnis | 92/100 | ✅ Baik |
-| Arsitektur Kode | 78/100 | ⚠️ Perlu Perbaikan |
-| Keamanan | 71/100 | ⚠️ Perlu Perbaikan |
-| Test Coverage | 65/100 | ⚠️ Perlu Perbaikan |
-| Performa | 68/100 | ⚠️ Perlu Perbaikan |
-| Dokumentasi Kode | 55/100 | ❌ Kurang |
-| **Total (Rata-rata)** | **71.5/100** | **⚠️ Cukup** |
+| Domain | Skor Lama | Skor Baru | Rating |
+|--------|-----------|-----------|--------|
+| Fungsionalitas Bisnis | 92/100 | 88/100 | ✅ Baik |
+| Arsitektur Kode | 78/100 | 72/100 | ⚠️ Perlu Perbaikan |
+| Keamanan | 71/100 | 68/100 | ⚠️ Perlu Perbaikan |
+| Test Coverage | 65/100 | 63/100 | ⚠️ Perlu Perbaikan |
+| Performa | 68/100 | 55/100 | ❌ Buruk |
+| Dokumentasi Kode | 55/100 | 55/100 | ❌ Kurang |
+| **Modul Purchase** | — | **70/100** | ⚠️ Cukup |
+| **Modul Sales** | — | **68/100** | ⚠️ Cukup |
+| **Modul Finance** | — | **64/100** | ⚠️ Mengkhawatirkan |
+| **Total (Rata-rata)** | **71.5/100** | **68/100** | **⚠️ Cukup** |
 
 ---
 
-## BAGIAN 1: TEMUAN KEAMANAN (SECURITY FINDINGS)
+## BAGIAN 1: AUDIT MODUL PURCHASE
 
-### 🔴 KRITIS
+> *Re-audit mendalam dilakukan pada 26 Maret 2026. File utama: `PurchaseOrderResource.php` (~1700 LOC), `PurchaseReceiptResource.php`, `VendorPaymentResource.php`, `PurchaseReturnService.php`, `PurchaseReceiptService.php`.*
 
-#### SEC-001: Laravel Dusk Routes Aktif di Semua Environment
+### 🔴 Kritis
 
-**Lokasi:** `routes/web.php`, `app/Providers/RouteServiceProvider.php`  
-**Dampak:** SANGAT TINGGI — Memungkinkan siapa saja login sebagai user mana pun tanpa password
+#### PURCH-001: N+1 Query di PurchaseReceiptResource
 
-```
-GET|HEAD _dusk/login/{userId}/{guard?}   dusk.login
-GET|HEAD _dusk/logout/{guard?}           dusk.logout
-GET|HEAD _dusk/user/{guard?}             dusk.user
-```
+**Lokasi:** `app/Filament/Resources/PurchaseReceiptResource.php` — list view  
+**Dampak:** 120+ queries per halaman saat membuka daftar receipt
 
-**Masalah:** Dusk routes hanya boleh ada di environment `testing` atau `local`. Jika aktif di production, maka siapapun yang mengetahui `userId` dapat login langsung tanpa autentikasi.
+**Temuan:** Kolom `total_biaya` dan `qc_status` tidak dilazily loaded dan setiap baris mengeksekusi `sum()` atau `count()` terpisah tanpa eager loading. Tidak ada `->with()` pada `modifyQueryUsing()`.
 
 **Rekomendasi:**
 ```php
-// bootstrap/app.php atau RouteServiceProvider
-if (app()->environment('local', 'testing')) {
-    Route::middleware('web')->group(function () {
-        // Dusk routes
+// Tambahkan di getEloquentQuery() atau modifyQueryUsing()
+->with([
+    'purchaseReceiptItems',
+    'purchaseReceiptItems.qcResults',
+    'supplier',
+    'purchaseOrder',
+])
+// Untuk kolom kalkulasi, gunakan withSum / withCount
+->withSum('purchaseReceiptItems as total_biaya', 'total_price')
+->withCount('purchaseReceiptItems as item_count')
+```
+
+**Prioritas:** 🔴 FIX IMMEDIATELY
+
+---
+
+#### PURCH-002: N+1 Query di PurchaseOrderResource
+
+**Lokasi:** `app/Filament/Resources/PurchaseOrderResource.php` (~1700 LOC)  
+**Dampak:** ~100+ extra queries per page load di list view
+
+**Temuan:** `modifyQueryUsing()` hanya menambahkan `orderBy('tanggal_po', 'desc')` dan **tidak** menambahkan `->with()` apapun. Kolom `supplier.perusahaan`, `items`, dan status badge semuanya melakukan query satu per satu per baris.
+
+**Rekomendasi:**
+```php
+public static function getEloquentQuery(): Builder
+{
+    return parent::getEloquentQuery()
+        ->with([
+            'supplier',
+            'purchaseOrderItems.product',
+            'purchaseReceipts',
+        ])
+        ->withCount('purchaseOrderItems');
+}
+```
+
+**Prioritas:** 🔴 FIX IMMEDIATELY
+
+---
+
+#### PURCH-003: Race Condition di PurchaseReturnService
+
+**Lokasi:** `app/Services/PurchaseReturnService.php` baris ~160–200  
+**Dampak:** Data corruption — dua return bersamaan dapat menggandakan atau merusak `qty_received` di `PurchaseOrderItem`
+
+**Temuan:** Update `PurchaseOrderItem` quantity dilakukan tanpa `DB::transaction()` atau `lockForUpdate()`. Dua request return bersamaan dapat membaca nilai qty yang sama dan masing-masing mengurangi, hasilnya qty salah.
+
+**Rekomendasi:**
+```php
+DB::transaction(function () use ($return, $items) {
+    foreach ($items as $item) {
+        $poItem = PurchaseOrderItem::where('purchase_order_id', $return->purchase_order_id)
+            ->where('product_id', $item['product_id'])
+            ->lockForUpdate()   // ← kunci row selama transaksi
+            ->firstOrFail();
+        
+        $poItem->decrement('qty_received', $item['qty_return']);
+    }
+    $return->update(['status' => 'approved']);
+});
+```
+
+**Prioritas:** 🔴 FIX IMMEDIATELY
+
+---
+
+#### PURCH-004: N+1 Query di VendorPaymentResource
+
+**Lokasi:** `app/Filament/Resources/VendorPaymentResource.php` baris ~805  
+**Dampak:** Setiap baris di daftar payment melakukan query tambahan untuk `selected_invoices`
+
+**Temuan:** Kolom `selected_invoices` adalah JSON array berisi `invoice_id`. Untuk menampilkan nama invoice, sistem melakukan `Invoice::find($id)` per baris. Dengan 50 payment dan 3 invoice per payment = 150+ extra queries.
+
+**Rekomendasi:**
+- Preload invoice IDs dalam bulk query setelah pagination
+- Atau store `invoice_number` langsung di JSON sehingga tidak perlu join
+
+---
+
+### 🟠 Tinggi
+
+#### PURCH-005: Auto-Create Cabang di Supplier Booted() Menggunakan `uniqid()`
+
+**Lokasi:** `app/Models/Supplier.php` — method `booted()`  
+**Dampak:** Saat `Auth::id()` null (artisan command, seeder, API call tanpa auth), sistem auto-membuat Cabang baru yang tidak terkontrol, dengan kode cabang yang tidak bermakna (`uniqid()`)
+
+**Rekomendasi:** Guard secara eksplisit dan throw exception di environment non-seeder; atau pisahkan logika create-cabang dari booted() ke sebuah service.
+
+---
+
+#### PURCH-006: Silent Failure di PurchaseReceiptService
+
+**Lokasi:** `app/Services/PurchaseReceiptService.php`  
+**Dampak:** `['status' => 'skipped']` dikembalikan tanpa exception, caller tidak sadar ada inkonsistensi data
+
+**Temuan:** Beberapa kondisi mengembalikan `['status' => 'skipped']` daripada throw exception atau log error. Petugas gudang tidak get notifikasi jika receipt di-skip karena kondisi edge case.
+
+**Rekomendasi:**
+- Throw `ReceiptSkippedException` yang ditangkap di controller dan ditampilkan sebagai warning notification
+- Atau setidaknya `Log::warning()` dengan context yang cukup
+
+---
+
+#### PURCH-007: Uniqueness PO Number Hanya di Form Level — Tidak Ada DB Constraint
+
+**Lokasi:** `app/Filament/Resources/PurchaseOrderResource.php` — form validation  
+**Dampak:** Race condition: dua user submit PO dengan nomor yang sama dalam waktu bersamaan = duplikat nomor PO di database
+
+**Rekomendasi:**
+```php
+// Di migration
+$table->unique(['nomor_po', 'cabang_id']); // unique per cabang
+
+// Di service (sebelum simpan)
+DB::transaction(function () use ($data) {
+    // Check dengan lockForUpdate
+    $exists = PurchaseOrder::where('nomor_po', $data['nomor_po'])
+        ->where('cabang_id', $data['cabang_id'])
+        ->lockForUpdate()
+        ->exists();
+    
+    if ($exists) throw new DuplicatePONumberException();
+    
+    return PurchaseOrder::create($data);
+});
+```
+
+---
+
+### 🟡 Sedang
+
+#### PURCH-008: Magic Strings 'Belum Lunas' / 'Lunas' Tersebar
+
+**Lokasi:** Minimal 8 file (Resources, Observers, Services)  
+**Masalah:** `if ($invoice->status === 'Belum Lunas')` tersebar tanpa konstanta. Salah satu lokasi sudah menggunakan `'belum lunas'` (lowercase) sehingga ada inconsistency.  
+**Rekomendasi:** Buat `InvoiceStatus` enum atau constants class.
+
+---
+
+#### PURCH-009: N+1 Query di Form `afterStateUpdated` — Lazy Loading Relasi
+
+**Lokasi:** `PurchaseOrderResource.php` — Select::make untuk produk  
+**Masalah:** Saat user memilih supplier di form, `afterStateUpdated` melakukan query relasi secara lazy. Pada form dengan banyak item, ini memperlambat UI.
+
+---
+
+#### PURCH-010: `qty_rejected` Bisa Melebihi `qty_received` — Tidak Ada Validasi
+
+**Lokasi:** Quality Control form di `QualityControlPurchaseResource.php`  
+**Masalah:** Tidak ada validasi bahwa `qty_rejected ≤ qty_received`. Data inconsistency bisa terjadi jika user salah input.  
+**Rekomendasi:** Tambahkan `lte('qty_received')` Rule di validasi form.
+
+---
+
+#### PURCH-011: Method `createQCFromPurchaseReceiptItem()` Bertanda `@deprecated` Tapi Masih Digunakan
+
+**Lokasi:** `app/Services/QualityControlService.php`  
+**Masalah:** Method yang di-deprecated masih di-call dari beberapa lokasi. Ini menunjukkan refactoring yang tidak selesai.  
+**Rekomendasi:** Selesaikan migrasi ke method pengganti atau hapus tag deprecated.
+
+---
+
+#### PURCH-012: 40+ Baris Debug Log di PurchaseOrderResource
+
+**Lokasi:** `app/Filament/Resources/PurchaseOrderResource.php` baris ~559–605  
+**Masalah:** `Log::debug()` statements yang seharusnya sementara masih ada di production code. Ini menghasilkan log besar yang bisa mengisi storage.  
+**Rekomendasi:** Hapus atau pindahkan ke balik kondisi `if (config('app.debug'))`.
+
+---
+
+## BAGIAN 2: AUDIT MODUL SALES
+
+> *Re-audit mendalam dilakukan pada 26 Maret 2026. File utama: `SaleOrderResource.php` (~1820 LOC), `DeliveryOrderResource.php` (~1050 LOC), `SalesInvoiceResource.php` (~1200+ LOC), `CustomerReturnService.php`, `CreditValidationService.php`, `CustomerReceiptObserver.php`.*
+
+### 🔴 Kritis
+
+#### SALES-001: N+1 Query di SaleOrderResource
+
+**Lokasi:** `app/Filament/Resources/SaleOrderResource.php` (~1820 LOC)  
+**Dampak:** Partial eager loading — `saleOrderItem` dimuat 1 level, tapi `saleOrderItem.product`, `saleOrderItem.warehouse`, dan `customer` tidak.
+
+**Temuan:** `modifyQueryUsing()` menambahkan `with(['saleOrderItems'])` saja, tapi ketika rendering list view, setiap kolom yang tampil `customer.name`, `saleOrderItem.product.kode_produk`, dsb. masing-masing melakukan query terpisah.
+
+**Rekomendasi:**
+```php
+public static function getEloquentQuery(): Builder
+{
+    return parent::getEloquentQuery()
+        ->with([
+            'customer',
+            'saleOrderItems.product',
+            'saleOrderItems.warehouse',
+            'salesInvoices',
+        ])
+        ->withCount('saleOrderItems');
+}
+```
+
+**Prioritas:** 🔴 FIX IMMEDIATELY
+
+---
+
+#### SALES-002: Race Condition di DeliveryOrderObserver `handleSentStatus()`
+
+**Lokasi:** `app/Observers/DeliveryOrderObserver.php` — `handleSentStatus()`  
+**Dampak:** `delivered_quantity` pada `SaleOrderItem` bisa salah jika dua DO dikirim bersamaan untuk SO yang sama
+
+**Temuan:** Tidak ada `DB::transaction()` atau `lockForUpdate()` saat mengupdate `delivered_quantity`. Dua observer yang berjalan bersamaan membaca nilai yang sama dan masing-masing menambahkan quantity, hasilnya hanya satu penambahan yang tersimpan.
+
+**Rekomendasi:**
+```php
+private function handleSentStatus(DeliveryOrder $do): void
+{
+    DB::transaction(function () use ($do) {
+        foreach ($do->deliveryOrderItems as $doItem) {
+            SaleOrderItem::where('id', $doItem->sale_order_item_id)
+                ->lockForUpdate()
+                ->increment('delivered_quantity', $doItem->quantity);
+        }
+        $do->saleOrder->recalculateDeliveryStatus();
     });
 }
 ```
@@ -54,488 +271,531 @@ if (app()->environment('local', 'testing')) {
 
 ---
 
-#### SEC-002: Tidak Ada Rate Limiting pada API Endpoints
+#### SALES-003: Credit Limit Check Tidak Atomic
 
-**Lokasi:** `routes/web.php`  
-**Dampak:** TINGGI — Rentan terhadap brute force dan denial-of-service
+**Lokasi:** `app/Services/CreditValidationService.php`  
+**Dampak:** Dua SO concurrent dapat masing-masing lolos validasi kredit, kemudian berdua di-commit, sehingga total outstanding melebihi limit
 
-**Rekomendasi:** Terapkan rate limiting pada semua route report dan data:
+**Temuan:**
 ```php
-Route::middleware(['auth', 'throttle:60,1'])->group(function () {
-    Route::get('/reports/...', ...);
-});
+// CreditValidationService::validate() — TIDAK ATOMIC
+$outstanding = CustomerReceipt::where(...)...->sum('amount');
+$creditLimit = $customer->credit_limit;
+
+if ($outstanding + $newSOAmount > $creditLimit) {
+    throw new CreditLimitExceededException();
+}
+// GAP di sini: dua request bisa sama-sama sampai di sini sebelum salah satu commit SO
 ```
 
----
-
-### 🟠 TINGGI
-
-#### SEC-003: Mass Assignment pada Beberapa Model
-
-**Lokasi:** Beberapa model menggunakan `$guarded = []` atau fillable yang terlalu lebar
-
-**Contoh:**
+**Rekomendasi:** Lock row customer saat validasi:
 ```php
-// Risiko: Semua kolom bisa di-mass-assign
-protected $guarded = [];
-```
-
-**Rekomendasi:** Review semua model dan gunakan `$fillable` eksplisit, khususnya untuk kolom sensitif seperti `status`, `approved_by`, `is_active`.
-
----
-
-#### SEC-004: Input Validation Lemah pada BeberaPa Form
-
-**Lokasi:** Beberapa Filament Resource  
-**Masalah:** Beberapa field menerima input tanpa sanitasi yang memadai:
-- File upload `po_file_path` di Quotation — tidak ada validasi MIME type yang ketat
-- Field teks bebas tanpa pembatasan karakter
-
-**Rekomendasi:**
-```php
-FileUpload::make('po_file_path')
-    ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
-    ->maxSize(10240); // 10MB
-```
-
----
-
-#### SEC-005: N+1 Query Problem pada Beberapa Resource
-
-**Lokasi:** Beberapa Filament Resource list view  
-**Dampak:** Performa buruk + potensi timeout  
-
-**Contoh (tidak ada eager loading):**
-```php
-// DO Resource — memuat relasi satu per satu
-->relationship('saleOrders', ...)
-```
-
-**Rekomendasi:** Gunakan `with()` / `eager loading` pada semua relasi yang ditampilkan di tabel.
-
----
-
-### 🟡 SEDANG
-
-#### SEC-006: Debug Routes di Production
-
-**Lokasi:** `routes/web.php`
-```php
-Route::get('exports/download/{filename}', ...) 
-    ->middleware([...])
-    // Hanya tersedia di local env ✅
-```
-Ini sudah diperlindungi dengan `app()->environment('local')` — **aman**, tapi perlu review berkala.
-
----
-
-#### SEC-007: Activity Log Tidak Lengkap
-
-**Lokasi:** `app/Traits/LogsGlobalActivity.php`  
-**Masalah:** Tidak semua model menggunakan trait `LogsGlobalActivity`. Model kritis (financial, user management) mungkin tidak semua memiliki audit trail.
-
----
-
-## BAGIAN 2: TEMUAN ARSITEKTUR (ARCHITECTURE FINDINGS)
-
-### 🟠 TINGGI
-
-#### ARCH-001: Observer Side Effects Tidak Dapat Di-disable / Di-test Secara Terisolasi
-
-**Lokasi:** `app/Providers/AppServiceProvider.php` — 20+ observer terdaftar  
-**Masalah:** Setiap create/update/delete model memicu chain observer yang panjang. Jika satu observer gagal (exception), seluruh transaction bisa gagal. Testing sangat sulit karena side effects selalu terjadi.
-
-**Solusi Rekomendasi:**
-- Gunakan `withoutObservers()` dalam test data setup
-- Wrapping observer dalam try-catch untuk non-critical operations
-- Pisahkan critical observer (jurnal) dari non-critical (notifikasi)
-
----
-
-#### ARCH-002: Business Logic Tercampur di Observer dan Service
-
-**Masalah:** Beberapa logika bisnis ada di Observer, beberapa di Service, dan beberapa di Resource. Tidak ada konsistensi.
-
-**Contoh:**
-- `SaleOrderObserver` — membuat WarehouseConfirmation (harusnya di SalesOrderService)
-- `PurchaseReceiptObserver` — cascade ke QC (harusnya di PurchaseReceiptService)
-- `InvoiceObserver` — membuat AR/AP (harusnya di InvoiceService)
-
-**Rekomendasi:** Standardkan: Observer hanya trigger Event, Service handle semua business logic.
-
----
-
-#### ARCH-003: Service Layer Terlalu Besar dan Tidak Konsisten
-
-**Masalah:** 50+ Service files dengan berbagai pola:
-- Beberapa Service adalah static methods
-- Beberapa adalah instance methods
-- Beberapa Service sangat besar (>500 baris)
-- Beberapa sangat kecil (<50 baris) dan bisa digabung
-
-**Rekomendasi:**
-- Ekstrak domain-specific classes dari service yang terlalu besar
-- Standarkan pola: semua service sebagai instance methods yang can be injected
-
----
-
-#### ARCH-004: Race Condition Potensi pada Stock Operations
-
-**Lokasi:** `app/Models/InventoryStock.php`, `app/Observers/StockMovementObserver.php`  
-**Masalah:** `qty_available` diupdate tanpa database-level locking. Pada concurrent requests, stok bisa menjadi negatif.
-
-**Rekomendasi:**
-```php
-// Gunakan pessimistic locking
-DB::transaction(function() {
-    $stock = InventoryStock::where('product_id', $productId)
+DB::transaction(function () use ($customer, $newSOAmount) {
+    $customer = Customer::where('id', $customer->id)
         ->lockForUpdate()
         ->first();
     
-    $stock->decrement('qty_available', $quantity);
-});
-```
-
----
-
-### 🟡 SEDANG
-
-#### ARCH-005: Global Query Scope (CabangScope) Bisa Menghambat Cross-Branch Operations
-
-**Lokasi:** `app/Models/Scopes/CabangScope.php`  
-**Masalah:** Beberapa operasi yang legitimately cross-branch (misalnya Superadmin report, Stock Transfer) harus selalu menggunakan `withoutGlobalScope()` yang mudah terlupakan.
-
-**Rekomendasi:** Dokumentasikan semua query yang deliberately bypass CabangScope.
-
----
-
-#### ARCH-006: JSON Columns untuk Data Relasional
-
-**Lokasi:** `invoices.other_fee`, `invoices.delivery_orders`, `vendor_payments.selected_invoices`, etc.  
-**Masalah:** Data relasional disimpan dalam JSON array alih-alih pivot tables yang proper. Ini menghambat:
-- Query filtering yang efisien
-- Foreign key constraints
-- Data integrity
-
-**Rekomendasi:** Pertimbangkan migrasi ke proper pivot tables untuk data kritis.
-
----
-
-#### ARCH-007: Duplicated Number Generation Logic
-
-**Lokasi:** Banyak model generate nomor dokumen dengan pola yang sama  
-**Masalah:** Tidak ada centralized number generator service. Logic generasi nomor tersebar di berbagai model/observer.
-
-**Rekomendasi:** Buat `DocumentNumberService` yang terpusat.
-
----
-
-## BAGIAN 3: TEMUAN KODE (CODE QUALITY FINDINGS)
-
-### 🟠 TINGGI
-
-#### CODE-001: Filament Resource Files Terlalu Besar
-
-**Lokasi:** Banyak Resource file  
-**Masalah:** Beberapa Resource file >1000 baris kode. Contoh:
-- `SaleOrderResource.php` — sangat besar
-- `PurchaseOrderResource.php` — sangat besar
-- `DeliveryOrderResource.php` — sangat besar
-
-**Rekomendasi:** Pecah ke dalam Pages, RelationManagers, dan Form components terpisah.
-
----
-
-#### CODE-002: Strings Hardcoded di Banyak Tempat
-
-**Masalah:** Label, pesan, dan reference string menggunakan hardcoded Indonesian text tanpa translation helper.
-
-**Contoh:**
-```php
-->label('Konfirmasi Dana Diterima')
-->modalHeading('Apakah Dana Sudah Diterima?')
-```
-
-**Rekomendasi:** Gunakan language files (`lang/id/`) untuk semua user-facing strings.
-
----
-
-#### CODE-003: Inkonsistensi Status String
-
-**Masalah:** Status values tidak di-enum atau tidak konsisten:
-- `status = 'Draft'` di beberapa model
-- `status = 'draft'` di model lain
-- `status = 1` (integer) di SuratJalan
-
-**Rekomendasi:** Gunakan PHP 8.1+ Enum atau constants class untuk semua status values.
-
----
-
-#### CODE-004: Magic Numbers dan Strings
-
-**Contoh:**
-```php
-if ($status === 1) // SuratJalan status
-->ppn_rate == 11  // hardcoded tax rate
-```
-
-**Rekomendasi:** Extract ke named constants atau config values.
-
----
-
-### 🟡 SEDANG
-
-#### CODE-005: Missing Type Declarations pada Beberapa Method
-
-**Masalah:** Banyak method di Service classes tidak memiliki return type declarations atau parameter type hints.
-
-**Rekomendasi:**
-```php
-// Sebelum
-public function processPayment($payment, $amount) {
+    $outstanding = $this->calculateOutstanding($customer);
     
-// Sesudah
-public function processPayment(VendorPayment $payment, float $amount): bool {
+    if ($outstanding + $newSOAmount > $customer->credit_limit) {
+        throw new CreditLimitExceededException($customer, $outstanding, $newSOAmount);
+    }
+});
+```
+
+**Prioritas:** 🔴 FIX IMMEDIATELY
+
+---
+
+### 🟠 Tinggi
+
+#### SALES-004: `SalesOrderService::approve()` Tidak Memanggil Credit Check
+
+**Lokasi:** `app/Services/SalesOrderService.php` — method `approve()`  
+**Dampak:** SO dapat disetujui meskipun customer sudah melebihi credit limit (jika credit limit berubah setelah SO dibuat)
+
+**Temuan:** Method `approve()` mengubah status SO menjadi 'approved' tanpa memanggil `CreditValidationService::validate()` terlebih dulu. Validasi kredit hanya ada di `SaleOrderResource` form level, bukan di service.
+
+**Rekomendasi:**
+```php
+public function approve(SaleOrder $saleOrder): void
+{
+    // Selalu validasi kredit sebelum approve
+    $this->creditValidationService->validate(
+        $saleOrder->customer,
+        $saleOrder->total_amount
+    );
+    
+    DB::transaction(function () use ($saleOrder) {
+        $saleOrder->update(['status' => 'approved']);
+        // ...rest of approval logic
+    });
+}
 ```
 
 ---
 
-#### CODE-006: Exception Handling Tidak Konsisten
+#### SALES-005: CustomerReturnService Tidak Membuat Jurnal untuk Tipe 'repair'
 
-**Masalah:**
-- Beberapa Observer menggunakan try-catch
-- Beberapa tidak menangani exception sama sekali
-- Exception messages tidak user-friendly
+**Lokasi:** `app/Services/CustomerReturnService.php`  
+**Dampak:** Jika keputusan return adalah 'repair' (perbaikan), tidak ada journal entry yang dibuat. Neraca tidak mencerminkan barang yang sedang diperbaiki.
 
-**Rekomendasi:** Standarkan exception handling dengan custom exception classes.
+**Temuan:** `switch ($decision)` dalam service hanya menangani `'refund'` dan `'replace'`; kasus `'repair'` tidak membuat jurnal dan tidak merestore stok.
 
----
-
-#### CODE-007: Dead Code dan Commented Code
-
-**Masalah:** Beberapa file mengandung kode yang di-comment atau method yang tidak digunakan.
+**Rekomendasi:** Tambahkan case `'repair'` yang membuat jurnal memo dan mencatat item sebagai "dalam perbaikan" dengan akun WIP atau akun sementara.
 
 ---
 
-## BAGIAN 4: TEMUAN PERFORMA (PERFORMANCE FINDINGS)
+#### SALES-006: CustomerReceiptObserver Status Comparison Case-Sensitive
 
-### 🟠 TINGGI
+**Lokasi:** `app/Observers/CustomerReceiptObserver.php`  
+**Dampak:** Receipt dengan `status = 'Paid'` (huruf besar P — data historis) tidak akan memicu journal posting karena observer mengecek `status === 'paid'` (huruf kecil)
 
-#### PERF-001: N+1 Query Problem pada Report Pages
+**Temuan:**
+```php
+// Observer
+if ($receipt->status === 'paid') {        // ← lowercase
+    $this->postReceiptJournal($receipt);
+}
 
-**Lokasi:** `BalanceSheetService`, `IncomeStatementService`, `CashFlowReportService`  
-**Masalah:** Report services melakukan query berulang untuk setiap COA atau transaksi.
-
-**Rekomendasi:**
-- Implement query result caching untuk frequently-accessed data
-- Use bulk/aggregate SQL queries
-- Cache report results dengan TTL 15-30 menit
-
----
-
-#### PERF-002: Tidak Ada Database Query Caching
-
-**Masalah:** Tidak ada implementation Redis/Memcached untuk caching hasil query yang berat.
+// Tapi beberapa data historis memiliki
+$receipt->status = 'Paid';               // ← uppercase P
+```
 
 **Rekomendasi:**
 ```php
-// Cache COA balances for 15 minutes
-$balance = Cache::remember("coa_balance_{$coaId}_{$period}", 900, function() {
-    return JournalEntry::where('coa_id', $coaId)...->sum(...);
+if (strtolower($receipt->status) === 'paid') {
+    $this->postReceiptJournal($receipt);
+}
+// Atau: standarisasi semua status ke lowercase via database migration
+```
+
+---
+
+#### SALES-007: Update AR Tidak Atomic dengan Journal Post di CustomerReceiptObserver
+
+**Lokasi:** `app/Observers/CustomerReceiptObserver.php`  
+**Dampak:** Jika journal posting sukses tapi AR update gagal (atau sebaliknya), data keuangan menjadi tidak konsisten
+
+**Rekomendasi:** Wrap keduanya dalam `DB::transaction()`:
+```php
+DB::transaction(function () use ($receipt) {
+    $this->ledgerPostingService->postCustomerReceiptJournal($receipt);
+    $this->arService->updateAccountReceivable($receipt);
 });
 ```
 
 ---
 
-#### PERF-003: Memory Usage pada Export Files
+### 🟡 Sedang
 
-**Lokasi:** `app/Exports/`  
-**Masalah:** Excel export untuk data besar bisa menyebabkan OOM error. `IncreaseMemoryLimit` middleware adalah workaround yang tidak ideal.
+#### SALES-008: Status String 'confirmed' Tidak Ada di Migrations
+
+**Lokasi:** `app/Filament/Resources/DeliveryOrderResource.php`  
+**Masalah:** Resource menggunakan status `'confirmed'` namun migration tabel delivery_orders tidak mendefinisikan status ini dalam kolom enum/check constraint. Risiko data inconsistency.
+
+---
+
+#### SALES-009: Resource Files Terlalu Besar — SaleOrderResource 1820 LOC
+
+**Lokasi:** `SaleOrderResource.php` (1820), `SalesInvoiceResource.php` (1200+), `DeliveryOrderResource.php` (1050)  
+**Masalah:** File terlalu besar menyulitkan maintenance dan code review.  
+**Rekomendasi:** Pecah ke Pages terpisah (CreateSaleOrder, EditSaleOrder, ListSaleOrder) dan gunakan RelationManager untuk relasi.
+
+---
+
+#### SALES-010: Repeater `saleOrderItem` Tidak Ada `minItems(1)` dan Duplikat Produk Tidak Dicegah
+
+**Lokasi:** `SaleOrderResource.php` — form Repeater  
+**Masalah:** User dapat menyimpan SO tanpa item. User juga dapat menambah produk yang sama dua kali dalam satu SO, menyebabkan duplikat entry.
 
 **Rekomendasi:**
-- Implement chunked export dengan `FromQuery` + `WithChunkReading`
-- Gunakan queue untuk export yang berat
-- Tambahkan progress tracking
+```php
+Repeater::make('saleOrderItems')
+    ->minItems(1)
+    ->rules([new NoDuplicateProducts()])
+```
 
 ---
 
-### 🟡 SEDANG
+#### SALES-011: `warehouse_id` Nullable di CustomerReturn Tapi Service Skip Jika Null
 
-#### PERF-004: Filament Resource List Queries Tidak Optimal
-
-**Masalah:** Beberapa resource list query tidak menggunakan pagination yang optimal dan melakukan subquery yang berat.
-
----
-
-#### PERF-005: Observer Chain Latency
-
-**Masalah:** Setiap transaksi memicu chain observer yang panjang secara synchronous. Ini meningkatkan response time.
-
-**Rekomendasi:** Gunakan Laravel Queue untuk non-critical observer side effects (notifikasi, activity logging).
+**Lokasi:** `app/Services/CustomerReturnService.php` dan `CustomerReturnResource.php`  
+**Masalah:** Jika `warehouse_id` null, service skip stock restoration tanpa warning. Stok tidak dikembalikan ke gudang manapun, tapi status return berhasil.
 
 ---
 
-## BAGIAN 5: TEMUAN BISNIS (BUSINESS LOGIC FINDINGS)
+#### SALES-012: N+1 di CustomerReceiptResource `viewData()` Loop
 
-### 🟡 SEDANG
-
-#### BIZ-001: Validasi Kredit Limit Tidak Konsisten
-
-**Lokasi:** `app/Services/CreditValidationService.php`  
-**Masalah:** Credit limit validation pada SO tidak selalu ditrigger. Edge cases:
-- SO yang dibuat dari Quotation bypass credit check?
-- SO yang diedit setelah approval tidak re-check limit?
-
-**Rekomendasi:** Audit semua code paths yang membuat/memodifikasi SO dan pastikan credit check selalu dijalankan.
+**Lokasi:** `app/Filament/Resources/CustomerReceiptResource.php` — `viewData()` / infolist  
+**Masalah:** Method `viewData()` melakukan loop dan query per receipt untuk mendapatkan detail invoice. Tanpa eager loading, ini menghasilkan 1 query per receipt per baris.
 
 ---
 
-#### BIZ-002: Stock Reservation Race Condition
+## BAGIAN 3: AUDIT MODUL FINANCE
 
-**Lokasi:** `app/Services/StockReservationService.php`  
-**Masalah:** Dua SO untuk produk yang sama bisa sama-sama di-approve concurrently tanpa proper locking, menghasilkan over-reservation.
+> *Re-audit mendalam dilakukan pada 26 Maret 2026. File utama: `LedgerPostingService.php`, `BalanceSheetService.php`, `IncomeStatementService.php`, `CashFlowReportService.php`, `JournalValidationTrait.php`, `InvoiceObserver.php`.*
 
----
+### ✅ Kekuatan yang Terdeteksi
 
-#### BIZ-003: Retur Customer Belum Fully Tested
+#### FIN-STRENGTH-01: Validasi Balance Jurnal yang Ketat
 
-**Lokasi:** `app/Filament/Resources/CustomerReturnResource.php`  
-**Masalah:** Fitur baru (Maret 2026). Jurnal entry saat customer return belum jelas apakah sudah di-implement dan sudah ditest secara end-to-end.
+**Lokasi:** `app/Traits/JournalValidationTrait.php`  
+Setiap posting jurnal memvalidasi bahwa total debit = total kredit dengan toleransi 0.01 IDR. Trait ini digunakan secara konsisten di seluruh `LedgerPostingService`. **Ini praktik yang sangat baik dan wajib dipertahankan.**
 
----
+#### FIN-STRENGTH-02: Pencegahan Double-Posting
 
-#### BIZ-004: Journal Entry Reversal Belum Fully Tested
-
-**Lokasi:** Schema `is_reversal`, `reversal_of_transaction_id` (baru Mar 2026)  
-**Masalah:** Kolom sudah ditambahkan tapi apakah UI dan service untuk melakukan reversal sudah tersedia?
+**Lokasi:** `app/Services/LedgerPostingService.php`  
+Sebelum posting, service mengecek `source_type + source_id` combination sudah ada atau belum. Ini mencegah jurnal duplikat akibat retry atau race condition sederhana.
 
 ---
 
-#### BIZ-005: Multi-Currency Tidak Fully Supported
+### 🔴 Kritis
 
-**Lokasi:** `purchase_order_currencies`, `currency_id` fields  
-**Masalah:** Ada tabel currency dan exchange rate, tapi tidak jelas apakah semua laporan keuangan sudah menangani multi-currency dengan benar.
+#### FIN-001: BalanceSheetService N+1 Query — Timeout Potensial 30–60 Detik
 
----
+**Lokasi:** `app/Services/BalanceSheetService.php` — method `getAccountsByType()` atau `buildSection()`  
+**Dampak:** Dengan 500 COA aktif, laporan Neraca mengeksekusi 500+ queries terpisah. Load time 30–60 detik. Di production dengan beban normal, bisa timeout.
 
-#### BIZ-006: Closing Period Akuntansi Tidak Ada
+**Temuan:**
+```php
+// Pola bermasalah yang terdeteksi:
+$accounts->map(function ($account) use ($period) {
+    $balance = JournalEntry::where('coa_id', $account->id)
+        ->whereBetween('tanggal', [$period->start, $period->end])
+        ->sum('debit') - JournalEntry::where(...)->sum('credit');
+    // ← ini dijalankan SATU PER COA, bukan dalam bulk
+    return [...];
+});
+```
 
-**Masalah:** Tidak ada mekanisme untuk menutup periode akuntansi (closing entries). Ini berarti journal entries dari periode lama masih bisa diedit/dihapus, yang melanggar prinsip akuntansi.
+**Rekomendasi:**
+```php
+// Satu query bulk daripada N queries
+$balances = JournalEntry::query()
+    ->whereBetween('tanggal', [$period->start, $period->end])
+    ->groupBy('coa_id')
+    ->selectRaw('coa_id, SUM(debit) - SUM(credit) as balance')
+    ->pluck('balance', 'coa_id');
 
----
+// Kemudian map tanpa additional query
+$accounts->map(fn($account) => [
+    'balance' => $balances->get($account->id, 0),
+    ...
+]);
+```
 
-## BAGIAN 6: TEMUAN TEST COVERAGE
-
-### 🟠 TINGGI
-
-#### TEST-001: Integration Test Coverage Tidak Merata
-
-**Masalah:** Beberapa modul penting tidak memiliki end-to-end test:
-- Asset lifecycle (purchase → depreciation → disposal) — ada test tapi perlu diperluas
-- Cash flow report accuracy — ada unit test, tapi belum ada test dengan data real
-- Bank reconciliation — ada test tapi masih basic
-
----
-
-#### TEST-002: Retur Customer Belum Ada Comprehensive Test
-
-**Lokasi:** Fitur baru Maret 2026  
-**Masalah:** `CustomerReturnFeatureTest` ada tapi perlu test kasus:
-- Stock restoration accuracy
-- Journal entry saat return
-- Edge cases: partial return, return dengan tax berbeda
-
----
-
-#### TEST-003: Tidak Ada Load/Stress Testing
-
-**Masalah:** Tidak ada test untuk scenario beban tinggi. Di production dengan banyak concurrent users, ada risiko race condition dan timeout.
+**Prioritas:** 🔴 FIX IMMEDIATELY — Laporan Neraca tidak usable di skala production
 
 ---
 
-#### TEST-004: Playwright Tests Terbatas
+#### FIN-002: Tidak Ada Mekanisme Period Closing Akuntansi
 
-**Lokasi:** `tests/playwright/`  
-**Masalah:** Hanya 4 spec files Playwright:
-- `auth.setup.js`
-- `currency-format.spec.js`
-- `money-format.spec.js`
-- `surat-jalan-flexible-report.spec.js`
+**Lokasi:** Database schema + `LedgerPostingService`  
+**Dampak:** Melanggar prinsip SAK/ASAK — journal entries dari periode yang sudah ditutup masih bisa diedit/dihapus
 
-**Rekomendasi:** Tambahkan Playwright tests untuk critical user flows.
+**Temuan:** Tidak ada:
+- Tabel `accounting_period` dengan field `closed_at`
+- Field `locked_at` atau `is_locked` di `journal_entries`
+- Check di service apakah periode sudah ditutup sebelum posting
 
----
+Ini berarti seseorang dapat secara tidak sengaja (atau sengaja) mengedit jurnal dari tahun lalu, mengubah laporan keuangan historis.
 
-### 🟡 SEDANG
+**Rekomendasi:**
+```sql
+-- Migration baru
+CREATE TABLE accounting_periods (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    cabang_id BIGINT UNSIGNED NOT NULL,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    closed_at TIMESTAMP NULL,
+    closed_by BIGINT UNSIGNED NULL,
+    ...
+);
+```
+```php
+// Di LedgerPostingService sebelum posting
+if ($this->isPeriodClosed($journalDate)) {
+    throw new ClosedPeriodException("Period {$journalDate} sudah ditutup");
+}
+```
 
-#### TEST-005: Test Data Setup Duplikasi
-
-**Masalah:** Banyak test file membuat data sendiri dengan pola yang duplikat. Should use shared factories/fixtures lebih banyak.
-
----
-
-#### TEST-006: Test Berjalan Lama
-
-**Masalah:** 2,544 test cases. Pada database operations, ini bisa sangat lambat. Perlu:
-- Parallel test execution
-- Selective test running berdasarkan modul
-
----
-
-## BAGIAN 7: TEMUAN DOKUMENTASI
-
-### ❌ KURANG
-
-#### DOC-001: Tidak Ada PHPDoc pada Service Classes
-
-**Masalah:** 50+ Service files hampir tidak ada PHPDoc. Developer baru tidak bisa memahami parameter dan return values tanpa membaca implementasi.
+**Prioritas:** 🔴 FIX SOON — Required untuk compliance akuntansi
 
 ---
 
-#### DOC-002: Observer Side Effects Tidak Terdokumentasi
+#### FIN-003: Multi-Currency Tidak Didukung di Journal Posting
 
-**Masalah:** Tidak ada dokumentasi "jika A terjadi, maka B, C, D juga terjadi". Ini membuat debugging sangat sulit.
+**Lokasi:** `app/Services/LedgerPostingService.php`, tabel `journal_entries`  
+**Dampak:** Semua jurnal diasumsikan IDR. Invoice dalam foreign currency tidak dapat diposting dengan benar.
+
+**Temuan:**
+- Model `Invoice` tidak memiliki `currency_id`
+- Tabel `journal_entries` tidak memiliki kolom `currency_id` atau `exchange_rate`
+- Ada tabel `currencies` dan `exchange_rates` tapi tidak digunakan di journal posting
+
+**Rekomendasi (jangka menengah):**
+1. Tambahkan `currency_id`, `exchange_rate`, `amount_original_currency` ke `journal_entries`
+2. Invoice yang sudah ada di-default-kan ke IDR (exchange rate = 1.0)
+3. Implementasikan konversi saat posting
 
 ---
 
-#### DOC-003: Permission Names Tidak Terdokumentasi Secara Komprehensif
+### 🟠 Tinggi
 
-**Masalah:** Tidak ada dokumen yang list semua permission string beserta artinya.
+#### FIN-004: Reversal Fields Ada di Schema Tapi Tidak Ada Implementasi
+
+**Lokasi:** Migration `2026_03_01_024900` — fielnd `is_reversal` dan `reversal_of_transaction_id` di `journal_entries`  
+**Dampak:** Fitur reversal jurnal tidak bisa digunakan meski sudah ada di schema; staff keuangan tidak bisa membatalkan jurnal salah dengan benar
+
+**Temuan:** Tidak ada:
+- Method `reverseEntry()` di `LedgerPostingService` atau service manapun  
+- UI di Filament untuk memicu reversal
+- Test untuk reversal functionality
+
+**Rekomendasi:**
+```php
+// LedgerPostingService
+public function reverseJournalEntry(JournalEntry $original): JournalEntry
+{
+    $this->ensurePeriodIsOpen($original->tanggal);
+    
+    return DB::transaction(function () use ($original) {
+        $reversal = JournalEntry::create([
+            ...
+            'is_reversal' => true,
+            'reversal_of_transaction_id' => $original->id,
+            'amount' => $original->amount * -1,
+        ]);
+        $original->update(['is_reversed' => true]);
+        return $reversal;
+    });
+}
+```
 
 ---
 
-## RINGKASAN TEMUAN
+#### FIN-005: JournalEntry Tidak Ada Audit Trail `created_by` / `updated_by`
 
-### By Severity
+**Lokasi:** Tabel `journal_entries` dan model `JournalEntry`  
+**Dampak:** Tidak dapat diketahui siapa yang membuat atau mengubah jurnal — melanggar prinsip audit keuangan
 
-| Severity | Jumlah | Issues |
-|----------|--------|--------|
-| 🔴 Kritis | 2 | SEC-001, SEC-002 |
-| 🟠 Tinggi | 11 | SEC-003, SEC-004, SEC-005, ARCH-001–004, CODE-001–002, PERF-001–003, TEST-001–002 |
-| 🟡 Sedang | 15 | Lainnya |
-| 🟢 Rendah | ~10 | Minor code quality |
+**Temuan:** Semua model keuangan lain (`AccountPayable`, `Deposit`, `CustomerReceipt`) memiliki `created_by`. Tapi `journal_entries` tidak.
 
-### By Domain
+**Rekomendasi:**
+```sql
+ALTER TABLE journal_entries
+    ADD COLUMN created_by BIGINT UNSIGNED NULL,
+    ADD COLUMN updated_by BIGINT UNSIGNED NULL,
+    ADD FOREIGN KEY (created_by) REFERENCES users(id),
+    ADD FOREIGN KEY (updated_by) REFERENCES users(id);
+```
+Gunakan `CreatedByObserver` yang sudah ada di project atau `BlamableTrait`.
 
-| Domain | Issues Kritis/Tinggi |
-|--------|----------------------|
-| Keamanan | 5 |
-| Arsitektur | 4 |
-| Performa | 3 |
-| Test Coverage | 2 |
-| Bisnis Logic | 6 |
-| Dokumentasi | 3 |
+---
+
+#### FIN-006: Double-Posting Race Condition Masih Bisa Terjadi
+
+**Lokasi:** `app/Services/LedgerPostingService.php`  
+**Dampak:** Dua request concurrent yang posting jurnal untuk source yang sama bisa lolos check `exists()` sebelum salah satu commit
+
+**Temuan:**
+```php
+// Check yang ada — TIDAK ATOMIC
+$alreadyPosted = JournalEntry::where('source_type', $type)
+    ->where('source_id', $id)
+    ->exists(); // ← dua request bisa sama-sama dapat false di sini
+
+if ($alreadyPosted) return; // ← lalu keduanya lanjut posting
+```
+
+**Rekomendasi:**
+```php
+DB::transaction(function () use ($type, $id, $entries) {
+    // Lock untuk mencegah concurrent insert
+    $alreadyPosted = JournalEntry::where('source_type', $type)
+        ->where('source_id', $id)
+        ->lockForUpdate()
+        ->exists();
+    
+    if ($alreadyPosted) return;
+    
+    // Create entries di dalam transaksi yang sama
+    JournalEntry::insert($entries);
+});
+```
+
+---
+
+### 🟡 Sedang
+
+#### FIN-007: IncomeStatementService N+1 Query Serupa dengan BalanceSheet
+
+**Lokasi:** `app/Services/IncomeStatementService.php` — `getAccountsByCodePrefix()` dan `getAccountsByType()`  
+**Masalah:** Pattern N+1 yang sama dengan BalanceSheetService. Laporan Laba Rugi juga terancam slow jika COA banyak.  
+**Rekomendasi:** Terapkan solusi bulk aggregate yang sama dengan FIN-001.
+
+---
+
+#### FIN-008: COA Code Lookup Menggunakan String Hardcoded yang Fragile
+
+**Lokasi:** `app/Services/LedgerPostingService.php`  
+**Masalah:** Kode COA seperti `'1140.01'` (Kas), `'2110'` (Hutang Usaha), `'2100.10'` di-hardcode sebagai string literal. Jika klien mengubah struktur COA, sistem akan error tanpa indikasi yang jelas.
+
+**Rekomendasi:**
+```php
+// config/coa.php
+return [
+    'kas'         => env('COA_CODE_KAS', '1140.01'),
+    'hutang_usaha' => env('COA_CODE_HUTANG', '2110'),
+    // ...
+];
+```
+
+---
+
+#### FIN-009: InvoiceObserver Risiko Null Reference pada fromModel Soft-Deleted
+
+**Lokasi:** `app/Observers/InvoiceObserver.php`  
+**Masalah:** `$invoice->fromModel->supplier_id` diakses langsung tanpa pengecekan apakah `fromModel` masih ada (bisa soft-deleted). Jika PO yang terkait di-soft-delete, observer akan throw `ErrorException: Trying to get property of null`.
+
+**Rekomendasi:**
+```php
+$supplierId = optional($invoice->fromModel)->supplier_id 
+    ?? $invoice->supplier_id 
+    ?? null;
+
+if (!$supplierId) {
+    Log::warning("Invoice #{$invoice->id} has no supplier reference");
+    return;
+}
+```
+
+---
+
+#### FIN-010: CashFlowReportService — Potensi Lazy Loading dalam `buildSection()`
+
+**Lokasi:** `app/Services/CashFlowReportService.php`  
+**Masalah:** Service memiliki eager loading yang baik di level utama (`sections`, `items`), tapi di dalam method `buildSection()` ada akses ke relasi yang mungkin tidak di-eager-load untuk setiap periode yang berbeda.  
+**Rekomendasi:** Review `buildSection()` dan pastikan tidak ada query tersembunyi dalam loop iterasi.
+
+---
+
+## BAGIAN 4: TEMUAN KEAMANAN (dari Audit Awal — masih relevan)
+
+### 🔴 Kritis
+
+#### SEC-001: Laravel Dusk Routes Aktif di Semua Environment
+
+**Lokasi:** `routes/web.php`  
+**Dampak:** Memungkinkan siapa saja login sebagai user mana pun tanpa password
+
+```
+GET|HEAD _dusk/login/{userId}/{guard?}
+GET|HEAD _dusk/logout/{guard?}
+```
+
+**Rekomendasi:** Pastikan Dusk routes hanya aktif di `local` atau `testing` environment dengan guard di `bootstrap/app.php`.
+
+**Prioritas:** 🔴 FIX IMMEDIATELY (jika belum dilakukan)
+
+---
+
+### 🟠 Tinggi
+
+#### SEC-002: Tidak Ada Rate Limiting pada Endpoint Report
+
+**Rekomendasi:** `Route::middleware(['auth', 'throttle:30,1'])` pada semua route laporan keuangan.
+
+#### SEC-003: Mass Assignment pada Beberapa Model
+
+**Rekomendasi:** Replace `$guarded = []` dengan `$fillable` explicit, terutama untuk kolom `status`, `approved_by`.
+
+#### SEC-004: Input Validation Lemah pada Form Upload
+
+**Rekomendasi:** Validasi MIME type ketat pada upload `po_file_path`.
+
+---
+
+## BAGIAN 5: TEMUAN ARSITEKTUR & KODE (dari Audit Awal — summary)
+
+### 🟠 Tinggi
+
+- **ARCH-001:** Observer side effects tidak bisa di-disable untuk testing — 20+ observer terdaftar, chain panjang
+- **ARCH-002:** Business logic tersebar antara Observer, Service, dan Resource — tidak konsisten
+- **ARCH-003:** Service layer tidak seragam (static vs instance, ukuran sangat bervariasi)
+- **ARCH-004:** Stock operations tanpa database locking *(terkait PURCH-003 dan SALES-002)*
+
+### 🟡 Sedang
+
+- **ARCH-005:** CabangScope global bisa menghambat cross-branch operations
+- **ARCH-006:** JSON columns untuk data relasional (menghambat DB-level integrity)
+- **CODE-001:** Resource files terlalu besar (>1000 LOC) *(terkait SALES-009)*
+- **CODE-003:** Inconsistency status strings (campuran uppercase/lowercase/integer)
+
+---
+
+## BAGIAN 6: RINGKASAN TEMUAN RE-AUDIT (26 Maret 2026)
+
+### Distribusi Severity — Temuan Baru
+
+| Severity | Purchase | Sales | Finance | Total Baru |
+|----------|----------|-------|---------|------------|
+| 🔴 Kritis | 4 | 3 | 3 | **10** |
+| 🟠 Tinggi | 3 | 4 | 3 | **10** |
+| 🟡 Sedang | 5 | 5 | 4 | **14** |
+| **Total** | **12** | **12** | **10** | **34** |
+
+### Top Issues by Risk
+
+| # | ID | Modul | Deskripsi | Risk |
+|---|-----|-------|-----------|------|
+| 1 | FIN-001 | Finance | BalanceSheet N+1 — 500+ queries, timeout 60s | 🔴 Kritis |
+| 2 | FIN-002 | Finance | Tidak ada period closing — data historis bisa diedit | 🔴 Kritis |
+| 3 | SALES-003 | Sales | Credit limit tidak atomic — race condition | 🔴 Kritis |
+| 4 | SALES-002 | Sales | DeliveryOrderObserver race condition | 🔴 Kritis |
+| 5 | PURCH-003 | Purchase | PurchaseReturnService race condition | 🔴 Kritis |
+| 6 | PURCH-001 | Purchase | PurchaseReceiptResource N+1 (120+ queries/page) | 🔴 Kritis |
+| 7 | FIN-006 | Finance | Double-posting race condition | 🟠 Tinggi |
+| 8 | SALES-004 | Sales | approve() tidak memanggil credit check | 🟠 Tinggi |
+| 9 | FIN-005 | Finance | JournalEntry tidak ada audit trail user | 🟠 Tinggi |
+| 10 | SALES-006 | Sales | Status comparison case-sensitive (Paid vs paid) | 🟠 Tinggi |
 
 ---
 
 ## REKOMENDASI PRIORITAS SEGERA
 
-1. **[KRITIS] Fix Dusk Routes** — Nonaktifkan di production environment
-2. **[TINGGI] Add Rate Limiting** — Protect semua report dan data endpoints  
-3. **[TINGGI] Database-level Locking** untuk stock operations
-4. **[TINGGI] Eager Loading** pada resource list views
-5. **[TINGGI] Test Customer Return** secara end-to-end dengan journal verification
+### Sprint 1 — Fix Dalam 1 Minggu (Kritis)
+
+1. **FIN-001: BalanceSheetService N+1** — Refactor ke bulk aggregate query (SQL `GROUP BY`). Laporan Neraca tidak dapat digunakan di production saat ini.
+2. **SALES-003 + FIN-006: Race conditions** — Tambahkan `lockForUpdate()` di kredit limit check dan double-posting check.
+3. **SALES-002 + PURCH-003: Observer/Service race conditions** — Wrap `DB::transaction()` dengan `lockForUpdate()` di semua operasi decrement/increment quantity.
+4. **PURCH-001 + PURCH-002: Eager loading** — Tambahkan `->with([...])` di semua Resource list views.
+5. **SALES-006: Case-sensitive status** — Gunakan `strtolower()` atau standardisasi data ke lowercase.
+
+### Sprint 2 — Fix Dalam 1 Bulan (Tinggi)
+
+6. **FIN-002: Period Closing** — Buat tabel `accounting_periods` dan guard di `LedgerPostingService`.
+7. **SALES-004: Credit check di approve()** — Pastikan `CreditValidationService::validate()` dipanggil di semua code path SO approval.
+8. **FIN-005: Audit trail jurnal** — Tambahkan `created_by`/`updated_by` ke `journal_entries`.
+9. **FIN-004: Reversal implementation** — Implement `reverseJournalEntry()` dan UI reversal.
+10. **PURCH-007: DB constraint PO number** — Tambahkan unique index level database.
+11. **SEC-001: Dusk routes** — Verifikasi sudah tidak aktif di production.
+
+### Sprint 3 — Improvement (Sedang)
+
+12. **FIN-003: Multi-currency** — Design dan implement currency support di journal entries.
+13. **FIN-008: COA config** — Extract hardcoded COA codes ke `config/coa.php`.
+14. **PURCH-012: Debug logs** — Bersihkan `Log::debug()` yang tidak diperlukan.
+15. **SALES-009: Resource refactoring** — Pecah resource besar ke Pages terpisah.
+16. **PURCH-010: qty_rejected validation** — Tambahkan rule `lte('qty_received')`.
 
 ---
 
-*Laporan audit ini dibuat pada 14 Maret 2026 berdasarkan analisis code review komprehensif.*
+*Re-audit ini dilakukan pada 26 Maret 2026 melalui code review statis mendalam pada modul Purchase, Sales, dan Finance.*  
+*Audit awal dilakukan pada 14 Maret 2026.*  
+*Auditor: GitHub Copilot AI*
+
+---
+

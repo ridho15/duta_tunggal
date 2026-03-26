@@ -274,17 +274,16 @@ class PurchaseInvoiceResourceTest extends TestCase
 
     public function test_tax_and_other_fees_calculations()
     {
-        // Test that tax and fee fields can be filled
+        // Test ppn-only behavior: ppn_rate can be set, tax is system-controlled
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'invoice_number' => 'PINV-TAX-TEST-001',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
-                'tax' => 5,
                 'ppn_rate' => 11,
             ])
             ->assertFormSet([
-                'tax' => 5,
+                'tax' => 0,
                 'ppn_rate' => 11,
             ]);
     }

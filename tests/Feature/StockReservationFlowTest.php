@@ -77,8 +77,7 @@ class StockReservationFlowTest extends TestCase
         // Assert inventory qty_reserved is updated
         $inventoryStock->refresh();
         $this->assertEquals(10, $inventoryStock->qty_reserved);
-        $this->assertEquals(100, $inventoryStock->qty_available); // qty_available stays the same
-        $this->assertEquals(90, $inventoryStock->qty_on_hand); // available - reserved
+        $this->assertEquals(90, $inventoryStock->qty_available); // qty_available berkurang saat stok direservasi
     }
 
     /** @test */
@@ -299,7 +298,7 @@ class StockReservationFlowTest extends TestCase
         // Assert inventory qty_reserved is updated
         $inventoryStock->refresh();
         $this->assertEquals(5, $inventoryStock->qty_reserved);
-        $this->assertEquals(95, $inventoryStock->qty_available);
+        $this->assertEquals(85, $inventoryStock->qty_available);
     }
 
     /** @test */
@@ -351,8 +350,7 @@ class StockReservationFlowTest extends TestCase
 
         $inventoryStock->refresh();
         $this->assertEquals(8, $inventoryStock->qty_reserved);
-        $this->assertEquals(10, $inventoryStock->qty_available); // qty_available stays the same
-        $this->assertEquals(2, $inventoryStock->qty_on_hand); // available - reserved
+        $this->assertEquals(2, $inventoryStock->qty_available); // qty_available berkurang sesuai qty reservasi
 
         // Try to confirm second sale order (should fail)
         $this->expectException(\Exception::class);

@@ -232,37 +232,42 @@ class BalanceSheetService
             });
         }
 
-        return $accounts->map(function ($account) use ($asOfDate, $cabangId, $type) {
-            // Get all journal entries for this account up to the date
-            $query = JournalEntry::where('coa_id', $account->id)
-                ->whereDate('date', '<=', $asOfDate);
+        // Pre-load all balances in a single bulk aggregate query to avoid N+1
+        // (previously one query per account — 500 accounts = 500+ queries, ~30-60s load time).
+        $accountIds = $accounts->pluck('id');
 
-            if ($cabangId) {
-                $query->where('cabang_id', $cabangId);
-            }
+        $balanceMap = $accountIds->isEmpty()
+            ? collect()
+            : JournalEntry::whereIn('coa_id', $accountIds)
+                ->whereDate('date', '<=', $asOfDate)
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->groupBy('coa_id')
+                ->selectRaw('coa_id, SUM(debit) as total_debit, SUM(credit) as total_credit, COUNT(*) as entries_count')
+                ->get()
+                ->keyBy('coa_id');
 
-            $entries = $query->get();
-
-            $totalDebit = $entries->sum('debit');
-            $totalCredit = $entries->sum('credit');
+        return $accounts->map(function ($account) use ($balanceMap, $type) {
+            $row = $balanceMap->get($account->id);
+            $totalDebit  = (float) ($row->total_debit  ?? 0);
+            $totalCredit = (float) ($row->total_credit ?? 0);
 
             // Calculate balance based on account type (normal balance)
             // Include opening balance in the calculation
             $openingBalance = (float) ($account->opening_balance ?? 0);
             $balance = match ($type) {
-                'Asset' => $openingBalance + $totalDebit - $totalCredit,
-                'Contra Asset' => $openingBalance - $totalDebit + $totalCredit, // Contra assets have credit normal balance
+                'Asset'            => $openingBalance + $totalDebit - $totalCredit,
+                'Contra Asset'     => $openingBalance - $totalDebit + $totalCredit,
                 'Liability', 'Equity' => $openingBalance - $totalDebit + $totalCredit,
-                default => $openingBalance + $totalDebit - $totalCredit,
+                default            => $openingBalance + $totalDebit - $totalCredit,
             };
 
             // Create object with balance property
             $accountWithBalance = clone $account;
-            $accountWithBalance->balance = $balance;
-            $accountWithBalance->total_debit = $totalDebit;
-            $accountWithBalance->total_credit = $totalCredit;
-            $accountWithBalance->entries_count = $entries->count();
-            
+            $accountWithBalance->balance       = $balance;
+            $accountWithBalance->total_debit   = $totalDebit;
+            $accountWithBalance->total_credit  = $totalCredit;
+            $accountWithBalance->entries_count = (int) ($row->entries_count ?? 0);
+
             // Add kode and nama aliases for blade compatibility
             $accountWithBalance->kode = $account->code;
             $accountWithBalance->nama = $account->name;
@@ -356,23 +361,21 @@ class BalanceSheetService
             ->whereNull('deleted_at')
             ->pluck('id');
 
-        // Calculate total revenue up to date
-        $revenueQuery = JournalEntry::whereIn('coa_id', $revenueAccounts)
-            ->whereDate('date', '<=', $asOfDate);
-        if ($cabangId) $revenueQuery->where('cabang_id', $cabangId);
-        
-        $totalRevenueDebit = $revenueQuery->sum('debit');
-        $totalRevenueCredit = $revenueQuery->sum('credit');
-        $totalRevenue = $totalRevenueCredit - $totalRevenueDebit; // Revenue normal balance is credit
+        // Calculate total revenue up to date — single query instead of two separate sum() calls.
+        $revenueResult = JournalEntry::whereIn('coa_id', $revenueAccounts)
+            ->whereDate('date', '<=', $asOfDate)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->selectRaw('SUM(credit) as total_credit, SUM(debit) as total_debit')
+            ->first();
+        $totalRevenue = (float) ($revenueResult->total_credit ?? 0) - (float) ($revenueResult->total_debit ?? 0);
 
-        // Calculate total expense up to date
-        $expenseQuery = JournalEntry::whereIn('coa_id', $expenseAccounts)
-            ->whereDate('date', '<=', $asOfDate);
-        if ($cabangId) $expenseQuery->where('cabang_id', $cabangId);
-        
-        $totalExpenseDebit = $expenseQuery->sum('debit');
-        $totalExpenseCredit = $expenseQuery->sum('credit');
-        $totalExpense = $totalExpenseDebit - $totalExpenseCredit; // Expense normal balance is debit
+        // Calculate total expense up to date — single query instead of two separate sum() calls.
+        $expenseResult = JournalEntry::whereIn('coa_id', $expenseAccounts)
+            ->whereDate('date', '<=', $asOfDate)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+            ->first();
+        $totalExpense = (float) ($expenseResult->total_debit ?? 0) - (float) ($expenseResult->total_credit ?? 0);
 
         // Retained Earnings = Total Revenue - Total Expense
         return $totalRevenue - $totalExpense;

@@ -17,7 +17,8 @@ class DeliveryOrderItem extends Model
         'sale_order_item_id',
         'product_id',
         'quantity',
-        'reason'
+        'reason',
+        'status',  // G-09: tracks item-level warehouse/delivery state
     ];
 
     public function deliveryOrder()
