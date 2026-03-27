@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Enums\PaymentStatus;
 use App\Models\VendorPayment;
 use App\Services\LedgerPostingService;
 use Illuminate\Support\Facades\Log;
@@ -104,7 +105,7 @@ class VendorPaymentObserver
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
-            $accountPayable->status = $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+            $accountPayable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
@@ -136,7 +137,7 @@ class VendorPaymentObserver
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
-            $accountPayable->status = $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+            $accountPayable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP

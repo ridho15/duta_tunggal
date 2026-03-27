@@ -160,6 +160,17 @@ class SalesOrderService
 
     public function approve($saleOrder)
     {
+        // Validate customer credit limit before approving
+        $saleOrder->loadMissing('customer');
+        if ($saleOrder->customer && $saleOrder->customer->tipe_pembayaran === 'Kredit') {
+            $creditService = app(CreditValidationService::class);
+            $check = $creditService->canCustomerMakePurchase($saleOrder->customer, (float) $saleOrder->total_amount);
+            if (! $check['can_purchase']) {
+                $messages = implode('; ', $check['messages']);
+                throw new \RuntimeException("Persetujuan ditolak: {$messages}");
+            }
+        }
+
         return $saleOrder->update([
             'status' => 'approved',
             'approve_by' => Auth::user()->id,

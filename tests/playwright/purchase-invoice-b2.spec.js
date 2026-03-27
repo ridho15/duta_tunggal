@@ -4,6 +4,7 @@ import {
   ensurePurchaseInvoiceFixture,
   openCreatePage,
   chooseFixtureSupplier,
+  chooseFixtureOrderRequest,
   checkCheckboxByLabel,
   clickCheckboxByLabel,
 } from './helpers/purchase-invoice-fixture'
@@ -37,6 +38,7 @@ test('B2-b: PPN nominal follows DPP × rate after selecting fixture receipt', as
   expect(body).not.toMatch(ERR)
 
   await chooseFixtureSupplier(page)
+  await chooseFixtureOrderRequest(page)
 
   let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()

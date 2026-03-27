@@ -85,6 +85,7 @@ class CashFlowReportServiceTest extends TestCase
             'notes' => null,
             'status' => 'Paid',
             'payment_method' => 'Cash',
+            'coa_id' => $cashCoa->id,
             'selected_invoices' => [$invoice->id],
             'invoice_receipts' => [],
             'diskon' => 0,

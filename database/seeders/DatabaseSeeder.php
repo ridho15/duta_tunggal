@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
             DriverSeeder::class,
             VehicleSeeder::class,
             ProductSeeder::class,
+            ProductSupplierSeeder::class,
             BillOfMaterialSeeder::class,
             
             // Manufacturing Process

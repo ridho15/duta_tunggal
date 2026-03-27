@@ -142,8 +142,8 @@ class HppReportService
 
         $query = $this->applyStockMovementFilters($query);
 
-        $inValue = (float) (clone $query)->whereIn('type', self::RAW_MATERIAL_IN_TYPES)->sum(\Illuminate\Support\Facades\DB::raw('quantity * value'));
-        $outValue = (float) (clone $query)->whereIn('type', self::RAW_MATERIAL_OUT_TYPES)->sum(\Illuminate\Support\Facades\DB::raw('quantity * value'));
+        $inValue = (float) (clone $query)->whereIn('type', self::RAW_MATERIAL_IN_TYPES)->sum('value');
+        $outValue = (float) (clone $query)->whereIn('type', self::RAW_MATERIAL_OUT_TYPES)->sum('value');
 
         return round($inValue - $outValue, 2);
     }
@@ -167,7 +167,7 @@ class HppReportService
 
         $query = $this->applyStockMovementFilters($query);
 
-        return (float) $query->sum(\Illuminate\Support\Facades\DB::raw('quantity * value'));
+        return (float) $query->sum('value');
     }
 
     private function calculateRawMaterialUsedFromStockMovements(Carbon $start, Carbon $end): float
@@ -185,7 +185,7 @@ class HppReportService
             ->whereIn('type', self::RAW_MATERIAL_OUT_TYPES);
 
         $query = $this->applyStockMovementFilters($query);
-        $stockUsed = (float) $query->sum(\Illuminate\Support\Facades\DB::raw('quantity * value'));
+        $stockUsed = (float) $query->sum('value');
         
         // Convert negative values to positive for cost calculation
         $stockUsed = abs($stockUsed);

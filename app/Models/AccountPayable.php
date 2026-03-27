@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -68,7 +69,7 @@ class AccountPayable extends Model
 
         static::updated(function ($accountPayable) {
             // Hapus ageing schedule ketika account payable lunas
-            if ($accountPayable->status === 'Lunas' && $accountPayable->wasChanged('status')) {
+            if ($accountPayable->status === PaymentStatus::PAID->value && $accountPayable->wasChanged('status')) {
                 if ($accountPayable->ageingSchedule) {
                     $accountPayable->ageingSchedule->delete();
                 }

@@ -40,6 +40,31 @@ class StockTransfer extends Model
         return $this->morphMany(JournalEntry::class, 'source');
     }
 
+    public static function generateTransferNumber(): string
+    {
+        $prefix = 'ST-' . now()->format('Ymd') . '-';
+        static $dailyCounter = [];
+
+        if (isset($dailyCounter[$prefix])) {
+            $dailyCounter[$prefix]++;
+            return $prefix . str_pad((string) $dailyCounter[$prefix], 4, '0', STR_PAD_LEFT);
+        }
+
+        $last = self::withTrashed()
+            ->where('transfer_number', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->first();
+
+        $next = 1;
+        if ($last && preg_match('/^(?:ST-\d{8}-)(\d{4})$/', (string) $last->transfer_number, $matches)) {
+            $next = ((int) $matches[1]) + 1;
+        }
+
+        $dailyCounter[$prefix] = $next;
+
+        return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
     protected static function booted()
     {
         static::deleting(function ($stockTransfer) {

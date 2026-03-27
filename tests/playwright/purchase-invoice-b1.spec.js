@@ -4,6 +4,7 @@ import {
   ensurePurchaseInvoiceFixture,
   openCreatePage,
   chooseFixtureSupplier,
+  chooseFixtureOrderRequest,
   checkCheckboxByLabel,
   clickCheckboxByLabel,
 } from './helpers/purchase-invoice-fixture'
@@ -24,6 +25,7 @@ test('B1-a: purchase invoice item pricing fields are read-only/disabled', async 
   expect(body).toContain('Harga mengikuti Purchase Receipt / Purchase Order dan tidak dapat diubah manual.')
 
   await chooseFixtureSupplier(page)
+  await chooseFixtureOrderRequest(page)
 
   let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()

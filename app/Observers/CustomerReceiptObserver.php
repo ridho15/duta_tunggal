@@ -2,9 +2,11 @@
 
 namespace App\Observers;
 
+use App\Enums\PaymentStatus;
 use App\Models\AccountReceivable;
 use App\Models\CustomerReceipt;
 use App\Services\LedgerPostingService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class CustomerReceiptObserver
@@ -36,24 +38,26 @@ class CustomerReceiptObserver
     {
         // Post journal for both partial and full receipts
         if (in_array(strtolower($receipt->status ?? ''), ['partial', 'paid'])) {
-            $currentTotal = $receipt->getCalculatedTotalAttribute();
-            $journalTotal = $receipt->journalEntries()->where('credit', '>', 0)->sum('credit');
+            DB::transaction(function () use ($receipt) {
+                $currentTotal = $receipt->getCalculatedTotalAttribute();
+                $journalTotal = $receipt->journalEntries()->where('credit', '>', 0)->sum('credit');
 
-            // If journals exist and total has changed, delete old journals and create new ones
-            if ($receipt->journalEntries()->exists() && $currentTotal != $journalTotal) {
-                $receipt->journalEntries()->delete();
-                $this->ledger->postCustomerReceipt($receipt);
-            } elseif (!$receipt->journalEntries()->exists()) {
-                // If no journals exist, create new ones
-                $this->ledger->postCustomerReceipt($receipt);
-            }
+                // If journals exist and total has changed, delete old journals and create new ones
+                if ($receipt->journalEntries()->exists() && $currentTotal != $journalTotal) {
+                    $receipt->journalEntries()->delete();
+                    $this->ledger->postCustomerReceipt($receipt);
+                } elseif (!$receipt->journalEntries()->exists()) {
+                    // If no journals exist, create new ones
+                    $this->ledger->postCustomerReceipt($receipt);
+                }
 
-            // Update AR only if afterCreate() did NOT already handle it.
-            // This prevents double-counting when status is set by CustomerReceiptItemObserver
-            // right after items are created in the same request.
-            if (!isset(self::$arUpdatedInCreate[$receipt->id])) {
-                $this->updateAccountReceivables($receipt);
-            }
+                // Update AR only if afterCreate() did NOT already handle it.
+                // This prevents double-counting when status is set by CustomerReceiptItemObserver
+                // right after items are created in the same request.
+                if (!isset(self::$arUpdatedInCreate[$receipt->id])) {
+                    $this->updateAccountReceivables($receipt);
+                }
+            });
         }
     }
 
@@ -104,7 +108,7 @@ class CustomerReceiptObserver
     {
         if ($ar->remaining <= 0) {
             $ar->invoice?->update(['status' => 'paid']);
-            $ar->update(['status' => 'Lunas']);
+            $ar->update(['status' => PaymentStatus::PAID->value]);
             if ($ar->ageingSchedule) {
                 $ar->ageingSchedule->delete();
             }

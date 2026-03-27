@@ -277,6 +277,7 @@ class QualityControlWorkflowTest extends TestCase
     {
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
+        $returnService = app(PurchaseReturnService::class);
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
@@ -289,36 +290,47 @@ class QualityControlWorkflowTest extends TestCase
             'supplier_action' => 'replace',
         ]);
 
-        $returnPayload = [
-            'return_number' => 'RP-' . now()->format('Ymd') . '-0001',
-            'warehouse_id' => $this->warehouse->id,
+        $replacementPo = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-' . now()->format('Ymd') . '-REPLACEMENT',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(5),
             'status' => 'draft',
-            'reason' => 'Damaged packaging',
-        ];
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+            'completed_by' => null,
+            'completed_at' => null,
+            'cabang_id' => $this->warehouse->cabang_id,
+        ]);
 
-        $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
+        $purchaseReturn = $returnService->createFromQualityControl(
+            $qualityControl,
+            PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER,
+            $replacementPo->id
+        );
+
+        $service->completeQualityControl($qualityControl->fresh(), []);
 
         $qualityControl->refresh();
 
-        // Verify return product is created for rejected items
-        $returnProduct = $qualityControl->returnProduct;
-        $this->assertNotNull($returnProduct);
-        $this->assertEquals('draft', $returnProduct->status);
-        $this->assertEquals('Damaged packaging', $returnProduct->reason);
-
-        // Verify return items
-        $returnItems = $returnProduct->returnProductItem;
-        $this->assertCount(1, $returnItems);
-        $this->assertEquals(3, $returnItems->first()->quantity);
-        $this->assertEquals($this->product->id, $returnItems->first()->product_id);
-
-        // In a real scenario, this would trigger a new purchase order or delivery schedule
-        // For now, we verify the rejection is recorded and can be processed
+        // Verify QC is completed and purchase return is created for the rejected items
         $this->assertEquals(1, $qualityControl->status);
-        $this->assertDatabaseHas('return_products', [
-            'id' => $returnProduct->id,
+        $this->assertNotNull($purchaseReturn);
+        $this->assertEquals('draft', $purchaseReturn->status);
+        $this->assertEquals(PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER, $purchaseReturn->failed_qc_action);
+        $this->assertEquals($replacementPo->id, $purchaseReturn->replacement_po_id);
+        $this->assertDatabaseHas('purchase_returns', [
+            'id' => $purchaseReturn->id,
             'status' => 'draft',
-            'reason' => 'Damaged packaging',
+            'failed_qc_action' => PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER,
+            'replacement_po_id' => $replacementPo->id,
+        ]);
+
+        $this->assertDatabaseHas('purchase_return_items', [
+            'purchase_return_id' => $purchaseReturn->id,
+            'qty_returned' => 3,
+            'product_id' => $this->product->id,
         ]);
     }
 
@@ -326,6 +338,7 @@ class QualityControlWorkflowTest extends TestCase
     {
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
+        $returnService = app(PurchaseReturnService::class);
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
@@ -339,34 +352,33 @@ class QualityControlWorkflowTest extends TestCase
             'credit_note_amount' => 45000, // 3 units * 15000
         ]);
 
-        $returnPayload = [
-            'return_number' => 'RP-' . now()->format('Ymd') . '-0001',
-            'warehouse_id' => $this->warehouse->id,
-            'status' => 'draft',
-            'reason' => 'Damaged packaging',
-        ];
+        $purchaseReturn = $returnService->createFromQualityControl(
+            $qualityControl,
+            PurchaseReturn::QC_ACTION_REDUCE_STOCK
+        );
 
-        $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
+        $service->completeQualityControl($qualityControl->fresh(), []);
 
         $qualityControl->refresh();
 
         // Verify QC is completed
         $this->assertEquals(1, $qualityControl->status);
 
-        // Verify return product is created
-        $returnProduct = $qualityControl->returnProduct;
-        $this->assertNotNull($returnProduct);
-
-        // In a real implementation, this would:
-        // 1. Create a credit note record
-        // 2. Reduce the purchase invoice amount
-        // 3. Update accounts payable
-        // 4. Create appropriate journal entries
-
-        // For now, we verify the rejection is recorded
-        $this->assertDatabaseHas('return_products', [
-            'id' => $returnProduct->id,
+        // Purchase QC currently creates a PurchaseReturn draft; financial credit-note
+        // processing is handled by the PurchaseReturn workflow, not by QC completion itself.
+        $this->assertNotNull($purchaseReturn);
+        $this->assertEquals('draft', $purchaseReturn->status);
+        $this->assertEquals(PurchaseReturn::QC_ACTION_REDUCE_STOCK, $purchaseReturn->failed_qc_action);
+        $this->assertDatabaseHas('purchase_returns', [
+            'id' => $purchaseReturn->id,
             'status' => 'draft',
+            'failed_qc_action' => PurchaseReturn::QC_ACTION_REDUCE_STOCK,
+        ]);
+
+        $this->assertDatabaseHas('purchase_return_items', [
+            'purchase_return_id' => $purchaseReturn->id,
+            'qty_returned' => 3,
+            'product_id' => $this->product->id,
         ]);
 
         // Verify stock movement for passed quantity only
@@ -380,6 +392,7 @@ class QualityControlWorkflowTest extends TestCase
     {
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
+        $returnService = app(PurchaseReturnService::class);
 
         // First, complete QC with passed items to create initial stock
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
@@ -393,49 +406,38 @@ class QualityControlWorkflowTest extends TestCase
             'supplier_action' => 'return_refund',
         ]);
 
-        $returnPayload = [
-            'return_number' => 'RP-' . now()->format('Ymd') . '-0001',
-            'warehouse_id' => $this->warehouse->id,
-            'status' => 'draft',
-            'reason' => 'Damaged packaging',
-        ];
+        $purchaseReturn = $returnService->createFromQualityControl(
+            $qualityControl,
+            PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY
+        );
 
-        $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
+        $service->completeQualityControl($qualityControl->fresh(), []);
 
         $qualityControl->refresh();
 
         // Verify QC completion
         $this->assertEquals(1, $qualityControl->status);
 
-        // Verify return product is created
-        $returnProduct = $qualityControl->returnProduct;
-        $this->assertNotNull($returnProduct);
-        $this->assertEquals('draft', $returnProduct->status);
-
-        // Verify return items
-        $returnItems = $returnProduct->returnProductItem;
-        $this->assertCount(1, $returnItems);
-        $this->assertEquals(3, $returnItems->first()->quantity);
-
-        // In a real implementation, this would:
-        // 1. Create a purchase return record linked to the original receipt
-        // 2. Create stock movement reversal for the returned items
-        // 3. Reverse the journal entries
-        // 4. Update accounts payable for the refund
+        // Purchase QC workflow should create a draft PurchaseReturn, not a sales-side ReturnProduct.
+        $this->assertNotNull($purchaseReturn);
+        $this->assertEquals('draft', $purchaseReturn->status);
+        $this->assertEquals(PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY, $purchaseReturn->failed_qc_action);
+        $this->assertDatabaseHas('purchase_returns', [
+            'id' => $purchaseReturn->id,
+            'status' => 'draft',
+            'failed_qc_action' => PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY,
+        ]);
+        $this->assertDatabaseHas('purchase_return_items', [
+            'purchase_return_id' => $purchaseReturn->id,
+            'qty_returned' => 3,
+            'product_id' => $this->product->id,
+        ]);
 
         // Verify stock movement for passed quantity only
         $stockMovement = $qualityControl->stockMovement;
         $this->assertNotNull($stockMovement);
         $this->assertEquals(5, $stockMovement->quantity);
         $this->assertEquals('purchase_in', $stockMovement->type);
-
-        // Verify the return can be processed (status draft means it's ready for supplier action)
-        $this->assertEquals('draft', $returnProduct->status);
-        $this->assertDatabaseHas('return_product_items', [
-            'return_product_id' => $returnProduct->id,
-            'quantity' => 3,
-            'product_id' => $this->product->id,
-        ]);
     }
 
     public function test_purchase_return_creation_for_qc_rejection(): void

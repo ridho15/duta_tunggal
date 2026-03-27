@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AccountReceivableResource\Pages;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\AccountReceivableResource;
 use App\Filament\Widgets\AccountReceivableStatsWidget;
 use App\Helpers\MoneyHelper;
@@ -67,7 +68,7 @@ class ListAccountReceivables extends ListRecords
             if (isset($tableFilters['overdue']['isActive']) && $tableFilters['overdue']['isActive']) {
                 $query->whereHas('invoice', function (Builder $query) {
                     $query->where('due_date', '<', now());
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
             
             // Apply date range filter
@@ -110,7 +111,7 @@ class ListAccountReceivables extends ListRecords
                             $query->where('due_date', '<', $now->copy()->subDays(60));
                             break;
                     }
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
         }
         

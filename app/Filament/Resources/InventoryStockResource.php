@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\InventoryStockResource\Pages;
 use App\Filament\Resources\InventoryStockResource\Pages\ViewInventoryStock;
+use App\Filament\Resources\InventoryStockResource\RelationManagers\StockMovementRelationManager;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Warehouse;
@@ -17,6 +18,7 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
@@ -217,6 +219,7 @@ class InventoryStockResource extends Resource
                     ->preload(),
             ])
             ->actions([
+                ViewAction::make(),
                 ActionGroup::make([
                     EditAction::make()
                         ->color('success'),
@@ -254,7 +257,7 @@ class InventoryStockResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            StockMovementRelationManager::class,
         ];
     }
 

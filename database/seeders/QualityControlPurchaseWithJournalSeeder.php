@@ -2,20 +2,19 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Cabang;
+use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceipt;
-use App\Models\PurchaseReceiptItem;
-use App\Models\QualityControl;
 use App\Models\Warehouse;
 use App\Models\Rak;
 use App\Models\User;
 use App\Models\Currency;
+use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
 use Illuminate\Support\Facades\DB;
 
@@ -130,44 +129,34 @@ class QualityControlPurchaseWithJournalSeeder extends Seeder
             'cabang_id' => $cabang->id,
         ]);
 
-        // Create Purchase Receipt Item
-        $receiptItem = PurchaseReceiptItem::create([
-            'purchase_receipt_id' => $receipt->id,
-            'purchase_order_item_id' => $poItem->id,
-            'product_id' => $product->id,
-            'warehouse_id' => $warehouse->id,
-            'rak_id' => $rak->id,
-            'qty_received' => 100,
-            'qty_accepted' => 100,
-            'qty_rejected' => 0,
-            'is_sent' => 0, // Will be set to 1 when QC is created
-        ]);
-
-        // Update receipt totals - removed as these columns don't exist
-        // $receipt->update([
-        //     'subtotal' => 1000000,
-        //     'tax' => 110000,
-        //     'total' => 1110000,
-        // ]);
-
-        // Create Quality Control from Purchase Receipt Item
+        // Create Quality Control from Purchase Order Item (current flow)
         $qcService = app(QualityControlService::class);
-        $qualityControl = $qcService->createQCFromPurchaseReceiptItem($receiptItem, [
+        $qualityControl = $qcService->createQCFromPurchaseOrderItem($poItem, [
             'passed_quantity' => 95, // 95 passed, 5 rejected
             'rejected_quantity' => 5,
             'inspected_by' => $user->id,
+            'warehouse_id' => $warehouse->id,
+            'rak_id' => $rak->id,
         ]);
+
+        // For rejected purchase QC, create purchase return first
+        $purchaseReturnService = app(PurchaseReturnService::class);
+        $purchaseReturn = $purchaseReturnService->createFromQualityControl(
+            $qualityControl,
+            PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY
+        );
 
         // Complete Quality Control to create journal entries automatically
         $qcService->completeQualityControl($qualityControl, [
             'warehouse_id' => $warehouse->id,
-            // Removed rak_id and item_condition as they don't exist in return_products table
+            'rak_id' => $rak->id,
         ]);
 
         $this->command->info('Quality Control Purchase with Journal Entries created successfully!');
         $this->command->info('QC Number: ' . $qualityControl->qc_number);
         $this->command->info('PO Number: ' . $po->po_number);
         $this->command->info('Receipt Number: ' . $receipt->receipt_number);
+        $this->command->info('Purchase Return Number: ' . $purchaseReturn->nota_retur);
         $this->command->info('Product: ' . $product->name . ' (' . $product->sku . ')');
         $this->command->info('Passed Quantity: 95, Rejected Quantity: 5');
         $this->command->info('Total Journal Entries: ' . $qualityControl->journalEntries()->count());

@@ -186,7 +186,7 @@ class StockMovementResource extends Resource
                             ->hidden(),
                         TextInput::make('from_model_id')
                             ->hidden(),
-                        DatePicker::make('date')
+                        DateTimePicker::make('date')
                             ->required(),
                         Textarea::make('notes')
                             ->nullable(),
@@ -276,6 +276,8 @@ class StockMovementResource extends Resource
                                 'App\Models\StockTransfer' => 'Stock Transfer',
                                 'App\Models\ManufacturingOrder' => 'Manufacturing Order',
                                 'App\Models\StockAdjustment' => 'Stock Adjustment',
+                                'App\Models\QualityControl' => 'Quality Control',
+                                'App\Models\PurchaseReturn' => 'Purchase Return',
                                 default => 'Unknown'
                             };
 
@@ -287,6 +289,8 @@ class StockMovementResource extends Resource
                                 'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
                                 'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
                                 'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
+                                'App\Models\QualityControl' => $record->fromModel->qc_number ?? 'N/A',
+                                'App\Models\PurchaseReturn' => $record->fromModel->nota_retur ?? 'N/A',
                                 default => 'N/A'
                             };
 

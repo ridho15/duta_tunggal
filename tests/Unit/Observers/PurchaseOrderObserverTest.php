@@ -50,7 +50,7 @@ class PurchaseOrderObserverTest extends TestCase
         ]);
 
         // Create product category
-        $category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+        $category = ProductCategory::factory()->create();
 
         // Create product
         $this->product = Product::factory()->create([
@@ -265,7 +265,7 @@ class PurchaseOrderObserverTest extends TestCase
             'name' => 'Server Equipment',
             'cabang_id' => $this->cabang->id,
             'supplier_id' => $this->supplier->id,
-            'product_category_id' => ProductCategory::factory()->create(['cabang_id' => $this->cabang->id])->id,
+            'product_category_id' => ProductCategory::factory()->create()->id,
         ]);
 
         PurchaseOrderItem::factory()->create([

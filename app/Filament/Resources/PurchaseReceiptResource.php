@@ -677,6 +677,15 @@ class PurchaseReceiptResource extends Resource
         ];
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'purchaseOrder.supplier',
+                'purchaseReceiptItem.product',
+            ]);
+    }
+
     public static function getPages(): array
     {
         return [

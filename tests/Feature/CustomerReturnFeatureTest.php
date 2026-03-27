@@ -593,6 +593,16 @@ function buildApprovedReturn(array $data, string $decision = CustomerReturnItem:
     test()->seed(\Database\Seeders\WarehouseSeeder::class);
     test()->actingAs($data['user']);
 
+    // Seed COA accounts required by CustomerReturnService::createJournalEntries()
+    \App\Models\ChartOfAccount::firstOrCreate(
+        ['code' => '1101.01'],
+        ['name' => 'Persediaan Barang', 'type' => 'asset', 'cabang_id' => $data['cabang']->id]
+    );
+    \App\Models\ChartOfAccount::firstOrCreate(
+        ['code' => '5100.10'],
+        ['name' => 'COGS Reversal', 'type' => 'expense', 'cabang_id' => $data['cabang']->id]
+    );
+
     // Bypass CabangScope so the seeded warehouse is always found in tests
     $warehouse = Warehouse::withoutGlobalScopes()->first();
 

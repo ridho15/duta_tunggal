@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CustomerReceiptResource\Pages;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\CustomerReceiptResource;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
@@ -316,7 +317,7 @@ class CreateCustomerReceipt extends CreateRecord
                         // Sync invoice and AR status
                         if ($newRemaining <= 0) {
                             $accountReceivable->invoice?->update(['status' => 'paid']);
-                            $accountReceivable->update(['status' => 'Lunas']);
+                            $accountReceivable->update(['status' => PaymentStatus::PAID->value]);
                             if ($accountReceivable->ageingSchedule) {
                                 $accountReceivable->ageingSchedule->delete();
                             }

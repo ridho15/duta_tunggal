@@ -3,6 +3,7 @@ import { expect } from '@playwright/test'
 export const FIXTURE = {
   supplierCode: 'SUPP001',
   supplierName: 'PT Supplier Utama',
+  orderRequestNumber: 'OR-TEST-INV-B23',
   poNumber: 'PO-TEST-INV-B23',
   receiptLocked: 'PR-TEST-INV-LOCKED',
   receiptOpen: 'PR-TEST-INV-OPEN',
@@ -31,6 +32,22 @@ export async function chooseFixtureSupplier(page) {
   await supplierOption.click({ force: true })
 
   await expect(supplierCombobox).toContainText(FIXTURE.supplierCode)
+  await page.waitForTimeout(1000)
+}
+
+export async function chooseFixtureOrderRequest(page) {
+  const orCombobox = page.locator('.fi-fo-field-wrp').filter({ hasText: 'Order Request (OR)' }).getByRole('combobox').first()
+  await expect(orCombobox).toBeVisible()
+  await orCombobox.click({ force: true })
+
+  const orSearch = page.locator('input.choices__input--cloned[aria-label="Pilih salah satu opsi"]:visible').first()
+  await expect(orSearch).toBeVisible()
+  await orSearch.fill(FIXTURE.orderRequestNumber)
+  const orOption = page.locator('[role="option"]').filter({ hasText: FIXTURE.orderRequestNumber }).first()
+  await expect(orOption).toBeVisible()
+  await orOption.click({ force: true })
+
+  await expect(orCombobox).toContainText(FIXTURE.orderRequestNumber)
   await page.waitForTimeout(1000)
 }
 

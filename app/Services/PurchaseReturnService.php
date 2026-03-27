@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\JournalEntry;
@@ -406,7 +407,7 @@ class PurchaseReturnService
                 $accountPayable->increment('paid', $purchaseReturn->credit_note_amount);
 
                 if ($accountPayable->remaining <= 0) {
-                    $accountPayable->update(['status' => 'Lunas']);
+                    $accountPayable->update(['status' => PaymentStatus::PAID->value]);
                 }
             }
 
@@ -440,7 +441,7 @@ class PurchaseReturnService
                 $accountPayable->increment('paid', $purchaseReturn->refund_amount);
 
                 if ($accountPayable->remaining <= 0) {
-                    $accountPayable->update(['status' => 'Lunas']);
+                    $accountPayable->update(['status' => PaymentStatus::PAID->value]);
                 }
             }
 

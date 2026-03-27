@@ -128,6 +128,7 @@ class QualityControlService
             'from_model_type' => \App\Models\Production::class,
             'from_model_id' => $production->id,
             'date_send_stock' => Carbon::now(),
+            'cabang_id' => $manufacturingOrder->cabang_id ?? Auth::user()?->cabang_id,
         ]);
 
         return $qualityControl;
@@ -347,7 +348,7 @@ class QualityControlService
             return;
         }
 
-        $date = now()->toDateString();
+        $date = now();
         $reference = $qualityControl->qc_number;
 
         // Prevent duplicate posting
@@ -698,7 +699,7 @@ class QualityControlService
             return;
         }
 
-        $date = now()->toDateString();
+        $date = now();
         $reference = $qualityControl->qc_number;
 
         // Prevent duplicate posting
@@ -835,6 +836,9 @@ class QualityControlService
             'rak_id'                 => $qualityControl->rak_id,
             'status'                 => 'completed', // QC already done
         ]);
+
+        app(\App\Services\PurchaseReceiptService::class)
+            ->copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $purchaseReceipt);
 
         Log::info('Auto-created Purchase Receipt from QC', [
             'qc_number' => $qualityControl->qc_number,

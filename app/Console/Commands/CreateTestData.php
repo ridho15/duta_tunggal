@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\PaymentStatus;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -147,7 +148,7 @@ class CreateTestData extends Command
                 'total' => 5000000,
                 'paid' => 1500000,
                 'remaining' => 3500000,
-                'status' => 'Belum Lunas',
+                'status' => PaymentStatus::UNPAID->value,
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
@@ -159,7 +160,7 @@ class CreateTestData extends Command
                 'total' => 8000000,
                 'paid' => 1600000,
                 'remaining' => 6400000,
-                'status' => 'Belum Lunas',
+                'status' => PaymentStatus::UNPAID->value,
                 'created_at' => now(),
                 'updated_at' => now()
             ]);

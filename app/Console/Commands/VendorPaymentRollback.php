@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\PaymentStatus;
 use App\Models\AccountPayable;
 use App\Models\JournalEntry;
 use App\Models\VendorPayment;
@@ -125,7 +126,7 @@ class VendorPaymentRollback extends Command
                 $paid = round($paid, 2);
                 $remaining = max(0, round($ap->total - $paid, 2));
 
-                $status = $remaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+                $status = $remaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
 
                 $ap->update([
                     'paid' => $paid,

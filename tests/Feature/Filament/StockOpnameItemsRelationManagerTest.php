@@ -47,7 +47,7 @@ class StockOpnameItemsRelationManagerTest extends TestCase
         $this->rak = Rak::factory()->create(['warehouse_id' => $this->warehouse->id]);
 
         // Create product category
-        $category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+        $category = ProductCategory::factory()->create();
 
         // Create product
         $this->product = Product::factory()->create([

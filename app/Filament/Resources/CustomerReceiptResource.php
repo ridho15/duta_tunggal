@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\CustomerReceiptResource\Pages;
 use App\Filament\Resources\CustomerReceiptResource\Pages\ViewCustomerReceipt;
 use App\Http\Controllers\HelperController;
@@ -405,9 +406,22 @@ class CustomerReceiptResource extends Resource
                         if (!is_array($invoiceIds) || empty($invoiceIds)) {
                             return $record->invoice ? $record->invoice->invoice_number : '-';
                         }
-                        
-                        $invoices = Invoice::whereIn('id', $invoiceIds)->pluck('invoice_number')->toArray();
-                        return implode(', ', $invoices);
+
+                        static $invoiceNumberCache = [];
+                        $missingIds = array_values(array_diff($invoiceIds, array_keys($invoiceNumberCache)));
+                        if (!empty($missingIds)) {
+                            $invoiceNumberCache += Invoice::whereIn('id', $missingIds)
+                                ->pluck('invoice_number', 'id')
+                                ->toArray();
+                        }
+
+                        $numbers = collect($invoiceIds)
+                            ->map(fn ($id) => $invoiceNumberCache[$id] ?? null)
+                            ->filter()
+                            ->values()
+                            ->all();
+
+                        return empty($numbers) ? '-' : implode(', ', $numbers);
                     })
                     ->searchable(query: function (Builder $query, $search) {
                         $query->where(function ($query) use ($search) {
@@ -588,6 +602,17 @@ class CustomerReceiptResource extends Resource
             ));
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'customer',
+                'invoice',
+                'coa',
+                'customerReceiptItem.invoice',
+            ]);
+    }
+
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
@@ -717,7 +742,7 @@ class CustomerReceiptResource extends Resource
                                 
                                 $html = '';
                                 foreach ($summaryData as $data) {
-                                    $statusColor = $data['status'] === 'Lunas' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+                                    $statusColor = $data['status'] === PaymentStatus::PAID->value ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
                                     $progressWidth = min(100, $data['percentage']);
                                     
                                     $html .= '<div class="border border-gray-200 rounded-lg p-4 mb-3 bg-white">';

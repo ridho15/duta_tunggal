@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Enums\PaymentStatus;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
@@ -30,14 +31,23 @@ class InvoiceObserver
 
         // Create AP or AR depending on source
         if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder') {
+            $fromModel = $invoice->fromModel;
+            if (! $fromModel) {
+                Log::warning('InvoiceObserver: fromModel is null for purchase invoice, skipping AP creation', [
+                    'invoice_id'      => $invoice->id,
+                    'from_model_type' => $invoice->from_model_type,
+                    'from_model_id'   => $invoice->from_model_id,
+                ]);
+                return;
+            }
             // Create Account Payable
             $data = [
                 'invoice_id' => $invoice->id,
-                'supplier_id' => $invoice->fromModel->supplier_id,
+                'supplier_id' => $fromModel->supplier_id,
                 'total' => $invoice->total,
                 'paid' => 0,
                 'remaining' => $invoice->total,
-                'status' => 'Belum Lunas',
+                'status' => PaymentStatus::UNPAID->value,
             ];
             // branch column may not exist on older installs; include only when present
             if (\Illuminate\Support\Facades\Schema::hasColumn('account_payables', 'cabang_id')) {
@@ -71,14 +81,23 @@ class InvoiceObserver
                 throw $e;
             }
         } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+            $fromModel = $invoice->fromModel;
+            if (! $fromModel) {
+                Log::warning('InvoiceObserver: fromModel is null for sales invoice, skipping AR creation', [
+                    'invoice_id'      => $invoice->id,
+                    'from_model_type' => $invoice->from_model_type,
+                    'from_model_id'   => $invoice->from_model_id,
+                ]);
+                return;
+            }
             // Create Account Receivable
             $accountReceivable = AccountReceivable::create([
                 'invoice_id' => $invoice->id,
-                'customer_id' => $invoice->fromModel->customer_id,
+                'customer_id' => $fromModel->customer_id,
                 'total' => $invoice->total,
                 'paid' => 0,
                 'remaining' => $invoice->total,
-                'status' => "Belum Lunas",
+                'status' => PaymentStatus::UNPAID->value,
                 'cabang_id' => $invoice->cabang_id, // FIX #5: propagate branch scope so AR is visible to branch users
             ]);
             // Create Ageing Schedule

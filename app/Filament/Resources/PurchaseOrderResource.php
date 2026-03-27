@@ -123,7 +123,7 @@ class PurchaseOrderResource extends Resource
                                         $defaultCurrencyId = Currency::query()->first()?->id;
 
                                         if ($get('refer_model_type') == 'App\Models\SaleOrder') {
-                                            $saleOrder = SaleOrder::find($state);
+                                            $saleOrder = SaleOrder::with(['saleOrderItem.product.uom', 'saleOrderItem.product.suppliers'])->find($state);
                                             if ($saleOrder) {
                                                 foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
                                                     // Calculate subtotal using HelperController for consistency
@@ -148,53 +148,38 @@ class PurchaseOrderResource extends Resource
                                                 $set('cabang_id', $saleOrder->cabang_id ?? null);
                                             }
                                         } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
-                                            $orderRequest = OrderRequest::find($state);
+                                            $orderRequest = OrderRequest::with(['orderRequestItem.product.uom', 'orderRequestItem.product.suppliers'])->find($state);
                                             if ($orderRequest) {
                                                 $set('warehouse_id', $orderRequest->warehouse_id);
-                                                foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
-                                                    // Calculate remaining quantity (not yet fulfilled)
-                                                    $remainingQuantity = $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0);
-                                                    // Use unit_price from OrderRequestItem if available, otherwise use item supplier price from pivot, fallback to cost_price
-                                                    if (($orderRequestItem->unit_price ?? 0) > 0) {
-                                                        $unitPrice = $orderRequestItem->unit_price;
-                                                    } else {
-                                                        $product = $orderRequestItem->product;
-                                                        $supplierId = $orderRequestItem->supplier_id;
-                                                        $supplierProduct = ($product && $supplierId)
-                                                            ? $product->suppliers()->where('suppliers.id', $supplierId)->first()
-                                                            : null;
-                                                        $unitPrice = $supplierProduct ? (float) $supplierProduct->pivot->supplier_price : ($product->cost_price ?? 0);
-                                                    }
-                                                    $discount  = $orderRequestItem->discount ?? 0;
-                                                    $tax       = $orderRequestItem->tax ?? 0;
-                                                    // Map order request tax_type to PO item tipe_pajak
-                                                    $tipePajak = match ($orderRequest->tax_type ?? 'PPN Excluded') {
-                                                        'PPN Included' => 'Inklusif',
-                                                        'None'         => 'Non Pajak',
-                                                        default        => 'Eklusif', // 'PPN Excluded'
-                                                    };
-
-                                                    // Calculate subtotal using HelperController for consistency
-                                                    $subtotal = HelperController::hitungSubtotal($remainingQuantity, $unitPrice, $discount, $tax, $tipePajak);
-
-                                                    array_push($items, [
-                                                        'product_id'            => $orderRequestItem->product_id,
-                                                        'quantity'              => $remainingQuantity,
-                                                        'unit_price'            => $unitPrice,
-                                                        'discount'              => $discount,
-                                                        'tax'                   => $tax,
-                                                        'tipe_pajak'            => $tipePajak,
-                                                        'subtotal'              => $subtotal,
-                                                        'currency_id'           => $defaultCurrencyId,
-                                                        'refer_item_model_type' => \App\Models\OrderRequestItem::class,
-                                                        'refer_item_model_id'   => $orderRequestItem->id,
-                                                        'unit' => $orderRequestItem->product->uom?->abbreviation ?? '-',
-                                                    ]);
-                                                }
                                                 $set('cabang_id', $orderRequest->cabang_id ?? null);
-                                                // Map order request tax_type to PO ppn_option values
                                                 $ppnOption = ($orderRequest->tax_type === 'None') ? 'non_ppn' : 'standard';
                                                 $set('ppn_option', $ppnOption);
+
+                                                // Detect multisupplier: count distinct supplier_ids on OR items
+                                                $uniqueSupplierIds = $orderRequest->orderRequestItem
+                                                    ->pluck('supplier_id')->filter()->unique();
+
+                                                if ($uniqueSupplierIds->count() > 1) {
+                                                    // Multisupplier OR: clear supplier field so user must choose one.
+                                                    // Items will be populated automatically via supplier_id->afterStateUpdated.
+                                                    $set('supplier_id', null);
+                                                    // $items stays [] — will be set by the final $set('purchaseOrderItem', $items) below
+                                                } else {
+                                                    // Single supplier: auto-select and populate all items immediately
+                                                    $autoSupplierId = $uniqueSupplierIds->first();
+                                                    if ($autoSupplierId) {
+                                                        $set('supplier_id', $autoSupplierId);
+                                                        $autoSupplier = Supplier::find($autoSupplierId);
+                                                        if ($autoSupplier) {
+                                                            $set('tempo_hutang', $autoSupplier->tempo_hutang);
+                                                        }
+                                                    }
+                                                    $items = self::buildOrderRequestItems(
+                                                        $orderRequest,
+                                                        $autoSupplierId ? (int) $autoSupplierId : null,
+                                                        $defaultCurrencyId
+                                                    );
+                                                }
                                             }
                                         }
                                         $set('currency_id', $defaultCurrencyId);
@@ -206,7 +191,25 @@ class PurchaseOrderResource extends Resource
                             ->label('Supplier')
                             ->preload()
                             ->reactive()
-                            ->relationship('supplier', 'perusahaan')
+                            ->relationship(
+                                name: 'supplier',
+                                titleAttribute: 'perusahaan',
+                                modifyQueryUsing: function (Builder $query, Get $get) {
+                                    // When an Order Request is selected, restrict options to only that OR's suppliers
+                                    $referType    = $get('refer_model_type');
+                                    $referModelId = $get('refer_model_id');
+                                    if ($referType === 'App\\Models\\OrderRequest' && $referModelId) {
+                                        $or = OrderRequest::with('orderRequestItem')->find($referModelId);
+                                        if ($or && $or->orderRequestItem->isNotEmpty()) {
+                                            $supplierIds = $or->orderRequestItem
+                                                ->pluck('supplier_id')->filter()->unique();
+                                            if ($supplierIds->isNotEmpty()) {
+                                                $query->whereIn('id', $supplierIds);
+                                            }
+                                        }
+                                    }
+                                }
+                            )
                             ->validationMessages([
                                 'required' => 'Supplier belum dipilih',
                             ])
@@ -214,10 +217,34 @@ class PurchaseOrderResource extends Resource
                             ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
                                 return "({$supplier->code}) {$supplier->perusahaan}";
                             })
-                            ->afterStateUpdated(function ($state, $set) {
+                            ->helperText(function (Get $get) {
+                                if ($get('refer_model_type') !== 'App\\Models\\OrderRequest' || !$get('refer_model_id')) {
+                                    return null;
+                                }
+                                $or = OrderRequest::with('orderRequestItem')->find($get('refer_model_id'));
+                                if (! $or) {
+                                    return null;
+                                }
+                                $count = $or->orderRequestItem->pluck('supplier_id')->filter()->unique()->count();
+                                if ($count > 1) {
+                                    return "Order Request ini memiliki {$count} supplier. Pilih satu supplier — item akan diisi otomatis sesuai supplier terpilih.";
+                                }
+                                return null;
+                            })
+                            ->afterStateUpdated(function ($state, $set, Get $get) {
                                 $supplier = Supplier::find($state);
                                 if ($supplier) {
                                     $set('tempo_hutang', $supplier->tempo_hutang);
+                                }
+                                // When referring to a multisupplier Order Request, rebuild items for the chosen supplier only
+                                if ($get('refer_model_type') === 'App\\Models\\OrderRequest' && $get('refer_model_id') && $state) {
+                                    $orderRequest = OrderRequest::with(['orderRequestItem.product.uom', 'orderRequestItem.product.suppliers'])
+                                        ->find($get('refer_model_id'));
+                                    if ($orderRequest) {
+                                        $defaultCurrencyId = Currency::query()->first()?->id;
+                                        $items = self::buildOrderRequestItems($orderRequest, (int) $state, $defaultCurrencyId);
+                                        $set('purchaseOrderItem', $items);
+                                    }
                                 }
                             })
                             // Task 13: Add link to create new supplier
@@ -556,61 +583,24 @@ class PurchaseOrderResource extends Resource
                                     })
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         // Ensure this currency is added to purchaseOrderCurrency if not already present
-                                        // log selection to help debug validation issue
-                                        \Illuminate\Support\Facades\Log::debug('POItem.currency afterStateUpdated START', [
-                                            'state' => $state,
-                                            'state_type' => gettype($state),
-                                            'is_null' => is_null($state),
-                                            'is_empty' => empty($state),
-                                            'purchaseOrderItem' => $get('../..purchaseOrderItem') ?? null,
-                                        ]);
-
                                         $currencies = $get('../../purchaseOrderCurrency') ?? [];
-                                        \Illuminate\Support\Facades\Log::debug('POItem.currency current currencies', [
-                                            'currencies' => $currencies,
-                                            'currencies_count' => count($currencies),
-                                        ]);
 
                                         $currencyExists = false;
 
-                                        foreach ($currencies as $index => $currency) {
-                                            \Illuminate\Support\Facades\Log::debug('POItem.currency checking currency', [
-                                                'index' => $index,
-                                                'currency' => $currency,
-                                                'currency_id' => $currency['currency_id'] ?? null,
-                                                'state' => $state,
-                                                'matches' => (($currency['currency_id'] ?? null) == $state)
-                                            ]);
+                                        foreach ($currencies as $currency) {
                                             if (($currency['currency_id'] ?? null) == $state) {
                                                 $currencyExists = true;
                                                 break;
                                             }
                                         }
 
-                                        \Illuminate\Support\Facades\Log::debug('POItem.currency exists check result', [
-                                            'currencyExists' => $currencyExists,
-                                            'will_add' => (!$currencyExists && $state)
-                                        ]);
-
                                         if (!$currencyExists && $state) {
                                             $currencies[] = [
                                                 'currency_id' => $state,
                                                 'nominal' => 0
                                             ];
-                                            \Illuminate\Support\Facades\Log::debug('POItem.currency adding new currency', [
-                                                'new_currencies' => $currencies
-                                            ]);
                                             $set('../../purchaseOrderCurrency', $currencies);
-
-                                            // Verify the set worked
-                                            $updatedCurrencies = $get('../../purchaseOrderCurrency') ?? [];
-                                            \Illuminate\Support\Facades\Log::debug('POItem.currency after set verification', [
-                                                'updated_currencies' => $updatedCurrencies,
-                                                'updated_count' => count($updatedCurrencies)
-                                            ]);
                                         }
-
-                                        \Illuminate\Support\Facades\Log::debug('POItem.currency afterStateUpdated END');
                                     })
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih',
@@ -1762,6 +1752,71 @@ class PurchaseOrderResource extends Resource
             ]);
     }
 
+    /**
+     * Build PurchaseOrderItem array from an OrderRequest.
+     * When $filterSupplierId is given, only items with matching supplier_id are included.
+     * This supports the 1-PO-per-supplier rule when creating a manual PO from a multisupplier OR.
+     */
+    public static function buildOrderRequestItems(
+        OrderRequest $orderRequest,
+        ?int $filterSupplierId = null,
+        ?int $defaultCurrencyId = null
+    ): array {
+        $defaultCurrencyId ??= Currency::query()->first()?->id;
+        $items = [];
+
+        foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
+            // Skip items that belong to a different supplier when a filter is active
+            if ($filterSupplierId !== null
+                && $orderRequestItem->supplier_id !== null
+                && (int) $orderRequestItem->supplier_id !== $filterSupplierId
+            ) {
+                continue;
+            }
+
+            $remainingQuantity = max(0, $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0));
+            if ($remainingQuantity <= 0) {
+                continue;
+            }
+
+            if (($orderRequestItem->unit_price ?? 0) > 0) {
+                $unitPrice = (float) $orderRequestItem->unit_price;
+            } else {
+                $product  = $orderRequestItem->product;
+                $spId     = $orderRequestItem->supplier_id;
+                $sp       = ($product && $spId)
+                    ? $product->suppliers()->where('suppliers.id', $spId)->first()
+                    : null;
+                $unitPrice = $sp ? (float) $sp->pivot->supplier_price : (float) ($product->cost_price ?? 0);
+            }
+
+            $discount  = $orderRequestItem->discount ?? 0;
+            $tax       = $orderRequestItem->tax ?? 0;
+            $tipePajak = match ($orderRequest->tax_type ?? 'PPN Excluded') {
+                'PPN Included' => 'Inklusif',
+                'None'         => 'Non Pajak',
+                default        => 'Eklusif',
+            };
+            $subtotal = HelperController::hitungSubtotal($remainingQuantity, $unitPrice, $discount, $tax, $tipePajak);
+
+            $items[] = [
+                'product_id'            => $orderRequestItem->product_id,
+                'quantity'              => $remainingQuantity,
+                'unit_price'            => $unitPrice,
+                'discount'              => $discount,
+                'tax'                   => $tax,
+                'tipe_pajak'            => $tipePajak,
+                'subtotal'              => $subtotal,
+                'currency_id'           => $defaultCurrencyId,
+                'refer_item_model_type' => \App\Models\OrderRequestItem::class,
+                'refer_item_model_id'   => $orderRequestItem->id,
+                'unit'                  => $orderRequestItem->product->uom?->abbreviation ?? '-',
+            ];
+        }
+
+        return $items;
+    }
+
     public static function getRelations(): array
     {
         return [
@@ -1771,7 +1826,13 @@ class PurchaseOrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery();
+        return parent::getEloquentQuery()
+            ->with([
+                'supplier',
+                'purchaseOrderItem.product',
+                'purchaseReceipt',
+            ])
+            ->withCount('purchaseOrderItem');
     }
 
     public static function getPages(): array

@@ -27,6 +27,7 @@ use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
 use App\Models\CustomerReceipt;
 use App\Models\CustomerReceiptItem;
+use App\Models\ChartOfAccount;
 
 class SalesAuditTest extends TestCase
 {
@@ -109,6 +110,14 @@ class SalesAuditTest extends TestCase
             'qty_available' => 100,
             'qty_reserved' => 0,
         ]);
+
+        // Create Chart of Accounts for Ledger Posting
+        ChartOfAccount::unguard();
+        ChartOfAccount::firstOrCreate(['code' => '1120'], ['name' => 'Piutang Dagang', 'type' => 'Asset']);
+        ChartOfAccount::firstOrCreate(['code' => '1112.01'], ['name' => 'Bank Default', 'type' => 'Asset']);
+        ChartOfAccount::firstOrCreate(['code' => '4000'], ['name' => 'Penjualan', 'type' => 'Revenue']);
+        ChartOfAccount::firstOrCreate(['code' => '2110-02'], ['name' => 'PPN Keluaran', 'type' => 'Liability']);
+        ChartOfAccount::reguard();
     }
 
     /** @test */

@@ -15,6 +15,12 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        // Ensure roles and permissions exist even when this seeder is executed standalone.
+        $this->call([
+            PermissionSeeder::class,
+            RoleSeeder::class,
+        ]);
+
         $user = User::updateOrCreate([
             'email' => 'ralamzah@gmail.com',
         ], [

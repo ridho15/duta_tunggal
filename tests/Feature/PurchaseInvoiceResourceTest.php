@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
+use App\Models\Cabang;
 use App\Models\Invoice;
+use App\Models\OrderRequest;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -99,7 +101,10 @@ class PurchaseInvoiceResourceTest extends TestCase
             'is_active' => 1
         ]);
 
-        $this->user = User::factory()->create();
+        $this->cabang = Cabang::factory()->create();
+        $this->user = User::factory()->create([
+            'cabang_id' => $this->cabang->id,
+        ]);
         $permissions = [
             'view any invoice',
             'view invoice',
@@ -135,6 +140,7 @@ class PurchaseInvoiceResourceTest extends TestCase
         ]);
         $this->warehouse = Warehouse::factory()->create([
             'status' => 1,
+            'cabang_id' => $this->cabang->id,
         ]);
         $this->product = Product::factory()->create([
             'uom_id' => \App\Models\UnitOfMeasure::first()->id,
@@ -184,13 +190,15 @@ class PurchaseInvoiceResourceTest extends TestCase
         // Create PO for supplier1
         $purchaseOrder1 = PurchaseOrder::factory()->create([
             'supplier_id' => $supplier1->id,
-            'status' => 'completed'
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
         ]);
 
         // Create PO for supplier2
         $purchaseOrder2 = PurchaseOrder::factory()->create([
             'supplier_id' => $supplier2->id,
-            'status' => 'completed'
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
         ]);
 
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
@@ -206,16 +214,87 @@ class PurchaseInvoiceResourceTest extends TestCase
             ]);
     }
 
+    public function test_order_request_and_purchase_order_options_follow_cabang_scope()
+    {
+        $supplier = Supplier::factory()->create();
+        $branchA = $this->cabang;
+        $branchB = Cabang::factory()->create();
+
+        $orderRequestA = OrderRequest::factory()->create([
+            'cabang_id' => $branchA->id,
+            'status' => 'approved',
+        ]);
+        $purchaseOrderA = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $branchA->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequestA->id,
+        ]);
+        PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrderA->id,
+            'status' => 'completed',
+            'cabang_id' => $branchA->id,
+        ]);
+
+        $orderRequestB = OrderRequest::factory()->create([
+            'cabang_id' => $branchB->id,
+            'status' => 'approved',
+        ]);
+        $purchaseOrderB = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $branchB->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequestB->id,
+        ]);
+        PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrderB->id,
+            'status' => 'completed',
+            'cabang_id' => $branchB->id,
+        ]);
+
+        $allAccessUser = User::factory()->create([
+            'cabang_id' => $branchA->id,
+            'manage_type' => 'all',
+        ]);
+        $this->actingAs($allAccessUser);
+
+        $branchAOrderRequests = PurchaseInvoiceResource::getOrderRequestOptions($supplier->id, $branchA->id);
+        $this->assertArrayHasKey($orderRequestA->id, $branchAOrderRequests);
+        $this->assertArrayNotHasKey($orderRequestB->id, $branchAOrderRequests);
+
+        $branchAPurchaseOrders = PurchaseInvoiceResource::getPurchaseOrderOptions($supplier->id, $orderRequestA->id, $branchA->id);
+        $this->assertArrayHasKey($purchaseOrderA->id, $branchAPurchaseOrders);
+        $this->assertArrayNotHasKey($purchaseOrderB->id, $branchAPurchaseOrders);
+
+        $branchUser = User::factory()->create([
+            'cabang_id' => $branchB->id,
+        ]);
+        $this->actingAs($branchUser);
+
+        $branchBOrderRequests = PurchaseInvoiceResource::getOrderRequestOptions($supplier->id);
+        $this->assertArrayHasKey($orderRequestB->id, $branchBOrderRequests);
+        $this->assertArrayNotHasKey($orderRequestA->id, $branchBOrderRequests);
+    }
+
     public function test_purchase_order_selection_loads_receipts()
     {
         $supplier = Supplier::factory()->create();
         $product = Product::factory()->create();
         $warehouse = Warehouse::factory()->create();
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
 
         // Create PO
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
-            'status' => 'completed'
+            'status' => 'completed',
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+            'cabang_id' => $this->cabang->id,
         ]);
 
         $purchaseOrderItem = PurchaseOrderItem::factory()->create([
@@ -230,7 +309,8 @@ class PurchaseInvoiceResourceTest extends TestCase
         // Create completed receipt
         $purchaseReceipt = PurchaseReceipt::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,
-            'status' => 'completed'
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
         ]);
 
         $purchaseReceiptItem = PurchaseReceiptItem::factory()->create([
@@ -246,6 +326,7 @@ class PurchaseInvoiceResourceTest extends TestCase
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'selected_supplier' => $supplier->id,
+                'selected_order_request' => $orderRequest->id,
                 'selected_purchase_orders' => [$purchaseOrder->id],
             ])
             ->assertFormSet([
@@ -312,6 +393,30 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertHasFormErrors(['selected_supplier' => 'required']);
     }
 
+    public function test_purchase_orders_require_order_request_before_submit()
+    {
+        $supplier = Supplier::factory()->create();
+        $orderRequest = OrderRequest::factory()->create();
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $supplier->id,
+                'invoice_number' => 'PINV-OR-REQ-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+                'selected_purchase_orders' => [$purchaseOrder->id],
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['selected_order_request' => 'required']);
+    }
+
     public function test_form_validation_requires_invoice_date()
     {
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
@@ -340,13 +445,15 @@ class PurchaseInvoiceResourceTest extends TestCase
 
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
-            'status' => 'completed'
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
         ]);
 
         $invoice = Invoice::factory()->create([
             'invoice_number' => 'PINV-20251101-0002',
             'from_model_type' => PurchaseOrder::class,
-            'from_model_id' => $purchaseOrder->id
+            'from_model_id' => $purchaseOrder->id,
+            'cabang_id' => $this->cabang->id,
         ]);
 
         Livewire::test(PurchaseInvoiceResource\Pages\EditPurchaseInvoice::class, [
@@ -364,7 +471,8 @@ class PurchaseInvoiceResourceTest extends TestCase
         // Create PO
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
-            'status' => 'completed'
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
         ]);
 
         $purchaseOrderItem = PurchaseOrderItem::factory()->create([
@@ -379,7 +487,9 @@ class PurchaseInvoiceResourceTest extends TestCase
         // Create completed receipt
         $purchaseReceipt = PurchaseReceipt::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,
-            'status' => 'completed'
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'cabang_id' => $this->cabang->id,
         ]);
 
         $purchaseReceiptItem = PurchaseReceiptItem::factory()->create([
@@ -400,7 +510,6 @@ class PurchaseInvoiceResourceTest extends TestCase
             'total' => 7500,
             'currency_id' => $currency->id,
         ]);
-
         // Test creating invoice with other fees
         $invoiceData = [
             'supplier_id' => $supplier->id,
@@ -409,6 +518,7 @@ class PurchaseInvoiceResourceTest extends TestCase
             'invoice_number' => 'PINV-TEST-OTHER-FEE-001',
             'from_model_type' => \App\Models\PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
+            'cabang_id' => $this->cabang->id,
             'invoice_date' => now()->format('Y-m-d'),
             'due_date' => now()->addDays(30)->format('Y-m-d'),
             'subtotal' => 100000,
@@ -454,6 +564,91 @@ class PurchaseInvoiceResourceTest extends TestCase
 
         $invoice = Invoice::where('invoice_number', 'PINV-TEST-OTHER-FEE-001')->first();
         $this->assertEquals(12500, $invoice->other_fee_total);
+    }
+
+    public function test_purchase_invoice_create_page_persists_receipt_biaya_items()
+    {
+        $supplier = Supplier::factory()->create();
+        $product = Product::factory()->create();
+
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+
+        PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 10000,
+            'discount' => 0,
+            'tax' => 0,
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrder->purchaseOrderItem->first()->id,
+            'product_id' => $product->id,
+            'qty_received' => 10,
+            'qty_accepted' => 10,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        PurchaseReceiptBiaya::create([
+            'purchase_receipt_id' => $receipt->id,
+            'nama_biaya' => 'Biaya Transport',
+            'total' => 7500,
+            'currency_id' => $this->currency->id,
+            'masuk_invoice' => 1,
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_purchase_receipts' => [$receipt->id],
+                'invoice_number' => 'PINV-RECEIPT-FEE-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+                'status' => 'draft',
+                'invoiceItem' => [[
+                    'product_id' => $product->id,
+                    'quantity' => 10,
+                    'price' => 10000,
+                    'total' => 100000,
+                ]],
+                'other_fees' => [],
+                'receiptBiayaItems' => [[
+                    'receipt_id' => $receipt->id,
+                    'nama_biaya' => 'Biaya Transport',
+                    'total' => 7500,
+                ]],
+            ])
+            ->call('create');
+
+        $savedInvoice = Invoice::where('invoice_number', 'PINV-RECEIPT-FEE-001')->first();
+
+        $this->assertNotNull($savedInvoice);
+        $this->assertIsArray($savedInvoice->other_fee);
+        $this->assertCount(1, $savedInvoice->other_fee);
+        $this->assertEquals('Biaya Transport', $savedInvoice->other_fee[0]['name']);
+        $this->assertEquals(7500, $savedInvoice->other_fee[0]['amount']);
+        $this->assertEquals(7500, $savedInvoice->other_fee_total);
     }
 
     public function test_purchase_invoice_receipt_biaya_deletion()

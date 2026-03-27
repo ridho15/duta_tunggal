@@ -6,6 +6,7 @@ use App\Observers\InventoryStockObserver;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class InventoryStock extends Model
@@ -41,6 +42,12 @@ class InventoryStock extends Model
     public function rak()
     {
         return $this->belongsTo(Rak::class, 'rak_id')->withDefault();
+    }
+
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class, 'product_id', 'product_id')
+            ->where('warehouse_id', $this->warehouse_id);
     }
 
     /**

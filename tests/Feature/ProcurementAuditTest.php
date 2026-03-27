@@ -266,7 +266,7 @@ class ProcurementAuditTest extends TestCase
             'purchase_receipt_id' => $receipt->id,
             'product_id' => $this->product->id,
             'warehouse_id' => $this->warehouse->id,
-            'quantity' => 50,
+            'qty_received' => 50,
             'unit_price' => 50000,
             'total_amount' => 2500000,
         ]);

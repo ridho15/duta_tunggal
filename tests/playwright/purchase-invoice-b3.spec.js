@@ -4,6 +4,7 @@ import {
   ensurePurchaseInvoiceFixture,
   openCreatePage,
   chooseFixtureSupplier,
+  chooseFixtureOrderRequest,
   checkCheckboxByLabel,
   clickCheckboxByLabel,
 } from './helpers/purchase-invoice-fixture'
@@ -31,6 +32,7 @@ test('B3-b: fixture already-invoiced receipt option is disabled', async ({ page 
   expect(body).not.toMatch(ERR)
 
   await chooseFixtureSupplier(page)
+  await chooseFixtureOrderRequest(page)
 
   let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\PaymentStatus;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
@@ -75,7 +76,7 @@ class SyncArApCommand extends Command
                 ->sum('total_payment');
             
             $remaining = max(0, $invoice->total - $totalPaid);
-            $status = $remaining > 0 ? 'Belum Lunas' : 'Lunas';
+            $status = $remaining > 0 ? PaymentStatus::UNPAID->value : PaymentStatus::PAID->value;
 
             $arData = [
                 'invoice_id' => $invoice->id,
@@ -132,7 +133,7 @@ class SyncArApCommand extends Command
                 ->sum('total_payment');
             
             $remaining = max(0, $invoice->total - $totalPaid);
-            $status = $remaining > 0 ? 'Belum Lunas' : 'Lunas';
+            $status = $remaining > 0 ? PaymentStatus::UNPAID->value : PaymentStatus::PAID->value;
 
             $apData = [
                 'invoice_id' => $invoice->id,

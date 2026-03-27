@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Reports;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\Reports\AgeingReportResource\Pages;
 use App\Models\AccountReceivable;
 use App\Models\AccountPayable;
@@ -136,8 +137,8 @@ class AgeingReportResource extends Resource
                     ->label('Status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'Lunas' => 'success',
-                        'Belum Lunas' => 'warning',
+                        PaymentStatus::PAID->value => 'success',
+                        PaymentStatus::UNPAID->value => 'warning',
                         default => 'gray',
                     }),
 

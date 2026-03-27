@@ -144,6 +144,18 @@ class SaleOrder extends Model
     }
 
     /**
+     * Inverse relation to invoices created from this Sale Order.
+     * Filament resources expect a `salesInvoices` relation for eager-loading.
+     */
+    public function salesInvoices()
+    {
+        // Use the same polymorphic column names as Invoice::fromModel()
+        // Invoice::fromModel() uses ('from_model_type', 'from_model_id') explicitly,
+        // so provide those here to avoid Laravel looking for `fromModel_id`.
+        return $this->morphMany(\App\Models\Invoice::class, 'fromModel', 'from_model_type', 'from_model_id');
+    }
+
+    /**
      * Check if any items in this sale order have insufficient stock
      */
     public function hasInsufficientStock()

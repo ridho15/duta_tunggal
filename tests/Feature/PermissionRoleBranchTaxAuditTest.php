@@ -454,7 +454,7 @@ test('hitungSubtotal defaults to Inklusif when null taxType passed', function ()
 // SECTION 8 — QUOTATION TAX BEHAVIOR
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('QuotationItem stores tax_type Exclusive by default from DB column', function () {
+test('QuotationItem stores tax_type None by default from DB column', function () {
     $customer  = makeCustomer('CUST-QIT');
     $quotation = makeQuotation($customer);
 
@@ -465,11 +465,11 @@ test('QuotationItem stores tax_type Exclusive by default from DB column', functi
         'unit_price'   => 500000,
         'discount'     => 0,
         'tax'          => 12,
-        // tax_type omitted — DB default 'Exclusive'
+        // tax_type omitted — DB default 'None'
     ]);
     $item->refresh();
 
-    expect($item->tax_type)->toBe('Exclusive');
+    expect($item->tax_type)->toBe('None');
 });
 
 test('QuotationItem stores Inclusive when explicitly set', function () {
@@ -572,7 +572,7 @@ test('QuotationService updateTotalAmount handles multiple items with mixed tax t
 // SECTION 9 — SALE ORDER ITEM: tipe_pajak column
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('SaleOrderItem tipe_pajak column defaults to Exclusive', function () {
+test('SaleOrderItem tipe_pajak column defaults to None', function () {
     $cabang   = makeCabang('Cabang SOI');
     $customer = makeCustomer('CUST-SOI');
 
@@ -595,11 +595,11 @@ test('SaleOrderItem tipe_pajak column defaults to Exclusive', function () {
         'discount'       => 0,
         'tax'            => 12,
         'warehouse_id'   => 1,
-        // tipe_pajak omitted — DB default 'Exclusive'
+        // tipe_pajak omitted — DB default 'None'
     ]);
     $item->refresh();
 
-    expect($item->tipe_pajak)->toBe('Exclusive');
+    expect($item->tipe_pajak)->toBe('None');
 });
 
 test('SaleOrderItem tipe_pajak can be set to Inclusive', function () {

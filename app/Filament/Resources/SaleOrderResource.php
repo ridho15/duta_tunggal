@@ -125,6 +125,8 @@ class SaleOrderResource extends Resource
                                             'subtotal' => HelperController::hitungSubtotal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak),
                                             'tax_nominal' => number_format(HelperController::hitungTaxNominal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak), 0, ',', '.'),
                                             'rak_id' => null,
+                                            'unit' => $item->product->uom?->abbreviation ?? '-',
+                                            'total' => number_format($item->quantity * $unitPrice, 0, ',', '.'),
                                         ]);
                                     }
                                     $set('total_amount', (float) HelperController::parseIndonesianMoney($quotation->total_amount ?? 0));
@@ -456,6 +458,8 @@ class SaleOrderResource extends Resource
                             ->columnSpanFull()
                             ->reactive()
                             ->columns(3)
+                            ->minItems(1)
+                            ->rules([new \App\Rules\NoDuplicateProducts()])
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data) {
                                 return $data;
                             })
@@ -1304,7 +1308,8 @@ class SaleOrderResource extends Resource
                     })
             ])
             ->modifyQueryUsing(function (Builder $query) {
-                return $query->with('saleOrderItem');
+                // Additional eager loading for table display
+                return $query->with(['customer', 'saleOrderItem.product']);
             })
             ->recordClasses(function (SaleOrder $record): string {
                 return $record->hasInsufficientStock() ? 'insufficient-stock-row' : '';
@@ -1820,7 +1825,14 @@ class SaleOrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->orderBy('created_at', 'desc');
+        return parent::getEloquentQuery()
+            ->orderBy('created_at', 'asc')
+            ->with([
+                'customer',
+                'saleOrderItem.product',
+                'salesInvoices',
+            ])
+            ->withCount('saleOrderItem');
     }
 
     public static function getPages(): array

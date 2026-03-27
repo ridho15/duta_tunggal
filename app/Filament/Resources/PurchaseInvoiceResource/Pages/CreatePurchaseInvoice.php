@@ -6,6 +6,7 @@ use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Models\PurchaseOrder;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Validation\ValidationException;
 
 class CreatePurchaseInvoice extends CreateRecord
 {
@@ -13,6 +14,12 @@ class CreatePurchaseInvoice extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        if (!empty($data['selected_purchase_orders']) && empty($data['selected_order_request'])) {
+            throw ValidationException::withMessages([
+                'selected_order_request' => 'Order Request harus dipilih terlebih dahulu sebelum memilih Purchase Order.',
+            ]);
+        }
+
         // Remove temporary fields
         unset($data['selected_supplier']);
         unset($data['selected_order_request']); // Task 14: remove OR filter field
@@ -43,12 +50,38 @@ class CreatePurchaseInvoice extends CreateRecord
         $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
         $data['expense_coa_id'] = $data['expense_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
 
-        $subtotal = (float) ($data['subtotal'] ?? 0);
+        $subtotal = (float) \App\Helpers\MoneyHelper::parse($data['subtotal'] ?? 0);
+        $data['subtotal'] = $subtotal;
         $ppnRate = (float) ($data['ppn_rate'] ?? 0);
         // Always store tax as the IDR amount (ppn_rate % of DPP), never store a percentage rate in this field.
         $data['tax'] = round($subtotal * $ppnRate / 100, 2);
 
-        $data['other_fee'] = $data['other_fees'] ?? [];
+        $otherFees = [];
+        if (isset($data['other_fees']) && is_array($data['other_fees'])) {
+            $otherFees = array_merge($otherFees, $data['other_fees']);
+        }
+
+        if (isset($data['receiptBiayaItems']) && is_array($data['receiptBiayaItems'])) {
+            $otherFees = array_merge($otherFees, $data['receiptBiayaItems']);
+        }
+
+        $data['other_fee'] = collect($otherFees)->map(function ($fee) {
+            return [
+                'name' => $fee['nama_biaya'] ?? $fee['name'] ?? 'Biaya Lain',
+                'amount' => (float) \App\Helpers\MoneyHelper::parse($fee['total'] ?? $fee['amount'] ?? 0),
+            ];
+        })->toArray();
+
+        unset($data['other_fees'], $data['receiptBiayaItems']);
+
+        // Always parse total in case it comes in as an Indonesian-formatted string (e.g. '17.000.000')
+        $parsedTotal = (float) \App\Helpers\MoneyHelper::parse($data['total'] ?? 0);
+        if ($parsedTotal === 0.0) {
+            $otherFeeTotal = (float) collect($data['other_fee'] ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+            $parsedTotal = $subtotal + $otherFeeTotal + round($subtotal * $ppnRate / 100, 2);
+        }
+        $data['total'] = $parsedTotal;
+
         return $data;
     }
 
@@ -57,6 +90,9 @@ class CreatePurchaseInvoice extends CreateRecord
         // Create invoice items
         if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
             foreach ($this->data['invoiceItem'] as $item) {
+                $item['price']    = (float) \App\Helpers\MoneyHelper::parse($item['price'] ?? 0);
+                $item['total']    = (float) \App\Helpers\MoneyHelper::parse($item['total'] ?? 0);
+                $item['quantity'] = (float) ($item['quantity'] ?? 0);
                 $this->record->invoiceItem()->create($item);
             }
         }

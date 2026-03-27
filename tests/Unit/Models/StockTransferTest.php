@@ -59,7 +59,7 @@ class StockTransferTest extends TestCase
         ]);
 
         // Create product
-        $category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+        $category = ProductCategory::factory()->create();
         $this->product = Product::factory()->create([
             'cabang_id' => $this->cabang->id,
             'product_category_id' => $category->id,
@@ -127,8 +127,11 @@ class StockTransferTest extends TestCase
         // Delete the stock transfer
         $transfer->delete();
 
-        // Assert stock movements were deleted
-        $this->assertDatabaseCount('stock_movements', 0);
+        // Assert no active stock movements remain for this transfer
+        $this->assertEquals(0, StockMovement::query()
+            ->where('from_model_type', StockTransfer::class)
+            ->where('from_model_id', $transfer->id)
+            ->count());
 
         // Assert transfer items were soft deleted
         $this->assertSoftDeleted($item1);
@@ -161,8 +164,11 @@ class StockTransferTest extends TestCase
         // Force delete the stock transfer
         $transfer->forceDelete();
 
-        // Assert stock movements were force deleted
-        $this->assertDatabaseCount('stock_movements', 0);
+        // Assert no active stock movements remain for this transfer
+        $this->assertEquals(0, StockMovement::query()
+            ->where('from_model_type', StockTransfer::class)
+            ->where('from_model_id', $transfer->id)
+            ->count());
 
         // Assert transfer items were force deleted
         $this->assertDatabaseMissing('stock_transfer_items', ['id' => $item1->id]);
@@ -231,13 +237,13 @@ class StockTransferTest extends TestCase
         // Verify that stock movements were updated
         $transferOut = StockMovement::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->fromWarehouse->id)
-            ->where('movement_type', 'transfer_out')
+            ->where('type', 'transfer_out')
             ->first();
         $this->assertEquals(-20, $transferOut->quantity);
 
         $transferIn = StockMovement::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->toWarehouse->id)
-            ->where('movement_type', 'transfer_in')
+            ->where('type', 'transfer_in')
             ->first();
         $this->assertEquals(20, $transferIn->quantity);
     }

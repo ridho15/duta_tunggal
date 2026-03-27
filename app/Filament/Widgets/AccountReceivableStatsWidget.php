@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\PaymentStatus;
 use App\Helpers\MoneyHelper;
 use App\Models\AccountReceivable;
 use Filament\Widgets\StatsOverviewWidget;
@@ -51,7 +52,7 @@ class AccountReceivableStatsWidget extends StatsOverviewWidget
             if (isset($tableFilters['overdue']['isActive']) && $tableFilters['overdue']['isActive']) {
                 $query->whereHas('invoice', function ($q) {
                     $q->where('due_date', '<', now());
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
             
             // Apply date range filter
@@ -94,7 +95,7 @@ class AccountReceivableStatsWidget extends StatsOverviewWidget
                             $q->where('due_date', '<', $now->copy()->subDays(60));
                             break;
                     }
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
         }
         

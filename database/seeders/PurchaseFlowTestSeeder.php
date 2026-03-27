@@ -142,7 +142,7 @@ class PurchaseFlowTestSeeder extends Seeder
             if (!isset($result['status']) || $result['status'] !== 'posted') {
                 throw new \Exception('Failed to send item to QC: ' . ($result['message'] ?? 'Unknown error'));
             }
-            $receipt->updateStatusBasedOnQCItems();
+            $receipt->checkAndUpdateStatus();
 
             // QC is automatically created via model observer
 

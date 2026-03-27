@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\AccountReceivableResource\Pages;
 use App\Models\Cabang;
 use App\Models\AccountReceivable;
@@ -136,7 +137,7 @@ class AccountReceivableResource extends Resource
                     ->date('M j, Y')
                     ->sortable()
                     ->color(function ($record) {
-                        if ($record->invoice->due_date < now() && $record->status === 'Belum Lunas') {
+                        if ($record->invoice->due_date < now() && $record->status === PaymentStatus::UNPAID->value) {
                             return 'danger';
                         }
                         return 'gray';
@@ -179,7 +180,7 @@ class AccountReceivableResource extends Resource
                 TextColumn::make('days_overdue')
                     ->label('Days Overdue')
                     ->getStateUsing(function ($record) {
-                        if ($record->status === 'Belum Lunas' && $record->invoice->due_date < now()) {
+                        if ($record->status === PaymentStatus::UNPAID->value && $record->invoice->due_date < now()) {
                             return now()->diffInDays($record->invoice->due_date);
                         }
                         return 0;
@@ -237,7 +238,7 @@ class AccountReceivableResource extends Resource
                     ->label('Payment Status')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        return $record->status === 'Lunas' ? '✅ PAID' : '⏳ OUTSTANDING';
+                        return $record->status === PaymentStatus::PAID->value ? '✅ PAID' : '⏳ OUTSTANDING';
                     })
                     ->collapsible(),
                     
@@ -245,7 +246,7 @@ class AccountReceivableResource extends Resource
                     ->label('Overdue Status')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        if ($record->status === 'Lunas') return '✅ PAID';
+                        if ($record->status === PaymentStatus::PAID->value) return '✅ PAID';
                         
                         $daysOverdue = $record->invoice->due_date < now() 
                             ? now()->diffInDays($record->invoice->due_date) 
@@ -272,8 +273,8 @@ class AccountReceivableResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Payment Status')
                     ->options([
-                        'Belum Lunas' => 'Outstanding',
-                        'Lunas' => 'Paid',
+                        PaymentStatus::UNPAID->value => 'Outstanding',
+                        PaymentStatus::PAID->value => 'Paid',
                     ])
                     ->multiple(),
                     
@@ -317,7 +318,7 @@ class AccountReceivableResource extends Resource
                     ->query(function (Builder $query): Builder {
                         return $query->whereHas('invoice', function (Builder $query) {
                             $query->where('due_date', '<', now());
-                        })->where('status', 'Belum Lunas');
+                        })->where('status', PaymentStatus::UNPAID->value);
                     })
                     ->toggle(),
                     

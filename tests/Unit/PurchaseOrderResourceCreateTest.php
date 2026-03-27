@@ -29,7 +29,7 @@ beforeEach(function () {
     $this->supplier = Supplier::factory()->create();
     $this->warehouse = Warehouse::factory()->create();
     $this->currency = Currency::factory()->create(['code' => 'IDR', 'name' => 'Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
-    $this->category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+    $this->category = ProductCategory::factory()->create();
 
     // Create product with COA
     $this->product = Product::factory()->create([

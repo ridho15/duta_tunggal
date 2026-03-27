@@ -443,7 +443,7 @@ class CashFlowReportService
     private function getSalesReceiptBreakdown(Carbon $start, Carbon $end): array
     {
         return CustomerReceiptItem::query()
-            ->with(['customerReceipt'])
+            ->with(['customerReceipt.customer'])
             ->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()])
             ->whereHas('customerReceipt', function (Builder $query) {
                 $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer', 'Deposit'])

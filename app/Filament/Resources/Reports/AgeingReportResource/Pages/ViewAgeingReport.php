@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Reports\AgeingReportResource\Pages;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\Reports\AgeingReportResource;
 use App\Models\AccountReceivable;
 use App\Models\AccountPayable;
@@ -407,8 +408,8 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
                 BadgeColumn::make('status')
                     ->colors([
-                        'success' => 'Lunas',
-                        'warning' => fn ($state) => !in_array($state, ['Lunas']),
+                        'success' => PaymentStatus::PAID->value,
+                        'warning' => fn ($state) => !in_array($state, [PaymentStatus::PAID->value]),
                     ]),
             ])
             ->defaultSort('invoice.due_date', 'asc')

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\PaymentStatus;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
 use Filament\Pages\Page;
@@ -150,7 +151,7 @@ class ArApManagementPage extends Page implements HasTable
                     ->visible(function ($record) {
                         try {
                             // Only show for unpaid invoices that don't have payment records yet
-                            if ($record->status !== 'Belum Lunas') {
+                            if ($record->status !== PaymentStatus::UNPAID->value) {
                                 return false;
                             }
                             
@@ -187,7 +188,7 @@ class ArApManagementPage extends Page implements HasTable
                     ->visible(function ($record) {
                         try {
                             // Show for unpaid invoices that already have payment records (for additional payments)
-                            if ($record->status !== 'Belum Lunas') {
+                            if ($record->status !== PaymentStatus::UNPAID->value) {
                                 return false;
                             }
                             
@@ -316,8 +317,8 @@ class ArApManagementPage extends Page implements HasTable
                 ->badge()
                 ->color(function ($state) {
                     return match ($state) {
-                        'Belum Lunas' => 'warning',
-                        'Lunas' => 'success',
+                        PaymentStatus::UNPAID->value => 'warning',
+                        PaymentStatus::PAID->value => 'success',
                         default => 'gray'
                     };
                 }),
@@ -329,8 +330,8 @@ class ArApManagementPage extends Page implements HasTable
         return [
             SelectFilter::make('status')
                 ->options([
-                    'Belum Lunas' => 'Outstanding',
-                    'Lunas' => 'Paid',
+                    PaymentStatus::UNPAID->value => 'Outstanding',
+                    PaymentStatus::PAID->value => 'Paid',
                 ])
                 ->multiple(),
 
@@ -339,7 +340,7 @@ class ArApManagementPage extends Page implements HasTable
                 ->label('Overdue')
                 ->query(function (Builder $query) {
                     return $query
-                        ->where('status', 'Belum Lunas')
+                        ->where('status', PaymentStatus::UNPAID->value)
                         ->whereHas('invoice', function (Builder $q) {
                             $q->where('due_date', '<', Carbon::now());
                         });
@@ -357,7 +358,7 @@ class ArApManagementPage extends Page implements HasTable
                     if (!($data['value'] ?? null)) {
                         return $query;
                     }
-                    return $query->where('status', 'Belum Lunas')->whereHas('invoice', function (Builder $q) use ($data) {
+                    return $query->where('status', PaymentStatus::UNPAID->value)->whereHas('invoice', function (Builder $q) use ($data) {
                         $now = Carbon::now()->toDateString();
                         if ($data['value'] === '1-30') {
                             $q->whereRaw('DATEDIFF(?, due_date) BETWEEN 1 AND 30', [$now]);

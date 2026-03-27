@@ -738,8 +738,14 @@ class VendorPaymentResource extends Resource
             ]);
     }
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['supplier', 'invoice']);
+    }
+
     public static function mutateFormDataBeforeFill(array $data): array
     {
+
         // For edit mode, set payment_details based on selected_invoices
         if (!empty($data['selected_invoices'])) {
             try {
@@ -826,8 +832,16 @@ class VendorPaymentResource extends Resource
                         }
 
                         try {
-                            $invoices = Invoice::whereIn('id', $invoiceIds)->pluck('invoice_number')->toArray();
-                            return $invoices ? implode(', ', $invoices) : '-';
+                            // Static cache to avoid N+1 when rendering multiple rows
+                            static $invoiceNumberCache = [];
+                            $missingIds = array_values(array_diff($invoiceIds, array_keys($invoiceNumberCache)));
+                            if (!empty($missingIds)) {
+                                $invoiceNumberCache += Invoice::whereIn('id', $missingIds)
+                                    ->pluck('invoice_number', 'id')
+                                    ->toArray();
+                            }
+                            $numbers = array_filter(array_map(fn ($id) => $invoiceNumberCache[$id] ?? null, $invoiceIds));
+                            return $numbers ? implode(', ', $numbers) : '-';
                         } catch (\Exception $e) {
                             return 'ERROR: ' . $e->getMessage();
                         }

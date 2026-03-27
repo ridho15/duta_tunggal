@@ -14,6 +14,7 @@ use App\Models\Customer;
 use App\Models\DeliveryOrder;
 use App\Models\ProductionPlan;
 use App\Models\PurchaseOrder;
+use App\Models\OrderRequest;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
@@ -80,15 +81,26 @@ test('purchase invoice inherits cabang from selected purchase order source', fun
     $cabangSource = Cabang::factory()->create();
     $cabangWrong = Cabang::factory()->create();
     $supplier = Supplier::factory()->create();
+    $user = User::factory()->create(['cabang_id' => $cabangSource->id]);
+    $warehouse = Warehouse::factory()->create(['cabang_id' => $cabangSource->id]);
+    $orderRequest = OrderRequest::factory()->create([
+        'cabang_id' => $cabangSource->id,
+        'status' => 'approved',
+        'warehouse_id' => $warehouse->id,
+        'created_by' => $user->id,
+    ]);
 
     $purchaseOrder = PurchaseOrder::factory()->create([
         'supplier_id' => $supplier->id,
         'cabang_id' => $cabangSource->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
     ]);
 
     $page = new CreatePurchaseInvoice();
 
     $result = invokeMutateBeforeCreate($page, [
+        'selected_order_request' => $orderRequest->id,
         'selected_purchase_orders' => [$purchaseOrder->id],
         'subtotal' => 100000,
         'ppn_rate' => 11,
@@ -163,12 +175,16 @@ test('delivery order inherits cabang from selected sales order source', function
 
     Supplier::factory()->create(['cabang_id' => $cabangSource->id]);
     UnitOfMeasure::factory()->create();
+    $warehouse = Warehouse::factory()->create(['cabang_id' => $cabangSource->id]);
+    $rak = \App\Models\Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $product = Product::factory()->create();
 
     $saleOrderItem = SaleOrderItem::factory()->create([
         'sale_order_id' => $saleOrder->id,
         'product_id' => $product->id,
         'quantity' => 5,
+        'warehouse_id' => $warehouse->id,
+        'rak_id' => $rak->id,
     ]);
 
     $page = new CreateDeliveryOrder();

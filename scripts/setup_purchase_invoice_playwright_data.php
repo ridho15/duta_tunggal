@@ -4,6 +4,7 @@
  *
  * Creates:
  * - 1 dedicated supplier fixture
+ * - 1 approved order request fixture
  * - 1 completed PO fixture
  * - 2 completed receipts under that PO:
  *     - receipt #1 already invoiced (must be disabled in UI)
@@ -21,6 +22,7 @@ $now = now();
 $fixture = [
     'supplier_code' => 'SUPP001',
     'supplier_name' => 'PT Supplier Utama',
+    'order_request_number' => 'OR-TEST-INV-B23',
     'po_number' => 'PO-TEST-INV-B23',
     'receipt_locked' => 'PR-TEST-INV-LOCKED',
     'receipt_open' => 'PR-TEST-INV-OPEN',
@@ -29,6 +31,7 @@ $fixture = [
 
 // Skip setup if all fixture data already exists with correct state (idempotent guard)
 $existingPo = DB::table('purchase_orders')->where('po_number', $fixture['po_number'])->where('status', 'completed')->first();
+$existingOr = DB::table('order_requests')->where('request_number', $fixture['order_request_number'])->first();
 $existingLocked = DB::table('purchase_receipts')->where('receipt_number', $fixture['receipt_locked'])->where('status', 'completed')->first();
 $existingOpen = DB::table('purchase_receipts')->where('receipt_number', $fixture['receipt_open'])->where('status', 'completed')->first();
 $existingInvoice = DB::table('invoices')->where('invoice_number', $fixture['invoice_number'])->first();
@@ -42,7 +45,7 @@ if ($existingOpen) {
         ->exists();
 }
 
-if ($existingPo && $existingLocked && $existingOpen && $existingInvoice
+if ($existingOr && $existingPo && $existingLocked && $existingOpen && $existingInvoice
     && $existingLocked->purchase_order_id === $existingPo->id
     && $existingOpen->purchase_order_id === $existingPo->id
     && !$openReceiptAlreadyInvoiced) {
@@ -75,6 +78,25 @@ DB::transaction(function () use ($now, $fixture) {
         $fixture['supplier_name'] = $supplier->perusahaan;
     }
     $supplierId = (int) $supplier->id;
+
+    $orderRequestId = DB::table('order_requests')->where('request_number', $fixture['order_request_number'])->value('id');
+    if (!$orderRequestId) {
+        DB::table('order_requests')->updateOrInsert(
+            ['request_number' => $fixture['order_request_number']],
+            [
+                'warehouse_id' => $warehouseId,
+                'cabang_id' => $cabangId,
+                'request_date' => now()->toDateString(),
+                'status' => 'approved',
+                'note' => 'Fixture order request for purchase invoice browser tests',
+                'tax_type' => 'PPN Excluded',
+                'created_by' => $userId,
+                'updated_at' => $now,
+                'created_at' => $now,
+            ]
+        );
+        $orderRequestId = (int) DB::table('order_requests')->where('request_number', $fixture['order_request_number'])->value('id');
+    }
 
     // Cleanup previous fixture chain
     $existingInvoiceIds = DB::table('invoices')
@@ -127,22 +149,25 @@ DB::transaction(function () use ($now, $fixture) {
     }
 
     // Create completed PO
-    $poId = DB::table('purchase_orders')->insertGetId([
-        'supplier_id' => $supplierId,
-        'po_number' => $fixture['po_number'],
-        'order_date' => now()->toDateString(),
-        'status' => 'completed',
-        'expected_date' => now()->addDays(7)->toDateString(),
-        'total_amount' => 1000000,
-        'warehouse_id' => $warehouseId,
-        'tempo_hutang' => 30,
-        'created_by' => $userId,
-        'refer_model_type' => null,
-        'refer_model_id' => null,
-        'cabang_id' => $cabangId,
-        'created_at' => $now,
-        'updated_at' => $now,
-    ]);
+    DB::table('purchase_orders')->updateOrInsert(
+        ['po_number' => $fixture['po_number']],
+        [
+            'supplier_id' => $supplierId,
+            'order_date' => now()->toDateString(),
+            'status' => 'completed',
+            'expected_date' => now()->addDays(7)->toDateString(),
+            'total_amount' => 1000000,
+            'warehouse_id' => $warehouseId,
+            'tempo_hutang' => 30,
+            'created_by' => $userId,
+            'refer_model_type' => 'App\\Models\\OrderRequest',
+            'refer_model_id' => $orderRequestId,
+            'cabang_id' => $cabangId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]
+    );
+    $poId = (int) DB::table('purchase_orders')->where('po_number', $fixture['po_number'])->value('id');
 
     $poItemId = DB::table('purchase_order_items')->insertGetId([
         'purchase_order_id' => $poId,
@@ -248,6 +273,7 @@ DB::transaction(function () use ($now, $fixture) {
 
     echo "✅ Purchase invoice fixture ready\n";
     echo "   Supplier : {$fixture['supplier_name']} ({$fixture['supplier_code']})\n";
+    echo "   OR       : {$fixture['order_request_number']}\n";
     echo "   PO       : {$fixture['po_number']}\n";
     echo "   Locked   : {$fixture['receipt_locked']} (already invoiced)\n";
     echo "   Open     : {$fixture['receipt_open']} (selectable)\n";

@@ -57,7 +57,7 @@ class StockOpnameTest extends TestCase
         ]);
 
         // Create product category
-        $category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+        $category = ProductCategory::factory()->create();
 
         // Create product
         $this->product = Product::factory()->create([
@@ -457,7 +457,7 @@ class StockOpnameTest extends TestCase
         $product2 = Product::factory()->create([
             'cabang_id' => $this->cabang->id,
             'supplier_id' => $this->supplier->id,
-            'product_category_id' => ProductCategory::factory()->create(['cabang_id' => $this->cabang->id])->id,
+            'product_category_id' => ProductCategory::factory()->create()->id,
         ]);
 
         StockOpnameItem::factory()->create([

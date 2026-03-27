@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\PaymentStatus;
 use App\Helpers\MoneyHelper;
 use App\Models\AccountPayable;
 use Filament\Widgets\StatsOverviewWidget;
@@ -19,7 +20,7 @@ class AccountPayableStatsWidget extends StatsOverviewWidget
         
         // Build query with current filters
         $query = AccountPayable::query()
-            ->where('status', '!=', 'Lunas') // Exclude PAID records from ageing schedule
+            ->where('status', '!=', PaymentStatus::PAID->value) // Exclude PAID records from ageing schedule
             ->whereNull('deleted_at'); // Exclude soft deleted records
         
         if (!empty($tableFilters)) {
@@ -53,9 +54,9 @@ class AccountPayableStatsWidget extends StatsOverviewWidget
             if (isset($tableFilters['overdue']['isActive']) && $tableFilters['overdue']['isActive']) {
                 $query->whereHas('invoice', function ($q) {
                     $q->where('due_date', '<', now());
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
-            
+
             // Apply date range filter
             if (isset($tableFilters['date_range']) && !empty($tableFilters['date_range'])) {
                 $data = $tableFilters['date_range'];
@@ -96,7 +97,7 @@ class AccountPayableStatsWidget extends StatsOverviewWidget
                             $q->where('due_date', '<', $now->copy()->subDays(60));
                             break;
                     }
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
         }
         // Calculate totals based on filtered data

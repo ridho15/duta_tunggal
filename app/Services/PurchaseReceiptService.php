@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 use App\Models\JournalEntry;
@@ -20,6 +21,18 @@ class PurchaseReceiptService
      * @var array<string, ?ChartOfAccount>
      */
     protected static array $coaCache = [];
+
+    protected function skipWithWarning(string $message, array $context = []): array
+    {
+        Log::warning('PurchaseReceiptService skipped flow', array_merge([
+            'message' => $message,
+        ], $context));
+
+        return [
+            'status' => 'skipped',
+            'message' => $message,
+        ];
+    }
 
     public function generateReceiptNumber()
     {
@@ -69,8 +82,10 @@ class PurchaseReceiptService
         }
 
         if ($validItems === 0) {
-            Log::info('postPurchaseReceipt: no valid items', ['receipt_id' => $receipt->id, 'items' => $debugItems]);
-            return ['status' => 'skipped', 'message' => 'No valid items to process'];
+            return $this->skipWithWarning('No valid items to process', [
+                'receipt_id' => $receipt->id,
+                'items' => $debugItems,
+            ]);
         }
 
 
@@ -165,8 +180,9 @@ class PurchaseReceiptService
             ->where('description', 'like', '%Inventory Stock%')
             ->exists()
         ) {
-            Log::info('postItemInventoryAfterQC: skipped - duplicate journal exists', ['item_id' => $item->id]);
-            return ['status' => 'skipped', 'message' => 'Item inventory already posted'];
+            return $this->skipWithWarning('Item inventory already posted', [
+                'item_id' => $item->id,
+            ]);
         }
 
         $item->loadMissing([
@@ -179,21 +195,27 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         if ($qtyAccepted <= 0) {
-            Log::info('postItemInventoryAfterQC: skipped - no accepted quantity', ['item_id' => $item->id, 'qtyAccepted' => $qtyAccepted]);
-            return ['status' => 'skipped', 'message' => 'No accepted quantity to post inventory'];
+            return $this->skipWithWarning('No accepted quantity to post inventory', [
+                'item_id' => $item->id,
+                'qty_accepted' => $qtyAccepted,
+            ]);
         }
 
         $poItem = $item->purchaseOrderItem;
         $unitPrice = $poItem?->unit_price ?? 0;
         if ($unitPrice <= 0) {
-            Log::info('postItemInventoryAfterQC: skipped - invalid unit price', ['item_id' => $item->id, 'unitPrice' => $unitPrice]);
-            return ['status' => 'skipped', 'message' => 'Invalid unit price'];
+            return $this->skipWithWarning('Invalid unit price', [
+                'item_id' => $item->id,
+                'unit_price' => $unitPrice,
+            ]);
         }
 
         $amount = round($qtyAccepted * $unitPrice, 2);
         if ($amount <= 0) {
-            Log::info('postItemInventoryAfterQC: skipped - invalid amount', ['item_id' => $item->id, 'amount' => $amount]);
-            return ['status' => 'skipped', 'message' => 'Invalid amount'];
+            return $this->skipWithWarning('Invalid amount', [
+                'item_id' => $item->id,
+                'amount' => $amount,
+            ]);
         }
 
         $product = $item->product;
@@ -202,10 +224,14 @@ class PurchaseReceiptService
         $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
 
         if (! $inventoryCoa || ! $temporaryProcurementCoa || ! $unbilledPurchaseCoa) {
-            Log::info('postItemInventoryAfterQC: skipped - missing COA', ['item_id' => $item->id]);
-            return ['status' => 'skipped', 'message' => 'Missing required COA configuration'];
+            return $this->skipWithWarning('Missing required COA configuration', [
+                'item_id' => $item->id,
+                'inventory_coa_id' => $inventoryCoa?->id,
+                'temporary_procurement_coa_id' => $temporaryProcurementCoa?->id,
+                'unbilled_purchase_coa_id' => $unbilledPurchaseCoa?->id,
+            ]);
         }
-        $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
+        $date = $item->purchaseReceipt->receipt_date ?? Carbon::now();
 
         // Resolve branch from source
         $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
@@ -333,7 +359,9 @@ class PurchaseReceiptService
             ->where('description', 'like', '%Return Product%')
             ->exists()
         ) {
-            return ['status' => 'skipped', 'message' => 'Return already posted'];
+            return $this->skipWithWarning('Return already posted', [
+                'item_id' => $item->id,
+            ]);
         }
 
         $item->loadMissing([
@@ -345,18 +373,27 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         if ($qtyAccepted <= 0) {
-            return ['status' => 'skipped', 'message' => 'No accepted quantity to return'];
+            return $this->skipWithWarning('No accepted quantity to return', [
+                'item_id' => $item->id,
+                'qty_accepted' => $qtyAccepted,
+            ]);
         }
 
         $poItem = $item->purchaseOrderItem;
         $unitPrice = $poItem?->unit_price ?? 0;
         if ($unitPrice <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid unit price'];
+            return $this->skipWithWarning('Invalid unit price', [
+                'item_id' => $item->id,
+                'unit_price' => $unitPrice,
+            ]);
         }
 
         $amount = round($qtyAccepted * $unitPrice, 2);
         if ($amount <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid amount'];
+            return $this->skipWithWarning('Invalid amount', [
+                'item_id' => $item->id,
+                'amount' => $amount,
+            ]);
         }
 
         $product = $item->product;
@@ -364,7 +401,11 @@ class PurchaseReceiptService
         $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
 
         if (! $returnCoa || ! $temporaryProcurementCoa) {
-            return ['status' => 'skipped', 'message' => 'Missing required COA configuration'];
+            return $this->skipWithWarning('Missing required COA configuration', [
+                'item_id' => $item->id,
+                'return_coa_id' => $returnCoa?->id,
+                'temporary_procurement_coa_id' => $temporaryProcurementCoa?->id,
+            ]);
         }
 
         $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
@@ -523,7 +564,9 @@ class PurchaseReceiptService
             ->where('description', 'like', '%Temporary Procurement%')
             ->exists()
         ) {
-            return ['status' => 'skipped', 'message' => 'Temporary procurement entries already exist'];
+            return $this->skipWithWarning('Temporary procurement entries already exist', [
+                'item_id' => $item->id,
+            ]);
         }
 
         $item->loadMissing([
@@ -535,32 +578,47 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         if ($qtyAccepted <= 0) {
-            return ['status' => 'skipped', 'message' => 'No accepted quantity'];
+            return $this->skipWithWarning('No accepted quantity', [
+                'item_id' => $item->id,
+                'qty_accepted' => $qtyAccepted,
+            ]);
         }
 
         $poItem = $item->purchaseOrderItem;
         $unitPrice = $poItem?->unit_price ?? 0;
         if ($unitPrice <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid unit price'];
+            return $this->skipWithWarning('Invalid unit price', [
+                'item_id' => $item->id,
+                'unit_price' => $unitPrice,
+            ]);
         }
 
         $amount = round($qtyAccepted * $unitPrice, 2);
         if ($amount <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid amount'];
+            return $this->skipWithWarning('Invalid amount', [
+                'item_id' => $item->id,
+                'amount' => $amount,
+            ]);
         }
 
         $product = $item->product;
         $temporaryProcurementCoa = $product?->temporaryProcurementCoa?->exists ? $product->temporaryProcurementCoa : null;
 
         if (! $temporaryProcurementCoa) {
-            return ['status' => 'skipped', 'message' => 'No temporary procurement COA configured for product'];
+            return $this->skipWithWarning('No temporary procurement COA configured for product', [
+                'item_id' => $item->id,
+                'product_id' => $item->product_id,
+            ]);
         }
 
         // Find unbilled purchase COA from product configuration. If not set on product,
         // prefer liability COA for unbilled purchases created at receipt time
         $unbilledPurchaseCoa = $product?->unbilledPurchaseCoa?->exists ? $product->unbilledPurchaseCoa : $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
         if (! $unbilledPurchaseCoa) {
-            return ['status' => 'skipped', 'message' => 'No unbilled purchase COA configured for product and no default liability COA found'];
+            return $this->skipWithWarning('No unbilled purchase COA configured for product and no default liability COA found', [
+                'item_id' => $item->id,
+                'product_id' => $item->product_id,
+            ]);
         }
 
         $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
@@ -860,7 +918,7 @@ class PurchaseReceiptService
             'paid' => $total, // Mark as fully paid since invoice is paid
             'remaining' => 0,
             'due_date' => $invoice->due_date,
-            'status' => 'Lunas',
+            'status' => PaymentStatus::PAID->value,
             'supplier_id' => $supplier ? $supplier->id : null,
         ]);
 
@@ -880,7 +938,7 @@ class PurchaseReceiptService
     /**
      * Copy biaya tambahan from Purchase Order to Purchase Receipt
      */
-    protected function copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $receipt)
+    public function copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $receipt)
     {
         // Load biaya relationship if not already loaded
         if (!$purchaseOrder->relationLoaded('purchaseOrderBiaya')) {

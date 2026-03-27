@@ -129,13 +129,15 @@ class CashBankTransferObserverTest extends TestCase
     public function syncs_journal_entries_when_from_coa_is_updated_on_posted_transfer()
     {
         $transferNumber = 'TEST-' . time() . '-003';
-        $newFromCoa = ChartOfAccount::create([
-            'code' => '1111.03',
-            'name' => 'Kas Operasional',
-            'type' => 'asset',
-            'level' => 3,
-            'is_active' => true,
-        ]);
+        $newFromCoa = ChartOfAccount::firstOrCreate(
+            ['code' => '1111.03'],
+            [
+                'name' => 'Kas Operasional',
+                'type' => 'asset',
+                'level' => 3,
+                'is_active' => true,
+            ]
+        );
 
         $transfer = CashBankTransfer::create([
             'number' => $transferNumber,
@@ -156,28 +158,30 @@ class CashBankTransferObserverTest extends TestCase
         // Refresh and check
         $transfer->refresh();
 
-        // Check debit entry updated to new COA
-        $debitEntry = $transfer->journalEntries->where('type', 'debit')->first();
-        $this->assertEquals($newFromCoa->id, $debitEntry->coa_id);
-        $this->assertEquals(1000000, $debitEntry->amount);
+        // from_coa gets credit entry (cash going out)
+        $fromEntry = $transfer->journalEntries->where('coa_id', $newFromCoa->id)->first();
+        $this->assertNotNull($fromEntry);
+        $this->assertEquals(1000000, $fromEntry->credit);
 
-        // Credit entry should remain the same
-        $creditEntry = $transfer->journalEntries->where('type', 'credit')->first();
-        $this->assertEquals($this->toCoa->id, $creditEntry->coa_id);
-        $this->assertEquals(1000000, $creditEntry->amount);
+        // to_coa gets debit entry (cash coming in)
+        $toEntry = $transfer->journalEntries->where('coa_id', $this->toCoa->id)->first();
+        $this->assertNotNull($toEntry);
+        $this->assertEquals(1000000, $toEntry->debit);
     }
 
     #[Test]
     public function syncs_journal_entries_when_to_coa_is_updated_on_posted_transfer()
     {
         $transferNumber = 'TEST-' . time() . '-004';
-        $newToCoa = ChartOfAccount::create([
-            'code' => '1111.04',
-            'name' => 'Kas Marketing',
-            'type' => 'asset',
-            'level' => 3,
-            'is_active' => true,
-        ]);
+        $newToCoa = ChartOfAccount::firstOrCreate(
+            ['code' => '1111.04'],
+            [
+                'name' => 'Kas Marketing',
+                'type' => 'asset',
+                'level' => 3,
+                'is_active' => true,
+            ]
+        );
 
         $transfer = CashBankTransfer::create([
             'number' => $transferNumber,
@@ -198,15 +202,15 @@ class CashBankTransferObserverTest extends TestCase
         // Refresh and check
         $transfer->refresh();
 
-        // Debit entry should remain the same
-        $debitEntry = $transfer->journalEntries->where('type', 'debit')->first();
-        $this->assertEquals($this->fromCoa->id, $debitEntry->coa_id);
-        $this->assertEquals(1000000, $debitEntry->amount);
+        // from_coa entry should remain the same (credit entry, cash going out)
+        $fromEntry = $transfer->journalEntries->where('coa_id', $this->fromCoa->id)->first();
+        $this->assertNotNull($fromEntry);
+        $this->assertEquals(1000000, $fromEntry->credit);
 
-        // Check credit entry updated to new COA
-        $creditEntry = $transfer->journalEntries->where('type', 'credit')->first();
-        $this->assertEquals($newToCoa->id, $creditEntry->coa_id);
-        $this->assertEquals(1000000, $creditEntry->amount);
+        // to_coa gets debit entry (cash coming in), updated to new COA
+        $toEntry = $transfer->journalEntries->where('coa_id', $newToCoa->id)->first();
+        $this->assertNotNull($toEntry);
+        $this->assertEquals(1000000, $toEntry->debit);
     }
 
     #[Test]
@@ -241,14 +245,25 @@ class CashBankTransferObserverTest extends TestCase
     #[Test]
     public function handles_other_fee_in_journal_entries()
     {
+        $feeCoa = ChartOfAccount::firstOrCreate(
+            ['code' => '8000.01'],
+            [
+                'name' => 'Biaya Administrasi Bank',
+                'type' => 'expense',
+                'level' => 3,
+                'is_active' => true,
+            ]
+        );
+
         $transferNumber = 'TEST-' . time() . '-006';
         $transfer = CashBankTransfer::create([
+            'other_costs_coa_id' => $feeCoa->id,
             'number' => $transferNumber,
             'date' => now()->toDateString(),
             'from_coa_id' => $this->fromCoa->id,
             'to_coa_id' => $this->toCoa->id,
             'amount' => 1000000,
-            'other_fee' => 50000,
+            'other_costs' => 50000,
             'description' => 'Test transfer with fee',
             'status' => 'draft',
         ]);
@@ -261,20 +276,22 @@ class CashBankTransferObserverTest extends TestCase
 
         $this->assertEquals('posted', $transfer->status);
 
-        // Should have 3 journal entries: debit from, credit to, debit fee
+        // Should have 3 journal entries: credit from (total), debit to (amount), debit fee
         $this->assertCount(3, $transfer->journalEntries);
 
-        // Check debit entry (from account) - amount + fee
-        $debitEntry = $transfer->journalEntries->where('type', 'debit')->where('coa_id', $this->fromCoa->id)->first();
-        $this->assertEquals(1050000, $debitEntry->amount);
+        // from_coa is credited with total (amount + fee)
+        $fromEntry = $transfer->journalEntries->where('coa_id', $this->fromCoa->id)->first();
+        $this->assertNotNull($fromEntry);
+        $this->assertEquals(1050000, $fromEntry->credit);
 
-        // Check credit entry (to account)
-        $creditEntry = $transfer->journalEntries->where('type', 'credit')->first();
-        $this->assertEquals($this->toCoa->id, $creditEntry->coa_id);
-        $this->assertEquals(1000000, $creditEntry->amount);
+        // to_coa is debited with amount only
+        $toEntry = $transfer->journalEntries->where('coa_id', $this->toCoa->id)->first();
+        $this->assertNotNull($toEntry);
+        $this->assertEquals(1000000, $toEntry->debit);
 
-        // Check fee entry (assuming fee is debited to same account)
-        $feeEntry = $transfer->journalEntries->where('type', 'debit')->where('coa_id', '!=', $this->fromCoa->id)->first();
-        $this->assertEquals(50000, $feeEntry->amount);
+        // fee COA is debited with the fee amount
+        $feeEntry = $transfer->journalEntries->where('coa_id', $feeCoa->id)->first();
+        $this->assertNotNull($feeEntry);
+        $this->assertEquals(50000, $feeEntry->debit);
     }
 }

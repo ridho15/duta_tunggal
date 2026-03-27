@@ -4,6 +4,7 @@ use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderBiaya;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
@@ -26,6 +27,14 @@ beforeEach(function () {
         'code' => 'IDR',
         'name' => 'Rupiah',
         'symbol' => 'Rp',
+        'to_rupiah' => 1,
+    ]);
+
+    \App\Models\ChartOfAccount::create([
+        'code' => '2110',
+        'name' => 'Hutang Dagang',
+        'type' => 'liability',
+        'is_active' => 1,
     ]);
 
     $this->supplier = Supplier::factory()->create([
@@ -92,6 +101,14 @@ test('updateTotalAmount recalculates purchase order total accurately', function 
 });
 
 test('generateInvoice creates invoice with correct totals and items', function () {
+    PurchaseOrderBiaya::create([
+        'purchase_order_id' => $this->purchaseOrder->id,
+        'currency_id' => $this->currency->id,
+        'nama_biaya' => 'Biaya Pengiriman',
+        'total' => 2000,
+        'masuk_invoice' => 1,
+    ]);
+
     $data = [
         'invoice_number' => 'INV-UNIT-001',
         'invoice_date' => Carbon::now()->toDateString(),
@@ -111,6 +128,12 @@ test('generateInvoice creates invoice with correct totals and items', function (
         ->and((float) $invoice->tax)->toBe(5000.0)
         ->and((float) $invoice->total)->toBe(42000.0)
         ->and($invoice->status)->toBe('draft');
+
+    expect($invoice->other_fee)->toBeArray()
+        ->and($invoice->other_fee)->toHaveCount(1)
+        ->and($invoice->other_fee[0]['name'])->toBe('Biaya Pengiriman')
+        ->and((float) $invoice->other_fee[0]['amount'])->toBe(2000.0)
+        ->and($invoice->other_fee_total)->toBe(2000);
 
     expect($invoice->invoiceItem)->toHaveCount(2);
 

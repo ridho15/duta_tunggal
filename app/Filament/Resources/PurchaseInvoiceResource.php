@@ -103,26 +103,15 @@ class PurchaseInvoiceResource extends Resource
                                 Select::make('selected_order_request')
                                     ->label('Order Request (OR)')
                                     ->options(function ($get) {
-                                        $supplierId = $get('selected_supplier');
-                                        if (!$supplierId) return [];
-                                        
-                                        return \App\Models\OrderRequest::where(function ($q) use ($supplierId) {
-                                                                                        // Match ORs by item-level supplier OR ORs that have POs from this supplier
-                                                                                        $q->whereHas('orderRequestItem', fn($iq) => $iq->where('supplier_id', $supplierId))
-                                                                                            ->orWhereHas('purchaseOrders', fn($pq) => $pq->where('supplier_id', $supplierId));
-                                        })
-                                            ->whereHas('purchaseOrder', function ($q) {
-                                                $q->where('status', 'completed')
-                                                  ->whereHas('purchaseReceipt', fn($q2) => $q2->where('status', 'completed'));
-                                            })
-                                            ->orderByDesc('request_date')
-                                            ->get()
-                                            ->mapWithKeys(fn ($or) => [$or->id => $or->request_number]);
+                                        return self::getOrderRequestOptions(
+                                            $get('selected_supplier'),
+                                            $get('cabang_id')
+                                        );
                                     })
                                     ->searchable()
                                     ->reactive()
-                                    ->nullable()
-                                    ->helperText('Pilih OR untuk memfilter PO. Biarkan kosong untuk melihat semua PO.')
+                                    ->required()
+                                    ->helperText('Pilih Order Request terlebih dahulu. Purchase Order akan muncul setelah OR dipilih.')
                                     ->afterStateUpdated(function ($set) {
                                         $set('selected_purchase_orders', []);
                                         $set('selected_purchase_receipts', []);
@@ -135,46 +124,24 @@ class PurchaseInvoiceResource extends Resource
                                 // Task 14: Multiple PO selection filtered by OR
                                 Forms\Components\CheckboxList::make('selected_purchase_orders')
                                     ->label('Purchase Orders')
+                                    ->hidden(fn ($get) => blank($get('selected_order_request')))
                                     ->options(function ($get) {
-                                        $supplierId = $get('selected_supplier');
-                                        if (!$supplierId) return [];
-                                        
-                                        $query = PurchaseOrder::where('supplier_id', $supplierId)
-                                            ->where('status', 'completed')
-                                            ->whereHas('purchaseReceipt', fn($q) => $q->where('status', 'completed'));
-                                        
-                                        // Filter by OR if selected
-                                        $orId = $get('selected_order_request');
-                                        if ($orId) {
-                                            $query->where('refer_model_type', 'App\Models\OrderRequest')
-                                                  ->where('refer_model_id', $orId);
-                                        }
-                                        
-                                        return $query->get()
-                                            ->mapWithKeys(function ($po) {
-                                                $allReceiptIds = $po->purchaseReceipt()
-                                                    ->where('status', 'completed')
-                                                    ->pluck('id')->toArray();
-                                                
-                                                $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
-                                                    ->whereNotNull('purchase_receipts')
-                                                    ->get()->pluck('purchase_receipts')->flatten()
-                                                    ->intersect($allReceiptIds)->unique()->toArray();
-                                                
-                                                $fullyInvoiced = !empty($allReceiptIds) && count($invoicedReceiptIds) >= count($allReceiptIds);
-                                                $label = $po->po_number . ($po->referModel?->request_number ? ' (OR: ' . $po->referModel->request_number . ')' : '');
-                                                if ($fullyInvoiced) $label .= ' [Sudah di-invoice]';
-                                                
-                                                return [$po->id => $label];
-                                            });
+                                        return self::getPurchaseOrderOptions(
+                                            $get('selected_supplier'),
+                                            $get('selected_order_request'),
+                                            $get('cabang_id')
+                                        );
                                     })
                                     ->disableOptionWhen(function ($value, $get) {
                                         $supplierId = $get('selected_supplier');
-                                        if (!$supplierId) {
+                                        $orId = $get('selected_order_request');
+                                        $cabangId = self::resolveInvoiceCabangId($get('cabang_id'));
+                                        if (!$supplierId || !$orId || !$cabangId) {
                                             return false;
                                         }
 
                                         $po = PurchaseOrder::where('supplier_id', $supplierId)
+                                            ->where('cabang_id', $cabangId)
                                             ->where('status', 'completed')
                                             ->find($value);
 
@@ -295,7 +262,7 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 Placeholder::make('receipt_invoiced_info')
                                     ->label('')
-                                    ->content('Receipt yang berlabel "Sudah di-invoice" tetap ditampilkan, namun tidak dapat dipilih.'),
+                                    ->content('Receipt yang berlabel "Sudah di-invoice" tetap ditampilkan, namun tidak dapat dipilih. Biaya lain dari receipt yang dipilih akan otomatis masuk ke Other Fees dan total invoice.'),
                                 // Task 14: Receipts from ALL selected POs
                                 Forms\Components\CheckboxList::make('selected_purchase_receipts')
                                     ->label('')
@@ -789,6 +756,7 @@ class PurchaseInvoiceResource extends Resource
                         // Biaya Lain dari Purchase Receipt
                         Repeater::make('receiptBiayaItems')
                             ->label('Biaya Lain dari Purchase Receipt')
+                            ->helperText('Biaya ini dibawa dari receipt terpilih dan akan digabung ke biaya invoice saat disimpan.')
                             ->schema([
                                 Hidden::make('receipt_id'),
                                 TextInput::make('nama_biaya')
@@ -1224,5 +1192,80 @@ class PurchaseInvoiceResource extends Resource
             'view' => Pages\ViewPurchaseInvoice::route('/{record}'),
             'edit' => Pages\EditPurchaseInvoice::route('/{record}/edit'),
         ];
+    }
+
+    protected static function resolveInvoiceCabangId(mixed $selectedCabangId = null): ?int
+    {
+        $user = Auth::user();
+        $manageType = $user?->manage_type ?? [];
+
+        if (is_array($manageType) && in_array('all', $manageType, true)) {
+            return filled($selectedCabangId) ? (int) $selectedCabangId : null;
+        }
+
+        return filled($user?->cabang_id) ? (int) $user->cabang_id : (filled($selectedCabangId) ? (int) $selectedCabangId : null);
+    }
+
+    public static function getOrderRequestOptions(mixed $supplierId, mixed $selectedCabangId = null): array
+    {
+        $supplierId = filled($supplierId) ? (int) $supplierId : null;
+        $cabangId = self::resolveInvoiceCabangId($selectedCabangId);
+
+        if (!$supplierId || !$cabangId) {
+            return [];
+        }
+
+        return \App\Models\OrderRequest::where('cabang_id', $cabangId)
+            ->where(function ($q) use ($supplierId) {
+                $q->whereHas('orderRequestItem', fn($iq) => $iq->where('supplier_id', $supplierId))
+                  ->orWhereHas('purchaseOrders', fn($pq) => $pq->where('supplier_id', $supplierId));
+            })
+            ->whereHas('purchaseOrder', function ($q) {
+                $q->where('status', 'completed')
+                  ->whereHas('purchaseReceipt', fn($q2) => $q2->where('status', 'completed'));
+            })
+            ->orderByDesc('request_date')
+            ->get()
+            ->mapWithKeys(fn ($or) => [$or->id => $or->request_number])
+            ->toArray();
+    }
+
+    public static function getPurchaseOrderOptions(mixed $supplierId, mixed $orderRequestId, mixed $selectedCabangId = null): array
+    {
+        $supplierId = filled($supplierId) ? (int) $supplierId : null;
+        $orderRequestId = filled($orderRequestId) ? (int) $orderRequestId : null;
+        $cabangId = self::resolveInvoiceCabangId($selectedCabangId);
+
+        if (!$supplierId || !$orderRequestId || !$cabangId) {
+            return [];
+        }
+
+        $query = PurchaseOrder::where('supplier_id', $supplierId)
+            ->where('cabang_id', $cabangId)
+            ->where('status', 'completed')
+            ->whereHas('purchaseReceipt', fn($q) => $q->where('status', 'completed'))
+            ->where('refer_model_type', 'App\\Models\\OrderRequest')
+            ->where('refer_model_id', $orderRequestId);
+
+        return $query->get()
+            ->mapWithKeys(function ($po) {
+                $allReceiptIds = $po->purchaseReceipt()
+                    ->where('status', 'completed')
+                    ->pluck('id')->toArray();
+
+                $invoicedReceiptIds = Invoice::where('from_model_type', 'App\\Models\\PurchaseOrder')
+                    ->whereNotNull('purchase_receipts')
+                    ->get()->pluck('purchase_receipts')->flatten()
+                    ->intersect($allReceiptIds)->unique()->toArray();
+
+                $fullyInvoiced = !empty($allReceiptIds) && count($invoicedReceiptIds) >= count($allReceiptIds);
+                $label = $po->po_number . ($po->referModel?->request_number ? ' (OR: ' . $po->referModel->request_number . ')' : '');
+                if ($fullyInvoiced) {
+                    $label .= ' [Sudah di-invoice]';
+                }
+
+                return [$po->id => $label];
+            })
+            ->toArray();
     }
 }

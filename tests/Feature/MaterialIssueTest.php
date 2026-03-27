@@ -29,7 +29,7 @@ test('issue materials to production', function () {
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1140.01'],
@@ -140,7 +140,7 @@ test('validate stock deduction', function () {
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1140.01'],
@@ -248,7 +248,7 @@ test('test journal entries (Dr WIP, Cr Raw Material)', function () {
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1140.01'],
@@ -374,7 +374,7 @@ test('handle material returns', function () {
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1140.01'],
@@ -523,7 +523,7 @@ test('material issue with insufficient stock allows negative stock', function ()
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1140.01'],
@@ -632,7 +632,7 @@ test('material issue form validation prevents insufficient stock', function () {
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1140.01'],

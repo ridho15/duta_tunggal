@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AccountPayableResource\Pages;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\AccountPayableResource;
 use App\Filament\Widgets\AccountPayableStatsWidget;
 use App\Models\AccountPayable;
@@ -66,7 +67,7 @@ class ListAccountPayables extends ListRecords
             if (isset($tableFilters['overdue']['isActive']) && $tableFilters['overdue']['isActive']) {
                 $query->whereHas('invoice', function (Builder $query) {
                     $query->where('due_date', '<', now());
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
             
             // Apply date range filter
@@ -109,7 +110,7 @@ class ListAccountPayables extends ListRecords
                             $query->where('due_date', '<', $now->copy()->subDays(60));
                             break;
                     }
-                })->where('status', 'Belum Lunas');
+                })->where('status', PaymentStatus::UNPAID->value);
             }
         }
         

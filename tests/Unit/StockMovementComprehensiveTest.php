@@ -276,7 +276,7 @@ class StockMovementComprehensiveTest extends TestCase
 
         echo "\n=== TEST DATA CREATION COMPLETED ===\n";
         echo "Product ID: {$this->product->id}\n";
-        echo "Expected final stock: 30 (purchase) - 25 (sales) + 5 (adjustment) = 10\n";
+        echo "Expected final stock (warehouse 1): 30 (purchase_in) - 25 (sales) - 10 (transfer_out) + 5 (adjustment_in) = 0\n";
 
         // Verify stock movements were created
         $stockMovements = StockMovement::where('product_id', $this->product->id)->get();
@@ -287,17 +287,19 @@ class StockMovementComprehensiveTest extends TestCase
         }
 
         // Verify final stock calculation
-        $stockMovements = StockMovement::where('product_id', $this->product->id)->get();
+        // Only count warehouse 1 movements to isolate the test scenario
+        // (transfers to other warehouses should not affect final warehouse 1 stock)
+        $stockMovements = StockMovement::where('product_id', $this->product->id)->where('warehouse_id', 1)->get();
         $finalStock = 0;
         foreach ($stockMovements as $movement) {
             if (in_array($movement->type, ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'])) {
-                $finalStock += $movement->quantity;
+                $finalStock += abs((float) $movement->quantity);
             } elseif (in_array($movement->type, ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'])) {
-                $finalStock -= $movement->quantity;
+                $finalStock -= abs((float) $movement->quantity);
             }
         }
-        echo "\nFinal calculated stock: {$finalStock}\n";
-        $this->assertEquals(10, $finalStock);
+        echo "\nFinal calculated stock (warehouse 1): {$finalStock}\n";
+        $this->assertEquals(0, $finalStock);
 
         // Test source information display
         echo "\n=== TESTING SOURCE INFORMATION ===\n";
@@ -312,6 +314,14 @@ class StockMovementComprehensiveTest extends TestCase
         $sourceType = 'Unknown';
         $sourceNumber = 'N/A';
         $sourceLink = 'N/A';
+
+        if (empty($movement->from_model_type) || empty($movement->from_model_id) || !class_exists($movement->from_model_type)) {
+            return [
+                'type' => $sourceType,
+                'number' => $sourceNumber,
+                'link' => $sourceLink,
+            ];
+        }
 
         if ($movement->fromModel) {
             $model = $movement->fromModel;

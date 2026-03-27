@@ -56,8 +56,14 @@ class PurchaseOrderService
      * (supplier_id, warehouse_id, expected_date, tempo_hutang, po_number, note).
      *
      * @deprecated Use SalesOrderService::createPurchaseOrder($saleOrder, $data) instead.
+     * @throws \BadMethodCallException
      */
-    public function createPoFromSo($saleOrder) {}
+    public function createPoFromSo($saleOrder): never
+    {
+        throw new \BadMethodCallException(
+            'PurchaseOrderService::createPoFromSo is deprecated. Use SalesOrderService::createPurchaseOrder($saleOrder, $data) instead.'
+        );
+    }
 
     /**
      * Approve a Purchase Order.
@@ -121,12 +127,14 @@ class PurchaseOrderService
             $subtotal += $item->quantity * $item->unit_price - $item->discount + $item->tax;
         }
 
-        $total = $subtotal + $data['tax'] + $data['other_fee'];
+        $otherFees = $this->buildInvoiceOtherFees($purchaseOrder, $data['other_fee'] ?? null);
+        $otherFeeTotal = (float) collect($otherFees)->sum(fn (array $fee) => (float) ($fee['amount'] ?? 0));
+        $total = $subtotal + $data['tax'] + $otherFeeTotal;
         $invoice = $purchaseOrder->invoice()->create([
             'invoice_number' => $data['invoice_number'],
             'invoice_date' => $data['invoice_date'],
             'tax' => $data['tax'],
-            'other_fee' => $data['other_fee'],
+            'other_fee' => $otherFees,
             'due_date' => $data['due_date'],
             'status' => 'draft',
             'subtotal' => $subtotal,
@@ -145,6 +153,43 @@ class PurchaseOrderService
         }
 
         return true;
+    }
+
+    /**
+     * Build invoice other fees from PO biaya lines.
+     * Falls back to a single manual line when no PO biaya is marked for invoice.
+     */
+    protected function buildInvoiceOtherFees(PurchaseOrder $purchaseOrder, mixed $fallbackOtherFee = null): array
+    {
+        $purchaseOrder->loadMissing('purchaseOrderBiaya.currency');
+
+        $otherFees = [];
+
+        foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
+            if ((int) ($biaya->masuk_invoice ?? 0) !== 1) {
+                continue;
+            }
+
+            $conversionRate = (float) ($biaya->currency->to_rupiah ?? 1);
+            $otherFees[] = [
+                'name' => $biaya->nama_biaya ?? 'Biaya Lain',
+                'amount' => round(((float) ($biaya->total ?? 0)) * $conversionRate, 2),
+            ];
+        }
+
+        if (!empty($otherFees)) {
+            return $otherFees;
+        }
+
+        $fallbackAmount = (float) ($fallbackOtherFee ?? 0);
+        if ($fallbackAmount <= 0) {
+            return [];
+        }
+
+        return [[
+            'name' => 'Biaya Lain',
+            'amount' => round($fallbackAmount, 2),
+        ]];
     }
 
     public function generatePoNumber()

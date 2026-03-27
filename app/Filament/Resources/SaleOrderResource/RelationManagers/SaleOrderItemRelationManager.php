@@ -92,6 +92,11 @@ class SaleOrderItemRelationManager extends RelationManager
                         TextInput::make('unit_price')
                             ->label('Unit Price')
                             ->reactive()
+                            ->afterStateHydrated(function ($component, $record) {
+                                if ($record) {
+                                    $component->state(number_format((float) $record->unit_price, 0, ',', '.'));
+                                }
+                            })
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state, $get('tipe_pajak') ?? null));
                             })

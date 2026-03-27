@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderBiaya;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
@@ -59,7 +60,6 @@ class QcBeforeReceiptTest extends TestCase
     /** @test */
     public function qc_from_po_item_creates_receipt_and_posts_journals()
     {
-        // create approved purchase order and item
         $po = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
             'status' => 'approved',
@@ -73,7 +73,6 @@ class QcBeforeReceiptTest extends TestCase
             'unit_price' => 10000,
         ]);
 
-        // create QC from PO item (simulate inspector created record)
         $qcService = app(QualityControlService::class);
         $qc = $qcService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
@@ -88,11 +87,8 @@ class QcBeforeReceiptTest extends TestCase
             'from_model_type' => \App\Models\PurchaseOrderItem::class,
         ]);
 
-    // complete QC -> this should create receipt + receipt item and create temporary procurement journal
-    // but inventory posting is deferred until the purchase receipt is posted
-    $qcService->completeQualityControl($qc, []);
+        $qcService->completeQualityControl($qc, []);
 
-        // assert a purchase receipt was created
         $this->assertDatabaseHas('purchase_receipts', [
             'purchase_order_id' => $po->id,
         ]);
@@ -100,33 +96,83 @@ class QcBeforeReceiptTest extends TestCase
         $receipt = PurchaseReceipt::where('purchase_order_id', $po->id)->first();
         $this->assertNotNull($receipt);
 
-        // assert receipt item created
         $this->assertDatabaseHas('purchase_receipt_items', [
             'purchase_receipt_id' => $receipt->id,
             'product_id' => $this->product->id,
             'qty_accepted' => 5,
         ]);
 
-        // temporary procurement journal should be created (temporary entry)
-        $this->assertTrue(\App\Models\JournalEntry::where('journal_type', 'procurement')
-            ->where('description', 'like', '%Temporary Procurement%')
-            ->exists());
+        $this->assertTrue(
+            \App\Models\JournalEntry::where('journal_type', 'inventory')
+                ->where('description', 'like', '%QC Inventory - Debit inventory for QC passed items%')
+                ->exists()
+        );
+        $this->assertTrue(
+            \App\Models\JournalEntry::where('journal_type', 'inventory')
+                ->where('description', 'like', '%QC Inventory - Credit temporary procurement for QC passed items%')
+                ->exists()
+        );
 
-        // Inventory journal should NOT yet be created (deferred to receipt posting)
-        $this->assertFalse(\App\Models\JournalEntry::where('journal_type', 'inventory')
-            ->where('description', 'like', '%Inventory Stock%')
-            ->exists());
-
-        // Now post the receipt (this should post inventory and close temporary procurement)
         $purchaseReceiptService = app(\App\Services\PurchaseReceiptService::class);
         $result = $purchaseReceiptService->postPurchaseReceipt($receipt);
 
         $this->assertEquals('posted', $result['status']);
+    }
 
-        // inventory journal should be created (inventory posting)
-        $this->assertTrue(\App\Models\JournalEntry::where('journal_type', 'inventory')
-            ->where('description', 'like', '%Inventory Stock%')
-            ->exists());
+    /** @test */
+    public function qc_from_po_item_copies_purchase_order_biaya_to_receipt()
+    {
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $this->product->id,
+            'quantity' => 4,
+            'unit_price' => 12500,
+        ]);
+
+        $poBiaya = PurchaseOrderBiaya::create([
+            'purchase_order_id' => $po->id,
+            'currency_id' => $this->currency->id,
+            'coa_id' => ChartOfAccount::where('code', '6100.02')->first()?->id,
+            'nama_biaya' => 'Biaya Handling',
+            'total' => 25000,
+            'untuk_pembelian' => 0,
+            'masuk_invoice' => 1,
+        ]);
+
+        $qcService = app(QualityControlService::class);
+        $qc = $qcService->createQCFromPurchaseOrderItem($poItem, [
+            'inspected_by' => $this->user->id,
+            'passed_quantity' => 4,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $qcService->completeQualityControl($qc, []);
+
+        $receipt = PurchaseReceipt::where('purchase_order_id', $po->id)->first();
+        $this->assertNotNull($receipt);
+
+        $this->assertDatabaseHas('purchase_receipt_biayas', [
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_biaya_id' => $poBiaya->id,
+            'nama_biaya' => 'Biaya Handling',
+            'total' => 25000,
+        ]);
+
+        $receiptBiaya = PurchaseReceiptBiaya::where('purchase_receipt_id', $receipt->id)
+            ->where('purchase_order_biaya_id', $poBiaya->id)
+            ->first();
+
+        $this->assertNotNull($receiptBiaya);
+        $this->assertSame('Biaya Handling', $receiptBiaya->nama_biaya);
+        $this->assertEquals(25000, (float) $receiptBiaya->total);
+        $this->assertEquals(1, (int) $receiptBiaya->masuk_invoice);
     }
 
     /** @test */
@@ -253,7 +299,6 @@ class QcBeforeReceiptTest extends TestCase
     /** @test */
     public function qc_rejection_prevents_inventory_update()
     {
-        // create approved purchase order and item
         $po = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
             'status' => 'approved',
@@ -267,7 +312,6 @@ class QcBeforeReceiptTest extends TestCase
             'unit_price' => 15000,
         ]);
 
-        // create QC with all items rejected
         $qcService = app(QualityControlService::class);
         $qc = $qcService->createQCFromPurchaseOrderItem($poItem, [
             'inspected_by' => $this->user->id,
@@ -276,37 +320,26 @@ class QcBeforeReceiptTest extends TestCase
             'warehouse_id' => $this->warehouse->id,
         ]);
 
-        // complete QC with rejection
         $qcService->completeQualityControl($qc, [
             'item_condition' => 'damage',
             'notes' => 'All items rejected due to quality issues'
         ]);
 
-        // get the created receipt
-        $receipt = PurchaseReceipt::where('purchase_order_id', $po->id)->first();
-        $this->assertNotNull($receipt);
+        $this->assertDatabaseMissing('purchase_receipts', [
+            'purchase_order_id' => $po->id,
+        ]);
 
-        // post receipt (should be skipped since nothing was accepted)
-        $purchaseReceiptService = app(\App\Services\PurchaseReceiptService::class);
-        $result = $purchaseReceiptService->postPurchaseReceipt($receipt);
-        $this->assertEquals('skipped', $result['status']);
-
-        // verify NO inventory stock was updated (all rejected)
         $inventoryStock = \App\Models\InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
 
-        // Should be null or zero since nothing was accepted
         if ($inventoryStock) {
             $this->assertEquals(0.0, (float) $inventoryStock->qty_available);
         }
 
-        // verify receipt item shows all rejected
-        $receiptItem = PurchaseReceiptItem::where('purchase_receipt_id', $receipt->id)->first();
-        $this->assertNotNull($receiptItem);
-        $this->assertEquals(10, $receiptItem->qty_received);
-        $this->assertEquals(0, $receiptItem->qty_accepted);
-        $this->assertEquals(10, $receiptItem->qty_rejected);
+        $this->assertDatabaseMissing('purchase_receipt_items', [
+            'purchase_order_item_id' => $poItem->id,
+        ]);
     }
 
     /**

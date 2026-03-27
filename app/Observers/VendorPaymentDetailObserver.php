@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Enums\PaymentStatus;
 use App\Http\Controllers\HelperController;
 use App\Models\AccountPayable;
 use App\Models\ChartOfAccount;
@@ -31,7 +32,7 @@ class VendorPaymentDetailObserver
             $accountPayable->update([
                 'paid' => $newPaid,
                 'remaining' => $newRemaining,
-                'status' => $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas',
+                'status' => $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
             ]);
         }
         // Status & invoice synchronization now handled centrally after header creation.

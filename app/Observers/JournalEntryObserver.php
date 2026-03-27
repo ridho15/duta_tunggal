@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Enums\PaymentStatus;
 use App\Models\JournalEntry;
 use App\Models\User;
 use App\Notifications\JournalEntryCreated;
@@ -210,7 +211,7 @@ class JournalEntryObserver
                     // Reset account payable to original state
                     $accountPayable->paid = 0;
                     $accountPayable->remaining = $accountPayable->total;
-                    $accountPayable->status = 'Belum Lunas';
+                    $accountPayable->status = PaymentStatus::UNPAID->value;
                     $accountPayable->save();
                 }
             }
@@ -315,7 +316,7 @@ class JournalEntryObserver
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
-            $accountPayable->status = $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+            $accountPayable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
@@ -347,7 +348,7 @@ class JournalEntryObserver
 
             $accountReceivable->paid = $newPaid;
             $accountReceivable->remaining = $newRemaining;
-            $accountReceivable->status = $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+            $accountReceivable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountReceivable->save();
 
             // Sync invoice status with AR

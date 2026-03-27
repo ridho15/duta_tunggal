@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\Customer;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
@@ -115,7 +116,7 @@ class CreditValidationService
     public function getCurrentCreditUsage(Customer $customer): float
     {
         return AccountReceivable::where('customer_id', $customer->id)
-            ->where('status', 'Belum Lunas')
+            ->where('status', PaymentStatus::UNPAID->value)
             ->sum('remaining') ?? 0;
     }
 

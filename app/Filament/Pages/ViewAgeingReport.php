@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\PaymentStatus;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Pages\Page;
@@ -170,8 +171,8 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
                 BadgeColumn::make('status')
                     ->colors([
-                        'success' => 'Lunas',
-                        'warning' => fn ($state) => !in_array($state, ['Lunas']),
+                        'success' => PaymentStatus::PAID->value,
+                        'warning' => fn ($state) => !in_array($state, [PaymentStatus::PAID->value]),
                     ]),
             ])
             ->defaultSort('invoice.due_date', 'asc')

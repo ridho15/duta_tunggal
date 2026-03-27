@@ -65,7 +65,7 @@ class StockTransferItemObserverTest extends TestCase
         ]);
 
         // Create product
-        $category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+        $category = ProductCategory::factory()->create();
         $this->product = Product::factory()->create([
             'cabang_id' => $this->cabang->id,
             'product_category_id' => $category->id,
@@ -351,7 +351,7 @@ class StockTransferItemObserverTest extends TestCase
     public function it_handles_multiple_stock_transfer_items_correctly()
     {
         // Create multiple products
-        $category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+        $category = ProductCategory::factory()->create();
         $product2 = Product::factory()->create([
             'cabang_id' => $this->cabang->id,
             'product_category_id' => $category->id,

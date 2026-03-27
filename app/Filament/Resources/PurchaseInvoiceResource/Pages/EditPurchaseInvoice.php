@@ -98,6 +98,9 @@ class EditPurchaseInvoice extends EditRecord
             
             // Create new items
             foreach ($this->data['invoiceItem'] as $item) {
+                $item['price']    = (float) \App\Helpers\MoneyHelper::parse($item['price'] ?? 0);
+                $item['total']    = (float) \App\Helpers\MoneyHelper::parse($item['total'] ?? 0);
+                $item['quantity'] = (float) ($item['quantity'] ?? 0);
                 $this->record->invoiceItem()->create($item);
             }
         }

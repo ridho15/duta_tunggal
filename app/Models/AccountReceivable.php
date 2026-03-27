@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -68,7 +69,7 @@ class AccountReceivable extends Model
 
         static::updated(function ($accountReceivable) {
             // Hapus ageing schedule ketika account receivable lunas
-            if ($accountReceivable->status === 'Lunas' && $accountReceivable->wasChanged('status')) {
+            if ($accountReceivable->status === PaymentStatus::PAID->value && $accountReceivable->wasChanged('status')) {
                 if ($accountReceivable->ageingSchedule) {
                     $accountReceivable->ageingSchedule->delete();
                 }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\AccountPayableResource\Pages;
 use App\Models\AccountPayable;
 use App\Models\Invoice;
@@ -121,10 +122,10 @@ class AccountPayableResource extends Resource
                         Radio::make('status')
                             ->label('Status Pembayaran')
                             ->options([
-                                'Belum Lunas' => 'Belum Lunas',
-                                'Lunas' => 'Lunas',
+                                PaymentStatus::UNPAID->value => 'Belum Lunas',
+                                PaymentStatus::PAID->value => 'Lunas',
                             ])
-                            ->default('Belum Lunas')
+                            ->default(PaymentStatus::UNPAID->value)
                             ->required()
                             ->validationMessages([
                                 'required' => 'Status pembayaran harus dipilih'
@@ -142,7 +143,7 @@ class AccountPayableResource extends Resource
                 $query->leftJoin('invoices', function ($join) {
                     $join->on('account_payables.invoice_id', '=', 'invoices.id');
                 })
-                    ->where('account_payables.status', '!=', 'Lunas') // Exclude PAID records from ageing schedule
+                    ->where('account_payables.status', '!=', PaymentStatus::PAID->value) // Exclude PAID records from ageing schedule
                     ->whereNull('account_payables.deleted_at') // Exclude soft deleted AP records from ageing schedule
                     ->select('account_payables.*')
                     ->addSelect(
@@ -206,7 +207,7 @@ class AccountPayableResource extends Resource
                         if ($record->overdue_group === 'DELETED INVOICE') {
                             return 'danger';
                         }
-                        if ($record->invoice && $record->invoice->due_date < now() && $record->status === 'Belum Lunas') {
+                        if ($record->invoice && $record->invoice->due_date < now() && $record->status === PaymentStatus::UNPAID->value) {
                             return 'danger';
                         }
                         return 'gray';
@@ -258,7 +259,7 @@ class AccountPayableResource extends Resource
                         if ($record->overdue_group === 'DELETED INVOICE') {
                             return 'DELETED';
                         }
-                        if ($record->status === 'Belum Lunas' && $record->invoice && $record->invoice->due_date < now()) {
+                        if ($record->status === PaymentStatus::UNPAID->value && $record->invoice && $record->invoice->due_date < now()) {
                             return now()->diffInDays($record->invoice->due_date);
                         }
                         return 0;
@@ -276,8 +277,8 @@ class AccountPayableResource extends Resource
                     ->label('Status')
                     ->color(function ($state) {
                         return match ($state) {
-                            'Belum Lunas' => 'warning',
-                            'Lunas' => 'success',
+                            PaymentStatus::UNPAID->value => 'warning',
+                            PaymentStatus::PAID->value => 'success',
                             default => 'gray'
                         };
                     })
@@ -343,7 +344,7 @@ class AccountPayableResource extends Resource
                     ->label('Payment Status')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        return $record->status === 'Lunas' ? '✅ PAID' : '⏳ OUTSTANDING';
+                        return $record->status === PaymentStatus::PAID->value ? '✅ PAID' : '⏳ OUTSTANDING';
                     })
                     ->collapsible(),
                     
@@ -380,8 +381,8 @@ class AccountPayableResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Payment Status')
                     ->options([
-                        'Belum Lunas' => 'Outstanding',
-                        'Lunas' => 'Paid',
+                        PaymentStatus::UNPAID->value => 'Outstanding',
+                        PaymentStatus::PAID->value => 'Paid',
                     ])
                     ->multiple(),
                     
@@ -425,7 +426,7 @@ class AccountPayableResource extends Resource
                     ->query(function (Builder $query): Builder {
                         return $query->whereHas('invoice', function (Builder $query) {
                             $query->where('due_date', '<', now());
-                        })->where('status', 'Belum Lunas');
+                        })->where('status', PaymentStatus::UNPAID->value);
                     })
                     ->toggle(),
                     
@@ -509,9 +510,9 @@ class AccountPayableResource extends Resource
                                     $query->where('due_date', '<', $now->copy()->subDays(60));
                                     break;
                             }
-                        })->where('status', 'Belum Lunas');
+                        })->where('status', PaymentStatus::UNPAID->value);
                     }),
-                    
+                
                 Tables\Filters\Filter::make('invoice_date_range')
                     ->form([
                         Forms\Components\Grid::make(2)
@@ -578,7 +579,7 @@ class AccountPayableResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('account_payables.status', '!=', 'Lunas');
+        $query = parent::getEloquentQuery()->where('account_payables.status', '!=', PaymentStatus::PAID->value);
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {

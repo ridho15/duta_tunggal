@@ -12,12 +12,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
-use Spatie\Permission\Traits\HasPermissions;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
-    use HasFactory, Notifiable, HasRoles, HasPermissions, LogsGlobalActivity;
+    use HasFactory, Notifiable, HasRoles {
+        hasPermissionTo as protected spatieHasPermissionTo;
+    }
+    use LogsGlobalActivity;
     protected $fillable = [
         'name', // Gabungan dari first name dan last name
         'email',
@@ -88,5 +91,14 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function hasPermission(string $permission): bool
     {
         return $this->hasPermissionTo($permission);
+    }
+
+    public function hasPermissionTo($permission, $guardName = null): bool
+    {
+        try {
+            return $this->spatieHasPermissionTo($permission, $guardName);
+        } catch (PermissionDoesNotExist $exception) {
+            return false;
+        }
     }
 }

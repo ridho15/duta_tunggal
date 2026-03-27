@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\PaymentStatus;
 use App\Helpers\MoneyHelper;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
@@ -19,13 +20,15 @@ class ArApSummaryWidget extends BaseWidget
 
     public function getStats(): array
     {
+        $unpaid = PaymentStatus::UNPAID->value;
+
         // Account Receivables Summary
         $arStats = AccountReceivable::selectRaw('
             SUM(total) as total_ar,
             SUM(paid) as paid_ar,
             SUM(remaining) as outstanding_ar,
             COUNT(*) as count_ar,
-            COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as unpaid_count_ar
+            COUNT(CASE WHEN status = "' . $unpaid . '" THEN 1 END) as unpaid_count_ar
         ')->first();
 
         // Account Payables Summary  
@@ -34,17 +37,17 @@ class ArApSummaryWidget extends BaseWidget
             SUM(paid) as paid_ap,
             SUM(remaining) as outstanding_ap,
             COUNT(*) as count_ap,
-            COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as unpaid_count_ap
+            COUNT(CASE WHEN status = "' . $unpaid . '" THEN 1 END) as unpaid_count_ap
         ')->first();
 
         // Overdue calculations
         $overdueAR = AccountReceivable::whereHas('invoice', function ($query) {
             $query->where('due_date', '<', now());
-        })->where('status', 'Belum Lunas')->sum('remaining');
+        })->where('status', PaymentStatus::UNPAID->value)->sum('remaining');
 
         $overdueAP = AccountPayable::whereHas('invoice', function ($query) {
             $query->where('due_date', '<', now());
-        })->where('status', 'Belum Lunas')->sum('remaining');
+        })->where('status', PaymentStatus::UNPAID->value)->sum('remaining');
 
         return [
             Card::make('Total Account Receivable', MoneyHelper::rupiah($arStats->total_ar ?? 0))

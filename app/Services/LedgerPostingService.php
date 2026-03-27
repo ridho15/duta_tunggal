@@ -62,11 +62,11 @@ class LedgerPostingService
             $isImportPurchase = $purchaseOrder && $purchaseOrder->is_import;
         }
 
-        $inventoryCoa = $invoice->inventory_coa_id ? ChartOfAccount::find($invoice->inventory_coa_id) : ChartOfAccount::where('code', '1140.01')->first(); // default inventory
-        $fixedAssetCoa = ChartOfAccount::where('code', '1500')->first() ?? ChartOfAccount::find(11); // HARGA PEROLEHAN ASET TETAP
-        $ppnMasukanCoa = $invoice->ppn_masukan_coa_id ? ChartOfAccount::find($invoice->ppn_masukan_coa_id) : ChartOfAccount::where('code', '1170.06')->first();
-        $utangCoa = $invoice->accounts_payable_coa_id ? ChartOfAccount::find($invoice->accounts_payable_coa_id) : ChartOfAccount::where('code', '2110')->first();
-        $unbilledPurchaseCoa = ChartOfAccount::where('code', '2100.10')->first(); // Penerimaan Barang Belum Tertagih
+        $inventoryCoa = $invoice->inventory_coa_id ? ChartOfAccount::find($invoice->inventory_coa_id) : ChartOfAccount::where('code', config('coa.inventory'))->first();
+        $fixedAssetCoa = ChartOfAccount::where('code', config('coa.fixed_asset'))->first() ?? ChartOfAccount::find(11); // HARGA PEROLEHAN ASET TETAP fallback
+        $ppnMasukanCoa = $invoice->ppn_masukan_coa_id ? ChartOfAccount::find($invoice->ppn_masukan_coa_id) : ChartOfAccount::where('code', config('coa.ppn_masukan'))->first();
+        $utangCoa = $invoice->accounts_payable_coa_id ? ChartOfAccount::find($invoice->accounts_payable_coa_id) : ChartOfAccount::where('code', config('coa.accounts_payable'))->first();
+        $unbilledPurchaseCoa = ChartOfAccount::where('code', config('coa.unbilled_purchase'))->first();
 
         // Use fixed asset COA if it's asset purchase, otherwise inventory
         $debitCoa = $isAssetPurchase ? $fixedAssetCoa : $inventoryCoa;
@@ -189,7 +189,7 @@ class LedgerPostingService
 
             // Create journal entry for other fees if any
             if ($totalOtherFees > 0) {
-                $expenseCoa = $invoice->expense_coa_id ? ChartOfAccount::find($invoice->expense_coa_id) : ChartOfAccount::where('code', '6100')->first(); // default expense
+                $expenseCoa = $invoice->expense_coa_id ? ChartOfAccount::find($invoice->expense_coa_id) : ChartOfAccount::where('code', config('coa.general_expense'))->first();
                 $entries[] = JournalEntry::create([
                     'coa_id' => $expenseCoa ? $expenseCoa->id : 1, // fallback to first COA if not found
                     'date' => $date,
@@ -297,7 +297,7 @@ class LedgerPostingService
             }
 
             // Credit: Kas/Bank (try to find default)
-            $bankCoa = \App\Models\ChartOfAccount::where('code', 'LIKE', '111%')->first();
+            $bankCoa = \App\Models\ChartOfAccount::where('code', 'LIKE', config('coa.cash_and_bank') . '%')->first();
             if ($bankCoa) {
                 $entries[] = \App\Models\JournalEntry::create([
                     'coa_id' => $bankCoa->id,
@@ -335,7 +335,7 @@ class LedgerPostingService
             }
 
             // Credit: Customer deposit liability
-            $liabilityCoa = \App\Models\ChartOfAccount::where('code', '2160.04')->first();
+            $liabilityCoa = \App\Models\ChartOfAccount::where('code', config('coa.customer_deposit'))->first();
             if ($liabilityCoa) {
                 $entries[] = \App\Models\JournalEntry::create([
                     'coa_id' => $liabilityCoa->id,
@@ -386,11 +386,11 @@ class LedgerPostingService
             return ['status' => 'skipped', 'message' => 'VendorPayment has no amount to post'];
         }
 
-        $utangCoa = ChartOfAccount::where('code', '2110')->first();
-        $defaultBankCoa = $payment->coa_id ? $payment->coa : ChartOfAccount::where('code', '1112.01')->first();
-        $ppnMasukanCoa = ChartOfAccount::where('code', '1170.06')->first();
-        $pph22Coa = ChartOfAccount::where('code', '1170.02')->first();
-        $beaMasukCoa = ChartOfAccount::where('code', '5130')->first();
+        $utangCoa = ChartOfAccount::where('code', config('coa.accounts_payable'))->first();
+        $defaultBankCoa = $payment->coa_id ? $payment->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
+        $ppnMasukanCoa = ChartOfAccount::where('code', config('coa.ppn_masukan'))->first();
+        $pph22Coa = ChartOfAccount::where('code', config('coa.pph22'))->first();
+        $beaMasukCoa = ChartOfAccount::where('code', config('coa.import_duty'))->first();
 
         $entries = [];
 
@@ -635,8 +635,8 @@ class LedgerPostingService
         }
 
         // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
-        $piutangCoa = ChartOfAccount::where('code', '1120')->first(); // Piutang Dagang
-        $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', '1112.01')->first();
+        $piutangCoa = ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
+        $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
 
         $entries = [];
 
@@ -780,5 +780,71 @@ class LedgerPostingService
         }
 
         return ChartOfAccount::where('name', 'LIKE', '%UANG MUKA%')->first();
+    }
+
+    /**
+     * Reverse a set of journal entries identified by their shared transaction_id.
+     *
+     * Creates mirror entries (debit ↔ credit swapped) dated on $reversalDate,
+     * and marks both the original entries and the new reversal entries with the
+     * is_reversal / reversal_of_transaction_id relationship fields.
+     *
+     * @param  string  $transactionId  The transaction_id shared by the entries to reverse.
+     * @param  \Carbon\Carbon|string|null  $reversalDate  Date for the reversal entries (defaults to today).
+     * @return \Illuminate\Support\Collection  The newly created reversal JournalEntry models.
+     */
+    public function reverseJournalEntries(string $transactionId, $reversalDate = null): \Illuminate\Support\Collection
+    {
+        return DB::transaction(function () use ($transactionId, $reversalDate) {
+            $date = $reversalDate
+                ? \Carbon\Carbon::parse($reversalDate)->toDateString()
+                : now()->toDateString();
+
+            $originals = JournalEntry::where('transaction_id', $transactionId)
+                ->where('is_reversal', false)
+                ->get();
+
+            if ($originals->isEmpty()) {
+                throw new \RuntimeException("Tidak ada jurnal ditemukan untuk transaction_id: {$transactionId}");
+            }
+
+            $reversalTransactionId = 'REV-' . $transactionId . '-' . now()->format('YmdHis');
+            $reversals = collect();
+
+            foreach ($originals as $entry) {
+                $reversal = JournalEntry::create([
+                    'coa_id'                      => $entry->coa_id,
+                    'date'                        => $date,
+                    'reference'                   => 'REVERSAL: ' . ($entry->reference ?? $transactionId),
+                    'description'                 => 'Pembalikan Jurnal: ' . ($entry->description ?? ''),
+                    'debit'                       => $entry->credit,  // swap
+                    'credit'                      => $entry->debit,   // swap
+                    'journal_type'                => $entry->journal_type,
+                    'cabang_id'                   => $entry->cabang_id,
+                    'department_id'               => $entry->department_id,
+                    'project_id'                  => $entry->project_id,
+                    'source_type'                 => $entry->source_type,
+                    'source_id'                   => $entry->source_id,
+                    'transaction_id'              => $reversalTransactionId,
+                    'is_reversal'                 => true,
+                    'reversal_of_transaction_id'  => $transactionId,
+                ]);
+
+                $reversals->push($reversal);
+            }
+
+            // Mark original entries as reversed
+            JournalEntry::where('transaction_id', $transactionId)
+                ->where('is_reversal', false)
+                ->update(['reversal_of_transaction_id' => $reversalTransactionId]);
+
+            Log::info('LedgerPostingService: journal reversal created', [
+                'original_transaction_id' => $transactionId,
+                'reversal_transaction_id' => $reversalTransactionId,
+                'entries_reversed'        => $reversals->count(),
+            ]);
+
+            return $reversals;
+        });
     }
 }
