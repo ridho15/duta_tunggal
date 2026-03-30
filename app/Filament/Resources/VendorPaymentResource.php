@@ -483,6 +483,68 @@ class VendorPaymentResource extends Resource
                                     ->key(fn($get) => md5(json_encode($get('payment_details') ?? []))),
                             ]),
 
+                            // Notes and Payment Method Section
+                        Section::make()
+                            ->columns(2)
+                            ->schema([
+                                Textarea::make('notes')
+                                    ->label('Catatan')
+                                    ->rows(3)
+                                    ->columnSpan(1),
+
+                                Radio::make('payment_method')
+                                    ->label('Payment Method')
+                                    ->inline()
+                                    ->required()
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        // Auto-select appropriate COA based on payment method
+                                        $firstCoa = null;
+
+                                        switch ($state) {
+                                            case 'Cash':
+                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
+                                                    ->where(function ($q) {
+                                                        $q->where('name', 'LIKE', '%kas%')
+                                                            ->orWhere('name', 'LIKE', '%tunai%');
+                                                    })
+                                                    ->first();
+                                                break;
+                                            case 'Bank Transfer':
+                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
+                                                    ->where(function ($q) {
+                                                        $q->where('name', 'LIKE', '%bank%')
+                                                            ->orWhere('name', 'LIKE', '%rekening%');
+                                                    })
+                                                    ->first();
+                                                break;
+                                            case 'Credit':
+                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
+                                                    ->where('name', 'LIKE', '%piutang%')
+                                                    ->first();
+                                                break;
+                                            case 'Deposit':
+                                                $firstCoa = ChartOfAccount::where('type', 'asset')
+                                                    ->where('name', 'LIKE', '%deposit%')
+                                                    ->first();
+                                                break;
+                                        }
+
+                                        if ($firstCoa) {
+                                            $set('coa_id', $firstCoa->id);
+                                        } else {
+                                            $set('coa_id', null);
+                                        }
+                                    })
+                                    ->options([
+                                        'Cash' => 'Cash',
+                                        'Bank Transfer' => 'Bank Transfer',
+                                        'Credit' => 'Credit',
+                                        'Deposit' => 'Deposit'
+                                    ])
+                                    ->columnSpan(1),
+                            ]),
+
                         // Payment Details Section
                         Section::make()
                             ->columns(3)
@@ -626,67 +688,7 @@ class VendorPaymentResource extends Resource
                                     ->required(),
                             ]),
 
-                        // Notes and Payment Method Section
-                        Section::make()
-                            ->columns(2)
-                            ->schema([
-                                Textarea::make('notes')
-                                    ->label('Catatan')
-                                    ->rows(3)
-                                    ->columnSpan(1),
-
-                                Radio::make('payment_method')
-                                    ->label('Payment Method')
-                                    ->inline()
-                                    ->required()
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        // Auto-select appropriate COA based on payment method
-                                        $firstCoa = null;
-
-                                        switch ($state) {
-                                            case 'Cash':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%kas%')
-                                                            ->orWhere('name', 'LIKE', '%tunai%');
-                                                    })
-                                                    ->first();
-                                                break;
-                                            case 'Bank Transfer':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%bank%')
-                                                            ->orWhere('name', 'LIKE', '%rekening%');
-                                                    })
-                                                    ->first();
-                                                break;
-                                            case 'Credit':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where('name', 'LIKE', '%piutang%')
-                                                    ->first();
-                                                break;
-                                            case 'Deposit':
-                                                $firstCoa = ChartOfAccount::where('type', 'asset')
-                                                    ->where('name', 'LIKE', '%deposit%')
-                                                    ->first();
-                                                break;
-                                        }
-
-                                        if ($firstCoa) {
-                                            $set('coa_id', $firstCoa->id);
-                                        } else {
-                                            $set('coa_id', null);
-                                        }
-                                    })
-                                    ->options([
-                                        'Cash' => 'Cash',
-                                        'Bank Transfer' => 'Bank Transfer',
-                                        'Credit' => 'Credit',
-                                        'Deposit' => 'Deposit'
-                                    ])
-                                    ->columnSpan(1),
-                            ]),
+                        
 
                         Section::make('Pajak Impor (Opsional)')
                             ->description('Isi nilai pajak impor ketika pembayaran ini mencakup PPN Impor, PPh 22, atau Bea Masuk. Nilai akan dijurnal saat pembayaran Kas/Bank.')
