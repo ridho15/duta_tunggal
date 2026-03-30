@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\VendorPayment;
 use App\Models\VendorPaymentDetail;
 use App\Models\Warehouse;
+use App\Enums\PaymentStatus;
 use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -702,6 +703,27 @@ class VendorPaymentTest extends TestCase
         $this->assertEquals('Lunas', $accountPayable->status);
     }
 
+    public function test_account_payable_status_is_normalized_from_legacy_values()
+    {
+        $invoice = $this->createTestInvoice();
+
+        $accountPayable = AccountPayable::create([
+            'invoice_id' => $invoice->id,
+            'supplier_id' => $this->supplier->id,
+            'total' => 110000,
+            'paid' => 0,
+            'remaining' => 110000,
+            'status' => 'paid',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->assertSame(PaymentStatus::PAID->value, $accountPayable->fresh()->status);
+
+        $accountPayable->update(['status' => 'unpaid']);
+
+        $this->assertSame(PaymentStatus::UNPAID->value, $accountPayable->fresh()->status);
+    }
+
     public function test_recalculate_total_payment_method()
     {
         $invoice = $this->createTestInvoice();
@@ -822,5 +844,14 @@ class VendorPaymentTest extends TestCase
         ]);
 
         return $invoice;
+    }
+
+    public function test_invoice_status_is_normalized_to_canonical_lowercase_value()
+    {
+        $invoice = $this->createTestInvoice();
+
+        $invoice->update(['status' => 'Paid']);
+
+        $this->assertSame(Invoice::STATUS_PAID, $invoice->fresh()->status);
     }
 }

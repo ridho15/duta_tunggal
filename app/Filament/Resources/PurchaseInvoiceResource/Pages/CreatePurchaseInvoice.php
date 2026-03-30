@@ -53,8 +53,9 @@ class CreatePurchaseInvoice extends CreateRecord
         $subtotal = (float) \App\Helpers\MoneyHelper::parse($data['subtotal'] ?? 0);
         $data['subtotal'] = $subtotal;
         $ppnRate = (float) ($data['ppn_rate'] ?? 0);
-        // Always store tax as the IDR amount (ppn_rate % of DPP), never store a percentage rate in this field.
-        $data['tax'] = round($subtotal * $ppnRate / 100, 2);
+        $ppnAmount = round($subtotal * $ppnRate / 100, 2);
+        $data['tax'] = $ppnRate;
+        $data['ppn_amount'] = $ppnAmount;
 
         $otherFees = [];
         if (isset($data['other_fees']) && is_array($data['other_fees'])) {
@@ -78,7 +79,7 @@ class CreatePurchaseInvoice extends CreateRecord
         $parsedTotal = (float) \App\Helpers\MoneyHelper::parse($data['total'] ?? 0);
         if ($parsedTotal === 0.0) {
             $otherFeeTotal = (float) collect($data['other_fee'] ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
-            $parsedTotal = $subtotal + $otherFeeTotal + round($subtotal * $ppnRate / 100, 2);
+            $parsedTotal = $subtotal + $otherFeeTotal + $ppnAmount;
         }
         $data['total'] = $parsedTotal;
 

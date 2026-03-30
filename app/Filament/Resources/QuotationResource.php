@@ -699,8 +699,8 @@ class QuotationResource extends Resource
                     ->color(function ($state) {
                         return match ($state) {
                             'draft' => 'gray',
-                            'request_approve' => 'primary',
-                            'approve' => 'success',
+                            'request_approve' => 'gray',
+                            'approve' => 'info',
                             'reject' => 'danger',
                         };
                     }),
@@ -769,6 +769,13 @@ class QuotationResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->recordClasses(fn($record) => match ($record->status) {
+                'draft' => '',
+                'request_approve' => 'bg-gray-100',
+                'approve' => 'bg-blue-100',
+                'reject' => 'bg-red-100',
+                default => '',
+            })
             ->filters([
                 SelectFilter::make('customer')
                     ->label('Customer')

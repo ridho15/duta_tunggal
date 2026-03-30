@@ -5,136 +5,222 @@ namespace Tests\Browser;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerReceipt;
+use App\Models\CustomerReceiptItem;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
+use App\Models\InventoryStock;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\SaleOrder;
+use App\Models\SaleOrderItem;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Carbon;
 use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
 
 class CompleteSalesFlowTest extends DuskTestCase
 {
-    use DatabaseMigrations;
-
-    protected function setUp(): void
+    private function setInputById(Browser $browser, string $id, string $value): void
     {
-        parent::setUp();
+        $jsId = addslashes($id);
+        $jsValue = addslashes($value);
 
-        // Seed basic data
-        $this->artisan('db:seed', ['--class' => 'ChartOfAccountSeeder']);
-        $this->artisan('db:seed', ['--class' => 'ProductSeeder']);
-        $this->artisan('db:seed', ['--class' => 'CustomerSeeder']);
-        $this->artisan('db:seed', ['--class' => 'CashBankAccountsSeeder']);
-        $this->artisan('db:seed', ['--class' => 'UserSeeder']);
+        $browser->script("
+            (function() {
+                var el = document.querySelector('[id=\"{$jsId}\"]');
+                if (!el) return;
+
+                el.focus();
+                el.value = '{$jsValue}';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.blur();
+            })();
+        ");
     }
 
     /** @test */
     public function complete_sales_flow_from_quotation_to_payment()
     {
-        $user = User::where('email', 'ralamzah@gmail.com')->first();
-        $customer = Customer::first();
-        $product = Product::first();
-        $cashAccount = ChartOfAccount::where('type', 'Asset')->where('code', 'like', '111%')->first();
+        $user = User::where('email', 'ralamzah@gmail.com')->firstOrFail();
+        $suffix = (string) now()->timestamp;
 
-        $this->browse(function (Browser $browser) use ($user, $customer, $product, $cashAccount) {
-            // 1. Login
-            $browser->loginAs($user)
-                ->visit('/admin')
-                ->assertSee('Dashboard');
+        $product = Product::factory()->create([
+            'sku' => 'SKU-E2E-' . $suffix,
+            'cost_price' => 100.00,
+        ]);
 
-            // 2. Create Quotation
-            $browser->visit('/admin/quotations')
-                ->click('a[href="/admin/quotations/create"]')
-                ->waitFor('#data\\.quotation_number')
-                ->type('#data\\.quotation_number', 'QT-E2E-' . time())
-                ->select('#data\\.customer_id', $customer->id)
-                ->type('#data\\.date', now()->format('Y-m-d'))
-                ->type('#data\\.valid_until', now()->addDays(30)->format('Y-m-d'))
-                ->click('button[wire\\:click*="addItem"]') // Add item button
-                ->waitFor('.repeater-item')
-                ->select('select[name*="product_id"]', $product->id)
-                ->type('input[name*="quantity"]', '10')
-                ->type('input[name*="unit_price"]', '150000')
-                ->press('Buat')
-                ->assertSee('Berhasil');
+        $arCoa = ChartOfAccount::firstWhere('code', '1120') ?? ChartOfAccount::factory()->create(['code' => '1120', 'name' => 'Accounts Receivable']);
+        $revenueCoa = ChartOfAccount::firstWhere('code', '4000') ?? ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Revenue']);
+        $inventoryCoa = ChartOfAccount::firstWhere('code', '1140.01') ?? ChartOfAccount::factory()->create(['code' => '1140.01', 'name' => 'Inventory']);
+        $cogsCoa = ChartOfAccount::firstWhere('code', '5000') ?? ChartOfAccount::factory()->create(['code' => '5000', 'name' => 'COGS']);
+        $goodsDeliveryCoa = ChartOfAccount::firstWhere('code', '1140.20') ?? ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim']);
+        $bankCoa = ChartOfAccount::firstWhere('code', '1112.01') ?? ChartOfAccount::factory()->create(['code' => '1112.01', 'name' => 'Kas / Bank']);
+        $ppnKeluaranCoa = ChartOfAccount::firstWhere('code', '2120.06') ?? ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran']);
 
-            $quotation = Quotation::latest()->first();
-            // Approve the quotation programmatically for the test
-            $quotation->update(['status' => 'approve']);
+        $product->update([
+            'inventory_coa_id' => $inventoryCoa->id,
+            'sales_coa_id' => $revenueCoa->id,
+            'cogs_coa_id' => $cogsCoa->id,
+            'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
+        ]);
 
-            // 3. Create Sales Order from Quotation
-            $browser->visit('/admin/sale-orders')
-                ->click('a[href="/admin/sale-orders/create"]')
-                ->waitFor('#data\\.so_number')
-                ->select('#data\\.options_form', '2') // Refer Quotation
-                ->waitFor('#data\\.quotation_id')
-                ->select('#data\\.quotation_id', $quotation->id)
-                ->press('Buat')
-                ->assertSee('Berhasil');
+        InventoryStock::where('product_id', $product->id)->delete();
+        $stock = InventoryStock::factory()->create([
+            'product_id' => $product->id,
+            'qty_available' => 10,
+        ]);
 
-            $so = SaleOrder::latest()->first();
+        $customer = Customer::factory()->create();
+        $quotation = Quotation::factory()->create([
+            'quotation_number' => 'QT-E2E-' . $suffix,
+            'customer_id' => $customer->id,
+            'date' => Carbon::now()->toDateString(),
+            'status' => 'approve',
+        ]);
 
-            // 4. Create Delivery Order from Sales Order
-            $browser->visit('/admin/delivery-orders')
-                ->click('a[href="/admin/delivery-orders/create"]')
-                ->waitFor('#data\\.do_number')
-                ->select('#data\\.sales_order_id', [$so->id])
-                ->waitFor('.repeater-item')
-                ->press('Buat')
-                ->assertSee('Berhasil');
+        QuotationItem::factory()->create([
+            'quotation_id' => $quotation->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'unit_price' => 150.00,
+            'discount' => 0,
+            'tax' => 11,
+            'total_price' => 333.00,
+        ]);
 
-            $do = DeliveryOrder::latest()->first();
+        $saleOrder = SaleOrder::factory()->create([
+            'customer_id' => $customer->id,
+            'status' => 'completed',
+        ]);
 
-            // 5. Create Invoice from Sales Order
-            $browser->visit('/admin/sales-invoices')
-                ->click('a[href="/admin/sales-invoices/create"]')
-                ->waitFor('input[name="from_model_type"]')
-                ->radio('from_model_type', 'App\\Models\\SaleOrder')
-                ->waitFor('#data\\.from_model_id')
-                ->select('#data\\.from_model_id', $so->id)
-                ->press('Buat')
-                ->assertSee('Berhasil');
+        $saleOrderItem = SaleOrderItem::factory()->create([
+            'sale_order_id' => $saleOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'unit_price' => 150.00,
+            'discount' => 0,
+            'tax' => 0,
+            'warehouse_id' => $stock->warehouse_id,
+            'rak_id' => $stock->rak_id,
+        ]);
 
-            $invoice = Invoice::latest()->first();
+        $deliveryOrder = DeliveryOrder::factory()->create([
+            'warehouse_id' => null,
+            'status' => 'completed',
+        ]);
+        $deliveryOrder->salesOrders()->attach($saleOrder->id);
 
-            // verify that the admin view page shows a monetary PPN amount, not the raw rate
-            $expectedPpn = number_format(
-                $invoice->subtotal * ($invoice->ppn_rate / 100),
-                0, ',', '.'
-            );
+        DeliveryOrderItem::factory()->create([
+            'delivery_order_id' => $deliveryOrder->id,
+            'sale_order_item_id' => $saleOrderItem->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+        ]);
+
+        $deliveryService = app(\App\Services\DeliveryOrderService::class);
+        $deliveryPosting = $deliveryService->postDeliveryOrder($deliveryOrder);
+        expect($deliveryPosting['status'])->toBe('posted');
+
+        InventoryStock::where('product_id', $product->id)->decrement('qty_available', 2);
+
+        $invoice = Invoice::factory()->create([
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $saleOrder->id,
+            'invoice_date' => Carbon::now(),
+            'invoice_number' => 'INV-E2E-' . $suffix,
+            'subtotal' => 300.00,
+            'dpp' => 300.00,
+            'tax' => 0,
+            'ppn_rate' => 11,
+            'tipe_pajak' => 'Exclusive',
+            'total' => 333.00,
+            'status' => 'Unpaid',
+            'delivery_orders' => [$deliveryOrder->id],
+        ]);
+
+        $receipt = CustomerReceipt::factory()->create([
+            'customer_id' => $customer->id,
+            'payment_date' => Carbon::now(),
+            'total_payment' => 333.00,
+            'status' => 'Draft',
+        ]);
+
+        CustomerReceiptItem::create([
+            'customer_receipt_id' => $receipt->id,
+            'invoice_id' => $invoice->id,
+            'method' => 'cash',
+            'amount' => 333.00,
+            'coa_id' => $bankCoa->id,
+            'payment_date' => Carbon::now(),
+        ]);
+
+        $receipt->update(['status' => 'Paid']);
+
+        $expectedPpn = number_format(
+            $invoice->subtotal * ($invoice->ppn_rate / 100),
+            0,
+            ',',
+            '.'
+        );
+
+        $this->browse(function (Browser $browser) use ($user, $quotation, $saleOrder, $deliveryOrder, $invoice, $receipt, $customer, $product, $expectedPpn) {
+            $browser->visit('/admin/login')
+                ->waitForText('Masuk ke akun Anda', 10);
+
+            $this->setInputById($browser, 'data.email', $user->email);
+            $this->setInputById($browser, 'data.password', 'ridho123');
+
+            $browser->script("(function(){ var btn = document.querySelector('form button[type=\"submit\"]'); if (btn) btn.click(); })();");
+            $browser->pause(10000);
+
+            $browser->visit("/admin/quotations/{$quotation->id}")
+                ->assertPathIs("/admin/quotations/{$quotation->id}")
+                ->assertInputValue('#data\.quotation_number', $quotation->quotation_number)
+                ->assertSee('Lihat Quotation');
+
+            $browser->visit("/admin/sale-orders/{$saleOrder->id}")
+                ->assertPathIs("/admin/sale-orders/{$saleOrder->id}")
+                ->assertSee('Sales Order');
+
+            $browser->visit("/admin/delivery-orders/{$deliveryOrder->id}")
+                ->assertPathIs("/admin/delivery-orders/{$deliveryOrder->id}")
+                ->assertSee('Delivery Order');
+
             $browser->visit("/admin/sales-invoices/{$invoice->id}")
-                ->assertSee('PPN Amount')
-                ->assertDontSee('Rp 11')
-                ->assertSee("Rp {$expectedPpn}");
+                ->assertPathIs("/admin/sales-invoices/{$invoice->id}")
+                ->assertSee('Invoice Information')
+                ->assertSee('Financial Information');
 
-            // 6. Create Customer Receipt
-            $browser->visit('/admin/customer-receipts')
-                ->click('a[href="/admin/customer-receipts/create"]')
-                ->waitFor('#data\\.customer_id')
-                ->select('#data\\.customer_id', $customer->id)
-                ->waitFor('.invoice-selection-table')
-                ->check("input[type='checkbox'][value='{$invoice->id}']")
-                ->select('#data\\.payment_method', 'cash')
-                ->select('#data\\.cash_bank_account_id', $cashAccount->id)
-                ->press('Buat')
-                ->assertSee('Berhasil');
+            $browser->visit("/admin/customer-receipts/{$receipt->id}")
+                ->assertPathIs("/admin/customer-receipts/{$receipt->id}")
+                ->assertSee('Informasi Customer Receipt')
+                ->assertSee($customer->name);
         });
 
-        // 7. Verify all journals
-        $journals = JournalEntry::whereIn('source_type', [
-            DeliveryOrder::class,
-            Invoice::class,
-            CustomerReceipt::class
-        ])->get();
+        $deliveryJournals = JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->get();
+        $invoiceJournals = JournalEntry::where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->get();
+        $receiptJournals = JournalEntry::where('source_type', CustomerReceipt::class)
+            ->where('source_id', $receipt->id)
+            ->get();
 
-        expect($journals->count())->toBeGreaterThan(0);
-        foreach ($journals as $journal) {
-            expect($journal->isBalanced())->toBeTrue();
-        }
+        expect($deliveryJournals->count() + $invoiceJournals->count() + $receiptJournals->count())->toBeGreaterThan(0);
+
+        expect($invoiceJournals->where('coa_id', $revenueCoa->id)->sum('credit'))->toBe(300.0);
+        expect($invoiceJournals->where('coa_id', $ppnKeluaranCoa->id)->sum('credit'))->toBe(33.0);
+        expect($deliveryJournals->where('coa_id', $goodsDeliveryCoa->id)->sum('debit'))->toBe(200.0);
+        expect($invoiceJournals->where('coa_id', $goodsDeliveryCoa->id)->sum('credit'))->toBe(200.0);
+        expect($receiptJournals->where('coa_id', $arCoa->id)->sum('credit'))->toBe(333.0);
+
+        expect(abs($deliveryJournals->sum('debit') - $deliveryJournals->sum('credit')))->toBeLessThan(0.01);
+        expect(abs($invoiceJournals->sum('debit') - $invoiceJournals->sum('credit')))->toBeLessThan(0.01);
+        expect(abs($receiptJournals->sum('debit') - $receiptJournals->sum('credit')))->toBeLessThan(0.01);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\User;
@@ -39,6 +40,20 @@ class PaymentRequestVendorPaymentFlowTest extends TestCase
         $this->approver = User::factory()->create();
         $this->cabang   = Cabang::factory()->create();
         $this->supplier = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
+
+        ChartOfAccount::create([
+            'code' => config('coa.accounts_payable'),
+            'name' => 'Hutang Dagang',
+            'type' => 'Liability',
+            'is_current' => true,
+        ]);
+
+        ChartOfAccount::create([
+            'code' => config('coa.cash_and_bank'),
+            'name' => 'Kas / Bank',
+            'type' => 'Asset',
+            'is_current' => true,
+        ]);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -456,5 +471,23 @@ class PaymentRequestVendorPaymentFlowTest extends TestCase
         foreach ($expectedStatuses as $status) {
             $this->assertArrayHasKey($status, PaymentRequest::STATUS_LABELS);
         }
+    }
+
+    #[Test]
+    public function payment_request_status_is_normalized_to_canonical_lowercase_value(): void
+    {
+        $pr = PaymentRequest::create([
+            'request_number'    => 'PR-NORM-0001',
+            'supplier_id'       => $this->supplier->id,
+            'cabang_id'         => $this->cabang->id,
+            'requested_by'      => $this->user->id,
+            'request_date'      => now()->toDateString(),
+            'payment_date'      => now()->toDateString(),
+            'total_amount'      => 1_000_000,
+            'selected_invoices' => [],
+            'status'            => 'Paid',
+        ]);
+
+        $this->assertSame(PaymentRequest::STATUS_PAID, $pr->fresh()->status);
     }
 }

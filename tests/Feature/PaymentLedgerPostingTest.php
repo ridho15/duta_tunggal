@@ -366,12 +366,6 @@ class PaymentLedgerPostingTest extends TestCase
             ]);
         });
 
-        VendorPaymentDetail::create([
-            'vendor_payment_id' => $payment->id,
-            'account_payable_id' => $accountPayable->id,
-            'amount' => 100000,
-        ]);
-
         // Post payment to ledger
         $service = app(LedgerPostingService::class);
         $result = $service->postVendorPayment($payment);

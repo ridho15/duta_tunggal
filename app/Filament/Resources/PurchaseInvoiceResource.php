@@ -463,7 +463,7 @@ class PurchaseInvoiceResource extends Resource
                                         // Calculate total using tax amount derived from PO item tax
                                         $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
                                         $set('total', $finalTotal);
-                                        $set('tax', $taxAmount);
+                                        $set('tax', $effectivePpnRate);
                                         $set('ppn_rate', $effectivePpnRate);
 
                                         // Update PPN amount display
@@ -552,7 +552,7 @@ class PurchaseInvoiceResource extends Resource
                                         $taxAmount = $subtotal * $ppnRate / 100;
                                         $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
                                         $set('total', $finalTotal);
-                                        $set('tax', $taxAmount);
+                                        $set('tax', $ppnRate);
                                         
                                         // Update PPN amount display
                                         $set('ppn_amount', $taxAmount);
@@ -599,7 +599,8 @@ class PurchaseInvoiceResource extends Resource
                                         $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
                                         
                                         $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
-                                        $taxAmount = (float) \App\Helpers\MoneyHelper::parse($get('tax') ?? 0);
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
+                                        $taxAmount = $subtotal * $ppnRate / 100;
                                         $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
                                         $set('total', $finalTotal);
 
@@ -646,7 +647,7 @@ class PurchaseInvoiceResource extends Resource
                                         $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
                                         $set('total', $finalTotal);
                                         $set('other_fee', $totalOtherFee);
-                                        $set('tax', $taxAmount);
+                                        $set('tax', (float) $state);
 
                                         // Update PPN amount display
                                         $set('ppn_amount', $taxAmount);
@@ -675,13 +676,13 @@ class PurchaseInvoiceResource extends Resource
                                 Select::make('status')
                                     ->label('Status')
                                     ->options([
-                                        'draft' => 'Draft',
-                                        'sent' => 'Sent',
-                                        'paid' => 'Paid',
-                                        'partially_paid' => 'Partially Paid',
-                                        'overdue' => 'Overdue',
+                                        Invoice::STATUS_DRAFT => 'Draft',
+                                        Invoice::STATUS_SENT => 'Sent',
+                                        Invoice::STATUS_PAID => 'Paid',
+                                        Invoice::STATUS_PARTIALLY_PAID => 'Partially Paid',
+                                        Invoice::STATUS_OVERDUE => 'Overdue',
                                     ])
-                                    ->default('draft')
+                                    ->default(Invoice::STATUS_DRAFT)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Status harus dipilih'
@@ -785,7 +786,8 @@ class PurchaseInvoiceResource extends Resource
                                 $manualOtherFeeTotal = (float) collect($existingOtherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
                                 $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
                                 
-                                $taxAmount = (float) \App\Helpers\MoneyHelper::parse($get('tax') ?? 0);
+                                $ppnRate = (float) ($get('ppn_rate') ?? 0);
+                                $taxAmount = $subtotal * $ppnRate / 100;
                                 $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
                                 $set('total', $finalTotal);
 
@@ -981,20 +983,20 @@ class PurchaseInvoiceResource extends Resource
                     ->label('Status')
                     ->formatStateUsing(function ($state) {
                         return match ($state) {
-                            'draft' => 'Draft',
-                            'sent' => 'Terkirim',
-                            'paid' => 'Lunas',
-                            'partially_paid' => 'Dibayar Sebagian',
-                            'overdue' => 'Terlambat',
+                            Invoice::STATUS_DRAFT => 'Draft',
+                            Invoice::STATUS_SENT => 'Terkirim',
+                            Invoice::STATUS_PAID => 'Lunas',
+                            Invoice::STATUS_PARTIALLY_PAID => 'Dibayar Sebagian',
+                            Invoice::STATUS_OVERDUE => 'Terlambat',
                             default => $state,
                         };
                     })
                     ->colors([
-                        'secondary' => 'draft',
-                        'warning' => 'sent',
-                        'success' => 'paid',
-                        'primary' => 'partially_paid',
-                        'danger' => 'overdue',
+                        'secondary' => Invoice::STATUS_DRAFT,
+                        'warning' => Invoice::STATUS_SENT,
+                        'success' => Invoice::STATUS_PAID,
+                        'primary' => Invoice::STATUS_PARTIALLY_PAID,
+                        'danger' => Invoice::STATUS_OVERDUE,
                     ]),
             ])
             ->filters([
@@ -1029,13 +1031,13 @@ class PurchaseInvoiceResource extends Resource
                         ->label('Mark as Sent')
                         ->icon('heroicon-o-paper-airplane')
                         ->color('warning')
-                        ->visible(fn ($record) => $record->status === 'draft')
+                        ->visible(fn ($record) => $record->status === Invoice::STATUS_DRAFT)
                         ->requiresConfirmation()
                         ->modalHeading('Mark Invoice as Sent')
                         ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
                         ->modalSubmitActionLabel('Yes, Mark as Sent')
                         ->action(function ($record) {
-                            $record->update(['status' => 'sent']);
+                            $record->update(['status' => Invoice::STATUS_SENT]);
                             \Filament\Notifications\Notification::make()
                                 ->title('Invoice marked as sent')
                                 ->success()
@@ -1070,10 +1072,16 @@ class PurchaseInvoiceResource extends Resource
     public static function mutateFormDataBeforeFill(array $data): array
     {
         // Calculate PPN amount for display
-        $subtotal = $data['subtotal'] ?? 0;
-        $ppnRate = $data['ppn_rate'] ?? 0;
+        $subtotal = (float) ($data['subtotal'] ?? 0);
+        $ppnRate = (float) ($data['ppn_rate'] ?? 0);
 
-        $data['tax'] = 0; // Remove legacy tax; only PPN is used
+        if ($ppnRate <= 0 && !empty($data['tax']) && $subtotal > 0) {
+            $legacyTaxValue = (float) $data['tax'];
+            $ppnRate = $legacyTaxValue <= 100 ? $legacyTaxValue : round(($legacyTaxValue / $subtotal) * 100, 2);
+        }
+
+        $data['tax'] = $ppnRate;
+        $data['ppn_rate'] = $ppnRate;
         $data['ppn_amount'] = $subtotal * $ppnRate / 100;
 
         return $data;
@@ -1113,13 +1121,16 @@ class PurchaseInvoiceResource extends Resource
         unset($data['other_fees'], $data['receiptBiayaItems']);
         
         // Calculate totals if not set - use PPN only (no separate tax)
+        $subtotal = (float) ($data['subtotal'] ?? 0);
+        $ppnRate = (float) ($data['ppn_rate'] ?? 0);
+        $ppnAmount = $subtotal * $ppnRate / 100;
+
         if (!isset($data['total']) || $data['total'] == 0) {
-            $subtotal = $data['subtotal'] ?? 0;
             $otherFeeTotal = (float) collect($data['other_fee'] ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
-            $ppnRate = $data['ppn_rate'] ?? 0;
-            $data['total'] = $subtotal + $otherFeeTotal + ($subtotal * $ppnRate / 100);
+            $data['total'] = $subtotal + $otherFeeTotal + $ppnAmount;
         }
-        $data['tax'] = 0; // Always set tax to 0; only ppn_rate is used
+        $data['tax'] = $ppnRate; // Store tax as percentage for consistency
+        $data['ppn_amount'] = $ppnAmount;
         
         return $data;
     }

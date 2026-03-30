@@ -23,6 +23,7 @@ class AdminLoginRalamzahDuskTest extends DuskTestCase
                 'kode_user' => 'ridho',
                 'status' => true,
                 'manage_type' => 'all',
+                'email_verified_at' => now(),
                 'password' => Hash::make('ridho123'),
             ]
         );
@@ -59,7 +60,7 @@ class AdminLoginRalamzahDuskTest extends DuskTestCase
 
             $browser->script("(function(){ var btn = document.querySelector('form button[type=\"submit\"]'); if (btn) btn.click(); })();");
 
-            $browser->pause(2500)
+            $browser->pause(10000)
                 ->screenshot('login-ralamzah-02-after-submit');
 
             $path = (string) ($browser->script('return window.location.pathname;')[0] ?? '');

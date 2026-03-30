@@ -188,7 +188,7 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
         // SaleOrderObserver should create WarehouseConfirmation automatically
         $warehouseConfirmation = $saleOrder->fresh()->warehouseConfirmation;
         $this->assertNotNull($warehouseConfirmation);
-        $this->assertEquals('Confirmed', $warehouseConfirmation->status); // Auto-confirmed since stock is available
+        $this->assertEquals('confirmed', $warehouseConfirmation->status); // Auto-confirmed since stock is available
 
         // ==========================================
         // STEP 3: CHECK AUTO-CREATED DELIVERY ORDER

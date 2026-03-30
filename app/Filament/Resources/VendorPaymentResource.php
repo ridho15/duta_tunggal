@@ -740,7 +740,7 @@ class VendorPaymentResource extends Resource
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
-        return parent::getEloquentQuery()->with(['supplier', 'invoice']);
+        return parent::getEloquentQuery()->with(['supplier', 'vendorPaymentDetail.invoice']);
     }
 
     public static function mutateFormDataBeforeFill(array $data): array
@@ -821,8 +821,13 @@ class VendorPaymentResource extends Resource
                         $selectedInvoices = $record->selected_invoices;
 
                         if (!$selectedInvoices || empty($selectedInvoices)) {
-                            // Fallback to single invoice for backward compatibility
-                            return $record->invoice ? $record->invoice->invoice_number : '-';
+                            $invoiceNumbers = $record->vendorPaymentDetail
+                                ->map(fn ($detail) => $detail->invoice?->invoice_number)
+                                ->filter()
+                                ->values()
+                                ->all();
+
+                            return !empty($invoiceNumbers) ? implode(', ', $invoiceNumbers) : '-';
                         }
 
                         // Handle both JSON string and array formats
@@ -877,8 +882,11 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
+                    ->formatStateUsing(fn ($state) => App\Models\VendorPayment::STATUS_LABELS[$state] ?? $state)
                     ->color(fn(string $state): string => match ($state) {
                         'Draft' => 'gray',
+                        'Partial' => 'warning',
+                        'Paid' => 'success',
                         'Approved' => 'success',
                         'Rejected' => 'danger',
                         default => 'gray',
@@ -906,11 +914,7 @@ class VendorPaymentResource extends Resource
                     ]),
                 SelectFilter::make('status')
                     ->label('Status')
-                    ->options([
-                        'Draft' => 'Draft',
-                        'Partial' => 'Partial',
-                        'Paid' => 'Paid',
-                    ]),
+                    ->options(App\Models\VendorPayment::STATUS_LABELS),
             ])
             ->actions([
                 ActionGroup::make([

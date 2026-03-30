@@ -34,6 +34,8 @@ it('end-to-end sales flow: stock reduces, invoice and payment post to ledger', f
     $inventoryCoa = ChartOfAccount::firstWhere('code', '1140.01') ?? ChartOfAccount::factory()->create(['code' => '1140.01', 'name' => 'Inventory']);
     $cogsCoa = ChartOfAccount::firstWhere('code', '5000') ?? ChartOfAccount::factory()->create(['code' => '5000', 'name' => 'COGS']);
     $goodsDeliveryCoa = ChartOfAccount::firstWhere('code', '1140.20') ?? ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim']);
+    $bankCoa = ChartOfAccount::firstWhere('code', '1112.01') ?? ChartOfAccount::factory()->create(['code' => '1112.01', 'name' => 'Kas / Bank']);
+    $ppnKeluaranCoa = ChartOfAccount::firstWhere('code', '2120.06') ?? ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran']);
 
     // Attach COAs to product where appropriate
     $product->update([
@@ -59,6 +61,8 @@ it('end-to-end sales flow: stock reduces, invoice and payment post to ledger', f
         'product_id' => $product->id,
         'quantity' => 2,
         'unit_price' => 150.00,
+        'discount' => 0,
+        'tax' => 0,
         'warehouse_id' => $stock->warehouse_id,
         'rak_id' => $stock->rak_id,
     ]);
@@ -110,7 +114,8 @@ it('end-to-end sales flow: stock reduces, invoice and payment post to ledger', f
         'invoice_number' => 'INV-TEST-001',
         'subtotal' => 300.00,
         'tax' => 0,
-        'total' => 300.00,
+        'ppn_rate' => 11,
+        'total' => 333.00,
         'status' => 'Unpaid',
         'delivery_orders' => [$do->id],
     ]);
@@ -127,9 +132,11 @@ it('end-to-end sales flow: stock reduces, invoice and payment post to ledger', f
 
     // Assert invoice journal entries exist
     $invEntries = JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->get();
-    expect($invEntries->count())->toBe(4);
-    expect($invEntries->sum('debit'))->toBe(500.00);
-    expect($invEntries->sum('credit'))->toBe(500.00);
+    expect($invEntries->count())->toBe(5);
+    expect($invEntries->sum('debit'))->toBe(533.00);
+    expect($invEntries->sum('credit'))->toBe(533.00);
+    expect($invEntries->where('coa_id', $revenueCoa->id)->sum('credit'))->toBe(300.0);
+    expect($invEntries->where('coa_id', $ppnKeluaranCoa->id)->sum('credit'))->toBe(33.0);
     expect($invEntries->where('coa_id', $cogsCoa->id)->sum('debit'))->toBe(200.0);
     expect($invEntries->where('coa_id', $goodsDeliveryCoa->id)->sum('credit'))->toBe(200.0);
 
@@ -137,25 +144,30 @@ it('end-to-end sales flow: stock reduces, invoice and payment post to ledger', f
     $receipt = CustomerReceipt::factory()->create([
         'customer_id' => $customer->id,
         'payment_date' => Carbon::now(),
-        'total_payment' => 300.00,
-        'status' => 'Paid',
+        'total_payment' => 333.00,
+        'status' => 'Draft',
     ]);
 
     $receiptItem = \App\Models\CustomerReceiptItem::create([
         'customer_receipt_id' => $receipt->id,
         'invoice_id' => $invoice->id,
         'method' => 'cash',
-        'amount' => 300.00,
-        'coa_id' => $arCoa->id, // use AR's coa as bank for simplicity if app uses it
+        'amount' => 333.00,
+        'coa_id' => $bankCoa->id,
         'payment_date' => Carbon::now(),
     ]);
 
+    $receipt->update(['status' => 'Paid']);
+
     // Observer should create journal entries for receipt
-    $paymentEntries = JournalEntry::where('source_type', \App\Models\CustomerReceiptItem::class)
-        ->where('source_id', $receiptItem->id)
+    $paymentEntries = JournalEntry::where('source_type', CustomerReceipt::class)
+        ->where('source_id', $receipt->id)
         ->get();
 
-    expect($paymentEntries->sum('debit'))->toBe(300.00);
-    expect($paymentEntries->sum('credit'))->toBe(300.00);
+    expect($paymentEntries->count())->toBe(2);
+    expect($paymentEntries->sum('debit'))->toBe(333.00);
+    expect($paymentEntries->sum('credit'))->toBe(333.00);
+    expect($paymentEntries->where('coa_id', $bankCoa->id)->sum('debit'))->toBe(333.00);
+    expect($paymentEntries->where('coa_id', $arCoa->id)->sum('credit'))->toBe(333.00);
 
 });

@@ -17,6 +17,7 @@ class WarehouseConfirmation extends Model
     protected $table = 'warehouse_confirmations';
 
     protected $fillable = [
+        'sale_order_id',
         'confirmable_type',
         'confirmable_id',
         'confirmation_type',
@@ -103,6 +104,17 @@ class WarehouseConfirmation extends Model
 
     protected static function booted()
     {
+        static::creating(function (WarehouseConfirmation $wc) {
+            if (empty($wc->confirmable_type) && !empty($wc->sale_order_id)) {
+                $wc->confirmable_type = SaleOrder::class;
+                $wc->confirmable_id = $wc->sale_order_id;
+            }
+
+            if (!empty($wc->sale_order_id)) {
+                $wc->offsetUnset('sale_order_id');
+            }
+        });
+
         static::created(function ($wc) {
             $wc->load(['confirmable', 'warehouseConfirmationItems.saleOrderItem.product']);
 

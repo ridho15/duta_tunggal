@@ -1294,11 +1294,14 @@ class PurchaseOrderResource extends Resource
                             case 'draft':
                                 return 'gray';
                                 break;
+                            case 'approved':
+                                return 'info';
+                                break;
                             case 'partially_received':
                                 return 'warning';
                                 break;
                             case 'request_close':
-                                return 'warning';
+                                return 'danger';
                                 break;
                             case 'closed':
                                 return 'danger';
@@ -1450,6 +1453,15 @@ class PurchaseOrderResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->recordClasses(fn($record) => match ($record->status) {
+                'draft' => '',
+                'approved' => 'bg-blue-100',
+                'partially_received' => 'bg-yellow-100',
+                'request_close' => 'bg-red-100',
+                'closed' => 'bg-red-100',
+                'completed' => 'bg-green-100',
+                default => '',
+            })
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Purchase Order</summary>' .

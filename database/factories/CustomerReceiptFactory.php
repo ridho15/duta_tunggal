@@ -25,7 +25,7 @@ class CustomerReceiptFactory extends Factory
             'payment_adjustment' => number_format($this->faker->randomFloat(2, 0, 50000), 2, '.', ''),
             'payment_method' => $this->faker->randomElement(['cash', 'bank_transfer', 'cheque', 'deposit', 'credit_card']),
             'coa_id' => ChartOfAccount::factory(),
-            'status' => $this->faker->randomElement(['Draft', 'Partial', 'Paid']),
+            'status' => 'Draft',
         ];
     }
 

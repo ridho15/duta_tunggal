@@ -19,6 +19,37 @@ class AccountPayable extends Model
         'remaining' => 'float',
     ];
 
+    public function getStatusAttribute($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        return match ($normalized) {
+            'lunas', 'paid' => PaymentStatus::PAID->value,
+            'belum lunas', 'unpaid' => PaymentStatus::UNPAID->value,
+            default => $value,
+        };
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['status'] = null;
+            return;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        $this->attributes['status'] = match ($normalized) {
+            'lunas', 'paid' => PaymentStatus::PAID->value,
+            'belum lunas', 'unpaid' => PaymentStatus::UNPAID->value,
+            default => $value,
+        };
+    }
+
     protected $fillable = [
         'invoice_id',
         'supplier_id',

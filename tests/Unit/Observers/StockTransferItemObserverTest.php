@@ -35,9 +35,6 @@ class StockTransferItemObserverTest extends TestCase
     {
         parent::setUp();
 
-        // Register the observer for testing
-        StockTransferItem::observe(StockTransferItemObserver::class);
-
         // Create test user
         $this->user = User::factory()->create();
 

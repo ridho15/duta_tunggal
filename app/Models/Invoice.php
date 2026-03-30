@@ -67,6 +67,41 @@ class Invoice extends Model
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
     ];
 
+    public function getStatusAttribute($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return match (strtolower(trim((string) $value))) {
+            self::STATUS_DRAFT => self::STATUS_DRAFT,
+            self::STATUS_SENT => self::STATUS_SENT,
+            self::STATUS_PAID => self::STATUS_PAID,
+            self::STATUS_PARTIALLY_PAID => self::STATUS_PARTIALLY_PAID,
+            self::STATUS_OVERDUE => self::STATUS_OVERDUE,
+            default => $value,
+        };
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['status'] = null;
+            return;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        $this->attributes['status'] = match ($normalized) {
+            self::STATUS_DRAFT,
+            self::STATUS_SENT,
+            self::STATUS_PAID,
+            self::STATUS_PARTIALLY_PAID,
+            self::STATUS_OVERDUE => $normalized,
+            default => $value,
+        };
+    }
+
     public function getInvoiceDateAttribute($value): ?\Illuminate\Support\Carbon
     {
         if (!$value || trim((string) $value) === '' || trim((string) $value) === '-') {

@@ -10,6 +10,7 @@ use App\Models\Reports\CashFlowItem;
 use App\Models\Reports\CashFlowSection;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class CashFlowReportService
 {
@@ -300,7 +301,7 @@ class CashFlowReportService
             })
             ->whereHas('customerReceipt', function (Builder $query) {
                 $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer', 'Deposit'])
-                    ->whereIn('status', ['Paid', 'paid', 'Partial', 'partial']);
+                    ->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
             })
             ->sum('amount');
 
@@ -447,7 +448,7 @@ class CashFlowReportService
             ->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()])
             ->whereHas('customerReceipt', function (Builder $query) {
                 $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer', 'Deposit'])
-                    ->whereIn('status', ['Paid', 'paid', 'Partial', 'partial']);
+                    ->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
             })
             ->selectRaw('customer_receipt_id, SUM(amount) as total')
             ->groupBy('customer_receipt_id')

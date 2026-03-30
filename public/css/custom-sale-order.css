@@ -10,3 +10,38 @@
 .insufficient-stock-row td {
     background-color: transparent !important;
 }
+
+.fi-ta-table tbody tr.bg-gray-100 > td,
+.fi-ta-table tbody tr.bg-gray-100:hover > td {
+    background-color: rgb(243 244 246) !important;
+}
+
+.fi-ta-table tbody tr.bg-yellow-100 > td,
+.fi-ta-table tbody tr.bg-yellow-100:hover > td {
+    background-color: rgb(254 249 195) !important;
+}
+
+.fi-ta-table tbody tr.bg-blue-100 > td,
+.fi-ta-table tbody tr.bg-blue-100:hover > td {
+    background-color: rgb(219 234 254) !important;
+}
+
+.fi-ta-table tbody tr.bg-white > td,
+.fi-ta-table tbody tr.bg-white:hover > td {
+    background-color: rgb(255 255 255) !important;
+}
+
+.fi-ta-table tbody tr.bg-orange-100 > td,
+.fi-ta-table tbody tr.bg-orange-100:hover > td {
+    background-color: rgb(255 237 213) !important;
+}
+
+.fi-ta-table tbody tr.bg-green-100 > td,
+.fi-ta-table tbody tr.bg-green-100:hover > td {
+    background-color: rgb(220 252 231) !important;
+}
+
+.fi-ta-table tbody tr.bg-red-100 > td,
+.fi-ta-table tbody tr.bg-red-100:hover > td {
+    background-color: rgb(254 226 226) !important;
+}

@@ -116,9 +116,16 @@ class VendorPaymentResourceTest extends TestCase
 
         // Create COA for accounts payable
         ChartOfAccount::factory()->create([
-            'code' => '2101',
-            'name' => 'Hutang Supplier',
+            'code' => config('coa.accounts_payable'),
+            'name' => 'Hutang Dagang',
             'type' => 'Liability',
+            'is_current' => true,
+        ]);
+
+        ChartOfAccount::factory()->create([
+            'code' => config('coa.inventory'),
+            'name' => 'Persediaan Barang',
+            'type' => 'Asset',
             'is_current' => true,
         ]);
     }

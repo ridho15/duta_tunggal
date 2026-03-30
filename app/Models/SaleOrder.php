@@ -130,7 +130,7 @@ class SaleOrder extends Model
     /** Alias for backward-compatible single-record access. */
     public function warehouseConfirmation()
     {
-        return $this->morphMany(WarehouseConfirmation::class, 'confirmable');
+        return $this->morphOne(WarehouseConfirmation::class, 'confirmable')->latestOfMany();
     }
 
     public function purchaseOrder()
@@ -254,13 +254,13 @@ class SaleOrder extends Model
                 $saleOrder->saleOrderItem()->forceDelete();
                 $saleOrder->deliverySalesOrder()->forceDelete();
                 // Use query builder (with parens) — safe even when no record exists
-                $saleOrder->warehouseConfirmation()->forceDelete();
+                $saleOrder->warehouseConfirmations()->forceDelete();
                 $saleOrder->purchaseOrder()->forceDelete();
                 $saleOrder->depositLog()->forceDelete();
             } else {
                 $saleOrder->saleOrderItem()->delete();
                 $saleOrder->deliverySalesOrder()->delete();
-                $saleOrder->warehouseConfirmation()->delete();
+                $saleOrder->warehouseConfirmations()->delete();
                 $saleOrder->purchaseOrder()->delete();
                 $saleOrder->depositLog()->delete();
             }
@@ -269,7 +269,7 @@ class SaleOrder extends Model
         static::restoring(function ($saleOrder) {
             $saleOrder->saleOrderItem()->withTrashed()->restore();
             $saleOrder->deliverySalesOrder()->withTrashed()->restore();
-            $saleOrder->warehouseConfirmation()->withTrashed()->restore();
+            $saleOrder->warehouseConfirmations()->withTrashed()->restore();
             $saleOrder->purchaseOrder()->withTrashed()->restore();
             $saleOrder->depositLog()->withTrashed()->restore();
         });

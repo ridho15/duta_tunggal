@@ -240,21 +240,6 @@
                 @endforeach
             @endif
             
-            {{-- Biaya dari Purchase Receipts --}}
-            @if($invoice->purchase_receipts && is_array($invoice->purchase_receipts))
-                @php
-                    $receiptBiayas = \App\Models\PurchaseReceiptBiaya::whereHas('purchaseReceipt', function($query) use ($invoice) {
-                        $query->whereIn('id', $invoice->purchase_receipts);
-                    })->get();
-                @endphp
-                @foreach($receiptBiayas as $biaya)
-                <tr>
-                    <td>{{ $biaya->nama_biaya }}:</td>
-                    <td class="text-right rupiah">Rp {{ number_format($biaya->total, 0, ',', '.') }}</td>
-                </tr>
-                @endforeach
-            @endif
-            
             {{-- PPN --}}
             @if($invoice->ppn_rate > 0)
             <tr>
@@ -264,14 +249,6 @@
             <tr>
                 <td>PPN {{ $invoice->ppn_rate }}%:</td>
                 <td class="text-right rupiah">Rp {{ number_format($invoice->ppn_amount ?? (($invoice->dpp ?? $invoice->subtotal) * $invoice->ppn_rate / 100), 0, ',', '.') }}</td>
-            </tr>
-            @endif
-            
-            {{-- Tax tambahan jika ada --}}
-            @if($invoice->tax > 0)
-            <tr>
-                <td>Tax ({{ $invoice->tax }}%):</td>
-                <td class="text-right rupiah">Rp {{ number_format($invoice->tax_amount ?? ($invoice->subtotal * $invoice->tax / 100), 0, ',', '.') }}</td>
             </tr>
             @endif
             

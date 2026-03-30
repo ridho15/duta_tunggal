@@ -228,6 +228,8 @@ class DeliveryOrderService
             ];
         }
 
+        $this->createJournalEntriesForDelivery($deliveryOrder);
+
         $date = $deliveryOrder->delivery_date ?? Carbon::now()->toDateString();
 
         // Create stock movements for physical inventory reduction
@@ -286,6 +288,90 @@ class DeliveryOrderService
         }
 
         return ['status' => 'posted'];
+    }
+
+    protected function createJournalEntriesForDelivery(DeliveryOrder $deliveryOrder): void
+    {
+        $existingEntries = JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->exists();
+
+        if ($existingEntries) {
+            return;
+        }
+
+        $deliveryOrder->loadMissing('deliveryOrderItem.product.inventoryCoa', 'deliveryOrderItem.product.goodsDeliveryCoa');
+
+        $date = $deliveryOrder->delivery_date ?? now()->toDateString();
+
+        $defaultInventoryCoa = ChartOfAccount::whereIn('code', ['1140.10', '1140.01'])->first();
+        $defaultGoodsDeliveryCoa = ChartOfAccount::whereIn('code', ['1140.20', '1180.10'])->first();
+
+        $debitTotals = [];
+        $creditTotals = [];
+
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            $qtyDelivered = max(0, $item->quantity ?? 0);
+            if ($qtyDelivered <= 0) {
+                continue;
+            }
+
+            $product = $item->product;
+            $costPerUnit = $product?->cost_price ?? 0;
+            if ($costPerUnit <= 0) {
+                continue;
+            }
+
+            $lineAmount = round($qtyDelivered * $costPerUnit, 2);
+            if ($lineAmount <= 0) {
+                continue;
+            }
+
+            $inventoryCoa = $product?->inventoryCoa?->id ? $product->inventoryCoa : $defaultInventoryCoa;
+            $goodsDeliveryCoa = $product?->goodsDeliveryCoa?->id ? $product->goodsDeliveryCoa : $defaultGoodsDeliveryCoa;
+
+            if (!$inventoryCoa || !$goodsDeliveryCoa) {
+                throw new \RuntimeException(
+                    'COA persediaan atau barang terkirim tidak ditemukan untuk delivery order ' . $deliveryOrder->do_number
+                );
+            }
+
+            $debitTotals[$goodsDeliveryCoa->id]['coa'] = $goodsDeliveryCoa;
+            $debitTotals[$goodsDeliveryCoa->id]['amount'] = ($debitTotals[$goodsDeliveryCoa->id]['amount'] ?? 0) + $lineAmount;
+
+            $creditTotals[$inventoryCoa->id]['coa'] = $inventoryCoa;
+            $creditTotals[$inventoryCoa->id]['amount'] = ($creditTotals[$inventoryCoa->id]['amount'] ?? 0) + $lineAmount;
+        }
+
+        foreach ($debitTotals as $debitData) {
+            JournalEntry::create([
+                'coa_id' => $debitData['coa']->id,
+                'date' => $date,
+                'reference' => $deliveryOrder->do_number,
+                'description' => 'Goods Delivery - Cost of Goods Sold for ' . $deliveryOrder->do_number,
+                'debit' => round($debitData['amount'], 2),
+                'credit' => 0,
+                'journal_type' => 'sales',
+                'source_type' => DeliveryOrder::class,
+                'source_id' => $deliveryOrder->id,
+                'cabang_id' => $deliveryOrder->cabang_id,
+            ]);
+        }
+
+        foreach ($creditTotals as $creditData) {
+            JournalEntry::create([
+                'coa_id' => $creditData['coa']->id,
+                'date' => $date,
+                'reference' => $deliveryOrder->do_number,
+                'description' => 'Goods Delivery - Inventory Reduction for ' . $deliveryOrder->do_number,
+                'debit' => 0,
+                'credit' => round($creditData['amount'], 2),
+                'journal_type' => 'sales',
+                'source_type' => DeliveryOrder::class,
+                'source_id' => $deliveryOrder->id,
+                'cabang_id' => $deliveryOrder->cabang_id,
+            ]);
+        }
     }
 
     /**

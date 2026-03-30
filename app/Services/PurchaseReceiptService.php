@@ -891,7 +891,7 @@ class PurchaseReceiptService
             'other_fee' => $otherFees, // Add biaya as other_fee
             'total' => $total,
             'due_date' => now()->addDays(30)->toDateString(),
-            'status' => 'paid', // Create as paid directly
+            'status' => \App\Models\Invoice::STATUS_PAID, // Create as paid directly
             'ppn_rate' => $ppnRate,
             'dpp' => $subtotal,
             'supplier_name' => $supplier ? $supplier->perusahaan : null,

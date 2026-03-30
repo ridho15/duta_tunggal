@@ -355,7 +355,7 @@ class PurchaseInvoiceResourceTest extends TestCase
 
     public function test_tax_and_other_fees_calculations()
     {
-        // Test ppn-only behavior: ppn_rate can be set, tax is system-controlled
+        // Test ppn-only behavior: ppn_rate and tax are stored as the same percentage rate.
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'invoice_number' => 'PINV-TAX-TEST-001',
@@ -364,9 +364,122 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'ppn_rate' => 11,
             ])
             ->assertFormSet([
-                'tax' => 0,
+                'tax' => 11,
                 'ppn_rate' => 11,
             ]);
+    }
+
+    public function test_purchase_invoice_create_normalizes_tax_to_percentage()
+    {
+        $supplier = Supplier::factory()->create();
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+        ]);
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+        ]);
+        $product = Product::factory()->create();
+        PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 1000000,
+            'discount' => 0,
+            'tax' => 11,
+        ]);
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrder->purchaseOrderItem->first()->id,
+            'product_id' => $product->id,
+            'qty_received' => 10,
+            'qty_accepted' => 10,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_purchase_receipts' => [$receipt->id],
+                'invoice_number' => 'PINV-NORMALIZE-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+                'ppn_rate' => 11,
+                'status' => Invoice::STATUS_DRAFT,
+                'invoiceItem' => [[
+                    'product_id' => $product->id,
+                    'quantity' => 10,
+                    'price' => 1000000,
+                    'total' => 10000000,
+                ]],
+                'other_fees' => [[
+                    'name' => 'Biaya Admin',
+                    'amount' => 100000,
+                ]],
+                'receiptBiayaItems' => [],
+            ])
+            ->call('create');
+
+        $saved = Invoice::where('invoice_number', 'PINV-NORMALIZE-001')->firstOrFail();
+
+        $this->assertSame(11.0, (float) $saved->tax);
+        $this->assertSame(11.0, (float) $saved->ppn_rate);
+        $this->assertSame(1100000.0, (float) $saved->ppn_amount);
+        $this->assertSame(11200000.0, (float) $saved->total);
+    }
+
+    public function test_purchase_invoice_pdf_renders_ppn_once_without_legacy_tax_row()
+    {
+        $supplier = Supplier::factory()->create();
+        $product = Product::factory()->create();
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+        ]);
+
+        Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $purchaseOrder->id,
+            'invoice_number' => 'PINV-PDF-TEST-001',
+            'subtotal' => 17000000,
+            'tax' => 11,
+            'ppn_rate' => 11,
+            'dpp' => 17000000,
+            'other_fee' => [
+                ['name' => 'Biaya Transport', 'amount' => 100000],
+            ],
+            'total' => 18970000,
+            'purchase_receipts' => [$receipt->id],
+        ]);
+
+        $invoice = Invoice::where('invoice_number', 'PINV-PDF-TEST-001')
+            ->with(['fromModel.supplier', 'invoiceItem.product', 'cabang'])
+            ->firstOrFail();
+
+        $html = view('pdf.purchase-order-invoice-2', ['invoice' => $invoice])->render();
+
+        $this->assertStringContainsString('PPN 11%', $html);
+        $this->assertStringContainsString('Biaya Transport', $html);
+        $this->assertSame(1, substr_count($html, 'Biaya Transport'));
+        $this->assertStringNotContainsString('Tax (', $html);
     }
 
     public function test_invoice_creation_with_valid_data()
@@ -625,7 +738,7 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'invoice_number' => 'PINV-RECEIPT-FEE-001',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
-                'status' => 'draft',
+                'status' => Invoice::STATUS_DRAFT,
                 'invoiceItem' => [[
                     'product_id' => $product->id,
                     'quantity' => 10,

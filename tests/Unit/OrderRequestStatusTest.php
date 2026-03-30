@@ -2,9 +2,34 @@
 
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 
-uses(RefreshDatabase::class);
+function makeOrderRequestMock(string $status, array $items, ?array $expectedUpdate = null): OrderRequest
+{
+    $orderRequest = Mockery::mock(OrderRequest::class)->makePartial();
+    $orderRequest->status = $status;
+
+    $relation = Mockery::mock();
+    $relation->shouldReceive('withoutTrashed')->andReturnSelf();
+    $relation->shouldReceive('get')->andReturn(new Collection($items));
+
+    $orderRequest->shouldReceive('orderRequestItem')->andReturn($relation);
+
+    if ($expectedUpdate !== null) {
+            $orderRequest->shouldReceive('update')
+                ->once()
+                ->with($expectedUpdate)
+                ->andReturnUsing(function (array $attributes) use ($orderRequest) {
+                    $orderRequest->status = $attributes['status'];
+
+                    return true;
+                });
+    } else {
+        $orderRequest->shouldReceive('update')->never();
+    }
+
+    return $orderRequest;
+}
 
 /**
  * Tests for OrderRequest::syncFulfillmentStatus()
@@ -18,101 +43,69 @@ uses(RefreshDatabase::class);
 describe('OrderRequest::syncFulfillmentStatus()', function () {
 
     it('transitions approved → complete when all items fully fulfilled', function () {
-        $or = OrderRequest::factory()->create(['status' => 'approved']);
-        $item = OrderRequestItem::factory()->create([
-            'order_request_id'    => $or->id,
-            'quantity'            => 10,
-            'fulfilled_quantity'  => 10,
-        ]);
+        $or = makeOrderRequestMock('approved', [
+            new OrderRequestItem(['quantity' => 10, 'fulfilled_quantity' => 10]),
+        ], ['status' => 'complete']);
 
         $or->syncFulfillmentStatus();
-        $or->refresh();
 
-        expect($or->status)->toBe('complete');
+            expect($or->status)->toBe('complete');
     });
 
     it('transitions approved → partial when some items partially fulfilled', function () {
-        $or = OrderRequest::factory()->create(['status' => 'approved']);
-        OrderRequestItem::factory()->create([
-            'order_request_id'   => $or->id,
-            'quantity'           => 10,
-            'fulfilled_quantity' => 5,
-        ]);
-        OrderRequestItem::factory()->create([
-            'order_request_id'   => $or->id,
-            'quantity'           => 20,
-            'fulfilled_quantity' => 0,
-        ]);
+        $or = makeOrderRequestMock('approved', [
+            new OrderRequestItem(['quantity' => 10, 'fulfilled_quantity' => 5]),
+            new OrderRequestItem(['quantity' => 20, 'fulfilled_quantity' => 0]),
+        ], ['status' => 'partial']);
 
         $or->syncFulfillmentStatus();
-        $or->refresh();
 
         expect($or->status)->toBe('partial');
     });
 
     it('stays approved when nothing is fulfilled', function () {
-        $or = OrderRequest::factory()->create(['status' => 'approved']);
-        OrderRequestItem::factory()->create([
-            'order_request_id'   => $or->id,
-            'quantity'           => 10,
-            'fulfilled_quantity' => 0,
+        $or = makeOrderRequestMock('approved', [
+            new OrderRequestItem(['quantity' => 10, 'fulfilled_quantity' => 0]),
         ]);
 
         $or->syncFulfillmentStatus();
-        $or->refresh();
 
         expect($or->status)->toBe('approved');
     });
 
     it('does NOT transition a draft order', function () {
-        $or = OrderRequest::factory()->create(['status' => 'draft']);
-        OrderRequestItem::factory()->create([
-            'order_request_id'   => $or->id,
-            'quantity'           => 5,
-            'fulfilled_quantity' => 5,
+        $or = makeOrderRequestMock('draft', [
+            new OrderRequestItem(['quantity' => 5, 'fulfilled_quantity' => 5]),
         ]);
 
         $or->syncFulfillmentStatus();
-        $or->refresh();
 
         expect($or->status)->toBe('draft');
     });
 
     it('does NOT transition a closed order', function () {
-        $or = OrderRequest::factory()->create(['status' => 'closed']);
-        OrderRequestItem::factory()->create([
-            'order_request_id'   => $or->id,
-            'quantity'           => 5,
-            'fulfilled_quantity' => 5,
+        $or = makeOrderRequestMock('closed', [
+            new OrderRequestItem(['quantity' => 5, 'fulfilled_quantity' => 5]),
         ]);
 
         $or->syncFulfillmentStatus();
-        $or->refresh();
 
         expect($or->status)->toBe('closed');
     });
 
     it('transitions partial → complete once last item is fulfilled', function () {
-        $or = OrderRequest::factory()->create(['status' => 'partial']);
-        OrderRequestItem::factory()->create([
-            'order_request_id'   => $or->id,
-            'quantity'           => 10,
-            'fulfilled_quantity' => 10,
-        ]);
-        OrderRequestItem::factory()->create([
-            'order_request_id'   => $or->id,
-            'quantity'           => 20,
-            'fulfilled_quantity' => 20,
-        ]);
+        $or = makeOrderRequestMock('partial', [
+            new OrderRequestItem(['quantity' => 10, 'fulfilled_quantity' => 10]),
+            new OrderRequestItem(['quantity' => 20, 'fulfilled_quantity' => 20]),
+        ], ['status' => 'complete']);
 
         $or->syncFulfillmentStatus();
-        $or->refresh();
 
-        expect($or->status)->toBe('complete');
+            expect($or->status)->toBe('complete');
     });
 
     it('remaining_quantity accessor returns correct value', function () {
-        $item = OrderRequestItem::factory()->make([
+        $item = new OrderRequestItem([
             'quantity'           => 100,
             'fulfilled_quantity' => 60,
         ]);
@@ -121,7 +114,7 @@ describe('OrderRequest::syncFulfillmentStatus()', function () {
     });
 
     it('remaining_quantity is never negative', function () {
-        $item = OrderRequestItem::factory()->make([
+        $item = new OrderRequestItem([
             'quantity'           => 10,
             'fulfilled_quantity' => 20, // over-fulfilled edge case
         ]);

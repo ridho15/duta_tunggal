@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Enums\PaymentStatus;
+use App\Models\Invoice;
 use App\Models\VendorPayment;
 use App\Services\LedgerPostingService;
 use Illuminate\Support\Facades\Log;
@@ -85,7 +86,8 @@ class VendorPaymentObserver
 
         foreach ($paymentDetails as $detail) {
             $invoiceId = $detail->invoice_id;
-            $paidAmount = $detail->amount;
+            $paidAmount = (float) $detail->amount;
+            $adjustmentAmount = (float) ($detail->adjustment_amount ?? 0);
 
             // Update Account Payable
             $accountPayable = \App\Models\AccountPayable::where('invoice_id', $invoiceId)->first();
@@ -100,8 +102,14 @@ class VendorPaymentObserver
                 })
                 ->sum('amount');
 
+            $totalAdjustmentForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+                ->whereHas('vendorPayment', function($query) {
+                    $query->whereIn('status', ['partial', 'paid']);
+                })
+                ->sum('adjustment_amount');
+
             $newPaid = min($totalPaidForInvoice, $accountPayable->total);
-            $newRemaining = max(0, $accountPayable->total - $newPaid);
+            $newRemaining = max(0, $accountPayable->total - $newPaid - $totalAdjustmentForInvoice);
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
@@ -110,7 +118,9 @@ class VendorPaymentObserver
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : $accountPayable->invoice->status);
+                $accountPayable->invoice->status = $newRemaining <= 0.01
+                    ? Invoice::STATUS_PAID
+                    : ($newPaid > 0 ? Invoice::STATUS_PARTIALLY_PAID : $accountPayable->invoice->status);
                 $accountPayable->invoice->save();
             }
         }
@@ -123,7 +133,8 @@ class VendorPaymentObserver
 
         foreach ($paymentDetails as $detail) {
             $invoiceId = $detail->invoice_id;
-            $paidAmount = $detail->amount;
+            $paidAmount = (float) $detail->amount;
+            $adjustmentAmount = (float) ($detail->adjustment_amount ?? 0);
 
             // Update Account Payable - subtract the payment amount
             $accountPayable = \App\Models\AccountPayable::where('invoice_id', $invoiceId)->first();
@@ -133,7 +144,7 @@ class VendorPaymentObserver
 
             // Subtract the payment amount directly from paid and add to remaining
             $newPaid = max(0, $accountPayable->paid - $paidAmount);
-            $newRemaining = $accountPayable->total - $newPaid;
+            $newRemaining = min($accountPayable->total, $accountPayable->remaining + $paidAmount + $adjustmentAmount);
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
@@ -142,7 +153,9 @@ class VendorPaymentObserver
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : 'unpaid');
+                $accountPayable->invoice->status = $newRemaining <= 0.01
+                    ? Invoice::STATUS_PAID
+                    : ($newPaid > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
                 $accountPayable->invoice->save();
             }
         }

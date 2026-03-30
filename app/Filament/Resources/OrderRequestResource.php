@@ -710,14 +710,14 @@ class OrderRequestResource extends Resource
                     }),
             ])
             ->recordClasses(fn($record) => match ($record->status) {
-                'draft'           => '',
+                'draft' => '',
                 'request_approve' => 'bg-gray-100',
-                'approved'        => 'bg-blue-50',
-                'partial'         => 'bg-yellow-50',
-                'complete'        => 'bg-green-50',
-                'closed'          => 'bg-red-50',
-                'rejected'        => 'bg-red-50',
-                default           => '',
+                'approved' => 'bg-blue-100',
+                'partial' => 'bg-yellow-100',
+                'complete' => 'bg-green-100',
+                'closed' => 'bg-red-100',
+                'rejected' => 'bg-red-100',
+                default => '',
             })
             ->actions([
                 ActionGroup::make([

@@ -35,6 +35,43 @@ class PaymentRequest extends Model
         // request_date, payment_date, and approved_at handled via accessors to guard against invalid DB values like '-'
     ];
 
+    public function getStatusAttribute($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return match (strtolower(trim((string) $value))) {
+            self::STATUS_DRAFT => self::STATUS_DRAFT,
+            self::STATUS_PENDING => self::STATUS_PENDING,
+            self::STATUS_APPROVED => self::STATUS_APPROVED,
+            self::STATUS_PARTIAL => self::STATUS_PARTIAL,
+            self::STATUS_REJECTED => self::STATUS_REJECTED,
+            self::STATUS_PAID => self::STATUS_PAID,
+            default => $value,
+        };
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['status'] = null;
+            return;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        $this->attributes['status'] = match ($normalized) {
+            self::STATUS_DRAFT,
+            self::STATUS_PENDING,
+            self::STATUS_APPROVED,
+            self::STATUS_PARTIAL,
+            self::STATUS_REJECTED,
+            self::STATUS_PAID => $normalized,
+            default => $value,
+        };
+    }
+
     /**
      * Accessor for approved_at — guards against invalid DB values like '-'.
      */

@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Enums\PaymentStatus;
+use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\User;
 use App\Notifications\JournalEntryCreated;
@@ -321,7 +322,9 @@ class JournalEntryObserver
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : 'unpaid');
+                $accountPayable->invoice->status = $newRemaining <= 0.01
+                    ? Invoice::STATUS_PAID
+                    : ($newPaid > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
                 $accountPayable->invoice->save();
             }
         }

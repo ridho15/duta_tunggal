@@ -12,6 +12,23 @@ class VendorPayment extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
     protected $table = 'vendor_payments';
+
+    public const STATUS_DRAFT = 'Draft';
+    public const STATUS_PARTIAL = 'Partial';
+    public const STATUS_PAID = 'Paid';
+
+    public const STATUS_LABELS = [
+        self::STATUS_DRAFT => 'Draft',
+        self::STATUS_PARTIAL => 'Partial',
+        self::STATUS_PAID => 'Paid',
+    ];
+
+    public const STATUS_COLORS = [
+        self::STATUS_DRAFT => 'gray',
+        self::STATUS_PARTIAL => 'warning',
+        self::STATUS_PAID => 'success',
+    ];
+
     protected $fillable = [
         'payment_request_id', // Task 15c: link to PaymentRequest
         'supplier_id',
@@ -67,6 +84,37 @@ class VendorPayment extends Model
         } else {
             $this->attributes['payment_date'] = $value instanceof \Illuminate\Support\Carbon ? $value->toDateString() : $value;
         }
+    }
+
+    public function getStatusAttribute($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return match (strtolower(trim((string) $value))) {
+            'draft' => self::STATUS_DRAFT,
+            'partial' => self::STATUS_PARTIAL,
+            'paid' => self::STATUS_PAID,
+            default => $value,
+        };
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['status'] = null;
+            return;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        $this->attributes['status'] = match ($normalized) {
+            'draft' => self::STATUS_DRAFT,
+            'partial' => self::STATUS_PARTIAL,
+            'paid' => self::STATUS_PAID,
+            default => $value,
+        };
     }
 
     public function paymentRequest()

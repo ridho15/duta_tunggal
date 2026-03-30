@@ -1033,7 +1033,7 @@ $accountReceivable->remaining = $accountReceivable->remaining - $item->amount;
 ## Urutan Pelaksanaan yang Direkomendasikan (Sales Side)
 
 ```
-Minggu 1 (Pembenahan Dasar):
+(Pembenahan Dasar):
   [F1] Format Rupiah konsisten
   [F2] Satuan produk di baris item
   [G2] SO: kolom total harga
@@ -1041,7 +1041,7 @@ Minggu 1 (Pembenahan Dasar):
   [M1] CustomerReceipt: hapus debug
   [M4] CustomerReceipt: bug AR paid_amount ← KRITIS (data piutang salah)
 
-Minggu 1-2 (SO & Invoice):
+(SO & Invoice):
   [G4] SO: tipe pajak
   [G1] Cabang turunan Sales chain
   [L1] SalesInvoice: tipe pajak dari SO
@@ -1049,26 +1049,26 @@ Minggu 1-2 (SO & Invoice):
   [M5] CustomerReceipt: verifikasi journal otomatis
   [M3] CustomerReceipt: tampilkan journal entries
 
-Minggu 2 (DO Redesign):
+(DO Redesign):
   [H1] DO: urutan field
   [H2] DO: hapus receipt item
   [J2] Surat Jalan: simplifikasi field
   [J1] Surat Jalan: hanya DO approved
   [J3] Surat Jalan PDF: gabungkan item
 
-Minggu 2-3 (Multi-Gudang — paling complex):
+(Multi-Gudang — paling complex):
   [G5] SO multi-gudang
   [H3] DO multi-gudang
   [H4] DO → WC flow baru
   [I1] WC: approve/reject manual
   [I2] WC: info DO bukan sales
 
-Minggu 3 (Delivery Schedule):
+(Delivery Schedule):
   [K1] Metode pengiriman
   [K2] Surat kerja driver
   [K3] Schedule selesai → DO selesai
 
-Minggu 3-4 (Minor & Cleanup):
+(Minor & Cleanup):
   [G6] PO dari SO
   [S4] User management warehouse visibility
   [S13] QC Purchase multi-product

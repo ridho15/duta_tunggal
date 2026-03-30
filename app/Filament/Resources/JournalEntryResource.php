@@ -17,6 +17,7 @@ use Filament\Tables\Grouping;
 use Filament\Tables\Filters\TextFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Filament\Tables\Actions\ActionGroup;
@@ -232,11 +233,11 @@ class JournalEntryResource extends Resource
                                             $query->where('status', 'completed');
                                             break;
                                         case 'App\\Models\\CustomerReceipt':
-                                            $query->whereIn('status', ['Paid', 'Partial']);
+                                            $query->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
                                             break;
                                         case 'App\\Models\\CustomerReceiptItem':
                                             $query->whereHas('customerReceipt', function ($q) {
-                                                $q->whereIn('status', ['Paid', 'Partial']);
+                                                $q->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
                                             });
                                             break;
                                         case 'App\\Models\\OtherSale':

@@ -32,6 +32,10 @@ class SaleOrderObserver
         $originalStatus = $saleOrder->getOriginal('status');
         $newStatus = $saleOrder->status;
 
+        if ($originalStatus !== 'approved' && $newStatus === 'approved') {
+            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
+        }
+
         // WC and DO creation is now triggered when a Delivery Order is created.
 
         // Jika status berubah ke 'completed', buat invoice otomatis dan kurangi stock untuk Ambil Sendiri
