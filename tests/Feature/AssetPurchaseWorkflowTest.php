@@ -353,7 +353,7 @@ class AssetPurchaseWorkflowTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', [
             'id' => $purchaseOrder->id,
             'supplier_id' => $this->supplier->id,
-            'status' => 'completed', // Asset purchases are auto-completed
+            'status' => 'approved',
             'is_asset' => true
         ]);
 

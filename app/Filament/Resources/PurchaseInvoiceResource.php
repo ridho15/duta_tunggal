@@ -1231,10 +1231,10 @@ class PurchaseInvoiceResource extends Resource
                 $q->whereHas('orderRequestItem', fn($iq) => $iq->where('supplier_id', $supplierId))
                   ->orWhereHas('purchaseOrders', fn($pq) => $pq->where('supplier_id', $supplierId));
             })
-            ->whereHas('purchaseOrder', function ($q) {
-                $q->where('status', 'completed')
-                  ->whereHas('purchaseReceipt', fn($q2) => $q2->where('status', 'completed'));
-            })
+            // ->whereHas('purchaseOrder', function ($q) {
+            //     $q->where('status', 'completed')
+            //       ->whereHas('purchaseReceipt', fn($q2) => $q2->where('status', 'completed'));
+            // })
             ->orderByDesc('request_date')
             ->get()
             ->mapWithKeys(fn ($or) => [$or->id => $or->request_number])
@@ -1254,7 +1254,7 @@ class PurchaseInvoiceResource extends Resource
         $query = PurchaseOrder::where('supplier_id', $supplierId)
             ->where('cabang_id', $cabangId)
             ->where('status', 'completed')
-            ->whereHas('purchaseReceipt', fn($q) => $q->where('status', 'completed'))
+            // ->whereHas('purchaseReceipt', fn($q) => $q->where('status', 'completed'))
             ->where('refer_model_type', 'App\\Models\\OrderRequest')
             ->where('refer_model_id', $orderRequestId);
 

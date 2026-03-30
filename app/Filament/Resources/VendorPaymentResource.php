@@ -882,7 +882,7 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => App\Models\VendorPayment::STATUS_LABELS[$state] ?? $state)
+                    ->formatStateUsing(fn ($state) => VendorPayment::STATUS_LABELS[$state] ?? $state)
                     ->color(fn(string $state): string => match ($state) {
                         'Draft' => 'gray',
                         'Partial' => 'warning',
@@ -914,7 +914,7 @@ class VendorPaymentResource extends Resource
                     ]),
                 SelectFilter::make('status')
                     ->label('Status')
-                    ->options(App\Models\VendorPayment::STATUS_LABELS),
+                    ->options(VendorPayment::STATUS_LABELS),
             ])
             ->actions([
                 ActionGroup::make([

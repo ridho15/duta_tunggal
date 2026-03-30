@@ -205,9 +205,9 @@ class QualityControlService
         // Create journal entries and inventory stock for passed QC items from PurchaseOrderItem or PurchaseReceiptItem
         // For PurchaseReceiptItem QC (legacy flow), journal entries are created when the receipt is posted
         // For PurchaseOrderItem QC (new flow), journal entries are created here since receipt posting happens later
-        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
-            $this->createJournalEntriesAndInventoryForQC($qualityControl);
-        }
+        // if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
+        //     $this->createJournalEntriesAndInventoryForQC($qualityControl);
+        // }
 
         // Handle Purchase Receipt and Purchase Order completion based on QC results
         if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
