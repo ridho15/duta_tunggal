@@ -232,9 +232,21 @@ class QualityControlPurchaseResource extends Resource
                                     ->dehydrated(true),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
-                                    ->options(Warehouse::all()->mapWithKeys(function ($warehouse) {
-                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                    }))
+                                    ->options(function () {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+                                        $query = Warehouse::where('status', 1);
+
+                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                            $query->where('cabang_id', $user?->cabang_id);
+                                        }
+
+                                        return $query->orderBy('name')
+                                            ->get()
+                                            ->mapWithKeys(function ($warehouse) {
+                                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                            });
+                                    })
                                     ->searchable(['kode', 'name'])
                                     ->required()
                                     ->reactive()
@@ -639,9 +651,21 @@ class QualityControlPurchaseResource extends Resource
                     ]),
                 SelectFilter::make('warehouse_id')
                     ->label('Gudang')
-                    ->options(Warehouse::all()->mapWithKeys(function ($warehouse) {
-                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                    })),
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        $query = Warehouse::where('status', 1);
+
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            $query->where('cabang_id', $user?->cabang_id);
+                        }
+
+                        return $query->orderBy('name')
+                            ->get()
+                            ->mapWithKeys(function ($warehouse) {
+                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                            });
+                    }),
                 Filter::make('supplier')
                     ->label('Supplier')
                     ->form([

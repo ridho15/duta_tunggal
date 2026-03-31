@@ -217,9 +217,21 @@ class StockAdjustmentResource extends Resource
             ->filters([
                 SelectFilter::make('warehouse_id')
                     ->label('Gudang')
-                    ->options(Warehouse::all()->mapWithKeys(function ($warehouse) {
-                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                    })),
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        $query = Warehouse::where('status', 1);
+
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            $query->where('cabang_id', $user?->cabang_id);
+                        }
+
+                        return $query->orderBy('name')
+                            ->get()
+                            ->mapWithKeys(function ($warehouse) {
+                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                            });
+                    }),
 
                 SelectFilter::make('adjustment_type')
                     ->label('Tipe Adjustment')

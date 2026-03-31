@@ -4,13 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
+use App\Models\Invoice;
+use App\Models\PurchaseOrder;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\VendorPayment;
+use App\Filament\Resources\PaymentRequestResource\Pages\CreatePaymentRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\Test;
+use Livewire\Livewire;
+use App\Models\Warehouse;
 use Tests\TestCase;
 
 /**
@@ -80,6 +85,43 @@ class PaymentRequestVendorPaymentFlowTest extends TestCase
             'status'         => 'draft',
             'requested_by'   => $this->user->id,
         ]);
+    }
+
+    #[Test]
+    public function payment_request_total_amount_is_formatted_as_rupiah_in_the_create_form(): void
+    {
+        $warehouse = Warehouse::factory()->create([
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-TEST-PR-0001',
+            'warehouse_id' => $warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->approver->id,
+            'status' => 'approved',
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'invoice_number' => 'INV-TEST-PR-0001',
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $purchaseOrder->id,
+            'cabang_id' => $this->cabang->id,
+            'subtotal' => 1_250_000,
+            'dpp' => 1_250_000,
+            'total' => 1_250_000,
+            'status' => 'unpaid',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(CreatePaymentRequest::class)
+            ->set('data.supplier_id', $this->supplier->id)
+            ->set('data.cabang_id', $this->cabang->id)
+            ->set('data.request_date', now()->toDateString())
+            ->set('data.payment_date', now()->addDays(7)->toDateString())
+            ->set('data.selected_invoices', [$invoice->id])
+            ->assertSet('data.total_amount', '1.250.000');
     }
 
     #[Test]

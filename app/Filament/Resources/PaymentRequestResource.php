@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\Cabang;
+use App\Helpers\MoneyHelper;
 use Filament\Forms;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -94,6 +95,7 @@ class PaymentRequestResource extends Resource
                                     ->label('Total Pembayaran (Rp)')
                                     ->disabled()
                                     ->dehydrated(true)
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::parse($state))
                                     ->indonesianMoney(),
                             ]),
 
@@ -141,7 +143,7 @@ class PaymentRequestResource extends Resource
                                         }
 
                                         $total = Invoice::whereIn('id', $state)->sum('total');
-                                        $set('total_amount', $total);
+                                        $set('total_amount', number_format((float) $total, 0, ',', '.'));
                                     }),
                             ]),
 

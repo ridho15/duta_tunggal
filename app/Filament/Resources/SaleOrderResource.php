@@ -574,7 +574,7 @@ class SaleOrderResource extends Resource
                                                 $user = Auth::user();
                                                 $manageType = $user?->manage_type ?? [];
 
-                                                $query = Warehouse::query();
+                                                $query = Warehouse::where('status', 1);
                                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                                     $query->where('cabang_id', $user?->cabang_id);
                                                 }

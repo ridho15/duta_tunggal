@@ -100,3 +100,26 @@ test('sale order item tax follows selected tipe pajak in the create flow', funct
         ->set('data.saleOrderItem.0.tipe_pajak', 'PPN Included')
         ->assertSet('data.saleOrderItem.0.tax', $activeRate);
 });
+
+test('sale order warehouse allocations only use active warehouses in the user branch', function () {
+    $inactiveWarehouse = Warehouse::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'status' => 0,
+    ]);
+
+    $otherCabang = Cabang::factory()->create();
+    $otherBranchWarehouse = Warehouse::factory()->create([
+        'cabang_id' => $otherCabang->id,
+        'status' => 1,
+    ]);
+
+    $eligibleWarehouseIds = Warehouse::where('status', 1)
+        ->where('cabang_id', $this->cabang->id)
+        ->pluck('id')
+        ->all();
+
+    expect($eligibleWarehouseIds)
+        ->toContain($this->warehouse->id)
+        ->not->toContain($inactiveWarehouse->id)
+        ->not->toContain($otherBranchWarehouse->id);
+});

@@ -99,6 +99,26 @@ class StockOpnameResourceTest extends TestCase
     }
 
     #[Test]
+    public function it_scopes_rak_selection_to_the_stock_opname_warehouse()
+    {
+        $opname = StockOpname::factory()->create([
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $otherWarehouse = Warehouse::factory()->create();
+        $rakInOpnameWarehouse = \App\Models\Rak::factory()->create(['warehouse_id' => $this->warehouse->id]);
+        $rakInOtherWarehouse = \App\Models\Rak::factory()->create(['warehouse_id' => $otherWarehouse->id]);
+
+        $eligibleRakIds = \App\Models\Rak::where('warehouse_id', $opname->warehouse_id)
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($rakInOpnameWarehouse->id, $eligibleRakIds);
+        $this->assertNotContains($rakInOtherWarehouse->id, $eligibleRakIds);
+    }
+
+    #[Test]
     public function it_can_render_stock_opname_edit_page()
     {
         $opname = StockOpname::factory()->create([

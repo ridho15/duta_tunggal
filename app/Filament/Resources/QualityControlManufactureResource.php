@@ -93,7 +93,21 @@ class QualityControlManufactureResource extends Resource
                 ->default($record?->reason_reject),
             Select::make('warehouse_id')
                 ->label('Gudang')
-                ->options(Warehouse::query()->pluck('name', 'id')->toArray())
+                ->options(function () {
+                    $user = Auth::user();
+                    $manageType = $user?->manage_type ?? [];
+                    $query = Warehouse::where('status', 1);
+
+                    if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                        $query->where('cabang_id', $user?->cabang_id);
+                    }
+
+                    return $query->orderBy('name')
+                        ->get()
+                        ->mapWithKeys(function ($warehouse) {
+                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                        });
+                })
                 ->default($record?->warehouse_id)
                 ->required()
                 ->searchable()
@@ -187,7 +201,21 @@ class QualityControlManufactureResource extends Resource
                                     }),
                                 Select::make('warehouse_id')
                                     ->label('Warehouse')
-                                    ->options(Warehouse::pluck('name', 'id'))
+                                    ->options(function () {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+                                        $query = Warehouse::where('status', 1);
+
+                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                            $query->where('cabang_id', $user?->cabang_id);
+                                        }
+
+                                        return $query->orderBy('name')
+                                            ->get()
+                                            ->mapWithKeys(function ($warehouse) {
+                                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                            });
+                                    })
                                     ->required()
                                     ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                         return "({$warehouse->kode}) {$warehouse->name}";
@@ -341,7 +369,18 @@ class QualityControlManufactureResource extends Resource
                     ]),
                 SelectFilter::make('warehouse_id')
                     ->label('Warehouse')
-                    ->options(Warehouse::pluck('name', 'id')),
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        $query = Warehouse::where('status', 1);
+
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            $query->where('cabang_id', $user?->cabang_id);
+                        }
+
+                        return $query->orderBy('name')
+                            ->pluck('name', 'id');
+                    }),
                 Filter::make('created_at')
                     ->form([
                         DatePicker::make('created_from'),

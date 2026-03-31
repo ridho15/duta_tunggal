@@ -147,9 +147,13 @@ class OrderRequestResource extends Resource
                             ->options(function (callable $get) {
                                 $cabangId = $get('cabang_id');
                                 if ($cabangId) {
-                                    return Warehouse::where('cabang_id', $cabangId)->get()->mapWithKeys(function ($warehouse) {
+                                    return Warehouse::where('status', 1)
+                                        ->where('cabang_id', $cabangId)
+                                        ->orderBy('name')
+                                        ->get()
+                                        ->mapWithKeys(function ($warehouse) {
                                         return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                    });
+                                        });
                                 }
                                 return [];
                             })
@@ -157,8 +161,11 @@ class OrderRequestResource extends Resource
                             ->searchable()
                             ->getSearchResultsUsing(function (string $search, callable $get) {
                                 $cabangId = $get('cabang_id');
-                                $query = Warehouse::where('name', 'like', "%{$search}%")
-                                    ->orWhere('kode', 'like', "%{$search}%");
+                                $query = Warehouse::where('status', 1)
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                            ->orWhere('kode', 'like', "%{$search}%");
+                                    });
 
                                 if ($cabangId) {
                                     $query->where('cabang_id', $cabangId);

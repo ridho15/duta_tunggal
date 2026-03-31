@@ -40,7 +40,17 @@ class StockAdjustmentItemsRelationManager extends RelationManager
 
                 Select::make('rak_id')
                     ->label('Rak')
-                    ->options(Rak::pluck('name', 'id'))
+                    ->options(function () {
+                        $warehouseId = $this->getOwnerRecord()->warehouse_id ?? null;
+
+                        if (!$warehouseId) {
+                            return [];
+                        }
+
+                        return Rak::where('warehouse_id', $warehouseId)
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
+                    })
                     ->searchable()
                     ->preload(),
 

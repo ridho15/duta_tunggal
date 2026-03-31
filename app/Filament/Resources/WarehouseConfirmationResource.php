@@ -218,12 +218,20 @@ class WarehouseConfirmationResource extends Resource
 
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
-                                    ->searchable('name', 'kode')
-                                    ->options(function () {
-                                        return Warehouse::all()->mapWithKeys(function ($warehouse) {
-                                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                        });
-                                    })
+                                       ->searchable()
+                                       ->options(function () {
+                                           $user = Auth::user();
+                                           $manageType = $user?->manage_type ?? [];
+                                           $query = Warehouse::where('status', 1);
+
+                                           if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                               $query->where('cabang_id', $user?->cabang_id);
+                                           }
+
+                                           return $query->orderBy('name')
+                                               ->get()
+                                               ->mapWithKeys(fn($w) => [$w->id => "({$w->kode}) {$w->name}"]);
+                                       })
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Warehouse harus dipilih'

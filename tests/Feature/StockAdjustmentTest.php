@@ -229,3 +229,19 @@ test('adjustment belongs to approver', function () {
 
     expect($adjustment->approver->id)->toBe($user->id);
 });
+
+test('stock adjustment rak selection stays within the adjustment warehouse', function () {
+    $adjustment = StockAdjustment::factory()->create();
+    $otherWarehouse = Warehouse::factory()->create();
+
+    $rakInAdjustmentWarehouse = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
+    $rakInOtherWarehouse = Rak::factory()->create(['warehouse_id' => $otherWarehouse->id]);
+
+    $eligibleRakIds = Rak::where('warehouse_id', $adjustment->warehouse_id)
+        ->pluck('id')
+        ->all();
+
+    expect($eligibleRakIds)
+        ->toContain($rakInAdjustmentWarehouse->id)
+        ->not->toContain($rakInOtherWarehouse->id);
+});

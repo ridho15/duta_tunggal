@@ -100,6 +100,29 @@ it('creates an order request through the Filament create page', function () {
     expect((float) $item->subtotal)->toBeGreaterThan(0.0);
 });
 
+it('only offers active warehouses for order request selection', function () {
+    $activeWarehouse = Warehouse::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'status' => 1,
+        'name' => 'Gudang Aktif',
+    ]);
+
+    $inactiveWarehouse = Warehouse::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'status' => 0,
+        'name' => 'Gudang Nonaktif',
+    ]);
+
+    $availableWarehouseIds = Warehouse::where('status', 1)
+        ->where('cabang_id', $this->cabang->id)
+        ->orderBy('name')
+        ->pluck('id')
+        ->all();
+
+    expect($availableWarehouseIds)->toContain($activeWarehouse->id)
+        ->and($availableWarehouseIds)->not->toContain($inactiveWarehouse->id);
+});
+
 it('stores formatted unit_price as numeric value in database', function () {
     $component = Livewire::actingAs($this->user)
         ->test(CreateOrderRequest::class)

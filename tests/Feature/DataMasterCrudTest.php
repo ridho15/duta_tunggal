@@ -878,6 +878,28 @@ describe('Rak (Shelf) CRUD', function () {
         ]);
     });
 
+    it('only offers active warehouses for rak selection', function () {
+        $inactiveWarehouse = Warehouse::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 0,
+        ]);
+
+        $otherCabang = Cabang::factory()->create();
+        $otherBranchWarehouse = Warehouse::factory()->create([
+            'cabang_id' => $otherCabang->id,
+            'status' => 1,
+        ]);
+
+        $eligibleWarehouseIds = Warehouse::where('status', 1)
+            ->where('cabang_id', $this->cabang->id)
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($this->warehouse->id, $eligibleWarehouseIds);
+        $this->assertNotContains($inactiveWarehouse->id, $eligibleWarehouseIds);
+        $this->assertNotContains($otherBranchWarehouse->id, $eligibleWarehouseIds);
+    });
+
     it('validates required fields when creating rak', function () {
         Livewire::test(CreateRak::class)
             ->fillForm([])

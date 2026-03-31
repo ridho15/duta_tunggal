@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AccountPayable;
+use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
 use App\Models\Invoice;
@@ -45,7 +46,9 @@ class PurchaseReceiptFlowTest extends TestCase
         $this->seed(CabangSeeder::class);
         $this->seed(ChartOfAccountSeeder::class);
 
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->create([
+            'cabang_id' => Cabang::first()?->id,
+        ]);
         $this->supplier = Supplier::factory()->create();
         $this->warehouse = Warehouse::factory()->create();
         $this->product = Product::factory()->create();
@@ -252,6 +255,39 @@ class PurchaseReceiptFlowTest extends TestCase
         // Verify automatic qty_rejected calculation
         $receiptItem->refresh();
         $this->assertEquals(5, $receiptItem->qty_rejected); // 20 - 15 = 5
+    }
+
+    /** @test */
+    public function purchase_receipt_item_warehouse_selection_is_active_and_branch_scoped()
+    {
+        $activeWarehouse = Warehouse::factory()->create([
+            'cabang_id' => $this->user->cabang_id,
+            'status' => true,
+            'name' => 'Gudang Aktif Receipt',
+        ]);
+
+        $inactiveWarehouse = Warehouse::factory()->create([
+            'cabang_id' => $this->user->cabang_id,
+            'status' => false,
+            'name' => 'Gudang Nonaktif Receipt',
+        ]);
+
+        $otherCabang = Cabang::where('id', '!=', $this->user->cabang_id)->first();
+        $otherCabangWarehouse = Warehouse::factory()->create([
+            'cabang_id' => $otherCabang->id,
+            'status' => true,
+            'name' => 'Gudang Cabang Lain Receipt',
+        ]);
+
+        $eligibleWarehouseIds = Warehouse::where('status', true)
+            ->where('cabang_id', $this->user->cabang_id)
+            ->orderBy('name')
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($activeWarehouse->id, $eligibleWarehouseIds);
+        $this->assertNotContains($inactiveWarehouse->id, $eligibleWarehouseIds);
+        $this->assertNotContains($otherCabangWarehouse->id, $eligibleWarehouseIds);
     }
 
     /** @test */
