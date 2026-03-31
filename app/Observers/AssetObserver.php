@@ -3,6 +3,8 @@
 namespace App\Observers;
 
 use App\Models\Asset;
+use App\Services\AssetService;
+use Illuminate\Support\Facades\Log;
 
 class AssetObserver
 {
@@ -12,6 +14,26 @@ class AssetObserver
     public function creating(Asset $asset): void
     {
         $this->calculateDepreciation($asset);
+    }
+
+    /**
+     * Handle the Asset "created" event.
+     */
+    public function created(Asset $asset): void
+    {
+        try {
+            $assetService = app(AssetService::class);
+
+            if (!$assetService->hasPostedJournals($asset)) {
+                $assetService->postAssetAcquisitionJournal($asset);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('AssetObserver: automatic asset journal posting skipped', [
+                'asset_id' => $asset->id,
+                'asset_name' => $asset->name,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

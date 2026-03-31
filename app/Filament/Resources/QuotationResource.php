@@ -60,6 +60,37 @@ class QuotationResource extends Resource
     protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
 
     protected static ?int $navigationSort = 1;
+
+    protected static function normalizeTaxTypeValue(?string $taxType): string
+    {
+        $value = strtolower(trim((string) $taxType));
+
+        return match ($value) {
+            'ppn included', 'ppn_included', 'inclusive', 'inklusif' => 'PPN Included',
+            'ppn excluded', 'ppn_excluded', 'exclusive', 'eksklusif', 'eklusif' => 'PPN Excluded',
+            'non pajak', 'non-pajak', 'nonpajak', 'none' => 'None',
+            default => trim((string) $taxType) !== '' ? (string) $taxType : 'None',
+        };
+    }
+
+    protected static function taxTypeOptions(): array
+    {
+        return [
+            'None' => 'Non Pajak',
+            'PPN Excluded' => 'PPN Excluded (PPN di luar harga)',
+            'PPN Included' => 'PPN Included (PPN sudah termasuk harga)',
+        ];
+    }
+
+    protected static function subtotalLabelForTaxType(?string $taxType): string
+    {
+        return match (static::normalizeTaxTypeValue($taxType)) {
+            'PPN Included' => 'Sub Total (PPN Included)',
+            'PPN Excluded' => 'Sub Total (PPN Excluded)',
+            default => 'Sub Total (Non Pajak)',
+        };
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -519,18 +550,27 @@ class QuotationResource extends Resource
                                 Select::make('tax_type')
                                     ->label('Tipe Pajak')
                                     ->default('None')
-                                    ->options([
-                                        'None' => 'Non Pajak',
-                                        'Exclusive' => 'Eksklusif (PPN di luar harga)',
-                                        'Inclusive' => 'Inklusif (PPN sudah termasuk harga)',
-                                    ])
+                                    ->options(static::taxTypeOptions())
                                     ->nullable()
+                                    ->afterStateHydrated(function ($component, $state) {
+                                        $component->state(static::normalizeTaxTypeValue($state));
+                                    })
                                     ->live()
                                     ->afterStateUpdated(function ($state, callable $get, callable $set, $livewire) {
+                                        $state = static::normalizeTaxTypeValue($state);
+                                        $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
+
+                                        if ($state === 'None') {
+                                            $set('tax', 0);
+                                            $set('tax_nominal', '0');
+                                        } else {
+                                            $set('tax', $defaultTax);
+                                        }
+
                                         $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
                                         $qty = (float)($get('quantity') ?? 0);
                                         $discPct = (float)($get('discount') ?? 0);
-                                        $taxPct = (float)($get('tax') ?? 0);
+                                        $taxPct = $state === 'None' ? 0 : $defaultTax;
                                         $taxType = $state ?? 'None';
                                         // total = unit_price * quantity (no discount)
                                         $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
@@ -572,8 +612,12 @@ class QuotationResource extends Resource
                                         $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
                                         $qty = (float)($get('quantity') ?? 0);
                                         $discPct = (float)($get('discount') ?? 0);
-                                        $taxPct = (float)($state ?? 0);
                                         $taxType = $get('tax_type') ?? 'None';
+                                        if ($taxType === 'None') {
+                                            $state = 0;
+                                            $set('tax', 0);
+                                        }
+                                        $taxPct = (float)($state ?? 0);
                                         // total = unit_price * quantity (no discount)
                                         $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
                                         // subtotal = with discount + tax (formatted)
@@ -630,11 +674,7 @@ class QuotationResource extends Resource
                                         }
                                     }),
                                 TextInput::make('subtotal')
-                                    ->label(fn ($get) => match ($get('tax_type') ?? 'None') {
-                                        'Inclusive' => 'Sub Total (Inklusif PPN)',
-                                        'Exclusive' => 'Sub Total (Eksklusif PPN)',
-                                        default     => 'Sub Total (Non Pajak)',
-                                    })
+                                    ->label(fn ($get) => static::subtotalLabelForTaxType($get('tax_type') ?? 'None'))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)

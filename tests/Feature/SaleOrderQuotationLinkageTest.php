@@ -122,7 +122,7 @@ function makeFixtures(): array
         'unit_price' => 12500000,
         'discount' => 0,
         'tax' => 11,
-        'tax_type' => 'Exclusive',
+        'tax_type' => 'PPN Excluded',
     ]);
 
     return compact('cabang', 'customer', 'product', 'quotation', 'warehouse', 'warehouse2', 'rak');

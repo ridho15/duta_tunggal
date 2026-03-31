@@ -282,7 +282,7 @@ class ViewQuotation extends ViewRecord
                                             }),
                                         Select::make('rak_id')
                                             ->label('Rak')
-                                            ->searchable(['code', 'perusahaan'])
+                                            ->searchable(['code', 'name'])
                                             ->preload()
                                             ->options(function ($get) {
                                                 $warehouseId = $get('warehouse_id');

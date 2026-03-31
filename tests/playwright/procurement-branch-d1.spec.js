@@ -4,6 +4,7 @@ import {
   ensurePurchaseInvoiceFixture,
   openCreatePage,
   chooseFixtureSupplier,
+  chooseFixtureCabang,
   chooseFixtureOrderRequest,
   checkCheckboxByLabel,
   clickCheckboxByLabel,
@@ -42,6 +43,7 @@ test('D1-c: selecting fixture PO populates cabang in purchase invoice form', asy
   await openCreatePage(page)
 
   await chooseFixtureSupplier(page)
+  await chooseFixtureCabang(page)
   await chooseFixtureOrderRequest(page)
 
   let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)

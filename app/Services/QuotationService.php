@@ -13,7 +13,7 @@ class QuotationService
     {
         $total = 0;
         foreach ($quotation->quotationItem as $item) {
-            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tax_type ?? 'Exclusive');
+            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tax_type ?? 'PPN Excluded');
         }
 
         $quotation->update([

@@ -25,6 +25,13 @@ class EditOrderRequest extends EditRecord
         if ($this->getRecord()->created_by == null) {
             $data['created_by'] = Auth::user()->id;
         }
+
+        if (($data['tax_type'] ?? 'None') === 'None' && isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
+            foreach ($data['orderRequestItem'] as &$item) {
+                $item['tax'] = 0;
+            }
+            unset($item);
+        }
         return $data;
     }
 

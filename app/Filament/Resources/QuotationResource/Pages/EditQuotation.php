@@ -53,8 +53,9 @@ class EditQuotation extends EditRecord
             $numericUnit = \App\Http\Controllers\HelperController::parseIndonesianMoney($rawUnit);
             $qty = (int)($item['quantity'] ?? 0);
             $disc = (int)($item['discount'] ?? 0);
-            $tax = (int)($item['tax'] ?? 0);
-            $tipe = $item['tipe_pajak'] ?? null;
+            $tipe = $item['tipe_pajak'] ?? $item['tax_type'] ?? null;
+            $tax = in_array($tipe, ['None', 'Non Pajak'], true) ? 0 : (int)($item['tax'] ?? 0);
+            $item['tax'] = $tax;
             $total = \App\Http\Controllers\HelperController::hitungSubtotal($qty, $numericUnit, $disc, $tax, $tipe);
             $grand += $total;
             // Replace with normalized numeric values (stored as integer Rupiah)

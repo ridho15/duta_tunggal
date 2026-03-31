@@ -54,6 +54,33 @@ class OrderRequestResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    public static function calculateApprovalItemPreview(
+        float $quantity,
+        float $unitPrice,
+        float $discountPct,
+        float $taxPct,
+        string $taxType
+    ): array {
+        $base = $quantity * $unitPrice;
+        $afterDisc = $base - $base * ($discountPct / 100);
+        $subtotal = $taxType === 'PPN Included'
+            ? $afterDisc
+            : $afterDisc + $afterDisc * ($taxPct / 100);
+
+        try {
+            $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
+            $taxNominal = (float) ($taxRes['ppn'] ?? 0);
+        } catch (\Throwable $e) {
+            $taxNominal = 0;
+        }
+
+        return [
+            'total_cost' => number_format($base, 0, ',', '.'),
+            'subtotal' => number_format($subtotal, 0, ',', '.'),
+            'tax_nominal' => number_format($taxNominal, 0, ',', '.'),
+        ];
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -130,7 +157,7 @@ class OrderRequestResource extends Resource
                             ->searchable()
                             ->getSearchResultsUsing(function (string $search, callable $get) {
                                 $cabangId = $get('cabang_id');
-                                $query = Warehouse::where('perusahaan', 'like', "%{$search}%")
+                                $query = Warehouse::where('name', 'like', "%{$search}%")
                                     ->orWhere('kode', 'like', "%{$search}%");
 
                                 if ($cabangId) {
@@ -166,13 +193,28 @@ class OrderRequestResource extends Resource
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (string $state, callable $get, callable $set) {
+                                $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
+
+                                if ($state === 'None') {
+                                    $items = $get('orderRequestItem') ?? [];
+                                    foreach ($items as $key => $item) {
+                                        $set("orderRequestItem.{$key}.tax", 0);
+                                        $set("orderRequestItem.{$key}.tax_nominal", '0');
+                                    }
+                                } else {
+                                    $items = $get('orderRequestItem') ?? [];
+                                    foreach ($items as $key => $item) {
+                                        $set("orderRequestItem.{$key}.tax", $defaultTax);
+                                    }
+                                }
+
                                 // Recalculate subtotals for all items when tax type changes
                                 $items = $get('orderRequestItem') ?? [];
                                 foreach ($items as $key => $item) {
                                     $qty     = (float) ($item['quantity'] ?? 0);
                                     $price   = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
                                     $discPct = (float) ($item['discount'] ?? 0);
-                                    $taxPct  = (float) ($item['tax'] ?? 0);
+                                    $taxPct  = $state === 'None' ? 0 : $defaultTax;
                                     $base      = $qty * $price;
                                     $afterDisc = $base - $base * ($discPct / 100);
                                     try {
@@ -232,7 +274,9 @@ class OrderRequestResource extends Resource
                                             $product = Product::find($state);
                                             if ($product) {
                                                 // Set tax from product if available, otherwise keep current value
-                                                if ($product->pajak && $product->pajak > 0) {
+                                                if (($get('../../tax_type') ?? 'PPN Excluded') === 'None') {
+                                                    $set('tax', 0);
+                                                } elseif ($product->pajak && $product->pajak > 0) {
                                                     $set('tax', $product->pajak);
                                                 }
 
@@ -259,18 +303,10 @@ class OrderRequestResource extends Resource
                                                 $quantity = (float) ($get('quantity') ?? 0);
                                                 $discPct  = (float) ($get('discount') ?? 0);
                                                 $taxPct   = (float) ($get('tax') ?? 0);
-                                                $base      = $quantity * $unitPrice;
-                                                $afterDisc = $base - $base * ($discPct / 100);
-                                                $subtotal  = $taxType === 'PPN Included'
-                                                    ? $afterDisc
-                                                    : $afterDisc + $afterDisc * ($taxPct / 100);
-                                                $set('subtotal', number_format((float)$subtotal, 0, ',', '.'));
-                                                try {
-                                                    $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
-                                                    $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
-                                                } catch (\Throwable $e) {
-                                                    $set('tax_nominal', '0');
-                                                }
+                                                $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                                $set('total_cost', $preview['total_cost']);
+                                                $set('subtotal', $preview['subtotal']);
+                                                $set('tax_nominal', $preview['tax_nominal']);
                                             }
                                         }
                                     })
@@ -323,6 +359,10 @@ class OrderRequestResource extends Resource
                                     })
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         if ($state) {
+                                            $set('orderRequestItem', []);
+                                        }
+
+                                        if ($state) {
                                             $productId = $get('product_id');
                                             if ($productId) {
                                                 $product = Product::find($productId);
@@ -340,16 +380,10 @@ class OrderRequestResource extends Resource
                                                     $quantity = (float) ($get('quantity') ?? 0);
                                                     $discPct  = (float) ($get('discount') ?? 0);
                                                     $taxPct   = (float) ($get('tax') ?? 0);
-                                                    $base      = $quantity * $unitPrice;
-                                                    $afterDisc = $base - $base * ($discPct / 100);
-                                                    try {
-                                                        $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
-                                                        $set('subtotal', number_format((float)$taxRes['total'], 0, ',', '.'));
-                                                        $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
-                                                    } catch (\Throwable $e) {
-                                                        $set('subtotal', number_format((float)$afterDisc, 0, ',', '.'));
-                                                        $set('tax_nominal', '0');
-                                                    }
+                                                    $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                                    $set('total_cost', $preview['total_cost']);
+                                                    $set('subtotal', $preview['subtotal']);
+                                                    $set('tax_nominal', $preview['tax_nominal']);
                                                 }
                                             }
                                         }
@@ -479,12 +513,16 @@ class OrderRequestResource extends Resource
                                 TextInput::make('tax')
                                     ->label('Tax (%)')
                                     ->numeric()
-                                    ->default(fn() => \App\Models\TaxSetting::activeRate('PPN'))
+                                    ->default(fn (callable $get) => ($get('../../tax_type') ?? 'PPN Excluded') === 'None' ? 0 : \App\Models\TaxSetting::activeRate('PPN'))
                                     ->minValue(0)
                                     ->maxValue(100)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        if ($taxType === 'None') {
+                                            $state = 0;
+                                            $set('tax', 0);
+                                        }
                                         $quantity  = (float) ($get('quantity') ?? 0);
                                         $unitPrice = \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
                                         $discPct   = (float) ($get('discount') ?? 0);
@@ -609,6 +647,22 @@ class OrderRequestResource extends Resource
                         return "({$state->product->sku}) {$state->product->name}";
                     })
                     ->badge(),
+                TextColumn::make('fulfilled_quantity')
+                    ->label('Qty Terpenuhi')
+                    ->state(function ($record) {
+                        return (float) $record->orderRequestItem->sum(
+                            fn ($item) => (float) ($item->fulfilled_quantity ?? 0)
+                        );
+                    })
+                    ->numeric(),
+                TextColumn::make('remaining_quantity')
+                    ->label('Sisa Qty')
+                    ->state(function ($record) {
+                        return (float) $record->orderRequestItem->sum(
+                            fn ($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
+                        );
+                    })
+                    ->numeric(),
                 TextColumn::make('item_units')
                     ->label('Satuan')
                     ->state(function ($record) {
@@ -808,6 +862,7 @@ class OrderRequestResource extends Resource
                             return [
                                 'supplier_id'           => $firstSupplierId,
                                 'create_purchase_order' => true,
+                                'tax_type'              => $record->tax_type ?? 'None',
                                 'selected_items'        => $items,
                             ];
                         })
@@ -817,6 +872,7 @@ class OrderRequestResource extends Resource
                                 ->columns(2)
                                 ->visible(fn(Get $get) => $get('create_purchase_order'))
                                 ->schema([
+                                    Hidden::make('tax_type'),
                                     Select::make('supplier_id')
                                         ->label('Supplier (untuk PO)')
                                         ->helperText('Supplier utama untuk Purchase Order. Setiap item memiliki supplier masing-masing (lihat di tabel item).')
@@ -907,7 +963,23 @@ class OrderRequestResource extends Resource
                                                 ->label('Qty')
                                                 ->numeric()
                                                 ->minValue(0)
+                                                ->reactive()
+                                                ->live()
                                                 ->required()
+                                                ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                    $taxType = $get('../../tax_type') ?? 'PPN Excluded';
+                                                    $preview = self::calculateApprovalItemPreview(
+                                                        (float) ($state ?? 0),
+                                                        (float) \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0),
+                                                        (float) ($get('discount') ?? 0),
+                                                        (float) ($get('tax') ?? 0),
+                                                        $taxType
+                                                    );
+
+                                                    $set('total_cost', $preview['total_cost']);
+                                                    $set('subtotal', $preview['subtotal']);
+                                                    $set('tax_nominal', $preview['tax_nominal']);
+                                                })
                                                 ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                                                 ->rules([
                                                     fn($get) => function ($attribute, $value, $fail) use ($get) {
@@ -926,6 +998,22 @@ class OrderRequestResource extends Resource
                                                 ->label('Harga Satuan (Rp)')
                                                 ->required()
                                                 ->indonesianMoney()
+                                                ->reactive()
+                                                ->live()
+                                                ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                    $taxType = $get('../../tax_type') ?? 'PPN Excluded';
+                                                    $preview = self::calculateApprovalItemPreview(
+                                                        (float) ($get('quantity') ?? 0),
+                                                        (float) \App\Helpers\MoneyHelper::parse($state ?? 0),
+                                                        (float) ($get('discount') ?? 0),
+                                                        (float) ($get('tax') ?? 0),
+                                                        $taxType
+                                                    );
+
+                                                    $set('total_cost', $preview['total_cost']);
+                                                    $set('subtotal', $preview['subtotal']);
+                                                    $set('tax_nominal', $preview['tax_nominal']);
+                                                })
                                                 ->rules([
                                                     'required',
                                                     'regex:/^[0-9\.,]+$/',
@@ -1075,6 +1163,7 @@ class OrderRequestResource extends Resource
                                 'supplier_id'           => $isMultiSupplier ? null : $uniqueSuppliers->first(),
                                 'create_purchase_order' => true,
                                 'multi_supplier'        => $isMultiSupplier,
+                                'tax_type'              => $record->tax_type ?? 'PPN Excluded',
                                 'selected_items'        => $items,
                             ];
                         })
@@ -1082,6 +1171,7 @@ class OrderRequestResource extends Resource
                             Section::make('Opsi Persetujuan')
                                 ->icon('heroicon-o-cog-6-tooth')
                                 ->schema([
+                                    Hidden::make('tax_type'),
                                     \Filament\Forms\Components\Toggle::make('create_purchase_order')
                                         ->label('Buat Purchase Order secara otomatis?')
                                         ->helperText('Aktifkan untuk langsung membuat PO setelah approval.')
@@ -1191,7 +1281,23 @@ class OrderRequestResource extends Resource
                                                 ->label('Qty')
                                                 ->numeric()
                                                 ->minValue(0)
+                                                ->reactive()
+                                                ->live()
                                                 ->required()
+                                                ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                    $taxType = $get('../../tax_type') ?? 'PPN Excluded';
+                                                    $preview = self::calculateApprovalItemPreview(
+                                                        (float) ($state ?? 0),
+                                                        (float) \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0),
+                                                        (float) ($get('discount') ?? 0),
+                                                        (float) ($get('tax') ?? 0),
+                                                        $taxType
+                                                    );
+
+                                                    $set('total_cost', $preview['total_cost']);
+                                                    $set('subtotal', $preview['subtotal']);
+                                                    $set('tax_nominal', $preview['tax_nominal']);
+                                                })
                                                 ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                                                 ->rules([
                                                     fn($get) => function ($attribute, $value, $fail) use ($get) {
@@ -1222,6 +1328,22 @@ class OrderRequestResource extends Resource
                                                 ->label('Harga Satuan (Rp)')
                                                 ->required()
                                                 ->indonesianMoney()
+                                                ->reactive()
+                                                ->live()
+                                                ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                    $taxType = $get('../../tax_type') ?? 'PPN Excluded';
+                                                    $preview = self::calculateApprovalItemPreview(
+                                                        (float) ($get('quantity') ?? 0),
+                                                        (float) \App\Helpers\MoneyHelper::parse($state ?? 0),
+                                                        (float) ($get('discount') ?? 0),
+                                                        (float) ($get('tax') ?? 0),
+                                                        $taxType
+                                                    );
+
+                                                    $set('total_cost', $preview['total_cost']);
+                                                    $set('subtotal', $preview['subtotal']);
+                                                    $set('tax_nominal', $preview['tax_nominal']);
+                                                })
                                                 ->rules([
                                                     'required',
                                                     'regex:/^[0-9\.,]+$/',
@@ -1292,6 +1414,7 @@ class OrderRequestResource extends Resource
                                         $orderRequestService->createPurchaseOrder($record, $poData);
                                         $created++;
                                     }
+                                    $record->refresh();
                                     $record->update(['status' => 'approved']);
                                     HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
                                     return;
@@ -1306,6 +1429,7 @@ class OrderRequestResource extends Resource
                             }
 
                             $orderRequestService->approve($record, $data);
+                            $record->refresh();
                             HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
                         }),
                     Action::make('request_approve')
@@ -1354,6 +1478,115 @@ class OrderRequestResource extends Resource
         ];
     }
 
+    public static function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
+    {
+        return $infolist
+            ->schema([
+                \Filament\Infolists\Components\Section::make('Informasi Order Request')
+                    ->columns(3)
+                    ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('request_number')
+                            ->label('Request Number'),
+                        \Filament\Infolists\Components\TextEntry::make('status')
+                            ->label('Status')
+                            ->badge(),
+                        \Filament\Infolists\Components\TextEntry::make('tax_type')
+                            ->label('Tipe PPN')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('warehouse.name')
+                            ->label('Gudang')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('cabang.nama')
+                            ->label('Cabang')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('request_date')
+                            ->label('Request Date')
+                            ->date('d/m/Y'),
+                    ]),
+                \Filament\Infolists\Components\Section::make('Ringkasan Quantity')
+                    ->columns(2)
+                    ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('items_count')
+                            ->label('Jumlah Item')
+                            ->getStateUsing(fn ($record) => $record->orderRequestItem->count()),
+                        \Filament\Infolists\Components\TextEntry::make('total_quantity')
+                            ->label('Total Qty')
+                            ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum('quantity')),
+                        \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
+                            ->label('Qty Terpenuhi')
+                            ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum('fulfilled_quantity')),
+                        \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
+                            ->label('Sisa Qty')
+                            ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum(
+                                fn ($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
+                            )),
+                    ]),
+                \Filament\Infolists\Components\Section::make('Detail Item Order Request')
+                    ->columnSpanFull()
+                    ->schema([
+                        \Filament\Infolists\Components\RepeatableEntry::make('orderRequestItem')
+                            ->label('')
+                            ->columnSpanFull()
+                            ->columns(6)
+                            ->schema([
+                                \Filament\Infolists\Components\TextEntry::make('product.name')
+                                    ->label('Produk')
+                                    ->columnSpan(2),
+                                \Filament\Infolists\Components\TextEntry::make('supplier.perusahaan')
+                                    ->label('Supplier')
+                                    ->placeholder('-'),
+                                \Filament\Infolists\Components\TextEntry::make('quantity')
+                                    ->label('Qty'),
+                                \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
+                                    ->label('Qty Terpenuhi')
+                                    ->getStateUsing(fn ($record) => (float) ($record->fulfilled_quantity ?? 0)),
+                                \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
+                                    ->label('Sisa Qty')
+                                    ->getStateUsing(fn ($record) => max(0, (float) $record->quantity - (float) ($record->fulfilled_quantity ?? 0))),
+                                \Filament\Infolists\Components\TextEntry::make('original_price')
+                                    ->label('Harga Supplier')
+                                    ->getStateUsing(function ($record) {
+                                        return 'Rp ' . number_format((float) ($record->original_price ?? 0), 0, ',', '.');
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('unit_price')
+                                    ->label('Harga Override')
+                                    ->getStateUsing(function ($record) {
+                                        return 'Rp ' . number_format((float) ($record->unit_price ?? 0), 0, ',', '.');
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('tax')
+                                    ->label('Pajak (%)')
+                                    ->getStateUsing(fn ($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'),
+                                \Filament\Infolists\Components\TextEntry::make('total_cost')
+                                    ->label('Total (Harga x Qty)')
+                                    ->getStateUsing(function ($record) {
+                                        $totalCost = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+
+                                        return 'Rp ' . number_format($totalCost, 0, ',', '.');
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('tax_nominal')
+                                    ->label('Nominal Pajak')
+                                    ->getStateUsing(function ($record) {
+                                        $taxType = $record->orderRequest->tax_type ?? 'PPN Excluded';
+                                        $base = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+
+                                        try {
+                                            $taxResult = \App\Services\TaxService::compute($base, (float) ($record->tax ?? 0), $taxType);
+
+                                            return 'Rp ' . number_format((float) ($taxResult['ppn'] ?? 0), 0, ',', '.');
+                                        } catch (\Throwable $e) {
+                                            return 'Rp 0';
+                                        }
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('subtotal')
+                                    ->label('Subtotal')
+                                    ->getStateUsing(function ($record) {
+                                        return 'Rp ' . number_format((float) ($record->subtotal ?? 0), 0, ',', '.');
+                                    }),
+                            ]),
+                    ]),
+            ]);
+    }
+
     public static function getPages(): array
     {
         return [
@@ -1364,7 +1597,7 @@ class OrderRequestResource extends Resource
         ];
     }
 
-    protected static function mutateFormDataBeforeCreate(array $data): array
+    public static function mutateFormDataBeforeCreate(array $data): array
     {
         // Set cabang_id if not provided
         if (empty($data['cabang_id'])) {

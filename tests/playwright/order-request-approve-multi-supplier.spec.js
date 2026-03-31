@@ -185,4 +185,49 @@ test.describe('Order Request #5 Approve Modal — multi-supplier & satuan per it
     expect(supplierVal).toContain('CV Distributor Jaya');
   });
 
+  test('changing override price updates total_cost and subtotal before approval', async ({ page }) => {
+    const modal = await openApproveModal(page, null);
+    const firstItem = modal.locator('.fi-fo-repeater-item').first();
+
+    const unitPriceInput = firstItem.locator('input[id*="unit_price"]').first();
+    const totalCostInput = firstItem.locator('input[id*="total_cost"]').first();
+    const subtotalInput = firstItem.locator('input[id*="subtotal"]').first();
+    const taxNominalInput = firstItem.locator('input[id*="tax_nominal"]').first();
+
+    const originalUnitPrice = await unitPriceInput.inputValue();
+    const originalTotalCost = await totalCostInput.inputValue();
+    const originalSubtotal = await subtotalInput.inputValue();
+    const originalTaxNominal = await taxNominalInput.inputValue();
+
+    await unitPriceInput.click({ clickCount: 3 });
+    await unitPriceInput.fill('145.000');
+    await unitPriceInput.press('Tab');
+
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1200);
+
+    const newUnitPrice = await unitPriceInput.inputValue();
+    const newTotalCost = await totalCostInput.inputValue();
+    const newSubtotal = await subtotalInput.inputValue();
+    const newTaxNominal = await taxNominalInput.inputValue();
+
+    console.log('override price preview change:', {
+      originalUnitPrice,
+      originalTotalCost,
+      originalSubtotal,
+      originalTaxNominal,
+      newUnitPrice,
+      newTotalCost,
+      newSubtotal,
+      newTaxNominal,
+    });
+
+    expect(newUnitPrice).toBe('145.000');
+    expect(newTotalCost).not.toBe(originalTotalCost);
+    expect(newSubtotal).not.toBe(originalSubtotal);
+    expect(newTaxNominal).not.toBe(originalTaxNominal);
+    expect(newTotalCost).toBe('1.450.000');
+    expect(newSubtotal).toBe('1.609.500');
+  });
+
 });

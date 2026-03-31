@@ -4,6 +4,7 @@ import {
   ensurePurchaseInvoiceFixture,
   openCreatePage,
   chooseFixtureSupplier,
+  chooseFixtureCabang,
   chooseFixtureOrderRequest,
   checkCheckboxByLabel,
   clickCheckboxByLabel,
@@ -24,6 +25,10 @@ function parseIdr(value) {
   return Number.isFinite(num) ? num : 0
 }
 
+function isRupiahFormatted(value) {
+  return /^\d{1,3}(\.\d{3})*(,\d+)?$/.test(String(value || '').trim())
+}
+
 test('B2-a: purchase invoice page loads without errors', async ({ page }) => {
   await openCreatePage(page)
 
@@ -38,6 +43,7 @@ test('B2-b: PPN nominal follows DPP × rate after selecting fixture receipt', as
   expect(body).not.toMatch(ERR)
 
   await chooseFixtureSupplier(page)
+  await chooseFixtureCabang(page)
   await chooseFixtureOrderRequest(page)
 
   let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
@@ -82,9 +88,15 @@ test('B2-b: PPN nominal follows DPP × rate after selecting fixture receipt', as
   const dpp = parseIdr(await dppInput.inputValue())
   const ppnRate = Number((await ppnRateInput.inputValue() || '0').replace(',', '.'))
   const ppnAmount = parseIdr(await ppnAmountInput.inputValue())
+  const totalInput = page.locator('input[id*="total"]:visible').filter({ hasNot: page.locator('[id*="invoiceItem"]') }).first()
+  await expect(totalInput).toBeVisible()
 
   expect(dpp).toBeGreaterThan(0)
 
   const expectedPpn = Math.round((dpp * ppnRate) / 100)
   expect(Math.abs(ppnAmount - expectedPpn)).toBeLessThanOrEqual(1)
+
+  await expect(dppInput).toHaveValue(/^\d{1,3}(\.\d{3})*(,\d+)?$/)
+  await expect(ppnAmountInput).toHaveValue(/^\d{1,3}(\.\d{3})*(,\d+)?$/)
+  await expect(totalInput).toHaveValue(/^\d{1,3}(\.\d{3})*(,\d+)?$/)
 })

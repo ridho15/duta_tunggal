@@ -138,6 +138,42 @@ class QualityControlService
     {
         $productService = app(ProductService::class);
 
+        $qualityControl->loadMissing(['fromModel', 'product']);
+
+        if ($qualityControl->from_model_type === 'App\\Models\\Production') {
+            $qualityControl->fromModel->loadMissing('manufacturingOrder.productionPlan');
+        }
+
+        $updatedAttributes = [];
+        foreach (['passed_quantity', 'rejected_quantity', 'warehouse_id', 'rak_id', 'reason_reject', 'inspected_by'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $updatedAttributes[$field] = $data[$field];
+            }
+        }
+
+        if (!empty($updatedAttributes)) {
+            $qualityControl->fill($updatedAttributes);
+        }
+
+        if ($qualityControl->from_model_type === 'App\Models\Production') {
+            $production = $qualityControl->fromModel;
+            $targetQuantity = (float) ($production?->quantity_produced ?? $production?->manufacturingOrder?->productionPlan?->quantity ?? 0);
+            $passedQuantity = (float) ($qualityControl->passed_quantity ?? 0);
+            $rejectedQuantity = (float) ($qualityControl->rejected_quantity ?? 0);
+
+            if ($passedQuantity < 0 || $rejectedQuantity < 0) {
+                throw new \Exception('Passed quantity dan rejected quantity tidak boleh bernilai negatif.');
+            }
+
+            if ($targetQuantity > 0 && ($passedQuantity + $rejectedQuantity) > $targetQuantity) {
+                throw new \Exception("Total passed dan rejected ({$passedQuantity} + {$rejectedQuantity}) tidak boleh melebihi quantity produksi ({$targetQuantity}).");
+            }
+        }
+
+        if ($qualityControl->isDirty()) {
+            $qualityControl->save();
+        }
+
         // Validate QC passed quantity against receipt quantity for PurchaseReceiptItem
         if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
             $purchaseReceiptItem = $qualityControl->fromModel;
@@ -175,9 +211,10 @@ class QualityControlService
         if ($qualityControl->from_model_type == 'App\Models\Production') {
             $qualityControl->fromModel->load('manufacturingOrder.productionPlan');
 
-            if ($qualityControl->passed_quantity >= $qualityControl->fromModel->manufacturingOrder->productionPlan->quantity) {
-                echo "passed_quantity: {$qualityControl->passed_quantity}, plan_quantity: {$qualityControl->fromModel->manufacturingOrder->productionPlan->quantity}\n";
-                echo "Completing MO: passed_quantity {$qualityControl->passed_quantity} >= plan_quantity {$qualityControl->fromModel->manufacturingOrder->productionPlan->quantity}\n";
+            $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+            $targetQuantity = (float) ($qualityControl->fromModel->quantity_produced ?? $qualityControl->fromModel->manufacturingOrder->productionPlan->quantity ?? 0);
+
+            if ($targetQuantity > 0 && $inspectedQuantity >= $targetQuantity) {
                 $qualityControl->fromModel->manufacturingOrder->update([
                     'status' => 'completed'
                 ]);
@@ -774,7 +811,10 @@ class QualityControlService
         }
 
         // Update production status to finished only if all quantity passed QC
-        if ($passedQuantity >= $production->quantity_produced) {
+        $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+        $targetQuantity = (float) ($production->quantity_produced ?? $productionPlan->quantity ?? 0);
+
+        if ($targetQuantity > 0 && $inspectedQuantity >= $targetQuantity) {
             $production->status = 'finished';
             $production->save();
         }

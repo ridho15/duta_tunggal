@@ -36,7 +36,7 @@ class ProductionResource extends Resource
 
     protected static ?string $navigationGroup = 'Manufacturing Order';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
@@ -102,6 +102,20 @@ class ProductionResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
+                TextColumn::make('manufacturingOrder.productionPlan.quantity')
+                    ->label('Qty Plan')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('quantity_produced')
+                    ->label('Qty Produced')
+                    ->formatStateUsing(function ($state, $record) {
+                        return $state ?? $record->manufacturingOrder?->productionPlan?->quantity ?? '-';
+                    })
+                    ->sortable(),
+                TextColumn::make('manufacturingOrder.cabang.nama')
+                    ->label('Cabang')
+                    ->placeholder('-')
+                    ->toggleable(),
                 TextColumn::make('production_date')
                     ->date()
                     ->sortable(),
@@ -176,16 +190,14 @@ class ProductionResource extends Resource
                         })
                         ->requiresConfirmation()
                         ->action(function ($record) {
-                            $manufacturingOrder = $record->manufacturingOrder;
-                            if ($manufacturingOrder) {
-                                $manufacturingOrder->update([
-                                    'status' => 'completed'
-                                ]);
-                            }
+                            $plannedQuantity = $record->manufacturingOrder?->productionPlan?->quantity;
+
                             $record->update([
-                                'status' => 'finished'
+                                'status' => 'finished',
+                                'quantity_produced' => $record->quantity_produced ?? $plannedQuantity,
                             ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished. Proses selanjutnya: Tim Quality Control (QC) perlu melakukan pemeriksaan kualitas hasil produksi sebelum barang dipindahkan ke gudang.");
+
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished. Quality Control manufacture dibuat otomatis dan Manufacturing Order akan diselesaikan setelah QC diproses.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
@@ -241,8 +253,7 @@ class ProductionResource extends Resource
     {
         return [
             'index' => Pages\ListProductions::route('/'),
-            // 'create' => Pages\CreateProduction::route('/create'),
-            // 'edit' => Pages\EditProduction::route('/{record}/edit'),
+            'edit' => Pages\EditProduction::route('/{record}/edit'),
         ];
     }
 }

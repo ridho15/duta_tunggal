@@ -68,8 +68,9 @@ class PurchaseOrderService
     /**
      * Approve a Purchase Order.
      * Sets status=approved, date_approved, and approved_by.
-     * If the PO was created from an OrderRequest, updates fulfilled_quantity
-     * on the linked OrderRequestItems based on the current PO item quantities.
+     * Fulfillment quantities are maintained when PurchaseOrderItems are created
+     * or deleted. Approval only finalizes the PO status and syncs the parent
+     * Order Request status from the already-updated item quantities.
      */
     public function approvePo(PurchaseOrder $purchaseOrder, ?int $userId = null): PurchaseOrder
     {
@@ -79,41 +80,11 @@ class PurchaseOrderService
             'approved_by'   => $userId ?? Auth::id(),
         ]);
 
-        // Update fulfilled_quantity on linked OrderRequest items using current PO quantities
+        // Re-evaluate the linked Order Request status using the current fulfillment totals.
         if ($purchaseOrder->refer_model_type === 'App\\Models\\OrderRequest') {
-            $purchaseOrder->loadMissing('purchaseOrderItem');
-            foreach ($purchaseOrder->purchaseOrderItem as $poItem) {
-                if (
-                    $poItem->refer_item_model_type === 'App\\Models\\OrderRequestItem'
-                    && $poItem->refer_item_model_id
-                ) {
-                    $orItem = \App\Models\OrderRequestItem::find($poItem->refer_item_model_id);
-                    if ($orItem) {
-                        $remaining = max(0, (float) $orItem->quantity - (float) ($orItem->fulfilled_quantity ?? 0));
-                        if ((float) $poItem->quantity > $remaining + 0.000001) {
-                            throw new \RuntimeException("Qty PO untuk item {$orItem->id} melebihi sisa Order Request ({$remaining}).");
-                        }
-
-                        $orItem->addFulfilledQuantity($poItem->quantity);
-                    }
-                }
-            }
-
-            // Update the OrderRequest status to partial or complete
             $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);
             if ($orderRequest) {
-                $orderRequest->loadMissing('orderRequestItem');
-                $allFulfilled = $orderRequest->orderRequestItem->every(function ($item) {
-                    return ($item->fulfilled_quantity ?? 0) >= $item->quantity;
-                });
-                $anyFulfilled = $orderRequest->orderRequestItem->contains(function ($item) {
-                    return ($item->fulfilled_quantity ?? 0) > 0;
-                });
-                if ($allFulfilled) {
-                    $orderRequest->update(['status' => 'complete']);
-                } elseif ($anyFulfilled) {
-                    $orderRequest->update(['status' => 'partial']);
-                }
+                $orderRequest->syncFulfillmentStatus();
             }
         }
 

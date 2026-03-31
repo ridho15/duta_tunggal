@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductionPlanResource\Pages;
 use App\Http\Controllers\HelperController;
+use App\Models\Cabang;
 use App\Models\ProductionPlan;
 use App\Models\SaleOrder;
 use App\Models\BillOfMaterial;
@@ -85,6 +86,34 @@ class ProductionPlanResource extends Resource
                             ])
                             ->maxLength(255),
 
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(function () {
+                                $user = Auth::user();
+                                $manageType = $user?->manage_type ?? [];
+
+                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                    return Cabang::query()
+                                        ->where('id', $user?->cabang_id)
+                                        ->get()
+                                        ->mapWithKeys(fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                        ->toArray();
+                                }
+
+                                return Cabang::query()
+                                    ->get()
+                                    ->mapWithKeys(fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                    ->toArray();
+                            })
+                            ->default(fn () => Auth::user()?->cabang_id)
+                            ->disabled(fn () => !in_array('all', Auth::user()?->manage_type ?? []))
+                            ->dehydrated(true)
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->reactive()
+                            ->helperText('Cabang otomatis mengikuti Sales Order atau BOM yang dipilih agar isolasi data tetap konsisten.'),
+
                         Radio::make('source_type')
                             ->label('Sumber Produksi')
                             ->options([
@@ -108,9 +137,9 @@ class ProductionPlanResource extends Resource
 
                         Select::make('sale_order_id')
                             ->label('Pesanan Penjualan')
-                            ->options(function () {
+                            ->options(function ($get) {
                                 $productionPlanService = app(ProductionPlanService::class);
-                                return $productionPlanService->getSaleOrderOptions();
+                                return $productionPlanService->getSaleOrderOptions($get('cabang_id'));
                             })
                             ->searchable()
                             ->preload()
@@ -123,18 +152,24 @@ class ProductionPlanResource extends Resource
                             ->dehydrated()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state && $get('source_type') === 'sale_order') {
+                                    $saleOrder = SaleOrder::find($state);
+                                    if ($saleOrder?->cabang_id) {
+                                        $set('cabang_id', $saleOrder->cabang_id);
+                                    }
+
                                     // Reset product selection when sale order changes
                                     $set('product_id', null);
                                     $set('quantity', null);
                                     $set('uom_id', null);
+                                    $set('warehouse_id', null);
                                 }
                             }),
 
                         Select::make('bill_of_material_id')
                             ->label('Formula Produksi (BOM)')
-                            ->options(function () {
+                            ->options(function ($get) {
                                 $productionPlanService = app(ProductionPlanService::class);
-                                return $productionPlanService->getBillOfMaterialOptions();
+                                return $productionPlanService->getBillOfMaterialOptions($get('cabang_id'));
                             })
                             ->searchable()
                             ->preload()
@@ -146,10 +181,14 @@ class ProductionPlanResource extends Resource
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state && $get('source_type') === 'manual') {
-                                    $bom = BillOfMaterial::with('product')->find($state);
+                                    $bom = BillOfMaterial::with(['product', 'cabang'])->find($state);
                                     if ($bom) {
+                                        if ($bom->cabang_id) {
+                                            $set('cabang_id', $bom->cabang_id);
+                                        }
                                         $set('product_id', $bom->product_id);
                                         $set('uom_id', $bom->uom_id);
+                                        $set('warehouse_id', null);
                                     }
                                 }
                             })
@@ -270,15 +309,18 @@ class ProductionPlanResource extends Resource
 
                         Select::make('warehouse_id')
                             ->label('Gudang Produksi')
-                            ->options(function () {
+                            ->options(function ($get) {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', true);
-                                
-                                if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+
+                                $selectedCabangId = $get('cabang_id');
+                                if ($selectedCabangId) {
+                                    $query->where('cabang_id', $selectedCabangId);
+                                } elseif (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     $query->where('cabang_id', $user?->cabang_id);
                                 }
-                                
+
                                 return $query->get()->mapWithKeys(function ($warehouse) {
                                     return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                 });
@@ -290,14 +332,14 @@ class ProductionPlanResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', true)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('perusahaan', 'like', "%{$search}%")
+                                                                                $q->where('name', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
-                                
+
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     $query->where('cabang_id', $user?->cabang_id);
                                 }
-                                
+
                                 return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
                                     return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                 });
@@ -372,6 +414,11 @@ class ProductionPlanResource extends Resource
                 TextColumn::make('name')
                     ->label('Nama Pekerjaan')
                     ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('cabang.nama')
+                    ->label('Cabang')
+                    ->placeholder('-')
                     ->sortable(),
 
                 TextColumn::make('source_type')
@@ -537,10 +584,14 @@ class ProductionPlanResource extends Resource
                                 DB::transaction(function () use ($record) {
                                     $record->update(['status' => 'scheduled']);
 
-                                    // Check if MaterialIssue was created by the model event
                                     $materialIssue = \App\Models\MaterialIssue::where('production_plan_id', $record->id)
                                         ->where('type', 'issue')
                                         ->first();
+
+                                    if (!$materialIssue) {
+                                        $manufacturingService = app(\App\Services\ManufacturingService::class);
+                                        $materialIssue = $manufacturingService->createMaterialIssueForProductionPlan($record);
+                                    }
 
                                     if ($materialIssue) {
                                         HelperController::setLog(
@@ -553,32 +604,17 @@ class ProductionPlanResource extends Resource
                                             title: 'Berhasil',
                                             message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis. Proses selanjutnya: Kepala Produksi perlu memulai Manufacturing Order dan memastikan bahan baku siap."
                                         );
-                                        $manufacturingService = app(\App\Services\ManufacturingService::class);
-                                        $materialIssue = $manufacturingService->createMaterialIssueForProductionPlan($record);
+                                    } else {
+                                        HelperController::setLog(
+                                            message: 'Production plan dijadwalkan tapi MaterialIssue gagal dibuat.',
+                                            model: $record
+                                        );
 
-                                        if ($materialIssue) {
-                                            HelperController::setLog(
-                                                message: 'Production plan dijadwalkan dan MaterialIssue dibuat otomatis (fallback).',
-                                                model: $record
-                                            );
-
-                                            HelperController::sendNotification(
-                                                isSuccess: true,
-                                                title: 'Berhasil',
-                                                message: "Rencana produksi berhasil dijadwalkan dan MaterialIssue {$materialIssue->issue_number} telah dibuat otomatis. Proses selanjutnya: Kepala Produksi perlu memulai Manufacturing Order dan memastikan bahan baku siap."
-                                            );
-                                        } else {
-                                            HelperController::setLog(
-                                                message: 'Production plan dijadwalkan tapi MaterialIssue gagal dibuat.',
-                                                model: $record
-                                            );
-
-                                            HelperController::sendNotification(
-                                                isSuccess: false,
-                                                title: 'Berhasil (Dengan Peringatan)',
-                                                message: 'Rencana produksi berhasil dijadwalkan, namun MaterialIssue gagal dibuat otomatis. Silakan buat MaterialIssue secara manual.'
-                                            );
-                                        }
+                                        HelperController::sendNotification(
+                                            isSuccess: false,
+                                            title: 'Berhasil (Dengan Peringatan)',
+                                            message: 'Rencana produksi berhasil dijadwalkan, namun MaterialIssue gagal dibuat otomatis. Silakan buat MaterialIssue secara manual.'
+                                        );
                                     }
                                 });
                             } catch (\Throwable $exception) {
@@ -681,8 +717,10 @@ class ProductionPlanResource extends Resource
                             // Create Manufacturing Order from Production Plan
                             $manufacturingService = app(\App\Services\ManufacturingService::class);
 
-                            $record->loadMissing(['saleOrder', 'warehouse', 'billOfMaterial.items']);
-                            $inheritedCabangId = $record->saleOrder?->cabang_id
+                            $record->loadMissing(['saleOrder', 'warehouse', 'billOfMaterial.items', 'billOfMaterial.cabang']);
+                            $inheritedCabangId = $record->cabang_id
+                                ?? $record->saleOrder?->cabang_id
+                                ?? $record->billOfMaterial?->cabang_id
                                 ?? $record->warehouse?->cabang_id
                                 ?? null;
 
@@ -798,8 +836,20 @@ class ProductionPlanResource extends Resource
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {
-            $query->whereHas('billOfMaterial', function ($q) use ($user) {
-                $q->where('cabang_id', $user->cabang_id);
+            $query->where(function (Builder $subQuery) use ($user) {
+                $subQuery->where('cabang_id', $user->cabang_id)
+                    ->orWhere(function (Builder $fallbackQuery) use ($user) {
+                        $fallbackQuery->whereNull('cabang_id')
+                            ->where(function (Builder $relationshipQuery) use ($user) {
+                                $relationshipQuery->whereHas('billOfMaterial', function (Builder $q) use ($user) {
+                                    $q->where('cabang_id', $user->cabang_id);
+                                })->orWhereHas('saleOrder', function (Builder $q) use ($user) {
+                                    $q->where('cabang_id', $user->cabang_id);
+                                })->orWhereHas('warehouse', function (Builder $q) use ($user) {
+                                    $q->where('cabang_id', $user->cabang_id);
+                                });
+                            });
+                    });
             });
         }
 

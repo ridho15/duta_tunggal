@@ -22,6 +22,7 @@ use App\Models\Currency;
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
@@ -231,6 +232,47 @@ test('groupBy supplier_id on multisupplier OR produces correct groups', function
     expect($groups)->toHaveCount(2);
     expect($groups[$this->supplierA->id])->toHaveCount(1);
     expect($groups[$this->supplierB->id])->toHaveCount(1);
+});
+
+test('available order request supplier ids exclude suppliers that already have a purchase order', function () {
+    PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    $this->orderRequest->load('orderRequestItem');
+
+    $availableSupplierIds = PurchaseOrderResource::getAvailableOrderRequestSupplierIds($this->orderRequest);
+
+    expect($availableSupplierIds)
+        ->toBeArray()
+        ->toContain($this->supplierB->id)
+        ->not->toContain($this->supplierA->id)
+        ->and($availableSupplierIds)->toHaveCount(1);
+});
+
+test('available order request supplier ids are empty when all suppliers already have purchase orders', function () {
+    PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplierB->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    $this->orderRequest->load('orderRequestItem');
+
+    $availableSupplierIds = PurchaseOrderResource::getAvailableOrderRequestSupplierIds($this->orderRequest);
+
+    expect($availableSupplierIds)->toBe([]);
 });
 
 test('buildOrderRequestItems for each supplier group produces non-overlapping product sets', function () {

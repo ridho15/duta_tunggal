@@ -11,6 +11,7 @@ use App\Models\ChartOfAccount;
 use App\Models\Currency;
 use App\Models\Invoice;
 use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
@@ -29,6 +30,7 @@ use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -78,6 +80,79 @@ class PurchaseOrderResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    protected static function formatMoneyState(mixed $value): string
+    {
+        return number_format((float) \App\Helpers\MoneyHelper::parse($value), 0, ',', '.');
+    }
+
+    protected static function formatSupplierLabel(?Supplier $supplier): string
+    {
+        if (! $supplier || ! $supplier->exists) {
+            return '-';
+        }
+
+        $code = trim((string) ($supplier->code ?? ''));
+        $name = trim((string) ($supplier->perusahaan ?? ''));
+
+        if ($code === '' && $name === '') {
+            return '-';
+        }
+
+        if ($code === '') {
+            return $name;
+        }
+
+        if ($name === '') {
+            return "({$code})";
+        }
+
+        return "({$code}) {$name}";
+    }
+
+    public static function resolveOrderRequestItemReference(
+        ?int $orderRequestId,
+        ?int $productId,
+        ?int $supplierId = null
+    ): ?OrderRequestItem {
+        if (! $orderRequestId || ! $productId) {
+            return null;
+        }
+
+        $query = OrderRequestItem::query()
+            ->where('order_request_id', $orderRequestId)
+            ->where('product_id', $productId)
+            ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)');
+
+        if ($supplierId) {
+            $query->orderByRaw('CASE WHEN supplier_id = ? THEN 0 WHEN supplier_id IS NULL THEN 1 ELSE 2 END', [$supplierId]);
+        }
+
+        return $query->orderBy('id')->first();
+    }
+
+    public static function getOrderRequestOptions(?int $currentOrderRequestId = null): array
+    {
+        $options = OrderRequest::query()
+            ->where('status', 'approved')
+            ->select(['id', 'request_number'])
+            ->orderBy('request_number')
+            ->get()
+            ->pluck('request_number', 'id')
+            ->all();
+
+        if ($currentOrderRequestId && ! array_key_exists($currentOrderRequestId, $options)) {
+            $currentOrderRequest = OrderRequest::query()
+                ->select(['id', 'request_number'])
+                ->find($currentOrderRequestId);
+
+            if ($currentOrderRequest) {
+                $options[$currentOrderRequest->id] = $currentOrderRequest->request_number;
+            }
+        }
+
+        return $options;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -114,7 +189,9 @@ class PurchaseOrderResource extends Resource
                                         if ($get('refer_model_type') == 'App\Models\SaleOrder') {
                                             return SaleOrder::select(['id', 'so_number'])->get()->pluck('so_number', 'id');
                                         } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
-                                            return OrderRequest::where('status', 'approved')->select(['id', 'request_number'])->get()->pluck('request_number', 'id');
+                                            return self::getOrderRequestOptions(
+                                                is_numeric($state) ? (int) $state : (int) ($get('refer_model_id') ?? 0)
+                                            );
                                         }
                                         return [];
                                     })
@@ -155,24 +232,25 @@ class PurchaseOrderResource extends Resource
                                                 $ppnOption = ($orderRequest->tax_type === 'None') ? 'non_ppn' : 'standard';
                                                 $set('ppn_option', $ppnOption);
 
-                                                // Detect multisupplier: count distinct supplier_ids on OR items
-                                                $uniqueSupplierIds = $orderRequest->orderRequestItem
-                                                    ->pluck('supplier_id')->filter()->unique();
+                                                $availableSupplierIds = self::getAvailableOrderRequestSupplierIds($orderRequest);
 
-                                                if ($uniqueSupplierIds->count() > 1) {
+                                                if (count($availableSupplierIds) > 1) {
                                                     // Multisupplier OR: clear supplier field so user must choose one.
                                                     // Items will be populated automatically via supplier_id->afterStateUpdated.
                                                     $set('supplier_id', null);
                                                     // $items stays [] — will be set by the final $set('purchaseOrderItem', $items) below
                                                 } else {
                                                     // Single supplier: auto-select and populate all items immediately
-                                                    $autoSupplierId = $uniqueSupplierIds->first();
+                                                    $autoSupplierId = $availableSupplierIds[0] ?? null;
                                                     if ($autoSupplierId) {
                                                         $set('supplier_id', $autoSupplierId);
                                                         $autoSupplier = Supplier::find($autoSupplierId);
                                                         if ($autoSupplier) {
                                                             $set('tempo_hutang', $autoSupplier->tempo_hutang);
                                                         }
+                                                    } else {
+                                                        $set('supplier_id', null);
+                                                        $set('purchaseOrderItem', []);
                                                     }
                                                     $items = self::buildOrderRequestItems(
                                                         $orderRequest,
@@ -201,10 +279,18 @@ class PurchaseOrderResource extends Resource
                                     if ($referType === 'App\\Models\\OrderRequest' && $referModelId) {
                                         $or = OrderRequest::with('orderRequestItem')->find($referModelId);
                                         if ($or && $or->orderRequestItem->isNotEmpty()) {
-                                            $supplierIds = $or->orderRequestItem
-                                                ->pluck('supplier_id')->filter()->unique();
-                                            if ($supplierIds->isNotEmpty()) {
+                                            $supplierIds = self::getAvailableOrderRequestSupplierIds($or);
+                                            $currentSupplierId = (int) ($get('supplier_id') ?? 0);
+
+                                            if ($currentSupplierId > 0) {
+                                                $supplierIds[] = $currentSupplierId;
+                                                $supplierIds = array_values(array_unique(array_map('intval', $supplierIds)));
+                                            }
+
+                                            if (! empty($supplierIds)) {
                                                 $query->whereIn('id', $supplierIds);
+                                            } else {
+                                                $query->whereRaw('1 = 0');
                                             }
                                         }
                                     }
@@ -213,6 +299,30 @@ class PurchaseOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Supplier belum dipilih',
                             ])
+                            ->helperText(function (Get $get) {
+                                $supplierId = $get('supplier_id');
+
+                                if (! $supplierId) {
+                                    return null;
+                                }
+
+                                return 'Supplier saat ini: ' . static::formatSupplierLabel(Supplier::find($supplierId));
+                            })
+                            ->disabled(function (Get $get) {
+                                if ($get('refer_model_type') !== 'App\\Models\\OrderRequest' || !$get('refer_model_id')) {
+                                    return false;
+                                }
+
+                                $or = OrderRequest::with('orderRequestItem')->find($get('refer_model_id'));
+                                if (! $or) {
+                                    return false;
+                                }
+
+                                $availableSupplierIds = self::getAvailableOrderRequestSupplierIds($or);
+                                $currentSupplierId = (int) ($get('supplier_id') ?? 0);
+
+                                return count($availableSupplierIds) === 0 && $currentSupplierId === 0;
+                            })
                             ->searchable(['code', 'perusahaan'])
                             ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
                                 return "({$supplier->code}) {$supplier->perusahaan}";
@@ -225,9 +335,19 @@ class PurchaseOrderResource extends Resource
                                 if (! $or) {
                                     return null;
                                 }
-                                $count = $or->orderRequestItem->pluck('supplier_id')->filter()->unique()->count();
-                                if ($count > 1) {
-                                    return "Order Request ini memiliki {$count} supplier. Pilih satu supplier — item akan diisi otomatis sesuai supplier terpilih.";
+                                $availableSupplierCount = count(self::getAvailableOrderRequestSupplierIds($or));
+                                $currentSupplierId = (int) ($get('supplier_id') ?? 0);
+
+                                if ($currentSupplierId > 0 && $availableSupplierCount === 0) {
+                                    return 'Supplier ini sudah dipakai untuk PO lain, tetapi tetap ditampilkan karena merupakan supplier aktif pada PO ini.';
+                                }
+
+                                if ($availableSupplierCount > 1) {
+                                    return "Order Request ini memiliki {$availableSupplierCount} supplier yang belum dibuat PO. Pilih satu supplier — item akan diisi otomatis sesuai supplier terpilih.";
+                                }
+
+                                if ($availableSupplierCount === 0) {
+                                    return 'Semua supplier pada Order Request ini sudah memiliki PO. Field supplier dinonaktifkan karena tidak ada pilihan yang masih tersedia.';
                                 }
                                 return null;
                             })
@@ -357,7 +477,7 @@ class PurchaseOrderResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', 1)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('perusahaan', 'like', "%{$search}%")
+                                        $q->where('name', 'like', "%{$search}%")
                                             ->orWhere('kode', 'like', "%{$search}%");
                                     });
 
@@ -387,7 +507,7 @@ class PurchaseOrderResource extends Resource
                                 'non_ppn' => 'Non PPN',
                             ])
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                if (!in_array($state, ['standard', 'non_ppn'])) {
+                                if (! in_array($state, ['standard', 'non_ppn'])) {
                                     return;
                                 }
 
@@ -395,15 +515,16 @@ class PurchaseOrderResource extends Resource
                                     $items = collect($get('purchaseOrderItem') ?? [])->map(function ($item) {
                                         $item['tax'] = 0;
                                         $item['tipe_pajak'] = 'Non Pajak';
-                                        $item['subtotal'] = \App\Http\Controllers\HelperController::hitungSubtotal(
-                                            (float)($item['quantity'] ?? 0),
+                                        $item['subtotal'] = self::formatMoneyState(HelperController::hitungSubtotal(
+                                            (float) ($item['quantity'] ?? 0),
                                             \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                            (float)($item['discount'] ?? 0),
+                                            (float) ($item['discount'] ?? 0),
                                             0,
                                             'Non Pajak'
-                                        );
+                                        ));
                                         return $item;
                                     })->all();
+
                                     $set('purchaseOrderItem', $items);
                                 }
 
@@ -412,28 +533,28 @@ class PurchaseOrderResource extends Resource
                                         $tipePajak = 'Inklusif';
                                         $tax = 0;
 
-                                        if (!empty($item['product_id'])) {
+                                        if (! empty($item['product_id'])) {
                                             $product = \App\Models\Product::find($item['product_id']);
                                             if ($product) {
-                                                $raw = strtolower(trim((string)($product->tipe_pajak ?? 'inklusif')));
+                                                $raw = strtolower(trim((string) ($product->tipe_pajak ?? 'inklusif')));
                                                 $tipePajak = match ($raw) {
                                                     'eklusif', 'eksklusif', 'exclusive', 'ppn excluded' => 'Eklusif',
-                                                    'non pajak', 'non-pajak', 'nonpajak', 'none'        => 'Non Pajak',
-                                                    default                                              => 'Inklusif',
+                                                    'non pajak', 'non-pajak', 'nonpajak', 'none' => 'Non Pajak',
+                                                    default => 'Inklusif',
                                                 };
-                                                $tax = $tipePajak === 'Non Pajak' ? 0 : (float)($product->pajak ?? 0);
+                                                $tax = $tipePajak === 'Non Pajak' ? 0 : (float) ($product->pajak ?? 0);
                                             }
                                         }
 
                                         $item['tipe_pajak'] = $tipePajak;
-                                        $item['tax']        = $tax;
-                                        $item['subtotal']   = \App\Http\Controllers\HelperController::hitungSubtotal(
-                                            (float)($item['quantity'] ?? 0),
+                                        $item['tax'] = $tax;
+                                        $item['subtotal'] = self::formatMoneyState(HelperController::hitungSubtotal(
+                                            (float) ($item['quantity'] ?? 0),
                                             \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                            (float)($item['discount'] ?? 0),
+                                            (float) ($item['discount'] ?? 0),
                                             $tax,
                                             $tipePajak
-                                        );
+                                        ));
                                         return $item;
                                     })->all();
                                     $set('purchaseOrderItem', $items);
@@ -479,6 +600,10 @@ class PurchaseOrderResource extends Resource
                             })
                             ->defaultItems(0)
                             ->schema([
+                                Hidden::make('refer_item_model_type')
+                                    ->dehydrated(true),
+                                Hidden::make('refer_item_model_id')
+                                    ->dehydrated(true),
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->options(function (Get $get) {
@@ -541,22 +666,35 @@ class PurchaseOrderResource extends Resource
                                             $set('discount', 0);
                                             $set('tax', $newTax);
                                             $set('tipe_pajak', $newTipePajak);
+                                            $referItem = null;
+                                            if ($get('../../refer_model_type') === 'App\\Models\\OrderRequest') {
+                                                $referItem = self::resolveOrderRequestItemReference(
+                                                    (int) $get('../../refer_model_id'),
+                                                    (int) $state,
+                                                    $supplierId ? (int) $supplierId : null
+                                                );
+                                            }
+
+                                            $set('refer_item_model_type', $referItem ? OrderRequestItem::class : null);
+                                            $set('refer_item_model_id', $referItem?->id);
                                             // Use local variables (not $get) to avoid stale state after $set
-                                            $set('subtotal', HelperController::hitungSubtotal(
+                                            $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
                                                 (float)$get('quantity'),
                                                 $newUnitPrice,
                                                 0,
                                                 $newTax,
                                                 $newTipePajak
-                                            ));
+                                            )));
                                         } else {
-                                            $set('subtotal', HelperController::hitungSubtotal(
+                                            $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
                                                 (float)$get('quantity'),
                                                 HelperController::parseIndonesianMoney($get('unit_price')),
                                                 (float)$get('discount'),
                                                 (float)$get('tax'),
                                                 $get('tipe_pajak') ?? 'Inklusif'
-                                            ));
+                                            )));
+                                            $set('refer_item_model_type', null);
+                                            $set('refer_item_model_id', null);
                                         }
                                     })
                                     ->required(),
@@ -635,7 +773,7 @@ class PurchaseOrderResource extends Resource
                                         $qty = (float)$get('quantity');
                                         $price = HelperController::parseIndonesianMoney($get('unit_price'));
                                         $set('total', number_format($qty * $price, 0, ',', '.'));
-                                        $set('subtotal', HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
+                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif')));
                                     }),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
@@ -649,7 +787,7 @@ class PurchaseOrderResource extends Resource
                                         $qty = (float)$get('quantity');
                                         $price = HelperController::parseIndonesianMoney($get('unit_price'));
                                         $set('total', number_format($qty * $price, 0, ',', '.'));
-                                        $set('subtotal', HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
+                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif')));
                                     })
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
@@ -689,7 +827,7 @@ class PurchaseOrderResource extends Resource
                                         'max' => 'Discount maksimal 100%.',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', HelperController::hitungSubtotal((float)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif'));
+                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal((float)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (float)$get('discount'), (float)$get('tax'), $get('tipe_pajak') ?? 'Inklusif')));
                                     })
                                     ->suffix('%')
                                     ->default(0),
@@ -716,13 +854,13 @@ class PurchaseOrderResource extends Resource
                                     ->afterStateUpdated(function (Set $set, Get $get) {
                                         $tipePajak = $get('tipe_pajak') ?? 'Inklusif';
                                         $effectiveTax = $tipePajak === 'Non Pajak' ? 0 : (float)$get('tax');
-                                        $set('subtotal', HelperController::hitungSubtotal(
+                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
                                             (float)$get('quantity'),
                                             HelperController::parseIndonesianMoney($get('unit_price')),
                                             (float)$get('discount'),
                                             $effectiveTax,
                                             $tipePajak
-                                        ));
+                                        )));
                                     })
                                     ->suffix('%')
                                     ->default(fn() => \App\Models\TaxSetting::activeRate('PPN')),
@@ -782,7 +920,7 @@ class PurchaseOrderResource extends Resource
                                             $total += ($biaya['total'] ?? 0) * $nominal;
                                         }
 
-                                        $livewire->data['total_amount'] = $total;
+                                        $livewire->data['total_amount'] = self::formatMoneyState($total);
                                     }),
                                 Radio::make('tipe_pajak')
                                     ->label('Tipe Pajak')
@@ -798,19 +936,22 @@ class PurchaseOrderResource extends Resource
                                         'Eklusif' => 'Eksklusif (PPN ditambahkan)',
                                     ])
                                     ->afterStateUpdated(function ($state, Get $get, Set $set) {
-                                        // Reset tax to 0 when Non Pajak selected
+                                        $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
+
                                         if ($state === 'Non Pajak') {
                                             $set('tax', 0);
+                                        } else {
+                                            $set('tax', $defaultTax);
                                         }
                                         $effectiveTax = $state === 'Non Pajak' ? 0 : (float)$get('tax');
                                         // Recalculate subtotal when tax type changes
-                                        $set('subtotal', HelperController::hitungSubtotal(
+                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
                                             (float)$get('quantity'),
                                             HelperController::parseIndonesianMoney($get('unit_price')),
                                             (float)$get('discount'),
                                             $effectiveTax,
                                             $state
-                                        ));
+                                        )));
                                     })
                                     ->validationMessages([
                                         'required' => 'Tipe Pajak belum dipilih'
@@ -1031,10 +1172,11 @@ class PurchaseOrderResource extends Resource
                                                     }
                                                 }
                                             }
-                                            $total += ((float)$biaya['total'] ?? 0) * $nominal;
+                                            $biayaTotal = (float) HelperController::parseIndonesianMoney($biaya['total'] ?? 0);
+                                            $total += $biayaTotal * $nominal;
                                         }
 
-                                        $livewire->data['total_amount'] = $total;
+                                        $livewire->data['total_amount'] = self::formatMoneyState($total);
                                     }),
                                 Radio::make('untuk_pembelian')
                                     ->label('Untuk Pembelian')
@@ -1158,10 +1300,11 @@ class PurchaseOrderResource extends Resource
                                                     }
                                                 }
                                             }
-                                            $total += ((float)$biaya['total'] ?? 0) * $nominal;
+                                            $biayaTotal = (float) HelperController::parseIndonesianMoney($biaya['total'] ?? 0);
+                                            $total += $biayaTotal * $nominal;
                                         }
 
-                                        $livewire->data['total_amount'] = $total;
+                                        $livewire->data['total_amount'] = self::formatMoneyState($total);
                                     }),
                             ]),
                         TextInput::make('total_amount')
@@ -1202,9 +1345,9 @@ class PurchaseOrderResource extends Resource
                                     $biayaNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
                                         ? (float)$poCurrency->nominal
                                         : ($biaya->currency->to_rupiah ?? 1);
-                                    $total += $biaya->total * $biayaNominal;
+                                    $total += (float) $biaya->total * $biayaNominal;
                                 }
-                                $component->state($total);
+                                $component->state(self::formatMoneyState($total));
                             }),
 
                     ])
@@ -1631,6 +1774,7 @@ class PurchaseOrderResource extends Resource
                             try {
                                 $poService = app(PurchaseOrderService::class);
                                 $poService->approvePo($record);
+                                $record->refresh();
                                 \Filament\Notifications\Notification::make()
                                     ->title('Purchase Order Disetujui')
                                     ->body('PO ' . $record->po_number . ' berhasil disetujui.')
@@ -1827,6 +1971,36 @@ class PurchaseOrderResource extends Resource
         }
 
         return $items;
+    }
+
+    /**
+     * Return Order Request supplier IDs that have not yet been used by an existing PO for the same OR.
+     */
+    public static function getAvailableOrderRequestSupplierIds(OrderRequest $orderRequest): array
+    {
+        $orSupplierIds = $orderRequest->orderRequestItem
+            ->pluck('supplier_id')
+            ->filter()
+            ->map(fn ($supplierId) => (int) $supplierId)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($orSupplierIds)) {
+            return [];
+        }
+
+        $usedSupplierIds = PurchaseOrder::query()
+            ->where('refer_model_type', OrderRequest::class)
+            ->where('refer_model_id', $orderRequest->id)
+            ->pluck('supplier_id')
+            ->filter()
+            ->map(fn ($supplierId) => (int) $supplierId)
+            ->unique()
+            ->values()
+            ->all();
+
+        return array_values(array_diff($orSupplierIds, $usedSupplierIds));
     }
 
     public static function getRelations(): array

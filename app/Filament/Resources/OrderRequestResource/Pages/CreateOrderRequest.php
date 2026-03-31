@@ -21,8 +21,16 @@ class CreateOrderRequest extends CreateRecord
             $data['cabang_id'] = $user?->cabang_id;
         }
 
+        if (($data['tax_type'] ?? 'None') === 'None' && isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
+            foreach ($data['orderRequestItem'] as &$item) {
+                $item['tax'] = 0;
+            }
+            unset($item);
+        }
+
         $data['created_by'] = Auth::user()->id;
-        return $data;
+
+        return OrderRequestResource::mutateFormDataBeforeCreate($data);
     }
 
     protected function afterCreate(): void

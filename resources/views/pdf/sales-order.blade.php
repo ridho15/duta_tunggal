@@ -99,7 +99,7 @@
                 $lineBase = $item->quantity * $item->unit_price;
                 $discountAmount = $lineBase * ($item->discount / 100);
                 $afterDiscount = $lineBase - $discountAmount;
-                $taxType = $item->tipe_pajak ?? 'Eksklusif';
+                $taxType = \App\Services\TaxService::normalizeType($item->tipe_pajak ?? 'PPN Excluded');
                 $taxResult = \App\Services\TaxService::compute($afterDiscount, (float)$item->tax, $taxType);
                 $taxAmount = $taxResult['ppn'];
                 $subtotal = $taxResult['total'];

@@ -46,7 +46,7 @@ class ManufacturingOrderResource extends Resource
     protected static ?string $navigationGroup = 'Manufacturing Order';
 
     // Position Manufacturing Order as the 4th group
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {
@@ -84,7 +84,20 @@ class ManufacturingOrderResource extends Resource
                         Select::make('production_plan_id')
                             ->label('Rencana Produksi')
                             ->relationship('productionPlan', 'plan_number', function (Builder $query) {
-                                $query->where('status', 'in_progress');
+                                $query->whereIn('status', ['scheduled', 'in_progress']);
+
+                                $user = Auth::user();
+                                if ($user && !in_array('all', $user->manage_type ?? [])) {
+                                    $query->where(function (Builder $branchQuery) use ($user) {
+                                        $branchQuery->where('cabang_id', $user->cabang_id)
+                                            ->orWhereHas('billOfMaterial', function (Builder $relatedQuery) use ($user) {
+                                                $relatedQuery->where('cabang_id', $user->cabang_id);
+                                            })
+                                            ->orWhereHas('saleOrder', function (Builder $relatedQuery) use ($user) {
+                                                $relatedQuery->where('cabang_id', $user->cabang_id);
+                                            });
+                                    });
+                                }
                             })
                             ->searchable()
                             ->preload()
@@ -95,8 +108,13 @@ class ManufacturingOrderResource extends Resource
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state) {
-                                    $productionPlan = \App\Models\ProductionPlan::with('product', 'billOfMaterial.items.product')->find($state);
+                                    $productionPlan = \App\Models\ProductionPlan::with('product', 'billOfMaterial.items.product', 'billOfMaterial.cabang', 'saleOrder', 'warehouse')->find($state);
                                     if ($productionPlan) {
+                                        $set('cabang_id', $productionPlan->cabang_id
+                                            ?? $productionPlan->saleOrder?->cabang_id
+                                            ?? $productionPlan->billOfMaterial?->cabang_id
+                                            ?? $productionPlan->warehouse?->cabang_id);
+
                                         // Auto-fill start_date and end_date from Production Plan
                                         if ($productionPlan->start_date) {
                                             $set('start_date', \Carbon\Carbon::parse($productionPlan->start_date)->format('Y-m-d H:i:s'));

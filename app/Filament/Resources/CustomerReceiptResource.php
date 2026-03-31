@@ -78,6 +78,14 @@ class CustomerReceiptResource extends Resource
                                     })
                                     ->relationship('customer', 'name')
                                     ->afterStateUpdated(function ($set, $get, $state, $livewire) {
+                                        if ($state) {
+                                            $customer = Customer::find($state);
+
+                                            if ($customer?->cabang_id) {
+                                                $set('cabang_id', $customer->cabang_id);
+                                            }
+                                        }
+
                                         $set('selected_invoices', []);
                                         $set('total_payment', 0);
                                         $set('payment_adjustment', 0);
@@ -244,12 +252,10 @@ class CustomerReceiptResource extends Resource
                                     })
                                     ->visible(fn ($get) => !empty($get('customer_id'))),
 
-                                TextInput::make('selected_invoices')
-                                    ->label('Selected Invoices (JSON)')
+                                Hidden::make('selected_invoices')
                                     ->default('[]')
                                     ->dehydrated(true)
                                     ->reactive()
-                                    ->readOnly()
                                     ->extraAttributes([
                                         'wire:model' => 'data.selected_invoices',
                                         'data-field' => 'selected_invoices',
@@ -257,12 +263,10 @@ class CustomerReceiptResource extends Resource
                                     ])
                                     ->helperText('Invoice IDs yang dipilih (diupdate otomatis oleh JavaScript)'),
                                     
-                                TextInput::make('invoice_receipts')
-                                    ->label('Invoice Receipts (JSON)')
+                                Hidden::make('invoice_receipts')
                                     ->default('{}')
                                     ->dehydrated(true)
                                     ->reactive()
-                                    ->readOnly()
                                     ->extraAttributes([
                                         'wire:model' => 'data.invoice_receipts',
                                         'data-field' => 'invoice_receipts',
@@ -305,7 +309,7 @@ class CustomerReceiptResource extends Resource
                                 Select::make('coa_id')
                                     ->label('COA')
                                     ->preload()
-                                    ->searchable(['code', 'perusahaan'])
+                                    ->searchable(['code', 'name'])
                                     ->reactive()
                                     ->options(function () {
                                         return ChartOfAccount::all()->mapWithKeys(function ($coa) {
@@ -388,56 +392,6 @@ class CustomerReceiptResource extends Resource
                         $query->whereHas('customer', function ($query) use ($search) {
                             $query->where('code', 'LIKE', '%' . $search . '%')
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
-                        });
-                    }),
-
-                TextColumn::make('selected_invoices')
-                    ->label('Invoices')
-                    ->formatStateUsing(function ($state, $record) {
-                        if (!$state || empty($state)) {
-                            // Fallback to single invoice for backward compatibility
-                            return $record->invoice ? $record->invoice->invoice_number : '-';
-                        }
-                        
-                        // Handle if state is string (JSON) or already array
-                        $invoiceIds = is_array($state) ? $state : json_decode($state, true);
-                        
-                        // Safety check - ensure we have a valid array
-                        if (!is_array($invoiceIds) || empty($invoiceIds)) {
-                            return $record->invoice ? $record->invoice->invoice_number : '-';
-                        }
-
-                        static $invoiceNumberCache = [];
-                        $missingIds = array_values(array_diff($invoiceIds, array_keys($invoiceNumberCache)));
-                        if (!empty($missingIds)) {
-                            $invoiceNumberCache += Invoice::whereIn('id', $missingIds)
-                                ->pluck('invoice_number', 'id')
-                                ->toArray();
-                        }
-
-                        $numbers = collect($invoiceIds)
-                            ->map(fn ($id) => $invoiceNumberCache[$id] ?? null)
-                            ->filter()
-                            ->values()
-                            ->all();
-
-                        return empty($numbers) ? '-' : implode(', ', $numbers);
-                    })
-                    ->searchable(query: function (Builder $query, $search) {
-                        $query->where(function ($query) use ($search) {
-                            // Search in invoice_id for backward compatibility
-                            $query->whereHas('invoice', function ($q) use ($search) {
-                                $q->where('invoice_number', 'LIKE', '%' . $search . '%');
-                            })
-                            // Search in selected_invoices JSON
-                            ->orWhere(function ($q) use ($search) {
-                                $invoiceIds = Invoice::where('invoice_number', 'LIKE', '%' . $search . '%')->pluck('id')->toArray();
-                                if (!empty($invoiceIds)) {
-                                    foreach ($invoiceIds as $id) {
-                                        $q->orWhereJsonContains('selected_invoices', $id);
-                                    }
-                                }
-                            });
                         });
                     }),
 

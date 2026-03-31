@@ -3,6 +3,7 @@
 use App\Filament\Resources\AssetTransferResource\Pages\CreateAssetTransfer;
 use App\Filament\Resources\DeliveryOrderResource\Pages\CreateDeliveryOrder;
 use App\Filament\Resources\ManufacturingOrderResource\Pages\CreateManufacturingOrder;
+use App\Filament\Resources\ProductionPlanResource\Pages\CreateProductionPlan;
 use App\Filament\Resources\PurchaseInvoiceResource\Pages\CreatePurchaseInvoice;
 use App\Filament\Resources\SaleOrderResource\Pages\CreateSaleOrder;
 use App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice;
@@ -132,6 +133,38 @@ test('manufacturing order inherits cabang from production plan sale order source
 
     $result = invokeMutateBeforeCreate($page, [
         'production_plan_id' => $productionPlan->id,
+    ]);
+
+    expect((int) $result['cabang_id'])->toBe((int) $cabangSource->id);
+});
+
+test('production plan inherits cabang from selected BOM source', function () {
+    $cabangSource = Cabang::factory()->create();
+    $cabangWrong = Cabang::factory()->create();
+    $uom = UnitOfMeasure::factory()->create();
+    $product = Product::factory()->create([
+        'uom_id' => $uom->id,
+        'cabang_id' => $cabangSource->id,
+    ]);
+
+    $bom = \App\Models\BillOfMaterial::factory()->create([
+        'cabang_id' => $cabangSource->id,
+        'product_id' => $product->id,
+        'uom_id' => $uom->id,
+        'is_active' => true,
+    ]);
+
+    $page = new CreateProductionPlan();
+
+    $result = invokeMutateBeforeCreate($page, [
+        'source_type' => 'manual',
+        'bill_of_material_id' => $bom->id,
+        'product_id' => $product->id,
+        'quantity' => 5,
+        'uom_id' => $uom->id,
+        'cabang_id' => $cabangWrong->id,
+        'start_date' => now(),
+        'end_date' => now()->addDay(),
     ]);
 
     expect((int) $result['cabang_id'])->toBe((int) $cabangSource->id);

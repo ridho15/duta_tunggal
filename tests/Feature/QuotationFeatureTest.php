@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
+use App\Models\TaxSetting;
 use App\Models\SaleOrder;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
@@ -13,6 +14,8 @@ use App\Services\QuotationService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 
 uses(RefreshDatabase::class);
 
@@ -550,7 +553,7 @@ test('quotation item stores tax_type None by default', function () {
     expect($item->tax_type)->toBe('None');
 });
 
-test('quotation item stores tax_type Inclusive when explicitly set', function () {
+test('quotation item stores tax_type PPN Included when explicitly set', function () {
     $customer = Customer::factory()->create();
 
     $quotation = Quotation::create([
@@ -568,14 +571,40 @@ test('quotation item stores tax_type Inclusive when explicitly set', function ()
         'unit_price'   => 2500000,
         'discount'     => 0,
         'tax'          => 12,
-        'tax_type'     => 'Inclusive',
+        'tax_type'     => 'PPN Included',
     ]);
 
     $item->refresh();
-    expect($item->tax_type)->toBe('Inclusive');
+    expect($item->tax_type)->toBe('PPN Included');
 });
 
-test('QuotationService updateTotalAmount uses Exclusive tax_type correctly', function () {
+test('quotation item forces tax to zero when tax type is non tax', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0001-NP',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 100000,
+        'discount'     => 0,
+        'tax'          => 0,
+        'tax_type'     => 'None',
+    ]);
+
+    $item->refresh();
+    expect($item->tax_type)->toBe('None')
+        ->and((float) $item->tax)->toBe(0.0);
+});
+
+test('QuotationService updateTotalAmount uses PPN Excluded tax_type correctly', function () {
     $customer = Customer::factory()->create();
 
     $quotation = Quotation::create([
@@ -586,7 +615,7 @@ test('QuotationService updateTotalAmount uses Exclusive tax_type correctly', fun
         'created_by'       => 1,
     ]);
 
-    // 1 qty x 2,500,000, 0% discount, 12% Exclusive -> total = 2,800,000
+    // 1 qty x 2,500,000, 0% discount, 12% PPN Excluded -> total = 2,800,000
     QuotationItem::create([
         'quotation_id' => $quotation->id,
         'product_id'   => 1,
@@ -594,17 +623,17 @@ test('QuotationService updateTotalAmount uses Exclusive tax_type correctly', fun
         'unit_price'   => 2500000,
         'discount'     => 0,
         'tax'          => 12,
-        'tax_type'     => 'Exclusive',
+        'tax_type'     => 'PPN Excluded',
     ]);
 
     $this->quotationService->updateTotalAmount($quotation);
     $quotation->refresh();
 
-    // Exclusive: 2,500,000 + 12% = 2,800,000
+    // PPN Excluded: 2,500,000 + 12% = 2,800,000
     expect((float) $quotation->total_amount)->toBe(2800000.0);
 });
 
-test('QuotationService updateTotalAmount uses Inclusive tax_type correctly', function () {
+test('QuotationService updateTotalAmount uses PPN Included tax_type correctly', function () {
     $customer = Customer::factory()->create();
 
     $quotation = Quotation::create([
@@ -615,7 +644,7 @@ test('QuotationService updateTotalAmount uses Inclusive tax_type correctly', fun
         'created_by'       => 1,
     ]);
 
-    // 1 qty x 2,500,000, 0% discount, 12% Inclusive -> total stays 2,500,000
+    // 1 qty x 2,500,000, 0% discount, 12% PPN Included -> total stays 2,500,000
     QuotationItem::create([
         'quotation_id' => $quotation->id,
         'product_id'   => 1,
@@ -623,13 +652,13 @@ test('QuotationService updateTotalAmount uses Inclusive tax_type correctly', fun
         'unit_price'   => 2500000,
         'discount'     => 0,
         'tax'          => 12,
-        'tax_type'     => 'Inclusive',
+        'tax_type'     => 'PPN Included',
     ]);
 
     $this->quotationService->updateTotalAmount($quotation);
     $quotation->refresh();
 
-    // Inclusive: total stays at gross amount 2,500,000
+    // PPN Included: total stays at gross amount 2,500,000
     expect((float) $quotation->total_amount)->toBe(2500000.0);
 });
 
@@ -651,11 +680,61 @@ test('quotation item tax_type persists through update', function () {
         'unit_price'   => 100000,
         'discount'     => 0,
         'tax'          => 12,
-        'tax_type'     => 'Exclusive',
+        'tax_type'     => 'PPN Excluded',
     ]);
 
-    $item->update(['tax_type' => 'Inclusive']);
+    $item->update(['tax_type' => 'PPN Included']);
     $item->refresh();
 
-    expect($item->tax_type)->toBe('Inclusive');
+    expect($item->tax_type)->toBe('PPN Included');
+});
+
+test('quotation form auto-fills tax from active setting when tax type is PPN Excluded or Included', function () {
+    $user = User::factory()->create();
+    $permissions = [
+        'view any quotation',
+        'view quotation',
+        'create quotation',
+        'update quotation',
+        'delete quotation',
+        'view any customer',
+        'view any product',
+    ];
+
+    foreach ($permissions as $permission) {
+        Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+    }
+    $user->givePermissionTo($permissions);
+
+    $customer = Customer::factory()->create();
+    $product = Product::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'uom_id' => $this->uom->id,
+    ]);
+
+    TaxSetting::factory()->ppn()->create([
+        'effective_date' => now()->subDay()->toDateString(),
+        'status' => true,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.quotationItem', [
+            [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+                'tax_type' => 'None',
+            ],
+        ])
+            ->set('data.quotationItem.0.tax_type', 'PPN Excluded')
+            ->assertSet('data.quotationItem.0.tax', 11)
+        ->set('data.quotationItem.0.tax', 7)
+        ->assertSet('data.quotationItem.0.tax', 7)
+            ->set('data.quotationItem.0.tax_type', 'PPN Included')
+        ->assertSet('data.quotationItem.0.tax', 11);
 });

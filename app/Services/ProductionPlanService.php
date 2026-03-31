@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ProductionPlan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class ProductionPlanService
@@ -21,9 +22,18 @@ class ProductionPlanService
         return $candidate;
     }
 
-    public function getSaleOrderOptions()
+    public function getSaleOrderOptions(?int $cabangId = null)
     {
-        return \App\Models\SaleOrder::whereIn('status', ['approved', 'confirmed'])
+        $query = \App\Models\SaleOrder::whereIn('status', ['approved', 'confirmed']);
+
+        $user = Auth::user();
+        if ($cabangId) {
+            $query->where('cabang_id', $cabangId);
+        } elseif ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->where('cabang_id', $user->cabang_id);
+        }
+
+        return $query
             ->with(['customer', 'saleOrderItem.product'])
             ->get()
             ->mapWithKeys(function ($saleOrder) {
@@ -32,10 +42,19 @@ class ProductionPlanService
             });
     }
 
-    public function getBillOfMaterialOptions()
+    public function getBillOfMaterialOptions(?int $cabangId = null)
     {
-        return \App\Models\BillOfMaterial::with(['product', 'cabang'])
-            ->where('is_active', true) // Only active BOMs
+        $query = \App\Models\BillOfMaterial::with(['product', 'cabang'])
+            ->where('is_active', true);
+
+        $user = Auth::user();
+        if ($cabangId) {
+            $query->where('cabang_id', $cabangId);
+        } elseif ($user && !in_array('all', $user->manage_type ?? [])) {
+            $query->where('cabang_id', $user->cabang_id);
+        }
+
+        return $query
             ->get()
             ->mapWithKeys(function ($bom) {
                 $label = "{$bom->code} - {$bom->product->name} ({$bom->cabang->nama})";

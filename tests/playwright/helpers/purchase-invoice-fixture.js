@@ -7,10 +7,33 @@ export const FIXTURE = {
   poNumber: 'PO-TEST-INV-B23',
   receiptLocked: 'PR-TEST-INV-LOCKED',
   receiptOpen: 'PR-TEST-INV-OPEN',
+  invoiceNumber: 'INV-TEST-INV-LOCKED',
 }
 
 export function ensurePurchaseInvoiceFixture() {
   execSync('php scripts/setup_purchase_invoice_playwright_data.php', { stdio: 'inherit' })
+}
+
+async function selectFirstChoicesOption(page, labelText, searchTerm = '') {
+  const wrapper = page.locator('.fi-fo-field-wrp').filter({ has: page.locator(`label:has-text("${labelText}")`) }).first()
+  await expect(wrapper).toBeVisible()
+
+  const choicesInner = wrapper.locator('.choices__inner')
+  await choicesInner.click()
+
+  if (searchTerm) {
+    const searchInput = wrapper.locator('.choices__input--cloned, .choices__input[type="search"]').first()
+    await expect(searchInput).toBeVisible()
+    await searchInput.click({ force: true })
+    await searchInput.type(searchTerm, { delay: 60 })
+    await page.waitForTimeout(600)
+  }
+
+  const firstItem = wrapper.locator('.choices__list--dropdown .choices__item--choice:not(.choices__placeholder):not(.is-disabled)').first()
+  await expect(firstItem).toBeVisible({ timeout: 10000 })
+  await firstItem.click()
+
+  await page.waitForTimeout(500)
 }
 
 export async function openCreatePage(page) {
@@ -20,35 +43,15 @@ export async function openCreatePage(page) {
 }
 
 export async function chooseFixtureSupplier(page) {
-  const supplierCombobox = page.getByRole('combobox').first()
-  await expect(supplierCombobox).toBeVisible()
-  await supplierCombobox.click({ force: true })
+  await selectFirstChoicesOption(page, 'Supplier', FIXTURE.supplierCode)
+}
 
-  const supplierSearch = page.locator('input.choices__input--cloned[aria-label="Pilih salah satu opsi"]:visible').first()
-  await expect(supplierSearch).toBeVisible()
-  await supplierSearch.fill(FIXTURE.supplierCode)
-  const supplierOption = page.locator('[role="option"]').filter({ hasText: FIXTURE.supplierCode }).first()
-  await expect(supplierOption).toBeVisible()
-  await supplierOption.click({ force: true })
-
-  await expect(supplierCombobox).toContainText(FIXTURE.supplierCode)
-  await page.waitForTimeout(1000)
+export async function chooseFixtureCabang(page) {
+  await selectFirstChoicesOption(page, 'Cabang', 'Cabang Sawahlunto')
 }
 
 export async function chooseFixtureOrderRequest(page) {
-  const orCombobox = page.locator('.fi-fo-field-wrp').filter({ hasText: 'Order Request (OR)' }).getByRole('combobox').first()
-  await expect(orCombobox).toBeVisible()
-  await orCombobox.click({ force: true })
-
-  const orSearch = page.locator('input.choices__input--cloned[aria-label="Pilih salah satu opsi"]:visible').first()
-  await expect(orSearch).toBeVisible()
-  await orSearch.fill(FIXTURE.orderRequestNumber)
-  const orOption = page.locator('[role="option"]').filter({ hasText: FIXTURE.orderRequestNumber }).first()
-  await expect(orOption).toBeVisible()
-  await orOption.click({ force: true })
-
-  await expect(orCombobox).toContainText(FIXTURE.orderRequestNumber)
-  await page.waitForTimeout(1000)
+  await selectFirstChoicesOption(page, 'Order Request (OR)', FIXTURE.orderRequestNumber)
 }
 
 export async function checkCheckboxByLabel(page, labelText) {

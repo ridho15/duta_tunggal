@@ -81,6 +81,11 @@ async function openApproveModal(page, targetRow) {
   return modalContainer;
 }
 
+async function gotoOrderRequestList(page) {
+  await page.goto(`/admin/order-requests?tableSearch=${encodeURIComponent(OR2_REQUEST_NUMBER)}`);
+  await page.waitForLoadState('networkidle');
+}
+
 test.describe('Order Request Approve Modal — field pre-fill', () => {
 
   test('Approve modal for OR #2 pre-fills original_price and total_cost', async ({ page }) => {
@@ -88,8 +93,7 @@ test.describe('Order Request Approve Modal — field pre-fill', () => {
     page.on('pageerror', err => jsErrors.push(err.message));
 
     // ── 1. Navigate to Order Request list ─────────────────────────────────
-    await page.goto('/admin/order-requests');
-    await page.waitForLoadState('networkidle');
+    await gotoOrderRequestList(page);
 
     // Confirm we reached the list (not redirected back to login)
     await expect(page).not.toHaveURL(/login/, { timeout: 5_000 });
@@ -142,8 +146,7 @@ test.describe('Order Request Approve Modal — field pre-fill', () => {
   });
 
   test('original_price and total_cost are not empty in approve modal', async ({ page }) => {
-    await page.goto('/admin/order-requests');
-    await page.waitForLoadState('networkidle');
+    await gotoOrderRequestList(page);
 
     const targetRow = page.locator('tr').filter({ hasText: OR2_REQUEST_NUMBER }).first();
     await targetRow.waitFor({ state: 'visible', timeout: 15_000 });
@@ -164,8 +167,7 @@ test.describe('Order Request Approve Modal — field pre-fill', () => {
   });
 
   test('product_name is visible and unit_price is pre-filled in approve modal', async ({ page }) => {
-    await page.goto('/admin/order-requests');
-    await page.waitForLoadState('networkidle');
+    await gotoOrderRequestList(page);
 
     const targetRow = page.locator('tr').filter({ hasText: OR2_REQUEST_NUMBER }).first();
     await targetRow.waitFor({ state: 'visible', timeout: 15_000 });
@@ -181,5 +183,56 @@ test.describe('Order Request Approve Modal — field pre-fill', () => {
     const unitPriceVal = await modal.locator('input[id*="unit_price"]').first().inputValue();
     console.log('unit_price:', unitPriceVal);
     expect(unitPriceVal.trim()).toBe(EXPECTED_UNIT_PRICE);
+  });
+
+  test('changing override price updates total_cost and subtotal before approval', async ({ page }) => {
+    await gotoOrderRequestList(page);
+
+    const targetRow = page.locator('tr').filter({ hasText: OR2_REQUEST_NUMBER }).first();
+    await targetRow.waitFor({ state: 'visible', timeout: 15_000 });
+
+    const modal = await openApproveModal(page, targetRow);
+
+    const unitPriceInput = modal.locator('input[id*="unit_price"]').first();
+    const totalCostInput = modal.locator('input[id*="total_cost"]').first();
+    const subtotalInput = modal.locator('input[id*="subtotal"]').first();
+    const taxNominalInput = modal.locator('input[id*="tax_nominal"]').first();
+
+    const originalUnitPrice = await unitPriceInput.inputValue();
+    const originalTotalCost = await totalCostInput.inputValue();
+    const originalSubtotal = await subtotalInput.inputValue();
+    const originalTaxNominal = await taxNominalInput.inputValue();
+
+    console.log('before change:', {
+      originalUnitPrice,
+      originalTotalCost,
+      originalSubtotal,
+      originalTaxNominal,
+    });
+
+    await unitPriceInput.click({ clickCount: 3 });
+    await unitPriceInput.fill('140.000');
+    await unitPriceInput.press('Tab');
+
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1200);
+
+    const newUnitPrice = await unitPriceInput.inputValue();
+    const newTotalCost = await totalCostInput.inputValue();
+    const newSubtotal = await subtotalInput.inputValue();
+    const newTaxNominal = await taxNominalInput.inputValue();
+
+    console.log('after change:', {
+      newUnitPrice,
+      newTotalCost,
+      newSubtotal,
+      newTaxNominal,
+    });
+
+    expect(newUnitPrice).toBe('140.000');
+    expect(newTotalCost).not.toBe(originalTotalCost);
+    expect(newSubtotal).not.toBe(originalSubtotal);
+    expect(newTaxNominal).not.toBe(originalTaxNominal);
+    expect(newTotalCost).toContain('1.400.000');
   });
 });

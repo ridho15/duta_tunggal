@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\ProductionPlanResource\Pages;
 
 use App\Filament\Resources\ProductionPlanResource;
+use App\Models\BillOfMaterial;
+use App\Models\SaleOrder;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +17,24 @@ class CreateProductionPlan extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['created_by'] = Auth::id();
+
+        if (!empty($data['sale_order_id'])) {
+            $saleOrder = SaleOrder::find($data['sale_order_id']);
+            if ($saleOrder?->cabang_id) {
+                $data['cabang_id'] = $saleOrder->cabang_id;
+            }
+        }
+
+        if (!empty($data['bill_of_material_id'])) {
+            $bom = BillOfMaterial::find($data['bill_of_material_id']);
+            if ($bom?->cabang_id) {
+                $data['cabang_id'] = $bom->cabang_id;
+            }
+        }
+
+        if (empty($data['cabang_id'])) {
+            $data['cabang_id'] = Auth::user()?->cabang_id;
+        }
 
         // Auto schedule option: if checked, set status to scheduled else default draft
         if (!empty($data['auto_schedule'])) {

@@ -67,11 +67,17 @@ class CreatePurchaseInvoice extends CreateRecord
         }
 
         $data['other_fee'] = collect($otherFees)->map(function ($fee) {
+            $amount = (float) \App\Helpers\MoneyHelper::parse($fee['total'] ?? $fee['amount'] ?? 0);
+
+            if ($amount <= 0) {
+                return null;
+            }
+
             return [
                 'name' => $fee['nama_biaya'] ?? $fee['name'] ?? 'Biaya Lain',
-                'amount' => (float) \App\Helpers\MoneyHelper::parse($fee['total'] ?? $fee['amount'] ?? 0),
+                'amount' => $amount,
             ];
-        })->toArray();
+        })->filter()->values()->toArray();
 
         unset($data['other_fees'], $data['receiptBiayaItems']);
 

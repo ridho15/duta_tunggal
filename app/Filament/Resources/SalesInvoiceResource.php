@@ -678,6 +678,8 @@ class SalesInvoiceResource extends Resource
                                     ->reactive()
                                     ->helperText('Diisi otomatis dari Sales Order. Dapat diubah bila perlu.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
+                                        $activePpnRate = \App\Models\TaxSetting::activeRate('PPN');
+
                                         // If None, set ppn_rate to 0
                                         if ($state === 'None') {
                                             $set('ppn_rate', 0);
@@ -686,11 +688,8 @@ class SalesInvoiceResource extends Resource
                                             $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
                                             $set('total', $subtotal + $otherFeeTotal);
                                         } else {
-                                            // Set ppn_rate to active rate if not already set
-                                            $currentRate = (float) ($get('ppn_rate') ?? 0);
-                                            if ($currentRate === 0.0) {
-                                                $set('ppn_rate', \App\Models\TaxSetting::activeRate('PPN'));
-                                            }
+                                            // Reapply active rate when PPN is enabled, but keep the field editable
+                                            $set('ppn_rate', $activePpnRate);
                                         }
                                     }),
 

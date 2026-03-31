@@ -145,7 +145,7 @@ function makeSoWithAllocations(array $f, string $tipe = 'Kirim Langsung'): array
         'unit_price' => 10000000,
         'discount' => 0,
         'tax' => 11,
-        'tipe_pajak' => 'Exclusive',
+        'tipe_pajak' => 'PPN Excluded',
         'warehouse_id' => null,
         'rak_id' => null,
     ]);

@@ -28,6 +28,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\OrderRequestService;
+use App\Services\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
@@ -306,6 +307,45 @@ test('createPurchaseOrder with selected_items includes only checked items', func
 });
 
 // ─────────────────────────────────────────────
+// SCENARIO 7B — manual PO item creation still backfills traceability
+// ─────────────────────────────────────────────
+test('manually created PO items linked to an OrderRequest backfill refer_item_model and update fulfillment', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $this->supplier->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'po_number' => 'PO-TEST-MANUAL-001',
+        'order_date' => Carbon::today()->toDateString(),
+        'status' => 'draft',
+        'warehouse_id' => $this->warehouse->id,
+        'cabang_id' => $this->cabang->id,
+        'tempo_hutang' => $this->supplier->tempo_hutang,
+        'created_by' => $this->user->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 10,
+        'unit_price' => 10000,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Non Pajak',
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $poItem->refresh();
+    $this->itemA->refresh();
+
+    expect($poItem->refer_item_model_type)->toBe(OrderRequestItem::class)
+        ->and($poItem->refer_item_model_id)->toBe($this->itemA->id)
+        ->and((float) $this->itemA->fulfilled_quantity)->toBe(10.0)
+        ->and((float) $this->itemA->remaining_quantity)->toBe(0.0);
+});
+
+// ─────────────────────────────────────────────
 // SCENARIO 8 — refer_item_model traceability preserved
 // ─────────────────────────────────────────────
 test('PO items have correct refer_item_model traceability after approve', function () {
@@ -348,6 +388,50 @@ test('fulfilled_quantity on OrderRequestItems is updated after approve', functio
 
     expect((float) $this->itemA->fulfilled_quantity)->toBe(10.0);
     expect((float) $this->itemB->fulfilled_quantity)->toBe(5.0);
+});
+
+test('approving an existing PO does not double count fulfilled quantities', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+
+    $payload = [
+        'supplier_id'    => $this->supplier->id,
+        'po_number'      => 'PO-TEST-009B',
+        'order_date'     => Carbon::today()->toDateString(),
+        'selected_items' => [
+            [
+                'item_id'      => $this->itemA->id,
+                'product_name' => 'Product A',
+                'quantity'     => 10,
+                'unit_price'   => 10000,
+                'include'      => true,
+            ],
+            [
+                'item_id'      => $this->itemB->id,
+                'product_name' => 'Product B',
+                'quantity'     => 5,
+                'unit_price'   => 20000,
+                'include'      => true,
+            ],
+        ],
+    ];
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(), $payload);
+
+    $this->itemA->refresh();
+    $this->itemB->refresh();
+
+    $fulfilledA = (float) $this->itemA->fulfilled_quantity;
+    $fulfilledB = (float) $this->itemB->fulfilled_quantity;
+
+    app(PurchaseOrderService::class)->approvePo($po, $this->user->id);
+
+    $this->itemA->refresh();
+    $this->itemB->refresh();
+
+    expect((float) $this->itemA->fulfilled_quantity)->toBe($fulfilledA);
+    expect((float) $this->itemB->fulfilled_quantity)->toBe($fulfilledB);
+    expect((float) $this->itemA->remaining_quantity)->toBe((float) max(0, $this->itemA->quantity - $fulfilledA));
+    expect((float) $this->itemB->remaining_quantity)->toBe((float) max(0, $this->itemB->quantity - $fulfilledB));
 });
 
 // ─────────────────────────────────────────────

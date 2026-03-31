@@ -153,7 +153,7 @@ class ViewProfitAndLoss extends Page
             });
         } else {
             $query->where('type', 'Expense')
-                ->where('perusahaan', 'like', '%HPP%');
+                ->where('name', 'like', '%HPP%');
         }
 
         $cogsAccounts = $query->get();
@@ -182,14 +182,14 @@ class ViewProfitAndLoss extends Page
 
     protected function getOtherIncomeExpense($start, $end): float
     {
-        $otherIncome = ChartOfAccount::where('type', 'Revenue')->where('perusahaan', 'like', '%Lain%')->get();
-        $otherExpense = ChartOfAccount::where('type', 'Expense')->where('perusahaan', 'like', '%Lain%')->get();
+        $otherIncome = ChartOfAccount::where('type', 'Revenue')->where('name', 'like', '%Lain%')->get();
+        $otherExpense = ChartOfAccount::where('type', 'Expense')->where('name', 'like', '%Lain%')->get();
         return $this->sumByAccounts($otherIncome, $start, $end) - $this->sumByAccounts($otherExpense, $start, $end);
     }
 
     protected function getTaxExpense($start, $end): float
     {
-        $taxAccounts = ChartOfAccount::where('type', 'Expense')->where('perusahaan', 'like', '%Pajak%')->get();
+        $taxAccounts = ChartOfAccount::where('type', 'Expense')->where('name', 'like', '%Pajak%')->get();
         return $this->sumByAccounts($taxAccounts, $start, $end);
     }
 }

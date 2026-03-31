@@ -81,15 +81,13 @@ class ViewOrderRequest extends ViewRecord
                         $totalCost = max(0, $remainingQty) * $unitPrice;
 
                         $taxPct = (float)($item->tax ?? 0);
-                        $base = $totalCost;
-                        try {
-                            $taxRes = \App\Services\TaxService::compute($base, $taxPct, $taxType);
-                            $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
-                            $subtotal = number_format($taxRes['total'], 0, ',', '.');
-                        } catch (\Throwable $e) {
-                            $taxNom = '0';
-                            $subtotal = '0';
-                        }
+                        $preview = OrderRequestResource::calculateApprovalItemPreview(
+                            (float) max(0, $remainingQty),
+                            (float) $unitPrice,
+                            0,
+                            $taxPct,
+                            $taxType
+                        );
 
                         $supplierName = $item->supplier_id
                             ? ("({$item->supplier->code}) {$item->supplier->perusahaan}")
@@ -106,9 +104,9 @@ class ViewOrderRequest extends ViewRecord
                             'original_price'   => $originalPrice,
                             'unit_price'       => $unitPrice,
                             'tax'              => $taxPct,
-                            'tax_nominal'      => $taxNom,
-                            'total_cost'       => $totalCost,
-                            'subtotal'         => $subtotal,
+                            'tax_nominal'      => $preview['tax_nominal'],
+                            'total_cost'       => $preview['total_cost'],
+                            'subtotal'         => $preview['subtotal'],
                             'max_quantity'     => max(0, $remainingQty),
                             'include'          => $remainingQty > 0,
                         ];
@@ -124,6 +122,7 @@ class ViewOrderRequest extends ViewRecord
                         'supplier_id'           => $firstSupplierId,
                         'create_purchase_order' => true,
                         'multi_supplier'        => $isMultiSupplier,
+                        'tax_type'              => $record->tax_type ?? 'None',
                         'selected_items'        => $items,
                     ];
                 })
@@ -131,6 +130,7 @@ class ViewOrderRequest extends ViewRecord
                     Section::make('Opsi Persetujuan')
                         ->icon('heroicon-o-cog-6-tooth')
                         ->schema([
+                            Hidden::make('tax_type'),
                             Toggle::make('create_purchase_order')
                                 ->label('Buat Purchase Order secara otomatis?')
                                 ->helperText('Aktifkan untuk langsung membuat PO setelah approval.')
@@ -231,7 +231,23 @@ class ViewOrderRequest extends ViewRecord
                                     TextInput::make('quantity')
                                         ->label('Qty')
                                         ->minValue(0)
+                                        ->reactive()
+                                        ->live()
                                         ->required()
+                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                            $taxType = $get('../../tax_type') ?? 'None';
+                                            $preview = OrderRequestResource::calculateApprovalItemPreview(
+                                                (float) ($state ?? 0),
+                                                (float) MoneyHelper::parse($get('unit_price') ?? 0),
+                                                0,
+                                                (float) ($get('tax') ?? 0),
+                                                $taxType
+                                            );
+
+                                            $set('total_cost', $preview['total_cost']);
+                                            $set('subtotal', $preview['subtotal']);
+                                            $set('tax_nominal', $preview['tax_nominal']);
+                                        })
                                         ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                                         ->rules([
                                             fn($get) => function ($attribute, $value, $fail) use ($get) {
@@ -245,6 +261,16 @@ class ViewOrderRequest extends ViewRecord
                                             'required' => 'Qty wajib diisi.',
                                             'min' => 'Qty minimal 0.',
                                         ]),
+                                    TextInput::make('fulfilled_quantity')
+                                        ->label('Qty Terpenuhi')
+                                        ->readOnly()
+                                        ->dehydrated(false)
+                                        ->default(0),
+                                    TextInput::make('remaining_quantity')
+                                        ->label('Sisa Qty')
+                                        ->readOnly()
+                                        ->dehydrated(false)
+                                        ->default(0),
                                     TextInput::make('original_price')
                                         ->label('Harga Asli (Rp)')
                                         ->minValue(0)
@@ -252,7 +278,23 @@ class ViewOrderRequest extends ViewRecord
                                     TextInput::make('unit_price')
                                         ->label('Harga Override (Rp)')
                                         ->minValue(0)
-                                        ->indonesianMoney(),
+                                        ->indonesianMoney()
+                                        ->reactive()
+                                        ->live()
+                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                            $taxType = $get('../../tax_type') ?? 'None';
+                                            $preview = OrderRequestResource::calculateApprovalItemPreview(
+                                                (float) ($get('quantity') ?? 0),
+                                                (float) MoneyHelper::parse($state ?? 0),
+                                                0,
+                                                (float) ($get('tax') ?? 0),
+                                                $taxType
+                                            );
+
+                                            $set('total_cost', $preview['total_cost']);
+                                            $set('subtotal', $preview['subtotal']);
+                                            $set('tax_nominal', $preview['tax_nominal']);
+                                        }),
                                     TextInput::make('tax')
                                         ->label('Pajak (%)')
                                         ->readOnly()
@@ -260,22 +302,15 @@ class ViewOrderRequest extends ViewRecord
                                         ->columnSpan(1),
                                     TextInput::make('tax_nominal')
                                         ->label('Nominal Pajak (Rp)')
-                                        ->prefix('Rp')
+                                        ->indonesianMoney()
                                         ->readOnly(),
                                     TextInput::make('total_cost')
                                         ->label('Total (Harga × Qty)')
-                                        ->prefix('Rp')
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format((float)$state, 0, ',', '.') : '')
-                                        ->rules([
-                                            'regex:/^[0-9\.,]+$/',
-                                        ])
-                                        ->validationMessages([
-                                            'regex' => 'Total harus berupa angka (contoh: 12.000.000).',
-                                        ])
+                                        ->indonesianMoney()
                                         ->readOnly(),
                                     TextInput::make('subtotal')
                                         ->label('Subtotal (Rp)')
-                                        ->prefix('Rp')
+                                        ->indonesianMoney()
                                         ->readOnly(),
                                     Checkbox::make('include')
                                         ->label('Sertakan')
@@ -318,6 +353,7 @@ class ViewOrderRequest extends ViewRecord
                                 $created++;
                             }
 
+                            $record->refresh();
                             $record->update(['status' => 'approved']);
                             HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
                             return;
@@ -331,6 +367,7 @@ class ViewOrderRequest extends ViewRecord
                     }
 
                     $orderRequestService->approve($record, $data);
+                    $record->refresh();
                     HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
                 }),
             Action::make('create_purchase_order')
@@ -501,11 +538,20 @@ class ViewOrderRequest extends ViewRecord
                                             'numeric' => 'Qty harus berupa angka.',
                                             'min' => 'Qty minimal 0.',
                                         ]),
+                                    TextInput::make('fulfilled_quantity')
+                                        ->label('Qty Terpenuhi')
+                                        ->readOnly()
+                                        ->dehydrated(false)
+                                        ->default(0),
+                                    TextInput::make('remaining_quantity')
+                                        ->label('Sisa Qty')
+                                        ->readOnly()
+                                        ->dehydrated(false)
+                                        ->default(0),
                                     TextInput::make('original_price')
                                         ->label('Harga Asli')
-                                        ->prefix('Rp')
+                                        ->indonesianMoney()
                                         ->readOnly()
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
                                         ->columnSpan(2),
                                     TextInput::make('unit_price')
                                         ->label('Harga Override')
@@ -519,7 +565,7 @@ class ViewOrderRequest extends ViewRecord
                                         ->columnSpan(1),
                                     TextInput::make('tax_nominal')
                                         ->label('Nominal Pajak (Rp)')
-                                        ->prefix('Rp')
+                                        ->indonesianMoney()
                                         ->readOnly()
                                         ->columnSpan(2),
                                     Checkbox::make('include')

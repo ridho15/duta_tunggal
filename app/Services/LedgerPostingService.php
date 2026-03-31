@@ -153,8 +153,9 @@ class LedgerPostingService
                 // Legacy fallback: tax field may store absolute IDR amount or legacy percentage rate
                 $taxValue = (float) $invoice->tax;
                 $expectedByRate = round($subtotalAmount * ($taxValue / 100), 2);
+                $otherFeeAmount = (float) ($invoice->other_fee_total ?? 0);
                 $looksLikeLegacyRate = $taxValue <= 100
-                    && abs(((float) $invoice->total) - ($subtotalAmount + $expectedByRate)) < 1;
+                    && abs(((float) $invoice->total) - ($subtotalAmount + $otherFeeAmount + $expectedByRate)) < 1;
                 $ppnAmount = $looksLikeLegacyRate ? $expectedByRate : $taxValue;
             }
 
@@ -178,14 +179,20 @@ class LedgerPostingService
                 $actualPpnAmount = $ppnAmount;
             }
 
-            // Calculate total other fees as: invoice_total - subtotal - ppn_amount
-            // This ensures journal entries always balance with invoice total
-            // Calculate other fees beyond subtotal + PPN.
-            // IMPORTANT: totalOtherFees must never be negative. If $total was stored WITHOUT PPN
-            // (e.g., total = subtotal and ppn_rate is stored separately), the naive formula
-            // ($total - $subtotal - $ppnAmount) would go negative and reduce the AP credit —
-            // causing an unbalanced journal entry. Use max(0, ...) as safety guard.
-            $totalOtherFees = max(0.0, $total - $subtotal - $actualPpnAmount);
+            // Prefer the normalized other_fee JSON as the source of truth.
+            // This prevents Rp 0 shipping/additional fee rows from being journalized
+            // while still allowing legacy invoices without structured fees to fall
+            // back to the stored grand total difference.
+            $normalizedOtherFeeTotal = (float) $invoice->getOtherFeeTotalAttribute();
+            if ($normalizedOtherFeeTotal > 0) {
+                $totalOtherFees = $normalizedOtherFeeTotal;
+            } else {
+                // Legacy fallback: derive the amount from the stored grand total.
+                // Treat sub-rupiah residuals as rounding noise so they do not become
+                // false shipping/additional-fee journal lines.
+                $legacyOtherFee = max(0.0, $total - $subtotal - $actualPpnAmount);
+                $totalOtherFees = $legacyOtherFee >= 1 ? round($legacyOtherFee) : 0.0;
+            }
 
             // Create journal entry for other fees if any
             if ($totalOtherFees > 0) {
@@ -840,6 +847,70 @@ class LedgerPostingService
 
             Log::info('LedgerPostingService: journal reversal created', [
                 'original_transaction_id' => $transactionId,
+                'reversal_transaction_id' => $reversalTransactionId,
+                'entries_reversed'        => $reversals->count(),
+            ]);
+
+            return $reversals;
+        });
+    }
+
+    /**
+     * Reverse all journal entries for a given invoice source.
+     *
+     * This is intended for legacy cleanup/backfill when purchase invoice journal
+     * entries were created without a transaction_id. It mirrors the entries and
+     * links the originals to the generated reversal batch using reversal_of_transaction_id.
+     */
+    public function reverseInvoiceJournalEntries(Invoice $invoice, $reversalDate = null): \Illuminate\Support\Collection
+    {
+        return DB::transaction(function () use ($invoice, $reversalDate) {
+            $date = $reversalDate
+                ? \Carbon\Carbon::parse($reversalDate)->toDateString()
+                : now()->toDateString();
+
+            $originals = JournalEntry::where('source_type', Invoice::class)
+                ->where('source_id', $invoice->id)
+                ->where('is_reversal', false)
+                ->get();
+
+            if ($originals->isEmpty()) {
+                throw new \RuntimeException("Tidak ada jurnal ditemukan untuk invoice ID: {$invoice->id}");
+            }
+
+            $reversalTransactionId = 'REV-INVOICE-' . $invoice->id . '-' . now()->format('YmdHis');
+            $reversals = collect();
+
+            foreach ($originals as $entry) {
+                $reversal = JournalEntry::create([
+                    'coa_id'                      => $entry->coa_id,
+                    'date'                        => $date,
+                    'reference'                   => 'REVERSAL: ' . ($entry->reference ?? $invoice->invoice_number),
+                    'description'                 => 'Pembalikan Jurnal Invoice: ' . ($entry->description ?? ''),
+                    'debit'                       => $entry->credit,
+                    'credit'                      => $entry->debit,
+                    'journal_type'                => $entry->journal_type,
+                    'cabang_id'                   => $entry->cabang_id,
+                    'department_id'               => $entry->department_id,
+                    'project_id'                  => $entry->project_id,
+                    'source_type'                 => $entry->source_type,
+                    'source_id'                   => $entry->source_id,
+                    'transaction_id'              => $reversalTransactionId,
+                    'is_reversal'                 => true,
+                    'reversal_of_transaction_id'  => $invoice->id,
+                ]);
+
+                $reversals->push($reversal);
+            }
+
+            JournalEntry::where('source_type', Invoice::class)
+                ->where('source_id', $invoice->id)
+                ->where('is_reversal', false)
+                ->update(['reversal_of_transaction_id' => $reversalTransactionId]);
+
+            Log::info('LedgerPostingService: invoice journal reversal created', [
+                'invoice_id'              => $invoice->id,
+                'invoice_number'          => $invoice->invoice_number,
                 'reversal_transaction_id' => $reversalTransactionId,
                 'entries_reversed'        => $reversals->count(),
             ]);

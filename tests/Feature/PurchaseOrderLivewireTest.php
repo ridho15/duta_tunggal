@@ -1,12 +1,19 @@
 <?php
 
 use App\Filament\Resources\PurchaseOrderResource\Pages\CreatePurchaseOrder;
+use App\Filament\Resources\PurchaseOrderResource\Pages\EditPurchaseOrder;
+use App\Filament\Resources\PurchaseOrderResource\Pages\ViewPurchaseOrder;
 use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Currency;
+use App\Models\ChartOfAccount;
+use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
+use App\Models\TaxSetting;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -113,6 +120,154 @@ test('purchase order livewire form auto-fills tempo hutang from supplier selecti
         ->assertSet('data.tempo_hutang', $this->supplier->tempo_hutang);
 });
 
+test('purchase order edit and view pages show supplier code and name', function () {
+    $supplier = Supplier::factory()->create([
+        'code' => 'SUP-PO-001',
+        'perusahaan' => 'PT Supplier Purchase Order',
+        'tempo_hutang' => 30,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $supplier->id,
+        'po_number' => 'PO-SUP-001',
+        'order_date' => Carbon::now()->toDateString(),
+        'status' => 'draft',
+        'expected_date' => Carbon::now()->addDays(3)->toDateString(),
+        'total_amount' => 0,
+        'warehouse_id' => $this->warehouse->id,
+        'tempo_hutang' => $supplier->tempo_hutang,
+        'note' => 'PO supplier label test',
+        'created_by' => $this->user->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertFormExists()
+        ->assertSee('(SUP-PO-001) PT Supplier Purchase Order');
+
+    Livewire::actingAs($this->user)
+        ->test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertSee('(SUP-PO-001) PT Supplier Purchase Order');
+});
+
+test('purchase order edit and view keep the linked order request supplier visible even after it is already used', function () {
+    $supplierA = Supplier::factory()->create([
+        'code' => 'SUP-OR-001',
+        'perusahaan' => 'PT Supplier OR A',
+        'tempo_hutang' => 30,
+    ]);
+    $supplierB = Supplier::factory()->create([
+        'code' => 'SUP-OR-002',
+        'perusahaan' => 'PT Supplier OR B',
+        'tempo_hutang' => 14,
+    ]);
+
+    $orderRequest = \App\Models\OrderRequest::factory()->create([
+        'warehouse_id' => $this->warehouse->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+        'status' => 'approved',
+        'tax_type' => 'PPN Excluded',
+        'request_date' => Carbon::now()->toDateString(),
+    ]);
+
+    $productA = Product::factory()->create(['supplier_id' => $supplierA->id, 'cost_price' => 10000]);
+    $productB = Product::factory()->create(['supplier_id' => $supplierB->id, 'cost_price' => 20000]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $productA->id,
+        'supplier_id' => $supplierA->id,
+        'quantity' => 5,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 10000,
+        'discount' => 0,
+        'tax' => 0,
+    ]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $productB->id,
+        'supplier_id' => $supplierB->id,
+        'quantity' => 4,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 20000,
+        'discount' => 0,
+        'tax' => 0,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $supplierA->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'po_number' => 'PO-OR-SUP-001',
+        'order_date' => Carbon::now()->toDateString(),
+        'status' => 'draft',
+        'expected_date' => Carbon::now()->addDays(3)->toDateString(),
+        'total_amount' => 50000,
+        'warehouse_id' => $this->warehouse->id,
+        'tempo_hutang' => $supplierA->tempo_hutang,
+        'note' => 'PO linked to OR supplier test',
+        'created_by' => $this->user->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertFormExists()
+        ->assertFormSet(['supplier_id' => $supplierA->id])
+        ->assertSee('(SUP-OR-001) PT Supplier OR A');
+
+    Livewire::actingAs($this->user)
+        ->test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertSee('(SUP-OR-001) PT Supplier OR A');
+});
+
+test('purchase order edit and view keep a completed order request visible in the reference field', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'warehouse_id' => $this->warehouse->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+        'status' => 'complete',
+        'tax_type' => 'PPN Excluded',
+        'request_date' => Carbon::now()->toDateString(),
+    ]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'quantity' => 2,
+        'fulfilled_quantity' => 2,
+        'unit_price' => 12500,
+        'discount' => 0,
+        'tax' => 0,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $this->supplier->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'po_number' => 'PO-OR-COMPLETE-001',
+        'order_date' => Carbon::now()->toDateString(),
+        'status' => 'draft',
+        'expected_date' => Carbon::now()->addDays(3)->toDateString(),
+        'total_amount' => 25000,
+        'warehouse_id' => $this->warehouse->id,
+        'tempo_hutang' => $this->supplier->tempo_hutang,
+        'created_by' => $this->user->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertFormExists()
+        ->assertFormSet(['refer_model_id' => $orderRequest->id])
+        ->assertSee($orderRequest->request_number);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertSee($orderRequest->request_number);
+});
+
 test('purchase order can be created through livewire create page', function () {
     $orderDate = Carbon::now()->toDateString();
     $expectedDate = Carbon::now()->addDays(3)->toDateString();
@@ -168,4 +323,184 @@ test('purchase order can be created through livewire create page', function () {
         ->and((int) $line->quantity)->toBe(2)
         ->and((float) $line->unit_price)->toBe(12500.0)
         ->and($line->currency_id)->toBe($this->currency->id);
+});
+
+test('purchase order create page backfills refer_item_model when linked to an order request', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'warehouse_id' => $this->warehouse->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+        'status' => 'approved',
+        'tax_type' => 'PPN Excluded',
+        'request_date' => Carbon::now()->toDateString(),
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 12500,
+        'discount' => 0,
+        'tax' => 0,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.refer_model_type', OrderRequest::class)
+        ->set('data.refer_model_id', $orderRequest->id)
+        ->assertSet('data.supplier_id', $this->supplier->id)
+        ->assertSet('data.purchaseOrderItem.0.product_id', $this->product->id)
+        ->assertSet('data.purchaseOrderItem.0.refer_item_model_type', OrderRequestItem::class)
+        ->assertSet('data.purchaseOrderItem.0.refer_item_model_id', $orderRequestItem->id);
+});
+
+test('purchase order subtotal and total amount stay formatted after reactive updates and hydration', function () {
+    $orderDate = Carbon::now()->toDateString();
+    $expectedDate = Carbon::now()->addDays(3)->toDateString();
+
+    $createComponent = Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.po_number', 'PO-LIVE-FORMAT-001')
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.order_date', $orderDate)
+        ->set('data.expected_date', $expectedDate)
+        ->set('data.warehouse_id', $this->warehouse->id)
+        ->set('data.status', 'draft')
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [
+            [
+                'product_id' => $this->product->id,
+                'currency_id' => $this->currency->id,
+                'quantity' => 2,
+                'unit_price' => 12500,
+                'discount' => 0,
+                'tax' => 0,
+                'subtotal' => 25000,
+                'tipe_pajak' => 'Non Pajak',
+            ],
+        ])
+        ->set('data.purchaseOrderCurrency', [
+            [
+                'currency_id' => $this->currency->id,
+                'nominal' => 1.0,
+            ],
+        ])
+        ->set('data.purchaseOrderBiaya', [])
+        ->set('data.purchaseOrderItem.0.quantity', 3);
+
+    $createComponent
+        ->assertSet('data.purchaseOrderItem.0.subtotal', '37.500')
+        ->assertSet('data.total_amount', '37.500');
+
+    $createComponent->call('create')->assertHasNoFormErrors();
+
+    $purchaseOrder = PurchaseOrder::where('po_number', 'PO-LIVE-FORMAT-001')->with(['purchaseOrderItem', 'purchaseOrderCurrency'])->first();
+
+    expect($purchaseOrder)->not->toBeNull();
+
+    PurchaseOrderItem::query()
+        ->where('purchase_order_id', $purchaseOrder->id)
+        ->update(['subtotal' => 37500]);
+
+    Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertFormExists()
+        ->assertFormSet([
+            'total_amount' => '37.500',
+            'purchaseOrderItem.0.subtotal' => '37.500',
+        ]);
+});
+
+test('purchase order total amount includes formatted other fee values correctly', function () {
+    $orderDate = Carbon::now()->toDateString();
+    $expectedDate = Carbon::now()->addDays(3)->toDateString();
+    $expenseCoa = ChartOfAccount::factory()->create([
+        'code' => '6000.99',
+        'name' => 'Biaya Pengiriman Test',
+        'type' => 'Expense',
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.po_number', 'PO-LIVE-FEE-001')
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.order_date', $orderDate)
+        ->set('data.expected_date', $expectedDate)
+        ->set('data.warehouse_id', $this->warehouse->id)
+        ->set('data.status', 'draft')
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [
+            [
+                'product_id' => $this->product->id,
+                'currency_id' => $this->currency->id,
+                'quantity' => 2,
+                'unit_price' => 12500,
+                'discount' => 0,
+                'tax' => 0,
+                'subtotal' => '25.000',
+                'tipe_pajak' => 'Non Pajak',
+            ],
+        ])
+        ->set('data.purchaseOrderCurrency', [
+            [
+                'currency_id' => $this->currency->id,
+                'nominal' => 1.0,
+            ],
+        ])
+        ->set('data.purchaseOrderBiaya', [[
+            'nama_biaya' => 'Biaya Pengiriman',
+            'currency_id' => $this->currency->id,
+            'coa_id' => $expenseCoa->id,
+            'total' => '0',
+            'masuk_invoice' => false,
+            'untuk_pembelian' => 0,
+        ]])
+        ->set('data.purchaseOrderBiaya.0.total', '100.000');
+
+    $component
+        ->assertSet('data.total_amount', '125.000')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $purchaseOrder = PurchaseOrder::where('po_number', 'PO-LIVE-FEE-001')->first();
+
+    expect($purchaseOrder)->not->toBeNull()
+        ->and((float) $purchaseOrder->total_amount)->toBe(125000.0);
+});
+
+test('purchase order item tax auto-fills from active setting when tipe pajak changes', function () {
+    TaxSetting::factory()->ppn()->create([
+        'effective_date' => now()->subDay()->toDateString(),
+        'status' => true,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.order_date', Carbon::now()->toDateString())
+        ->set('data.expected_date', Carbon::now()->addDays(3)->toDateString())
+        ->set('data.warehouse_id', $this->warehouse->id)
+        ->set('data.status', 'draft')
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [
+            [
+                'product_id' => $this->product->id,
+                'currency_id' => $this->currency->id,
+                'quantity' => 1,
+                'unit_price' => 12500,
+                'discount' => 0,
+                'tax' => 0,
+                'tipe_pajak' => 'Inklusif',
+            ],
+        ])
+        ->set('data.purchaseOrderItem.0.tipe_pajak', 'Eklusif')
+        ->assertSet('data.purchaseOrderItem.0.tax', 11)
+        ->set('data.purchaseOrderItem.0.tax', 7)
+        ->assertSet('data.purchaseOrderItem.0.tax', 7)
+        ->set('data.purchaseOrderItem.0.tipe_pajak', 'Non Pajak')
+        ->assertSet('data.purchaseOrderItem.0.tax', 0)
+        ->set('data.purchaseOrderItem.0.tipe_pajak', 'Inklusif')
+        ->assertSet('data.purchaseOrderItem.0.tax', 11);
 });

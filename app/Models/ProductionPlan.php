@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Models\Cabang;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -24,6 +25,7 @@ class ProductionPlan extends Model
         'product_id',
         'quantity',
         'uom_id',
+        'cabang_id',
         'warehouse_id',
         'start_date',
         'end_date',
@@ -61,6 +63,11 @@ class ProductionPlan extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     public function creator()

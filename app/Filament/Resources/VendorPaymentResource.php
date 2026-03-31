@@ -816,7 +816,7 @@ class VendorPaymentResource extends Resource
                         });
                     }),
 
-                TextColumn::make('selected_invoices')
+                TextColumn::make('invoice_summary')
                     ->label('Invoices')
                     ->getStateUsing(function ($record) {
                         // Ensure we get the casted array value

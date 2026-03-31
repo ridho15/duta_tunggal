@@ -414,7 +414,7 @@ class PurchaseReceiptFlowTest extends TestCase
 
         // Assert posting was successful
         $this->assertEquals('posted', $inventoryResult['status']);
-        $this->assertCount(2, $inventoryResult['entries']); // Debit inventory + Credit temp procurement
+        $this->assertCount(2, $inventoryResult['entries']); // Debit inventory + Credit unbilled purchase
 
         // Check journal entries were created
         $this->assertDatabaseHas('journal_entries', [
@@ -439,6 +439,14 @@ class PurchaseReceiptFlowTest extends TestCase
 
         $this->assertNotNull($inventoryStock);
         $this->assertEquals(10.0, (float) $inventoryStock->qty_available);
+
+        $creditEntry = JournalEntry::where('source_type', \App\Models\PurchaseReceiptItem::class)
+            ->where('source_id', $receiptItem->id)
+            ->where('credit', '>', 0)
+            ->first();
+
+        $this->assertNotNull($creditEntry);
+        $this->assertEquals('2100.10', $creditEntry->coa->code);
     }
 
     /** @test */

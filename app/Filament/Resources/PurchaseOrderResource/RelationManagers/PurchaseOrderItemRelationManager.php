@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\Currency;
 use App\Models\Product;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -38,6 +40,10 @@ class PurchaseOrderItemRelationManager extends RelationManager
             ->schema([
                 Fieldset::make('Form Purchasee Order Item')
                     ->schema([
+                        Hidden::make('refer_item_model_type')
+                            ->dehydrated(true),
+                        Hidden::make('refer_item_model_id')
+                            ->dehydrated(true),
                         Select::make('product_id')
                             ->label('Product')
                             ->searchable()
@@ -59,6 +65,19 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     }
                                 }
                                 $set('unit_price', $unitPrice);
+
+                                $po = $livewire->ownerRecord;
+                                $referItem = null;
+                                if ($po?->refer_model_type === 'App\\Models\\OrderRequest' && $po?->refer_model_id) {
+                                    $referItem = PurchaseOrderResource::resolveOrderRequestItemReference(
+                                        (int) $po->refer_model_id,
+                                        (int) $state,
+                                        $supplierId ? (int) $supplierId : null
+                                    );
+                                }
+
+                                $set('refer_item_model_type', $referItem ? \App\Models\OrderRequestItem::class : null);
+                                $set('refer_item_model_id', $referItem?->id);
 
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -154,6 +173,24 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 'Eklusif' => 'Eklusif'
                             ])
                             ->default('Inklusif')
+                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
+
+                                if ($state === 'Non Pajak') {
+                                    $set('tax', 0);
+                                } else {
+                                    $set('tax', $defaultTax);
+                                }
+
+                                $subtotal = static::getSubtotal([
+                                    'quantity' => $get('quantity'),
+                                    'unit_price' => $get('unit_price'),
+                                    'tax' => $state === 'Non Pajak' ? 0 : $defaultTax,
+                                    'discount' => $get('discount'),
+                                    'tipe_pajak' => $state,
+                                ]);
+                                $set('subtotal', $subtotal);
+                            })
                     ])
             ]);
     }

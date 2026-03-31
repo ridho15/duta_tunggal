@@ -118,7 +118,7 @@ class DepositAdjustmentResource extends Resource
                         Select::make('coa_id')
                             ->label('Chart Of Account')
                             ->required()
-                            ->searchable(['code', 'perusahaan'])
+                            ->searchable(['code', 'name'])
                             ->relationship('coa', 'code')
                             ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
                                 return "({$chartOfAccount->code}) {$chartOfAccount->name}";

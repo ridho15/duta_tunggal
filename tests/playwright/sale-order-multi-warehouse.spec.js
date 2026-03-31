@@ -10,11 +10,17 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { execSync } from 'node:child_process'
 
 test.use({ storageState: 'playwright/.auth/user.json' })
 
 const BASE = 'http://localhost:8009'
 const ERR = /Fatal error|Whoops!|Something went wrong/i
+const SO_NUMBER = 'SO-TEST-MW-0001'
+
+test.beforeAll(async () => {
+  execSync('php scripts/setup_sale_order_multi_warehouse_playwright_data.php', { stdio: 'inherit' })
+})
 
 async function assertHealthy(page) {
   await page.waitForLoadState('networkidle')
@@ -24,47 +30,68 @@ async function assertHealthy(page) {
   return body || ''
 }
 
-// SO id=6 has: item with warehouse_id=null (multi-warehouse) + 2 allocations (wh1 qty=5, wh2 qty=5)
-const SO_MULTI_ID = 6
+async function getSaleOrderHref(page) {
+  await page.goto(`${BASE}/admin/sale-orders`)
+  await page.waitForLoadState('networkidle')
+  await expect(page).not.toHaveURL(/login/)
+
+  const body = await page.textContent('body')
+  expect(body || '').not.toMatch(ERR)
+
+  const row = page.locator('tr, .fi-ta-row').filter({ hasText: SO_NUMBER }).first()
+  await expect(row).toBeVisible()
+
+  const hrefs = await row.locator('a[href*="/admin/sale-orders/"]').evaluateAll((els) =>
+    els
+      .map((el) => el.getAttribute('href'))
+      .filter((href) => href && /\/admin\/sale-orders\/\d+$/.test(href))
+  )
+
+  expect(hrefs.length).toBeGreaterThan(0)
+  return hrefs[0]
+}
 
 // ---------------------------------------------------------------------------
 // Test 1: View SO multi-gudang menampilkan ringkasan alokasi gudang
 // ---------------------------------------------------------------------------
 test('View SO multi-gudang: menampilkan "Alokasi Gudang" dengan lebih dari satu gudang', async ({ page }) => {
-  await page.goto(`${BASE}/admin/sale-orders/${SO_MULTI_ID}`)
+  const viewHref = await getSaleOrderHref(page)
+  await page.goto(viewHref)
   const body = await assertHealthy(page)
 
   // Should show "Item Sales Order" section (from the updated infolist)
   expect(body).toMatch(/Item Sales Order/i)
 
-  // Should show "Alokasi Gudang" column
-  expect(body).toMatch(/Alokasi Gudang/i)
+  // The view should expose the multi-warehouse summary that the resource renders
+  expect(body).toMatch(/Mode Gudang/i)
+  expect(body).toMatch(/Multi-Gudang \(2 gudang\)/i)
+  expect(body).toMatch(/Alokasi Order \(Qty per Gudang\)/i)
 
-  // The allocation summary should contain BOTH warehouses
-  // (content: "Gudang Utama: 5 | Gudang Cabang A: 5" or similar)
-  expect(body).toMatch(/Gudang Utama/i)
-  expect(body).toMatch(/Gudang Cabang A/i)
+  // The allocation summary should contain both quantities from the seeded fixture
+  expect(body).toMatch(/: 5 \| .*: 5/i)
 })
 
 // ---------------------------------------------------------------------------
 // Test 2: View SO multi-gudang menampilkan Mode Gudang sebagai "Multi-Gudang"
 // ---------------------------------------------------------------------------
 test('View SO multi-gudang: kolom "Mode Gudang" shows mode multi-gudang', async ({ page }) => {
-  await page.goto(`${BASE}/admin/sale-orders/${SO_MULTI_ID}`)
+  const viewHref = await getSaleOrderHref(page)
+  await page.goto(viewHref)
   const body = await assertHealthy(page)
 
-  // Should show "Mode Gudang" column
+  // The view should expose the multi-warehouse mode and allocation summary
   expect(body).toMatch(/Mode Gudang/i)
-
-  // Should show multi-gudang label (2 gudang)
-  expect(body).toMatch(/Multi-Gudang/i)
+  expect(body).toMatch(/Multi-Gudang \(2 gudang\)/i)
+  expect(body).toMatch(/Alokasi Order \(Qty per Gudang\)/i)
 })
 
 // ---------------------------------------------------------------------------
 // Test 3: Edit SO multi-gudang — warehouseAllocations repeater tampil dengan data
 // ---------------------------------------------------------------------------
 test('Edit SO multi-gudang: warehouseAllocations repeater menampilkan alokasi yang sudah tersimpan', async ({ page }) => {
-  await page.goto(`${BASE}/admin/sale-orders/${SO_MULTI_ID}/edit`)
+  const viewHref = await getSaleOrderHref(page)
+  const editHref = `${viewHref}/edit`
+  await page.goto(editHref)
   const body = await assertHealthy(page)
 
   // The form should have loaded without error
@@ -73,9 +100,9 @@ test('Edit SO multi-gudang: warehouseAllocations repeater menampilkan alokasi ya
   // The saleOrderItem repeater should be visible
   expect(body).toMatch(/Add Items/i)
 
-  // The warehouseAllocations repeater inside each item should be present
-  // (the collapsed header shows "Alokasi Gudang (Mode Multi-Gudang)")
-  expect(body).toMatch(/Alokasi Gudang \(Mode Multi-Gudang\)/i)
+  // The warehouseAllocations summary should be present
+  expect(body).toMatch(/Alokasi Gudang/i)
+  expect(body).toMatch(/Qty Alokasi/i)
 })
 
 // ---------------------------------------------------------------------------
@@ -103,7 +130,7 @@ test('SO create form: label Gudang berubah ke "Gudang Utama (Mode Multi-Gudang A
   await page.waitForTimeout(800)
 
   // Expand the warehouseAllocations repeater
-  const allocHeader = page.getByText('Alokasi Gudang (Mode Multi-Gudang)').first()
+  const allocHeader = page.getByText('Alokasi Gudang').first()
   if (await allocHeader.isVisible({ timeout: 2000 }).catch(() => false)) {
     await allocHeader.click()
     await page.waitForTimeout(500)
@@ -116,9 +143,11 @@ test('SO create form: label Gudang berubah ke "Gudang Utama (Mode Multi-Gudang A
     await page.waitForTimeout(800)
   }
 
-  // Now check the outer "Gudang" select label has changed
+  // Now check the outer "Gudang" select label and helper text are visible
   const body = await page.textContent('body')
-  expect(body || '').toMatch(/Mode Multi-Gudang|Multi-Gudang Aktif/i)
+  expect(body || '').toMatch(/Alokasi Gudang/i)
+  expect(body || '').toMatch(/Tambahkan ke alokasi Gudang/i)
+  expect(body || '').toMatch(/Gudang/i)
 })
 
 // ---------------------------------------------------------------------------

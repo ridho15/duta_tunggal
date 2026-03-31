@@ -79,9 +79,9 @@ async function goToQuotationCreate(page) {
  * the tax rate's afterStateUpdated fires it already has the correct type.
  *
  * @param {object} opts  { price, qty, discount, taxRate, taxType }
- *   taxType: 'None'|'Exclusive'|'Inclusive'
+ *   taxType: 'None'|'PPN Excluded'|'PPN Included'
  */
-async function fillQuotationItem(page, { price, qty = 1, discount = 0, taxRate = 0, taxType = 'Exclusive' }) {
+async function fillQuotationItem(page, { price, qty = 1, discount = 0, taxRate = 0, taxType = 'PPN Excluded' }) {
   const unitPriceInput  = page.getByLabel(/Unit Price/i).first();
   const quantityInput   = page.getByLabel(/Quantity/i).first();
   const discountInput   = page.getByRole('spinbutton', { name: /Discount/i }).first();
@@ -106,10 +106,10 @@ async function fillQuotationItem(page, { price, qty = 1, discount = 0, taxRate =
   // Step 4: Select tax type FIRST (before filling tax rate) so that when
   // the tax rate's afterStateUpdated fires, tax_type is already committed.
   if (await taxTypeSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const taxTypeLabel = taxType === 'Exclusive'
-      ? 'Eksklusif (PPN di luar harga)'
-      : taxType === 'Inclusive'
-        ? 'Inklusif (PPN sudah termasuk harga)'
+    const taxTypeLabel = taxType === 'PPN Excluded'
+      ? 'PPN Excluded (PPN di luar harga)'
+      : taxType === 'PPN Included'
+        ? 'PPN Included (PPN sudah termasuk harga)'
         : 'Non Pajak'
 
     await taxTypeSelect.selectOption({ label: taxTypeLabel })
@@ -133,7 +133,7 @@ test('TC-TAX-003: PPN rate 0% — total equals base price (PPN = 0)', async ({ p
 
   const price = 100000;
   const { totalPriceInput, taxNominalInput, taxRateInput } = await fillQuotationItem(page, {
-    price, qty: 1, discount: 0, taxRate: 0, taxType: 'Exclusive',
+    price, qty: 1, discount: 0, taxRate: 0, taxType: 'PPN Excluded',
   });
 
   const totalValue = await totalPriceInput.inputValue();
@@ -159,7 +159,7 @@ test('TC-TAX-004: PPN rounding — no decimal places in total', async ({ page })
   // Total = 100001 + 12000 = 112001 (exact integer, no decimal)
   const price = 100001;
   const { taxNominalInput, taxRateInput } = await fillQuotationItem(page, {
-    price, qty: 1, discount: 0, taxRate: 12, taxType: 'Exclusive',
+    price, qty: 1, discount: 0, taxRate: 12, taxType: 'PPN Excluded',
   });
 
   const taxNominalValue = await taxNominalInput.inputValue();
@@ -184,7 +184,7 @@ test('TC-TAX-005: Large amount > Rp 1 Miliar — correct PPN without floating po
   // Total = 1,120,000,000
   const price = 1000000000;
   const { taxNominalInput, taxRateInput } = await fillQuotationItem(page, {
-    price, qty: 1, discount: 0, taxRate: 12, taxType: 'Exclusive',
+    price, qty: 1, discount: 0, taxRate: 12, taxType: 'PPN Excluded',
   });
 
   const taxNominalValue = await taxNominalInput.inputValue();
@@ -213,7 +213,7 @@ test('TC-TAX-006: PPN Eksklusif with discount — DPP = base minus discount', as
   // Total = 900,000 + 108,000 = 1,008,000
   const price = 1000000;
   const { taxNominalInput, taxRateInput } = await fillQuotationItem(page, {
-    price, qty: 1, discount: 10, taxRate: 12, taxType: 'Exclusive',
+    price, qty: 1, discount: 10, taxRate: 12, taxType: 'PPN Excluded',
   });
 
   const taxNominalValue = await taxNominalInput.inputValue();

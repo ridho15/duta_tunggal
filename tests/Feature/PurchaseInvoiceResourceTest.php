@@ -337,6 +337,67 @@ class PurchaseInvoiceResourceTest extends TestCase
             ]);
     }
 
+    public function test_purchase_receipt_checkbox_labels_use_rupiah_format()
+    {
+        $supplier = Supplier::factory()->create();
+        $product = Product::factory()->create();
+        $warehouse = Warehouse::factory()->create();
+
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 1500,
+            'tax' => 0,
+            'discount' => 0,
+        ]);
+
+        $purchaseReceipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $purchaseReceipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id' => $product->id,
+            'qty_received' => 1,
+            'qty_accepted' => 1,
+            'qty_rejected' => 0,
+            'warehouse_id' => $warehouse->id,
+        ]);
+
+        $expectedLabel = sprintf(
+            '[%s] %s - %s',
+            $purchaseOrder->po_number,
+            $purchaseReceipt->receipt_number,
+            \App\Helpers\MoneyHelper::rupiah(1500)
+        );
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+            ])
+            ->assertSeeHtml($expectedLabel)
+            ->assertDontSeeHtml('Rp. 1.500');
+    }
+
     public function test_receipt_selection_calculates_invoice_items()
     {
         // Test that the form can be filled with basic data
@@ -459,6 +520,7 @@ class PurchaseInvoiceResourceTest extends TestCase
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
             'invoice_number' => 'PINV-PDF-TEST-001',
+            'cabang_id' => $this->cabang->id,
             'subtotal' => 17000000,
             'tax' => 11,
             'ppn_rate' => 11,
@@ -476,7 +538,7 @@ class PurchaseInvoiceResourceTest extends TestCase
 
         $html = view('pdf.purchase-order-invoice-2', ['invoice' => $invoice])->render();
 
-        $this->assertStringContainsString('PPN 11%', $html);
+        $this->assertStringContainsString('PPN 11.00%', $html);
         $this->assertStringContainsString('Biaya Transport', $html);
         $this->assertSame(1, substr_count($html, 'Biaya Transport'));
         $this->assertStringNotContainsString('Tax (', $html);
@@ -762,6 +824,83 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertEquals('Biaya Transport', $savedInvoice->other_fee[0]['name']);
         $this->assertEquals(7500, $savedInvoice->other_fee[0]['amount']);
         $this->assertEquals(7500, $savedInvoice->other_fee_total);
+    }
+
+    public function test_purchase_invoice_ignores_zero_value_other_fee_items()
+    {
+        $supplier = Supplier::factory()->create();
+        $product = Product::factory()->create();
+
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+
+        PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 10000,
+            'discount' => 0,
+            'tax' => 0,
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrder->purchaseOrderItem->first()->id,
+            'product_id' => $product->id,
+            'qty_received' => 10,
+            'qty_accepted' => 10,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_purchase_receipts' => [$receipt->id],
+                'invoice_number' => 'PINV-ZERO-FEE-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+                'status' => Invoice::STATUS_DRAFT,
+                'invoiceItem' => [[
+                    'product_id' => $product->id,
+                    'quantity' => 10,
+                    'price' => 10000,
+                    'total' => 100000,
+                ]],
+                'other_fees' => [[
+                    'name' => 'Biaya Pengiriman',
+                    'amount' => 0,
+                ]],
+                'receiptBiayaItems' => [[
+                    'receipt_id' => $receipt->id,
+                    'nama_biaya' => 'Biaya Pengiriman',
+                    'total' => 0,
+                ]],
+            ])
+            ->call('create');
+
+        $savedInvoice = Invoice::where('invoice_number', 'PINV-ZERO-FEE-001')->firstOrFail();
+
+        $this->assertIsArray($savedInvoice->other_fee);
+        $this->assertFalse(collect($savedInvoice->other_fee)->contains(fn ($fee) => (float) ($fee['amount'] ?? 0) <= 0));
+        $this->assertSame(0, collect($savedInvoice->other_fee)->sum(fn ($fee) => (float) ($fee['amount'] ?? 0) <= 0 ? (float) ($fee['amount'] ?? 0) : 0));
     }
 
     public function test_purchase_invoice_receipt_biaya_deletion()

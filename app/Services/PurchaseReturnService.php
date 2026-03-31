@@ -253,6 +253,8 @@ class PurchaseReturnService
     {
         try {
             DB::transaction(function () use ($purchaseReturn) {
+                $purchaseReturn->load('purchaseReturnItem.product.inventoryCoa', 'purchaseReturnItem.product.purchaseReturnCoa');
+
                 // Prevent duplicate posting
                 if (JournalEntry::where('source_type', PurchaseReturn::class)
                     ->where('source_id', $purchaseReturn->id)
@@ -272,18 +274,65 @@ class PurchaseReturnService
                 $description = 'Purchase Return: ' . $purchaseReturn->nota_retur;
                 $date = $purchaseReturn->return_date ?? now();
 
-                // Get COA accounts
-                $inventoryCoa = ChartOfAccount::where('code', '1101.01')->first(); // Inventory account
-                $purchaseReturnCoa = ChartOfAccount::where('code', '5120.10')->first(); // Purchase Return account
-                $accountsPayableCoa = ChartOfAccount::where('code', '2101.01')->first(); // Accounts Payable
+                $defaultInventoryCoa = $this->findFirstExistingCoa([
+                    config('coa.inventory'),
+                    '1140.01',
+                    '1101.01',
+                    '1140.10',
+                ]);
 
-                if (!$inventoryCoa || !$purchaseReturnCoa || !$accountsPayableCoa) {
+                $purchaseReturnCoa = $this->findFirstExistingCoa([
+                    '5120.10',
+                    '5120',
+                ]);
+
+                $accountsPayableCoa = $this->findFirstExistingCoa([
+                    config('coa.accounts_payable'),
+                    '2110',
+                    '2101.01',
+                ]);
+
+                $inventoryCredits = [];
+
+                foreach ($purchaseReturn->purchaseReturnItem as $item) {
+                    $lineAmount = (float) $item->qty_returned * (float) $item->unit_price;
+
+                    if ($lineAmount <= 0) {
+                        continue;
+                    }
+
+                    $inventoryCoa = ($item->product?->inventoryCoa && $item->product->inventoryCoa->id)
+                        ? $item->product->inventoryCoa
+                        : $defaultInventoryCoa;
+
+                    if (!$inventoryCoa || !$inventoryCoa->id) {
+                        Log::error('Missing inventory COA for purchase return journal line', [
+                            'purchase_return_id' => $purchaseReturn->id,
+                            'product_id' => $item->product_id,
+                            'fallback_inventory_code' => config('coa.inventory'),
+                        ]);
+
+                        throw new \Exception('Akun COA persediaan tidak ditemukan untuk jurnal retur pembelian. Periksa konfigurasi inventory COA produk atau default inventory COA.');
+                    }
+
+                    if (!isset($inventoryCredits[$inventoryCoa->id])) {
+                        $inventoryCredits[$inventoryCoa->id] = [
+                            'coa' => $inventoryCoa,
+                            'amount' => 0,
+                        ];
+                    }
+
+                    $inventoryCredits[$inventoryCoa->id]['amount'] += $lineAmount;
+                }
+
+                if (empty($inventoryCredits) || !$accountsPayableCoa) {
                     Log::error('Missing COA accounts for purchase return journal', [
-                        'inventory' => $inventoryCoa?->id,
+                        'inventory' => $defaultInventoryCoa?->id,
                         'purchase_return' => $purchaseReturnCoa?->id,
-                        'accounts_payable' => $accountsPayableCoa?->id
+                        'accounts_payable' => $accountsPayableCoa?->id,
+                        'purchase_return_id' => $purchaseReturn->id,
                     ]);
-                    throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur pembelian. Diperlukan: Persediaan (1101.01), Retur Pembelian (5120.10), Hutang Dagang (2101.01).');
+                    throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur pembelian. Periksa akun persediaan dan hutang dagang yang aktif. Legacy mapping yang masih didukung: 1101.01, 5120.10, 2101.01.');
                 }
 
                 $entries = [];
@@ -302,25 +351,29 @@ class PurchaseReturnService
                     'cabang_id' => $purchaseReturn->cabang_id,
                 ]);
 
-                // Credit Inventory (reduce inventory value)
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $inventoryCoa->id,
-                    'date' => $date,
-                    'reference' => $reference,
-                    'description' => $description . ' - Reduce inventory value',
-                    'debit' => 0,
-                    'credit' => $totalReturnAmount,
-                    'journal_type' => 'purchase_return',
-                    'source_type' => PurchaseReturn::class,
-                    'source_id' => $purchaseReturn->id,
-                    'cabang_id' => $purchaseReturn->cabang_id,
-                ]);
+                foreach ($inventoryCredits as $inventoryCredit) {
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $inventoryCredit['coa']->id,
+                        'date' => $date,
+                        'reference' => $reference,
+                        'description' => $description . ' - Reduce inventory value',
+                        'debit' => 0,
+                        'credit' => $inventoryCredit['amount'],
+                        'journal_type' => 'purchase_return',
+                        'source_type' => PurchaseReturn::class,
+                        'source_id' => $purchaseReturn->id,
+                        'cabang_id' => $purchaseReturn->cabang_id,
+                    ]);
+                }
 
                 Log::info('Purchase return journal entries created', [
                     'purchase_return_id' => $purchaseReturn->id,
                     'nota_retur' => $purchaseReturn->nota_retur,
                     'total_amount' => $totalReturnAmount,
-                    'entries_count' => count($entries)
+                    'entries_count' => count($entries),
+                    'purchase_return_coa' => $purchaseReturnCoa?->code,
+                    'accounts_payable_coa' => $accountsPayableCoa?->code,
+                    'inventory_coa_ids' => array_keys($inventoryCredits),
                 ]);
             });
 
@@ -332,6 +385,18 @@ class PurchaseReturnService
             ]);
             return false;
         }
+    }
+
+    private function findFirstExistingCoa(array $codes): ?ChartOfAccount
+    {
+        foreach (array_filter(array_unique($codes)) as $code) {
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa) {
+                return $coa;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -493,7 +558,7 @@ class PurchaseReturnService
             } else {
                 // Standard receipt-based return: reverse inventory and create journal entries.
                 if (!$this->createJournalEntry($purchaseReturn)) {
-                    throw new \Exception('Gagal membuat jurnal akuntansi retur pembelian. Silakan periksa konfigurasi akun COA (1101.01, 5120.10, 2101.01).');
+                    throw new \Exception('Gagal membuat jurnal akuntansi retur pembelian. Silakan periksa konfigurasi akun COA inventory dan hutang dagang aktif. Legacy mapping yang masih didukung: 1101.01, 5120.10, 2101.01.');
                 }
                 if (!$this->adjustStock($purchaseReturn)) {
                     throw new \Exception('Gagal menyesuaikan stok untuk retur pembelian. Silakan coba lagi atau hubungi administrator.');

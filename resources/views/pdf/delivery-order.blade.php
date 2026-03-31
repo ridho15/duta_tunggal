@@ -147,7 +147,7 @@
                     $discountPct = $item->saleOrderItem->discount;
                     $taxRate = $item->saleOrderItem->tax;
                     $base = $item->quantity * $price * (1 - $discountPct/100);
-                    $tr = $item->saleOrderItem->tipe_pajak ?? 'Eksklusif';
+                    $tr = \App\Services\TaxService::normalizeType($item->saleOrderItem->tipe_pajak ?? 'PPN Excluded');
                     $taxResult = \App\Services\TaxService::compute($base, $taxRate, $tr);
                     $taxAmount = $taxResult['ppn'];
                     $lineSubtotal = $taxResult['total'];

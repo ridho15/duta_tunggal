@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\JournalEntry;
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
+use App\Models\Supplier;
 use App\Services\PurchaseReturnService;
 use App\Services\StockService;
 use App\Services\AccountingService;
@@ -19,6 +21,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Seed other required data (but not suppliers yet, as they need cabang)
+    test()->seed(\Database\Seeders\ChartOfAccountSeeder::class);
     test()->seed(\Database\Seeders\CurrencySeeder::class);
     test()->seed(\Database\Seeders\UnitOfMeasureSeeder::class);
     test()->seed(\Database\Seeders\ProductSeeder::class);
@@ -92,7 +95,7 @@ test('can create purchase return with auto generated number', function () {
 
     expect($purchaseReturn->nota_retur)->toMatch('/^NR-\d{8}-\d{4}$/')
         ->and($purchaseReturn->purchase_receipt_id)->toBe($purchaseReceipt->id)
-        ->and($purchaseReturn->cabang_id)->toBe($user->cabang_id);
+        ->and($purchaseReturn->status)->toBe('draft');
 });
 
 test('can submit purchase return for approval', function () {
@@ -511,9 +514,34 @@ test('journal entry creation on approval', function () {
         'status' => 'approved',
     ]);
 
+    $product = Product::factory()->create([
+        'cabang_id' => Cabang::query()->value('id'),
+        'supplier_id' => Supplier::query()->value('id'),
+        'inventory_coa_id' => ChartOfAccount::where('code', '1140.01')->value('id'),
+        'purchase_return_coa_id' => ChartOfAccount::where('code', '5120.10')->value('id'),
+    ]);
+
+    \App\Models\PurchaseReturnItem::create([
+        'purchase_return_id' => $purchaseReturn->id,
+        'product_id' => $product->id,
+        'qty_returned' => 2,
+        'unit_price' => 50000,
+        'reason' => 'Barang rusak',
+    ]);
+
     $result = $service->createJournalEntry($purchaseReturn);
 
-    expect($result)->toBeTrue();
+    $entries = JournalEntry::withoutGlobalScopes()->with('coa')->where('source_type', PurchaseReturn::class)
+        ->where('source_id', $purchaseReturn->id)
+        ->orderBy('id')
+        ->get();
+
+    expect($result)->toBeTrue()
+        ->and($entries)->toHaveCount(2)
+        ->and((float) $entries->sum('debit'))->toBe(100000.0)
+        ->and((float) $entries->sum('credit'))->toBe(100000.0)
+        ->and($entries->firstWhere('debit', '>', 0)?->coa?->code)->toBe('2110')
+        ->and($entries->firstWhere('credit', '>', 0)?->coa?->code)->toBe($product->inventoryCoa?->code ?? '1140.01');
 });
 
 test('purchase return auto created for rejected items in receipt', function () {

@@ -68,5 +68,3 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::get('/reports/inventory-card/download-pdf',   [InventoryCardController::class, 'downloadPdf'])->name('inventory-card.pdf');
     Route::get('/reports/inventory-card/download-excel', [InventoryCardController::class, 'downloadExcel'])->name('inventory-card.excel');
 });
-
-

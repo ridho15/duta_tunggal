@@ -20,7 +20,6 @@ class EditAsset extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        dd($data);
         return $data;
     }
 }

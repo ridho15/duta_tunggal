@@ -19,12 +19,13 @@ class SalesOrderService
     {
         $total_amount = 0;
         foreach ($salesOrder->saleOrderItem as $item) {
+            $taxType = \App\Services\TaxService::normalizeType($item->tipe_pajak ?? 'PPN Excluded');
             $total_amount += HelperController::hitungSubtotal(
                 $item->quantity,
                 $item->unit_price,
                 $item->discount,
                 $item->tax,
-                $item->tipe_pajak ?? 'Inklusif'
+                $taxType
             );
         }
 

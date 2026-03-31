@@ -21,6 +21,7 @@ use App\Models\OrderRequestItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Services\PurchaseOrderService;
+use App\Services\TaxService;
 
 $now = now();
 
@@ -95,6 +96,7 @@ DB::transaction(function () use ($now) {
     }
 
     $service = app(PurchaseOrderService::class);
+    $fixtureSuffix = $now->format('YmdHisv') . '-' . bin2hex(random_bytes(3));
 
     // Transition fixture 1: approved -> partial after approvePo
     $orPartial = OrderRequest::create([
@@ -134,7 +136,7 @@ DB::transaction(function () use ($now) {
 
     $poPartial = PurchaseOrder::create([
         'supplier_id' => $supplierId,
-        'po_number' => 'PO-TEST-A4-PARTIAL',
+        'po_number' => 'PO-TEST-A4-PARTIAL-' . $fixtureSuffix,
         'order_date' => now()->toDateString(),
         'status' => 'draft',
         'warehouse_id' => $warehouseId,
@@ -198,7 +200,7 @@ DB::transaction(function () use ($now) {
 
     $poComplete = PurchaseOrder::create([
         'supplier_id' => $supplierId,
-        'po_number' => 'PO-TEST-A4-COMPLETE',
+        'po_number' => 'PO-TEST-A4-COMPLETE-' . $fixtureSuffix,
         'order_date' => now()->toDateString(),
         'status' => 'draft',
         'warehouse_id' => $warehouseId,
@@ -237,11 +239,39 @@ DB::transaction(function () use ($now) {
 
     $service->approvePo($poComplete, $userId);
 
+    $orTaxId = $createOr('OR-TEST-A4-TAX', 'approved');
+
+    DB::table('order_requests')
+        ->where('id', $orTaxId)
+        ->update([
+            'tax_type' => 'PPN Excluded',
+            'updated_at' => $now,
+        ]);
+
+    $taxBase = 3 * 100000;
+    $taxResult = TaxService::compute($taxBase, 11, 'PPN Excluded');
+
+    DB::table('order_request_items')->insert([
+        'order_request_id' => $orTaxId,
+        'product_id' => $productA,
+        'supplier_id' => $supplierId,
+        'quantity' => 3,
+        'fulfilled_quantity' => 1,
+        'unit_price' => 100000,
+        'original_price' => 100000,
+        'discount' => 0,
+        'tax' => 11,
+        'subtotal' => $taxResult['total'],
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
     echo "✅ A4 OR fixture ready\n";
     echo "   request_approve: OR-TEST-A4-REQAPP\n";
     echo "   approved       : OR-TEST-A4-APPROVED\n";
     echo "   partial        : OR-TEST-A4-PARTIAL\n";
     echo "   complete       : OR-TEST-A4-COMPLETE\n";
+    echo "   tax           : OR-TEST-A4-TAX\n";
     echo "   closed         : OR-TEST-A4-CLOSED\n";
     echo "   rejected       : OR-TEST-A4-REJECTED\n";
 });

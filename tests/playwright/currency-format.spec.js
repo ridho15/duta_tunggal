@@ -29,6 +29,10 @@ import {
   testCurrencyPaste,
   EDGE_CASES,
 } from './helpers/currency.js';
+import {
+  FIXTURE as PURCHASE_INVOICE_FIXTURE,
+  ensurePurchaseInvoiceFixture,
+} from './helpers/purchase-invoice-fixture.js';
 
 // ──────────────────────────────────────────────────────────────
 // HELPER — collect console errors during a test
@@ -253,6 +257,48 @@ test.describe('Purchase Order — currency field formatting', () => {
     const numeric = Number((current || '').replace(/\./g, ''));
     expect(current).toMatch(/^[\d.]+$/);
     expect(numeric).toBeGreaterThan(0);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// STEP 2 — PURCHASE INVOICE MODULE
+// ──────────────────────────────────────────────────────────────
+test.describe('Purchase Invoice — refresh formatting', () => {
+  test.beforeAll(async () => {
+    ensurePurchaseInvoiceFixture();
+  });
+
+  test('show page keeps rupiah formatting after refresh', async ({ page }) => {
+    await page.goto('/admin/purchase-invoices');
+    await page.waitForLoadState('networkidle');
+
+    const row = page.locator('tr, .fi-ta-row').filter({ hasText: PURCHASE_INVOICE_FIXTURE.invoiceNumber }).first();
+    await expect(row).toBeVisible();
+
+    const hrefs = await row.locator('a[href*="/admin/purchase-invoices/"]').evaluateAll((els) =>
+      els
+        .map((el) => el.getAttribute('href'))
+        .filter((href) => href && /\/admin\/purchase-invoices\/\d+$/.test(href))
+    );
+    expect(hrefs.length).toBeGreaterThan(0);
+
+    await page.goto(hrefs[0]);
+    await page.waitForLoadState('networkidle');
+
+    const beforeReload = await page.textContent('body');
+    expect(beforeReload).toContain('Subtotal');
+    expect(beforeReload).toContain('Rp 400.000');
+    expect(beforeReload).toContain('Invoice Total');
+    expect(beforeReload).toContain('Rp 444.000');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    const afterReload = await page.textContent('body');
+    expect(afterReload).toContain('Subtotal');
+    expect(afterReload).toContain('Rp 400.000');
+    expect(afterReload).toContain('Invoice Total');
+    expect(afterReload).toContain('Rp 444.000');
   });
 });
 

@@ -77,7 +77,13 @@
                 $lineBase       = $item['quantity'] * $item['unit_price'];
                 $discountAmount = $lineBase * ($item['discount'] / 100);
                 $afterDiscount  = $lineBase - $discountAmount;
-                $taxType        = $item['tax_type'] ?? 'Exclusive';
+                $taxType        = $item['tax_type'] ?? 'PPN Excluded';
+                $normalizedTaxType = \App\Services\TaxService::normalizeType($taxType);
+                $displayTaxType = match ($normalizedTaxType) {
+                    'Inklusif' => 'PPN Included',
+                    'Eksklusif' => 'PPN Excluded',
+                    default => 'Non Pajak',
+                };
                 $taxResult      = \App\Services\TaxService::compute($afterDiscount, (float)$item['tax'], $taxType);
                 $taxAmount      = $taxResult['ppn'];
                 $lineSubtotal   = $taxResult['total'];
@@ -89,7 +95,7 @@
                 <td>Rp.{{ number_format($item['unit_price'], 0, ',', '.') }}</td>
                 <td>{{ number_format($item['discount'], 2) }}%</td>
                 <td>{{ number_format($item['tax'], 2) }}%</td>
-                <td>{{ $taxType }}</td>
+                <td>{{ $displayTaxType }}</td>
                 <td>Rp.{{ number_format($taxAmount, 0, ',', '.') }}</td>
                 <td>Rp.{{ number_format($lineSubtotal, 0, ',', '.') }}</td>
             </tr>

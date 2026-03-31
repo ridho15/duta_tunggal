@@ -24,6 +24,13 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { execSync } from 'node:child_process';
+
+test.use({ storageState: 'playwright/.auth/user.json' });
+
+test.beforeAll(() => {
+  execSync('php scripts/setup_procurement_test_data.php', { stdio: 'inherit' });
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +112,56 @@ test.describe('TEST 1: Approve modal — item unit_price override over catalog',
       totalCost,
       `total_cost should be "1.300.000" (10 × 130.000). Got: "${totalCost}"`
     ).toBe('1.300.000');
+  });
+
+  test('OR-TEST-B-APPROVE: changing override price recalculates tax_nominal, total_cost, and subtotal', async ({ page }) => {
+    await page.goto('/admin/order-requests');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page).not.toHaveURL(/login/, { timeout: 5_000 });
+
+    const modal = await openRowAction(page, 'OR-TEST-B-APPROVE', 'Approve');
+
+    const unitPriceInput = modal.locator('input[id*="unit_price"]').first();
+    const totalCostInput = modal.locator('input[id*="total_cost"]').first();
+    const subtotalInput = modal.locator('input[id*="subtotal"]').first();
+    const taxNominalInput = modal.locator('input[id*="tax_nominal"]').first();
+
+    const originalUnitPrice = await unitPriceInput.inputValue();
+    const originalTotalCost = await totalCostInput.inputValue();
+    const originalSubtotal = await subtotalInput.inputValue();
+    const originalTaxNominal = await taxNominalInput.inputValue();
+
+    await unitPriceInput.click({ clickCount: 3 });
+    await unitPriceInput.fill('140.000');
+    await unitPriceInput.press('Tab');
+
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1200);
+
+    const newUnitPrice = await unitPriceInput.inputValue();
+    const newTotalCost = await totalCostInput.inputValue();
+    const newSubtotal = await subtotalInput.inputValue();
+    const newTaxNominal = await taxNominalInput.inputValue();
+
+    console.log('[TEST1] override price recalculation:', {
+      originalUnitPrice,
+      originalTotalCost,
+      originalSubtotal,
+      originalTaxNominal,
+      newUnitPrice,
+      newTotalCost,
+      newSubtotal,
+      newTaxNominal,
+    });
+
+    expect(newUnitPrice).toBe('140.000');
+    expect(newTotalCost).not.toBe(originalTotalCost);
+    expect(newSubtotal).not.toBe(originalSubtotal);
+    expect(newTaxNominal).not.toBe(originalTaxNominal);
+    expect(newTotalCost).toBe('1.400.000');
+    expect(newSubtotal).toBe('1.554.000');
+    expect(newTaxNominal).toBe('154.000');
   });
 
 });

@@ -188,7 +188,6 @@ class PurchaseReceiptService
         $item->loadMissing([
             'purchaseOrderItem',
             'product.inventoryCoa',
-            'product.temporaryProcurementCoa',
             'product.unbilledPurchaseCoa',
             'purchaseReceipt.currency'
         ]);
@@ -220,14 +219,12 @@ class PurchaseReceiptService
 
         $product = $item->product;
         $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes(['1140.10', '1140.01']);
-        $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
         $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
 
-        if (! $inventoryCoa || ! $temporaryProcurementCoa || ! $unbilledPurchaseCoa) {
+        if (! $inventoryCoa || ! $unbilledPurchaseCoa) {
             return $this->skipWithWarning('Missing required COA configuration', [
                 'item_id' => $item->id,
                 'inventory_coa_id' => $inventoryCoa?->id,
-                'temporary_procurement_coa_id' => $temporaryProcurementCoa?->id,
                 'unbilled_purchase_coa_id' => $unbilledPurchaseCoa?->id,
             ]);
         }
@@ -257,13 +254,12 @@ class PurchaseReceiptService
             'source_id' => $item->id,
         ]);
 
-        // Credit temporary procurement position (close temporary procurement)
-        // Use the temporary procurement COA to close the position created when item was sent to QC
+        // Credit unbilled purchase position (goods receipt / GRNI)
         $entries[] = JournalEntry::create([
-            'coa_id' => $temporaryProcurementCoa->id,
+            'coa_id' => $unbilledPurchaseCoa->id,
             'date' => $date,
             'reference' => $receiptRef,
-            'description' => 'Inventory Posting - Credit temporary procurement for receipt item ' . $item->id,
+            'description' => 'Inventory Posting - Credit unbilled purchase for receipt item ' . $item->id,
             'debit' => 0,
             'credit' => round($amount, 2),
             'journal_type' => 'inventory',

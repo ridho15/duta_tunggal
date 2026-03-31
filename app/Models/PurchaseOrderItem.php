@@ -29,6 +29,38 @@ class PurchaseOrderItem extends Model
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id')->withDefault();
     }
 
+    protected static function booted()
+    {
+        static::creating(function (PurchaseOrderItem $purchaseOrderItem) {
+            if (! empty($purchaseOrderItem->refer_item_model_type) && ! empty($purchaseOrderItem->refer_item_model_id)) {
+                return;
+            }
+
+            $purchaseOrder = PurchaseOrder::withoutGlobalScopes()->find($purchaseOrderItem->purchase_order_id);
+            if (! $purchaseOrder || $purchaseOrder->refer_model_type !== OrderRequest::class || ! $purchaseOrder->refer_model_id) {
+                return;
+            }
+
+            $orderRequest = OrderRequest::withoutGlobalScopes()->find($purchaseOrder->refer_model_id);
+            if (! $orderRequest || ! $orderRequest->exists) {
+                return;
+            }
+
+            $matchedItem = $orderRequest->orderRequestItem()
+                ->where('product_id', $purchaseOrderItem->product_id)
+                ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)')
+                ->orderBy('id')
+                ->first();
+
+            if (! $matchedItem) {
+                return;
+            }
+
+            $purchaseOrderItem->refer_item_model_type = OrderRequestItem::class;
+            $purchaseOrderItem->refer_item_model_id = $matchedItem->id;
+        });
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();

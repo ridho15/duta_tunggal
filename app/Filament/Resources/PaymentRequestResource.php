@@ -128,11 +128,18 @@ class PaymentRequestResource extends Resource
                                     })
                                     ->columns(1)
                                     ->reactive()
-                                    ->afterStateUpdated(function ($set, $state) {
+                                    ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
+                                            $set('cabang_id', Auth::user()?->cabang_id);
                                             $set('total_amount', 0);
                                             return;
                                         }
+
+                                        $invoice = Invoice::whereIn('id', $state)->orderBy('id')->first();
+                                        if ($invoice && $invoice->cabang_id) {
+                                            $set('cabang_id', $invoice->cabang_id);
+                                        }
+
                                         $total = Invoice::whereIn('id', $state)->sum('total');
                                         $set('total_amount', $total);
                                     }),

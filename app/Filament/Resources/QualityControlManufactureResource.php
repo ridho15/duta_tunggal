@@ -50,7 +50,74 @@ class QualityControlManufactureResource extends Resource
 
     protected static ?string $navigationLabel = 'Quality Control Manufacture';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 5;
+
+    public static function buildProcessingFormSchema(?QualityControl $record): array
+    {
+        $production = $record?->fromModel;
+        $manufacturingOrder = $production?->manufacturingOrder;
+        $productionPlan = $manufacturingOrder?->productionPlan;
+        $product = $record?->product;
+        $targetQuantity = (float) ($production?->quantity_produced ?? $productionPlan?->quantity ?? 0);
+
+        return [
+            TextInput::make('product_info')
+                ->label('Produk')
+                ->default($product ? "({$product->sku}) {$product->name}" : '-')
+                ->disabled()
+                ->dehydrated(false),
+            TextInput::make('production_reference')
+                ->label('Referensi Produksi')
+                ->default($production ? "{$production->production_number} / {$manufacturingOrder?->mo_number}" : '-')
+                ->disabled()
+                ->dehydrated(false),
+            TextInput::make('target_quantity')
+                ->label('Total Produksi')
+                ->default($targetQuantity)
+                ->disabled()
+                ->dehydrated(false),
+            TextInput::make('passed_quantity')
+                ->label('Passed Quantity')
+                ->numeric()
+                ->required()
+                ->default((float) ($record?->passed_quantity ?? 0))
+                ->helperText($targetQuantity > 0 ? 'Total passed + reject tidak boleh melebihi total produksi.' : null),
+            TextInput::make('rejected_quantity')
+                ->label('Rejected Quantity')
+                ->numeric()
+                ->required()
+                ->default((float) ($record?->rejected_quantity ?? 0)),
+            Textarea::make('reason_reject')
+                ->label('Reason Reject')
+                ->rows(3)
+                ->default($record?->reason_reject),
+            Select::make('warehouse_id')
+                ->label('Gudang')
+                ->options(Warehouse::query()->pluck('name', 'id')->toArray())
+                ->default($record?->warehouse_id)
+                ->required()
+                ->searchable()
+                ->preload()
+                ->reactive(),
+            Select::make('rak_id')
+                ->label('Rak')
+                ->options(function ($get) {
+                    $warehouseId = $get('warehouse_id');
+
+                    if (!$warehouseId) {
+                        return [];
+                    }
+
+                    return Rak::query()
+                        ->where('warehouse_id', $warehouseId)
+                        ->pluck('name', 'id')
+                        ->toArray();
+                })
+                ->default($record?->rak_id)
+                ->searchable()
+                ->preload(),
+        ];
+    }
 
     public static function form(Form $form): Form
     {
@@ -301,9 +368,10 @@ class QualityControlManufactureResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->visible(fn ($record) => !$record->status)
-                        ->action(function ($record) {
+                        ->form(fn ($record) => static::buildProcessingFormSchema($record))
+                        ->action(function (array $data, $record) {
                             $qcService = new QualityControlService();
-                            $qcService->completeQualityControl($record, []);
+                            $qcService->completeQualityControl($record, $data);
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Manufacture Completed. Proses selanjutnya: Tim Gudang perlu memindahkan barang hasil produksi ke lokasi penyimpanan dan memperbarui stok inventori.");
                         }),
                     DeleteAction::make(),
