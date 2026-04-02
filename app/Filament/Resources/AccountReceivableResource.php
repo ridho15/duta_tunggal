@@ -8,6 +8,7 @@ use App\Models\Cabang;
 use App\Models\AccountReceivable;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Support\AccountReceivableQuery;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
@@ -104,7 +105,10 @@ class AccountReceivableResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                return $query->with(['invoice.fromModel']);
+                return AccountReceivableQuery::applyTableFilters(
+                    AccountReceivableQuery::base()->with(['invoice.fromModel']),
+                    []
+                );
             })
             ->columns([
                 TextColumn::make('invoice.invoice_number')

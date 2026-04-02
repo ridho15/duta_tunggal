@@ -5,6 +5,7 @@ namespace App\Filament\Resources\SalesInvoiceResource\Pages;
 use App\Helpers\MoneyHelper;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\SaleOrder;
+use App\Services\SalesInvoiceTaxResolver;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -20,6 +21,13 @@ class CreateSalesInvoice extends CreateRecord
             $saleOrder = SaleOrder::find($saleOrderId);
             if ($saleOrder && !empty($saleOrder->cabang_id)) {
                 $data['cabang_id'] = $saleOrder->cabang_id;
+            }
+
+            if ($saleOrder) {
+                $taxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
+                $data['tax'] = $taxData['tax'];
+                $data['ppn_rate'] = $taxData['ppn_rate'];
+                $data['tipe_pajak'] = $taxData['tipe_pajak'];
             }
         }
 

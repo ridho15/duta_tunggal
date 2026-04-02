@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice;
+use App\Filament\Resources\SalesInvoiceResource\Pages\ListSalesInvoices;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
@@ -201,5 +202,44 @@ class SalesInvoiceResourceTest extends TestCase
             ->assertSet('data.ar_coa_id', $arCoa->id)
             ->assertSet('data.revenue_coa_id', $revCoa->id)
             ->assertSet('data.ppn_keluaran_coa_id', $ppnCoa->id);
+    }
+
+    /** @test */
+    public function sales_invoice_list_defaults_to_newest_first(): void
+    {
+        $saleOrder = SaleOrder::factory()->create();
+
+        $olderInvoice = Invoice::withoutEvents(function () use ($saleOrder) {
+            return Invoice::create([
+                'from_model_type' => SaleOrder::class,
+                'from_model_id' => $saleOrder->id,
+                'invoice_number' => 'INV-OLD-001',
+                'invoice_date' => now()->subDays(2),
+                'created_at' => now()->subDays(2),
+                'updated_at' => now()->subDays(2),
+            ]);
+        });
+
+        $newerInvoice = Invoice::withoutEvents(function () use ($saleOrder) {
+            return Invoice::create([
+                'from_model_type' => SaleOrder::class,
+                'from_model_id' => $saleOrder->id,
+                'invoice_number' => 'INV-NEW-001',
+                'invoice_date' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        $user = User::factory()->create();
+        foreach (['view any invoice', 'view invoice'] as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+        $user->givePermissionTo(['view any invoice', 'view invoice']);
+
+        $component = Livewire::actingAs($user)->test(ListSalesInvoices::class);
+        $records = $component->instance()->getTableRecords();
+
+        $this->assertSame([$newerInvoice->id, $olderInvoice->id], $records->pluck('id')->all());
     }
 }

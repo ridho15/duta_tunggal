@@ -28,6 +28,16 @@ class SuratJalan extends Model
         return $this->belongsToMany(DeliveryOrder::class, 'surat_jalan_delivery_orders', 'surat_jalan_id', 'delivery_order_id');
     }
 
+    public function deliverySchedules()
+    {
+        return $this->belongsToMany(
+            DeliverySchedule::class,
+            'delivery_schedule_surat_jalans',
+            'surat_jalan_id',
+            'delivery_schedule_id'
+        )->withTimestamps();
+    }
+
     public function signedBy()
     {
         return $this->belongsTo(User::class, 'signed_by')->withDefault();

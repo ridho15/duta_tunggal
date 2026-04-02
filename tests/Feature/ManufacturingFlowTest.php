@@ -20,6 +20,7 @@ use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
 use App\Models\WarehouseConfirmation;
 use App\Models\User;
+use App\Services\BalanceSheetService;
 use App\Services\ManufacturingJournalService;
 use App\Services\QualityControlService;
 use Illuminate\Database\Eloquent\Model;
@@ -273,6 +274,14 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
     expect((float) $fgMovement->sum('credit'))->toBe(0.0);
 });
 
+
+    $balanceSheet = app(BalanceSheetService::class)->generate([
+        'as_of_date' => now()->format('Y-m-d'),
+        'cabang_id' => $branch->id,
+    ]);
+
+    expect($balanceSheet['is_balanced'])->toBeTrue();
+    expect((float) $balanceSheet['difference'])->toBe(0.0);
 test('create manufacturing order from production plan', function () {
     $branch = Cabang::factory()->create();
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);

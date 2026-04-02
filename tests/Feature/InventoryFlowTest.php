@@ -351,10 +351,13 @@ it('displays inventory stock details on the Filament view page', function () {
     ]);
 
     Livewire::test(ViewInventoryStock::class, ['record' => $inventoryStock->id])
-        ->assertOk();
+        ->assertOk()
+        ->assertSee('Satuan / UOM')
+        ->assertSee($this->uom->name);
 
     // Verify relationships are loaded correctly
     expect($inventoryStock->product->id)->toBe($this->product->id);
+    expect($inventoryStock->product->uom->id)->toBe($this->uom->id);
     expect($inventoryStock->warehouse->id)->toBe($warehouse->id);
     expect($inventoryStock->rak->id)->toBe($rak->id);
 });

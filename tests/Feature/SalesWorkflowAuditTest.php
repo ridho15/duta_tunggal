@@ -1111,6 +1111,37 @@ describe('Account Receivable — creation and branch scope', function () {
             expect($threw)->toBeTrue();
         });
     });
+
+                it('lists only unpaid account receivables by default', function () {
+                    AccountReceivable::withoutGlobalScopes()->create([
+                        'invoice_id' => 90001,
+                        'customer_id' => $this->customer->id,
+                        'total' => 100000,
+                        'paid' => 100000,
+                        'remaining' => 0,
+                        'status' => 'Lunas',
+                        'cabang_id' => $this->cabang->id,
+                    ]);
+
+                    AccountReceivable::withoutGlobalScopes()->create([
+            'invoice_id' => 90002,
+                        'customer_id' => $this->customer->id,
+                        'total' => 200000,
+                        'paid' => 50000,
+                        'remaining' => 150000,
+                        'status' => 'Belum Lunas',
+                        'cabang_id' => $this->cabang->id,
+                    ]);
+
+                    $page = new \App\Filament\Resources\AccountReceivableResource\Pages\ListAccountReceivables();
+                    $reflection = new \ReflectionMethod($page, 'getFilteredQuery');
+                    $reflection->setAccessible(true);
+
+                    $filtered = $reflection->invoke($page);
+
+                    expect($filtered->pluck('status')->all())->toBe(['Belum Lunas']);
+                    expect($filtered->count())->toBe(1);
+                });
 });
 
 // ─── SECTION 7: Inclusive Tax Invoice ───────────────────────────────────────

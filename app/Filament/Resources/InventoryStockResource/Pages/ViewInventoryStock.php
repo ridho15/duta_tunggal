@@ -31,6 +31,9 @@ class ViewInventoryStock extends ViewRecord
                             ->label('SKU'),
                         TextEntry::make('product.name')
                             ->label('Nama Produk'),
+                        TextEntry::make('product.uom.name')
+                            ->label('Satuan / UOM')
+                            ->placeholder('-'),
                         TextEntry::make('warehouse')
                             ->label('Gudang')
                             ->formatStateUsing(fn ($state) => "({$state->kode}) {$state->name}"),

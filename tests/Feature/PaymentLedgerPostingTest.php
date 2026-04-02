@@ -110,6 +110,76 @@ class PaymentLedgerPostingTest extends TestCase
         $this->assertGreaterThan(0, (float)$creditBank->credit);
     }
 
+    public function test_post_vendor_payment_is_idempotent_for_same_payment()
+    {
+        $apCoa = ChartOfAccount::create(['code' => '2110', 'name' => 'Accounts Payable']);
+        $bankCoa = ChartOfAccount::create(['code' => '1112.02', 'name' => 'Bank Account 2']);
+
+        $supplier = Supplier::create([
+            'code' => 'SUP-IDEMP',
+            'name' => 'Supplier Idempotent',
+            'perusahaan' => 'PT Idempotent',
+            'address' => 'Jalan Test No.3',
+            'phone' => '08123456781',
+            'handphone' => '08123456781',
+            'email' => 'supplier.idempotent@example.test',
+            'fax' => '',
+            'npwp' => '',
+            'tempo_hutang' => 0,
+            'kontak_person' => '',
+            'keterangan' => ''
+        ]);
+
+        AccountPayable::create([
+            'invoice_id' => 9996,
+            'supplier_id' => $supplier->id,
+            'total' => 250000,
+            'remaining' => 250000,
+            'paid' => 0,
+            'status' => 'Belum Lunas',
+            'created_by' => $this->user->id,
+        ]);
+
+        $payment = VendorPayment::create([
+            'supplier_id' => $supplier->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 250000,
+            'coa_id' => $bankCoa->id,
+            'payment_method' => 'cash',
+            'status' => 'Draft',
+        ]);
+
+        VendorPaymentDetail::create([
+            'vendor_payment_id' => $payment->id,
+            'method' => 'cash',
+            'amount' => 250000,
+            'coa_id' => $bankCoa->id,
+            'payment_date' => now()->toDateString(),
+            'invoice_id' => 9996,
+        ]);
+
+        $service = app(LedgerPostingService::class);
+
+        $firstResult = $service->postVendorPayment($payment);
+        $this->assertSame('posted', $firstResult['status']);
+
+        $initialEntries = JournalEntry::where('source_type', VendorPayment::class)
+            ->where('source_id', $payment->id)
+            ->get();
+        $this->assertCount(2, $initialEntries);
+
+        $secondResult = $service->postVendorPayment($payment);
+        $this->assertSame('skipped', $secondResult['status']);
+
+        $finalEntries = JournalEntry::where('source_type', VendorPayment::class)
+            ->where('source_id', $payment->id)
+            ->get();
+        $this->assertCount(2, $finalEntries);
+
+        $this->assertTrue($finalEntries->contains('coa_id', $apCoa->id));
+        $this->assertTrue($finalEntries->contains('coa_id', $bankCoa->id));
+    }
+
     public function test_post_vendor_payment_using_deposit_credits_deposit_coa()
     {
         $apCoa = ChartOfAccount::create(['code' => '2110', 'name' => 'Accounts Payable']);

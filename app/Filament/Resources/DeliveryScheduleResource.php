@@ -40,6 +40,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class DeliveryScheduleResource extends Resource
@@ -134,9 +135,33 @@ class DeliveryScheduleResource extends Resource
                             ->disabled(fn($get) => empty($get('cabang_id')))
                             ->live()
                             ->relationship('suratJalan', 'sj_number', function (Builder $query, Get $get) {
+                                $cabangId = $get('cabang_id');
+
+                                if (! $cabangId) {
+                                    $query->whereRaw('1 = 0');
+
+                                    return;
+                                }
+
+                                $selectedIds = collect($get('suratJalan') ?? [])
+                                    ->filter()
+                                    ->map(fn ($id) => (int) $id)
+                                    ->values()
+                                    ->all();
+
+                                $assignedIds = DB::table('delivery_schedule_surat_jalans')
+                                    ->distinct()
+                                    ->pluck('surat_jalan_id')
+                                    ->map(fn ($id) => (int) $id)
+                                    ->values()
+                                    ->all();
+
+                                $excludedIds = array_values(array_diff($assignedIds, $selectedIds));
+
                                 $query->withoutGlobalScopes()
-                                    ->where('cabang_id', $get('cabang_id'))
+                                    ->where('cabang_id', $cabangId)
                                     ->where('status', 1)
+                                    ->when(! empty($excludedIds), fn (Builder $query) => $query->whereNotIn('surat_jalans.id', $excludedIds))
                                     ->orderBy('sj_number');
                             })
                             ->helperText(fn($get) => empty($get('cabang_id')) ? 'Pilih Cabang terlebih dahulu untuk menampilkan Surat Jalan.' : 'Pilih satu atau lebih Surat Jalan untuk jadwal ini')
@@ -239,18 +264,37 @@ class DeliveryScheduleResource extends Resource
             ]);
     }
 
-    public static function getSuratJalanOptions(?int $cabangId): array
+    public static function getSuratJalanOptions(?int $cabangId, bool $excludeAlreadyAssigned = false): array
     {
         if (! $cabangId) {
             return [];
         }
 
+        $assignedIds = $excludeAlreadyAssigned
+            ? DB::table('delivery_schedule_surat_jalans')
+                ->distinct()
+                ->pluck('surat_jalan_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all()
+            : [];
+
         return SuratJalan::withoutGlobalScopes()
             ->where('cabang_id', $cabangId)
             ->where('status', 1)
+            ->when(
+                ! empty($assignedIds),
+                fn (Builder $query) => $query->whereNotIn('surat_jalans.id', $assignedIds)
+            )
             ->orderBy('sj_number')
             ->pluck('sj_number', 'id')
             ->toArray();
+    }
+
+    public static function shouldExcludeAssignedSuratJalan(): bool
+    {
+        return request()->routeIs('filament.admin.resources.delivery-schedules.create')
+            || str_ends_with((string) request()->path(), 'delivery-schedules/create');
     }
 
     public static function getDeliveryOrderOptions(?int $cabangId): array

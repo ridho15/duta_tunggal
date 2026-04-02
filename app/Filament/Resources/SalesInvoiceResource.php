@@ -976,7 +976,7 @@ class SalesInvoiceResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('invoice_date', 'desc')
+            ->defaultSort('created_at', 'desc')
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Sales Invoice</summary>' .

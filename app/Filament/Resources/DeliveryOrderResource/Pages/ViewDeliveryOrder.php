@@ -143,29 +143,29 @@ class ViewDeliveryOrder extends ViewRecord
                     \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan Invoice telah diterbitkan dan diselesaikan untuk Delivery Order ini.");
                 }),
 
-            Actions\Action::make('completed')
-                ->label('Complete')
-                ->icon('heroicon-o-check-badge')
-                ->requiresConfirmation()
-                ->color('success')
-                ->visible(function () {
-                    $record = $this->record;
-                    return Auth::user()->hasPermissionTo('response delivery order') &&
-                        $record->status == 'sent';
-                })
-                ->action(function ($record) {
-                    $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                    $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'completed');
-                    // Post delivery order to general ledger for HPP recognition
-                    $postResult = $deliveryOrderService->postDeliveryOrder($record);
-                    if ($postResult['status'] === 'posted') {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai dan telah diposting ke buku besar. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
-                    } elseif ($postResult['status'] === 'error') {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
-                    } else {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
-                    }
-                }),
+            // Actions\Action::make('completed')
+            //     ->label('Complete')
+            //     ->icon('heroicon-o-check-badge')
+            //     ->requiresConfirmation()
+            //     ->color('success')
+            //     ->visible(function () {
+            //         $record = $this->record;
+            //         return Auth::user()->hasPermissionTo('response delivery order') &&
+            //             $record->status == 'sent';
+            //     })
+            //     ->action(function ($record) {
+            //         $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
+            //         $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'completed');
+            //         // Post delivery order to general ledger for HPP recognition
+            //         $postResult = $deliveryOrderService->postDeliveryOrder($record);
+            //         if ($postResult['status'] === 'posted') {
+            //             \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai dan telah diposting ke buku besar. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
+            //         } elseif ($postResult['status'] === 'error') {
+            //             \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
+            //         } else {
+            //             \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
+            //         }
+            //     }),
 
             Actions\Action::make('checker_edit_quantity')
                 ->label('Checker Edit Qty')

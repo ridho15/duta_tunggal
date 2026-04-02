@@ -9,6 +9,7 @@ use App\Models\InvoiceItem;
 use App\Models\StockReservation;
 use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
+use App\Services\SalesInvoiceTaxResolver;
 use Illuminate\Support\Facades\Log;
 
 class SaleOrderObserver
@@ -99,6 +100,7 @@ class SaleOrderObserver
         $subtotal = 0;
         $tax = 0;
         $invoiceItems = [];
+        $invoiceTaxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
 
         foreach ($saleOrder->saleOrderItem as $item) {
             // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
@@ -171,17 +173,11 @@ class SaleOrderObserver
             }
         }
 
-        // FIX #1a: $tax holds the monetary PPN sum; derive the rate to store in invoice->tax.
-        // invoice->tax column (int) must store the rate (e.g. 11 or 12), NOT the monetary amount.
-        // The monetary amount is used for the invoice->total calculation below.
+        // FIX #1a: store the invoice-level tax metadata derived from the SO items.
+        // `tax` and `ppn_rate` hold the rate, while the monetary PPN is calculated separately.
         $taxMonetaryAmount = $tax;
-        $ppnRate = 0;
-        foreach ($saleOrder->saleOrderItem as $item) {
-            if ($item->tax > 0) {
-                $ppnRate = (int) $item->tax; // Use first non-zero rate (rates normally uniform per invoice)
-                break;
-            }
-        }
+        $ppnRate = (float) $invoiceTaxData['ppn_rate'];
+        $tipePajak = $invoiceTaxData['tipe_pajak'];
 
         $total = $subtotal + $taxMonetaryAmount + $additionalCosts;
 
@@ -214,6 +210,7 @@ class SaleOrderObserver
             'subtotal' => $subtotal,
             'tax' => $ppnRate,         // FIX #1a: store rate (int, e.g. 11), not monetary amount
             'ppn_rate' => $ppnRate,    // FIX #1a: also populate dedicated ppn_rate field
+            'tipe_pajak' => $tipePajak,
             'dpp' => $subtotal,        // FIX #1a: DPP = subtotal (sum of DPP amounts)
             'total' => $total,
             'other_fee' => $otherFees, // Tambahkan biaya tambahan dari delivery orders

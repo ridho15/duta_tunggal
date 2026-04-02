@@ -78,6 +78,33 @@ test('sales invoice inherits cabang from sale order source', function () {
     expect((int) $result['cabang_id'])->toBe((int) $cabangSource->id);
 });
 
+test('sales invoice inherits tax fields from sale order source', function () {
+    $cabang = Cabang::factory()->create();
+    $saleOrder = SaleOrder::factory()->create([
+        'cabang_id' => $cabang->id,
+    ]);
+
+    SaleOrderItem::factory()->create([
+        'sale_order_id' => $saleOrder->id,
+        'product_id' => Product::factory()->create()->id,
+        'quantity' => 1,
+        'unit_price' => 100000,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => 'Eklusif',
+    ]);
+
+    $page = new CreateSalesInvoice();
+
+    $result = invokeMutateBeforeCreate($page, [
+        'selected_sale_order' => $saleOrder->id,
+    ]);
+
+    expect((float) $result['tax'])->toBe(11.0)
+        ->and((float) $result['ppn_rate'])->toBe(11.0)
+        ->and($result['tipe_pajak'])->toBe('Eksklusif');
+});
+
 test('purchase invoice inherits cabang from selected purchase order source', function () {
     $cabangSource = Cabang::factory()->create();
     $cabangWrong = Cabang::factory()->create();

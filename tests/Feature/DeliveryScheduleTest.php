@@ -9,9 +9,13 @@ use App\Models\Driver;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Filament\Resources\DeliveryScheduleResource;
+use App\Filament\Resources\DeliveryScheduleResource\Pages\CreateDeliverySchedule;
 use App\Services\DeliveryScheduleService;
 use App\Models\SuratJalan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class DeliveryScheduleTest extends TestCase
@@ -40,6 +44,12 @@ class DeliveryScheduleTest extends TestCase
         $this->cabang  = Cabang::factory()->create();
         $this->driver  = Driver::factory()->create(['cabang_id' => $this->cabang->id]);
         $this->vehicle = Vehicle::factory()->create(['cabang_id' => $this->cabang->id]);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        foreach (['view any delivery schedule', 'create delivery schedule'] as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+        $this->user->givePermissionTo(['view any delivery schedule', 'create delivery schedule']);
 
         $this->scheduleService = app(DeliveryScheduleService::class);
     }
@@ -153,6 +163,142 @@ class DeliveryScheduleTest extends TestCase
         $this->assertSame('SJ-APPROVED-001', $options[$approved->id]);
         $this->assertNotContains('SJ-DRAFT-001', $options);
         $this->assertNotContains('SJ-APPROVED-OTHER', $options);
+    }
+
+    /** @test */
+    public function it_filters_surat_jalan_for_bau_bau_cabang(): void
+    {
+        $bauBauCabang = Cabang::factory()->create([
+            'nama' => 'Bau Bau',
+        ]);
+
+        $available = SuratJalan::create([
+            'sj_number' => 'SJ-BAU-AVAILABLE-001',
+            'issued_at' => now(),
+            'status' => 1,
+            'created_by' => $this->user->id,
+            'cabang_id' => $bauBauCabang->id,
+        ]);
+
+        $used = SuratJalan::create([
+            'sj_number' => 'SJ-BAU-USED-001',
+            'issued_at' => now(),
+            'status' => 1,
+            'created_by' => $this->user->id,
+            'cabang_id' => $bauBauCabang->id,
+        ]);
+
+        $otherDeliveryOrder = DeliveryOrder::factory()->create([
+            'cabang_id' => $bauBauCabang->id,
+            'status' => 'approved',
+        ]);
+
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'SCH-BAU-001',
+            'scheduled_date' => now(),
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'status' => 'pending',
+            'cabang_id' => $bauBauCabang->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $schedule->suratJalan()->attach($used->id);
+        $used->deliveryOrder()->attach($otherDeliveryOrder->id);
+
+        $options = DeliveryScheduleResource::getSuratJalanOptions($bauBauCabang->id, true);
+
+        $this->assertArrayHasKey($available->id, $options);
+        $this->assertSame('SJ-BAU-AVAILABLE-001', $options[$available->id]);
+        $this->assertArrayNotHasKey($used->id, $options);
+    }
+
+    /** @test */
+    public function it_still_excludes_surat_jalan_used_by_trashed_delivery_schedules(): void
+    {
+        $bauBauCabang = Cabang::factory()->create([
+            'nama' => 'Bau Bau',
+        ]);
+
+        $used = SuratJalan::create([
+            'sj_number' => 'SJ-BAU-TRASHED-001',
+            'issued_at' => now(),
+            'status' => 1,
+            'created_by' => $this->user->id,
+            'cabang_id' => $bauBauCabang->id,
+        ]);
+
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'SCH-BAU-TRASHED-001',
+            'scheduled_date' => now(),
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'status' => 'pending',
+            'cabang_id' => $bauBauCabang->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $schedule->suratJalan()->attach($used->id);
+        $schedule->delete();
+
+        $options = DeliveryScheduleResource::getSuratJalanOptions($bauBauCabang->id, true);
+
+        $this->assertArrayNotHasKey($used->id, $options);
+    }
+
+    /** @test */
+    public function it_excludes_surat_jalan_that_are_already_used_by_another_delivery_schedule(): void
+    {
+        $available = SuratJalan::create([
+            'sj_number' => 'SJ-AVAILABLE-001',
+            'issued_at' => now(),
+            'status' => 1,
+            'created_by' => $this->user->id,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $used = SuratJalan::create([
+            'sj_number' => 'SJ-USED-001',
+            'issued_at' => now(),
+            'status' => 1,
+            'created_by' => $this->user->id,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $otherDeliveryOrder = DeliveryOrder::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'SCH-USED-001',
+            'scheduled_date' => now(),
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'status' => 'pending',
+            'cabang_id' => $this->cabang->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $schedule->suratJalan()->attach($used->id);
+        $used->deliveryOrder()->attach($otherDeliveryOrder->id);
+
+        $options = DeliveryScheduleResource::getSuratJalanOptions($this->cabang->id, true);
+
+        $this->assertArrayHasKey($available->id, $options);
+        $this->assertSame('SJ-AVAILABLE-001', $options[$available->id]);
+        $this->assertArrayNotHasKey($used->id, $options);
+    }
+
+    /** @test */
+    public function it_renders_the_delivery_schedule_create_form(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(CreateDeliverySchedule::class)
+            ->assertSuccessful()
+            ->assertFormExists()
+            ->assertFormFieldExists('cabang_id')
+            ->assertFormFieldExists('suratJalan');
     }
 
     /** @test */
