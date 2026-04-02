@@ -7,8 +7,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $legacyConfirmations = DB::table('warehouse_confirmations')
-            ->select('warehouse_confirmations.*')
+        $legacyConfirmationIds = DB::table('warehouse_confirmations')
+            ->select('warehouse_confirmations.id')
             ->join('warehouse_confirmation_items', function ($join) {
                 $join->on('warehouse_confirmation_items.warehouse_confirmation_id', '=', 'warehouse_confirmations.id')
                     ->whereNull('warehouse_confirmation_items.deleted_at');
@@ -18,9 +18,17 @@ return new class extends Migration
             ->groupBy('warehouse_confirmations.id')
             ->havingRaw('COUNT(warehouse_confirmation_items.id) > 1')
             ->orderBy('warehouse_confirmations.id')
-            ->get();
+            ->pluck('warehouse_confirmations.id');
 
-        foreach ($legacyConfirmations as $confirmation) {
+        foreach ($legacyConfirmationIds as $confirmationId) {
+            $confirmation = DB::table('warehouse_confirmations')
+                ->where('id', $confirmationId)
+                ->first();
+
+            if (! $confirmation) {
+                continue;
+            }
+
             $items = DB::table('warehouse_confirmation_items')
                 ->where('warehouse_confirmation_id', $confirmation->id)
                 ->whereNull('deleted_at')

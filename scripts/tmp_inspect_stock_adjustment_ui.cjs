@@ -33,6 +33,9 @@ function queryAdjustmentStatus(number) {
   await page.goto('http://localhost:8009/admin/stock-adjustments')
   await page.waitForLoadState('networkidle')
 
+  console.log('URL=' + page.url())
+  console.log('BODY_START=' + JSON.stringify(((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ').trim().slice(0, 500)))
+
   const row = page.locator('tr', { hasText: 'ADJ-PW-APPROVE-001' }).first()
 
   console.log('ROW=' + JSON.stringify(((await row.textContent()) || '').replace(/\s+/g, ' ').trim()))
