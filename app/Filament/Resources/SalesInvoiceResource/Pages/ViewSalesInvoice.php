@@ -202,7 +202,7 @@ class ViewSalesInvoice extends ViewRecord
                     ])->setPaper('A4', 'portrait');
 
                     return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
+                        echo $pdf->output();
                     }, 'Invoice_SO_' . $record->invoice_number . '.pdf');
                 })
         ];

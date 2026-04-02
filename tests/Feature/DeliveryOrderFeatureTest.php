@@ -21,6 +21,7 @@ use App\Models\Warehouse;
 use App\Services\DeliveryOrderService;
 use App\Services\ProductService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DeliveryOrderFeatureTest extends TestCase
@@ -108,7 +109,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_delivery_order_manually()
     {
         $data = [
@@ -129,7 +130,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals('draft', $deliveryOrder->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_delivery_order_from_sale_order()
     {
         // Create DO from SO
@@ -165,7 +166,7 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_approval_logs_and_status_changes()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -193,7 +194,7 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_approve_delivery_order_without_surat_jalan()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -206,7 +207,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals('approved', $deliveryOrder->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_assign_vehicle_and_driver_for_shipping()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -226,7 +227,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals($this->vehicle->plate, $deliveryOrder->fresh()->vehicle->plate);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_surat_jalan()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -257,7 +258,7 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_proof_of_delivery()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -275,7 +276,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertTrue(str_contains($deliveryOrder->fresh()->notes, 'Received by customer'));
     }
 
-    /** @test */
+    #[Test]
     public function it_updates_stock_on_delivery()
     {
         // Create DO with items
@@ -314,7 +315,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertNotNull($stockMovement);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_total_value_correctly()
     {
         $deliveryOrder = DeliveryOrder::factory()->create();
@@ -332,7 +333,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals(200000, $deliveryOrder->fresh()->total);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_unique_do_number()
     {
         $doNumber1 = $this->deliveryOrderService->generateDoNumber();
@@ -350,7 +351,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertStringStartsWith('DO-' . now()->format('Ymd') . '-', $doNumber2);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_delivery_order_lifecycle()
     {
         // 1. Create
@@ -409,7 +410,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals(['request_approve', 'approved', 'sent', 'received', 'completed'], $logs->pluck('status')->toArray());
     }
 
-    /** @test */
+    #[Test]
     public function it_manages_stock_correctly_through_delivery_order_lifecycle()
     {
         // Clean up any existing inventory stock for this product/warehouse
@@ -529,7 +530,7 @@ class DeliveryOrderFeatureTest extends TestCase
     // Task 19: SJ berlaku untuk semua jenis customer (termasuk direct selling)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function it_can_create_delivery_order_for_ambil_sendiri_sale_order()
     {
         // Create a 'Ambil Sendiri' (self-pickup / direct selling) SO
@@ -585,7 +586,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals('Ambil Sendiri', $selfPickupSO->tipe_pengiriman);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_surat_jalan_for_ambil_sendiri_delivery_order()
     {
         // Create Ambil Sendiri SO

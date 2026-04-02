@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SalesOrderService
 {
@@ -143,6 +144,8 @@ class SalesOrderService
 
     public function requestApprove($saleOrder)
     {
+        $this->ensureStockAvailableForApproval($saleOrder);
+
         return $saleOrder->update([
             'status' => 'request_approve',
             'request_approve_by' => Auth::user()->id,
@@ -161,6 +164,8 @@ class SalesOrderService
 
     public function approve($saleOrder)
     {
+        $this->ensureStockAvailableForApproval($saleOrder);
+
         // Validate customer credit limit before approving
         $saleOrder->loadMissing('customer');
         if ($saleOrder->customer && $saleOrder->customer->tipe_pembayaran === 'Kredit') {
@@ -168,7 +173,15 @@ class SalesOrderService
             $check = $creditService->canCustomerMakePurchase($saleOrder->customer, (float) $saleOrder->total_amount);
             if (! $check['can_purchase']) {
                 $messages = implode('; ', $check['messages']);
-                throw new \RuntimeException("Persetujuan ditolak: {$messages}");
+                Notification::make()
+                    ->title('Persetujuan Ditolak')
+                    ->body($messages)
+                    ->danger()
+                    ->send();
+
+                throw ValidationException::withMessages([
+                    'customer_id' => $messages,
+                ]);
             }
         }
 
@@ -176,6 +189,34 @@ class SalesOrderService
             'status' => 'approved',
             'approve_by' => Auth::user()->id,
             'approve_at' => Carbon::now()
+        ]);
+    }
+
+    protected function ensureStockAvailableForApproval(SaleOrder $saleOrder): void
+    {
+        $saleOrder->loadMissing('saleOrderItem.warehouseAllocations', 'saleOrderItem.product');
+
+        if (! $saleOrder->hasInsufficientStock()) {
+            return;
+        }
+
+        $insufficientItems = collect($saleOrder->getInsufficientStockItems())
+            ->map(function (array $item) {
+                $product = $item['item']?->product;
+
+                return trim(sprintf(
+                    '%s (butuh %s, tersedia %s)',
+                    $product?->name ?? 'Produk',
+                    rtrim(rtrim((string) ($item['needed'] ?? 0), '0'), '.'),
+                    rtrim(rtrim((string) ($item['available'] ?? 0), '0'), '.')
+                ));
+            })
+            ->implode('; ');
+
+        throw ValidationException::withMessages([
+            'stock' => $insufficientItems
+                ? 'Stok tidak cukup untuk request/approve sales order: ' . $insufficientItems
+                : 'Stok tidak cukup untuk request/approve sales order.',
         ]);
     }
 
@@ -216,7 +257,15 @@ class SalesOrderService
 
         $saleOrderItems = $itemsQuery->with('product')->get();
         if ($saleOrderItems->isEmpty()) {
-            throw new \RuntimeException('Tidak ada item Sales Order yang valid untuk dibuatkan Purchase Order.');
+            Notification::make()
+                ->title('Gagal Membuat Purchase Order')
+                ->body('Tidak ada item Sales Order yang valid untuk dibuatkan Purchase Order.')
+                ->danger()
+                ->send();
+
+            throw ValidationException::withMessages([
+                'selected_sale_order_item_ids' => 'Tidak ada item Sales Order yang valid untuk dibuatkan Purchase Order.',
+            ]);
         }
 
         // Create Purchase order
@@ -315,7 +364,15 @@ class SalesOrderService
     {
         // Validate that SO is approved
         if ($saleOrder->status !== 'approved') {
-            throw new \Exception('Sales Order must be approved before warehouse confirmation');
+            Notification::make()
+                ->title('Gagal Konfirmasi Gudang')
+                ->body('Sales Order harus disetujui terlebih dahulu sebelum konfirmasi gudang.')
+                ->danger()
+                ->send();
+
+            throw ValidationException::withMessages([
+                'status' => 'Sales Order harus disetujui terlebih dahulu sebelum konfirmasi gudang.',
+            ]);
         }
 
         // Create warehouse confirmation record (polymorphic confirmable)
@@ -392,13 +449,29 @@ class SalesOrderService
     {
         // Validate that SO is confirmed
         if (!in_array($saleOrder->status, ['confirmed', 'partial_confirmed'])) {
-            throw new \Exception('Sales Order must be warehouse confirmed before creating delivery order');
+            Notification::make()
+                ->title('Gagal Membuat Delivery Order')
+                ->body('Sales Order harus sudah konfirmasi gudang sebelum Delivery Order dibuat.')
+                ->danger()
+                ->send();
+
+            throw ValidationException::withMessages([
+                'status' => 'Sales Order harus sudah konfirmasi gudang sebelum Delivery Order dibuat.',
+            ]);
         }
 
         // Create delivery order
         $warehouseId = $deliveryData['warehouse_id'] ?? $saleOrder->warehouseConfirmation->warehouseConfirmationItems->first()->warehouse_id ?? null;
         if (!$warehouseId) {
-            throw new \Exception('Warehouse ID is required to create delivery order');
+            Notification::make()
+                ->title('Gagal Membuat Delivery Order')
+                ->body('Gudang harus dipilih untuk membuat Delivery Order.')
+                ->danger()
+                ->send();
+
+            throw ValidationException::withMessages([
+                'warehouse_id' => 'Gudang harus dipilih untuk membuat Delivery Order.',
+            ]);
         }
 
         // Resolve a real driver and vehicle to satisfy NOT NULL FK constraints
@@ -411,7 +484,9 @@ class SalesOrderService
                 ->danger()
                 ->body('Tidak ditemukan driver atau kendaraan di database. Silakan pastikan data master sudah terisi untuk auto-creation Delivery Order.')
                 ->send();
-            throw new \Exception('A Driver and a Vehicle must exist before a Delivery Order can be created.');
+            throw ValidationException::withMessages([
+                'driver_id' => 'Driver dan kendaraan harus tersedia sebelum Delivery Order dapat dibuat.',
+            ]);
         }
 
         $deliveryOrder = $saleOrder->deliveryOrder()->create([

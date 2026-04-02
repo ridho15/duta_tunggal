@@ -14,15 +14,151 @@ use Filament\Notifications\Notification;
 
 class ManufacturingService
 {
-    public function createWarehouseConfirmation($manufacturingOrder)
+    public function createWarehouseConfirmation($manufacturingOrder, array $attributes = []): WarehouseConfirmation
     {
-        return WarehouseConfirmation::create([
-            'manufacturing_order_id' => $manufacturingOrder->id,
-            'status' => 'request',
-            'notes' => null,
-            'confirmed_by' => null,
-            'confirmed_at' => null
+        $warehouseConfirmation = WarehouseConfirmation::query()->firstOrNew([
+            'confirmable_type' => ManufacturingOrder::class,
+            'confirmable_id' => $manufacturingOrder->id,
         ]);
+
+        $status = $attributes['status']
+            ?? (strtolower((string) $warehouseConfirmation->status) === 'confirmed' ? 'confirmed' : 'request');
+
+        $payload = array_merge([
+            'confirmation_type' => 'manufacturing_order',
+            'note' => $warehouseConfirmation->note ?: 'Auto-generated from Manufacturing Order',
+            'rejection_reason' => null,
+            'status' => $status,
+        ], $attributes);
+
+        if ($payload['status'] !== 'confirmed') {
+            $payload['confirmed_by'] = null;
+            $payload['confirmed_at'] = null;
+        }
+
+        $warehouseConfirmation->fill($payload);
+        $warehouseConfirmation->save();
+
+        return $warehouseConfirmation;
+    }
+
+    public function createWarehouseConfirmationForMaterialIssue(MaterialIssue $materialIssue, array $attributes = []): WarehouseConfirmation
+    {
+        $materialIssue->loadMissing('items.product');
+
+        $existingConfirmations = WarehouseConfirmation::query()
+            ->where('confirmable_type', MaterialIssue::class)
+            ->where('confirmable_id', $materialIssue->id)
+            ->with('warehouseConfirmationItems')
+            ->get();
+
+        $retainedConfirmationIds = [];
+        $latestSyncedConfirmation = null;
+
+        foreach ($materialIssue->items as $item) {
+            $sourceConfirmation = $existingConfirmations->first(function (WarehouseConfirmation $confirmation) use ($item) {
+                return $confirmation->warehouseConfirmationItems
+                    ->contains(fn ($confirmationItem) => (int) $confirmationItem->material_issue_item_id === (int) $item->id);
+            });
+
+            $sourceConfirmationItem = $sourceConfirmation?->warehouseConfirmationItems
+                ->firstWhere('material_issue_item_id', $item->id);
+
+            $targetConfirmation = $existingConfirmations->first(function (WarehouseConfirmation $confirmation) use ($item) {
+                if ($confirmation->warehouseConfirmationItems->count() !== 1) {
+                    return false;
+                }
+
+                return (int) $confirmation->warehouseConfirmationItems->first()?->material_issue_item_id === (int) $item->id;
+            });
+
+            if (! $targetConfirmation) {
+                $targetConfirmation = new WarehouseConfirmation([
+                    'confirmable_type' => MaterialIssue::class,
+                    'confirmable_id' => $materialIssue->id,
+                ]);
+            }
+
+            $itemStatus = strtolower((string) ($sourceConfirmationItem?->status ?? 'request'));
+            if (! in_array($itemStatus, ['confirmed', 'partial_confirmed', 'rejected'], true)) {
+                $itemStatus = strtolower((string) ($attributes['status'] ?? 'request'));
+                if (! in_array($itemStatus, ['confirmed', 'partial_confirmed', 'rejected'], true)) {
+                    $itemStatus = 'request';
+                }
+            }
+
+            $confirmationPayload = array_merge([
+                'confirmation_type' => 'material_issue',
+                'note' => $targetConfirmation->note ?: 'Auto-generated from Material Issue',
+                'rejection_reason' => null,
+                'status' => $itemStatus,
+            ], $attributes);
+
+            $confirmationPayload['status'] = $itemStatus;
+
+            if (! in_array($itemStatus, ['confirmed', 'partial_confirmed', 'rejected'], true)) {
+                $confirmationPayload['confirmed_by'] = null;
+                $confirmationPayload['confirmed_at'] = null;
+            } else {
+                $confirmationPayload['confirmed_by'] = $confirmationPayload['confirmed_by']
+                    ?? $sourceConfirmation?->confirmed_by
+                    ?? $targetConfirmation->confirmed_by;
+                $confirmationPayload['confirmed_at'] = $confirmationPayload['confirmed_at']
+                    ?? $sourceConfirmation?->confirmed_at
+                    ?? $targetConfirmation->confirmed_at;
+            }
+
+            $targetConfirmation->fill($confirmationPayload);
+            $targetConfirmation->save();
+
+            $itemPayload = [
+                'material_issue_item_id' => $item->id,
+                'product_id' => $item->product_id,
+                'sale_order_item_id' => null,
+                'product_name' => $item->product?->name ?? 'Unknown Product',
+                'requested_qty' => $item->quantity,
+                'confirmed_qty' => $sourceConfirmationItem?->confirmed_qty ?? $item->quantity,
+                'warehouse_id' => $item->warehouse_id,
+                'rak_id' => $item->rak_id,
+                'status' => $itemStatus,
+            ];
+
+            $existingItem = $targetConfirmation->warehouseConfirmationItems()
+                ->where('material_issue_item_id', $item->id)
+                ->first();
+
+            if ($existingItem) {
+                $existingItem->fill($itemPayload);
+                $existingItem->save();
+            } else {
+                $existingItem = $targetConfirmation->warehouseConfirmationItems()->create($itemPayload);
+            }
+
+            $targetConfirmation->warehouseConfirmationItems()
+                ->where('id', '!=', $existingItem->id)
+                ->delete();
+
+            $retainedConfirmationIds[] = $targetConfirmation->id;
+            $latestSyncedConfirmation = $targetConfirmation;
+        }
+
+        $existingConfirmations
+            ->whereNotIn('id', array_unique($retainedConfirmationIds))
+            ->each
+            ->delete();
+
+        if (! $latestSyncedConfirmation) {
+            $latestSyncedConfirmation = WarehouseConfirmation::query()->firstOrCreate([
+                'confirmable_type' => MaterialIssue::class,
+                'confirmable_id' => $materialIssue->id,
+            ], [
+                'confirmation_type' => 'material_issue',
+                'note' => 'Auto-generated from Material Issue',
+                'status' => 'request',
+            ]);
+        }
+
+        return $latestSyncedConfirmation->fresh(['warehouseConfirmationItems']);
     }
 
     public function checkStockMaterial($manufacturingOrder)
@@ -136,12 +272,16 @@ class ManufacturingService
                 $quantity = $bomItem->quantity * $productionPlan->quantity;
                 $costPerUnit = $bomItem->product->cost_price ?? 0;
                 $itemTotalCost = $quantity * $costPerUnit;
+                $warehouseId = \App\Filament\Resources\MaterialIssueResource::resolveWarehouseIdForProduct(
+                    $bomItem->product_id,
+                    $productionPlan->warehouse_id
+                );
 
                 $materialIssueItem = MaterialIssueItem::create([
                     'material_issue_id' => $materialIssue->id,
                     'product_id' => $bomItem->product_id,
                     'uom_id' => $bomItem->uom_id,
-                    'warehouse_id' => $productionPlan->warehouse_id,
+                    'warehouse_id' => $warehouseId,
                     'quantity' => $quantity,
                     'cost_per_unit' => $costPerUnit,
                     'total_cost' => $itemTotalCost,

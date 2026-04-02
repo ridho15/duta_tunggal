@@ -5,11 +5,11 @@ use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
 use App\Models\JournalEntry;
 use App\Models\ManufacturingOrder;
-use App\Models\ManufacturingOrderMaterial;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductionPlan;
 use App\Models\Rak;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
@@ -22,6 +22,18 @@ use Illuminate\Support\Facades\DB;
 \Tests\TestCase::disableBaseSeeding();
 
 afterAll(fn () => \Tests\TestCase::enableBaseSeeding());
+
+function createManufacturingTestPlan(Product $finishedGood, UnitOfMeasure $uom, User $user): ProductionPlan
+{
+    return ProductionPlan::factory()->create([
+        'product_id' => $finishedGood->id,
+        'uom_id' => $uom->id,
+        'source_type' => 'manual',
+        'quantity' => 1,
+        'status' => 'scheduled',
+        'created_by' => $user->id,
+    ]);
+}
 
 test('issue materials to production', function () {
     $branch = Cabang::factory()->create();
@@ -36,8 +48,12 @@ test('issue materials to production', function () {
         ['name' => 'Persediaan Bahan Baku', 'type' => 'Asset', 'is_active' => true]
     );
     $wipCoa = ChartOfAccount::firstOrCreate(
-        ['code' => '1140.02'],
-        ['name' => 'Persediaan Barang Dalam Proses', 'type' => 'Asset', 'is_active' => true]
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
+    );
+    ChartOfAccount::firstOrCreate(
+        ['code' => '1150'],
+        ['name' => 'Barang Dalam Proses', 'type' => 'Asset', 'is_active' => true]
     );
 
     $rawCost = 50000.0;
@@ -64,29 +80,18 @@ test('issue materials to production', function () {
         'inventory_coa_id' => null,
     ]);
 
+    $plan = createManufacturingTestPlan($finishedGood, $uom, $user);
+
     $mo = ManufacturingOrder::create([
         'mo_number' => 'MO-TEST',
-        'product_id' => $finishedGood->id,
-        'quantity' => 10,
+        'production_plan_id' => $plan->id,
         'status' => 'in_progress',
         'start_date' => Carbon::now(),
         'end_date' => null,
-        'uom_id' => $uom->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $materialQty = 20;
-    ManufacturingOrderMaterial::create([
-        'manufacturing_order_id' => $mo->id,
-        'material_id' => $rawMaterial->id,
-        'qty_required' => $materialQty,
-        'qty_used' => 0,
-        'warehouse_id' => $warehouse->id,
-        'uom_id' => $uom->id,
-        'rak_id' => $rak->id,
-    ]);
-
     $initialQty = 100;
     $rawStock = InventoryStock::create([
         'product_id' => $rawMaterial->id,
@@ -171,29 +176,18 @@ test('validate stock deduction', function () {
         'inventory_coa_id' => null,
     ]);
 
+    $plan = createManufacturingTestPlan($finishedGood, $uom, User::factory()->create(['cabang_id' => $branch->id]));
+
     $mo = ManufacturingOrder::create([
         'mo_number' => 'MO-TEST-002',
-        'product_id' => $finishedGood->id,
-        'quantity' => 5,
+        'production_plan_id' => $plan->id,
         'status' => 'in_progress',
         'start_date' => Carbon::now(),
         'end_date' => null,
-        'uom_id' => $uom->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $materialQty = 10;
-    ManufacturingOrderMaterial::create([
-        'manufacturing_order_id' => $mo->id,
-        'material_id' => $rawMaterial->id,
-        'qty_required' => $materialQty,
-        'qty_used' => 0,
-        'warehouse_id' => $warehouse->id,
-        'uom_id' => $uom->id,
-        'rak_id' => $rak->id,
-    ]);
-
     $initialQty = 50;
     $rawStock = InventoryStock::create([
         'product_id' => $rawMaterial->id,
@@ -255,8 +249,8 @@ test('test journal entries (Dr WIP, Cr Raw Material)', function () {
         ['name' => 'Persediaan Bahan Baku', 'type' => 'Asset', 'is_active' => true]
     );
     $wipCoa = ChartOfAccount::firstOrCreate(
-        ['code' => '1140.02'],
-        ['name' => 'Persediaan Barang Dalam Proses', 'type' => 'Asset', 'is_active' => true]
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
     );
 
     $rawCost = 50000.0;
@@ -283,29 +277,18 @@ test('test journal entries (Dr WIP, Cr Raw Material)', function () {
         'inventory_coa_id' => null,
     ]);
 
+    $plan = createManufacturingTestPlan($finishedGood, $uom, User::factory()->create(['cabang_id' => $branch->id]));
+
     $mo = ManufacturingOrder::create([
         'mo_number' => 'MO-TEST-003',
-        'product_id' => $finishedGood->id,
-        'quantity' => 2,
+        'production_plan_id' => $plan->id,
         'status' => 'in_progress',
         'start_date' => Carbon::now(),
         'end_date' => null,
-        'uom_id' => $uom->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $materialQty = 4;
-    ManufacturingOrderMaterial::create([
-        'manufacturing_order_id' => $mo->id,
-        'material_id' => $rawMaterial->id,
-        'qty_required' => $materialQty,
-        'qty_used' => 0,
-        'warehouse_id' => $warehouse->id,
-        'uom_id' => $uom->id,
-        'rak_id' => $rak->id,
-    ]);
-
     $initialQty = 20;
     $rawStock = InventoryStock::create([
         'product_id' => $rawMaterial->id,
@@ -405,29 +388,18 @@ test('handle material returns', function () {
         'inventory_coa_id' => null,
     ]);
 
+    $plan = createManufacturingTestPlan($finishedGood, $uom, User::factory()->create(['cabang_id' => $branch->id]));
+
     $mo = ManufacturingOrder::create([
         'mo_number' => 'MO-TEST-004',
-        'product_id' => $finishedGood->id,
-        'quantity' => 1,
+        'production_plan_id' => $plan->id,
         'status' => 'in_progress',
         'start_date' => Carbon::now(),
         'end_date' => null,
-        'uom_id' => $uom->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $materialQty = 2;
-    ManufacturingOrderMaterial::create([
-        'manufacturing_order_id' => $mo->id,
-        'material_id' => $rawMaterial->id,
-        'qty_required' => $materialQty,
-        'qty_used' => 0,
-        'warehouse_id' => $warehouse->id,
-        'uom_id' => $uom->id,
-        'rak_id' => $rak->id,
-    ]);
-
     $initialQty = 10;
     $rawStock = InventoryStock::create([
         'product_id' => $rawMaterial->id,
@@ -554,29 +526,18 @@ test('material issue with insufficient stock allows negative stock', function ()
         'inventory_coa_id' => null,
     ]);
 
+    $plan = createManufacturingTestPlan($finishedGood, $uom, User::factory()->create(['cabang_id' => $branch->id]));
+
     $mo = ManufacturingOrder::create([
         'mo_number' => 'MO-INSUFF',
-        'product_id' => $finishedGood->id,
-        'quantity' => 10,
+        'production_plan_id' => $plan->id,
         'status' => 'in_progress',
         'start_date' => Carbon::now(),
         'end_date' => null,
-        'uom_id' => $uom->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $materialQty = 20;
-    ManufacturingOrderMaterial::create([
-        'manufacturing_order_id' => $mo->id,
-        'material_id' => $rawMaterial->id,
-        'qty_required' => $materialQty,
-        'qty_used' => 0,
-        'warehouse_id' => $warehouse->id,
-        'uom_id' => $uom->id,
-        'rak_id' => $rak->id,
-    ]);
-
     $initialQty = 5; // Less than materialQty
     $rawStock = InventoryStock::create([
         'product_id' => $rawMaterial->id,

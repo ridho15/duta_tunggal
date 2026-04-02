@@ -33,9 +33,11 @@ use App\Models\Product;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturn;
 use App\Services\PurchaseReturnService;
+use App\Support\ProcurementFailureNotifier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class PurchaseReturnResource extends Resource
 {
@@ -401,18 +403,18 @@ class PurchaseReturnResource extends Resource
                                     ->body('Retur pembelian berhasil diajukan untuk persetujuan.')
                                     ->success()
                                     ->send();
-                            } catch (\Exception $e) {
+                            } catch (Throwable $exception) {
                                 Log::error('PurchaseReturn submit_for_approval failed', [
                                     'purchase_return_id' => $record->id,
                                     'status' => $record->status,
                                     'user_id' => Auth::id(),
-                                    'error' => $e->getMessage(),
+                                    'error' => $exception->getMessage(),
                                 ]);
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Gagal Mengajukan Retur')
-                                    ->body($e->getMessage())
-                                    ->danger()
-                                    ->send();
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Mengajukan Retur',
+                                    $exception,
+                                    'Retur pembelian belum berhasil diajukan. Silakan coba lagi.'
+                                );
                             }
                         }),
                     \Filament\Tables\Actions\Action::make('approve')
@@ -434,19 +436,19 @@ class PurchaseReturnResource extends Resource
                                     ->body('Retur pembelian berhasil disetujui. Jurnal akuntansi dan penyesuaian stok telah diproses.')
                                     ->success()
                                     ->send();
-                            } catch (\Exception $e) {
+                            } catch (Throwable $exception) {
                                 Log::error('PurchaseReturn approve failed', [
                                     'purchase_return_id' => $record->id,
                                     'status' => $record->status,
                                     'user_id' => Auth::id(),
                                     'approval_notes' => $data['approval_notes'] ?? null,
-                                    'error' => $e->getMessage(),
+                                    'error' => $exception->getMessage(),
                                 ]);
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Gagal Menyetujui Retur')
-                                    ->body($e->getMessage())
-                                    ->danger()
-                                    ->send();
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Menyetujui Retur',
+                                    $exception,
+                                    'Retur pembelian belum dapat disetujui. Silakan coba lagi.'
+                                );
                             }
                         }),
                     \Filament\Tables\Actions\Action::make('reject')
@@ -468,19 +470,19 @@ class PurchaseReturnResource extends Resource
                                     ->body('Retur pembelian telah ditolak.')
                                     ->danger()
                                     ->send();
-                            } catch (\Exception $e) {
+                            } catch (Throwable $exception) {
                                 Log::error('PurchaseReturn reject failed', [
                                     'purchase_return_id' => $record->id,
                                     'status' => $record->status,
                                     'user_id' => Auth::id(),
                                     'rejection_notes' => $data['rejection_notes'] ?? null,
-                                    'error' => $e->getMessage(),
+                                    'error' => $exception->getMessage(),
                                 ]);
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Gagal Menolak Retur')
-                                    ->body($e->getMessage())
-                                    ->danger()
-                                    ->send();
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Menolak Retur',
+                                    $exception,
+                                    'Retur pembelian belum dapat ditolak. Silakan coba lagi.'
+                                );
                             }
                         }),
                     DeleteAction::make()

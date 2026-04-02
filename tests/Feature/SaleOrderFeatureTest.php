@@ -477,7 +477,7 @@ test('sales order approval workflow works correctly', function () {
     expect($result)->toBeTrue();
 
     $salesOrder->refresh();
-    expect($salesOrder->status)->toBe('confirmed')
+    expect($salesOrder->status)->toBe('approved')
         ->and($salesOrder->approve_by)->toBe($user->id)
         ->and($salesOrder->approve_at)->toBeInstanceOf(Carbon::class);
 

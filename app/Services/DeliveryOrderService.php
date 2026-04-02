@@ -8,6 +8,7 @@ use App\Models\JournalEntry;
 use App\Models\ChartOfAccount;
 use App\Models\StockReservation;
 use App\Models\InventoryStock;
+use App\Models\WarehouseConfirmation;
 use App\Services\ProductService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +64,85 @@ class DeliveryOrderService
     }
 
     public function updateQuantity() {}
+
+    public function createWarehouseConfirmationsForDeliveryOrder(DeliveryOrder $deliveryOrder): array
+    {
+        $deliveryOrder->loadMissing('deliveryOrderItem.warehouseSources', 'deliveryOrderItem.product');
+
+        $confirmations = [];
+
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            $sources = $item->warehouseSources;
+
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+
+                    if (! $source->warehouse_id || $sourceQty <= 0) {
+                        continue;
+                    }
+
+                    $confirmations[] = $this->createSingleWarehouseConfirmationForDeliveryOrder(
+                        deliveryOrder: $deliveryOrder,
+                        item: $item,
+                        warehouseId: (int) $source->warehouse_id,
+                        quantity: $sourceQty,
+                        rakId: $source->rak_id,
+                    );
+                }
+
+                continue;
+            }
+
+            $quantity = max(0, (float) ($item->quantity ?? 0));
+            if (! $deliveryOrder->warehouse_id || $quantity <= 0) {
+                continue;
+            }
+
+            $confirmations[] = $this->createSingleWarehouseConfirmationForDeliveryOrder(
+                deliveryOrder: $deliveryOrder,
+                item: $item,
+                warehouseId: (int) $deliveryOrder->warehouse_id,
+                quantity: $quantity,
+                rakId: $item->rak_id,
+            );
+        }
+
+        return array_values(array_filter($confirmations));
+    }
+
+    protected function createSingleWarehouseConfirmationForDeliveryOrder(
+        DeliveryOrder $deliveryOrder,
+        $item,
+        int $warehouseId,
+        float $quantity,
+        $rakId = null,
+    ): WarehouseConfirmation {
+        $warehouseConfirmation = WarehouseConfirmation::create([
+            'confirmable_type' => DeliveryOrder::class,
+            'confirmable_id' => $deliveryOrder->id,
+            'confirmation_type' => 'delivery_order',
+            'status' => 'request',
+            'note' => sprintf(
+                'Auto-created dari DO %s | SO Item #%s | Gudang #%s',
+                $deliveryOrder->do_number,
+                $item->sale_order_item_id ?? '-',
+                $warehouseId,
+            ),
+        ]);
+
+        $warehouseConfirmation->warehouseConfirmationItems()->create([
+            'sale_order_item_id' => $item->sale_order_item_id,
+            'product_name' => $item->product->name ?? '-',
+            'requested_qty' => $quantity,
+            'confirmed_qty' => $quantity,
+            'warehouse_id' => $warehouseId,
+            'rak_id' => $rakId,
+            'status' => 'request',
+        ]);
+
+        return $warehouseConfirmation;
+    }
 
     public function generateDoNumber()
     {

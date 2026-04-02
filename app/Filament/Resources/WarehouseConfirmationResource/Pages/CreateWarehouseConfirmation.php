@@ -47,9 +47,7 @@ class CreateWarehouseConfirmation extends CreateRecord
                 'confirmable_id'    => $data['mo_id_virtual'] ?? null,
                 'confirmation_type' => 'manufacturing_order',
                 'note'              => $data['note'] ?? null,
-                'status'            => 'confirmed',
-                'confirmed_by'      => \Illuminate\Support\Facades\Auth::id(),
-                'confirmed_at'      => now(),
+                'status'            => 'request',
             ];
         } else {
             // delivery_order

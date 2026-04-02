@@ -4,6 +4,7 @@
             <h1 class="text-2xl font-bold">Laporan Inventori</h1>
             <div class="flex space-x-2">
                 <x-filament::button wire:click="exportExcel" color="success">Export Excel</x-filament::button>
+                <x-filament::button wire:click="exportPdf" color="gray">Export PDF</x-filament::button>
             </div>
         </div>
 
@@ -28,14 +29,16 @@
 
         <!-- Filters -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="filament-forms-field-wrapper" x-show="show_movement_history || show_aging_stock">
-                <label class="filament-forms-field-wrapper-label">Tanggal Mulai</label>
-                <input wire:model.live="start_date" type="date" class="filament-forms-input">
-            </div>
-            <div class="filament-forms-field-wrapper" x-show="show_movement_history || show_aging_stock">
-                <label class="filament-forms-field-wrapper-label">Tanggal Akhir</label>
-                <input wire:model.live="end_date" type="date" class="filament-forms-input">
-            </div>
+            @if($show_movement_history || $show_aging_stock)
+                <div class="filament-forms-field-wrapper">
+                    <label class="filament-forms-field-wrapper-label">Tanggal Mulai</label>
+                    <input wire:model.live="start_date" type="date" class="filament-forms-input">
+                </div>
+                <div class="filament-forms-field-wrapper">
+                    <label class="filament-forms-field-wrapper-label">Tanggal Akhir</label>
+                    <input wire:model.live="end_date" type="date" class="filament-forms-input">
+                </div>
+            @endif
             <div class="filament-forms-field-wrapper">
                 <label class="filament-forms-field-wrapper-label">Gudang</label>
                 <select wire:model.live="warehouse_id" class="filament-forms-select">

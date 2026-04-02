@@ -9,7 +9,6 @@ use App\Models\ProductionPlan;
 use App\Models\SaleOrder;
 use App\Models\BillOfMaterial;
 use App\Models\Warehouse;
-use App\Models\ManufacturingOrderMaterial;
 use App\Services\ProductionPlanService;
 use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Forms\Components\Checkbox;
@@ -57,6 +56,12 @@ class ProductionPlanResource extends Resource
             ->schema([
                 Fieldset::make('Informasi Rencana Produksi')
                     ->schema([
+                        Placeholder::make('status_info')
+                            ->label('Status')
+                            ->content(function ($record) {
+                                return $record ? Str::upper($record->status) : 'DRAFT';
+                            })
+                            ->visible(fn($record) => $record !== null),
                         TextInput::make('plan_number')
                             ->label('Nomor Rencana')
                             ->required()
@@ -96,17 +101,17 @@ class ProductionPlanResource extends Resource
                                     return Cabang::query()
                                         ->where('id', $user?->cabang_id)
                                         ->get()
-                                        ->mapWithKeys(fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                        ->mapWithKeys(fn(Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
                                         ->toArray();
                                 }
 
                                 return Cabang::query()
                                     ->get()
-                                    ->mapWithKeys(fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                    ->mapWithKeys(fn(Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
                                     ->toArray();
                             })
-                            ->default(fn () => Auth::user()?->cabang_id)
-                            ->disabled(fn () => !in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => Auth::user()?->cabang_id)
+                            ->disabled(fn() => !in_array('all', Auth::user()?->manage_type ?? []))
                             ->dehydrated(true)
                             ->required()
                             ->searchable()
@@ -332,8 +337,8 @@ class ProductionPlanResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', true)
                                     ->where(function ($q) use ($search) {
-                                                                                $q->where('name', 'like', "%{$search}%")
-                                          ->orWhere('kode', 'like', "%{$search}%");
+                                        $q->where('name', 'like', "%{$search}%")
+                                            ->orWhere('kode', 'like', "%{$search}%");
                                     });
 
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
@@ -382,12 +387,7 @@ class ProductionPlanResource extends Resource
                             ->disabled(fn($record) => $record && $record->status !== 'draft'),
                     ]),
 
-                Placeholder::make('status_info')
-                    ->label('Status')
-                    ->content(function ($record) {
-                        return $record ? Str::upper($record->status) : 'DRAFT';
-                    })
-                    ->visible(fn($record) => $record !== null),
+
             ]);
     }
 
@@ -744,44 +744,27 @@ class ProductionPlanResource extends Resource
                                 $defaultWarehouseId = 1; // Default to Gudang Utama
                             }
 
+                            $moItems = [];
+                            if ($record->billOfMaterial) {
+                                foreach ($record->billOfMaterial->items as $item) {
+                                    $moItems[] = [
+                                        'product_id' => $item->product_id,
+                                        'uom_id' => $item->uom_id,
+                                        'quantity' => $item->quantity * $record->quantity,
+                                        'notes' => $item->note,
+                                    ];
+                                }
+                            }
+
                             $mo = \App\Models\ManufacturingOrder::create([
                                 'mo_number' => $manufacturingService->generateMoNumber(),
                                 'production_plan_id' => $record->id,
-                                'product_id' => $record->product_id,
-                                'quantity' => $record->quantity,
                                 'status' => 'draft',
                                 'start_date' => $record->start_date,
                                 'end_date' => $record->end_date,
-                                'uom_id' => $record->uom_id,
-                                'warehouse_id' => $defaultWarehouseId,
-                                'rak_id' => null,
+                                'items' => $moItems,
                                 'cabang_id' => $inheritedCabangId,
                             ]);
-
-                            // Create MO materials from BOM if applicable
-                            if ($record->billOfMaterial) {
-                                foreach ($record->billOfMaterial->items as $item) {
-                                    // Find warehouse that has stock for this specific material
-                                    $materialWarehouseQuery = \App\Models\InventoryStock::where('product_id', $item->product_id)
-                                        ->where('qty_available', '>', 0);
-                                    if (!empty($inheritedCabangId)) {
-                                        $materialWarehouseQuery->whereHas('warehouse', function ($q) use ($inheritedCabangId) {
-                                            $q->where('cabang_id', $inheritedCabangId);
-                                        });
-                                    }
-                                    $materialWarehouse = $materialWarehouseQuery->first();
-
-                                    ManufacturingOrderMaterial::create([
-                                        'manufacturing_order_id' => $mo->id,
-                                        'material_id' => $item->product_id,
-                                        'qty_required' => $item->quantity * $record->quantity,
-                                        'qty_used' => 0,
-                                        'uom_id' => $item->uom_id,
-                                        'warehouse_id' => $materialWarehouse ? $materialWarehouse->warehouse_id : $defaultWarehouseId,
-                                        'rak_id' => null,
-                                    ]);
-                                }
-                            }
 
                             $warningMessage = '';
                             if (!$canStart) {
@@ -806,20 +789,20 @@ class ProductionPlanResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Rencana Produksi (Production Plan)</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Production Plan adalah rencana produksi yang dibuat berdasarkan pesanan penjualan atau secara manual untuk mengatur jadwal dan jumlah produksi.</li>' .
-                            '<li><strong>Sumber:</strong> <em>Sale Order</em> (dari pesanan penjualan) atau <em>Manual</em> (dibuat langsung untuk keperluan internal).</li>' .
-                            '<li><strong>Komponen Utama:</strong> <em>Bill of Material (BOM)</em> (daftar bahan baku), <em>Quantity</em> (jumlah produksi), <em>Schedule</em> (jadwal produksi), <em>Warehouse</em> (gudang tujuan).</li>' .
-                            '<li><strong>Status Flow:</strong> Draft → Scheduled → In Progress → Completed. Status otomatis berubah berdasarkan progress Manufacturing Order.</li>' .
-                            '<li><strong>Validasi:</strong> <em>BOM Validation</em> - memastikan BOM tersedia dan valid. <em>Stock Check</em> - verifikasi ketersediaan bahan baku. <em>Schedule Validation</em> - mencegah konflik jadwal.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Sale Order</em> (sumber pesanan), <em>Bill of Material</em> (resep produksi), <em>Manufacturing Order</em> (pelaksanaan produksi), dan <em>Material Issue</em> (pengambilan bahan).</li>' .
-                            '<li><strong>Actions:</strong> <em>Create Manufacturing Order</em> (membuat MO dari plan), <em>Schedule</em> (atur jadwal produksi), <em>Cancel</em> (batalkan plan), <em>View Progress</em> (lihat progress produksi).</li>' .
-                            '<li><strong>Permissions:</strong> <em>view any production plan</em>, <em>create production plan</em>, <em>update production plan</em>, <em>delete production plan</em>, <em>restore production plan</em>, <em>force-delete production plan</em>.</li>' .
-                            '<li><strong>Auto-Generation:</strong> Nomor plan otomatis dibuat dengan format PP-YYYYMMDD-XXX. Manufacturing Order dan Material Issue dapat dibuat otomatis dari plan ini.</li>' .
-                            '<li><strong>Reporting:</strong> Tracking progress produksi real-time, cost calculation otomatis, dan integration dengan inventory management.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Production Plan adalah rencana produksi yang dibuat berdasarkan pesanan penjualan atau secara manual untuk mengatur jadwal dan jumlah produksi.</li>' .
+                    '<li><strong>Sumber:</strong> <em>Sale Order</em> (dari pesanan penjualan) atau <em>Manual</em> (dibuat langsung untuk keperluan internal).</li>' .
+                    '<li><strong>Komponen Utama:</strong> <em>Bill of Material (BOM)</em> (daftar bahan baku), <em>Quantity</em> (jumlah produksi), <em>Schedule</em> (jadwal produksi), <em>Warehouse</em> (gudang tujuan).</li>' .
+                    '<li><strong>Status Flow:</strong> Draft → Scheduled → In Progress → Completed. Status otomatis berubah berdasarkan progress Manufacturing Order.</li>' .
+                    '<li><strong>Validasi:</strong> <em>BOM Validation</em> - memastikan BOM tersedia dan valid. <em>Stock Check</em> - verifikasi ketersediaan bahan baku. <em>Schedule Validation</em> - mencegah konflik jadwal.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan <em>Sale Order</em> (sumber pesanan), <em>Bill of Material</em> (resep produksi), <em>Manufacturing Order</em> (pelaksanaan produksi), dan <em>Material Issue</em> (pengambilan bahan).</li>' .
+                    '<li><strong>Actions:</strong> <em>Create Manufacturing Order</em> (membuat MO dari plan), <em>Schedule</em> (atur jadwal produksi), <em>Cancel</em> (batalkan plan), <em>View Progress</em> (lihat progress produksi).</li>' .
+                    '<li><strong>Permissions:</strong> <em>view any production plan</em>, <em>create production plan</em>, <em>update production plan</em>, <em>delete production plan</em>, <em>restore production plan</em>, <em>force-delete production plan</em>.</li>' .
+                    '<li><strong>Auto-Generation:</strong> Nomor plan otomatis dibuat dengan format PP-YYYYMMDD-XXX. Manufacturing Order dan Material Issue dapat dibuat otomatis dari plan ini.</li>' .
+                    '<li><strong>Reporting:</strong> Tracking progress produksi real-time, cost calculation otomatis, dan integration dengan inventory management.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 
@@ -864,6 +847,22 @@ class ProductionPlanResource extends Resource
             'view' => Pages\ViewProductionPlan::route('/{record}'),
             'edit' => Pages\EditProductionPlan::route('/{record}/edit'),
         ];
+    }
+
+    protected static function resolveProductionPlan(?int $productionPlanId): ?ProductionPlan
+    {
+        if (! $productionPlanId) {
+            return null;
+        }
+
+        return ProductionPlan::query()
+            ->with([
+                'product.uom',
+                'saleOrder',
+                'warehouse',
+                'billOfMaterial.items.product',
+            ])
+            ->find($productionPlanId);
     }
 
     /**

@@ -5,7 +5,6 @@ namespace App\Observers;
 use App\Models\MaterialIssue;
 use App\Models\ManufacturingOrder;
 use App\Models\MaterialIssueItem;
-use App\Models\ManufacturingOrderMaterial;
 use App\Services\ManufacturingJournalService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;

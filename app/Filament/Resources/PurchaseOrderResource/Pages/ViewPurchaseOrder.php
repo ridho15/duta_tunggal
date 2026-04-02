@@ -240,7 +240,7 @@ class ViewPurchaseOrder extends ViewRecord
                     $record->load(['assets.assetCoa', 'assets.accumulatedDepreciationCoa', 'assets.depreciationExpenseCoa']);
                     $pdf = Pdf::loadView('pdf.purchase-order', [
                         'purchaseOrder' => $record
-                    ])->setPaper('A4', 'potrait');
+                    ])->setPaper('A4', 'portrait');
 
                     return response()->streamDownload(function () use ($pdf) {
                         echo $pdf->stream();

@@ -8,6 +8,7 @@ use App\Models\VoucherRequest;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Services\VoucherRequestService;
+use App\Support\ProcurementFailureNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Filament\Forms;
@@ -21,6 +22,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class VoucherRequestResource extends Resource
 {
@@ -401,12 +403,12 @@ class VoucherRequestResource extends Resource
                                 ->title('Berhasil')
                                 ->body('Voucher berhasil diajukan untuk persetujuan' . ($notifyOwner ? ' dan notifikasi dikirim ke Owner' : ''))
                                 ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('Gagal')
-                                ->body($e->getMessage())
-                                ->send();
+                        } catch (Throwable $exception) {
+                            ProcurementFailureNotifier::danger(
+                                'Gagal Mengajukan Voucher',
+                                $exception,
+                                'Voucher request belum dapat diajukan. Silakan periksa data voucher lalu coba lagi.'
+                            );
                         }
                     }),
 
@@ -494,12 +496,12 @@ class VoucherRequestResource extends Resource
                                 ->title('Berhasil')
                                 ->body('Voucher berhasil disetujui')
                                 ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('Gagal')
-                                ->body($e->getMessage())
-                                ->send();
+                        } catch (Throwable $exception) {
+                            ProcurementFailureNotifier::danger(
+                                'Gagal Menyetujui Voucher',
+                                $exception,
+                                'Voucher request belum dapat disetujui. Silakan periksa data voucher lalu coba lagi.'
+                            );
                         }
                     }),
 
@@ -524,12 +526,12 @@ class VoucherRequestResource extends Resource
                                 ->title('Berhasil')
                                 ->body('Voucher berhasil ditolak')
                                 ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('Gagal')
-                                ->body($e->getMessage())
-                                ->send();
+                        } catch (Throwable $exception) {
+                            ProcurementFailureNotifier::danger(
+                                'Gagal Menolak Voucher',
+                                $exception,
+                                'Voucher request belum dapat ditolak. Silakan periksa data voucher lalu coba lagi.'
+                            );
                         }
                     }),
 

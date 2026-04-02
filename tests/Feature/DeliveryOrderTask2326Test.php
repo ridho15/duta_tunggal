@@ -16,6 +16,7 @@ use App\Models\Vehicle;
 use App\Models\Warehouse;
 use App\Services\DeliveryOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -97,7 +98,7 @@ class DeliveryOrderTask2326Test extends TestCase
 
     // ─── Task 23 ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function task23_do_status_becomes_sent_only_when_sj_terbit_action_is_triggered(): void
     {
         $do = DeliveryOrder::create([
@@ -130,7 +131,7 @@ class DeliveryOrderTask2326Test extends TestCase
         $this->assertDatabaseHas('surat_jalans',    ['id' => $sj->id, 'status' => 1]);
     }
 
-    /** @test */
+    #[Test]
     public function task23_do_resource_has_no_standalone_mark_as_sent_action(): void
     {
         // Parse the resource actions - ensure 'sent' action handle isn't present
@@ -161,7 +162,7 @@ class DeliveryOrderTask2326Test extends TestCase
 
     // ─── Task 24 ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function task24_do_approve_action_is_labeled_konfirmasi_dana_diterima(): void
     {
         $resourceSource = file_get_contents(
@@ -174,7 +175,7 @@ class DeliveryOrderTask2326Test extends TestCase
             'DO resource should contain modal heading "Apakah Dana Sudah Diterima?"');
     }
 
-    /** @test */
+    #[Test]
     public function task24_do_transitions_to_approved_via_service_when_dana_confirmed(): void
     {
         // Setup a SuratJalan so the approve action visibility check passes
@@ -207,7 +208,7 @@ class DeliveryOrderTask2326Test extends TestCase
 
     // ─── Task 25 ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function task25_do_resource_table_has_do_number_customer_date_status_as_primary_columns(): void
     {
         $resourceSource = file_get_contents(
@@ -231,7 +232,7 @@ class DeliveryOrderTask2326Test extends TestCase
         $this->assertLessThan($statusPos, $datePos,   'delivery_date must appear before status');
     }
 
-    /** @test */
+    #[Test]
     public function task25_do_can_be_queried_with_relevant_fields(): void
     {
         $do = DeliveryOrder::create([
@@ -259,7 +260,7 @@ class DeliveryOrderTask2326Test extends TestCase
 
     // ─── Task 26 ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function task26_surat_jalan_stores_sender_name_and_shipping_method(): void
     {
         $sj = SuratJalan::create([
@@ -278,7 +279,7 @@ class DeliveryOrderTask2326Test extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function task26_sj_resource_table_shows_sender_name_and_shipping_method_columns(): void
     {
         $resourceSource = file_get_contents(
@@ -299,7 +300,7 @@ class DeliveryOrderTask2326Test extends TestCase
         $this->assertNotFalse($methodPos,  'shipping_method column must be in table()');
     }
 
-    /** @test */
+    #[Test]
     public function task26_surat_jalan_allows_all_shipping_method_values(): void
     {
         $methods = ['Ekspedisi', 'Kurir Internal', 'Ambil Sendiri', 'Lainnya'];

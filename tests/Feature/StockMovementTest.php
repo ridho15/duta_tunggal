@@ -8,6 +8,7 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class StockMovementTest extends TestCase
@@ -40,7 +41,7 @@ class StockMovementTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_track_inbound_stock_movement()
     {
         $quantity = 100;
@@ -68,7 +69,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals($unitCost, $movement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_track_outbound_stock_movement()
     {
         $quantity = -50; // Negative for outbound
@@ -96,7 +97,7 @@ class StockMovementTest extends TestCase
         $this->assertTrue($movement->quantity < 0); // Outbound should be negative
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_movement_types()
     {
         $validTypes = ['purchase_in', 'sales', 'transfer_in', 'transfer_out', 'manufacture_in', 'manufacture_out', 'adjustment_in', 'adjustment_out'];
@@ -112,7 +113,7 @@ class StockMovementTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_fifo_costing_correctly()
     {
         // First purchase at lower cost
@@ -148,7 +149,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(50000, $saleMovement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_lifo_costing_correctly()
     {
         // First purchase at lower cost
@@ -184,7 +185,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(60000, $saleMovement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_average_costing_correctly()
     {
         // First purchase
@@ -222,7 +223,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals($averageCost, $saleMovement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_stock_valuation_correctly()
     {
         // Multiple purchases
@@ -267,7 +268,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(6250000, $remainingValue);
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_stock_transfers_between_warehouses()
     {
         $warehouse2 = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
@@ -304,7 +305,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(25, $warehouse2Stock);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_stock_adjustments()
     {
         // Initial stock
@@ -335,7 +336,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(95, $currentStock);
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_production_movements()
     {
         // Raw material consumption
@@ -376,7 +377,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(5, $finishedGoodsStock);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_return_movements()
     {
         // Initial sale
@@ -408,7 +409,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(-15, $currentStock); // -20 + 5 = -15
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_stock_movement_report()
     {
         // Create various movements

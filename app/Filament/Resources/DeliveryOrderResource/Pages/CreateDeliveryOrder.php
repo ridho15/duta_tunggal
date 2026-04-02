@@ -338,70 +338,27 @@ class CreateDeliveryOrder extends CreateRecord
             $deliveryOrder->salesOrders()->sync($this->processedSalesOrderIds);
         }
 
-        // Auto-create one WC per warehouse based on DO items' warehouse sources
-        $deliveryOrder->load('deliveryOrderItem.warehouseSources', 'deliveryOrderItem.product');
+        $warehouseConfirmations = app(\App\Services\DeliveryOrderService::class)
+            ->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder);
 
-        $groupedItemsByWarehouse = [];
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            $sources = $item->warehouseSources;
-            if ($sources->isNotEmpty()) {
-                foreach ($sources as $source) {
-                    if (empty($source->warehouse_id) || (float)($source->quantity ?? 0) <= 0) {
-                        continue;
-                    }
-                    $groupedItemsByWarehouse[$source->warehouse_id][] = [
-                        'sale_order_item_id' => $item->sale_order_item_id,
-                        'product_name'       => $item->product->name ?? '-',
-                        'requested_qty'      => (float)$source->quantity,
-                        'confirmed_qty'      => (float)$source->quantity,
-                        'warehouse_id'       => $source->warehouse_id,
-                        'rak_id'             => $source->rak_id,
-                        'status'             => 'request',
-                    ];
-                }
-            } else {
-                // Fallback: no warehouse sources — use DO-level warehouse_id
-                $fallbackWarehouseId = $deliveryOrder->warehouse_id;
-                if (empty($fallbackWarehouseId) || (float)($item->quantity ?? 0) <= 0) {
-                    continue;
-                }
-                $groupedItemsByWarehouse[$fallbackWarehouseId][] = [
-                    'sale_order_item_id' => $item->sale_order_item_id,
-                    'product_name'       => $item->product->name ?? '-',
-                    'requested_qty'      => (float)$item->quantity,
-                    'confirmed_qty'      => (float)$item->quantity,
-                    'warehouse_id'       => $fallbackWarehouseId,
-                    'rak_id'             => $item->rak_id,
-                    'status'             => 'request',
-                ];
-            }
-        }
-
-        if (!empty($groupedItemsByWarehouse)) {
-            foreach ($groupedItemsByWarehouse as $warehouseId => $items) {
-                $wc = \App\Models\WarehouseConfirmation::create([
-                    'confirmable_type'  => \App\Models\DeliveryOrder::class,
-                    'confirmable_id'    => $deliveryOrder->id,
-                    'confirmation_type' => 'delivery_order',
-                    'status'            => 'request',
-                    'note'              => 'Auto-created dari DO ' . $deliveryOrder->do_number . ' (Gudang #' . $warehouseId . ')',
-                ]);
-                foreach ($items as $itemData) {
-                    $wc->warehouseConfirmationItems()->create($itemData);
-                }
-            }
+        if (! empty($warehouseConfirmations)) {
+            $warehouseCount = collect($warehouseConfirmations)
+                ->map(fn ($warehouseConfirmation) => $warehouseConfirmation->warehouseConfirmationItems->first()?->warehouse_id)
+                ->filter()
+                ->unique()
+                ->count();
 
             // Advance DO status to request_stock (waiting for warehouse confirmations)
             app(\App\Services\DeliveryOrderService::class)->updateStatus(
                 deliveryOrder: $deliveryOrder,
                 status: 'request_stock',
-                comments: 'WC otomatis dibuat untuk ' . count($groupedItemsByWarehouse) . ' gudang.',
+                comments: 'WC otomatis dibuat per item request untuk ' . count($warehouseConfirmations) . ' request dari ' . $warehouseCount . ' gudang.',
             );
 
             \Filament\Notifications\Notification::make()
                 ->title('Delivery Order Dibuat')
                 ->success()
-                ->body('WC otomatis dikirim ke ' . count($groupedItemsByWarehouse) . ' gudang. Status: Request Stock.')
+                ->body('WC otomatis dibuat per item request untuk ' . count($warehouseConfirmations) . ' request dari ' . $warehouseCount . ' gudang. Status: Request Stock.')
                 ->send();
         }
     }

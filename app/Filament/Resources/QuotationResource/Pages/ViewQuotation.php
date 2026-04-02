@@ -270,7 +270,6 @@ class ViewQuotation extends ViewRecord
                                                 );
                                             })
                                             ->helperText('Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini.')
-                                            ->required()
                                             ->validationMessages([
                                                 'required' => 'Gudang wajib dipilih'
                                             ])

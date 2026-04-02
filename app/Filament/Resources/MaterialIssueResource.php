@@ -10,6 +10,7 @@ use App\Models\MaterialIssue;
 use App\Models\Product;
 use App\Services\ManufacturingService;
 use App\Services\ManufacturingJournalService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Components\Actions\Action as FormAction;
@@ -21,6 +22,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class MaterialIssueResource extends Resource
 {
@@ -113,13 +115,14 @@ class MaterialIssueResource extends Resource
                                     if ($productionPlan && $productionPlan->billOfMaterial) {
                                         $items = [];
                                         foreach ($productionPlan->billOfMaterial->items as $bomItem) {
+                                            $warehouseId = self::resolveWarehouseIdForProduct($bomItem->product_id, $productionPlan->warehouse_id);
                                             $items[] = [
                                                 'product_id' => $bomItem->product_id,
                                                 'uom_id' => $bomItem->uom_id,
                                                 'quantity' => $bomItem->quantity * $productionPlan->quantity,
                                                 'cost_per_unit' => $bomItem->product->cost_price ?? 0,
                                                 'total_cost' => ($bomItem->quantity * $productionPlan->quantity) * ($bomItem->product->cost_price ?? 0),
-                                                'warehouse_id' => $productionPlan->warehouse_id, // Auto-fill from ProductionPlan
+                                                'warehouse_id' => $warehouseId,
                                                 'rak_id' => null,
                                                 'notes' => null,
                                             ];
@@ -322,8 +325,7 @@ class MaterialIssueResource extends Resource
                                     ]),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
-                                    ->relationship('warehouse', 'name')
-                                    ->searchable('kode', 'name')
+                                    ->searchable()
                                     ->reactive()
                                     ->nullable()
                                     ->required()
@@ -334,28 +336,16 @@ class MaterialIssueResource extends Resource
                                     ])
                                     ->default(null)
                                     ->options(function (callable $get) {
-                                        $productId = $get('product_id');
-                                        if ($productId) {
-                                            return \App\Models\Warehouse::whereHas('inventoryStock', function ($q) use ($productId) {
-                                                $q->where('product_id', $productId)->whereRaw('qty_available > 0');
-                                            })
-                                                ->orderBy('kode')
-                                                ->limit(50)
-                                                ->get()
-                                                ->mapWithKeys(function ($warehouse) {
-                                                    return [$warehouse->id => $warehouse->kode . ' - ' . $warehouse->name];
-                                                })
-                                                ->toArray();
-                                        }
-                                        return [];
+                                        return self::resolveWarehouseOptionsForProduct($get('product_id'));
                                     })
-                                    ->getOptionLabelFromRecordUsing(
-                                        fn(\App\Models\Warehouse $record): string =>
-                                        $record->kode . ' - ' . $record->name
-                                    )
+                                    ->getSearchResultsUsing(function (string $search, callable $get) {
+                                        return self::resolveWarehouseOptionsForProduct($get('product_id'), $search);
+                                    })
+                                    ->getOptionLabelUsing(fn ($value): ?string => self::resolveWarehouseLabel(is_numeric($value) ? (int) $value : null))
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $productId = $get('product_id');
                                         $warehouseId = $state;
+
                                         if ($productId && $warehouseId) {
                                             $stockMetrics = self::getStockMetrics($productId, $warehouseId);
                                             $set('available_stock_display', number_format($stockMetrics['available'], 2, '.', ''));
@@ -376,7 +366,6 @@ class MaterialIssueResource extends Resource
                                         $warehouseId = $get('warehouse_id');
 
                                         if ($productId && $warehouseId) {
-                                            // Get racks that have inventory stock for this product in this warehouse
                                             return \App\Models\Rak::whereHas('inventoryStock', function ($q) use ($productId, $warehouseId) {
                                                 $q->where('product_id', $productId)
                                                     ->where('warehouse_id', $warehouseId)
@@ -391,7 +380,6 @@ class MaterialIssueResource extends Resource
                                         }
 
                                         if ($warehouseId) {
-                                            // If no product selected, show all racks in the warehouse
                                             return \App\Models\Rak::where('warehouse_id', $warehouseId)
                                                 ->orderBy('name')
                                                 ->get()
@@ -428,10 +416,11 @@ class MaterialIssueResource extends Resource
                                         if ($get('product_id') && $get('warehouse_id')) {
                                             if ($stockMetrics['available'] >= $quantity) {
                                                 return ['class' => 'text-green-600 font-semibold'];
-                                            } else {
-                                                return ['class' => 'text-red-600 font-semibold'];
                                             }
+
+                                            return ['class' => 'text-red-600 font-semibold'];
                                         }
+
                                         return ['class' => 'text-gray-500'];
                                     }),
                                 Forms\Components\TextInput::make('reserved_stock_display')
@@ -654,23 +643,16 @@ class MaterialIssueResource extends Resource
                     Tables\Actions\ViewAction::make()->color('primary'),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\Action::make('request_approval')
-                        ->label('Request Approval')
+                        ->label(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation() ? 'Request Konfirmasi Gudang' : 'Request Approval')
                         ->icon('heroicon-o-paper-airplane')
                         ->color('warning')
                         ->visible(fn(MaterialIssue $record) => $record->isDraft() && !$record->approved_by)
                         ->requiresConfirmation()
-                        ->modalHeading('Request Approval Material Issue')
-                        ->modalDescription('Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
+                        ->modalHeading(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation() ? 'Request Konfirmasi Gudang' : 'Request Approval Material Issue')
+                        ->modalDescription(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation()
+                            ? 'Konfirmasi gudang per item bahan akan dibuat atau diperbarui. Material Issue akan otomatis di-approve hanya jika semua item disetujui dan akan ditolak jika ada item yang ditolak.'
+                            : 'Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
                         ->action(function (MaterialIssue $record) {
-                            if ($message = $record->warehouseConfirmationBlockingMessage()) {
-                                Notification::make()
-                                    ->title('Konfirmasi Gudang Diperlukan')
-                                    ->body($message)
-                                    ->warning()
-                                    ->send();
-                                return;
-                            }
-
                             // Validate stock before request approval
                             $stockValidation = static::validateStockAvailability($record);
                             if (!$stockValidation['valid']) {
@@ -682,6 +664,44 @@ class MaterialIssueResource extends Resource
                                     ->send();
                                 return;
                             }
+
+                            if ($record->requiresWarehouseConfirmation()) {
+                                $warehouseConfirmation = $record->ensureWarehouseConfirmationRequest();
+
+                                if (! $warehouseConfirmation) {
+                                    Notification::make()
+                                        ->title('Konfirmasi Gudang Gagal Dibuat')
+                                        ->body('Manufacturing Order terkait tidak ditemukan sehingga konfirmasi gudang tidak dapat dibuat.')
+                                        ->danger()
+                                        ->send();
+                                    return;
+                                }
+
+                                if ($record->hasConfirmedWarehouseConfirmation()) {
+                                    $record->approveFromWarehouseConfirmation($record->latestWarehouseConfirmation() ?? $warehouseConfirmation);
+
+                                    Notification::make()
+                                        ->title('Material Issue Di-approve Otomatis')
+                                        ->body("Material Issue {$record->issue_number} langsung di-approve karena konfirmasi gudang sudah confirmed.")
+                                        ->success()
+                                        ->send();
+                                    return;
+                                }
+
+                                $record->update([
+                                    'approved_by' => null,
+                                    'approved_at' => null,
+                                    'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+                                ]);
+
+                                Notification::make()
+                                    ->title('Request Konfirmasi Gudang Terkirim')
+                                    ->body("Konfirmasi gudang per item untuk Material Issue {$record->issue_number} telah dibuat atau diperbarui. Material Issue akan otomatis di-approve jika semua item disetujui atau ditolak jika ada item yang ditolak.")
+                                    ->success()
+                                    ->send();
+                                return;
+                            }
+
                             // Super Admin bisa approve dari semua cabang, user lain harus di cabang yang sama
                             $currentUser = \Illuminate\Support\Facades\Auth::user();
                             if ($currentUser && $currentUser->hasRole('Super Admin')) {
@@ -731,6 +751,8 @@ class MaterialIssueResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->visible(function (MaterialIssue $record) {
+                            if ($record->requiresWarehouseConfirmation()) return false;
+
                             $currentUser = \Illuminate\Support\Facades\Auth::user();
                             if (!$currentUser) return false;
 
@@ -786,6 +808,8 @@ class MaterialIssueResource extends Resource
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->visible(function (MaterialIssue $record) {
+                            if ($record->requiresWarehouseConfirmation()) return false;
+
                             $currentUser = \Illuminate\Support\Facades\Auth::user();
                             if (!$currentUser) return false;
 
@@ -892,12 +916,12 @@ class MaterialIssueResource extends Resource
                                     ->title('Jurnal Berhasil Dibuat')
                                     ->success()
                                     ->send();
-                            } catch (\Exception $e) {
-                                Notification::make()
-                                    ->title('Gagal Membuat Jurnal')
-                                    ->body($e->getMessage())
-                                    ->danger()
-                                    ->send();
+                            } catch (Throwable $exception) {
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Membuat Jurnal',
+                                    $exception,
+                                    'Jurnal material issue belum dapat dibuat. Periksa data dokumen lalu coba lagi.'
+                                );
                             }
                         }),
                     Tables\Actions\DeleteAction::make(),
@@ -960,6 +984,80 @@ class MaterialIssueResource extends Resource
             'view' => Pages\ViewMaterialIssue::route('/{record}'),
             'edit' => Pages\EditMaterialIssue::route('/{record}/edit'),
         ];
+    }
+
+    public static function resolveWarehouseIdForProduct(?int $productId, ?int $preferredWarehouseId = null): ?int
+    {
+        if (! $productId) {
+            return null;
+        }
+
+        $options = self::resolveWarehouseOptionsForProduct($productId);
+
+        if ($preferredWarehouseId && array_key_exists($preferredWarehouseId, $options)) {
+            return $preferredWarehouseId;
+        }
+
+        $firstWarehouseId = array_key_first($options);
+
+        return $firstWarehouseId !== null ? (int) $firstWarehouseId : null;
+    }
+
+    public static function resolveWarehouseOptionsForProduct(?int $productId, ?string $search = null): array
+    {
+        if (! $productId) {
+            return [];
+        }
+
+        $warehouseIds = InventoryStock::query()
+            ->where('product_id', $productId)
+            ->where('qty_available', '>', 0)
+            ->distinct()
+            ->pluck('warehouse_id')
+            ->all();
+
+        if (empty($warehouseIds)) {
+            return [];
+        }
+
+        $query = \App\Models\Warehouse::withoutGlobalScopes()
+            ->whereIn('id', $warehouseIds)
+            ->orderBy('kode');
+
+        if (! app()->runningInConsole()) {
+            $user = Auth::user();
+            $manageType = $user?->manage_type ?? [];
+
+            if (! $user || ! is_array($manageType) || ! in_array('all', $manageType)) {
+                $query->where('cabang_id', $user?->cabang_id);
+            }
+        }
+
+        if (filled($search)) {
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('kode', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(function ($warehouse) {
+                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+            })
+            ->toArray();
+    }
+
+    public static function resolveWarehouseLabel(?int $warehouseId): ?string
+    {
+        if (! $warehouseId) {
+            return null;
+        }
+
+        $warehouse = \App\Models\Warehouse::withoutGlobalScopes()->find($warehouseId);
+
+        return $warehouse ? "({$warehouse->kode}) {$warehouse->name}" : null;
     }
 
     /**

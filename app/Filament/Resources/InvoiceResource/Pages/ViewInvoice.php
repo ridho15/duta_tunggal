@@ -29,7 +29,7 @@ class ViewInvoice extends ViewRecord
                     if ($record->from_model_type == 'App\Models\PurchaseOrder') {
                         $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
                             'invoice' => $record
-                        ])->setPaper('A4', 'potrait');
+                        ])->setPaper('A4', 'portrait');
 
                         return response()->streamDownload(function () use ($pdf) {
                             echo $pdf->stream();

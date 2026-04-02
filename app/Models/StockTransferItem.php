@@ -63,6 +63,6 @@ class StockTransferItem extends Model
     {
         return $this->hasMany(StockMovement::class, 'from_model_id', 'stock_transfer_id')
             ->where('from_model_type', StockTransfer::class)
-            ->where('product_id', $this->product_id);
+            ->where('meta->stock_transfer_item_id', $this->id);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\WarehouseConfirmationResource\Pages;
 
 use App\Filament\Resources\WarehouseConfirmationResource;
+use App\Models\MaterialIssue;
 use Filament\Actions;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Textarea;
@@ -77,9 +78,11 @@ class EditWarehouseConfirmation extends EditRecord
         $items = $formState['confirmation_items'] ?? [];
 
         foreach ($items as $itemData) {
-            // Match by sale_order_item_id to find the existing WC item
+            $lookupColumn = ! empty($itemData['material_issue_item_id']) ? 'material_issue_item_id' : 'sale_order_item_id';
+
+            // Match by the linked source item to find the existing WC item
             $wcItem = $record->warehouseConfirmationItems()
-                ->where('sale_order_item_id', $itemData['sale_order_item_id'] ?? null)
+                ->where($lookupColumn, $itemData[$lookupColumn] ?? null)
                 ->first();
 
             if ($wcItem) {
@@ -102,6 +105,7 @@ class EditWarehouseConfirmation extends EditRecord
         foreach ($record->warehouseConfirmationItems as $item) {
             $confirmationItems[] = [
                 'sale_order_item_id' => $item->sale_order_item_id,
+                'material_issue_item_id' => $item->material_issue_item_id,
                 'product_name' => $item->product_name ?? $item->saleOrderItem?->product?->name ?? '-',
                 'requested_qty' => $item->requested_qty,
                 'confirmed_qty' => $item->confirmed_qty,
@@ -114,6 +118,7 @@ class EditWarehouseConfirmation extends EditRecord
         // Detect confirmation_type from confirmable_type
         $data['confirmation_type'] = match ($record->confirmable_type) {
             \App\Models\ManufacturingOrder::class => 'manufacturing_order',
+            MaterialIssue::class => 'material_issue',
             \App\Models\DeliveryOrder::class      => 'delivery_order',
             default                               => 'sales_order',
         };
@@ -123,6 +128,8 @@ class EditWarehouseConfirmation extends EditRecord
             $data['so_id_virtual'] = $record->confirmable_id;
         } elseif ($record->confirmable_type === \App\Models\ManufacturingOrder::class) {
             $data['mo_id_virtual'] = $record->confirmable_id;
+        } elseif ($record->confirmable_type === MaterialIssue::class) {
+            $data['mi_id_virtual'] = $record->confirmable_id;
         } elseif ($record->confirmable_type === \App\Models\DeliveryOrder::class) {
             $data['do_id_virtual'] = $record->confirmable_id;
         }

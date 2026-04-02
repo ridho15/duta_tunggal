@@ -188,15 +188,15 @@ class VendorPaymentResource extends Resource
 
                                             $set('has_invoices', !empty($options));
                                             return $options;
-                                        } catch (\Exception $e) {
+                                        } catch (\Throwable $exception) {
                                             $set('has_invoices', false);
                                             Log::warning('VendorPaymentResource: gagal memuat daftar invoice', [
                                                 'payment_request_id' => $paymentRequestId,
-                                                'error' => $e->getMessage(),
+                                                'error' => $exception->getMessage(),
                                             ]);
                                             ProcurementFailureNotifier::warning(
                                                 'Gagal Memuat Daftar Invoice',
-                                                $e,
+                                                $exception,
                                                 'Daftar invoice supplier belum berhasil dimuat. Coba pilih ulang payment request atau refresh halaman.'
                                             );
                                             return [];
@@ -293,17 +293,17 @@ class VendorPaymentResource extends Resource
                                                 'total_payment' => $total,
                                                 'payment_details_count' => count($paymentDetails),
                                             ]);
-                                        } catch (\Exception $e) {
+                                        } catch (\Throwable $exception) {
                                             Log::error('VendorPaymentResource invoice selection processing failed', [
-                                                'error' => $e->getMessage(),
-                                                'trace' => $e->getTraceAsString(),
+                                                'error' => $exception->getMessage(),
+                                                'trace' => $exception->getTraceAsString(),
                                                 'invoice_ids' => $invoiceIds,
                                             ]);
                                             $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
                                             ProcurementFailureNotifier::warning(
                                                 'Gagal Memuat Detail Invoice',
-                                                $e,
+                                                $exception,
                                                 'Detail invoice yang dipilih belum berhasil diproses. Periksa invoice yang dipilih lalu coba lagi.'
                                             );
                                         }
@@ -589,7 +589,7 @@ class VendorPaymentResource extends Resource
                                             }
 
                                             return $options;
-                                        } catch (\Exception $e) {
+                                        } catch (\Throwable $exception) {
                                             return [];
                                         }
                                     })
@@ -770,14 +770,14 @@ class VendorPaymentResource extends Resource
                 } else {
                     $data['payment_details'] = [];
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $exception) {
                 Log::warning('VendorPaymentResource: gagal mengisi detail pembayaran', [
                     'vendor_payment_id' => $data['id'] ?? null,
-                    'error' => $e->getMessage(),
+                    'error' => $exception->getMessage(),
                 ]);
                 ProcurementFailureNotifier::warning(
                     'Detail Pembayaran Belum Lengkap',
-                    $e,
+                    $exception,
                     'Detail pembayaran vendor belum berhasil dimuat sepenuhnya. Silakan refresh halaman atau periksa invoice yang terkait.'
                 );
                 $data['payment_details'] = [];
@@ -839,10 +839,10 @@ class VendorPaymentResource extends Resource
                             }
                             $numbers = array_filter(array_map(fn ($id) => $invoiceNumberCache[$id] ?? null, $invoiceIds));
                             return $numbers ? implode(', ', $numbers) : '-';
-                        } catch (\Exception $e) {
+                        } catch (\Throwable $exception) {
                             Log::warning('VendorPaymentResource invoice summary rendering failed', [
                                 'vendor_payment_id' => $record->id,
-                                'error' => $e->getMessage(),
+                                'error' => $exception->getMessage(),
                             ]);
 
                             return 'Data invoice tidak tersedia';

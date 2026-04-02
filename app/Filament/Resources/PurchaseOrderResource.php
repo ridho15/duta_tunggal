@@ -133,10 +133,11 @@ class PurchaseOrderResource extends Resource
     public static function getOrderRequestOptions(?int $currentOrderRequestId = null): array
     {
         $options = OrderRequest::query()
-            ->where('status', 'approved')
+            ->whereIn('status', ['approved', 'partial'])
             ->select(['id', 'request_number'])
             ->orderBy('request_number')
             ->get()
+            ->filter(fn (OrderRequest $orderRequest) => static::hasAvailableOrderRequestSupplier($orderRequest))
             ->pluck('request_number', 'id')
             ->all();
 
@@ -151,6 +152,11 @@ class PurchaseOrderResource extends Resource
         }
 
         return $options;
+    }
+
+    public static function hasAvailableOrderRequestSupplier(OrderRequest $orderRequest): bool
+    {
+        return count(static::getAvailableOrderRequestSupplierIds($orderRequest)) > 0;
     }
 
     public static function form(Form $form): Form
@@ -1780,12 +1786,12 @@ class PurchaseOrderResource extends Resource
                                     ->body('PO ' . $record->po_number . ' berhasil disetujui.')
                                     ->success()
                                     ->send();
-                            } catch (\Exception $e) {
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Gagal Menyetujui PO')
-                                    ->body('Terjadi kesalahan: ' . $e->getMessage())
-                                    ->danger()
-                                    ->send();
+                            } catch (\Throwable $exception) {
+                                \App\Support\ProcurementFailureNotifier::danger(
+                                    'Gagal Menyetujui PO',
+                                    $exception,
+                                    'Purchase Order belum dapat disetujui. Silakan coba lagi.'
+                                );
                             }
                         }),
                     Action::make('request_close')
@@ -1822,7 +1828,7 @@ class PurchaseOrderResource extends Resource
                         ->action(function ($record) {
                             $pdf = Pdf::loadView('pdf.purchase-order', [
                                 'purchaseOrder' => $record
-                            ])->setPaper('A4', 'potrait');
+                            ])->setPaper('A4', 'portrait');
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();

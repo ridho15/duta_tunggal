@@ -77,7 +77,7 @@ class ProductResource extends Resource
      * @var array<string, string>
      */
     protected static array $defaultProductAccountCodes = [
-        'inventory' => '1140.02',
+        'inventory' => '1140.01',
         'sales' => '4100.10',
         'sales_return' => '4120.10',
         'sales_discount' => '4110.10',
@@ -106,6 +106,11 @@ class ProductResource extends Resource
         return trim("({$kode}) {$nama}");
     }
 
+    protected static function resolveInventoryCoaId(bool $isManufacture = false, bool $isRawMaterial = false): ?int
+    {
+        return Product::resolveDefaultInventoryCoaId($isManufacture, $isRawMaterial);
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -131,8 +136,8 @@ class ProductResource extends Resource
                                     if (! $get('manufacturing_overhead_coa_id')) {
                                         $set('manufacturing_overhead_coa_id', self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_overhead'] ?? null));
                                     }
-                                } elseif (! $get('is_raw_material')) {
-                                    $set('inventory_coa_id', null);
+                                } else {
+                                    $set('inventory_coa_id', self::resolveInventoryCoaId(false, (bool) $get('is_raw_material')));
                                 }
                             }),
                         Toggle::make('is_raw_material')
@@ -142,12 +147,9 @@ class ProductResource extends Resource
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state) {
                                     $set('is_manufacture', false);
-                                    $rawMaterialInventoryCoa = ChartOfAccount::where('code', '1140.01')->first();
-                                    if ($rawMaterialInventoryCoa) {
-                                        $set('inventory_coa_id', $rawMaterialInventoryCoa->id);
-                                    }
-                                } elseif (! $get('is_manufacture')) {
-                                    $set('inventory_coa_id', null);
+                                    $set('inventory_coa_id', self::resolveInventoryCoaId(false, true));
+                                } else {
+                                    $set('inventory_coa_id', self::resolveInventoryCoaId((bool) $get('is_manufacture'), false));
                                 }
                             }),
                         TextInput::make('sku')
@@ -348,7 +350,7 @@ class ProductResource extends Resource
                             ->label('Persediaan')
                             ->helperText('Akun untuk mencatat persediaan produk ini.')
                             ->options(fn() => self::getCoaOptions('Asset'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['inventory'] ?? null))
+                            ->default(fn () => self::resolveInventoryCoaId())
                             ->searchable()
                             ->preload()
                             ->nullable()

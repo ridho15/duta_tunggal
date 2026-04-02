@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockOpnameResource\Pages;
 use App\Filament\Resources\StockOpnameResource\RelationManagers;
+use App\Http\Controllers\HelperController;
 use App\Models\StockOpname;
 use App\Models\Warehouse;
+use App\Services\StockOpnameService;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
@@ -23,6 +25,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class StockOpnameResource extends Resource
 {
@@ -106,7 +109,6 @@ class StockOpnameResource extends Resource
                                 'draft' => 'Draft',
                                 'in_progress' => 'Sedang Berlangsung',
                                 'completed' => 'Selesai',
-                                'approved' => 'Disetujui',
                             ])
                             ->default('draft')
                             ->required(),
@@ -264,6 +266,7 @@ class StockOpnameResource extends Resource
                     Tables\Actions\ViewAction::make()
                     ->color('info'),
                 Tables\Actions\EditAction::make()
+                    ->visible(fn (StockOpname $record) => $record->status !== 'approved')
                     ->color('warning'),
                 Tables\Actions\Action::make('approve')
                     ->label('Setujui')
@@ -277,11 +280,21 @@ class StockOpnameResource extends Resource
                     ->modalDescription('Apakah Anda yakin ingin menyetujui stock opname ini?')
                     ->modalSubmitActionLabel('Ya, Setujui')
                     ->action(function ($record) {
-                        $record->update([
-                            'status' => 'approved',
-                            'approved_by' => Auth::id(),
-                            'approved_at' => now(),
-                        ]);
+                        try {
+                            app(StockOpnameService::class)->approveStockOpname($record, Auth::id());
+
+                            HelperController::sendNotification(
+                                isSuccess: true,
+                                title: 'Information',
+                                message: 'Stock opname berhasil disetujui dan jurnal penyesuaian sudah dibuat.'
+                            );
+                        } catch (ValidationException $exception) {
+                            HelperController::sendNotification(
+                                isSuccess: false,
+                                title: 'Validasi Stock Opname',
+                                message: collect($exception->errors())->flatten()->implode("\n")
+                            );
+                        }
                     }),
                 ])
                 ], position: ActionsPosition::BeforeColumns)

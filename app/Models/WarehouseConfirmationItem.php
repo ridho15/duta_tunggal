@@ -14,12 +14,20 @@ class WarehouseConfirmationItem extends Model
     protected $fillable = [
         'warehouse_confirmation_id',
         'sale_order_item_id',
+        'material_issue_item_id',
+        'product_id',
         'product_name',
         'requested_qty',
         'confirmed_qty',
         'warehouse_id',
         'rak_id',
         'status'
+    ];
+
+    protected $appends = [
+        'product_display',
+        'source_item_display',
+        'material_summary',
     ];
 
     public function warehouseConfirmation()
@@ -32,6 +40,16 @@ class WarehouseConfirmationItem extends Model
         return $this->belongsTo(SaleOrderItem::class)->withDefault();
     }
 
+    public function materialIssueItem()
+    {
+        return $this->belongsTo(MaterialIssueItem::class)->withDefault();
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class)->withDefault();
+    }
+
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class)->withDefault();
@@ -42,6 +60,52 @@ class WarehouseConfirmationItem extends Model
         return $this->belongsTo(Rak::class)->withDefault();
     }
 
+    public function getProductDisplayAttribute(): string
+    {
+        $product = $this->saleOrderItem?->product;
+
+        if (! $product || ! $product->exists) {
+            $product = $this->materialIssueItem?->product;
+        }
+
+        if (! $product || ! $product->exists) {
+            $product = $this->product;
+        }
+
+        if (! $product || ! $product->exists) {
+            return '-';
+        }
+
+        return sprintf('(%s) %s', $product->sku ?? '-', $product->name ?? '-');
+    }
+
+    public function getSourceItemDisplayAttribute(): string
+    {
+        if ($this->material_issue_item_id) {
+            return 'Material Issue Item #' . $this->material_issue_item_id;
+        }
+
+        if ($this->sale_order_item_id) {
+            return 'Sales Order Item #' . $this->sale_order_item_id;
+        }
+
+        return '-';
+    }
+
+    public function getMaterialSummaryAttribute(): string
+    {
+        $productDisplay = $this->product_display;
+
+        return sprintf(
+            '%s | Request %s | Confirm %s | Gudang %s | Status %s',
+            $productDisplay,
+            rtrim(rtrim((string) $this->requested_qty, '0'), '.'),
+            rtrim(rtrim((string) $this->confirmed_qty, '0'), '.'),
+            $this->warehouse?->name ?? '-',
+            ucfirst((string) $this->status)
+        );
+    }
+
     protected static function booted()
     {
         static::updating(function ($warehouseConfirmationItem) {
@@ -50,6 +114,7 @@ class WarehouseConfirmationItem extends Model
                 $warehouseConfirmation = $warehouseConfirmationItem->warehouseConfirmation;
 
                 if ($warehouseConfirmation) {
+                    $confirmationType = strtolower((string) $warehouseConfirmation->confirmation_type);
                     $statuses = $warehouseConfirmation->warehouseConfirmationItems()
                         ->get(['id', 'status'])
                         ->mapWithKeys(function ($item) {
@@ -67,7 +132,15 @@ class WarehouseConfirmationItem extends Model
                     $hasRejected = $statusValues->contains('rejected');
 
                     $parentStatus = 'request';
-                    if ($allConfirmed) {
+                    if ($confirmationType === 'material_issue') {
+                        if ($allConfirmed) {
+                            $parentStatus = 'confirmed';
+                        } elseif ($hasRejected || $allRejected) {
+                            $parentStatus = 'rejected';
+                        } elseif ($hasConfirmed) {
+                            $parentStatus = 'partial_confirmed';
+                        }
+                    } elseif ($allConfirmed) {
                         $parentStatus = 'confirmed';
                     } elseif ($allRejected) {
                         $parentStatus = 'rejected';

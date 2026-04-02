@@ -11,7 +11,6 @@ use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Tables\Enums\SortDirection;
 use Filament\Tables\Actions\Action;
 use App\Models\SaleOrder;
 use App\Models\Customer;
@@ -19,7 +18,6 @@ use App\Exports\SalesReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
-use Milon\Barcode\Facades\DNS2DFacade;
 
 class SalesReportPage extends Page implements HasTable
 {
@@ -44,16 +42,21 @@ class SalesReportPage extends Page implements HasTable
 
     public function mount(): void
     {
-        $this->form->fill([
-            'start_date' => now()->startOfMonth()->format('Y-m-d'),
-            'end_date' => now()->format('Y-m-d'),
-            'customer_id' => null,
-            'so_number' => null,
-            'sort_by_total' => null,
-            'status' => null,
-        ]);
+        $this->start_date = now()->startOfMonth()->format('Y-m-d');
+        $this->end_date = now()->format('Y-m-d');
+        $this->customer_id = null;
+        $this->so_number = null;
+        $this->sort_by_total = null;
+        $this->status = null;
 
-        $this->updateFilters();
+        $this->form->fill([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'customer_id' => $this->customer_id,
+            'so_number' => $this->so_number,
+            'sort_by_total' => $this->sort_by_total,
+            'status' => $this->status,
+        ]);
     }
 
     public function table(Table $table): Table
@@ -109,7 +112,6 @@ class SalesReportPage extends Page implements HasTable
                     ->label('Export Excel')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        $this->updateFilters();
                         $query = $this->getFilteredQuery();
                         return Excel::download(new SalesReportExport($query), 'sales_report.xlsx');
                     }),
@@ -118,7 +120,6 @@ class SalesReportPage extends Page implements HasTable
                     ->icon('heroicon-o-document')
                     ->action(function () {
                         return response()->streamDownload(function () {
-                            $this->updateFilters();
                             $query = $this->getFilteredQuery();
 
                             // Clean data to ensure UTF-8 encoding
@@ -201,8 +202,8 @@ class SalesReportPage extends Page implements HasTable
                 Select::make('sort_by_total')
                     ->label('Urutkan Total')
                     ->options([
-                        'asc' => 'Tertinggi ke Terendah',
-                        'desc' => 'Terendah ke Tertinggi',
+                        'asc' => 'Terendah ke Tertinggi',
+                        'desc' => 'Tertinggi ke Terendah',
                     ])
                     ->placeholder('Tidak diurutkan')
                     ->live()
@@ -224,17 +225,38 @@ class SalesReportPage extends Page implements HasTable
             ->columns(3);
     }
 
+    public function updatedStartDate(): void
+    {
+        $this->updateFilters();
+    }
+
+    public function updatedEndDate(): void
+    {
+        $this->updateFilters();
+    }
+
+    public function updatedCustomerId(): void
+    {
+        $this->updateFilters();
+    }
+
+    public function updatedSoNumber(): void
+    {
+        $this->updateFilters();
+    }
+
+    public function updatedSortByTotal(): void
+    {
+        $this->updateFilters();
+    }
+
+    public function updatedStatus(): void
+    {
+        $this->updateFilters();
+    }
+
     public function updateFilters(): void
     {
-        $formData = $this->form->getState();
-        $this->start_date = $formData['start_date'] ?? null;
-        $this->end_date = $formData['end_date'] ?? null;
-        $this->customer_id = $formData['customer_id'] ?? null;
-        $this->so_number = $formData['so_number'] ?? null;
-        $this->sort_by_total = $formData['sort_by_total'] ?? null;
-        $this->status = $formData['status'] ?? null;
-
-        // Reset table pagination when filters change
         $this->resetTable();
     }
 

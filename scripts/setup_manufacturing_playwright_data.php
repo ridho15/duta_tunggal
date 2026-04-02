@@ -20,6 +20,7 @@ $fixture = [
     'bom_name' => 'Fixture BOM Manufacturing',
     'plan_number' => 'PP-PW-MFG-001',
     'plan_name' => 'Fixture Production Plan Manufacturing',
+    'mo_number' => 'MO-PW-MFG-001',
     'issue_number' => 'MI-PW-MFG-001',
 ];
 
@@ -273,6 +274,26 @@ DB::transaction(function () use ($fixture, $now) {
         ]));
     }
 
+    $manufacturingOrderId = DB::table('manufacturing_orders')->where('mo_number', $fixture['mo_number'])->value('id');
+    $manufacturingOrderPayload = [
+        'production_plan_id' => $planId,
+        'status' => 'draft',
+        'start_date' => now()->toDateTimeString(),
+        'end_date' => now()->addDay()->toDateTimeString(),
+        'items' => json_encode([]),
+        'cabang_id' => $cabangId,
+        'updated_at' => $now,
+    ];
+
+    if ($manufacturingOrderId) {
+        DB::table('manufacturing_orders')->where('id', $manufacturingOrderId)->update($manufacturingOrderPayload);
+    } else {
+        $manufacturingOrderId = DB::table('manufacturing_orders')->insertGetId(array_merge($manufacturingOrderPayload, [
+            'mo_number' => $fixture['mo_number'],
+            'created_at' => $now,
+        ]));
+    }
+
     $inventoryStockId = DB::table('inventory_stocks')
         ->where('product_id', $rawMaterialId)
         ->where('warehouse_id', $warehouseId)
@@ -306,7 +327,7 @@ DB::transaction(function () use ($fixture, $now) {
 
     $issuePayload = [
         'production_plan_id' => $planId,
-        'manufacturing_order_id' => null,
+        'manufacturing_order_id' => $manufacturingOrderId,
         'warehouse_id' => $warehouseId,
         'issue_date' => now()->toDateString(),
         'type' => 'issue',
@@ -347,6 +368,7 @@ DB::transaction(function () use ($fixture, $now) {
     echo "✅ Manufacturing fixture ready\n";
     echo "   Plan      : {$fixture['plan_number']}\n";
     echo "   BOM       : {$fixture['bom_code']}\n";
+    echo "   MO        : {$fixture['mo_number']}\n";
     echo "   Product   : {$fixture['fg_sku']}\n";
     echo "   Material  : {$fixture['rm_sku']}\n";
     echo "   Issue     : {$fixture['issue_number']}\n";

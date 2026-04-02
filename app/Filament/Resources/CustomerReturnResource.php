@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\CustomerReturnService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -23,6 +24,7 @@ use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class CustomerReturnResource extends Resource
 {
@@ -423,12 +425,12 @@ class CustomerReturnResource extends Resource
                                 ->body('Stok barang berhasil dikembalikan ke gudang.')
                                 ->success()
                                 ->send();
-                        } catch (\Exception $e) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Gagal Menyelesaikan Return')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
+                        } catch (Throwable $exception) {
+                            ProcurementFailureNotifier::danger(
+                                'Gagal Menyelesaikan Return',
+                                $exception,
+                                'Customer return belum dapat diselesaikan. Silakan coba lagi.'
+                            );
                         }
                     }),
 

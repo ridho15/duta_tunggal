@@ -109,7 +109,7 @@ class OrderRequestService
             $currency = Currency::query()->first();
 
             if (! $currency) {
-                throw new \RuntimeException('Currency data is required before approving an order request.');
+                throw new \RuntimeException('Data mata uang wajib tersedia sebelum order request dapat disetujui.');
             }
 
             $purchaseOrder = $orderRequest->purchaseOrders()->create([
@@ -159,7 +159,7 @@ class OrderRequestService
         $currency = Currency::query()->first();
 
         if (! $currency) {
-            throw new \RuntimeException('Currency data is required before creating a purchase order.');
+            throw new \RuntimeException('Data mata uang wajib tersedia sebelum purchase order dibuat.');
         }
 
         $purchaseOrder = $orderRequest->purchaseOrders()->create([

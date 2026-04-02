@@ -68,6 +68,9 @@ test('I2-a  WC list table has Delivery Order column', async ({ page }) => {
   const body = await page.textContent('body')
   expect(body).not.toMatch(ERR)
   expect(body).toMatch(/Delivery Order/i)
+  expect(body).toMatch(/Source Item/i)
+  expect(body).toMatch(/Qty Request/i)
+  expect(body).toMatch(/Gudang/i)
 })
 
 // -------------------------------------------------------------------------

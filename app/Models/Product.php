@@ -197,6 +197,25 @@ class Product extends Model
         return $this->hasMany(Asset::class, 'product_id');
     }
 
+    public static function resolveDefaultInventoryCoaId(bool $isManufacture = false, bool $isRawMaterial = false): ?int
+    {
+        $codes = match (true) {
+            $isRawMaterial => ['1-101', '1140.10', '1140.01'],
+            $isManufacture => ['1140.02', '1140.01'],
+            default => ['1140.01', '1140.10'],
+        };
+
+        foreach ($codes as $code) {
+            $coaId = ChartOfAccount::where('code', $code)->value('id');
+
+            if ($coaId) {
+                return $coaId;
+            }
+        }
+
+        return null;
+    }
+
     protected static function booted()
     {
         static::addGlobalScope('product_cabang', function (Builder $builder) {

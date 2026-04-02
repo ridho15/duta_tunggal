@@ -88,7 +88,9 @@ class FinancialStatementPage extends Page
 
             $revenue = $this->sumAccounts($revenueAccounts->pluck('id'), $start, $end, 'credit');
             $cogs     = $this->sumAccounts(
-                ChartOfAccount::where('type', 'Expense')->where('name', 'like', '%HPP%')->orWhere('name', 'like', '%Pokok%')->pluck('id'),
+                ChartOfAccount::where('type', 'Expense')
+                    ->where(fn ($q) => $q->where('name', 'like', '%HPP%')->orWhere('name', 'like', '%Pokok%'))
+                    ->pluck('id'),
                 $start, $end, 'debit'
             );
             $grossProfit = $revenue - $cogs;

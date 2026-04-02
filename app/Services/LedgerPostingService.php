@@ -816,7 +816,7 @@ class LedgerPostingService
                 ->get();
 
             if ($originals->isEmpty()) {
-                throw new \RuntimeException("Tidak ada jurnal ditemukan untuk transaction_id: {$transactionId}");
+                throw new \RuntimeException("Tidak ada jurnal ditemukan untuk transaction_id: {$transactionId}.");
             }
 
             $reversalTransactionId = 'REV-' . $transactionId . '-' . now()->format('YmdHis');
@@ -879,7 +879,7 @@ class LedgerPostingService
                 ->get();
 
             if ($originals->isEmpty()) {
-                throw new \RuntimeException("Tidak ada jurnal ditemukan untuk invoice ID: {$invoice->id}");
+                throw new \RuntimeException("Tidak ada jurnal ditemukan untuk invoice ID: {$invoice->id}.");
             }
 
             $reversalTransactionId = 'REV-INVOICE-' . $invoice->id . '-' . now()->format('YmdHis');

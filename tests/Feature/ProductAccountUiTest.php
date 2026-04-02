@@ -159,4 +159,22 @@ describe('Product account mapping form defaults', function () {
             ->and($overrideProduct->purchase_return_coa_id)->toBe($customAccounts['purchase_return_coa_id'])
             ->and($overrideProduct->unbilled_purchase_coa_id)->toBe($customAccounts['unbilled_purchase_coa_id']);
     });
+
+it('switches inventory coa to 1-101 for raw material products', function () {
+    $component = Livewire::test(CreateProduct::class)
+        ->set('data.is_raw_material', true);
+
+    $component->assertFormSet([
+        'inventory_coa_id' => ChartOfAccount::where('code', '1-101')->value('id'),
+    ]);
+});
+
+it('switches inventory coa to 1140.02 for manufactured products', function () {
+    $component = Livewire::test(CreateProduct::class)
+        ->set('data.is_manufacture', true);
+
+    $component->assertFormSet([
+        'inventory_coa_id' => ChartOfAccount::where('code', '1140.02')->value('id'),
+    ]);
+});
 });

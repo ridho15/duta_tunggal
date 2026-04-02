@@ -12,15 +12,16 @@ use App\Filament\Resources\DeliveryScheduleResource;
 use App\Filament\Resources\DeliveryScheduleResource\Pages\CreateDeliverySchedule;
 use App\Services\DeliveryScheduleService;
 use App\Models\SuratJalan;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class DeliveryScheduleTest extends TestCase
 {
-    use RefreshDatabase;
+    use LazilyRefreshDatabase;
 
     protected User $user;
     protected Cabang $cabang;
@@ -54,7 +55,7 @@ class DeliveryScheduleTest extends TestCase
         $this->scheduleService = app(DeliveryScheduleService::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_unique_schedule_number(): void
     {
         $first  = $this->scheduleService->generateScheduleNumber();
@@ -64,7 +65,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertEquals($first, $second, 'Sequential generation before first save should be same');
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_incrementing_schedule_numbers(): void
     {
         $first = DeliverySchedule::create([
@@ -82,7 +83,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertNotEquals($first->schedule_number, $second);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_delivery_schedule_with_surat_jalan(): void
     {
         $deliveryOrder1 = DeliveryOrder::factory()->create(['cabang_id' => $this->cabang->id, 'status' => 'approved']);
@@ -129,7 +130,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertCount(2, $schedule->relatedDeliveryOrders());
     }
 
-    /** @test */
+    #[Test]
     public function it_lists_only_surat_jalan_for_the_selected_cabang(): void
     {
         $approved = SuratJalan::create([
@@ -165,7 +166,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertNotContains('SJ-APPROVED-OTHER', $options);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_surat_jalan_for_bau_bau_cabang(): void
     {
         $bauBauCabang = Cabang::factory()->create([
@@ -213,7 +214,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertArrayNotHasKey($used->id, $options);
     }
 
-    /** @test */
+    #[Test]
     public function it_still_excludes_surat_jalan_used_by_trashed_delivery_schedules(): void
     {
         $bauBauCabang = Cabang::factory()->create([
@@ -246,7 +247,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertArrayNotHasKey($used->id, $options);
     }
 
-    /** @test */
+    #[Test]
     public function it_excludes_surat_jalan_that_are_already_used_by_another_delivery_schedule(): void
     {
         $available = SuratJalan::create([
@@ -290,7 +291,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertArrayNotHasKey($used->id, $options);
     }
 
-    /** @test */
+    #[Test]
     public function it_renders_the_delivery_schedule_create_form(): void
     {
         Livewire::actingAs($this->user)
@@ -301,7 +302,7 @@ class DeliveryScheduleTest extends TestCase
             ->assertFormFieldExists('suratJalan');
     }
 
-    /** @test */
+    #[Test]
     public function it_can_update_schedule_status(): void
     {
         $deliveryOrder1 = DeliveryOrder::factory()->create([
@@ -359,7 +360,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertEquals('completed', $deliveryOrder2->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_have_multiple_surat_jalan_per_schedule(): void
     {
         $deliveryOrders = DeliveryOrder::factory()->count(3)->create([
@@ -397,7 +398,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertCount(3, $schedule->relatedDeliveryOrders());
     }
 
-    /** @test */
+    #[Test]
     public function it_shows_selected_surat_jalan_and_delivery_orders_preview(): void
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -429,7 +430,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertStringContainsString('Jumlah Delivery Order: <strong>1</strong>', $deliveryOrderPreview);
     }
 
-    /** @test */
+    #[Test]
     public function delivered_schedule_completes_related_delivery_orders(): void
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -464,7 +465,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertEquals('completed', $deliveryOrder->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function delivery_order_no_longer_requires_driver_and_vehicle(): void
     {
         // Verify DO model has nullable driver_id and vehicle_id
@@ -481,7 +482,7 @@ class DeliveryScheduleTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_provides_correct_status_label(): void
     {
         $schedule = new DeliverySchedule(['status' => 'on_the_way']);
@@ -494,7 +495,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertEquals('Menunggu Keberangkatan', $schedule->status_label);
     }
 
-    /** @test */
+    #[Test]
     public function it_soft_deletes_schedule(): void
     {
         $schedule = DeliverySchedule::withoutGlobalScopes()->create([

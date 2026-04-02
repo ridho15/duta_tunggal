@@ -47,7 +47,8 @@ class InventoryStock extends Model
     public function stockMovements(): HasMany
     {
         return $this->hasMany(StockMovement::class, 'product_id', 'product_id')
-            ->where('warehouse_id', $this->warehouse_id);
+            ->where('warehouse_id', $this->warehouse_id)
+            ->where('rak_id', $this->rak_id);
     }
 
     /**

@@ -882,8 +882,8 @@ class QuotationResource extends Resource
                         })
                         ->action(function ($record) {
                             $pdf = Pdf::loadView('pdf.quotation', [
-                                'quotation' => $record
-                            ])->setPaper('A4', 'potrait');
+                                'quotation' => $record,
+                            ])->setPaper('A4', 'portrait');
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
@@ -1134,7 +1134,6 @@ class QuotationResource extends Resource
                                                     );
                                                 })
                                                 ->helperText('Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini.')
-                                                ->required()
                                                 ->validationMessages([
                                                     'required' => 'Gudang wajib dipilih'
                                                 ])
@@ -1266,7 +1265,7 @@ class QuotationResource extends Resource
                             // Karena quotation sudah di-approve (termasuk discount & tempo pembayaran),
                             // SO yang dibuat dari quotation approved langsung berstatus 'approved'.
                             // Tidak perlu approval ulang di level SO karena sudah di-approve di Quotation.
-                            $soStatus = 'approved';
+                            $soStatus = 'draft';
                             $saleOrder = SaleOrder::create([
                                 'customer_id' => $record->customer_id,
                                 'quotation_id' => $record->id,
@@ -1317,7 +1316,19 @@ class QuotationResource extends Resource
                             // Update total amount
                             $salesOrderService->updateTotalAmount($saleOrder);
 
-                            HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation. Proses selanjutnya: Manajer Sales perlu menyetujui Sales Order ini sebelum diproses lebih lanjut.");
+                            $saleOrder->load('saleOrderItem.warehouseAllocations', 'saleOrderItem.product');
+
+                            if (! $saleOrder->hasInsufficientStock()) {
+                                $saleOrder->update([
+                                    'status' => 'approved',
+                                    'approve_by' => Auth::id(),
+                                    'approve_at' => now(),
+                                ]);
+
+                                HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation dan disetujui karena stok tersedia. Proses selanjutnya: Tim Gudang/Logistik dapat melanjutkan ke Delivery Order.");
+                            } else {
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation, tetapi status tetap draft karena stok belum mencukupi. Silakan lengkapi stok terlebih dahulu sebelum request approve.");
+                            }
 
                             // Redirect to edit page
                             return redirect()->route('filament.admin.resources.sale-orders.edit', $saleOrder);

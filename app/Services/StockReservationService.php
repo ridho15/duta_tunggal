@@ -17,7 +17,7 @@ class StockReservationService
     public function reserveStockForMaterialIssue(MaterialIssue $materialIssue): void
     {
         if (!$materialIssue->isApproved() && !$materialIssue->isPendingApproval()) {
-            throw new \Exception('Material issue must be approved or pending approval to reserve stock');
+            throw new \Exception('Material issue harus berstatus approved atau pending approval untuk reservasi stok.');
         }
 
         Log::info('Starting reserveStockForMaterialIssue', [
@@ -55,11 +55,11 @@ class StockReservationService
                     ->first();
 
                 if (!$inventoryStock) {
-                    throw new \Exception("Stock untuk produk {$item->product_id} di warehouse {$warehouseId} tidak ditemukan");
+                    throw new \Exception("Stok untuk produk {$item->product_id} di warehouse {$warehouseId} tidak ditemukan.");
                 }
 
                 if ((float) $inventoryStock->qty_available < (float) $item->quantity) {
-                    throw new \Exception("Stock tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$inventoryStock->qty_available}, dibutuhkan: {$item->quantity}");
+                    throw new \Exception("Stok tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$inventoryStock->qty_available}, dibutuhkan: {$item->quantity}.");
                 }
 
                 StockReservation::create([
@@ -140,7 +140,7 @@ class StockReservationService
     public function consumeReservedStockForMaterialIssue(MaterialIssue $materialIssue): void
     {
         if (!$materialIssue->isCompleted()) {
-            throw new \Exception('Material issue must be completed to consume reserved stock');
+            throw new \Exception('Material issue harus berstatus completed untuk mengonsumsi stok reservasi.');
         }
 
         Log::info('Starting consumeReservedStockForMaterialIssue', [

@@ -106,7 +106,7 @@ class DeliveryOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Minimal satu Sales Order wajib dipilih',
                             ])
-                            ->helperText('Sales Order yang sudah di-approve dapat dipilih untuk membuat Delivery Order. WC per gudang akan dibuat otomatis.')
+                            ->helperText('Sales Order yang sudah di-approve dapat dipilih untuk membuat Delivery Order. WC akan dibuat otomatis per request item pada gudang sumber.')
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $listSaleOrder = SaleOrder::whereIn('id', $state)->get();
                                 $deliveryItems = [];
@@ -634,7 +634,7 @@ class DeliveryOrderResource extends Resource
                     }),
 
                 Section::make('Status Konfirmasi Gudang')
-                    ->description('Setiap kartu mewakili satu gudang. DO di-approve otomatis jika semua gudang mengkonfirmasi; DO ditolak otomatis jika ada satu gudang yang menolak.')
+                    ->description('Setiap kartu mewakili satu request item pada satu gudang sumber. DO di-approve otomatis jika semua request dikonfirmasi; DO ditolak otomatis jika ada satu request yang ditolak.')
                     ->schema([
                         RepeatableEntry::make('warehouseConfirmations')
                             ->label('')
@@ -654,7 +654,7 @@ class DeliveryOrderResource extends Resource
                                         default             => 'gray',
                                     }),
                                 TextEntry::make('items_summary')
-                                    ->label('Item yang Diminta')
+                                    ->label('Detail Request')
                                     ->getStateUsing(
                                         fn($record) =>
                                         $record->warehouseConfirmationItems
@@ -973,9 +973,12 @@ class DeliveryOrderResource extends Resource
                                 $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
 
                                 HelperController::sendNotification(isSuccess: true, title: "Dana Dikonfirmasi", message: "Pembayaran Delivery Order telah dikonfirmasi diterima. Proses selanjutnya: jadwalkan pengiriman pada Delivery Schedule.");
-                            } catch (\Exception $e) {
-                                HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
-                                throw $e;
+                            } catch (\Throwable $exception) {
+                                \App\Support\ProcurementFailureNotifier::danger(
+                                    'Gagal Mengonfirmasi Dana',
+                                    $exception,
+                                    'Konfirmasi dana Delivery Order belum berhasil diproses. Silakan coba lagi.'
+                                );
                             }
                         }),
                     Action::make('closed')
@@ -1041,7 +1044,7 @@ class DeliveryOrderResource extends Resource
 
                             $pdf = Pdf::loadView('pdf.delivery-order', [
                                 'deliveryOrder' => $record
-                            ])->setPaper('A4', 'potrait');
+                            ])->setPaper('A4', 'portrait');
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
@@ -1222,7 +1225,7 @@ class DeliveryOrderResource extends Resource
                     '<div class="mt-2 text-sm">' .
                     '<ul class="list-disc pl-5">' .
                     '<li><strong>Apa ini:</strong> Delivery Order adalah dokumen pengiriman barang dari penjualan yang perlu disetujui sebelum dikirim.</li>' .
-                    '<li><strong>Flow Approval:</strong> Draft → Request Stock → Request Approve → Approved → Sent → Received → Completed. Proses pengiriman fisik dan penyelesaian DO mengikuti Jadwal Pengiriman.</li>' .
+                    '<li><strong>Flow Approval:</strong> Draft → Request Stock → Request Approve → Approved → Sent → Received → Completed. Request Stock berarti WC sudah dibuat per item dan per gudang sumber untuk diverifikasi oleh gudang.</li>' .
                     '<li><strong>Surat Jalan:</strong> Surat Jalan bersifat dokumen pendukung DO dan tidak lagi menjadi syarat approval atau filter utama pengiriman.</li>' .
                     '<li><strong>Actions:</strong> <em>Request Approve</em> (request_stock), <em>Approve/Reject</em> (request_approve), <em>Mark as Sent</em> (approved). Status selesai untuk DO dikelola otomatis mengikuti Delivery Schedule.</li>' .
                     '<li><strong>Checker Edit:</strong> User dengan role Checker dapat mengedit quantity setelah approved untuk penyesuaian aktual.</li>' .

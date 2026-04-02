@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Warehouse;
 use App\Models\ChartOfAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DeliveryOrderJournalIntegrationTest extends TestCase
@@ -51,7 +52,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function journal_entries_are_created_when_delivery_order_status_becomes_sent()
     {
         // Create required data
@@ -120,7 +121,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function journal_entries_are_updated_when_delivery_order_quantity_is_changed_after_sent()
     {
         // Create required data
@@ -208,7 +209,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
         $this->assertLessThan($initialCreditAmount, $updatedCreditAmount);
     }
 
-    /** @test */
+    #[Test]
     public function journal_entries_are_deleted_when_delivery_order_is_soft_deleted()
     {
         // Create required data

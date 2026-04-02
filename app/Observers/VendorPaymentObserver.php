@@ -8,8 +8,10 @@ use App\Models\Deposit;
 use App\Models\Invoice;
 use App\Models\VendorPayment;
 use App\Services\LedgerPostingService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class VendorPaymentObserver
 {
@@ -37,7 +39,21 @@ class VendorPaymentObserver
             $this->reverseJournalEntries($payment);
             // Re-post with new amount if payment is still active
             if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
-                $this->ledger->postVendorPayment($payment);
+                try {
+                    $this->ledger->postVendorPayment($payment);
+                } catch (Throwable $exception) {
+                    Log::error('VendorPaymentObserver: failed to post vendor payment after amount change', [
+                        'payment_id' => $payment->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                    if (! app()->runningInConsole()) {
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Posting Jurnal Pembayaran Vendor',
+                            $exception,
+                            'Perubahan pembayaran vendor berhasil disimpan, tetapi jurnal belum dapat diposting.'
+                        );
+                    }
+                }
             }
         }
         
@@ -70,7 +86,21 @@ class VendorPaymentObserver
         if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
             // Avoid double posting journals: only post if none exist yet
             if (!$payment->journalEntries()->exists()) {
-                $this->ledger->postVendorPayment($payment);
+                try {
+                    $this->ledger->postVendorPayment($payment);
+                } catch (Throwable $exception) {
+                    Log::error('VendorPaymentObserver: failed to post vendor payment on create', [
+                        'payment_id' => $payment->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                    if (! app()->runningInConsole()) {
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Posting Jurnal Pembayaran Vendor',
+                            $exception,
+                            'Pembayaran vendor berhasil disimpan, tetapi jurnal belum dapat diposting.'
+                        );
+                    }
+                }
             }
         }
         

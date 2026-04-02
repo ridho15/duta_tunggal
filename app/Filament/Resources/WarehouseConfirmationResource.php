@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\WarehouseConfirmationResource\Pages;
+use App\Models\MaterialIssue;
+use App\Models\Product;
 use App\Models\WarehouseConfirmation;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
@@ -27,6 +29,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 class WarehouseConfirmationResource extends Resource
@@ -79,6 +82,7 @@ class WarehouseConfirmationResource extends Resource
                             ->options([
                                 'sales_order'          => 'Sales Order',
                                 'manufacturing_order'  => 'Manufacturing Order',
+                                'material_issue'       => 'Material Issue',
                                 'delivery_order'       => 'Delivery Order',
                             ])
                             ->default('sales_order')
@@ -291,12 +295,35 @@ class WarehouseConfirmationResource extends Resource
                     ->sortable(false)
                     ->getStateUsing(fn ($record) => $record->source_label),
 
+                TextColumn::make('primary_item_source_label')
+                    ->label('Source Item')
+                    ->toggleable()
+                    ->getStateUsing(fn ($record) => $record->primary_item_source_label),
+
+                TextColumn::make('primary_item_product_label')
+                    ->label('Produk')
+                    ->toggleable()
+                    ->wrap()
+                    ->getStateUsing(fn ($record) => $record->primary_item_product_label),
+
+                TextColumn::make('primary_item_warehouse_label')
+                    ->label('Gudang')
+                    ->toggleable()
+                    ->wrap()
+                    ->getStateUsing(fn ($record) => $record->primary_item_warehouse_label),
+
+                TextColumn::make('request_qty_summary')
+                    ->label('Qty Request')
+                    ->toggleable()
+                    ->getStateUsing(fn ($record) => $record->request_qty_summary),
+
                 TextColumn::make('confirmable_type_label')
                     ->label('Tipe')
                     ->badge()
                     ->color(fn ($record) => match ($record->confirmable_type) {
                         \App\Models\SaleOrder::class          => 'success',
                         \App\Models\ManufacturingOrder::class => 'warning',
+                        \App\Models\MaterialIssue::class      => 'danger',
                         \App\Models\DeliveryOrder::class      => 'info',
                         default                               => 'gray',
                     })
@@ -327,6 +354,12 @@ class WarehouseConfirmationResource extends Resource
                     ->label('Notes')
                     ->limit(50),
 
+                TextColumn::make('item_audit_summary')
+                    ->label('Ringkasan Item')
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->getStateUsing(fn ($record) => $record->item_audit_summary),
+
                 TextColumn::make('rejection_reason')
                     ->label('Rejection Reason')
                     ->limit(60)
@@ -350,6 +383,82 @@ class WarehouseConfirmationResource extends Resource
                         'partial_confirmed' => 'Partial Confirmed',
                         'rejected' => 'Rejected',
                     ]),
+                SelectFilter::make('source_item_type')
+                    ->label('Tipe Source Item')
+                    ->options([
+                        'sale_order_item' => 'Sales Order Item',
+                        'material_issue_item' => 'Material Issue Item',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['value'] ?? null,
+                            function (Builder $query, $value): Builder {
+                                return $query->whereHas('warehouseConfirmationItems', function (Builder $itemQuery) use ($value) {
+                                    if ($value === 'sale_order_item') {
+                                        $itemQuery->whereNotNull('sale_order_item_id');
+                                    }
+
+                                    if ($value === 'material_issue_item') {
+                                        $itemQuery->whereNotNull('material_issue_item_id');
+                                    }
+                                });
+                            },
+                        );
+                    }),
+                SelectFilter::make('product_id')
+                    ->label('Produk Request')
+                    ->searchable()
+                    ->options(function () {
+                        return Product::query()
+                            ->orderBy('name')
+                            ->limit(200)
+                            ->get()
+                            ->mapWithKeys(fn ($product) => [
+                                $product->id => sprintf('(%s) %s', $product->sku ?? '-', $product->name ?? '-'),
+                            ])
+                            ->all();
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['value'] ?? null,
+                            fn (Builder $query, $value): Builder => $query->whereHas('warehouseConfirmationItems', function (Builder $itemQuery) use ($value) {
+                                $itemQuery->where('product_id', $value);
+                            }),
+                        );
+                    }),
+                SelectFilter::make('confirmable_type')
+                    ->label('Tipe Dokumen')
+                    ->options([
+                        SaleOrder::class => 'Sales Order',
+                        \App\Models\ManufacturingOrder::class => 'Manufacturing Order',
+                        MaterialIssue::class => 'Material Issue',
+                        \App\Models\DeliveryOrder::class => 'Delivery Order',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['value'] ?? null,
+                            fn (Builder $query, $value): Builder => $query->where('confirmable_type', $value),
+                        );
+                    }),
+                SelectFilter::make('warehouse_id')
+                    ->label('Gudang Request')
+                    ->options(function () {
+                        return Warehouse::query()
+                            ->orderBy('name')
+                            ->get()
+                            ->mapWithKeys(fn ($warehouse) => [
+                                $warehouse->id => sprintf('(%s) %s', $warehouse->kode ?? '-', $warehouse->name ?? '-'),
+                            ])
+                            ->all();
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['value'] ?? null,
+                            fn (Builder $query, $value): Builder => $query->whereHas('warehouseConfirmationItems', function (Builder $itemQuery) use ($value) {
+                                $itemQuery->where('warehouse_id', $value);
+                            }),
+                        );
+                    }),
             ])
             ->actions([
                 ActionGroup::make([
@@ -407,6 +516,7 @@ class WarehouseConfirmationResource extends Resource
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Konfirmasi Gudang adalah proses validasi dari warehouse terhadap Sales Order atau Manufacturing Order sebelum eksekusi.</li>' .
                             '<li><strong>Status Flow:</strong> Request → Confirmed/Partial Confirmed/Rejected. Gudang memberikan konfirmasi kesiapan stok dan logistik.</li>' .
+                            '<li><strong>Granularitas:</strong> Untuk Delivery Order dan Material Issue, satu WC mewakili satu item request pada satu gudang sumber.</li>' .
                             '<li><strong>Related Orders:</strong> Untuk flow DO baru, WC dibuat saat Delivery Order dibuat dan selalu diproses manual oleh gudang.</li>' .
                             '<li><strong>Actions:</strong> Gunakan aksi <em>Approve</em> atau <em>Reject</em> untuk memproses request. Reject wajib isi alasan.</li>' .
                             '<li><strong>Tracking:</strong> Mencatat siapa yang mengkonfirmasi (Confirmed By) dan kapan dikonfirmasi (Confirmed At).</li>' .

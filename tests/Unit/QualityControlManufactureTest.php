@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\InventoryStock;
+use App\Models\JournalEntry;
 use App\Models\ManufacturingOrder;
 use App\Models\Product;
 use App\Models\Production;

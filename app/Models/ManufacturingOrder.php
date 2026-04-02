@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -36,6 +37,19 @@ class ManufacturingOrder extends Model
         'items' => 'array',
     ];
 
+    protected function items(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if (is_array($value) && ! empty($value)) {
+                    return $value;
+                }
+
+                return $this->resolveMaterialItemsFallback();
+            },
+        );
+    }
+
     public function production()
     {
         return $this->hasOne(Production::class, 'manufacturing_order_id')->withDefault();
@@ -49,6 +63,51 @@ class ManufacturingOrder extends Model
     public function productionPlan()
     {
         return $this->belongsTo(ProductionPlan::class, 'production_plan_id')->withDefault();
+    }
+
+    public function resolveMaterialItemsFallback(): array
+    {
+        if (! $this->production_plan_id) {
+            return [];
+        }
+
+        $this->loadMissing([
+            'productionPlan.billOfMaterial.items.product',
+            'productionPlan.billOfMaterial.cabang',
+            'productionPlan.saleOrder',
+            'productionPlan.warehouse',
+        ]);
+
+        $productionPlan = $this->productionPlan;
+
+        if (! $productionPlan->exists || ! $productionPlan->billOfMaterial->exists) {
+            return [];
+        }
+
+        $materialIssue = MaterialIssue::where('production_plan_id', $productionPlan->id)
+            ->where('status', 'completed')
+            ->with('items.product')
+            ->first();
+
+        if ($materialIssue) {
+            return $materialIssue->items->map(function ($issueItem) {
+                return [
+                    'product_id' => $issueItem->product_id,
+                    'uom_id' => $issueItem->uom_id,
+                    'quantity' => $issueItem->quantity,
+                    'notes' => null,
+                ];
+            })->values()->all();
+        }
+
+        return $productionPlan->billOfMaterial->items->map(function ($bomItem) use ($productionPlan) {
+            return [
+                'product_id' => $bomItem->product_id,
+                'uom_id' => $bomItem->uom_id,
+                'quantity' => $bomItem->quantity * $productionPlan->quantity,
+                'notes' => null,
+            ];
+        })->values()->all();
     }
 
     public function journalEntries()

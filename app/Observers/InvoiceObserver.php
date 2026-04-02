@@ -7,9 +7,11 @@ use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
 use App\Services\LedgerPostingService;
+use App\Support\ProcurementFailureNotifier;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class InvoiceObserver
 {
@@ -72,13 +74,18 @@ class InvoiceObserver
             // Post journal entries for purchase invoice (accrual basis)
             try {
                 $this->ledger->postInvoice($invoice);
-            } catch (\Throwable $e) {
+            } catch (Throwable $exception) {
                 Log::error('InvoiceObserver: failed to post purchase invoice journal on create', [
                     'invoice_id' => $invoice->id,
-                    'error'      => $e->getMessage(),
+                    'error'      => $exception->getMessage(),
                 ]);
-                // Re-throw so Filament surfaces this as a visible error to the user
-                throw $e;
+                if (! app()->runningInConsole()) {
+                    ProcurementFailureNotifier::danger(
+                        'Gagal Posting Jurnal Invoice',
+                        $exception,
+                        'Invoice berhasil dibuat, tetapi jurnal pembelian belum dapat diposting.'
+                    );
+                }
             }
         } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
             $fromModel = $invoice->fromModel;
@@ -139,7 +146,21 @@ class InvoiceObserver
 
         // If invoice already paid on creation, post to ledger
         if (strtolower($invoice->status) === Invoice::STATUS_PAID) {
-            $this->ledger->postInvoice($invoice);
+            try {
+                $this->ledger->postInvoice($invoice);
+            } catch (Throwable $exception) {
+                Log::error('InvoiceObserver: failed to post paid invoice', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $exception->getMessage(),
+                ]);
+                if (! app()->runningInConsole()) {
+                    ProcurementFailureNotifier::danger(
+                        'Gagal Posting Invoice Lunas',
+                        $exception,
+                        'Invoice lunas berhasil disimpan, tetapi jurnal belum dapat diposting.'
+                    );
+                }
+            }
         }
     }
 
@@ -183,27 +204,41 @@ class InvoiceObserver
                 } else {
                     $this->ledger->postInvoice($invoice);
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $exception) {
                 Log::error('InvoiceObserver: failed to re-post journal on update', [
                     'invoice_id' => $invoice->id,
-                    'error'      => $e->getMessage(),
+                    'error'      => $exception->getMessage(),
                 ]);
+                if (! app()->runningInConsole()) {
+                    ProcurementFailureNotifier::warning(
+                        'Gagal Memperbarui Jurnal Invoice',
+                        $exception,
+                        'Perubahan invoice berhasil disimpan, tetapi jurnal belum dapat diperbarui.'
+                    );
+                }
             }
         }
 
         // When invoice status becomes 'paid', post to ledger (if not already posted)
         if (strtolower($invoice->status) === Invoice::STATUS_PAID) {
             try {
-                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                if ($invoice->from_model_type == 'App\Models\SaleOrder') {
                     $this->postSalesInvoice($invoice);
                 } else {
                     $this->ledger->postInvoice($invoice);
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $exception) {
                 Log::error('InvoiceObserver: failed to post on status=paid', [
                     'invoice_id' => $invoice->id,
-                    'error'      => $e->getMessage(),
+                    'error'      => $exception->getMessage(),
                 ]);
+                if (! app()->runningInConsole()) {
+                    ProcurementFailureNotifier::danger(
+                        'Gagal Posting Jurnal Invoice',
+                        $exception,
+                        'Invoice berhasil disimpan, tetapi jurnal belum dapat diposting.'
+                    );
+                }
             }
         }
 

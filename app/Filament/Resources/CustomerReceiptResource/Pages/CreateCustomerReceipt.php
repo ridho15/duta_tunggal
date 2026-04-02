@@ -9,12 +9,14 @@ use App\Models\Invoice;
 use App\Models\AccountReceivable;
 use App\Models\CustomerReceiptItem;
 use App\Services\LedgerPostingService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
+use Throwable;
 
 class CreateCustomerReceipt extends CreateRecord
 {
@@ -390,10 +392,26 @@ class CreateCustomerReceipt extends CreateRecord
 
         if ($allPaid) {
             $record->update(['status' => 'Paid']);
-            app(LedgerPostingService::class)->postCustomerReceipt($record->fresh());
+            try {
+                app(LedgerPostingService::class)->postCustomerReceipt($record->fresh());
+            } catch (Throwable $exception) {
+                ProcurementFailureNotifier::danger(
+                    'Gagal Posting Jurnal Penerimaan',
+                    $exception,
+                    'Customer receipt berhasil diproses, tetapi jurnal penerimaan belum dapat dibuat.'
+                );
+            }
         } elseif ($anyPartial) {
             $record->update(['status' => 'Partial']);
-            app(LedgerPostingService::class)->postCustomerReceipt($record->fresh());
+            try {
+                app(LedgerPostingService::class)->postCustomerReceipt($record->fresh());
+            } catch (Throwable $exception) {
+                ProcurementFailureNotifier::danger(
+                    'Gagal Posting Jurnal Penerimaan',
+                    $exception,
+                    'Customer receipt berhasil diproses, tetapi jurnal penerimaan belum dapat dibuat.'
+                );
+            }
         }
     }
 }

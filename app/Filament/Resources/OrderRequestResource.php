@@ -11,6 +11,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\OrderRequestService;
+use App\Support\ProcurementFailureNotifier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Forms\Components\Checkbox;
@@ -33,6 +34,7 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
+use Throwable;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
@@ -797,7 +799,7 @@ class OrderRequestResource extends Resource
                         ->action(function ($record) {
                             $pdf = Pdf::loadView('pdf.order-request', [
                                 'orderRequest' => $record
-                            ])->setPaper('A4', 'potrait');
+                            ])->setPaper('A4', 'portrait');
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
@@ -1060,43 +1062,51 @@ class OrderRequestResource extends Resource
                             );
                         })
                         ->action(function (array $data, $record) {
-                            $orderRequestService = app(OrderRequestService::class);
+                            try {
+                                $orderRequestService = app(OrderRequestService::class);
 
-                            if (! empty($data['multi_supplier'])) {
-                                // Multi-supplier mode: group included items by supplier and create one PO each
-                                $includedItems = collect($data['selected_items'])->filter(fn($i) => $i['include'] ?? false);
-                                if ($includedItems->isEmpty()) {
-                                    HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
-                                    return;
-                                }
-                                $groups = $includedItems->groupBy('item_supplier_id');
-                                $created = 0;
-                                foreach ($groups as $supplierId => $groupItems) {
-                                    if (empty($supplierId)) continue;
-                                    $poNumber = HelperController::generatePoNumber();
-                                    // Make sure it's unique
-                                    while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
-                                        $poNumber = HelperController::generatePoNumber();
+                                if (! empty($data['multi_supplier'])) {
+                                    // Multi-supplier mode: group included items by supplier and create one PO each
+                                    $includedItems = collect($data['selected_items'])->filter(fn($i) => $i['include'] ?? false);
+                                    if ($includedItems->isEmpty()) {
+                                        HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                        return;
                                     }
-                                    $poData = array_merge($data, [
-                                        'supplier_id'    => $supplierId,
-                                        'po_number'      => $poNumber,
-                                        'selected_items' => $groupItems->values()->toArray(),
-                                        'multi_supplier' => false,
-                                    ]);
-                                    $orderRequestService->createPurchaseOrder($record, $poData);
-                                    $created++;
+                                    $groups = $includedItems->groupBy('item_supplier_id');
+                                    $created = 0;
+                                    foreach ($groups as $supplierId => $groupItems) {
+                                        if (empty($supplierId)) continue;
+                                        $poNumber = HelperController::generatePoNumber();
+                                        // Make sure it's unique
+                                        while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
+                                            $poNumber = HelperController::generatePoNumber();
+                                        }
+                                        $poData = array_merge($data, [
+                                            'supplier_id'    => $supplierId,
+                                            'po_number'      => $poNumber,
+                                            'selected_items' => $groupItems->values()->toArray(),
+                                            'multi_supplier' => false,
+                                        ]);
+                                        $orderRequestService->createPurchaseOrder($record, $poData);
+                                        $created++;
+                                    }
+                                    HelperController::sendNotification(isSuccess: true, title: 'Berhasil', message: "{$created} Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
+                                } else {
+                                    // Single supplier mode (existing behaviour)
+                                    $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
+                                    if ($purchaseOrder) {
+                                        HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
+                                        return;
+                                    }
+                                    $orderRequestService->createPurchaseOrder($record, $data);
+                                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
                                 }
-                                HelperController::sendNotification(isSuccess: true, title: 'Berhasil', message: "{$created} Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
-                            } else {
-                                // Single supplier mode (existing behaviour)
-                                $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
-                                if ($purchaseOrder) {
-                                    HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
-                                    return;
-                                }
-                                $orderRequestService->createPurchaseOrder($record, $data);
-                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
+                            } catch (Throwable $exception) {
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Memproses Order Request',
+                                    $exception,
+                                    'Order request belum dapat diproses. Periksa data yang dipilih lalu coba lagi.'
+                                );
                             }
                         }),
                     Action::make('approve')

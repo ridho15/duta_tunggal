@@ -212,6 +212,56 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame('draft', $invoice->fresh()->status);
     }
 
+    public function test_purchase_invoice_pdf_renders_supplier_and_ppn_correctly(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $invoice = Invoice::withoutEvents(function () use ($purchaseOrder) {
+            return Invoice::factory()->create([
+                'invoice_number' => 'PINV-PDF-' . rand(1000, 9999),
+                'from_model_type' => PurchaseOrder::class,
+                'from_model_id' => $purchaseOrder->id,
+                'invoice_date' => now(),
+                'due_date' => now()->addDays(14),
+                'subtotal' => 100000,
+                'dpp' => 100000,
+                'ppn_rate' => 11,
+                'tax' => 11,
+                'total' => 111000,
+                'status' => 'draft',
+                'purchase_receipts' => [],
+                'cabang_id' => $this->cabang->id,
+            ]);
+        });
+
+        InvoiceItem::factory()->create([
+            'invoice_id' => $invoice->id,
+            'product_id' => $this->product->id,
+            'quantity' => 5,
+            'price' => 20000,
+            'subtotal' => 100000,
+            'tax_rate' => 11,
+            'tax_amount' => 11000,
+            'total' => 111000,
+        ]);
+
+        $html = view('pdf.purchase-order-invoice-2', [
+            'invoice' => $invoice->load('fromModel', 'invoiceItem.product', 'cabang'),
+        ])->render();
+
+        $this->assertStringContainsString('INVOICE PEMBELIAN', $html);
+        $this->assertStringContainsString($this->supplier->perusahaan, $html);
+        $this->assertStringContainsString('PPN 11,00%', $html);
+        $this->assertStringContainsString('Rp 11.000', $html);
+        $this->assertStringContainsString('Rp 111.000', $html);
+    }
+
     public function test_purchase_invoice_form_has_required_fields()
     {
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)

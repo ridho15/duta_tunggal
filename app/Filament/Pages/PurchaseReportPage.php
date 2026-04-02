@@ -40,15 +40,19 @@ class PurchaseReportPage extends Page implements HasTable
 
     public function mount(): void
     {
-        $this->form->fill([
-            'start_date' => now()->startOfMonth()->format('Y-m-d'),
-            'end_date' => now()->format('Y-m-d'),
-            'supplier_id' => null,
-            'status' => null,
-            'sort_by_total' => null,
-        ]);
+        $this->start_date = now()->startOfMonth()->format('Y-m-d');
+        $this->end_date = now()->format('Y-m-d');
+        $this->supplier_id = null;
+        $this->status = null;
+        $this->sort_by_total = null;
 
-        $this->updateFilters();
+        $this->form->fill([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'supplier_id' => $this->supplier_id,
+            'status' => $this->status,
+            'sort_by_total' => $this->sort_by_total,
+        ]);
     }
 
     public function table(Table $table): Table
@@ -84,7 +88,6 @@ class PurchaseReportPage extends Page implements HasTable
                     ->label('Export Excel')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        $this->updateFilters();
                         $query = $this->getFilteredQuery();
                         return Excel::download(new PurchaseReportExport($query), 'purchase_report.xlsx');
                     }),
@@ -92,7 +95,6 @@ class PurchaseReportPage extends Page implements HasTable
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        $this->updateFilters();
                         $query = $this->getFilteredQuery();
 
                         $pdf = Pdf::loadView('reports.purchase_report', [
@@ -144,7 +146,7 @@ class PurchaseReportPage extends Page implements HasTable
                     ->searchable()
                     ->getSearchResultsUsing(function (string $search): array {
                         return Supplier::where('code', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%")
+                            ->orWhere('perusahaan', 'like', "%{$search}%")
                             ->limit(50)
                             ->get()
                             ->mapWithKeys(function ($supplier) {
@@ -175,8 +177,8 @@ class PurchaseReportPage extends Page implements HasTable
                 Select::make('sort_by_total')
                     ->label('Urutkan Total')
                     ->options([
-                        'asc' => 'Tertinggi ke Terendah',
-                        'desc' => 'Terendah ke Tertinggi',
+                        'asc' => 'Terendah ke Tertinggi',
+                        'desc' => 'Tertinggi ke Terendah',
                     ])
                     ->placeholder('Tidak diurutkan')
                     ->live()
@@ -215,14 +217,6 @@ class PurchaseReportPage extends Page implements HasTable
 
     public function updateFilters(): void
     {
-        $formData = $this->form->getState();
-        $this->start_date = $formData['start_date'] ?? null;
-        $this->end_date = $formData['end_date'] ?? null;
-        $this->supplier_id = $formData['supplier_id'] ?? null;
-        $this->status = $formData['status'] ?? null;
-        $this->sort_by_total = $formData['sort_by_total'] ?? null;
-
-        // Reset table pagination when filters change
         $this->resetTable();
     }
 

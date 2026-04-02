@@ -54,13 +54,19 @@ class ViewSaleOrder extends ViewRecord
                     ->color('success')
                     ->icon('heroicon-o-arrow-uturn-up')
                     ->visible(function ($record) {
-                        return Auth::user()->hasPermissionTo('request sales order') && $record->status == 'draft';
+                        return Auth::user()->hasPermissionTo('request sales order')
+                               && $record->status == 'draft'
+                               && ! $record->hasInsufficientStock();
                     })
                     ->action(function ($record) {
                         try {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->requestApprove($record);
                             HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
+                        } catch (ValidationException $e) {
+                            $messages = collect($e->errors())->flatten()->implode(' ');
+
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Mengajukan Persetujuan", message: $messages ?: 'Validasi request approve gagal.');
                         } catch (\Exception $e) {
                             Log::error('ViewSaleOrder request_approve failed', [
                                 'sale_order_id' => $record->id,
@@ -103,13 +109,19 @@ class ViewSaleOrder extends ViewRecord
                     ->color('success')
                     ->icon('heroicon-o-check-badge')
                     ->visible(function ($record) {
-                        return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
+                        return Auth::user()->hasPermissionTo('response sales order')
+                               && ($record->status == 'request_approve')
+                               && ! $record->hasInsufficientStock();
                     })
                     ->action(function ($record) {
                         try {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->approve($record);
                             HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
+                        } catch (ValidationException $e) {
+                            $messages = collect($e->errors())->flatten()->implode(' ');
+
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
                         } catch (\Exception $e) {
                             Log::error('ViewSaleOrder approve failed', [
                                 'sale_order_id' => $record->id,
@@ -179,7 +191,7 @@ class ViewSaleOrder extends ViewRecord
                     ->action(function ($record) {
                         $pdf = Pdf::loadView('pdf.sales-order', [
                             'saleOrder' => $record
-                        ])->setPaper('A4', 'potrait');
+                        ])->setPaper('A4', 'portrait');
 
                         return response()->streamDownload(function () use ($pdf) {
                             echo $pdf->stream();

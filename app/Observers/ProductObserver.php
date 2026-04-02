@@ -11,11 +11,10 @@ class ProductObserver
     {
         // Set default COA mappings if not already set
         if (!$product->inventory_coa_id) {
-            $inventoryCoa = ChartOfAccount::where('code', config('coa.inventory', '1140.01'))->first()
-                ?? ChartOfAccount::where('code', '1140.10')->first();
-            if ($inventoryCoa) {
-                $product->inventory_coa_id = $inventoryCoa->id;
-            }
+            $product->inventory_coa_id = Product::resolveDefaultInventoryCoaId(
+                (bool) $product->is_manufacture,
+                (bool) $product->is_raw_material,
+            );
         }
 
         if (!$product->sales_coa_id) {

@@ -18,6 +18,7 @@ use App\Services\ReturnProductService;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -51,6 +52,101 @@ class QualityControlManufactureResource extends Resource
     protected static ?string $navigationLabel = 'Quality Control Manufacture';
 
     protected static ?int $navigationSort = 6;
+
+    public static function getProductionQuery(?QualityControl $record = null): Builder
+    {
+        $currentProductionId = $record?->from_model_type === Production::class
+            ? $record->from_model_id
+            : null;
+        $qualityControlTable = (new QualityControl())->getTable();
+        $productionTable = (new Production())->getTable();
+
+        return Production::query()
+            ->with(['manufacturingOrder.productionPlan.product'])
+            ->whereIn('status', ['finished', 'completed'])
+            ->where(function (Builder $query) use ($currentProductionId, $qualityControlTable, $productionTable) {
+                $query->whereNotExists(function ($subQuery) use ($qualityControlTable, $productionTable) {
+                    $subQuery->selectRaw('1')
+                        ->from($qualityControlTable)
+                        ->whereColumn("{$qualityControlTable}.from_model_id", "{$productionTable}.id")
+                        ->where("{$qualityControlTable}.from_model_type", Production::class)
+                        ->whereNull("{$qualityControlTable}.deleted_at");
+                });
+
+                if ($currentProductionId) {
+                    $query->orWhere('id', $currentProductionId);
+                }
+            })
+            ->orderByDesc('production_date')
+            ->orderByDesc('id');
+    }
+
+    public static function getProductionOptionLabel(?Production $production): string
+    {
+        if (! $production || ! $production->exists) {
+            return '-';
+        }
+
+        $production->loadMissing('manufacturingOrder.productionPlan.product');
+
+        $manufacturingOrder = $production->manufacturingOrder;
+        $productionPlan = $manufacturingOrder?->productionPlan;
+        $product = $productionPlan?->product;
+        $quantity = $production->quantity_produced ?? $productionPlan?->quantity ?? 0;
+
+        return sprintf(
+            'MO: %s - %s (Qty: %s)',
+            $manufacturingOrder?->mo_number ?? '-',
+            $product?->name ?? '-',
+            rtrim(rtrim(number_format((float) $quantity, 2, '.', ''), '0'), '.')
+        );
+    }
+
+    public static function getProductionSelectOptions(?QualityControl $record = null): array
+    {
+        return static::getProductionQuery($record)
+            ->get()
+            ->mapWithKeys(function (Production $production) {
+                return [$production->id => static::getProductionOptionLabel($production)];
+            })
+            ->all();
+    }
+
+    public static function findProductionOptionLabel($value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        $production = Production::query()
+            ->with(['manufacturingOrder.productionPlan.product'])
+            ->find($value);
+
+        if (! $production) {
+            return null;
+        }
+
+        return static::getProductionOptionLabel($production);
+    }
+
+    public static function resolveProductionContext(?Production $production): array
+    {
+        $production?->loadMissing('manufacturingOrder.productionPlan.product');
+
+        $manufacturingOrder = $production?->manufacturingOrder;
+        $productionPlan = $manufacturingOrder?->productionPlan;
+
+        return [
+            'product_id' => $productionPlan?->product_id,
+            'product_name' => $productionPlan?->product?->name,
+            'warehouse_id' => $production?->warehouse_id ?? $productionPlan?->warehouse_id,
+            'rak_id' => $production?->rak_id,
+            'passed_quantity' => (float) ($production?->quantity_produced ?? $productionPlan?->quantity ?? 0),
+            'rejected_quantity' => 0,
+            'total_inspected' => (float) ($production?->quantity_produced ?? $productionPlan?->quantity ?? 0),
+            'cabang_id' => $manufacturingOrder?->cabang_id ?? $productionPlan?->cabang_id ?? Auth::user()?->cabang_id,
+        ];
+    }
 
     public static function buildProcessingFormSchema(?QualityControl $record): array
     {
@@ -144,29 +240,30 @@ class QualityControlManufactureResource extends Resource
                             ->columns(2)
                             ->columnSpanFull()
                             ->schema([
+                                Hidden::make('from_model_type')
+                                    ->default(Production::class),
+                                Hidden::make('product_id')
+                                    ->default(fn (?QualityControl $record) => $record?->product_id),
+                                Hidden::make('cabang_id')
+                                    ->default(fn (?QualityControl $record) => $record?->cabang_id ?? Auth::user()?->cabang_id),
                                 Select::make('from_model_id')
                                     ->label('From Production')
-                                    ->options(Production::with(['manufacturingOrder.productionPlan.product'])
-                                        ->whereDoesntHave('qualityControl')
-                                        ->whereIn('status', ['finished', 'completed'])
-                                        ->get()
-                                        ->mapWithKeys(function ($production) {
-                                            $mo = $production->manufacturingOrder;
-                                            $product = $mo->productionPlan->product;
-
-                                            $label = "MO: {$mo->mo_number} - {$product->name} (Qty: {$production->quantity_produced})";
-                                            return [$production->id => $label];
-                                        }))
+                                    ->options(fn (?QualityControl $record) => static::getProductionSelectOptions($record))
+                                    ->getOptionLabelUsing(fn ($value) => static::findProductionOptionLabel($value))
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $production = Production::with(['manufacturingOrder'])->find($state);
+                                        $production = Production::query()
+                                            ->with(['manufacturingOrder.productionPlan.product'])
+                                            ->find($state);
+
                                         if ($production) {
-                                            $set('product_id', $production->manufacturingOrder->productionPlan->product_id);
-                                            $set('warehouse_id', $production->warehouse_id);
-                                            $set('passed_quantity', $production->quantity_produced);
-                                            $set('rejected_quantity', 0);
+                                            $context = static::resolveProductionContext($production);
+
+                                            foreach ($context as $field => $value) {
+                                                $set($field, $value);
+                                            }
                                         }
                                     })
                                     ->required()
@@ -190,6 +287,7 @@ class QualityControlManufactureResource extends Resource
                             ->schema([
                                 TextInput::make('product_name')
                                     ->label('Product')
+                                    ->default(fn (?QualityControl $record) => $record?->product?->name)
                                     ->disabled()
                                     ->dehydrated(false)
                                     ->afterStateUpdated(function ($set, $get) {
@@ -288,6 +386,7 @@ class QualityControlManufactureResource extends Resource
                                     ]),
                                 TextInput::make('total_inspected')
                                     ->label('Total Inspected')
+                                    ->default(fn (?QualityControl $record) => (float) (($record?->passed_quantity ?? 0) + ($record?->rejected_quantity ?? 0)))
                                     ->disabled()
                                     ->dehydrated(false)
                                     ->reactive()

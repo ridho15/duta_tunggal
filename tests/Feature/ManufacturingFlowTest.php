@@ -274,6 +274,8 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
     expect((float) $fgMovement->sum('credit'))->toBe(0.0);
 });
 
+test('manufacturing flow keeps balance sheet balanced', function () {
+    $branch = Cabang::factory()->create();
 
     $balanceSheet = app(BalanceSheetService::class)->generate([
         'as_of_date' => now()->format('Y-m-d'),
@@ -282,6 +284,8 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
 
     expect($balanceSheet['is_balanced'])->toBeTrue();
     expect((float) $balanceSheet['difference'])->toBe(0.0);
+});
+
 test('create manufacturing order from production plan', function () {
     $branch = Cabang::factory()->create();
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);

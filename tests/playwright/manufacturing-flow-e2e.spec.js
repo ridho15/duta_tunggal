@@ -20,6 +20,8 @@ test.describe.serial('Manufacturing full flow', () => {
   test('material issue shows available and reserved stock across reserve flow', async ({ page }) => {
     const issueId = querySingleValue(`DB::table('material_issues')->where('issue_number', '${FIXTURE.issueNumber}')->value('id')`)
     expect(issueId).toBeTruthy()
+      const manufacturingOrderId = querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('manufacturing_order_id')`)
+      expect(manufacturingOrderId).toBeTruthy()
 
     const readStockField = async (label) => {
       const field = page.getByRole('textbox', { name: label }).first()
@@ -48,7 +50,17 @@ test.describe.serial('Manufacturing full flow', () => {
       { timeout: 15000 },
     ).toBe('pending_approval')
 
-    await page.goto(`${BASE}/admin/material-issues?tableAction=approve&tableActionRecord=${issueId}`)
+      const warehouseConfirmationId = querySingleValue(
+        `DB::table('warehouse_confirmations')->where('confirmable_type', 'App\\Models\\MaterialIssue')->where('confirmable_id', ${issueId})->value('id')`,
+      )
+    expect(warehouseConfirmationId).toBeTruthy()
+
+    await expect.poll(
+      () => querySingleValue(`DB::table('warehouse_confirmations')->where('id', ${warehouseConfirmationId})->value('status')`),
+      { timeout: 15000 },
+    ).toBe('request')
+
+    await page.goto(`${BASE}/admin/warehouse-confirmations?tableAction=approve&tableActionRecord=${warehouseConfirmationId}`)
     await page.waitForLoadState('networkidle')
     await confirmDialogAction(page, 'Konfirmasi')
     await expect.poll(

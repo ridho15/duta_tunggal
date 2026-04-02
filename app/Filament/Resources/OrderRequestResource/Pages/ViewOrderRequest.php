@@ -8,6 +8,7 @@ use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Services\OrderRequestService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -25,6 +26,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class ViewOrderRequest extends ViewRecord
 {
@@ -322,53 +324,61 @@ class ViewOrderRequest extends ViewRecord
                     return $record->status == 'request_approve' && Auth::user()->hasPermissionTo('approve order request');
                 })
                 ->action(function (array $data, $record) {
-                    $orderRequestService = app(OrderRequestService::class);
-                    if ($data['create_purchase_order']) {
-                        if (!empty($data['multi_supplier'])) {
-                            $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
-                            if ($includedItems->isEmpty()) {
-                                HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                    try {
+                        $orderRequestService = app(OrderRequestService::class);
+                        if ($data['create_purchase_order']) {
+                            if (!empty($data['multi_supplier'])) {
+                                $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                                if ($includedItems->isEmpty()) {
+                                    HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                    return;
+                                }
+
+                                $groups = $includedItems->groupBy('item_supplier_id');
+                                $created = 0;
+                                foreach ($groups as $supplierId => $groupItems) {
+                                    if (empty($supplierId)) {
+                                        continue;
+                                    }
+                                    $poNumber = HelperController::generatePoNumber();
+                                    while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
+                                        $poNumber = HelperController::generatePoNumber();
+                                    }
+
+                                    $poData = array_merge($data, [
+                                        'supplier_id'    => $supplierId,
+                                        'po_number'      => $poNumber,
+                                        'selected_items' => $groupItems->values()->toArray(),
+                                        'multi_supplier' => false,
+                                    ]);
+
+                                    $orderRequestService->createPurchaseOrder($record, $poData);
+                                    $created++;
+                                }
+
+                                $record->refresh();
+                                $record->update(['status' => 'approved']);
+                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
                                 return;
                             }
 
-                            $groups = $includedItems->groupBy('item_supplier_id');
-                            $created = 0;
-                            foreach ($groups as $supplierId => $groupItems) {
-                                if (empty($supplierId)) {
-                                    continue;
-                                }
-                                $poNumber = HelperController::generatePoNumber();
-                                while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
-                                    $poNumber = HelperController::generatePoNumber();
-                                }
-
-                                $poData = array_merge($data, [
-                                    'supplier_id'    => $supplierId,
-                                    'po_number'      => $poNumber,
-                                    'selected_items' => $groupItems->values()->toArray(),
-                                    'multi_supplier' => false,
-                                ]);
-
-                                $orderRequestService->createPurchaseOrder($record, $poData);
-                                $created++;
+                            $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
+                            if ($purchaseOrder) {
+                                HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
+                                return;
                             }
-
-                            $record->refresh();
-                            $record->update(['status' => 'approved']);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
-                            return;
                         }
 
-                        $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
-                        if ($purchaseOrder) {
-                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
-                            return;
-                        }
+                        $orderRequestService->approve($record, $data);
+                        $record->refresh();
+                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
+                    } catch (Throwable $exception) {
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Memproses Order Request',
+                            $exception,
+                            'Order request belum dapat diproses. Periksa data yang dipilih lalu coba lagi.'
+                        );
                     }
-
-                    $orderRequestService->approve($record, $data);
-                    $record->refresh();
-                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
                 }),
             Action::make('create_purchase_order')
                 ->label('Create Purchase Order')

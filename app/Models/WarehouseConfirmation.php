@@ -51,6 +51,89 @@ class WarehouseConfirmation extends Model
         return $this->hasMany(WarehouseConfirmationItem::class);
     }
 
+    public function getPrimaryItemAttribute(): ?WarehouseConfirmationItem
+    {
+        return $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems->first()
+            : $this->warehouseConfirmationItems()->with(['warehouse', 'saleOrderItem.product', 'materialIssueItem.product', 'product'])->first();
+    }
+
+    public function getItemCountAttribute(): int
+    {
+        return $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems->count()
+            : $this->warehouseConfirmationItems()->count();
+    }
+
+    public function getPrimaryItemSourceLabelAttribute(): string
+    {
+        return $this->primary_item?->source_item_display ?? '-';
+    }
+
+    public function getPrimaryItemProductLabelAttribute(): string
+    {
+        return $this->primary_item?->product_display ?? '-';
+    }
+
+    public function getPrimaryItemWarehouseLabelAttribute(): string
+    {
+        $warehouse = $this->primary_item?->warehouse;
+
+        if (! $warehouse || ! $warehouse->exists) {
+            return '-';
+        }
+
+        return sprintf('(%s) %s', $warehouse->kode ?? '-', $warehouse->name ?? '-');
+    }
+
+    public function getRequestQtySummaryAttribute(): string
+    {
+        $items = $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems
+            : $this->warehouseConfirmationItems()->get(['requested_qty']);
+
+        if ($items->isEmpty()) {
+            return '-';
+        }
+
+        $totalQty = rtrim(rtrim((string) $items->sum('requested_qty'), '0'), '.');
+
+        if ($items->count() === 1) {
+            return $totalQty;
+        }
+
+        return sprintf('%d baris / qty %s', $items->count(), $totalQty);
+    }
+
+    public function getItemAuditSummaryAttribute(): string
+    {
+        $items = $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems
+            : $this->warehouseConfirmationItems()->with(['warehouse', 'saleOrderItem.product', 'materialIssueItem.product', 'product'])->get();
+
+        if ($items->isEmpty()) {
+            return '-';
+        }
+
+        if ($items->count() === 1) {
+            $item = $items->first();
+
+            return sprintf(
+                '%s | %s | Gudang %s | Qty %s',
+                $item->source_item_display,
+                $item->product_display,
+                $item->warehouse?->name ?? '-',
+                rtrim(rtrim((string) $item->requested_qty, '0'), '.')
+            );
+        }
+
+        return sprintf(
+            '%d item request | Qty %s',
+            $items->count(),
+            rtrim(rtrim((string) $items->sum('requested_qty'), '0'), '.')
+        );
+    }
+
     // ─────────────────────────── Helpers ─────────────────────────────────
 
     /** Return the linked SaleOrder when confirmable is SaleOrder, else null. */
@@ -84,6 +167,7 @@ class WarehouseConfirmation extends Model
         return match ($this->confirmable_type) {
             SaleOrder::class          => $model->so_number ?? 'SO #' . $this->confirmable_id,
             ManufacturingOrder::class => $model->mo_number ?? 'MO #' . $this->confirmable_id,
+            MaterialIssue::class      => $model->issue_number ?? 'MI #' . $this->confirmable_id,
             DeliveryOrder::class      => $model->do_number ?? 'DO #' . $this->confirmable_id,
             default                   => '#' . $this->confirmable_id,
         };
@@ -95,6 +179,7 @@ class WarehouseConfirmation extends Model
         return match ($this->confirmable_type) {
             SaleOrder::class          => 'Sales Order',
             ManufacturingOrder::class => 'Manufacturing Order',
+            MaterialIssue::class      => 'Material Issue',
             DeliveryOrder::class      => 'Delivery Order',
             default                   => $this->confirmable_type ?? '-',
         };
@@ -116,7 +201,7 @@ class WarehouseConfirmation extends Model
         });
 
         static::created(function ($wc) {
-            $wc->load(['confirmable', 'warehouseConfirmationItems.saleOrderItem.product']);
+            $wc->load(['confirmable', 'warehouseConfirmationItems.saleOrderItem.product', 'warehouseConfirmationItems.materialIssueItem.product']);
 
             // SO-linked WC created as already confirmed: update SO status immediately
             if ($wc->status === 'confirmed' && $wc->confirmable_type === SaleOrder::class) {
@@ -131,6 +216,14 @@ class WarehouseConfirmation extends Model
                         'so_id' => $wc->confirmable_id,
                     ]);
                 }
+            }
+
+            if ($wc->status === 'confirmed' && $wc->confirmable_type === ManufacturingOrder::class) {
+                static::syncPendingManufacturingMaterialIssues($wc);
+            }
+
+            if (in_array(strtolower((string) $wc->status), ['confirmed', 'rejected', 'partial_confirmed'], true)) {
+                static::syncMaterialIssueStatus($wc);
             }
         });
 
@@ -193,11 +286,59 @@ class WarehouseConfirmation extends Model
 
         // DO-linked WC status changed → re-evaluate DO's overall status
         static::updated(function ($wc) {
-            if ($wc->wasChanged('status') && $wc->confirmable_type === DeliveryOrder::class) {
-                $do = DeliveryOrder::find($wc->confirmable_id);
-                $do?->updateStatusFromWarehouseConfirmations();
+            if ($wc->wasChanged('status')) {
+                if ($wc->confirmable_type === DeliveryOrder::class) {
+                    $do = DeliveryOrder::find($wc->confirmable_id);
+                    $do?->updateStatusFromWarehouseConfirmations();
+                }
+
+                if ($wc->confirmable_type === ManufacturingOrder::class && strtolower((string) $wc->status) === 'confirmed') {
+                    static::syncPendingManufacturingMaterialIssues($wc);
+                }
+
+                if ($wc->confirmable_type === MaterialIssue::class) {
+                    static::syncMaterialIssueStatus($wc);
+                }
             }
         });
+    }
+
+    protected static function syncMaterialIssueStatus(WarehouseConfirmation $wc): void
+    {
+        if ($wc->confirmable_type !== MaterialIssue::class) {
+            return;
+        }
+
+        $materialIssue = $wc->confirmable;
+        if (! $materialIssue instanceof MaterialIssue) {
+            return;
+        }
+
+        $materialIssue->approveFromWarehouseConfirmation($wc);
+    }
+
+    protected static function syncPendingManufacturingMaterialIssues(WarehouseConfirmation $wc): void
+    {
+        $wc->loadMissing('confirmable');
+
+        $productionPlanId = $wc->confirmable?->production_plan_id;
+
+        MaterialIssue::query()
+            ->where('status', MaterialIssue::STATUS_PENDING_APPROVAL)
+            ->where(function ($query) use ($wc, $productionPlanId) {
+                $query->where('manufacturing_order_id', $wc->confirmable_id);
+
+                if ($productionPlanId) {
+                    $query->orWhere(function ($nestedQuery) use ($productionPlanId) {
+                        $nestedQuery->whereNull('manufacturing_order_id')
+                            ->where('production_plan_id', $productionPlanId);
+                    });
+                }
+            })
+            ->get()
+            ->each(function (MaterialIssue $materialIssue) use ($wc) {
+                $materialIssue->approveFromWarehouseConfirmation($wc);
+            });
     }
 
 }

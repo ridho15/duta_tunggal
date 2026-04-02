@@ -82,6 +82,10 @@ class ViewManufacturingOrder extends ViewRecord
         }
 
         $data['satuan_konversi'] = $listConversions;
+        if (empty($data['items'])) {
+            $data['items'] = ManufacturingOrderResource::resolveMaterialItems($record);
+        }
+
         return $data;
     }
 }

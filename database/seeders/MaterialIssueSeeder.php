@@ -6,9 +6,9 @@ use App\Models\ProductionPlan;
 use App\Models\ManufacturingOrder;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
+use App\Services\ManufacturingService;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Models\WarehouseConfirmation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -88,6 +88,7 @@ class MaterialIssueSeeder extends Seeder
                 'material_issue_id' => $materialIssue->id,
                 'product_id' => $bomItem->product_id,
                 'uom_id' => $bomItem->product->uom_id ?? 1,
+                'warehouse_id' => $plan->warehouse_id ?? $warehouse->id,
                 'quantity' => $requiredQuantity,
                 'cost_per_unit' => $unitCost,
                 'total_cost' => $itemTotalCost,
@@ -100,16 +101,36 @@ class MaterialIssueSeeder extends Seeder
         // Update total cost
         $materialIssue->update(['total_cost' => $totalCost]);
 
-        WarehouseConfirmation::create([
-            'confirmable_type' => ManufacturingOrder::class,
-            'confirmable_id' => $mo->id,
-            'confirmation_type' => 'manufacturing_order',
-            'status' => 'confirmed',
-            'confirmed_by' => $user->id,
-            'confirmed_at' => Carbon::now(),
+        app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($materialIssue, [
+            'status' => 'request',
+            'confirmed_by' => null,
+            'confirmed_at' => null,
         ]);
 
-        $materialIssue->items()->where('status', 'draft')->update(['status' => 'approved']);
+        $warehouseConfirmations = $materialIssue->warehouseConfirmations()
+            ->with('warehouseConfirmationItems')
+            ->get();
+
+        $warehouseConfirmations->each(function ($warehouseConfirmation) use ($user) {
+            $warehouseConfirmation->warehouseConfirmationItems->each(function ($warehouseConfirmationItem) use ($user) {
+                $warehouseConfirmationItem->update([
+                    'status' => 'confirmed',
+                    'confirmed_qty' => $warehouseConfirmationItem->requested_qty,
+                ]);
+            });
+
+            $warehouseConfirmation->forceFill([
+                'confirmed_by' => $user->id,
+                'confirmed_at' => Carbon::now(),
+            ])->save();
+        });
+
+        $materialIssue = $materialIssue->fresh();
+
+        $materialIssue->update([
+            'approved_by' => $user->id,
+            'approved_at' => Carbon::now(),
+        ]);
 
         $materialIssue->update([
             'status' => 'completed',

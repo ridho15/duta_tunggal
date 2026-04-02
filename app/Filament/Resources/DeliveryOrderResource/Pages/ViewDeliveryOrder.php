@@ -329,7 +329,7 @@ class ViewDeliveryOrder extends ViewRecord
 
                     $pdf = Pdf::loadView('pdf.delivery-order', [
                         'deliveryOrder' => $record
-                    ])->setPaper('A4', 'potrait');
+                    ])->setPaper('A4', 'portrait');
 
                     return response()->streamDownload(function () use ($pdf) {
                         echo $pdf->stream();

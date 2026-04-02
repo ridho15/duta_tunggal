@@ -490,7 +490,7 @@ class InvoiceResource extends Resource
                             if ($record->from_model_type == 'App\Models\PurchaseOrder') {
                                 $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
                                     'invoice' => $record
-                                ])->setPaper('A4', 'potrait');
+                                ])->setPaper('A4', 'portrait');
 
                                 return response()->streamDownload(function () use ($pdf) {
                                     echo $pdf->stream();
@@ -498,7 +498,7 @@ class InvoiceResource extends Resource
                             } elseif ($record->from_model_type == 'App\Models\SaleOrder') {
                                 $pdf = Pdf::loadView('pdf.sale-order-invoice', [
                                     'invoice' => $record
-                                ])->setPaper('A4', 'potrait');
+                                ])->setPaper('A4', 'portrait');
 
                                 return response()->streamDownload(function () use ($pdf) {
                                     echo $pdf->stream();

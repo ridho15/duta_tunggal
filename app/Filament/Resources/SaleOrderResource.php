@@ -343,20 +343,35 @@ class SaleOrderResource extends Resource
                                             ->maxLength(255),
                                         TextInput::make('email')
                                             ->email()
+                                            ->validationMessages([
+                                                'required' => 'Email customer tidak boleh kosong',
+                                                'email' => 'Format email customer tidak valid',
+                                            ])
                                             ->required()
                                             ->maxLength(255),
                                         TextInput::make('fax')
                                             ->label('Fax')
+                                            ->validationMessages([
+                                                'required' => 'Fax customer tidak boleh kosong',
+                                            ])
                                             ->required(),
                                         TextInput::make('tempo_kredit')
                                             ->numeric()
                                             ->label('Tempo Kredit (Hari)')
                                             ->helperText('Hari')
+                                            ->validationMessages([
+                                                'required' => 'Tempo kredit customer tidak boleh kosong',
+                                                'numeric' => 'Tempo kredit customer harus berupa angka',
+                                            ])
                                             ->required()
                                             ->default(0),
                                         TextInput::make('kredit_limit')
                                             ->label('Kredit Limit (Rp.)')
                                             ->default(0)
+                                            ->validationMessages([
+                                                'required' => 'Kredit limit customer tidak boleh kosong',
+                                                'numeric' => 'Kredit limit customer harus berupa angka',
+                                            ])
                                             ->required()
                                             ->indonesianMoney(),
                                         Radio::make('tipe_pembayaran')
@@ -366,7 +381,10 @@ class SaleOrderResource extends Resource
                                                 'Bebas' => 'Bebas',
                                                 'COD (Bayar Lunas)' => 'COD (Bayar Lunas)',
                                                 'Kredit' => 'Kredit (Bayar Kredit)'
-                                            ])->required(),
+                                            ])->required()
+                                            ->validationMessages([
+                                                'required' => 'Tipe bayar customer wajib dipilih',
+                                            ]),
                                         Radio::make('tipe')
                                             ->label('Tipe Customer')
                                             ->inlineLabel()
@@ -374,7 +392,10 @@ class SaleOrderResource extends Resource
                                                 'PKP' => 'PKP',
                                                 'PRI' => 'PRI'
                                             ])
-                                            ->required(),
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Tipe customer wajib dipilih',
+                                            ]),
                                         Checkbox::make('isSpecial')
                                             ->label('Spesial (Ya / Tidak)'),
                                         Textarea::make('keterangan')
@@ -578,7 +599,7 @@ class SaleOrderResource extends Resource
                                             $component->state($record->product->uom?->abbreviation ?? '-');
                                         }
                                     }),
-            
+
 
                                 TextInput::make('quantity')
                                     ->label('Quantity')
@@ -662,7 +683,7 @@ class SaleOrderResource extends Resource
                                             return "📦 Total stok tersedia: " . number_format($totalStock, 0, ',', '.') . " | Isi alokasi gudang di atas.";
                                         }
 
-                                        $allocationQty = (float) $allocations->sum(fn ($r) => (float) ($r['quantity'] ?? 0));
+                                        $allocationQty = (float) $allocations->sum(fn($r) => (float) ($r['quantity'] ?? 0));
                                         if ($quantity > 0 && abs($allocationQty - $quantity) > 0.0001) {
                                             return "❌ Total alokasi ({$allocationQty}) tidak sama dengan quantity ({$quantity})";
                                         }
@@ -790,7 +811,7 @@ class SaleOrderResource extends Resource
                                             Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
                                         }
                                     })
-                                    ->default(fn (callable $get) => ($get('tipe_pajak') ?? 'None') === 'None' ? 0 : \App\Models\TaxSetting::activeRate('PPN'))
+                                    ->default(fn(callable $get) => ($get('tipe_pajak') ?? 'None') === 'None' ? 0 : \App\Models\TaxSetting::activeRate('PPN'))
                                     ->suffix('%'),
                                 TextInput::make('tax_nominal')
                                     ->label('Nominal Pajak (Rp)')
@@ -868,7 +889,7 @@ class SaleOrderResource extends Resource
                                             }
                                         }
                                     }),
-                                    Repeater::make('warehouseAllocations')
+                                Repeater::make('warehouseAllocations')
                                     ->relationship('warehouseAllocations')
                                     ->label('Alokasi Gudang')
                                     ->helperText('Tentukan gudang sumber stok untuk item ini. Dapat dialokasikan ke beberapa gudang sekaligus.')
@@ -884,14 +905,21 @@ class SaleOrderResource extends Resource
                                             ->helperText('Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini.')
                                             ->searchable()
                                             ->preload()
-                                            ->required(),
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Gudang alokasi wajib dipilih',
+                                            ]),
                                         TextInput::make('quantity')
                                             ->label('Qty Alokasi')
                                             ->numeric()
-                                            ->required(),
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Qty alokasi wajib diisi',
+                                                'numeric' => 'Qty alokasi harus berupa angka',
+                                            ]),
                                     ])
                                     ->columns(2)
-                                    ->columnspanFull()   
+                                    ->columnspanFull()
                                     ->minItems(1)
                                     ->reactive(),
                             ])
@@ -1139,12 +1167,20 @@ class SaleOrderResource extends Resource
                         ->color('success')
                         ->icon('heroicon-o-arrow-uturn-up')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request sales order') && $record->status == 'draft';
+                            return Auth::user()->hasPermissionTo('request sales order')
+                                && $record->status == 'draft'
+                                && ! $record->hasInsufficientStock();
                         })
                         ->action(function ($record) {
-                            $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->requestApprove($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
+                            try {
+                                $salesOrderService = app(SalesOrderService::class);
+                                $salesOrderService->requestApprove($record);
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
+                            } catch (ValidationException $e) {
+                                $messages = collect($e->errors())->flatten()->implode(' ');
+
+                                HelperController::sendNotification(isSuccess: false, title: "Gagal Mengajukan Persetujuan", message: $messages ?: 'Validasi request approve gagal.');
+                            }
                         }),
                     Action::make('request_close')
                         ->label('Request Close')
@@ -1179,12 +1215,20 @@ class SaleOrderResource extends Resource
                         ->color('success')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
+                            return Auth::user()->hasPermissionTo('response sales order')
+                                && $record->status == 'request_approve'
+                                && ! $record->hasInsufficientStock();
                         })
                         ->action(function ($record) {
-                            $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->approve($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
+                            try {
+                                $salesOrderService = app(SalesOrderService::class);
+                                $salesOrderService->approve($record);
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
+                            } catch (ValidationException $e) {
+                                $messages = collect($e->errors())->flatten()->implode(' ');
+
+                                HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
+                            }
                         }),
                     Action::make('closed')
                         ->label('Close')
@@ -1233,7 +1277,7 @@ class SaleOrderResource extends Resource
                         ->action(function ($record) {
                             $pdf = Pdf::loadView('pdf.sales-order', [
                                 'saleOrder' => $record
-                            ])->setPaper('A4', 'potrait');
+                            ])->setPaper('A4', 'portrait');
 
                             return response()->streamDownload(function () use ($pdf) {
                                 echo $pdf->stream();
@@ -1513,7 +1557,7 @@ class SaleOrderResource extends Resource
                             ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('tempo_pembayaran')
                             ->label('Tempo Pembayaran')
-                            ->formatStateUsing(fn ($state) => $state ? $state . ' Hari' : '-'),
+                            ->formatStateUsing(fn($state) => $state ? $state . ' Hari' : '-'),
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
                             ->rupiah(),
@@ -1539,7 +1583,7 @@ class SaleOrderResource extends Resource
                                     ->label('Qty'),
                                 \Filament\Infolists\Components\TextEntry::make('unit_price')
                                     ->label('Harga Satuan')
-                                    ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.')),
+                                    ->formatStateUsing(fn($state) => 'Rp ' . number_format((float) $state, 0, ',', '.')),
                                 \Filament\Infolists\Components\TextEntry::make('line_total')
                                     ->label('Harga Satuan x Qty')
                                     ->getStateUsing(function ($record) {
@@ -1549,7 +1593,7 @@ class SaleOrderResource extends Resource
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('discount')
                                     ->label('Diskon (%)')
-                                    ->formatStateUsing(fn ($state) => $state . '%'),
+                                    ->formatStateUsing(fn($state) => $state . '%'),
                                 \Filament\Infolists\Components\TextEntry::make('tax')
                                     ->label('Pajak (%)')
                                     ->getStateUsing(function ($record) {
@@ -1589,7 +1633,7 @@ class SaleOrderResource extends Resource
                                             ->get();
                                         $total = $stocks->sum('qty_available');
                                         $perWh = $stocks->groupBy('warehouse_id')
-                                            ->map(fn ($s) => ($s->first()->warehouse?->name ?? 'Wh#' . $s->first()->warehouse_id) . ': ' . number_format((float) $s->sum('qty_available'), 0, ',', '.'))
+                                            ->map(fn($s) => ($s->first()->warehouse?->name ?? 'Wh#' . $s->first()->warehouse_id) . ': ' . number_format((float) $s->sum('qty_available'), 0, ',', '.'))
                                             ->values()->implode(' | ');
                                         return $total > 0
                                             ? '📦 ' . number_format((float) $total, 0, ',', '.') . ($perWh ? " ({$perWh})" : '')

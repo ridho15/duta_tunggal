@@ -33,8 +33,11 @@ use App\Models\Warehouse;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\SuratJalan;
+use App\Models\ProductCategory;
 use App\Services\SalesOrderService;
 use App\Services\TaxService;
+use App\Models\Supplier;
+use App\Models\UnitOfMeasure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 
@@ -88,6 +91,63 @@ it('view page logs ppn amount and account payable info', function () {
             && $context['id'] === $invoice->id
             && array_key_exists('account_payable', $context)
     );
+});
+
+it('renders the sales invoice pdf without dompdf table errors', function () {
+    $customer = Customer::factory()->create();
+    $saleOrder = SaleOrder::factory()->create([
+        'customer_id' => $customer->id,
+    ]);
+    $supplier = Supplier::factory()->create();
+    $category = ProductCategory::factory()->create();
+    $unit = UnitOfMeasure::factory()->create();
+
+    $product = Product::factory()->create([
+        'supplier_id' => $supplier->id,
+        'product_category_id' => $category->id,
+        'uom_id' => $unit->id,
+    ]);
+
+    $saleOrder = SaleOrder::factory()->create([
+        'customer_id' => $customer->id,
+    ]);
+
+    auditCoas();
+
+    $invoice = null;
+    Invoice::withoutEvents(function () use (&$invoice, $customer, $saleOrder, $product) {
+        $invoice = Invoice::factory()->create([
+            'customer_name' => $customer->name,
+            'invoice_number' => 'INV-PDF-001',
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(14)->toDateString(),
+            'subtotal' => 100000,
+            'tax' => 11,
+            'ppn_rate' => 11,
+            'dpp' => 100000,
+            'total' => 111000,
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $saleOrder->id,
+        ]);
+
+        InvoiceItem::factory()->create([
+            'invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'price' => 100000,
+            'discount' => 0,
+            'tax_rate' => 11,
+            'tax_amount' => 11000,
+            'subtotal' => 100000,
+            'total' => 111000,
+        ]);
+    });
+
+    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sale-order-invoice', [
+        'invoice' => $invoice,
+    ])->setPaper('A4', 'portrait');
+
+    expect($pdf->output())->not->toBeEmpty();
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -389,6 +449,8 @@ describe('PDF generators include required item columns and totals', function () 
         assertPdfHasColumns($html, [
             '#', 'Product', 'Qty', 'Unit Price', 'Discount', 'Tax (%)', 'Tax Type', 'Tax Amount', 'Subtotal'
         ]);
+        expect($html)->toContain('<td colspan="8" style="text-align: right;"><strong>Total</strong></td>');
+        expect($html)->toContain('Rp.99.900');
     });
 
     it('sales order PDF includes all columns', function () {
@@ -411,6 +473,8 @@ describe('PDF generators include required item columns and totals', function () 
         assertPdfHasColumns($html, [
             'No', 'Nama Item', 'Qty', 'Harga Satuan', 'Discount', 'Tax (%)', 'Tax Amount', 'Subtotal'
         ]);
+        expect($html)->toContain('<td colspan="7" class="total">Total</td>');
+        expect($html)->toContain('Rp 212.800');
     });
 
     it('invoice PDF includes all columns', function () {
@@ -426,26 +490,32 @@ describe('PDF generators include required item columns and totals', function () 
             $invoice = Invoice::factory()->create([
                 'from_model_type' => SaleOrder::class,
                 'from_model_id' => $so->id,
-                'subtotal' => 0,
-                'tax' => 0,
-                'total' => 0,
+                'subtotal' => 300000,
+                'tax' => 11,
+                'ppn_rate' => 11,
+                'dpp' => 300000,
+                'total' => 333000,
+            ]);
+
+            InvoiceItem::factory()->create([
+                'invoice_id' => $invoice->id,
+                'product_id' => $this->product->id,
+                'quantity' => 1,
+                'price' => 300000,
+                'discount' => 0,
+                'tax_rate' => 11,
+                'tax_amount' => 33000,
+                'subtotal' => 300000,
+                'total' => 333000,
             ]);
         });
-        InvoiceItem::factory()->create([
-            'invoice_id' => $invoice->id,
-            'product_id' => $this->product->id,
-            'quantity' => 1,
-            'price' => 300000,
-            'discount' => 0,
-            'tax_rate' => 12,
-            'tax_amount' => 36000,
-            'subtotal' => 300000,
-            'total' => 336000,
-        ]);
+
         $html = view('pdf.sale-order-invoice', ['invoice' => $invoice])->render();
         assertPdfHasColumns($html, [
             'SKU', 'Produk', 'Qty', 'Harga Satuan', 'Discount', 'Tax (%)', 'Tax Amount', 'Subtotal', 'Total'
         ]);
+        expect($html)->toContain('PPN (11,00%)');
+        expect($html)->toContain('Rp 33.000');
     });
 
     it('delivery order PDF includes all columns', function () {

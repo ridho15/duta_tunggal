@@ -275,6 +275,23 @@ test('available order request supplier ids are empty when all suppliers already 
     expect($availableSupplierIds)->toBe([]);
 });
 
+test('partial order request with remaining suppliers still appears in refer options', function () {
+    PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    $this->orderRequest->update(['status' => 'partial']);
+
+    $options = PurchaseOrderResource::getOrderRequestOptions();
+
+    expect($options)
+        ->toHaveKey($this->orderRequest->id)
+        ->and($options[$this->orderRequest->id])->toBe($this->orderRequest->request_number);
+});
+
 test('buildOrderRequestItems for each supplier group produces non-overlapping product sets', function () {
     $itemsA = PurchaseOrderResource::buildOrderRequestItems(
         $this->orderRequest,

@@ -124,6 +124,12 @@
 </head>
 
 <body>
+    @php
+        $supplier = $invoice->supplier ?? $invoice->fromModel->supplier;
+        $effectivePpnRate = (float) ($invoice->effective_ppn_rate ?? $invoice->ppn_rate ?? 0);
+        $ppnAmount = (float) ($invoice->ppn_amount ?? (($invoice->dpp ?? $invoice->subtotal) * $effectivePpnRate / 100));
+    @endphp
+
     <div class="header clearfix">
         <div class="company-info">
             <h2>PT.DUTA TUNGGAL</h2>
@@ -148,16 +154,16 @@
     <div class="invoice-details clearfix">
         <div class="customer-info">
             <h3>Supplier:</h3>
-            <p><strong>{{ $invoice->supplier_name ?? $invoice->fromModel->supplier->perusahaan }}</strong><br>
-                @if($invoice->fromModel->supplier->perusahaan)
-                {{ $invoice->fromModel->supplier->perusahaan }}<br>
+            <p><strong>{{ $invoice->supplier_name ?? $supplier->perusahaan ?? 'N/A' }}</strong><br>
+                @if($supplier->perusahaan)
+                {{ $supplier->perusahaan }}<br>
                 @endif
-                {{ $invoice->fromModel->supplier->address }}<br>
-                @if($invoice->fromModel->supplier->phone)
-                Telp: {{ $invoice->fromModel->supplier->phone }}<br>
+                {{ $supplier->address ?? '' }}<br>
+                @if($supplier->phone)
+                Telp: {{ $supplier->phone }}<br>
                 @endif
-                @if($invoice->fromModel->supplier->email)
-                Email: {{ $invoice->fromModel->supplier->email }}
+                @if($supplier->email)
+                Email: {{ $supplier->email }}
                 @endif
             </p>
         </div>
@@ -247,8 +253,8 @@
                 <td class="text-right rupiah">Rp {{ number_format($invoice->dpp ?? $invoice->subtotal, 0, ',', '.') }}</td>
             </tr>
             <tr>
-                <td>PPN {{ $invoice->ppn_rate }}%:</td>
-                <td class="text-right rupiah">Rp {{ number_format($invoice->ppn_amount ?? (($invoice->dpp ?? $invoice->subtotal) * $invoice->ppn_rate / 100), 0, ',', '.') }}</td>
+                <td>PPN {{ number_format($effectivePpnRate, 2, ',', '.') }}%:</td>
+                <td class="text-right rupiah">Rp {{ number_format($ppnAmount, 0, ',', '.') }}</td>
             </tr>
             @endif
             

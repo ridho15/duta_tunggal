@@ -131,6 +131,7 @@ class StockMovementObserver
         DB::transaction(function () use ($stockMovement, $delta) {
             $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
                 ->where('warehouse_id', $stockMovement->warehouse_id)
+                ->where('rak_id', $stockMovement->rak_id)
                 ->lockForUpdate()
                 ->first();
 

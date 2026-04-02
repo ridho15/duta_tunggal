@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\MaterialIssue;
+use App\Models\WarehouseConfirmationItem;
 use App\Models\User;
 use Database\Seeders\FinanceSeeder;
 
@@ -99,7 +100,7 @@ test('journal entry only created when approved and completed', function () {
         'issue_number' => 'MI-TEST-004',
         'issue_date' => now(),
         'type' => 'issue',
-        'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+        'status' => MaterialIssue::STATUS_DRAFT,
         'total_cost' => 10000,
         'created_by' => $user->id,
         'warehouse_id' => $warehouse->id,
@@ -116,16 +117,22 @@ test('journal entry only created when approved and completed', function () {
         'warehouse_id' => $warehouse->id,
     ]);
 
+    $confirmation = app(\App\Services\ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($materialIssue);
+
+    $confirmation->warehouseConfirmationItems->each(function (WarehouseConfirmationItem $item) {
+        $item->update([
+            'status' => 'confirmed',
+            'confirmed_qty' => $item->requested_qty,
+        ]);
+    });
+
+    $materialIssue = $materialIssue->fresh();
+
     // Before approval and completion, no journal entry should exist
     expect(\App\Models\JournalEntry::where('source_type', MaterialIssue::class)
         ->where('source_id', $materialIssue->id)->exists())->toBeFalse();
 
-    // Approve the material issue
-    $materialIssue->update([
-        'approved_by' => $approver->id,
-        'approved_at' => now(),
-        'status' => MaterialIssue::STATUS_APPROVED,
-    ]);
+    expect($materialIssue->fresh()->status)->toBe(MaterialIssue::STATUS_APPROVED);
 
     // Still no journal entry after approval
     expect(\App\Models\JournalEntry::where('source_type', MaterialIssue::class)

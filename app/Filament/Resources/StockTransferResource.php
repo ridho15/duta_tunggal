@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class StockTransferResource extends Resource
 {
@@ -278,8 +279,10 @@ class StockTransferResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
+                        ->visible(fn ($record) => in_array($record->status, ['Draft', 'Request'], true))
                         ->color('success'),
-                    DeleteAction::make(),
+                    DeleteAction::make()
+                        ->visible(fn ($record) => in_array($record->status, ['Draft', 'Request', 'Reject'], true)),
                     ActionsAction::make('request_transfer')
                         ->label('Request Transfer')
                         ->color('success')
@@ -289,9 +292,13 @@ class StockTransferResource extends Resource
                         })
                         ->icon('heroicon-o-arrow-down-circle')
                         ->action(function ($record) {
-                            $stockTransferService = app(StockTransferService::class);
-                            $stockTransferService->requestTransfer($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Request stock transfer berhasil dikirimkan. Proses selanjutnya: Manajer Gudang atau Manajer Logistik perlu mereview dan menyetujui permintaan transfer stok ini.");
+                            try {
+                                $stockTransferService = app(StockTransferService::class);
+                                $stockTransferService->requestTransfer($record);
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Request stock transfer berhasil dikirimkan. Proses selanjutnya: Manajer Gudang atau Manajer Logistik perlu mereview dan menyetujui permintaan transfer stok ini.");
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Validasi Transfer Stok', message: collect($exception->errors())->flatten()->implode("\n"));
+                            }
                         }),
                     ActionsAction::make('approve')
                         ->label('Approve')
@@ -302,9 +309,13 @@ class StockTransferResource extends Resource
                             return Auth::user()->hasPermissionTo('response stock transfer') && $record->status == 'Request';
                         })
                         ->action(function ($record) {
-                            $stockTransferService = app(StockTransferService::class);
-                            $stockTransferService->approveStockTransfer($record);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil diapprove. Proses selanjutnya: Tim Gudang perlu memproses dan mengirimkan barang sesuai dengan jumlah transfer yang telah disetujui.");
+                            try {
+                                $stockTransferService = app(StockTransferService::class);
+                                $stockTransferService->approveStockTransfer($record);
+                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil diapprove. Proses selanjutnya: Tim Gudang perlu memproses dan mengirimkan barang sesuai dengan jumlah transfer yang telah disetujui.");
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Validasi Transfer Stok', message: collect($exception->errors())->flatten()->implode("\n"));
+                            }
                         }),
                     ActionsAction::make('reject')
                         ->label('Reject')

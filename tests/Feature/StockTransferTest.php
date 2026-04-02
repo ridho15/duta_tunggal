@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Cabang;
+use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Rak;
 use App\Models\StockMovement;
@@ -12,6 +13,8 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\StockTransferService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class StockTransferTest extends TestCase
@@ -69,7 +72,7 @@ class StockTransferTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_stock_transfer_between_warehouses()
     {
         $stockTransfer = StockTransfer::create([
@@ -100,9 +103,10 @@ class StockTransferTest extends TestCase
         $this->assertEquals(1, $stockTransfer->stockTransferItem()->count());
         $this->assertEquals($this->product->id, $stockTransfer->stockTransferItem->first()->product_id);
         $this->assertEquals(10, $stockTransfer->stockTransferItem->first()->quantity);
+        $this->assertDatabaseCount('stock_movements', 0);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_stock_transfer_between_racks()
     {
         $anotherRak = Rak::factory()->create(['warehouse_id' => $this->fromWarehouse->id]);
@@ -139,7 +143,7 @@ class StockTransferTest extends TestCase
         $this->assertEquals($this->fromWarehouse->id, $item->to_warehouse_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_request_stock_transfer()
     {
         $stockTransfer = StockTransfer::factory()->create([
@@ -148,14 +152,32 @@ class StockTransferTest extends TestCase
             'to_warehouse_id' => $this->toWarehouse->id,
         ]);
 
+        StockTransferItem::factory()->create([
+            'stock_transfer_id' => $stockTransfer->id,
+            'product_id' => $this->product->id,
+            'quantity' => 5,
+            'from_warehouse_id' => $this->fromWarehouse->id,
+            'from_rak_id' => $this->fromRak->id,
+            'to_warehouse_id' => $this->toWarehouse->id,
+            'to_rak_id' => $this->toRak->id,
+        ]);
+
         $this->stockTransferService->requestTransfer($stockTransfer);
 
         $this->assertEquals('Request', $stockTransfer->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_approve_stock_transfer_and_create_stock_movements()
     {
+        InventoryStock::factory()->create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->fromWarehouse->id,
+            'rak_id' => $this->fromRak->id,
+            'qty_available' => 50,
+            'qty_reserved' => 0,
+        ]);
+
         $stockTransfer = StockTransfer::factory()->create([
             'status' => 'Request',
             'from_warehouse_id' => $this->fromWarehouse->id,
@@ -176,6 +198,7 @@ class StockTransferTest extends TestCase
 
         // Check that status is updated to Approved
         $this->assertEquals('Approved', $stockTransfer->fresh()->status);
+        $this->assertDatabaseCount('stock_movements', 2);
 
         // Check that stock movements are created
         $this->assertDatabaseHas('stock_movements', [
@@ -193,9 +216,107 @@ class StockTransferTest extends TestCase
             'type' => 'transfer_in',
             'quantity' => 15,
         ]);
+
+        $this->assertEquals(
+            35.0,
+            InventoryStock::where('product_id', $this->product->id)
+                ->where('warehouse_id', $this->fromWarehouse->id)
+                ->where('rak_id', $this->fromRak->id)
+                ->value('qty_available')
+        );
+
+        $this->assertEquals(
+            15.0,
+            InventoryStock::where('product_id', $this->product->id)
+                ->where('warehouse_id', $this->toWarehouse->id)
+                ->where('rak_id', $this->toRak->id)
+                ->value('qty_available')
+        );
     }
 
-    /** @test */
+    #[Test]
+    public function it_does_not_move_stock_before_transfer_is_approved()
+    {
+        InventoryStock::factory()->create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->fromWarehouse->id,
+            'rak_id' => $this->fromRak->id,
+            'qty_available' => 25,
+            'qty_reserved' => 0,
+        ]);
+
+        $stockTransfer = StockTransfer::factory()->create([
+            'status' => 'Draft',
+            'from_warehouse_id' => $this->fromWarehouse->id,
+            'to_warehouse_id' => $this->toWarehouse->id,
+        ]);
+
+        StockTransferItem::factory()->create([
+            'stock_transfer_id' => $stockTransfer->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'from_warehouse_id' => $this->fromWarehouse->id,
+            'from_rak_id' => $this->fromRak->id,
+            'to_warehouse_id' => $this->toWarehouse->id,
+            'to_rak_id' => $this->toRak->id,
+        ]);
+
+        $this->assertDatabaseCount('stock_movements', 0);
+        $this->assertEquals(
+            25.0,
+            InventoryStock::where('product_id', $this->product->id)
+                ->where('warehouse_id', $this->fromWarehouse->id)
+                ->where('rak_id', $this->fromRak->id)
+                ->value('qty_available')
+        );
+    }
+
+    #[Test]
+    public function it_blocks_approval_when_source_stock_is_insufficient()
+    {
+        InventoryStock::factory()->create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->fromWarehouse->id,
+            'rak_id' => $this->fromRak->id,
+            'qty_available' => 5,
+            'qty_reserved' => 0,
+        ]);
+
+        $stockTransfer = StockTransfer::factory()->create([
+            'status' => 'Request',
+            'from_warehouse_id' => $this->fromWarehouse->id,
+            'to_warehouse_id' => $this->toWarehouse->id,
+        ]);
+
+        StockTransferItem::factory()->create([
+            'stock_transfer_id' => $stockTransfer->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'from_warehouse_id' => $this->fromWarehouse->id,
+            'from_rak_id' => $this->fromRak->id,
+            'to_warehouse_id' => $this->toWarehouse->id,
+            'to_rak_id' => $this->toRak->id,
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Stok tidak cukup');
+
+        try {
+            $this->stockTransferService->approveStockTransfer($stockTransfer);
+        } finally {
+            $this->assertEquals('Request', $stockTransfer->fresh()->status);
+            $this->assertDatabaseCount('stock_movements', 0);
+            $this->assertEquals(
+                5.0,
+                InventoryStock::where('product_id', $this->product->id)
+                    ->where('warehouse_id', $this->fromWarehouse->id)
+                    ->where('rak_id', $this->fromRak->id)
+                    ->value('qty_available')
+            );
+        }
+    }
+
+    #[Test]
     public function it_can_reject_stock_transfer()
     {
         $stockTransfer = StockTransfer::factory()->create([
@@ -209,7 +330,7 @@ class StockTransferTest extends TestCase
         $this->assertEquals('Reject', $stockTransfer->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_stock_transfer_status_enum()
     {
         $validStatuses = ['Draft', 'Request', 'Approved', 'Reject', 'Cancelled'];
@@ -220,7 +341,7 @@ class StockTransferTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_unique_transfer_number()
     {
         $number1 = $this->stockTransferService->generateTransferNumber();
@@ -237,11 +358,11 @@ class StockTransferTest extends TestCase
         $number2 = $this->stockTransferService->generateTransferNumber();
 
         $this->assertNotEquals($number1, $number2);
-        $this->assertStringStartsWith('TN-', $number1);
-        $this->assertStringStartsWith('TN-', $number2);
+        $this->assertStringStartsWith('ST-' . now()->format('Ymd') . '-', $number1);
+        $this->assertStringStartsWith('ST-' . now()->format('Ymd') . '-', $number2);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_soft_delete_stock_transfer_and_items()
     {
         $stockTransfer = StockTransfer::factory()->create([
@@ -262,7 +383,7 @@ class StockTransferTest extends TestCase
         $this->assertSoftDeleted($stockTransferItem);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_restore_stock_transfer_and_items()
     {
         $stockTransfer = StockTransfer::factory()->create([
@@ -284,28 +405,32 @@ class StockTransferTest extends TestCase
         $this->assertFalse($stockTransferItem->fresh()->trashed());
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_transfer_quantity_is_positive()
     {
         $stockTransfer = StockTransfer::factory()->create([
+            'status' => 'Draft',
             'from_warehouse_id' => $this->fromWarehouse->id,
             'to_warehouse_id' => $this->toWarehouse->id,
         ]);
 
-        $stockTransferItem = StockTransferItem::factory()->create([
+        StockTransferItem::factory()->create([
             'stock_transfer_id' => $stockTransfer->id,
             'product_id' => $this->product->id,
             'quantity' => 0, // Invalid quantity
+            'from_rak_id' => $this->fromRak->id,
+            'to_rak_id' => $this->toRak->id,
             'from_warehouse_id' => $this->fromWarehouse->id,
             'to_warehouse_id' => $this->toWarehouse->id,
         ]);
 
-        $this->assertEquals(0, $stockTransferItem->quantity);
-        // Note: In a real application, you might want to add validation rules
-        // to prevent zero or negative quantities
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Qty transfer harus lebih besar dari 0');
+
+        $this->stockTransferService->requestTransfer($stockTransfer);
     }
 
-    /** @test */
+    #[Test]
     public function it_maintains_relationships_correctly()
     {
         $stockTransfer = StockTransfer::factory()->create([

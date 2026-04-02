@@ -141,7 +141,7 @@ class EditPurchaseOrder extends EditRecord
                 ->action(function ($record) {
                     $pdf = Pdf::loadView('pdf.purchase-order', [
                         'purchaseOrder' => $record
-                    ])->setPaper('A4', 'potrait');
+                    ])->setPaper('A4', 'portrait');
 
                     return response()->streamDownload(function () use ($pdf) {
                         echo $pdf->stream();

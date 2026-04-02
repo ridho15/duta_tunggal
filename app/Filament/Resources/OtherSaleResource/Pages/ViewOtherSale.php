@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\OtherSaleResource\Pages;
 
 use App\Filament\Resources\OtherSaleResource;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\Page;
 use Filament\Infolists;
@@ -13,6 +14,7 @@ use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Builder;
 use App\Models\OtherSale;
 use App\Models\JournalEntry;
+use Throwable;
 
 class ViewOtherSale extends Page implements HasTable
 {
@@ -60,15 +62,23 @@ class ViewOtherSale extends Page implements HasTable
                 ->color('success')
                 ->visible(fn(): bool => $this->record->status === 'draft')
                 ->action(function () {
-                    $service = new \App\Services\OtherSaleService();
-                    $service->postJournalEntries($this->record);
+                    try {
+                        $service = new \App\Services\OtherSaleService();
+                        $service->postJournalEntries($this->record);
 
-                    \Filament\Notifications\Notification::make()
-                        ->title('Journal entries posted successfully')
-                        ->success()
-                        ->send();
+                        \Filament\Notifications\Notification::make()
+                            ->title('Journal entries posted successfully')
+                            ->success()
+                            ->send();
 
-                    return redirect(request()->header('Referer'));
+                        return redirect(request()->header('Referer'));
+                    } catch (Throwable $exception) {
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Posting Jurnal',
+                            $exception,
+                            'Jurnal other sale belum dapat diposting. Silakan coba lagi.'
+                        );
+                    }
                 }),
 
             Actions\Action::make('reverse_journal')
@@ -77,15 +87,23 @@ class ViewOtherSale extends Page implements HasTable
                 ->color('warning')
                 ->visible(fn(): bool => $this->record->status === 'posted')
                 ->action(function () {
-                    $service = new \App\Services\OtherSaleService();
-                    $service->reverseJournalEntries($this->record);
+                    try {
+                        $service = new \App\Services\OtherSaleService();
+                        $service->reverseJournalEntries($this->record);
 
-                    \Filament\Notifications\Notification::make()
-                        ->title('Journal entries reversed successfully')
-                        ->warning()
-                        ->send();
+                        \Filament\Notifications\Notification::make()
+                            ->title('Journal entries reversed successfully')
+                            ->warning()
+                            ->send();
 
-                    return redirect(request()->header('Referer'));
+                        return redirect(request()->header('Referer'));
+                    } catch (Throwable $exception) {
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Membalik Jurnal',
+                            $exception,
+                            'Pembalikan jurnal other sale belum dapat diproses. Silakan coba lagi.'
+                        );
+                    }
                 }),
         ];
     }

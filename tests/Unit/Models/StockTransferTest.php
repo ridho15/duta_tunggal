@@ -212,6 +212,13 @@ class StockTransferTest extends TestCase
     #[Test]
     public function it_handles_updating_event_for_quantity_changes()
     {
+        InventoryStock::factory()->create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->fromWarehouse->id,
+            'rak_id' => $this->fromRak->id,
+            'qty_available' => 100,
+        ]);
+
         // Create stock transfer with approved status
         $transfer = StockTransfer::factory()->create([
             'from_warehouse_id' => $this->fromWarehouse->id,
@@ -239,7 +246,7 @@ class StockTransferTest extends TestCase
             ->where('warehouse_id', $this->fromWarehouse->id)
             ->where('type', 'transfer_out')
             ->first();
-        $this->assertEquals(-20, $transferOut->quantity);
+        $this->assertEquals(20, $transferOut->quantity);
 
         $transferIn = StockMovement::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->toWarehouse->id)
@@ -272,9 +279,9 @@ class StockTransferTest extends TestCase
         // Update transfer status to approved
         $transfer->update(['status' => 'Approved']);
 
-        // The updating event should not trigger for status changes
-        // but the StockTransferItemObserver should handle the creation
-        $this->assertDatabaseCount('stock_movements', 2);
+        // Perubahan status parent saja tidak boleh memindahkan stok.
+        // Stock movement baru dibuat lewat approval service.
+        $this->assertDatabaseCount('stock_movements', 0);
     }
 
     #[Test]

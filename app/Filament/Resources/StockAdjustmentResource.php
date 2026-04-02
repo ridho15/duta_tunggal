@@ -4,11 +4,15 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockAdjustmentResource\Pages;
 use App\Filament\Resources\StockAdjustmentResource\RelationManagers;
+use App\Http\Controllers\HelperController;
 use App\Models\StockAdjustment;
 use App\Models\Warehouse;
+use App\Services\StockAdjustmentService;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -23,6 +27,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 
 class StockAdjustmentResource extends Resource
 {
@@ -132,15 +137,19 @@ class StockAdjustmentResource extends Resource
                             ->label('Catatan')
                             ->rows(3),
 
-                        Select::make('status')
+                        Hidden::make('status')
+                            ->default('draft'),
+
+                        Hidden::make('created_by')
+                            ->default(Auth::id()),
+
+                        Placeholder::make('status_display')
                             ->label('Status')
-                            ->options([
-                                'draft' => 'Draft',
+                            ->content(fn (?StockAdjustment $record): string => match ($record?->status) {
                                 'approved' => 'Approved',
                                 'rejected' => 'Rejected',
-                            ])
-                            ->default('draft')
-                            ->required(),
+                                default => 'Draft',
+                            }),
                     ]),
             ]);
     }
@@ -251,8 +260,46 @@ class StockAdjustmentResource extends Resource
             ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make()->color('primary'),
-                    Tables\Actions\EditAction::make(),
-                    Tables\Actions\DeleteAction::make(),
+                    Tables\Actions\EditAction::make()
+                        ->visible(fn (StockAdjustment $record) => $record->status === 'draft'),
+                    Tables\Actions\DeleteAction::make()
+                        ->visible(fn (StockAdjustment $record) => in_array($record->status, ['draft', 'rejected'], true)),
+                    Tables\Actions\Action::make('approve')
+                        ->label('Approve')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn (StockAdjustment $record) => $record->status === 'draft')
+                        ->requiresConfirmation()
+                        ->modalHeading('Setujui Stock Adjustment')
+                        ->modalDescription('Approval akan membuat mutasi stok sesuai item adjustment dan tidak dapat dibatalkan dari layar ini.')
+                        ->action(function (StockAdjustment $record) {
+                            try {
+                                app(StockAdjustmentService::class)->approveStockAdjustment($record, Auth::id());
+
+                                HelperController::sendNotification(
+                                    isSuccess: true,
+                                    title: 'Information',
+                                    message: 'Stock adjustment berhasil disetujui dan mutasi stok sudah dicatat.'
+                                );
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: 'Validasi Stock Adjustment',
+                                    message: collect($exception->errors())->flatten()->implode("\n")
+                                );
+                            }
+                        }),
+                    Tables\Actions\Action::make('reject')
+                        ->label('Reject')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn (StockAdjustment $record) => $record->status === 'draft')
+                        ->requiresConfirmation()
+                        ->action(fn (StockAdjustment $record) => $record->update([
+                            'status' => 'rejected',
+                            'approved_by' => Auth::id(),
+                            'approved_at' => now(),
+                        ])),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

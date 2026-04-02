@@ -21,23 +21,16 @@ class ViewMaterialIssue extends ViewRecord
                 ->visible(fn(MaterialIssue $record) => in_array($record->status, ['draft', 'pending_approval'])),
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('request_approval')
-                ->label('Request Approval')
+                ->label(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation() ? 'Request Konfirmasi Gudang' : 'Request Approval')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('warning')
                 ->visible(fn(MaterialIssue $record) => $record->isDraft() && !$record->approved_by)
                 ->requiresConfirmation()
-                ->modalHeading('Request Approval Material Issue')
-                ->modalDescription('Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
+                ->modalHeading(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation() ? 'Request Konfirmasi Gudang' : 'Request Approval Material Issue')
+                ->modalDescription(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation()
+                    ? 'Konfirmasi gudang per item bahan akan dibuat atau diperbarui. Material Issue akan otomatis di-approve jika semua item disetujui dan akan ditolak jika ada item yang ditolak.'
+                    : 'Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
                 ->action(function (MaterialIssue $record) {
-                    if ($message = $record->warehouseConfirmationBlockingMessage()) {
-                        Notification::make()
-                            ->title('Konfirmasi Gudang Diperlukan')
-                            ->body($message)
-                            ->warning()
-                            ->send();
-                        return;
-                    }
-
                     // Validate stock before request approval
                     $stockValidation = $this->validateStockAvailability($record);
                     if (!$stockValidation['valid']) {
@@ -49,10 +42,44 @@ class ViewMaterialIssue extends ViewRecord
                             ->send();
                         return;
                     }
-                    // Logic untuk request approval - bisa kirim notifikasi ke approver gudang
-                    // Untuk sementara, langsung set approved_by ke user yang punya role gudang
-                    // Cari approver gudang berdasarkan permission 'approve warehouse'
-                    // Super Admin bisa approve dari semua cabang, user lain harus di cabang yang sama
+
+                    if ($record->requiresWarehouseConfirmation()) {
+                        $warehouseConfirmation = $record->ensureWarehouseConfirmationRequest();
+
+                        if (! $warehouseConfirmation) {
+                            Notification::make()
+                                ->title('Konfirmasi Gudang Gagal Dibuat')
+                                ->body('Manufacturing Order terkait tidak ditemukan sehingga konfirmasi gudang tidak dapat dibuat.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        if ($record->hasConfirmedWarehouseConfirmation()) {
+                            $record->approveFromWarehouseConfirmation($record->latestWarehouseConfirmation() ?? $warehouseConfirmation);
+
+                            Notification::make()
+                                ->title('Material Issue Di-approve Otomatis')
+                                ->body("Material Issue {$record->issue_number} langsung di-approve karena konfirmasi gudang sudah confirmed.")
+                                ->success()
+                                ->send();
+                            return;
+                        }
+
+                        $record->update([
+                            'approved_by' => null,
+                            'approved_at' => null,
+                            'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+                        ]);
+
+                        Notification::make()
+                            ->title('Request Konfirmasi Gudang Terkirim')
+                            ->body("Konfirmasi gudang per item untuk Material Issue {$record->issue_number} telah dibuat atau diperbarui. Material Issue akan otomatis di-approve jika semua item disetujui atau ditolak jika ada item yang ditolak.")
+                            ->success()
+                            ->send();
+                        return;
+                    }
+
                     $currentUser = Auth::user();
                     if ($currentUser && $currentUser->hasRole('Super Admin')) {
                         // Super Admin bisa approve dari semua cabang
@@ -101,6 +128,8 @@ class ViewMaterialIssue extends ViewRecord
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
                 ->visible(function (MaterialIssue $record) {
+                    if ($record->requiresWarehouseConfirmation()) return false;
+
                     $currentUser = Auth::user();
                     if (!$currentUser) return false;
 
@@ -156,6 +185,8 @@ class ViewMaterialIssue extends ViewRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->visible(function (MaterialIssue $record) {
+                    if ($record->requiresWarehouseConfirmation()) return false;
+
                     $currentUser = Auth::user();
                     if (!$currentUser) return false;
 

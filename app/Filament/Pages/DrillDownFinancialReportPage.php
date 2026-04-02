@@ -63,6 +63,13 @@ class DrillDownFinancialReportPage extends Page
         $this->end_date = now()->endOfMonth()->format('Y-m-d');
     }
 
+    public function updatedAccountType(): void
+    {
+        // Reset COA selection when account type changes so the stale coa_id
+        // (pointing to the previous type's account) does not pollute the new query.
+        $this->coa_id = null;
+    }
+
     public function getCoaOptionsProperty(): array
     {
         $query = ChartOfAccount::query()->orderBy('code');

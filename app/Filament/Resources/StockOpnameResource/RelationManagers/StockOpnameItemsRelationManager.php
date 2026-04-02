@@ -204,15 +204,19 @@ class StockOpnameItemsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\CreateAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
                 ]),
             ]);
     }
