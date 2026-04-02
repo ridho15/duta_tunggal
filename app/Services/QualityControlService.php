@@ -11,6 +11,7 @@ use App\Models\ChartOfAccount;
 use App\Services\ReturnProductService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class QualityControlService
@@ -366,70 +367,87 @@ class QualityControlService
             : $this->resolveCoaByCodes(['1180.01', '1400.01']);
         $unbilledPurchaseCoa = ($product->unbilledPurchaseCoa && $product->unbilledPurchaseCoa->id)
             ? $product->unbilledPurchaseCoa
-            : $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+            : $this->resolveCoaByCodes([
+                config('coa.unbilled_purchase', '2100.10'),
+                '2100.10',
+                '2190.10',
+                '1180.01',
+            ]);
 
         // The relation may still produce a ChartOfAccount with an empty id, or the
-        // fallback resolver may return null if none of the codes exist.  We guard
-        // against any missing account to prevent attempting to insert a journal
-        // entry with a null coa_id (which caused the bug logged earlier).
+        // fallback resolver may return null if none of the codes exist. Fail hard so
+        // stock cannot move without the matching journal entry.
         if (!$inventoryCoa || !$inventoryCoa->id || !$temporaryProcurementCoa || !$temporaryProcurementCoa->id || !$unbilledPurchaseCoa || !$unbilledPurchaseCoa->id) {
-            // Log the issue so that developers know journal entries were skipped.
-            Log::warning('QC journal posting skipped due to missing COA', [
+            Log::error('QC journal posting blocked due to missing COA', [
                 'qc_number' => $qualityControl->qc_number,
                 'inventory_coa' => $inventoryCoa?->id,
                 'temporary_procurement_coa' => $temporaryProcurementCoa?->id,
                 'unbilled_purchase_coa' => $unbilledPurchaseCoa?->id,
             ]);
 
-            // Skip posting if required COA accounts are not available (e.g., in test environment)
-            return;
+            throw new \RuntimeException(
+                'QC journal posting gagal karena COA persediaan, temporary procurement, atau unbilled purchase belum dikonfigurasi lengkap.'
+            );
         }
 
         $date = now();
         $reference = $qualityControl->qc_number;
 
-        // Prevent duplicate posting
-        if (JournalEntry::where('source_type', QualityControl::class)
-            ->where('source_id', $qualityControl->id)
-            ->where('description', 'like', '%QC Inventory%')
-            ->exists()) {
-            return;
-        }
+        DB::transaction(function () use (
+            $amount,
+            $date,
+            $fromModel,
+            $inventoryCoa,
+            $passedQuantity,
+            $product,
+            $qualityControl,
+            $reference,
+            $temporaryProcurementCoa,
+            $unitPrice
+        ) {
+            $alreadyPosted = JournalEntry::where('source_type', QualityControl::class)
+                ->where('source_id', $qualityControl->id)
+                ->where('journal_type', 'inventory')
+                ->lockForUpdate()
+                ->exists();
 
-        $entries = [];
+            if ($alreadyPosted) {
+                return;
+            }
 
-        // Debit inventory account
-        $entries[] = JournalEntry::create([
-            'coa_id' => $inventoryCoa->id,
-            'date' => $date,
-            'reference' => $reference,
-            'description' => 'QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number,
-            'debit' => $amount,
-            'credit' => 0,
-            'journal_type' => 'inventory',
-            'source_type' => QualityControl::class,
-            'source_id' => $qualityControl->id,
-        ]);
+            JournalEntry::create([
+                'coa_id' => $inventoryCoa->id,
+                'date' => $date,
+                'reference' => $reference,
+                'description' => 'QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number,
+                'debit' => $amount,
+                'credit' => 0,
+                'journal_type' => 'inventory',
+                'source_type' => QualityControl::class,
+                'source_id' => $qualityControl->id,
+            ]);
 
-        // Credit temporary procurement position
-        $entries[] = JournalEntry::create([
-            'coa_id' => $temporaryProcurementCoa->id,
-            'date' => $date,
-            'reference' => $reference,
-            'description' => 'QC Inventory - Credit temporary procurement for QC passed items: ' . $qualityControl->qc_number,
-            'debit' => 0,
-            'credit' => $amount,
-            'journal_type' => 'inventory',
-            'source_type' => QualityControl::class,
-            'source_id' => $qualityControl->id,
-        ]);
+            JournalEntry::create([
+                'coa_id' => $temporaryProcurementCoa->id,
+                'date' => $date,
+                'reference' => $reference,
+                'description' => 'QC Inventory - Credit temporary procurement for QC passed items: ' . $qualityControl->qc_number,
+                'debit' => 0,
+                'credit' => $amount,
+                'journal_type' => 'inventory',
+                'source_type' => QualityControl::class,
+                'source_id' => $qualityControl->id,
+            ]);
 
-        // Create stock movement to update inventory
-        $existingMovement = StockMovement::where('from_model_type', QualityControl::class)
-            ->where('from_model_id', $qualityControl->id)
-            ->first();
+            $existingMovement = StockMovement::where('from_model_type', QualityControl::class)
+                ->where('from_model_id', $qualityControl->id)
+                ->lockForUpdate()
+                ->first();
 
-        if (!$existingMovement) {
+            if ($existingMovement) {
+                return;
+            }
+
             $meta = [
                 'source' => 'quality_control',
                 'qc_id' => $qualityControl->id,
@@ -458,7 +476,7 @@ class QualityControlService
                 'from_model_type' => QualityControl::class,
                 'from_model_id' => $qualityControl->id,
             ]);
-        }
+        });
     }
 
     protected function resolveCoaByCodes(array $codes): ?\App\Models\ChartOfAccount
@@ -655,58 +673,60 @@ class QualityControlService
      */
     protected function calculateManufacturingOrderBDPTotal(\App\Models\ManufacturingOrder $mo): float
     {
-        // Get BOM from ProductionPlan
-        $bom = $mo->productionPlan?->billOfMaterial;
-
-        if (!$bom || !$bom->is_active) {
-            return 0; // Return 0 instead of throwing exception
+        // Primary: read WIP (1-201) debit balance from manufacturing_wip journal entries
+        $wipCoa = $this->resolveCoaByCodes(['1-201']);
+        if ($wipCoa) {
+            $productionIds = \App\Models\Production::where('manufacturing_order_id', $mo->id)->pluck('id');
+            if ($productionIds->isNotEmpty()) {
+                $wipBalance = \App\Models\JournalEntry::where('coa_id', $wipCoa->id)
+                    ->where('journal_type', 'manufacturing_wip')
+                    ->where('source_type', \App\Models\Production::class)
+                    ->whereIn('source_id', $productionIds)
+                    ->sum('debit');
+                if ($wipBalance > 0) {
+                    return (float) $wipBalance;
+                }
+            }
         }
 
-        $bom->loadMissing('items.product');
-
-        // Calculate standard costs from BOM
-        $materialCost = $bom->items->sum(function ($item) {
-            return (float) $item->quantity * (float) ($item->product->cost_price ?? 0);
-        });
-
-        $laborCost = (float) ($bom->labor_cost ?? 0);
-        $overheadCost = (float) ($bom->overhead_cost ?? 0);
-
-        // Standard total cost = (BB + TKL + BOP) × quantity
-        $standardTotalCost = ($materialCost + $laborCost + $overheadCost) * (float) $mo->productionPlan->quantity;
-
-        // Adjust with actual material issues and returns
-        $issuesTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+        // Fallback: actual material issues for this MO (older flow, no in-progress WIP journal)
+        $issuesTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
             ->where('status', 'completed')
             ->where('type', 'issue')
             ->sum('total_cost');
-
-        $returnsTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+        $returnsTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
             ->where('status', 'completed')
             ->where('type', 'return')
             ->sum('total_cost');
+        $actualMaterialCost = (float)$issuesTotal - (float)$returnsTotal;
 
-        // Use actual material cost if available, otherwise use standard
-        $actualMaterialCost = $issuesTotal - $returnsTotal;
-        $materialCostToUse = $actualMaterialCost > 0 ? $actualMaterialCost : $materialCost * (float) $mo->productionPlan->quantity;
-
-        // If using actual material cost, don't add labor/overhead again as they should be allocated separately
-        // If using standard cost, include labor and overhead
-        $additionalCosts = $actualMaterialCost > 0 ? 0 : ($laborCost + $overheadCost) * (float) $mo->productionPlan->quantity;
-
-        // Sum labor & overhead allocations posted to BDP and linked to this MO via source_type/source_id
-        $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
-        $allocationsTotal = 0;
-        if ($bdpCoa) {
-            $allocationsTotal = \App\Models\JournalEntry::where('coa_id', $bdpCoa->id)
-                ->where('journal_type', 'manufacturing_allocation')
-                ->where('source_type', \App\Models\ManufacturingOrder::class)
-                ->where('source_id', $mo->id)
-                ->sum('debit');
+        if ($actualMaterialCost <= 0 && $mo->production_plan_id) {
+            // Also check by production_plan_id (legacy path)
+            $issuesTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+                ->where('status', 'completed')
+                ->where('type', 'issue')
+                ->sum('total_cost');
+            $returnsTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+                ->where('status', 'completed')
+                ->where('type', 'return')
+                ->sum('total_cost');
+            $actualMaterialCost = (float)$issuesTotal - (float)$returnsTotal;
         }
 
-        // Final total = Material Cost + Additional Costs + Allocations
-        return max(0, $materialCostToUse + $additionalCosts + $allocationsTotal);
+        if ($actualMaterialCost > 0) {
+            return $actualMaterialCost;
+        }
+
+        // Ultimate fallback: standard BOM cost
+        $bom = $mo->productionPlan?->billOfMaterial;
+        if (!$bom || !$bom->is_active) {
+            return 0;
+        }
+        $bom->loadMissing('items.product');
+        $materialCost  = $bom->items->sum(fn ($i) => (float)$i->quantity * (float)($i->product->cost_price ?? 0));
+        $laborCost     = (float)($bom->labor_cost ?? 0);
+        $overheadCost  = (float)($bom->overhead_cost ?? 0);
+        return max(0, ($materialCost + $laborCost + $overheadCost) * (float)$mo->productionPlan->quantity);
     }
 
     /**
@@ -720,24 +740,55 @@ class QualityControlService
         $product = $qualityControl->product;
         $passedQuantity = $qualityControl->passed_quantity;
 
-        // Calculate total cost from BDP (Barang Dalam Proses)
+        // Labor/overhead are already captured in the manufacturing_wip journal
+        // (posted by ProductionObserver::created via generateJournalForProductionInProgress).
+        // No separate syncLaborAndOverheadAllocations call is needed here.
+
+        // Calculate total cost from WIP or fallback sources
         $totalCost = $this->calculateManufacturingOrderBDPTotal($manufacturingOrder);
 
         if ($totalCost <= 0 || $passedQuantity <= 0) {
             return;
         }
 
-        // Get COA accounts
-        $bom = $productionPlan->billOfMaterial;
-        $bdpCoa = $bom->workInProgressCoa ?? $this->resolveCoaByCodes(['1140.02']); // Barang Dalam Proses
-        $barangJadiCoa = $bom->finishedGoodsCoa ?? $this->resolveCoaByCodes(['1140.03']); // Persediaan Barang Jadi
+        // Determine credit COA: prefer 1-201 WIP Inventory if in-progress WIP journal exists,
+        // otherwise fall back to 1400.04 Pos Sementara Produksi (old flow)
+        $wipInventoryCoa = $this->resolveCoaByCodes(['1-201']);
+        $posSementaraCoa = $this->resolveCoaByCodes(['1400.04', '1150', '1140']);
 
-        if (!$bdpCoa || !$barangJadiCoa) {
+        $creditCoa = null;
+        if ($wipInventoryCoa) {
+            $productionIds = \App\Models\Production::where('manufacturing_order_id', $manufacturingOrder->id)->pluck('id');
+            if ($productionIds->isNotEmpty()) {
+                $wipBalance = \App\Models\JournalEntry::where('coa_id', $wipInventoryCoa->id)
+                    ->where('journal_type', 'manufacturing_wip')
+                    ->where('source_type', \App\Models\Production::class)
+                    ->whereIn('source_id', $productionIds)
+                    ->sum('debit');
+                if ($wipBalance > 0) {
+                    $creditCoa = $wipInventoryCoa;
+                }
+            }
+        }
+        if (!$creditCoa) {
+            $creditCoa = $posSementaraCoa;
+        }
+
+        $barangJadiCoa = ($product->inventoryCoa && $product->inventoryCoa->id)
+            ? $product->inventoryCoa
+            : $this->resolveCoaByCodes(['1140.02']);
+
+        if (!$creditCoa || !$barangJadiCoa) {
             return;
         }
 
-        $date = now();
-        $reference = $qualityControl->qc_number;
+        $branchResolver = app(\App\Services\JournalBranchResolver::class);
+        $branchId = $branchResolver->resolve($qualityControl) ?? $branchResolver->resolve($production) ?? $branchResolver->resolve($manufacturingOrder);
+        $departmentId = $branchResolver->resolveDepartment($qualityControl) ?? $branchResolver->resolveDepartment($production) ?? $branchResolver->resolveDepartment($manufacturingOrder);
+        $projectId = $branchResolver->resolveProject($qualityControl) ?? $branchResolver->resolveProject($production) ?? $branchResolver->resolveProject($manufacturingOrder);
+
+        $date = $qualityControl->date_send_stock ?? now();
+        $reference = $production->production_number ?: $qualityControl->qc_number;
 
         // Prevent duplicate posting
         if (\App\Models\JournalEntry::where('source_type', QualityControl::class)
@@ -759,19 +810,25 @@ class QualityControlService
             'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $product->name . ')',
             'debit' => $amount,
             'credit' => 0,
-            'journal_type' => 'finished_goods_completion',
+            'journal_type' => 'manufacturing_completion',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => QualityControl::class,
             'source_id' => $qualityControl->id,
         ]);
 
         \App\Models\JournalEntry::create([
-            'coa_id' => $bdpCoa->id,
+            'coa_id' => $creditCoa->id,
             'date' => $date,
             'reference' => $reference,
             'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $product->name . ')',
             'debit' => 0,
             'credit' => $amount,
-            'journal_type' => 'finished_goods_completion',
+            'journal_type' => 'manufacturing_completion',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => QualityControl::class,
             'source_id' => $qualityControl->id,
         ]);

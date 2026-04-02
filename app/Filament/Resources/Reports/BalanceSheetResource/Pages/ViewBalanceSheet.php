@@ -59,6 +59,7 @@ class ViewBalanceSheet extends Page
     public function generateReport(): void
     {
         $this->showPreview = true;
+        $this->notifyIfReportHasIssues($this->getReportData());
     }
 
     public function resetReport(): void
@@ -133,6 +134,8 @@ class ViewBalanceSheet extends Page
         $retained = $this->getRetainedEarnings($asOf);
         $current = $this->getCurrentEarnings($asOf);
         $equityTotal = $equityAccountsTotal + $retained + $current;
+        $difference = $assetTotal - ($liabTotal + $equityTotal);
+        $balanced = abs($difference) < 0.01;
 
         return [
             'assets' => $this->detailByParent($assets, $asOf, positiveFor: 'Asset'),
@@ -143,7 +146,11 @@ class ViewBalanceSheet extends Page
             'asset_total' => $assetTotal,
             'liab_total' => $liabTotal,
             'equity_total' => $equityTotal,
-            'balanced' => abs(($assetTotal) - ($liabTotal + $equityTotal)) < 0.01,
+            'balanced' => $balanced,
+            'difference' => $difference,
+            'balance_warning' => $balanced
+                ? null
+                : 'Total aset tidak sama dengan total kewajiban dan ekuitas. Selisih ini mencerminkan ledger aktual dan harus ditelusuri ke jurnal sumber.',
             'unbalanced_entries' => $unbalancedEntries,
             'has_unbalanced_entries' => !empty($unbalancedEntries),
         ];
@@ -347,6 +354,27 @@ class ViewBalanceSheet extends Page
         }
 
         return $data;
+    }
+
+    protected function notifyIfReportHasIssues(array $data): void
+    {
+        if (!$data['balanced']) {
+            Notification::make()
+                ->title('Neraca Tidak Seimbang')
+                ->warning()
+                ->persistent()
+                ->body('Selisih neraca saat ini Rp ' . number_format(abs((float) $data['difference']), 0, ',', '.') . '. Periksa jurnal sumber karena laporan menampilkan angka ledger aktual.')
+                ->send();
+        }
+
+        if ($data['has_unbalanced_entries']) {
+            Notification::make()
+                ->title('Ada Jurnal Tidak Seimbang')
+                ->danger()
+                ->persistent()
+                ->body('Ditemukan ' . count($data['unbalanced_entries']) . ' jurnal dengan total debit tidak sama dengan total kredit.')
+                ->send();
+        }
     }
 
     protected function applyDisplayMode(array $data): array

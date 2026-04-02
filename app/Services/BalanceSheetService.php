@@ -109,16 +109,8 @@ class BalanceSheetService
         $totalLiabilitiesAndEquity = $totalLiabilities + $totalEquityWithRetained;
 
         // Check if balanced
-        $isBalanced = abs($totalAssets - $totalLiabilitiesAndEquity) < 0.01; // Allow small rounding diff
-
-        // If not balanced, adjust retained earnings to force balance
-        if (!$isBalanced) {
-            $difference = $totalAssets - $totalLiabilitiesAndEquity;
-            $retainedEarnings += $difference;
-            $totalEquityWithRetained += $difference;
-            $totalLiabilitiesAndEquity += $difference;
-            $isBalanced = true;
-        }
+        $difference = $totalAssets - $totalLiabilitiesAndEquity;
+        $isBalanced = abs($difference) < 0.01; // Allow small rounding diff
 
         // Now apply display level filtering for the accounts shown in UI
         $displayCurrentAssets = $this->filterAccountsByDisplayLevel($currentAssets, $displayLevel, $showZeroBalance);
@@ -127,16 +119,6 @@ class BalanceSheetService
         $displayCurrentLiabilities = $this->filterAccountsByDisplayLevel($currentLiabilities, $displayLevel, $showZeroBalance);
         $displayLongTermLiabilities = $this->filterAccountsByDisplayLevel($longTermLiabilities, $displayLevel, $showZeroBalance);
         $displayEquity = $this->filterAccountsByDisplayLevel($equity, $displayLevel, $showZeroBalance);
-        $isBalanced = abs($totalAssets - $totalLiabilitiesAndEquity) < 0.01; // Allow small rounding diff
-
-        // If not balanced, adjust retained earnings to force balance
-        if (!$isBalanced) {
-            $difference = $totalAssets - $totalLiabilitiesAndEquity;
-            $retainedEarnings += $difference;
-            $totalEquityWithRetained += $difference;
-            $totalLiabilitiesAndEquity += $difference;
-            $isBalanced = true;
-        }
 
         return [
             'as_of_date' => $asOfDate,
@@ -182,7 +164,7 @@ class BalanceSheetService
             // TOTALS
             'total_liabilities_and_equity' => $totalLiabilitiesAndEquity,
             'is_balanced' => $isBalanced,
-            'difference' => $totalAssets - $totalLiabilitiesAndEquity,
+            'difference' => $difference,
         ];
     }
 
@@ -246,7 +228,7 @@ class BalanceSheetService
                 ->get()
                 ->keyBy('coa_id');
 
-        return $accounts->map(function ($account) use ($balanceMap, $type) {
+        return $this->orderAccountsHierarchically($accounts->map(function ($account) use ($balanceMap, $type) {
             $row = $balanceMap->get($account->id);
             $totalDebit  = (float) ($row->total_debit  ?? 0);
             $totalCredit = (float) ($row->total_credit ?? 0);
@@ -273,7 +255,49 @@ class BalanceSheetService
             $accountWithBalance->nama = $account->name;
 
             return $accountWithBalance;
-        });
+        }));
+    }
+
+    protected function orderAccountsHierarchically(Collection $accounts): Collection
+    {
+        $groupedByParent = $accounts->groupBy(fn ($account) => $account->parent_id ?? 0);
+        $ordered = collect();
+        $visited = [];
+
+        $appendChildren = function ($parentId) use (&$appendChildren, $groupedByParent, &$ordered, &$visited) {
+            $children = ($groupedByParent->get($parentId) ?? collect())
+                ->sortBy('code')
+                ->values();
+
+            foreach ($children as $account) {
+                if (isset($visited[$account->id])) {
+                    continue;
+                }
+
+                $visited[$account->id] = true;
+                $ordered->push($account);
+                $appendChildren($account->id);
+            }
+        };
+
+        $appendChildren(0);
+
+        $orphans = $accounts
+            ->filter(fn ($account) => !isset($visited[$account->id]))
+            ->sortBy('code')
+            ->values();
+
+        foreach ($orphans as $account) {
+            if (isset($visited[$account->id])) {
+                continue;
+            }
+
+            $visited[$account->id] = true;
+            $ordered->push($account);
+            $appendChildren($account->id);
+        }
+
+        return $ordered;
     }
 
     /**

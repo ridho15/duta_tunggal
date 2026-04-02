@@ -16,6 +16,7 @@ use App\Models\Rak;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseConfirmation;
 use App\Services\ManufacturingJournalService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -65,8 +66,8 @@ class MaterialIssueTest extends TestCase
 
         // Create WIP COA for manufacturing journal
         $this->wipCoa = ChartOfAccount::factory()->create([
-            'code' => '1140.02',
-            'name' => 'Work in Progress',
+            'code' => '1400.04',
+            'name' => 'POS SEMENTARA PRODUKSI',
             'type' => 'asset'
         ]);
 
@@ -216,7 +217,17 @@ class MaterialIssueTest extends TestCase
     /** @test */
     public function it_can_approve_material_issue()
     {
+        WarehouseConfirmation::create([
+            'confirmable_type' => ManufacturingOrder::class,
+            'confirmable_id' => $this->manufacturingOrder->id,
+            'confirmation_type' => 'manufacturing_order',
+            'status' => 'confirmed',
+            'confirmed_by' => $this->user->id,
+            'confirmed_at' => now(),
+        ]);
+
         $materialIssue = MaterialIssue::factory()->create([
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'status' => MaterialIssue::STATUS_DRAFT,
         ]);
 
@@ -247,12 +258,22 @@ class MaterialIssueTest extends TestCase
     /** @test */
     public function it_can_complete_material_issue_and_update_inventory()
     {
+        WarehouseConfirmation::create([
+            'confirmable_type' => ManufacturingOrder::class,
+            'confirmable_id' => $this->manufacturingOrder->id,
+            'confirmation_type' => 'manufacturing_order',
+            'status' => 'confirmed',
+            'confirmed_by' => $this->user->id,
+            'confirmed_at' => now(),
+        ]);
+
         $initialStock = InventoryStock::where('product_id', $this->rawMaterial->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
 
         $materialIssue = MaterialIssue::factory()->create([
             'warehouse_id' => $this->warehouse->id,
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'status' => MaterialIssue::STATUS_DRAFT,
         ]);
 
@@ -289,9 +310,19 @@ class MaterialIssueTest extends TestCase
     /** @test */
     public function it_generates_journal_entries_when_completed()
     {
+        WarehouseConfirmation::create([
+            'confirmable_type' => ManufacturingOrder::class,
+            'confirmable_id' => $this->manufacturingOrder->id,
+            'confirmation_type' => 'manufacturing_order',
+            'status' => 'confirmed',
+            'confirmed_by' => $this->user->id,
+            'confirmed_at' => now(),
+        ]);
+
         $materialIssue = MaterialIssue::factory()->create([
             'issue_number' => 'MI-JOURNAL-TEST',
             'warehouse_id' => $this->warehouse->id,
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'type' => 'issue',
             'status' => MaterialIssue::STATUS_COMPLETED,
             'total_cost' => 250000,
@@ -383,12 +414,22 @@ class MaterialIssueTest extends TestCase
     /** @test */
     public function it_handles_stock_reservation_during_material_issue()
     {
+        WarehouseConfirmation::create([
+            'confirmable_type' => ManufacturingOrder::class,
+            'confirmable_id' => $this->manufacturingOrder->id,
+            'confirmation_type' => 'manufacturing_order',
+            'status' => 'confirmed',
+            'confirmed_by' => $this->user->id,
+            'confirmed_at' => now(),
+        ]);
+
         $initialStock = InventoryStock::where('product_id', $this->rawMaterial->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
 
         $materialIssue = MaterialIssue::factory()->create([
             'warehouse_id' => $this->warehouse->id,
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'status' => MaterialIssue::STATUS_DRAFT,
         ]);
 
@@ -420,6 +461,65 @@ class MaterialIssueTest extends TestCase
 
         $this->assertEquals(95, $updatedStock->qty_available); // Stock should be reduced when reserved
         $this->assertEquals(5, $updatedStock->qty_reserved); // And reserved should increase
+    }
+
+    /** @test */
+    public function it_requires_confirmed_warehouse_confirmation_before_approval()
+    {
+        $materialIssue = MaterialIssue::factory()->create([
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => MaterialIssue::STATUS_DRAFT,
+        ]);
+
+        MaterialIssueItem::create([
+            'material_issue_id' => $materialIssue->id,
+            'product_id' => $this->rawMaterial->id,
+            'uom_id' => $this->uom->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'quantity' => 5,
+            'cost_per_unit' => 50000,
+            'total_cost' => 250000,
+            'status' => MaterialIssueItem::STATUS_DRAFT,
+        ]);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        $materialIssue->update([
+            'status' => MaterialIssue::STATUS_APPROVED,
+            'approved_by' => $this->user->id,
+            'approved_at' => now(),
+        ]);
+    }
+
+    /** @test */
+    public function it_requires_confirmed_warehouse_confirmation_before_requesting_approval()
+    {
+        $materialIssue = MaterialIssue::factory()->create([
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => MaterialIssue::STATUS_DRAFT,
+        ]);
+
+        MaterialIssueItem::create([
+            'material_issue_id' => $materialIssue->id,
+            'product_id' => $this->rawMaterial->id,
+            'uom_id' => $this->uom->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'quantity' => 5,
+            'cost_per_unit' => 50000,
+            'total_cost' => 250000,
+            'status' => MaterialIssueItem::STATUS_DRAFT,
+        ]);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        $materialIssue->update([
+            'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+            'approved_by' => $this->user->id,
+        ]);
     }
 
     /** @test */

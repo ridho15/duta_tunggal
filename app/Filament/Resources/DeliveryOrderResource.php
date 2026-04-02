@@ -15,9 +15,10 @@ use App\Models\AppSetting;
 use App\Models\Driver;
 use App\Models\InventoryStock;
 use App\Models\Rak;
-use App\Services\DeliveryOrderService;
 use App\Models\Warehouse;
+use App\Support\WarehouseStockOptions;
 use App\Exports\DeliveryOrderRecapExport;
+use App\Services\DeliveryOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
 use Maatwebsite\Excel\Facades\Excel;
@@ -330,106 +331,7 @@ class DeliveryOrderResource extends Resource
                                             ->validationMessages([
                                                 'required' => 'Product wajib dipilih',
                                             ]),
-                                        Repeater::make('warehouseSources')
-                                            ->relationship('warehouseSources')
-                                            ->label('Sumber Gudang (Multi-Gudang)')
-                                            ->schema([
-                                                Select::make('warehouse_id')
-                                                    ->label('Gudang Sumber')
-                                                    ->reactive()
-                                                    ->options(function () {
-                                                        $user = Auth::user();
-                                                        $manageType = $user?->manage_type ?? [];
 
-                                                        $query = Warehouse::where('status', 1);
-                                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
-                                                            $query->where('cabang_id', $user?->cabang_id);
-                                                        }
-
-                                                        return $query->get()->mapWithKeys(function ($warehouse) {
-                                                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                                        });
-                                                    })
-                                                    ->searchable()
-                                                    ->preload()
-                                                    ->required(),
-                                                Select::make('rak_id')
-                                                    ->label('Rak Sumber')
-                                                    ->reactive()
-                                                    ->options(function ($get) {
-                                                        $warehouseId = $get('warehouse_id');
-                                                        if (!$warehouseId) {
-                                                            return [];
-                                                        }
-
-                                                        return Rak::where('warehouse_id', $warehouseId)
-                                                            ->get()
-                                                            ->mapWithKeys(function ($rak) {
-                                                                return [$rak->id => "({$rak->code}) {$rak->name}"];
-                                                            });
-                                                    })
-                                                    ->searchable()
-                                                    ->preload()
-                                                    ->nullable(),
-                                                TextInput::make('quantity')
-                                                    ->label('Qty Sumber')
-                                                    ->reactive()
-                                                    ->numeric()
-                                                    ->suffix(function ($get) {
-                                                        $productId = $get('../../product_id') ?? $get('../product_id');
-                                                        $warehouseId = $get('warehouse_id');
-                                                        $rakId = $get('rak_id');
-
-                                                        if (!$productId || !$warehouseId) {
-                                                            return null;
-                                                        }
-
-                                                        $stockQuery = InventoryStock::where('product_id', $productId)
-                                                            ->where('warehouse_id', $warehouseId);
-
-                                                        if ($rakId) {
-                                                            $stockQuery->where('rak_id', $rakId);
-                                                        }
-
-                                                        $available = (float) $stockQuery->sum('qty_available');
-                                                        if ($available <= 0) {
-                                                            return '🚨 HABIS';
-                                                        }
-                                                        if ($available < 10) {
-                                                            return '⚠️ ' . number_format($available, 0, ',', '.');
-                                                        }
-
-                                                        return '✅ ' . number_format($available, 0, ',', '.');
-                                                    })
-                                                    ->helperText(function ($get) {
-                                                        $productId = $get('../../product_id') ?? $get('../product_id');
-                                                        $warehouseId = $get('warehouse_id');
-                                                        $rakId = $get('rak_id');
-                                                        $qty = (float) ($get('quantity') ?? 0);
-
-                                                        if (!$productId || !$warehouseId) {
-                                                            return 'Pilih produk dan gudang sumber untuk melihat stock tersedia.';
-                                                        }
-
-                                                        $stockQuery = InventoryStock::where('product_id', $productId)
-                                                            ->where('warehouse_id', $warehouseId);
-
-                                                        if ($rakId) {
-                                                            $stockQuery->where('rak_id', $rakId);
-                                                        }
-
-                                                        $available = (float) $stockQuery->sum('qty_available');
-                                                        if ($qty > 0 && $qty > $available) {
-                                                            return 'Qty melebihi stock tersedia: ' . number_format($available, 0, ',', '.');
-                                                        }
-
-                                                        return 'Stock tersedia: ' . number_format($available, 0, ',', '.');
-                                                    })
-                                                    ->required(),
-                                            ])
-                                            ->columns(3)
-                                            ->collapsed()
-                                            ->helperText('Jika diisi, total Qty Sumber harus sama dengan Quantity item.'),
                                         TextInput::make('quantity')
                                             ->label('Quantity')
                                             ->numeric()
@@ -517,7 +419,102 @@ class DeliveryOrderResource extends Resource
                                             }),
                                         Textarea::make('reason')
                                             ->label('Reason')
-                                            ->nullable()
+                                            ->nullable(),
+                                        Repeater::make('warehouseSources')
+                                            ->relationship('warehouseSources')
+                                            ->label('Sumber Gudang (Multi-Gudang)')
+                                            ->schema([
+                                                Select::make('warehouse_id')
+                                                    ->label('Gudang Sumber')
+                                                    ->reactive()
+                                                    ->options(function ($get) {
+                                                        return WarehouseStockOptions::forProduct(
+                                                            $get('../../product_id') ?? $get('../product_id'),
+                                                            $get('warehouse_id'),
+                                                        );
+                                                    })
+                                                    ->helperText('Hanya menampilkan gudang sumber yang masih memiliki stok produk ini.')
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->required(),
+                                                Select::make('rak_id')
+                                                    ->label('Rak Sumber')
+                                                    ->reactive()
+                                                    ->options(function ($get) {
+                                                        $warehouseId = $get('warehouse_id');
+                                                        if (!$warehouseId) {
+                                                            return [];
+                                                        }
+
+                                                        return Rak::where('warehouse_id', $warehouseId)
+                                                            ->get()
+                                                            ->mapWithKeys(function ($rak) {
+                                                                return [$rak->id => "({$rak->code}) {$rak->name}"];
+                                                            });
+                                                    })
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->nullable(),
+                                                TextInput::make('quantity')
+                                                    ->label('Qty Sumber')
+                                                    ->reactive()
+                                                    ->numeric()
+                                                    ->suffix(function ($get) {
+                                                        $productId = $get('../../product_id') ?? $get('../product_id');
+                                                        $warehouseId = $get('warehouse_id');
+                                                        $rakId = $get('rak_id');
+
+                                                        if (!$productId || !$warehouseId) {
+                                                            return null;
+                                                        }
+
+                                                        $stockQuery = InventoryStock::where('product_id', $productId)
+                                                            ->where('warehouse_id', $warehouseId);
+
+                                                        if ($rakId) {
+                                                            $stockQuery->where('rak_id', $rakId);
+                                                        }
+
+                                                        $available = (float) $stockQuery->sum('qty_available');
+                                                        if ($available <= 0) {
+                                                            return '🚨 HABIS';
+                                                        }
+                                                        if ($available < 10) {
+                                                            return '⚠️ ' . number_format($available, 0, ',', '.');
+                                                        }
+
+                                                        return '✅ ' . number_format($available, 0, ',', '.');
+                                                    })
+                                                    ->helperText(function ($get) {
+                                                        $productId = $get('../../product_id') ?? $get('../product_id');
+                                                        $warehouseId = $get('warehouse_id');
+                                                        $rakId = $get('rak_id');
+                                                        $qty = (float) ($get('quantity') ?? 0);
+
+                                                        if (!$productId || !$warehouseId) {
+                                                            return 'Pilih produk dan gudang sumber untuk melihat stock tersedia.';
+                                                        }
+
+                                                        $stockQuery = InventoryStock::where('product_id', $productId)
+                                                            ->where('warehouse_id', $warehouseId);
+
+                                                        if ($rakId) {
+                                                            $stockQuery->where('rak_id', $rakId);
+                                                        }
+
+                                                        $available = (float) $stockQuery->sum('qty_available');
+                                                        if ($qty > 0 && $qty > $available) {
+                                                            return 'Qty melebihi stock tersedia: ' . number_format($available, 0, ',', '.');
+                                                        }
+
+                                                        return 'Stock tersedia: ' . number_format($available, 0, ',', '.');
+                                                    })
+                                                    ->required(),
+                                            ])
+                                            ->columns(3)
+                                            ->columnSpanFull()
+                                            ->collapsed()
+                                            ->helperText('Jika diisi, total Qty Sumber harus sama dengan Quantity item.'),
                                     ])
                                     ->visible(function ($get, $context) {
                                         // Show deliveryOrderItem repeater when editing OR when creating (to enable relationship saving)
@@ -588,7 +585,7 @@ class DeliveryOrderResource extends Resource
                                 TextEntry::make('reason'),
                                 TextEntry::make('status')
                                     ->badge()
-                                    ->color(fn ($state) => match ($state) {
+                                    ->color(fn($state) => match ($state) {
                                         'confirmed'  => 'success',
                                         'requested'  => 'warning',
                                         'rejected'   => 'danger',
@@ -658,13 +655,14 @@ class DeliveryOrderResource extends Resource
                                     }),
                                 TextEntry::make('items_summary')
                                     ->label('Item yang Diminta')
-                                    ->getStateUsing(fn($record) =>
+                                    ->getStateUsing(
+                                        fn($record) =>
                                         $record->warehouseConfirmationItems
-                                            ->map(fn($item) =>
-                                                ($item->product_name ?? '-') . ': ' .
-                                                (int)$item->confirmed_qty . ' / ' .
-                                                (int)$item->requested_qty . ' ' .
-                                                ($item->status === 'confirmed' ? '✓' : ($item->status === 'rejected' ? '✗' : '…'))
+                                            ->map(
+                                                fn($item) => ($item->product_name ?? '-') . ': ' .
+                                                    (int)$item->confirmed_qty . ' / ' .
+                                                    (int)$item->requested_qty . ' ' .
+                                                    ($item->status === 'confirmed' ? '✓' : ($item->status === 'rejected' ? '✗' : '…'))
                                             )
                                             ->join("\n")
                                     )
@@ -681,7 +679,7 @@ class DeliveryOrderResource extends Resource
                                     ->dateTime('d M Y H:i')
                                     ->placeholder('-'),
                             ])->columns(3)
-                              ->columnSpanFull(),
+                            ->columnSpanFull(),
                     ])
                     ->visible(fn($record) => $record->warehouseConfirmations()->exists()),
             ]);
@@ -762,7 +760,7 @@ class DeliveryOrderResource extends Resource
                                 return "Surat Jalan: {$suratJalan->sj_number}\nStatus: {$suratJalan->status}";
                             }
                         }
-                        return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
+                        return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan sekarang hanya dipakai sebagai dokumen DO, bukan syarat approval atau pengiriman.';
                     }),
                 TextColumn::make('driver.name')
                     ->label('Driver')
@@ -955,14 +953,13 @@ class DeliveryOrderResource extends Resource
                         ->label('Konfirmasi Dana Diterima')
                         ->requiresConfirmation()
                         ->modalHeading('Konfirmasi: Apakah Dana Sudah Diterima?')
-                        ->modalDescription('Dengan mengkonfirmasi ini, Anda menyatakan bahwa pembayaran untuk Delivery Order ini sudah diterima dan barang siap dikirim melalui Surat Jalan.')
+                        ->modalDescription('Dengan mengkonfirmasi ini, Anda menyatakan bahwa pembayaran untuk Delivery Order ini sudah diterima dan barang siap dijadwalkan untuk pengiriman.')
                         ->modalSubmitActionLabel('Ya, Dana Sudah Diterima')
                         ->color('success')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response delivery order') &&
-                                $record->status == 'request_approve' &&
-                                $record->suratJalan->isNotEmpty();
+                                $record->status == 'request_approve';
                         })
                         ->form([
                             Textarea::make('comments')
@@ -975,7 +972,7 @@ class DeliveryOrderResource extends Resource
                                 $deliveryOrderService = app(DeliveryOrderService::class);
                                 $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
 
-                                HelperController::sendNotification(isSuccess: true, title: "Dana Dikonfirmasi", message: "Pembayaran Delivery Order telah dikonfirmasi diterima. Proses selanjutnya: Pengiriman barang oleh Driver melalui Surat Jalan.");
+                                HelperController::sendNotification(isSuccess: true, title: "Dana Dikonfirmasi", message: "Pembayaran Delivery Order telah dikonfirmasi diterima. Proses selanjutnya: jadwalkan pengiriman pada Delivery Schedule.");
                             } catch (\Exception $e) {
                                 HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
                                 throw $e;
@@ -1196,28 +1193,6 @@ class DeliveryOrderResource extends Resource
                                 message: "Quantity delivery order telah diperbarui oleh checker"
                             );
                         }),
-                    Action::make('completed')
-                        ->label('Complete')
-                        ->icon('heroicon-o-check-badge')
-                        ->requiresConfirmation()
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response delivery order') &&
-                                $record->status == 'sent';
-                        })
-                        ->color('success')
-                        ->action(function ($record) {
-                            $deliveryOrderService = app(DeliveryOrderService::class);
-                            $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'completed');
-                            // Post delivery order to general ledger for HPP recognition
-                            $postResult = $deliveryOrderService->postDeliveryOrder($record);
-                            if ($postResult['status'] === 'posted') {
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai dan telah diposting ke buku besar. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
-                            } elseif ($postResult['status'] === 'error') {
-                                HelperController::sendNotification(isSuccess: false, title: "Error", message: "Sales Order Completed but posting failed: " . $postResult['message']);
-                            } else {
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
-                            }
-                        }),
                     Action::make('mark_delivery_failed')
                         ->label('Pengiriman Gagal')
                         ->icon('heroicon-o-x-circle')
@@ -1247,9 +1222,9 @@ class DeliveryOrderResource extends Resource
                     '<div class="mt-2 text-sm">' .
                     '<ul class="list-disc pl-5">' .
                     '<li><strong>Apa ini:</strong> Delivery Order adalah dokumen pengiriman barang dari penjualan yang perlu disetujui sebelum dikirim.</li>' .
-                    '<li><strong>Flow Approval:</strong> Draft → Request Approve → Approved → Sent → Received → Completed. Gunakan tombol <em>Request Approve</em> untuk memulai proses approval.</li>' .
-                    '<li><strong>Surat Jalan:</strong> Wajib memiliki Surat Jalan sebelum approval. Status Surat Jalan ditampilkan di kolom khusus.</li>' .
-                    '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Mark as Sent</em> (approved), <em>Complete</em> (received).</li>' .
+                    '<li><strong>Flow Approval:</strong> Draft → Request Stock → Request Approve → Approved → Sent → Received → Completed. Proses pengiriman fisik dan penyelesaian DO mengikuti Jadwal Pengiriman.</li>' .
+                    '<li><strong>Surat Jalan:</strong> Surat Jalan bersifat dokumen pendukung DO dan tidak lagi menjadi syarat approval atau filter utama pengiriman.</li>' .
+                    '<li><strong>Actions:</strong> <em>Request Approve</em> (request_stock), <em>Approve/Reject</em> (request_approve), <em>Mark as Sent</em> (approved). Status selesai untuk DO dikelola otomatis mengikuti Delivery Schedule.</li>' .
                     '<li><strong>Checker Edit:</strong> User dengan role Checker dapat mengedit quantity setelah approved untuk penyesuaian aktual.</li>' .
                     '<li><strong>PDF:</strong> Download PDF tersedia setelah status approved atau completed.</li>' .
                     '</ul>' .

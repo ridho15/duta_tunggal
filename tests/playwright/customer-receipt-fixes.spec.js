@@ -4,6 +4,7 @@
  * Targeted tests for the 18 March 2026 CustomerReceipt fixes:
  *
  *  M1 — No debug/raw log output visible in UI responses
+ *  M2 — Payment method field remains visible on CustomerReceipt create flow
  *  M3 — Journal Entries section visible on CustomerReceipt view page
  *  M4 — AccountReceivable paid_amount is updated after creating a receipt
  *       (verified by checking the infolist "Status AR" section shows a non-zero
@@ -14,8 +15,13 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { ensureCustomerReceiptFixture, chooseFixtureCustomer } from './helpers/customer-receipt-fixture'
 
 const RUPIAH_PATTERN = /Rp\s[\d.]+/;
+
+test.beforeAll(() => {
+  ensureCustomerReceiptFixture()
+})
 
 // ─── Navigate to first receipt view ──────────────────────────────────────────
 async function openFirstReceipt(page) {
@@ -52,6 +58,125 @@ async function openFirstReceipt(page) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// M2: Payment method remains available on create page
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe('M2 — Payment method remains visible on CustomerReceipt create page', () => {
+  test('Create page shows payment method field', async ({ page }) => {
+    await page.goto('/admin/customer-receipts/create', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByText('Payment Method')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('Create page invoice checkbox can be selected and receipt auto-fills remaining amount', async ({ page }) => {
+    await page.goto('/admin/customer-receipts/create', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+
+    await chooseFixtureCustomer(page)
+
+    const cabangField = page.locator('#data\\.cabang_id, select[name="data.cabang_id"]').first();
+    if (await cabangField.isVisible().catch(() => false)) {
+      const cabangValue = await cabangField.inputValue();
+      expect(cabangValue).not.toBe('');
+    }
+
+    const fixtureRow = page.locator('tr').filter({ hasText: 'INV-PW-CR-001' }).first();
+    await expect(fixtureRow).toBeVisible({ timeout: 15_000 });
+
+    const invoiceCheckbox = fixtureRow.locator('input.invoice-checkbox:not([disabled])').first();
+    await expect(invoiceCheckbox).toBeVisible({ timeout: 15_000 });
+
+    const remaining = await invoiceCheckbox.getAttribute('data-remaining');
+    expect(remaining).not.toBeNull();
+    const remainingLabel = Number(remaining || '0').toLocaleString('id-ID');
+
+    await invoiceCheckbox.evaluate((element) => element.click());
+    await page.waitForTimeout(800);
+
+    const row = invoiceCheckbox.locator('xpath=ancestor::tr').first();
+    const receiptInput = row.locator('input.receipt-input').first();
+    await expect(receiptInput).toBeVisible();
+
+    const receiptValue = (await receiptInput.inputValue()).trim();
+    expect(receiptValue).toMatch(/^\d{1,3}(\.\d{3})*$/);
+    expect(receiptValue).toBe(remainingLabel);
+
+    await receiptInput.fill('100000');
+    await expect(receiptInput).toHaveValue('100.000', { timeout: 5_000 });
+
+    await receiptInput.fill('125000');
+    await expect(receiptInput).toHaveValue('125.000', { timeout: 5_000 });
+
+    const totalPaymentField = page.locator('#data\\.total_payment, input[name="total_payment"], input[wire\\:model*="total_payment"]').first();
+    if (await totalPaymentField.isVisible().catch(() => false)) {
+      const totalValue = (await totalPaymentField.inputValue()).trim();
+      expect(totalValue).not.toBe('0');
+      expect(totalValue).toMatch(/^\d{1,3}(\.\d{3})*$/);
+    }
+  });
+
+  test('Create page syncs cabang to selected invoice branch', async ({ page }) => {
+    await page.goto('/admin/customer-receipts/create', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+
+    await chooseFixtureCustomer(page)
+
+    const cabangSelect = page.locator('#data\\.cabang_id, select[name="data.cabang_id"], select[name="cabang_id"]').first();
+    await expect(cabangSelect).toHaveCount(1, { timeout: 10_000 });
+    const currentCabangId = await cabangSelect.inputValue();
+
+    const invoiceCheckboxCount = await page.locator('input.invoice-checkbox:not([disabled])').count();
+    expect(invoiceCheckboxCount).toBeGreaterThan(0);
+
+    let invoiceCheckbox = null;
+    let invoiceCabangId = null;
+
+    for (let index = 0; index < invoiceCheckboxCount; index += 1) {
+      const candidate = page.locator('input.invoice-checkbox:not([disabled])').nth(index);
+      const candidateCabangId = await candidate.getAttribute('data-cabang-id');
+
+      if (candidateCabangId && candidateCabangId !== currentCabangId) {
+        invoiceCheckbox = candidate;
+        invoiceCabangId = candidateCabangId;
+        break;
+      }
+    }
+
+    expect(invoiceCheckbox, 'Need an invoice from a different cabang to verify sync').not.toBeNull();
+    expect(invoiceCabangId).not.toBeNull();
+
+    await invoiceCheckbox.evaluate((element) => element.click());
+    await expect.poll(async () => {
+      return await page.locator('#data\\.cabang_id, select[name="data.cabang_id"], select[name="cabang_id"]').first().inputValue();
+    }, { timeout: 10_000 }).toBe(invoiceCabangId);
+    await expect(cabangSelect).toHaveValue(invoiceCabangId, { timeout: 10_000 });
+  });
+
+  test('Create page COA field is searchable and uses dropdown select behavior', async ({ page }) => {
+    await page.goto('/admin/customer-receipts/create', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+
+    const coaWrapper = page.locator('[data-field-wrapper="data.coa_id"], .fi-fo-field-wrp').filter({ has: page.locator('label:has-text("COA")') }).first();
+    await expect(coaWrapper).toBeVisible({ timeout: 10_000 });
+
+    const coaMarkup = await coaWrapper.innerHTML();
+    expect(coaMarkup).toContain('main-coa-field');
+    expect(coaMarkup).toMatch(/choices__|select2/i);
+
+    const coaWidget = coaWrapper.locator('.choices, .select2-container').first();
+    await coaWidget.click();
+
+    const searchInput = page.locator('.select2-search--dropdown .select2-search__field, .choices__input').first();
+    if (await searchInput.isVisible().catch(() => false)) {
+      await searchInput.fill('kas');
+      await page.waitForTimeout(300);
+      const dropdownText = await page.locator('body').textContent();
+      expect(dropdownText || '').toMatch(/kas|bank|deposit/i);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // M3: Journal Entries section is present on CustomerReceipt view
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('M3 — Journal Entries section on CustomerReceipt view', () => {
@@ -66,7 +191,7 @@ test.describe('M3 — Journal Entries section on CustomerReceipt view', () => {
     }
 
     // Journal Entries section must be present
-    await expect(page.getByText('Journal Entries')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Journal Entries', exact: true })).toBeVisible({ timeout: 10_000 });
   });
 
   test('Journal Entries section shows Jurnal Akuntansi label', async ({ page }) => {
@@ -166,5 +291,23 @@ test.describe('M1 — No debug/raw output on CustomerReceipt pages', () => {
     const content = await page.textContent('body');
     expect(content).not.toContain('Raw Form Data');
     expect(content).not.toContain('Attempting to extract data');
+  });
+
+  test('Create page total payment field renders rupiah formatted state', async ({ page }) => {
+    await page.goto('/admin/customer-receipts/create', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+
+    const totalPaymentField = page.locator('#data\\.total_payment, input[name="total_payment"], input[wire\\:model*="total_payment"]').first();
+    if (await totalPaymentField.isVisible().catch(() => false)) {
+      await page.evaluate(() => {
+        if (typeof window.updateTotalPaymentField === 'function') {
+          window.updateTotalPaymentField(1250000);
+        }
+      });
+
+      await page.waitForTimeout(300);
+      const value = (await totalPaymentField.inputValue()).trim();
+      expect(value).toBe('1.250.000');
+    }
   });
 });

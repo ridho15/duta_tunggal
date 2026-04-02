@@ -91,13 +91,13 @@ class CustomerReceiptItemObserver
             $debitDescription = 'Customer receipt item';
             
             // Define AR COA for credit entry
-            $arCoaId = \App\Models\ChartOfAccount::where('code', '1120')->first()?->id ?? $customerReceiptItem->coa_id;
+            $arCoaId = $this->resolveAccountsReceivableCoaId() ?? $customerReceiptItem->coa_id;
             
             if ($customerReceipt->payment_method === 'Deposit') {
                 // For deposit payments from customer:
                 // Dr: Hutang Titipan Konsumen (2160.04) - reduce liability
                 // Cr: Accounts Receivable (1120) - reduce receivable
-                $liabilityCoaId = \App\Models\ChartOfAccount::where('code', '2160.04')->first()?->id;
+                $liabilityCoaId = $this->resolveCustomerDepositCoaId();
                 if ($liabilityCoaId) {
                     // DEBIT entry for liability reduction
                     $customerReceiptItem->journalEntry()->create([
@@ -131,7 +131,6 @@ class CustomerReceiptItemObserver
             }
             
             // CREDIT: Accounts Receivable (reducing receivable)
-            $arCoaId = \App\Models\ChartOfAccount::where('code', '1120')->first()?->id ?? $customerReceiptItem->coa_id;
             \App\Models\JournalEntry::create([
                 'coa_id' => $arCoaId,
                 'date' => Carbon::now(),
@@ -146,6 +145,45 @@ class CustomerReceiptItemObserver
                 'project_id' => $projectId,
             ]);
         }
+    }
+
+    private function resolveAccountsReceivableCoaId(): ?int
+    {
+        return $this->resolveCoaIdByCodes([
+            config('coa.accounts_receivable'),
+            '1120',
+        ]);
+    }
+
+    private function resolveCustomerDepositCoaId(): ?int
+    {
+        return $this->resolveCoaIdByCodes([
+            config('coa.customer_deposit'),
+            '2160.04',
+        ]);
+    }
+
+    private function resolveCoaIdByCodes(array $codes): ?int
+    {
+        $codes = array_values(array_unique(array_filter($codes)));
+
+        if (empty($codes)) {
+            return null;
+        }
+
+        $accounts = \App\Models\ChartOfAccount::query()
+            ->whereIn('code', $codes)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('code');
+
+        foreach ($codes as $code) {
+            if ($accounts->has($code)) {
+                return $accounts->get($code)?->id;
+            }
+        }
+
+        return null;
     }
     
     private function updateCustomerReceiptStatus($customerReceipt)

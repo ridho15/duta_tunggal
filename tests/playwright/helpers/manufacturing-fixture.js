@@ -6,6 +6,9 @@ export const FIXTURE = {
   planName: 'Fixture Production Plan Manufacturing',
   productSku: 'FG-PW-MFG-001',
   productName: 'Fixture Finished Good Manufacturing',
+  rawMaterialSku: 'RM-PW-MFG-001',
+  warehouseCode: 'GDG-PW-MFG-001',
+  issueNumber: 'MI-PW-MFG-001',
 }
 
 export function ensureManufacturingFixture() {
@@ -48,7 +51,7 @@ export async function openRowAction(page, row, actionLabel) {
     }
   }
 
-  const actionToggle = row.locator('button').last()
+  const actionToggle = row.locator('button:visible').last()
   await expect(actionToggle).toBeVisible()
   await actionToggle.click({ force: true })
 

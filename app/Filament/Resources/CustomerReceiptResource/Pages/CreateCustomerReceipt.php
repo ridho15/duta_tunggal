@@ -4,9 +4,11 @@ namespace App\Filament\Resources\CustomerReceiptResource\Pages;
 
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\CustomerReceiptResource;
+use App\Helpers\MoneyHelper;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
 use App\Models\CustomerReceiptItem;
+use App\Services\LedgerPostingService;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
@@ -21,33 +23,38 @@ class CreateCustomerReceipt extends CreateRecord
     #[On('updateInvoiceData')]
     public function updateInvoiceData($data)
     {
-        
         if (isset($data['selected_invoices'])) {
-            $this->form->fill(['selected_invoices' => $data['selected_invoices']]);
+            $this->form->fill([
+                'selected_invoices' => $data['selected_invoices'],
+            ]);
         }
         
         if (isset($data['invoice_receipts'])) {
-            $this->form->fill(['invoice_receipts' => $data['invoice_receipts']]);
+            $this->form->fill([
+                'invoice_receipts' => $data['invoice_receipts'],
+            ]);
         }
     }
 
     #[On('updateHiddenField')]
     public function updateHiddenField($field, $value)
     {
-        
         // Handle the update based on field name
         if ($field === 'selected_invoices' || $field === 'invoice_receipts') {
             // Parse JSON string if needed
             $parsedValue = is_string($value) ? json_decode($value, true) : $value;
-            
-            // Update the form data
-            $this->data[$field] = $parsedValue;
-            
+
+            $this->form->fill([
+                $field => $parsedValue,
+            ]);
         }
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data['total_payment'] = MoneyHelper::parse($data['total_payment'] ?? 0);
+        $data['payment_method'] = $data['payment_method'] ?? 'Cash';
+
         // Extract data from Livewire component data if not in form data
         if (empty($data['selected_invoices']) || empty($data['invoice_receipts'])) {
             // Try to get data from current component state
@@ -291,7 +298,7 @@ class CreateCustomerReceipt extends CreateRecord
                     CustomerReceiptItem::create([
                         'customer_receipt_id' => $record->id,
                         'invoice_id' => $invoiceId,
-                        'method' => $record->payment_method ?? 'cash', // Use payment method from receipt
+                        'method' => $record->payment_method ?? 'Cash',
                         'amount' => $paymentAmount, // Use 'amount' instead of 'payment_amount'
                         'coa_id' => $record->coa_id, // Use coa_id from receipt
                         'payment_date' => now(),
@@ -338,11 +345,55 @@ class CreateCustomerReceipt extends CreateRecord
         // when CustomerReceiptItemObserver triggers a receipt status change.
         \App\Observers\CustomerReceiptObserver::markArUpdatedInCreate($record->id);
 
+        // Ensure the receipt status moves out of Draft after the create flow has
+        // finished updating Account Receivable balances.
+        $this->syncReceiptStatusFromReceivables($record);
+
         // Show success notification
         Notification::make()
             ->success()
             ->title('Customer Receipt created successfully')
             ->body("Payment of Rp " . number_format($finalTotal, 0, ',', '.') . " processed for {$itemsCreated} invoice(s). {$arUpdated} Account Receivable record(s) updated.")
             ->send();
+    }
+
+    private function syncReceiptStatusFromReceivables($record): void
+    {
+        $selectedInvoices = $record->selected_invoices;
+
+        if (is_string($selectedInvoices)) {
+            $selectedInvoices = json_decode($selectedInvoices, true) ?? [];
+        }
+
+        if (! is_array($selectedInvoices) || empty($selectedInvoices)) {
+            return;
+        }
+
+        $allPaid = true;
+        $anyPartial = false;
+
+        foreach ($selectedInvoices as $invoiceId) {
+            $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
+
+            if (! $accountReceivable) {
+                continue;
+            }
+
+            if ($accountReceivable->remaining > 0) {
+                $allPaid = false;
+
+                if ($accountReceivable->paid > 0) {
+                    $anyPartial = true;
+                }
+            }
+        }
+
+        if ($allPaid) {
+            $record->update(['status' => 'Paid']);
+            app(LedgerPostingService::class)->postCustomerReceipt($record->fresh());
+        } elseif ($anyPartial) {
+            $record->update(['status' => 'Partial']);
+            app(LedgerPostingService::class)->postCustomerReceipt($record->fresh());
+        }
     }
 }

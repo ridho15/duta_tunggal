@@ -435,8 +435,7 @@ draft ──► pending_approval ──► approved ──► paid
 - `quantity` — Jumlah yang dihasilkan per BOM
 - `uom_id` — Satuan
 - `labor_cost`, `overhead_cost`, `total_cost` — Komponen biaya
-- `finished_goods_coa_id` — COA barang jadi
-- `work_in_progress_coa_id` — COA WIP
+- `work_in_progress_coa_id` — COA pos sementara produksi / WIP
 
 **Item BOM:** product_id, quantity, uom_id per komponen bahan baku
 

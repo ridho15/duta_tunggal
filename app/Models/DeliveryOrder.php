@@ -51,6 +51,11 @@ class DeliveryOrder extends Model
         return $this->belongsToMany(SuratJalan::class, 'surat_jalan_delivery_orders', 'delivery_order_id', 'surat_jalan_id')->withTimestamps();
     }
 
+    public function deliverySchedules()
+    {
+        return $this->belongsToMany(DeliverySchedule::class, 'delivery_schedule_delivery_orders', 'delivery_order_id', 'delivery_schedule_id')->withTimestamps();
+    }
+
     public function deliverySalesOrder()
     {
         return $this->hasMany(DeliverySalesOrder::class, 'delivery_order_id');

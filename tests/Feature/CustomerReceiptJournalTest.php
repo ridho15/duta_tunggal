@@ -11,6 +11,7 @@ use App\Models\Deposit;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\User;
+use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -408,5 +409,58 @@ class CustomerReceiptJournalTest extends TestCase
         expect($cashEntry->debit)->toBe('691000.00');
         expect($cashEntry->credit)->toBe('0.00');
         expect($cashEntry->description)->toContain('Bank/Cash for receipt id');
+    }
+
+    /** @test */
+    public function it_throws_when_deposit_receipt_has_no_deposit_coa_and_rolls_back_entries()
+    {
+        $this->depositCoa->delete();
+
+        $invoice = Invoice::factory()->create([
+            'customer_name' => $this->customer->name,
+            'total' => 500000.00,
+            'status' => 'unpaid',
+        ]);
+
+        AccountReceivable::factory()->create([
+            'invoice_id' => $invoice->id,
+            'customer_id' => $this->customer->id,
+            'total' => 500000.00,
+            'paid' => 0,
+            'remaining' => 500000.00,
+            'status' => 'Belum Lunas',
+            'created_by' => $this->user->id,
+        ]);
+
+        $receipt = CustomerReceipt::factory()->create([
+            'customer_id' => $this->customer->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 500000.00,
+            'payment_method' => 'deposit',
+            'status' => 'draft',
+        ]);
+
+        CustomerReceiptItem::factory()->create([
+            'customer_receipt_id' => $receipt->id,
+            'invoice_id' => $invoice->id,
+            'method' => 'deposit',
+            'amount' => 500000.00,
+            'coa_id' => null,
+        ]);
+
+        $service = app(LedgerPostingService::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Akun deposit / uang muka pelanggan tidak ditemukan');
+
+        try {
+            $service->postCustomerReceipt($receipt);
+        } finally {
+            $entryCount = JournalEntry::where('source_type', CustomerReceipt::class)
+                ->where('source_id', $receipt->id)
+                ->count();
+
+            $this->assertSame(0, $entryCount);
+        }
     }
 }

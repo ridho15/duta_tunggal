@@ -12,6 +12,7 @@ use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
@@ -41,6 +42,8 @@ use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section as InfolistSection;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\RepeatableEntry;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class QualityControlPurchaseResource extends Resource
 {
@@ -800,19 +803,31 @@ class QualityControlPurchaseResource extends Resource
                         )
                         ->modalSubmitActionLabel('Proses QC')
                         ->action(function ($record, array $data) {
-                            $qcService     = new QualityControlService();
-                            $returnService = app(PurchaseReturnService::class);
+                            try {
+                                $qcService     = new QualityControlService();
+                                $returnService = app(PurchaseReturnService::class);
 
-                            // If there are rejected items, create the purchase return first
-                            if ($record->rejected_quantity > 0) {
-                                $action     = $data['failed_qc_action'] ?? PurchaseReturn::QC_ACTION_REDUCE_STOCK;
-                                $mergePoId  = $data['merge_target_po_id'] ?? null;
+                                if ($record->rejected_quantity > 0) {
+                                    $action     = $data['failed_qc_action'] ?? PurchaseReturn::QC_ACTION_REDUCE_STOCK;
+                                    $mergePoId  = $data['merge_target_po_id'] ?? null;
 
-                                $returnService->createFromQualityControl($record, $action, $mergePoId ?: null);
+                                    $returnService->createFromQualityControl($record, $action, $mergePoId ?: null);
+                                }
+
+                                $qcService->completeQualityControl($record, []);
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");
+                            } catch (Throwable $exception) {
+                                Log::error('QualityControlPurchaseResource process_qc failed', [
+                                    'quality_control_id' => $record->id,
+                                    'error' => $exception->getMessage(),
+                                ]);
+
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Memproses QC Pembelian',
+                                    $exception,
+                                    'QC pembelian belum berhasil diproses. Periksa hasil QC, gudang, dan data retur terkait lalu coba lagi.'
+                                );
                             }
-
-                            $qcService->completeQualityControl($record, []);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");
                         }),
                     DeleteAction::make(),
                 ])

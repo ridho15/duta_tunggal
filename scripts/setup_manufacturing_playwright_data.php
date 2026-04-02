@@ -20,6 +20,7 @@ $fixture = [
     'bom_name' => 'Fixture BOM Manufacturing',
     'plan_number' => 'PP-PW-MFG-001',
     'plan_name' => 'Fixture Production Plan Manufacturing',
+    'issue_number' => 'MI-PW-MFG-001',
 ];
 
 DB::transaction(function () use ($fixture, $now) {
@@ -83,7 +84,9 @@ DB::transaction(function () use ($fixture, $now) {
     }
 
     $coaInventoryRaw = DB::table('chart_of_accounts')->where('code', '1140.01')->value('id');
-    $coaInventoryFg = DB::table('chart_of_accounts')->where('code', '1140.03')->value('id');
+    $coaInventoryFg = DB::table('chart_of_accounts')->where('code', '1140.02')->value('id');
+    $coaLabor = DB::table('chart_of_accounts')->where('code', '5230')->value('id');
+    $coaOverhead = DB::table('chart_of_accounts')->where('code', '6000')->value('id');
 
     $rawMaterialId = DB::table('products')->where('sku', $fixture['rm_sku'])->value('id');
     $rawMaterialPayload = [
@@ -114,6 +117,8 @@ DB::transaction(function () use ($fixture, $now) {
         'purchase_return_coa_id' => null,
         'unbilled_purchase_coa_id' => null,
         'temporary_procurement_coa_id' => null,
+        'manufacturing_labor_coa_id' => null,
+        'manufacturing_overhead_coa_id' => null,
         'is_active' => 1,
         'updated_at' => $now,
     ];
@@ -156,6 +161,8 @@ DB::transaction(function () use ($fixture, $now) {
         'purchase_return_coa_id' => null,
         'unbilled_purchase_coa_id' => null,
         'temporary_procurement_coa_id' => null,
+        'manufacturing_labor_coa_id' => $coaLabor,
+        'manufacturing_overhead_coa_id' => $coaOverhead,
         'is_active' => 1,
         'updated_at' => $now,
     ];
@@ -181,8 +188,9 @@ DB::transaction(function () use ($fixture, $now) {
         'labor_cost' => 0,
         'overhead_cost' => 0,
         'total_cost' => 100000,
-        'work_in_progress_coa_id' => DB::table('chart_of_accounts')->where('code', '1140.02')->value('id'),
-        'finished_goods_coa_id' => DB::table('chart_of_accounts')->where('code', '1140.03')->value('id'),
+        'work_in_progress_coa_id' => DB::table('chart_of_accounts')->where('code', '1400.04')->value('id'),
+        'labor_coa_id' => $coaLabor,
+        'overhead_coa_id' => $coaOverhead,
         'updated_at' => $now,
     ];
 
@@ -289,10 +297,58 @@ DB::transaction(function () use ($fixture, $now) {
         ]));
     }
 
+    $existingIssueId = DB::table('material_issues')->where('issue_number', $fixture['issue_number'])->value('id');
+    if ($existingIssueId) {
+        DB::table('stock_reservations')->where('material_issue_id', $existingIssueId)->delete();
+        DB::table('journal_entries')->where('source_type', 'App\\Models\\MaterialIssue')->where('source_id', $existingIssueId)->delete();
+        DB::table('material_issue_items')->where('material_issue_id', $existingIssueId)->delete();
+    }
+
+    $issuePayload = [
+        'production_plan_id' => $planId,
+        'manufacturing_order_id' => null,
+        'warehouse_id' => $warehouseId,
+        'issue_date' => now()->toDateString(),
+        'type' => 'issue',
+        'status' => 'draft',
+        'total_cost' => 250000,
+        'notes' => 'Fixture material issue for Playwright stock reservation flow',
+        'created_by' => $user->id,
+        'approved_by' => null,
+        'approved_at' => null,
+        'updated_at' => $now,
+    ];
+
+    if ($existingIssueId) {
+        DB::table('material_issues')->where('id', $existingIssueId)->update($issuePayload);
+        $issueId = $existingIssueId;
+    } else {
+        $issueId = DB::table('material_issues')->insertGetId(array_merge($issuePayload, [
+            'issue_number' => $fixture['issue_number'],
+            'created_at' => $now,
+        ]));
+    }
+
+    DB::table('material_issue_items')->insert([
+        'material_issue_id' => $issueId,
+        'product_id' => $rawMaterialId,
+        'uom_id' => $uomId,
+        'warehouse_id' => $warehouseId,
+        'rak_id' => null,
+        'quantity' => 50,
+        'cost_per_unit' => 50000,
+        'total_cost' => 250000,
+        'status' => 'draft',
+        'notes' => 'Fixture material issue item for Playwright stock reservation flow',
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
     echo "✅ Manufacturing fixture ready\n";
     echo "   Plan      : {$fixture['plan_number']}\n";
     echo "   BOM       : {$fixture['bom_code']}\n";
     echo "   Product   : {$fixture['fg_sku']}\n";
     echo "   Material  : {$fixture['rm_sku']}\n";
+    echo "   Issue     : {$fixture['issue_number']}\n";
     echo "   Warehouse : {$fixture['warehouse_code']}\n";
 });

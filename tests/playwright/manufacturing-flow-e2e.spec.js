@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import {
+  confirmDialogAction,
   FIXTURE,
   ensureManufacturingFixture,
   selectFixtureProductionPlan,
@@ -14,6 +15,70 @@ test.use({ storageState: 'playwright/.auth/user.json' })
 test.describe.serial('Manufacturing full flow', () => {
   test.beforeAll(async () => {
     ensureManufacturingFixture()
+  })
+
+  test('material issue shows available and reserved stock across reserve flow', async ({ page }) => {
+    const issueId = querySingleValue(`DB::table('material_issues')->where('issue_number', '${FIXTURE.issueNumber}')->value('id')`)
+    expect(issueId).toBeTruthy()
+
+    const readStockField = async (label) => {
+      const field = page.getByRole('textbox', { name: label }).first()
+      await expect(field).toBeVisible({ timeout: 10000 })
+      return Number((await field.inputValue()).replace(/,/g, ''))
+    }
+
+    const availableQuery = `DB::table('inventory_stocks')->where('product_id', DB::table('products')->where('sku', '${FIXTURE.rawMaterialSku}')->value('id'))->where('warehouse_id', DB::table('warehouses')->where('kode', '${FIXTURE.warehouseCode}')->value('id'))->value('qty_available')`
+    const reservedQuery = `DB::table('inventory_stocks')->where('product_id', DB::table('products')->where('sku', '${FIXTURE.rawMaterialSku}')->value('id'))->where('warehouse_id', DB::table('warehouses')->where('kode', '${FIXTURE.warehouseCode}')->value('id'))->value('qty_reserved')`
+
+    await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('body')).not.toContainText(ERR)
+
+    await expect.poll(() => readStockField('Stock Available'), { timeout: 10000 }).toBe(100)
+    await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(0)
+
+    await page.goto(`${BASE}/admin/material-issues`)
+    await page.waitForLoadState('networkidle')
+
+    await page.goto(`${BASE}/admin/material-issues?tableAction=request_approval&tableActionRecord=${issueId}`)
+    await page.waitForLoadState('networkidle')
+    await confirmDialogAction(page, 'Konfirmasi')
+    await expect.poll(
+      () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
+      { timeout: 15000 },
+    ).toBe('pending_approval')
+
+    await page.goto(`${BASE}/admin/material-issues?tableAction=approve&tableActionRecord=${issueId}`)
+    await page.waitForLoadState('networkidle')
+    await confirmDialogAction(page, 'Konfirmasi')
+    await expect.poll(
+      () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
+      { timeout: 15000 },
+    ).toBe('approved')
+    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(50)
+    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(50)
+
+    await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
+    await page.waitForLoadState('networkidle')
+    await expect.poll(() => readStockField('Stock Available'), { timeout: 10000 }).toBe(50)
+    await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(50)
+
+    await page.goto(`${BASE}/admin/material-issues`)
+    await page.waitForLoadState('networkidle')
+    await page.goto(`${BASE}/admin/material-issues?tableAction=complete&tableActionRecord=${issueId}`)
+    await page.waitForLoadState('networkidle')
+    await confirmDialogAction(page, 'Konfirmasi')
+    await expect.poll(
+      () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
+      { timeout: 15000 },
+    ).toBe('completed')
+    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(50)
+    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(0)
+
+    await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
+    await page.waitForLoadState('networkidle')
+    await expect.poll(() => readStockField('Stock Available'), { timeout: 10000 }).toBe(50)
+    await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(0)
   })
 
   test('plan to MO to production to QC completes successfully', async ({ page }) => {

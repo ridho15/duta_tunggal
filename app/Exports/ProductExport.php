@@ -19,7 +19,7 @@ class ProductExport implements FromView, ShouldAutoSize
 
     public function view(): View
     {
-        $listProduct = Product::with(['cabang', 'productCategory'])->where('cabang_id', $this->data['cabang_id'])
+        $listProduct = Product::with(['cabang', 'productCategory'])->forCabang($this->data['cabang_id'])
             ->where('id', '>=', $this->data['dari_product_id'])
             ->where('id', '<=', $this->data['sampai_product_id'])
             ->get();
@@ -29,7 +29,8 @@ class ProductExport implements FromView, ShouldAutoSize
     }
     public function collection()
     {
-        return Product::where('cabang_id', $this->data['cabang_id'])
+        return Product::query()
+            ->forCabang($this->data['cabang_id'])
             ->where('id', '>=', $this->data['dari_product_id'])
             ->where('id', '<=', $this->data['sampai_product_id'])
             ->get();

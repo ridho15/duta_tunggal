@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\PurchaseInvoiceResource\Pages\ViewPurchaseInvoice;
 use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
 use App\Models\Cabang;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\OrderRequest;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
@@ -20,6 +22,7 @@ use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use RuntimeException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -166,6 +169,49 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_mark_as_sent_action_shows_friendly_notification_when_update_fails()
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'invoice_number' => 'PINV-FAIL-' . rand(1000, 9999),
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $purchaseOrder->id,
+            'invoice_date' => now(),
+            'due_date' => now()->addDays(14),
+            'subtotal' => 100000,
+            'tax' => 0,
+            'total' => 100000,
+            'status' => 'draft',
+            'purchase_receipts' => [],
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        InvoiceItem::factory()->create([
+            'invoice_id' => $invoice->id,
+            'product_id' => $this->product->id,
+            'quantity' => 5,
+            'price' => 20000,
+            'total' => 100000,
+        ]);
+
+        Invoice::updating(function () {
+            throw new RuntimeException('simulated invoice update failure');
+        });
+
+        Livewire::test(ViewPurchaseInvoice::class, ['record' => $invoice->getRouteKey()])
+            ->callAction('mark_as_sent')
+            ->assertNotified('Gagal Mengubah Status Invoice');
+
+        $this->assertSame('draft', $invoice->fresh()->status);
+    }
+
     public function test_purchase_invoice_form_has_required_fields()
     {
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
@@ -276,6 +322,63 @@ class PurchaseInvoiceResourceTest extends TestCase
         $branchBOrderRequests = PurchaseInvoiceResource::getOrderRequestOptions($supplier->id);
         $this->assertArrayHasKey($orderRequestB->id, $branchBOrderRequests);
         $this->assertArrayNotHasKey($orderRequestA->id, $branchBOrderRequests);
+    }
+
+    public function test_partial_purchase_receipt_can_be_selected_for_purchase_invoice()
+    {
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'partially_received',
+            'cabang_id' => $this->cabang->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+
+        PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 10000,
+            'discount' => 0,
+            'tax' => 11,
+            'tipe_pajak' => 'Eklusif',
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'partial',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'product_id' => $this->product->id,
+            'qty_accepted' => 4,
+        ]);
+
+        $purchaseOrderOptions = PurchaseInvoiceResource::getPurchaseOrderOptions(
+            $this->supplier->id,
+            $orderRequest->id,
+            $this->cabang->id
+        );
+
+        $this->assertArrayHasKey($purchaseOrder->id, $purchaseOrderOptions);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $this->supplier->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+            ])
+            ->fillForm([
+                'selected_purchase_receipts' => [$receipt->id],
+            ])
+            ->assertSet('data.purchase_receipts', [$receipt->id])
+            ->assertSet('data.invoiceItem.0.quantity', 4);
     }
 
     public function test_purchase_order_selection_loads_receipts()

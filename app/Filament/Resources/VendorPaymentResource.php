@@ -3,11 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\VendorPaymentResource\Pages;
+use App\Helpers\MoneyHelper;
+use App\Support\ProcurementFailureNotifier;
 use App\Models\ChartOfAccount;
 use App\Models\Invoice;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\VendorPayment;
+use App\Models\VendorPaymentDetail;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -29,6 +32,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
 use Filament\Tables\Actions\ActionGroup;
 
 class VendorPaymentResource extends Resource
@@ -72,7 +76,7 @@ class VendorPaymentResource extends Resource
                                         if (!$state) {
                                             $set('supplier_id', null);
                                             $set('selected_invoices', []);
-                                            $set('total_payment', 0);
+                                            $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
                                             return;
                                         }
@@ -90,24 +94,9 @@ class VendorPaymentResource extends Resource
                                             // Calculate total from PR invoices
                                             if (!empty($prInvoiceIds)) {
                                                 $invoices = $eligibleInvoices;
-                                                $total = $invoices->sum(function ($invoice) {
-                                                    return $invoice->accountPayable->remaining ?? $invoice->total;
-                                                });
-                                                $set('total_payment', $total);
-
-                                                $paymentDetails = $invoices->map(function ($invoice) {
-                                                    return [
-                                                        'invoice_id' => $invoice->id,
-                                                        'invoice_number' => $invoice->invoice_number,
-                                                        'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
-                                                        'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
-                                                        'total_invoice' => $invoice->total,
-                                                        'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                        'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                    ];
-                                                })->toArray();
-
-                                                $set('payment_details', $paymentDetails);
+                                                $total = self::calculateSelectedInvoiceTotal($invoices);
+                                                $set('total_payment', self::formatMoneyState($total));
+                                                $set('payment_details', self::buildPaymentDetails($invoices));
                                             } else {
                                                 $set('payment_details', []);
                                             }
@@ -140,7 +129,7 @@ class VendorPaymentResource extends Resource
                                         // Only reset if no payment_request_id is selected
                                         if (empty($get('payment_request_id'))) {
                                             $set('selected_invoices', []);
-                                            $set('total_payment', 0);
+                                            $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
                                         }
                                     })
@@ -189,7 +178,7 @@ class VendorPaymentResource extends Resource
 
                                             $options = [];
                                             foreach ($invoices as $invoice) {
-                                                $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
+                                                $remaining = self::resolveInvoiceRemainingAmount($invoice);
                                                 $statusText = $remaining <= 0 ? ' (SUDAH LUNAS)' : '';
 
                                                 $invDate = $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : '-';
@@ -201,12 +190,15 @@ class VendorPaymentResource extends Resource
                                             return $options;
                                         } catch (\Exception $e) {
                                             $set('has_invoices', false);
-                                            \Illuminate\Support\Facades\Log::warning('VendorPaymentResource: gagal memuat daftar invoice: ' . $e->getMessage());
-                                            \Filament\Notifications\Notification::make()
-                                                ->title('Gagal Memuat Daftar Invoice')
-                                                ->body('Terjadi kesalahan saat mengambil daftar invoice supplier. Coba pilih ulang supplier atau refresh halaman.')
-                                                ->warning()
-                                                ->send();
+                                            Log::warning('VendorPaymentResource: gagal memuat daftar invoice', [
+                                                'payment_request_id' => $paymentRequestId,
+                                                'error' => $e->getMessage(),
+                                            ]);
+                                            ProcurementFailureNotifier::warning(
+                                                'Gagal Memuat Daftar Invoice',
+                                                $e,
+                                                'Daftar invoice supplier belum berhasil dimuat. Coba pilih ulang payment request atau refresh halaman.'
+                                            );
                                             return [];
                                         }
                                     })
@@ -230,7 +222,7 @@ class VendorPaymentResource extends Resource
                                             return false;
                                         }
 
-                                        $remaining = (float) ($invoice->accountPayable->remaining ?? $invoice->total);
+                                        $remaining = self::resolveInvoiceRemainingAmount($invoice);
                                         return $remaining <= 0;
                                     })
                                     ->visible(fn($get) => !empty($get('supplier_id')))
@@ -264,7 +256,7 @@ class VendorPaymentResource extends Resource
 
                                         // Calculate total payment based on selected invoices
                                         if (empty($invoiceIds)) {
-                                            $set('total_payment', 0);
+                                            $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
                                             $set('force_section_update', false); // Reset force update
                                             \Illuminate\Support\Facades\Log::info('No invoices selected, resetting totals');
@@ -284,29 +276,17 @@ class VendorPaymentResource extends Resource
                                                         'id' => $invoice->id,
                                                         'number' => $invoice->invoice_number,
                                                         'total' => $invoice->total,
-                                                        'remaining' => $invoice->accountPayable->remaining ?? $invoice->total,
+                                                        'remaining' => self::resolveInvoiceRemainingAmount($invoice),
                                                     ];
                                                 })->toArray(),
                                             ]);
 
-                                            $total = $invoices->sum(function ($invoice) {
-                                                return $invoice->accountPayable->remaining ?? $invoice->total;
-                                            });
+                                            $total = self::calculateSelectedInvoiceTotal($invoices);
 
-                                            $set('total_payment', $total);
+                                            $set('total_payment', self::formatMoneyState($total));
 
                                             // Set payment details for each selected invoice
-                                            $paymentDetails = $invoices->map(function ($invoice) {
-                                                return [
-                                                    'invoice_id' => $invoice->id,
-                                                    'invoice_number' => $invoice->invoice_number,
-                                                    'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
-                                                    'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
-                                                    'total_invoice' => $invoice->total,
-                                                    'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                    'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                ];
-                                            })->toArray();
+                                            $paymentDetails = self::buildPaymentDetails($invoices);
 
                                             $set('payment_details', $paymentDetails);
                                             \Illuminate\Support\Facades\Log::info('Payment details set successfully', [
@@ -314,25 +294,25 @@ class VendorPaymentResource extends Resource
                                                 'payment_details_count' => count($paymentDetails),
                                             ]);
                                         } catch (\Exception $e) {
-                                            \Illuminate\Support\Facades\Log::error('Error in invoice selection processing', [
+                                            Log::error('VendorPaymentResource invoice selection processing failed', [
                                                 'error' => $e->getMessage(),
                                                 'trace' => $e->getTraceAsString(),
                                                 'invoice_ids' => $invoiceIds,
                                             ]);
-                                            $set('total_payment', 0);
+                                            $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
-                                            \Filament\Notifications\Notification::make()
-                                                ->title('Gagal Memuat Detail Invoice')
-                                                ->body('Terjadi kesalahan saat memproses invoice yang dipilih: ' . $e->getMessage())
-                                                ->warning()
-                                                ->send();
+                                            ProcurementFailureNotifier::warning(
+                                                'Gagal Memuat Detail Invoice',
+                                                $e,
+                                                'Detail invoice yang dipilih belum berhasil diproses. Periksa invoice yang dipilih lalu coba lagi.'
+                                            );
                                         }
 
                                         // End loading state and force section re-render
                                         $set('is_processing_invoices', false);
                                         $set('force_section_update', !$get('force_section_update'));
                                     })
-                                    ->columns(2)
+                                        ->columns(1)
                                     ->searchable(),
                             ]),
 
@@ -463,7 +443,7 @@ class VendorPaymentResource extends Resource
                                                     }
                                                 }
 
-                                                $set('../../total_payment', $totalPayment);
+                                                $set('../../total_payment', self::formatMoneyState($totalPayment));
 
                                                 \Illuminate\Support\Facades\Log::info('Payment amount updated, recalculating total', [
                                                     'new_payment_amount' => $state,
@@ -474,7 +454,7 @@ class VendorPaymentResource extends Resource
                                             ->columnSpan(1),
                                         Hidden::make('invoice_id'),
                                     ])
-                                    ->columns(6)
+                                    ->columns(1)
                                     ->columnSpanFull()
                                     ->addable(false)
                                     ->deletable(false)
@@ -558,7 +538,7 @@ class VendorPaymentResource extends Resource
                                 Placeholder::make('calculating_total')
                                     ->label('Total Pembayaran')
                                     ->content('Menghitung total pembayaran...')
-                                    ->visible(fn($get) => !empty($get('selected_invoices')) && $get('total_payment') == 0)
+                                    ->visible(fn($get) => !empty($get('selected_invoices')) && MoneyHelper::parse($get('total_payment') ?? 0) === 0.0)
                                     ->columnSpan(1),
 
                                 TextInput::make('total_payment')
@@ -568,69 +548,7 @@ class VendorPaymentResource extends Resource
                                     ->reactive()
                                     ->readOnly() // Make it read-only since it's calculated automatically
                                     ->default(0)
-                                    ->visible(fn($get) => $get('total_payment') > 0)
-                                    ->afterStateUpdated(function ($set, $get) {
-                                        $selectedInvoices = $get('selected_invoices') ?? [];
-
-                                        // Handle mixed data structure: objects from payment_details + strings
-                                        $invoiceIds = [];
-                                        if (is_array($selectedInvoices)) {
-                                            foreach ($selectedInvoices as $item) {
-                                                if (is_numeric($item)) {
-                                                    $invoiceIds[] = (int) $item;
-                                                } elseif (is_string($item)) {
-                                                    $invoiceIds[] = (int) $item;
-                                                } elseif (is_array($item) && isset($item['invoice_id'])) {
-                                                    $invoiceIds[] = (int) $item['invoice_id'];
-                                                } elseif (is_object($item) && isset($item->invoice_id)) {
-                                                    $invoiceIds[] = (int) $item->invoice_id;
-                                                }
-                                            }
-                                            $invoiceIds = array_unique($invoiceIds);
-                                        }
-
-                                        if (empty($invoiceIds)) {
-                                            $set('total_payment', 0);
-                                            $set('payment_details', []);
-                                            return;
-                                        }
-
-                                        try {
-                                            $invoices = Invoice::whereIn('id', $invoiceIds)
-                                                ->with('accountPayable')
-                                                ->get();
-
-                                            $total = $invoices->sum(function ($invoice) {
-                                                return $invoice->accountPayable->remaining ?? $invoice->total;
-                                            });
-
-                                            $set('total_payment', $total);
-
-                                            // Set payment details for each selected invoice
-                                            $paymentDetails = $invoices->map(function ($invoice) {
-                                                return [
-                                                    'invoice_id' => $invoice->id,
-                                                    'invoice_number' => $invoice->invoice_number,
-                                                    'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
-                                                    'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
-                                                    'total_invoice' => $invoice->total,
-                                                    'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                    'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                ];
-                                            })->toArray();
-
-                                            $set('payment_details', $paymentDetails);
-                                        } catch (\Exception $e) {
-                                            $set('total_payment', 0);
-                                            $set('payment_details', []);
-                                            \Illuminate\Support\Facades\Log::warning('VendorPaymentResource: gagal menghitung total pembayaran: ' . $e->getMessage());
-                                            \Filament\Notifications\Notification::make()
-                                                ->title('Gagal Menghitung Total Pembayaran')
-                                                ->body('Terjadi kesalahan saat memproses invoice. Pastikan semua invoice memiliki data yang lengkap.')
-                                                ->warning()
-                                                ->send();
-                                        }
-                                    })
+                                    ->visible(fn($get) => MoneyHelper::parse($get('total_payment') ?? 0) > 0)
                                     ->extraAttributes([
                                         'class' => 'auto-calculated-field',
                                         'data-field' => 'total_payment'
@@ -745,6 +663,85 @@ class VendorPaymentResource extends Resource
         return parent::getEloquentQuery()->with(['supplier', 'vendorPaymentDetail.invoice']);
     }
 
+    private static function formatMoneyState($value): string
+    {
+        return number_format((float) MoneyHelper::parse($value ?? 0), 0, ',', '.');
+    }
+
+    public static function calculateSelectedInvoiceTotal($invoices): float
+    {
+        return self::buildInvoicePaymentSnapshot($invoices)->sum('remaining_amount');
+    }
+
+    public static function resolveInvoiceRemainingAmount(Invoice $invoice): float
+    {
+        $accountPayable = $invoice->accountPayable;
+
+        if ($invoice->relationLoaded('accountPayable') && $accountPayable?->getKey()) {
+            return max(0, (float) MoneyHelper::parse($accountPayable->remaining ?? 0));
+        }
+
+        if ($accountPayable?->getKey()) {
+            return max(0, (float) MoneyHelper::parse($accountPayable->remaining ?? 0));
+        }
+
+        $paidTotal = (float) VendorPaymentDetail::query()
+            ->where('invoice_id', $invoice->id)
+            ->selectRaw('COALESCE(SUM(amount + COALESCE(adjustment_amount, 0)), 0) as paid_total')
+            ->value('paid_total');
+
+        return max(0, (float) MoneyHelper::parse($invoice->total ?? 0) - $paidTotal);
+    }
+
+    private static function buildInvoicePaymentSnapshot($invoices)
+    {
+        $invoiceCollection = collect($invoices)->values();
+
+        if ($invoiceCollection->isEmpty()) {
+            return collect();
+        }
+
+        $invoiceIds = $invoiceCollection->pluck('id')->filter()->values();
+        $fallbackPaidTotals = VendorPaymentDetail::query()
+            ->whereIn('invoice_id', $invoiceIds)
+            ->selectRaw('invoice_id, COALESCE(SUM(amount + COALESCE(adjustment_amount, 0)), 0) as paid_total')
+            ->groupBy('invoice_id')
+            ->pluck('paid_total', 'invoice_id');
+
+        return $invoiceCollection->map(function ($invoice) use ($fallbackPaidTotals) {
+            $totalAmount = (float) MoneyHelper::parse($invoice->total ?? 0);
+            $accountPayable = $invoice->accountPayable;
+            $remainingAmount = $accountPayable?->getKey()
+                ? max(0, (float) MoneyHelper::parse($accountPayable->remaining ?? 0))
+                : max(0, $totalAmount - (float) ($fallbackPaidTotals[$invoice->id] ?? 0));
+
+            return [
+                'invoice' => $invoice,
+                'total_amount' => $totalAmount,
+                'remaining_amount' => $remainingAmount,
+            ];
+        });
+    }
+
+    private static function buildPaymentDetails($invoices): array
+    {
+        return self::buildInvoicePaymentSnapshot($invoices)->map(function ($snapshot) {
+            /** @var Invoice $invoice */
+            $invoice = $snapshot['invoice'];
+            $remainingAmount = $snapshot['remaining_amount'];
+
+            return [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                'total_invoice' => self::formatMoneyState($snapshot['total_amount']),
+                'remaining_amount' => self::formatMoneyState($remainingAmount),
+                'payment_amount' => self::formatMoneyState($remainingAmount),
+            ];
+        })->toArray();
+    }
+
     public static function mutateFormDataBeforeFill(array $data): array
     {
 
@@ -769,27 +766,20 @@ class VendorPaymentResource extends Resource
                         ->with('accountPayable')
                         ->get();
 
-                    $paymentDetails = $invoices->map(function ($invoice) {
-                        return [
-                            'invoice_id' => $invoice->id,
-                            'invoice_number' => $invoice->invoice_number,
-                            'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
-                            'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
-                            'total_invoice' => $invoice->total,
-                            'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                            'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                        ];
-                    })->toArray();
-
-                    $data['payment_details'] = $paymentDetails;
+                    $data['payment_details'] = self::buildPaymentDetails($invoices);
                 } else {
                     $data['payment_details'] = [];
                 }
             } catch (\Exception $e) {
-                // If there's an error, log and continue without payment_details
-                \Illuminate\Support\Facades\Log::warning('VendorPaymentResource: gagal mengisi detail pembayaran: ' . $e->getMessage(), [
+                Log::warning('VendorPaymentResource: gagal mengisi detail pembayaran', [
                     'vendor_payment_id' => $data['id'] ?? null,
+                    'error' => $e->getMessage(),
                 ]);
+                ProcurementFailureNotifier::warning(
+                    'Detail Pembayaran Belum Lengkap',
+                    $e,
+                    'Detail pembayaran vendor belum berhasil dimuat sepenuhnya. Silakan refresh halaman atau periksa invoice yang terkait.'
+                );
                 $data['payment_details'] = [];
                 $data['selected_invoices'] = [];
             }
@@ -850,7 +840,12 @@ class VendorPaymentResource extends Resource
                             $numbers = array_filter(array_map(fn ($id) => $invoiceNumberCache[$id] ?? null, $invoiceIds));
                             return $numbers ? implode(', ', $numbers) : '-';
                         } catch (\Exception $e) {
-                            return 'ERROR: ' . $e->getMessage();
+                            Log::warning('VendorPaymentResource invoice summary rendering failed', [
+                                'vendor_payment_id' => $record->id,
+                                'error' => $e->getMessage(),
+                            ]);
+
+                            return 'Data invoice tidak tersedia';
                         }
                     }),
 

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\VendorPaymentResource\Pages;
 
 use App\Filament\Resources\VendorPaymentResource;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use App\Models\Invoice;
@@ -11,6 +12,10 @@ use App\Models\PaymentRequest;
 use App\Models\VendorPayment;
 use App\Helpers\MoneyHelper;
 use Filament\Notifications\Notification;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class CreateVendorPayment extends CreateRecord
 {
@@ -75,12 +80,10 @@ class CreateVendorPayment extends CreateRecord
                     : json_decode($data['selected_invoices'], true);
 
                 if (is_array($selectedInvoices)) {
-                    $totalInvoiceAmount = Invoice::whereIn('id', $selectedInvoices)
+                    $invoices = Invoice::whereIn('id', $selectedInvoices)
                         ->with('accountPayable')
-                        ->get()
-                        ->sum(function ($invoice) {
-                            return $invoice->accountPayable->remaining ?? $invoice->total;
-                        });
+                        ->get();
+                    $totalInvoiceAmount = VendorPaymentResource::calculateSelectedInvoiceTotal($invoices);
 
                     // Debug logging
                     \Illuminate\Support\Facades\Log::info('VendorPayment Status Determination (Page Level)', [
@@ -113,28 +116,68 @@ class CreateVendorPayment extends CreateRecord
 
     protected function afterCreate(): void
     {
-        // Update linked PaymentRequest status based on cumulative paid amount.
-        $paymentRequestId = $this->record->payment_request_id;
-        if ($paymentRequestId) {
-            $pr = PaymentRequest::find($paymentRequestId);
-            if ($pr) {
-                $paidSoFar = (float) VendorPayment::where('payment_request_id', $paymentRequestId)
-                    ->sum('total_payment');
-                $requestTotal = MoneyHelper::parse($pr->total_amount ?? 0);
-
-                if ($paidSoFar >= ($requestTotal - 0.01)) {
-                    $newStatus = PaymentRequest::STATUS_PAID;
-                } elseif ($paidSoFar > 0) {
-                    $newStatus = PaymentRequest::STATUS_PARTIAL;
-                } else {
-                    $newStatus = PaymentRequest::STATUS_APPROVED;
-                }
-
-                $pr->update([
-                    'status' => $newStatus,
-                    'vendor_payment_id' => $this->record->id,
-                ]);
+        try {
+            $paymentRequestId = $this->record->payment_request_id;
+            if (!$paymentRequestId) {
+                return;
             }
+
+            $pr = PaymentRequest::find($paymentRequestId);
+            if (!$pr) {
+                return;
+            }
+
+            $paidSoFar = (float) VendorPayment::where('payment_request_id', $paymentRequestId)
+                ->sum('total_payment');
+            $requestTotal = MoneyHelper::parse($pr->total_amount ?? 0);
+
+            if ($paidSoFar >= ($requestTotal - 0.01)) {
+                $newStatus = PaymentRequest::STATUS_PAID;
+            } elseif ($paidSoFar > 0) {
+                $newStatus = PaymentRequest::STATUS_PARTIAL;
+            } else {
+                $newStatus = PaymentRequest::STATUS_APPROVED;
+            }
+
+            $pr->update([
+                'status' => $newStatus,
+                'vendor_payment_id' => $this->record->id,
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('CreateVendorPayment afterCreate failed', [
+                'vendor_payment_id' => $this->record?->id,
+                'payment_request_id' => $this->record?->payment_request_id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::warning(
+                'Pembayaran Vendor Tersimpan Dengan Catatan',
+                $exception,
+                'Pembayaran vendor berhasil disimpan, tetapi sinkronisasi payment request belum berhasil diperbarui. Silakan periksa status payment request terkait.'
+            );
+        }
+    }
+
+    protected function handleRecordCreation(array $data): Model
+    {
+        try {
+            return parent::handleRecordCreation($data);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('CreateVendorPayment handleRecordCreation failed', [
+                'supplier_id' => $data['supplier_id'] ?? null,
+                'payment_request_id' => $data['payment_request_id'] ?? null,
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::danger(
+                'Gagal Membuat Pembayaran Vendor',
+                $exception,
+                'Pembayaran vendor belum berhasil dibuat. Periksa kembali invoice, nominal pembayaran, dan akun yang dipilih lalu coba lagi.'
+            );
+
+            throw $exception;
         }
     }
 }

@@ -29,6 +29,11 @@ test('material issue approval reserves stock from available to reserved', functi
         ['name' => 'Persediaan Bahan Baku', 'type' => 'Asset', 'is_active' => true]
     );
 
+    $temporaryProductionCoa = ChartOfAccount::firstOrCreate(
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
+    );
+
     // Create raw material product
     $rawMaterial = Product::factory()->create([
         'name' => 'Raw Material Test',
@@ -72,7 +77,7 @@ test('material issue approval reserves stock from available to reserved', functi
         'uom_id' => $uom->id,
         'quantity' => 1,
         'total_cost' => 10000,
-        'work_in_progress_coa_id' => $rawCoa->id,
+        'work_in_progress_coa_id' => $temporaryProductionCoa->id,
     ]);
 
     BillOfMaterialItem::create([
@@ -159,8 +164,8 @@ test('material issue completion releases reserved stock and reduces available st
 
     // Create COA for work in progress
     $wipCoa = ChartOfAccount::firstOrCreate(
-        ['code' => '1140.02'],
-        ['name' => 'Barang Dalam Proses', 'type' => 'Asset', 'is_active' => true]
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
     );
 
     // Create raw material product
@@ -206,7 +211,7 @@ test('material issue completion releases reserved stock and reduces available st
         'uom_id' => $uom->id,
         'quantity' => 1,
         'total_cost' => 10000,
-        'work_in_progress_coa_id' => $rawCoa->id,
+        'work_in_progress_coa_id' => $wipCoa->id,
     ]);
 
     BillOfMaterialItem::create([

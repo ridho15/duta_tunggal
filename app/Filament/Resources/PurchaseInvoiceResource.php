@@ -147,7 +147,7 @@ class PurchaseInvoiceResource extends Resource
 
                                         $po = PurchaseOrder::where('supplier_id', $supplierId)
                                             ->where('cabang_id', $cabangId)
-                                            ->where('status', 'completed')
+                                            ->whereIn('status', ['approved', 'partially_received', 'completed'])
                                             ->find($value);
 
                                         if (!$po) {
@@ -155,7 +155,7 @@ class PurchaseInvoiceResource extends Resource
                                         }
 
                                         $allReceiptIds = $po->purchaseReceipt()
-                                            ->where('status', 'completed')
+                                            ->whereIn('status', ['partial', 'completed'])
                                             ->pluck('id')
                                             ->toArray();
 
@@ -267,7 +267,7 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 Placeholder::make('receipt_invoiced_info')
                                     ->label('')
-                                    ->content('Receipt yang berlabel "Sudah di-invoice" tetap ditampilkan, namun tidak dapat dipilih. Biaya lain dari receipt yang dipilih akan otomatis masuk ke Other Fees dan total invoice.'),
+                                    ->content('Receipt berstatus partial maupun completed dapat dipilih. Receipt yang berlabel "Sudah di-invoice" tetap ditampilkan, namun tidak dapat dipilih. Biaya lain dari receipt yang dipilih akan otomatis masuk ke Other Fees dan total invoice.'),
                                 // Task 14: Receipts from ALL selected POs
                                 Forms\Components\CheckboxList::make('selected_purchase_receipts')
                                     ->label('')
@@ -288,7 +288,7 @@ class PurchaseInvoiceResource extends Resource
                                         foreach ($purchaseOrders as $purchaseOrder) {
                                             $purchaseReceipts = $purchaseOrder->purchaseReceipt()
                                                 ->with('purchaseReceiptItem.purchaseOrderItem', 'purchaseReceiptBiaya')
-                                                ->where('status', 'completed')
+                                                ->whereIn('status', ['partial', 'completed'])
                                                 ->get();
                                             
                                             foreach ($purchaseReceipts as $receipt) {
@@ -564,6 +564,44 @@ class PurchaseInvoiceResource extends Resource
                                     }),
                             ]),
 
+                        Repeater::make('receiptBiayaItems')
+                            ->label('Biaya Lain dari Purchase Receipt')
+                            ->helperText('Biaya ini dibawa dari receipt terpilih dan akan digabung ke biaya invoice saat disimpan.')
+                            ->schema([
+                                Hidden::make('receipt_id'),
+                                TextInput::make('nama_biaya')
+                                    ->label('Nama Biaya')
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Nama biaya tidak boleh kosong'
+                                    ]),
+                                TextInput::make('total')
+                                    ->label('Total')
+                                    ->indonesianMoney()
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Total tidak boleh kosong',
+                                    ]),
+                            ])
+                            ->columns(2)
+                            ->defaultItems(0)
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
+                                $receiptBiayaItems = $state ?? [];
+                                $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['total'] ?? 0));
+                                $existingOtherFees = $get('other_fees') ?? [];
+                                $manualOtherFeeTotal = (float) collect($existingOtherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
+
+                                $ppnRate = (float) ($get('ppn_rate') ?? 0);
+                                $taxAmount = $subtotal * $ppnRate / 100;
+                                $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
+
+                                $set('other_fee', $totalOtherFee);
+                                $set('total', self::formatMoneyState($finalTotal));
+                                $set('ppn_amount', self::formatMoneyState($taxAmount));
+                            }),
+
                         // Biaya Lain Section
                         Section::make('Biaya Lain - lain')
                             ->schema([
@@ -607,10 +645,10 @@ class PurchaseInvoiceResource extends Resource
                                         $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $taxAmount = $subtotal * $ppnRate / 100;
                                         $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
-                                        $set('total', $finalTotal);
+                                        $set('total', self::formatMoneyState($finalTotal));
 
                                         // Update PPN amount display
-                                        $set('ppn_amount', $taxAmount);
+                                        $set('ppn_amount', self::formatMoneyState($taxAmount));
                                     })
                                     ->collapsible(),
                             ]),
@@ -713,7 +751,7 @@ class PurchaseInvoiceResource extends Resource
                                         'required' => 'COA hutang supplier harus dipilih'
                                     ])
                                     ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '2110')->first()?->id;
+                                        return \App\Models\ChartOfAccount::where('code', config('coa.accounts_payable', '2110'))->first()?->id;
                                     }),
 
                                 Select::make('ppn_masukan_coa_id')
@@ -758,47 +796,6 @@ class PurchaseInvoiceResource extends Resource
                         Hidden::make('supplier_phone'),
                         Hidden::make('subtotal'),
                         Hidden::make('purchase_receipts'),
-                        
-                        // Biaya Lain dari Purchase Receipt
-                        Repeater::make('receiptBiayaItems')
-                            ->label('Biaya Lain dari Purchase Receipt')
-                            ->helperText('Biaya ini dibawa dari receipt terpilih dan akan digabung ke biaya invoice saat disimpan.')
-                            ->schema([
-                                Hidden::make('receipt_id'),
-                                TextInput::make('nama_biaya')
-                                    ->label('Nama Biaya')
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'Nama biaya tidak boleh kosong'
-                                    ]),
-                                TextInput::make('total')
-                                    ->label('Total')
-                                    ->indonesianMoney()
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'Total tidak boleh kosong',
-                                    ]),
-                            ])
-                            ->columns(2)
-                            ->defaultItems(0)
-                            ->collapsed()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                // Recalculate total when receiptBiayaItems changes
-                                $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
-                                $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::parse($row['total'] ?? 0));
-                                $existingOtherFees = $get('other_fees') ?? [];
-                                $manualOtherFeeTotal = (float) collect($existingOtherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
-                                $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
-                                
-                                $ppnRate = (float) ($get('ppn_rate') ?? 0);
-                                $taxAmount = $subtotal * $ppnRate / 100;
-                                $finalTotal = $subtotal + $totalOtherFee + $taxAmount;
-                                $set('total', $finalTotal);
-
-                                // Update PPN amount display
-                                $set('ppn_amount', $taxAmount);
-                            }),
                     ])
             ]);
     }
@@ -1264,15 +1261,16 @@ class PurchaseInvoiceResource extends Resource
 
         $query = PurchaseOrder::where('supplier_id', $supplierId)
             ->where('cabang_id', $cabangId)
-            ->where('status', 'completed')
-            // ->whereHas('purchaseReceipt', fn($q) => $q->where('status', 'completed'))
+            ->whereIn('status', ['approved', 'partially_received', 'completed'])
+            ->whereHas('purchaseReceipt', fn ($receiptQuery) => $receiptQuery->whereIn('status', ['partial', 'completed']))
+            // Allow PO selection once QC has produced a partial or completed receipt.
             ->where('refer_model_type', 'App\\Models\\OrderRequest')
             ->where('refer_model_id', $orderRequestId);
 
         return $query->get()
             ->mapWithKeys(function ($po) {
                 $allReceiptIds = $po->purchaseReceipt()
-                    ->where('status', 'completed')
+                    ->whereIn('status', ['partial', 'completed'])
                     ->pluck('id')->toArray();
 
                 $invoicedReceiptIds = Invoice::where('from_model_type', 'App\\Models\\PurchaseOrder')

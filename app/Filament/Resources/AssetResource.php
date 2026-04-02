@@ -121,11 +121,14 @@ class AssetResource extends Resource
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->sku . ' - ' . $record->name)
                             ->getSearchResultsUsing(function (string $search, Get $get) {
                                 $cabangId = $get('cabang_id');
-                                $query = \App\Models\Product::where('name', 'like', "%{$search}%")
-                                    ->orWhere('sku', 'like', "%{$search}%");
+                                $query = \App\Models\Product::query()
+                                    ->where(function ($productQuery) use ($search) {
+                                        $productQuery->where('name', 'like', "%{$search}%")
+                                            ->orWhere('sku', 'like', "%{$search}%");
+                                    });
 
                                 if ($cabangId) {
-                                    $query->where('cabang_id', $cabangId);
+                                    $query->forCabang($cabangId);
                                 }
 
                                 return $query->get()
@@ -135,7 +138,8 @@ class AssetResource extends Resource
                             ->options(function (Get $get) {
                                 $cabangId = $get('cabang_id');
                                 if ($cabangId) {
-                                    return \App\Models\Product::where('cabang_id', $cabangId)
+                                    return \App\Models\Product::query()
+                                        ->forCabang($cabangId)
                                         ->get()
                                         ->mapWithKeys(fn($product) => [$product->id => $product->sku . ' - ' . $product->name]);
                                 }

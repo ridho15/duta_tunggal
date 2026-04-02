@@ -28,6 +28,8 @@ class BillOfMaterialFactory extends Factory
             'labor_cost' => $this->faker->randomFloat(2, 1000, 50000),
             'overhead_cost' => $this->faker->randomFloat(2, 500, 10000),
             'total_cost' => 0, // Will be calculated
+            'labor_coa_id' => null,
+            'overhead_coa_id' => null,
         ];
     }
 

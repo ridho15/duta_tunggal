@@ -479,8 +479,9 @@ describe('Retained Earnings Calculation', function () {
             'as_of_date' => now()->format('Y-m-d'),
         ]);
         
-        // The service balances the statement, so retained earnings is adjusted back to zero
-        expect($result['retained_earnings'])->toBe(0.0);
+        expect($result['retained_earnings'])->toBe(45000000.0);
+        expect($result['is_balanced'])->toBe(false);
+        expect($result['difference'])->toBe(-45000000.0);
     });
     
     it('handles negative retained earnings (accumulated loss)', function () {
@@ -514,8 +515,9 @@ describe('Retained Earnings Calculation', function () {
             'as_of_date' => now()->format('Y-m-d'),
         ]);
         
-        // The service balances the statement, so retained earnings is adjusted back to zero
-        expect($result['retained_earnings'])->toBe(0.0);
+        expect($result['retained_earnings'])->toBe(-15000000.0);
+        expect($result['is_balanced'])->toBe(false);
+        expect($result['difference'])->toBe(15000000.0);
     });
 });
 
@@ -1064,8 +1066,10 @@ describe('Balance Verification', function () {
             'as_of_date' => now()->format('Y-m-d'),
         ]);
         
-        expect($result['is_balanced'])->toBe(true);
-        expect($result['difference'])->toBe(0.0);
+        expect($result['is_balanced'])->toBe(false);
+        expect($result['difference'])->toBe(10000000.0);
+        expect($result['retained_earnings'])->toBe(0.0);
+        expect($result['total_liabilities_and_equity'])->toBe(40000000.0);
     });
 });
 

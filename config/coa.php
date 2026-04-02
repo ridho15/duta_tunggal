@@ -22,9 +22,15 @@ return [
     'fixed_asset'            => '1500',    // Harga Perolehan Aset Tetap
 
     // --- Liabilities ---
-    'accounts_payable'       => '2110',    // Hutang Dagang
-    'unbilled_purchase'      => '2100.10', // Penerimaan Barang Belum Tertagih
+    'accounts_payable'       => '2110',     // Hutang Dagang
+    'unbilled_purchase'      => '2100.10',  // Pembelian Belum Tertagih
     'customer_deposit'       => '2160.04', // Deposit Pelanggan
+    'sales_output_vat'       => '2120.06', // PPN Keluaran
+
+    // --- Sales ---
+    'sales_revenue'          => '4000',    // Penjualan
+    'sales_discount'         => '4100.01', // Diskon Penjualan
+    'sales_shipping'         => '6100.02', // Biaya Pengiriman Penjualan
 
     // --- Expenses ---
     'import_duty'            => '5130',    // Bea Masuk

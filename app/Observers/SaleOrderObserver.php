@@ -32,11 +32,7 @@ class SaleOrderObserver
         $originalStatus = $saleOrder->getOriginal('status');
         $newStatus = $saleOrder->status;
 
-        if ($originalStatus !== 'approved' && $newStatus === 'approved') {
-            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
-        }
-
-        // WC and DO creation is now triggered when a Delivery Order is created.
+        // WC and DO creation is triggered when a Delivery Order is created.
 
         // Jika status berubah ke 'completed', buat invoice otomatis dan kurangi stock untuk Ambil Sendiri
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
@@ -281,10 +277,10 @@ class SaleOrderObserver
             return;
         }
 
-        // Cek apakah stock mencukupi untuk semua items
+        // Warehouse confirmation must always be processed manually by warehouse.
         $hasInsufficientStock = $saleOrder->hasInsufficientStock();
-        $wcStatus = $hasInsufficientStock ? 'request' : 'confirmed';
-        $itemStatus = $hasInsufficientStock ? 'request' : 'confirmed';
+        $wcStatus = 'request';
+        $itemStatus = 'request';
 
         Log::info('SaleOrderObserver: Stock check result', [
             'sale_order_id' => $saleOrder->id,
@@ -300,8 +296,8 @@ class SaleOrderObserver
             'confirmation_type' => 'sales_order',
             'status'            => $wcStatus,
             'note'              => 'Auto-generated from approved Sale Order ' . $saleOrder->so_number,
-            'confirmed_by'      => $hasInsufficientStock ? null : $saleOrder->approve_by,
-            'confirmed_at'      => $hasInsufficientStock ? null : now(),
+            'confirmed_by'      => null,
+            'confirmed_at'      => null,
         ]);
 
         // Buat warehouse confirmation items
@@ -352,7 +348,7 @@ class SaleOrderObserver
             'wc_id' => $warehouseConfirmation->id,
             'sale_order_id' => $saleOrder->id,
             'status' => $wcStatus,
-            'auto_approved' => !$hasInsufficientStock,
+            'auto_approved' => false,
         ]);
 
         // Notify if some items were skipped because warehouse_id is missing
@@ -362,15 +358,6 @@ class SaleOrderObserver
                 ->warning()
                 ->body('Item berikut tidak memiliki gudang sehingga tidak dimasukkan ke Warehouse Confirmation: ' . implode(', ', $skippedProducts) . '. Silakan set warehouse pada item SO tersebut.')
                 ->send();
-        }
-
-        // Jika WC status adalah confirmed, buat delivery order otomatis
-        if ($wcStatus === 'confirmed') {
-            // Load relationships yang diperlukan
-            $warehouseConfirmation->load('warehouseConfirmationItems.saleOrderItem.product');
-            
-            // Panggil method untuk membuat delivery order
-            \App\Models\WarehouseConfirmation::createDeliveryOrderForConfirmedWarehouseConfirmation($warehouseConfirmation);
         }
     }
 

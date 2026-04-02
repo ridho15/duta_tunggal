@@ -59,6 +59,12 @@ class QualityControlManufactureTest extends TestCase
         $product = Product::factory()->create([
             'name' => 'Test Product',
             'cabang_id' => $cabang->id,
+            'inventory_coa_id' => ChartOfAccount::create([
+                'code' => '1140.02',
+                'name' => 'Persediaan Barang Produksi',
+                'type' => 'asset',
+                'is_active' => true,
+            ])->id,
         ]);
         $warehouse = Warehouse::first();
 
@@ -105,25 +111,19 @@ class QualityControlManufactureTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        // Create COA accounts needed for production
-        $bdpCoa = ChartOfAccount::create([
-            'code' => '1140.02',
-            'name' => 'Barang Dalam Proses',
+        ChartOfAccount::create([
+            'code' => '1400.04',
+            'name' => 'POS SEMENTARA PRODUKSI',
             'type' => 'asset',
             'is_active' => true,
         ]);
 
-        $finishedGoodsCoa = ChartOfAccount::create([
-            'code' => '1140.03',
-            'name' => 'Persediaan Barang Jadi',
-            'type' => 'asset',
+        ChartOfAccount::firstOrCreate([
+            'code' => '6000',
+        ], [
+            'name' => 'Beban Produksi',
+            'type' => 'Expense',
             'is_active' => true,
-        ]);
-
-        // Update BOM with COA references
-        $bom->update([
-            'work_in_progress_coa_id' => $bdpCoa->id,
-            'finished_goods_coa_id' => $finishedGoodsCoa->id,
         ]);
 
         $productionPlan->update(['bill_of_material_id' => $bom->id]);
@@ -201,6 +201,18 @@ class QualityControlManufactureTest extends TestCase
         $this->assertEquals($product->id, $stockMovement->product_id, 'Stock movement product should match');
         $this->assertEquals($warehouse->id, $stockMovement->warehouse_id, 'Stock movement warehouse should match');
 
+        $journalEntries = JournalEntry::where('source_type', QualityControl::class)
+            ->where('source_id', $qc->id)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $journalEntries, 'QC completion should create balanced manufacturing completion journal entries');
+        $this->assertSame('manufacturing_completion', $journalEntries[0]->journal_type);
+        $this->assertSame('manufacturing_completion', $journalEntries[1]->journal_type);
+        $this->assertSame($cabang->id, $journalEntries[0]->cabang_id);
+        $this->assertSame($cabang->id, $journalEntries[1]->cabang_id);
+        $this->assertEquals((float) $journalEntries->sum('debit'), (float) $journalEntries->sum('credit'));
+
         echo "\n=== STOCK MOVEMENT CREATED ===\n";
         echo "Type: {$stockMovement->type}\n";
         echo "Quantity: {$stockMovement->quantity}\n";
@@ -226,10 +238,11 @@ class QualityControlManufactureTest extends TestCase
         // Note: The actual inventory update might happen through observers or other mechanisms
         // This test focuses on verifying the stock movement creation
 
-        // Assert: Check if manufacturing order status was updated (if all quantity passed)
+        // Assert: Check if manufacturing order status was updated
         $mo->refresh();
-        // Since passed_quantity (8) < total MO quantity (10), MO should remain in_progress
-        $this->assertEquals('in_progress', $mo->status, 'MO status should remain in_progress since not all quantity passed QC');
+        // All units have been inspected (8 passed + 2 rejected = 10 = total qty),
+        // so MO should be completed.
+        $this->assertEquals('completed', $mo->status, 'MO status should be completed when all quantity has been inspected (passed + rejected = total)');
 
         echo "\n=== MANUFACTURING ORDER STATUS ===\n";
         echo "Status: {$mo->status}\n";

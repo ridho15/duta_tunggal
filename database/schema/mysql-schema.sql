@@ -307,12 +307,9 @@ CREATE TABLE `bill_of_materials` (
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `uom_id` int NOT NULL,
-  `finished_goods_coa_id` bigint unsigned DEFAULT NULL,
   `work_in_progress_coa_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `bill_of_materials_finished_goods_coa_id_foreign` (`finished_goods_coa_id`),
   KEY `bill_of_materials_work_in_progress_coa_id_foreign` (`work_in_progress_coa_id`),
-  CONSTRAINT `bill_of_materials_finished_goods_coa_id_foreign` FOREIGN KEY (`finished_goods_coa_id`) REFERENCES `chart_of_accounts` (`id`),
   CONSTRAINT `bill_of_materials_work_in_progress_coa_id_foreign` FOREIGN KEY (`work_in_progress_coa_id`) REFERENCES `chart_of_accounts` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

@@ -143,29 +143,6 @@ class ViewDeliveryOrder extends ViewRecord
                     \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan Invoice telah diterbitkan dan diselesaikan untuk Delivery Order ini.");
                 }),
 
-            Actions\Action::make('sent')
-                ->label('Mark as Sent')
-                ->requiresConfirmation()
-                ->modalHeading('Mark Delivery Order as Sent')
-                ->modalDescription('Are you sure you want to mark this delivery order as sent? This will create journal entries for goods delivery.')
-                ->modalSubmitActionLabel('Yes, Mark as Sent')
-                ->color('info')
-                ->icon('heroicon-o-paper-airplane')
-                ->visible(function () {
-                    $record = $this->record;
-                    return Auth::user()->hasPermissionTo('response delivery order') &&
-                        $record->status == 'approved';
-                })
-                ->action(function ($record) {
-                    try {
-                        $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                        $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'sent');
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Success", message: "Delivery Order telah ditandai sebagai terkirim. Proses selanjutnya: Konfirmasi penerimaan oleh Tim Sales/Admin.");
-                    } catch (\Exception $e) {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
-                        throw $e;
-                    }
-                }),
             Actions\Action::make('completed')
                 ->label('Complete')
                 ->icon('heroicon-o-check-badge')
@@ -331,7 +308,7 @@ class ViewDeliveryOrder extends ViewRecord
                             return "Surat Jalan: {$suratJalan->sj_number} - Status: {$suratJalan->status}";
                         }
                     }
-                    return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan diperlukan sebelum approval.';
+                    return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan hanya untuk pencatatan dokumen DO.';
                 }),
             Action::make('pdf_delivery_order')
                 ->label('Download PDF')

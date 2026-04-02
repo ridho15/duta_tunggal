@@ -147,18 +147,11 @@ test.describe('J2 — SuratJalan simplification', () => {
     expect(pageContent).not.toContain('Cetak Rekap Driver');
   });
 
-  test('SJ list "Mark as Sent" action exists for published records', async ({ page }) => {
+  test('SJ list no longer shows "Mark as Sent" action', async ({ page }) => {
     await navigateTo(page, '/admin/surat-jalans');
 
-    // If any SJ records exist, check that "Tandai Gagal Kirim" does NOT appear
-    const tableRows = await page.locator('table tbody tr[data-id]').count();
-    if (tableRows === 0) {
-      const pageContent = await page.content();
-      expect(pageContent).toMatch(/surat jalan|tidak ada data|no records|belum ada/i);
-      return;
-    }
-
     const pageContent = await page.content();
-    expect(pageContent).not.toContain('Tandai Gagal Kirim');
+    expect(pageContent).not.toContain('Mark as Sent');
+    expect(pageContent).not.toContain('Tandai Terkirim');
   });
 });

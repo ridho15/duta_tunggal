@@ -8,6 +8,7 @@ use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseConfirmation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -68,11 +69,9 @@ class MaterialIssueSeeder extends Seeder
             'warehouse_id' => $plan->warehouse_id ?? $warehouse->id,
             'issue_date' => Carbon::now(),
             'type' => 'issue',
-            'status' => 'completed', // Mark as completed for demo data
+            'status' => 'draft',
             'notes' => "Material issue for {$mo->mo_number}",
             'created_by' => $user->id,
-            'approved_by' => $user->id,
-            'approved_at' => Carbon::now(),
         ]);
 
         $totalCost = 0;
@@ -100,6 +99,23 @@ class MaterialIssueSeeder extends Seeder
 
         // Update total cost
         $materialIssue->update(['total_cost' => $totalCost]);
+
+        WarehouseConfirmation::create([
+            'confirmable_type' => ManufacturingOrder::class,
+            'confirmable_id' => $mo->id,
+            'confirmation_type' => 'manufacturing_order',
+            'status' => 'confirmed',
+            'confirmed_by' => $user->id,
+            'confirmed_at' => Carbon::now(),
+        ]);
+
+        $materialIssue->items()->where('status', 'draft')->update(['status' => 'approved']);
+
+        $materialIssue->update([
+            'status' => 'completed',
+            'approved_by' => $user->id,
+            'approved_at' => Carbon::now(),
+        ]);
 
         $this->command->info("Created material issue: {$materialIssue->issue_number} for MO: {$mo->mo_number}");
     }

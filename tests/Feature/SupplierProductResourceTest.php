@@ -397,6 +397,45 @@ describe('ProductResource CRUD', function () {
             ->assertSuccessful();
     });
 
+    it('can create a global product without cabang', function () {
+        $adminUser = User::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'manage_type' => 'all',
+        ]);
+        $adminUser->givePermissionTo([
+            'view any product',
+            'view product',
+            'create product',
+            'update product',
+            'delete product',
+        ]);
+
+        Auth::login($adminUser);
+
+        Livewire::test(CreateProduct::class)
+            ->fillForm([
+                'sku'                 => 'SKU-GLOBAL-001',
+                'name'                => 'Produk Global',
+                'product_category_id' => $this->category->id,
+                'cost_price'          => 5000,
+                'sell_price'          => 8000,
+                'biaya'               => 0,
+                'uom_id'              => $this->uom->id,
+                'kode_merk'           => 'MRK-GLB',
+                'tipe_pajak'          => 'Non Pajak',
+                'pajak'               => 0,
+            ])
+            ->set('data.suppliers', [])
+            ->set('data.unitConversions', [['uom_id' => $this->uom->id, 'nilai_konversi' => 1]])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('products', [
+            'sku' => 'SKU-GLOBAL-001',
+            'cabang_id' => null,
+        ]);
+    });
+
     it('can create a product without suppliers (optional)', function () {
         Livewire::test(CreateProduct::class)
             ->fillForm([
@@ -418,6 +457,26 @@ describe('ProductResource CRUD', function () {
             ->assertHasNoFormErrors();
 
         $this->assertDatabaseHas('products', ['sku' => 'SKU-CREATE-002']);
+    });
+
+    it('shows global products to branch users', function () {
+        $globalProduct = Product::factory()->create([
+            'sku'                 => 'SKU-GLOBAL-VISIBLE-001',
+            'name'                => 'Produk Global Visible',
+            'cabang_id'           => null,
+            'product_category_id' => $this->category->id,
+            'uom_id'              => $this->uom->id,
+        ]);
+
+        $visibleSkus = Product::query()
+            ->orderBy('sku')
+            ->pluck('sku')
+            ->all();
+
+        expect($visibleSkus)->toContain('SKU-EXISTING-001')
+            ->and($visibleSkus)->toContain('SKU-GLOBAL-VISIBLE-001');
+
+        $this->assertTrue(Product::query()->whereKey($globalProduct->id)->exists());
     });
 
     it('can create a product then attach supplier via pivot relationship', function () {

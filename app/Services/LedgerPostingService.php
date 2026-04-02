@@ -371,73 +371,80 @@ class LedgerPostingService
      */
     public function postVendorPayment(VendorPayment $payment): array
     {
-        // Atomic duplicate-posting guard.
-        $alreadyPosted = DB::transaction(function () use ($payment) {
-            return JournalEntry::where('source_type', VendorPayment::class)
+        return DB::transaction(function () use ($payment) {
+            $alreadyPosted = JournalEntry::where('source_type', VendorPayment::class)
                 ->where('source_id', $payment->id)
                 ->lockForUpdate()
                 ->exists();
-        });
-        if ($alreadyPosted) {
-            return ['status' => 'skipped', 'message' => 'VendorPayment already posted to ledger'];
-        }
+            if ($alreadyPosted) {
+                return ['status' => 'skipped', 'message' => 'VendorPayment already posted to ledger'];
+            }
 
-        $rawPaymentDate = $payment->payment_date; // goes through accessor → Carbon or null
-        $date = ($rawPaymentDate instanceof \Carbon\Carbon ? $rawPaymentDate->toDateString() : null)
-            ?? Carbon::now()->toDateString();
-        $details = $payment->vendorPaymentDetail()->get();
+            $rawPaymentDate = $payment->payment_date; // goes through accessor → Carbon or null
+            $date = ($rawPaymentDate instanceof \Carbon\Carbon ? $rawPaymentDate->toDateString() : null)
+                ?? Carbon::now()->toDateString();
+            $details = $payment->vendorPaymentDetail()->get();
 
-        $total = (float) ($details->sum('amount') ?: $payment->total_payment);
+            $total = (float) ($details->sum('amount') ?: $payment->total_payment);
 
-        if ($total <= 0) {
-            return ['status' => 'skipped', 'message' => 'VendorPayment has no amount to post'];
-        }
+            if ($total <= 0) {
+                return ['status' => 'skipped', 'message' => 'VendorPayment has no amount to post'];
+            }
 
-        $utangCoa = ChartOfAccount::where('code', config('coa.accounts_payable'))->first();
-        $defaultBankCoa = $payment->coa_id ? $payment->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
-        $ppnMasukanCoa = ChartOfAccount::where('code', config('coa.ppn_masukan'))->first();
-        $pph22Coa = ChartOfAccount::where('code', config('coa.pph22'))->first();
-        $beaMasukCoa = ChartOfAccount::where('code', config('coa.import_duty'))->first();
+            $utangCoa = ChartOfAccount::where('code', config('coa.accounts_payable'))->first();
+            $defaultBankCoa = $payment->coa_id ? $payment->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
+            $ppnMasukanCoa = ChartOfAccount::where('code', config('coa.ppn_masukan'))->first();
+            $pph22Coa = ChartOfAccount::where('code', config('coa.pph22'))->first();
+            $beaMasukCoa = ChartOfAccount::where('code', config('coa.import_duty'))->first();
 
-        $entries = [];
+            $entries = [];
 
-        // Resolve branch from source
-        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($payment);
-        $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($payment);
-        $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($payment);
+            // Resolve branch from source
+            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($payment);
+            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($payment);
+            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($payment);
 
-        if ($utangCoa) {
-            $entries[] = JournalEntry::create([
-                'coa_id' => $utangCoa->id,
-                'date' => $date,
-                'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                'description' => 'Payment to supplier for payment id ' . $payment->id,
-                'debit' => $total,
-                'credit' => 0,
-                'journal_type' => 'payment',
-                'cabang_id' => $branchId,
-                'department_id' => $departmentId,
-                'project_id' => $projectId,
-                'source_type' => VendorPayment::class,
-                'source_id' => $payment->id,
-            ]);
-        }
+            if ($utangCoa) {
+                $entries[] = JournalEntry::create([
+                    'coa_id' => $utangCoa->id,
+                    'date' => $date,
+                    'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
+                    'description' => 'Payment to supplier for payment id ' . $payment->id,
+                    'debit' => $total,
+                    'credit' => 0,
+                    'journal_type' => 'payment',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
+                    'source_type' => VendorPayment::class,
+                    'source_id' => $payment->id,
+                ]);
+            }
 
-        $depositDetailsAmount = $details->filter(function ($detail) {
-            return strtolower($detail->method ?? '') === 'deposit';
-        })->sum('amount');
+            $depositDetailsAmount = $details->filter(function ($detail) {
+                return strtolower($detail->method ?? '') === 'deposit';
+            })->sum('amount');
 
-        $paymentMarkedDeposit = strtolower($payment->payment_method ?? '') === 'deposit';
-        if ($depositDetailsAmount <= 0 && $paymentMarkedDeposit) {
-            $depositDetailsAmount = $total;
-        }
+            $paymentMarkedDeposit = strtolower($payment->payment_method ?? '') === 'deposit';
+            if ($depositDetailsAmount <= 0 && $paymentMarkedDeposit) {
+                $depositDetailsAmount = $total;
+            }
 
-        $depositAmount = (float) min($total, $depositDetailsAmount);
-        $cashBankAmount = (float) max(0, $total - $depositAmount);
+            $depositAmount = (float) min($total, $depositDetailsAmount);
+            $cashBankAmount = (float) max(0, $total - $depositAmount);
 
-        if ($depositAmount > 0) {
-            $depositCoa = $this->resolveDepositCoa($payment);
-            if ($depositCoa) {
+            if ($depositAmount > 0) {
+                $depositCoa = $this->resolveDepositCoa($payment);
+                if (!$depositCoa) {
+                    Log::error('Missing deposit COA for vendor payment', [
+                        'payment_id' => $payment->id,
+                        'supplier_id' => $payment->supplier_id,
+                        'deposit_amount' => $depositAmount,
+                    ]);
+
+                    throw new \RuntimeException('Akun deposit / uang muka supplier tidak ditemukan. Jurnal pembayaran tidak dapat dibuat tanpa COA deposit yang valid.');
+                }
+
                 $entries[] = JournalEntry::create([
                     'coa_id' => $depositCoa->id,
                     'date' => $date,
@@ -452,149 +459,145 @@ class LedgerPostingService
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
                 ]);
-            } else {
-                // If deposit account is missing, fall back to bank/cash to keep journal balanced
-                $cashBankAmount += $depositAmount;
-                $depositAmount = 0;
             }
-        }
 
-        $nonDepositDetails = $details->filter(function ($detail) {
-            return strtolower($detail->method ?? '') !== 'deposit';
-        });
-
-        if ($nonDepositDetails->isNotEmpty()) {
-            $grouped = $nonDepositDetails->groupBy(function ($detail) {
-                return $detail->coa_id ?? 'default';
+            $nonDepositDetails = $details->filter(function ($detail) {
+                return strtolower($detail->method ?? '') !== 'deposit';
             });
 
-            foreach ($grouped as $coaKey => $group) {
-                $amount = (float) $group->sum('amount');
-                if ($amount <= 0) {
-                    continue;
-                }
+            if ($nonDepositDetails->isNotEmpty()) {
+                $grouped = $nonDepositDetails->groupBy(function ($detail) {
+                    return $detail->coa_id ?? 'default';
+                });
 
-                $coa = $coaKey === 'default'
-                    ? $defaultBankCoa
-                    : ChartOfAccount::find($group->first()->coa_id);
+                foreach ($grouped as $coaKey => $group) {
+                    $amount = (float) $group->sum('amount');
+                    if ($amount <= 0) {
+                        continue;
+                    }
 
-                if (!$coa) {
-                    $coa = $defaultBankCoa;
-                }
+                    $coa = $coaKey === 'default'
+                        ? $defaultBankCoa
+                        : ChartOfAccount::find($group->first()->coa_id);
 
-                if (!$coa) {
-                    Log::error('No COA found for payment group', [
-                        'coaKey' => $coaKey,
-                        'group' => $group->toArray()
+                    if (!$coa) {
+                        $coa = $defaultBankCoa;
+                    }
+
+                    if (!$coa) {
+                        Log::error('No COA found for payment group', [
+                            'coaKey' => $coaKey,
+                            'group' => $group->toArray()
+                        ]);
+                        throw new \Exception('Akun COA untuk metode pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal pembayaran tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
+                    }
+
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $coa->id,
+                        'date' => $date,
+                        'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
+                        'description' => 'Bank/Cash for payment id ' . $payment->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
+                        'debit' => 0,
+                        'credit' => $amount,
+                        'journal_type' => 'payment',
+                        'cabang_id' => $branchId,
+                        'department_id' => $departmentId,
+                        'project_id' => $projectId,
+                        'source_type' => VendorPayment::class,
+                        'source_id' => $payment->id,
                     ]);
-                    throw new \Exception('Akun COA untuk metode pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal pembayaran tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
                 }
-
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $coa->id,
-                    'date' => $date,
-                    'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                    'description' => 'Bank/Cash for payment id ' . $payment->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
-                    'debit' => 0,
-                    'credit' => $amount,
-                    'journal_type' => 'payment',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                    'source_type' => VendorPayment::class,
-                    'source_id' => $payment->id,
-                ]);
-            }
-        } elseif ($cashBankAmount > 0) {
-            // If no details or all details are deposit, use payment's coa_id or default bank coa
-            $coa = $defaultBankCoa ?: ($payment->coa_id ? ChartOfAccount::find($payment->coa_id) : null);
-            if ($coa) {
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $coa->id,
-                    'date' => $date,
-                    'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                    'description' => 'Bank/Cash for payment id ' . $payment->id,
-                    'debit' => 0,
-                    'credit' => $cashBankAmount,
-                    'journal_type' => 'payment',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                    'source_type' => VendorPayment::class,
-                    'source_id' => $payment->id,
-                ]);
-            } else {
-                Log::error('No COA available for payment credit entry', [
-                    'payment_id' => $payment->id,
-                    'defaultBankCoa_exists' => $defaultBankCoa ? true : false,
-                    'payment_coa_id' => $payment->coa_id
-                ]);
-                throw new \Exception('Akun Bank/Kas tidak dikonfigurasi. Jurnal pembayaran tidak dapat diseimbangkan. Silakan hubungi administrator keuangan.');
-            }
-        }
-
-        if ($payment->is_import_payment && $defaultBankCoa) {
-            $importDefinitions = [
-                [
-                    'amount' => (float) $payment->ppn_import_amount,
-                    'debit_coa' => $ppnMasukanCoa,
-                    'description' => 'PPN Impor'
-                ],
-                [
-                    'amount' => (float) $payment->pph22_amount,
-                    'debit_coa' => $pph22Coa,
-                    'description' => 'PPh 22 Impor'
-                ],
-                [
-                    'amount' => (float) $payment->bea_masuk_amount,
-                    'debit_coa' => $beaMasukCoa,
-                    'description' => 'Bea Masuk'
-                ],
-            ];
-
-            foreach ($importDefinitions as $definition) {
-                $amount = $definition['amount'];
-                $debitCoa = $definition['debit_coa'];
-                if ($amount <= 0 || !$debitCoa) {
-                    continue;
+            } elseif ($cashBankAmount > 0) {
+                // If no details or all details are deposit, use payment's coa_id or default bank coa
+                $coa = $defaultBankCoa ?: ($payment->coa_id ? ChartOfAccount::find($payment->coa_id) : null);
+                if ($coa) {
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $coa->id,
+                        'date' => $date,
+                        'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
+                        'description' => 'Bank/Cash for payment id ' . $payment->id,
+                        'debit' => 0,
+                        'credit' => $cashBankAmount,
+                        'journal_type' => 'payment',
+                        'cabang_id' => $branchId,
+                        'department_id' => $departmentId,
+                        'project_id' => $projectId,
+                        'source_type' => VendorPayment::class,
+                        'source_id' => $payment->id,
+                    ]);
+                } else {
+                    Log::error('No COA available for payment credit entry', [
+                        'payment_id' => $payment->id,
+                        'defaultBankCoa_exists' => $defaultBankCoa ? true : false,
+                        'payment_coa_id' => $payment->coa_id
+                    ]);
+                    throw new \Exception('Akun Bank/Kas tidak dikonfigurasi. Jurnal pembayaran tidak dapat diseimbangkan. Silakan hubungi administrator keuangan.');
                 }
-
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $debitCoa->id,
-                    'date' => $date,
-                    'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                    'description' => $definition['description'] . ' payment id ' . $payment->id,
-                    'debit' => $amount,
-                    'credit' => 0,
-                    'journal_type' => 'payment',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                    'source_type' => VendorPayment::class,
-                    'source_id' => $payment->id,
-                ]);
-
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $defaultBankCoa->id,
-                    'date' => $date,
-                    'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                    'description' => 'Kas/Bank ' . strtolower($definition['description']) . ' payment id ' . $payment->id,
-                    'debit' => 0,
-                    'credit' => $amount,
-                    'journal_type' => 'payment',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                    'source_type' => VendorPayment::class,
-                    'source_id' => $payment->id,
-                ]);
             }
-        }
 
-        // Validate that entries are balanced
-        $this->validateJournalEntries($entries);
+            if ($payment->is_import_payment && $defaultBankCoa) {
+                $importDefinitions = [
+                    [
+                        'amount' => (float) $payment->ppn_import_amount,
+                        'debit_coa' => $ppnMasukanCoa,
+                        'description' => 'PPN Impor'
+                    ],
+                    [
+                        'amount' => (float) $payment->pph22_amount,
+                        'debit_coa' => $pph22Coa,
+                        'description' => 'PPh 22 Impor'
+                    ],
+                    [
+                        'amount' => (float) $payment->bea_masuk_amount,
+                        'debit_coa' => $beaMasukCoa,
+                        'description' => 'Bea Masuk'
+                    ],
+                ];
 
-        return ['status' => 'posted', 'entries' => $entries];
+                foreach ($importDefinitions as $definition) {
+                    $amount = $definition['amount'];
+                    $debitCoa = $definition['debit_coa'];
+                    if ($amount <= 0 || !$debitCoa) {
+                        continue;
+                    }
+
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $debitCoa->id,
+                        'date' => $date,
+                        'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
+                        'description' => $definition['description'] . ' payment id ' . $payment->id,
+                        'debit' => $amount,
+                        'credit' => 0,
+                        'journal_type' => 'payment',
+                        'cabang_id' => $branchId,
+                        'department_id' => $departmentId,
+                        'project_id' => $projectId,
+                        'source_type' => VendorPayment::class,
+                        'source_id' => $payment->id,
+                    ]);
+
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $defaultBankCoa->id,
+                        'date' => $date,
+                        'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
+                        'description' => 'Kas/Bank ' . strtolower($definition['description']) . ' payment id ' . $payment->id,
+                        'debit' => 0,
+                        'credit' => $amount,
+                        'journal_type' => 'payment',
+                        'cabang_id' => $branchId,
+                        'department_id' => $departmentId,
+                        'project_id' => $projectId,
+                        'source_type' => VendorPayment::class,
+                        'source_id' => $payment->id,
+                    ]);
+                }
+            }
+
+            // Validate that entries are balanced
+            $this->validateJournalEntries($entries);
+
+            return ['status' => 'posted', 'entries' => $entries];
+        });
     }
 
     protected function resolveDepositCoa(VendorPayment $payment): ?ChartOfAccount
@@ -621,63 +624,68 @@ class LedgerPostingService
 
     public function postCustomerReceipt(\App\Models\CustomerReceipt $receipt): array
     {
-        // Atomic duplicate-posting guard.
-        $alreadyPosted = DB::transaction(function () use ($receipt) {
-            return JournalEntry::where('source_type', \App\Models\CustomerReceipt::class)
+        return DB::transaction(function () use ($receipt) {
+            $alreadyPosted = JournalEntry::where('source_type', \App\Models\CustomerReceipt::class)
                 ->where('source_id', $receipt->id)
                 ->lockForUpdate()
                 ->exists();
-        });
-        if ($alreadyPosted) {
-            return ['status' => 'skipped', 'message' => 'CustomerReceipt already posted to ledger'];
-        }
+            if ($alreadyPosted) {
+                return ['status' => 'skipped', 'message' => 'CustomerReceipt already posted to ledger'];
+            }
 
-        $date = $receipt->payment_date ?? Carbon::now()->toDateString();
-        $details = $receipt->customerReceiptItem()->get();
+            $date = $receipt->payment_date ?? Carbon::now()->toDateString();
+            $details = $receipt->customerReceiptItem()->get();
 
-        $total = (float) ($details->sum('amount') ?: $receipt->total_payment);
+            $total = (float) ($details->sum('amount') ?: $receipt->total_payment);
 
-        if ($total <= 0) {
-            return ['status' => 'skipped', 'message' => 'CustomerReceipt has no amount to post'];
-        }
+            if ($total <= 0) {
+                return ['status' => 'skipped', 'message' => 'CustomerReceipt has no amount to post'];
+            }
 
-        // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
-        $piutangCoa = ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
-        $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
+            // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
+            $piutangCoa = ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
+            $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
 
-        $entries = [];
+            $entries = [];
 
-        // Credit Piutang Dagang (reduce receivable)
-        if ($piutangCoa) {
-            $entries[] = JournalEntry::create([
-                'coa_id' => $piutangCoa->id,
-                'date' => $date,
-                'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
-                'description' => 'Customer receipt for receipt id ' . $receipt->id,
-                'debit' => 0,
-                'credit' => $total,
-                'journal_type' => 'receipt',
-                'source_type' => \App\Models\CustomerReceipt::class,
-                'source_id' => $receipt->id,
-            ]);
-        }
+            if ($piutangCoa) {
+                $entries[] = JournalEntry::create([
+                    'coa_id' => $piutangCoa->id,
+                    'date' => $date,
+                    'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
+                    'description' => 'Customer receipt for receipt id ' . $receipt->id,
+                    'debit' => 0,
+                    'credit' => $total,
+                    'journal_type' => 'receipt',
+                    'source_type' => \App\Models\CustomerReceipt::class,
+                    'source_id' => $receipt->id,
+                ]);
+            }
 
-        // Debit Cash/Bank
-        $depositDetailsAmount = $details->filter(function ($detail) {
-            return strtolower($detail->method ?? '') === 'deposit';
-        })->sum('amount');
+            $depositDetailsAmount = $details->filter(function ($detail) {
+                return strtolower($detail->method ?? '') === 'deposit';
+            })->sum('amount');
 
-        $paymentMarkedDeposit = strtolower($receipt->payment_method ?? '') === 'deposit';
-        if ($depositDetailsAmount <= 0 && $paymentMarkedDeposit) {
-            $depositDetailsAmount = $total;
-        }
+            $paymentMarkedDeposit = strtolower($receipt->payment_method ?? '') === 'deposit';
+            if ($depositDetailsAmount <= 0 && $paymentMarkedDeposit) {
+                $depositDetailsAmount = $total;
+            }
 
-        $depositAmount = (float) min($total, $depositDetailsAmount);
-        $cashBankAmount = (float) max(0, $total - $depositAmount);
+            $depositAmount = (float) min($total, $depositDetailsAmount);
+            $cashBankAmount = (float) max(0, $total - $depositAmount);
 
-        if ($depositAmount > 0) {
-            $depositCoa = $this->resolveDepositCoaForCustomer($receipt);
-            if ($depositCoa) {
+            if ($depositAmount > 0) {
+                $depositCoa = $this->resolveDepositCoaForCustomer($receipt);
+                if (!$depositCoa) {
+                    Log::error('Missing deposit COA for customer receipt', [
+                        'receipt_id' => $receipt->id,
+                        'customer_id' => $receipt->customer_id,
+                        'deposit_amount' => $depositAmount,
+                    ]);
+
+                    throw new \RuntimeException('Akun deposit / uang muka pelanggan tidak ditemukan. Jurnal penerimaan tidak dapat dibuat tanpa COA deposit yang valid.');
+                }
+
                 $entries[] = JournalEntry::create([
                     'coa_id' => $depositCoa->id,
                     'date' => $date,
@@ -689,82 +697,78 @@ class LedgerPostingService
                     'source_type' => \App\Models\CustomerReceipt::class,
                     'source_id' => $receipt->id,
                 ]);
-            } else {
-                // If deposit account is missing, fall back to bank/cash
-                $cashBankAmount += $depositAmount;
-                $depositAmount = 0;
             }
-        }
 
-        $nonDepositDetails = $details->filter(function ($detail) {
-            return strtolower($detail->method ?? '') !== 'deposit';
-        });
-
-        if ($nonDepositDetails->isNotEmpty()) {
-            $grouped = $nonDepositDetails->groupBy(function ($detail) {
-                return $detail->coa_id ?? 'default';
+            $nonDepositDetails = $details->filter(function ($detail) {
+                return strtolower($detail->method ?? '') !== 'deposit';
             });
 
-            foreach ($grouped as $coaKey => $group) {
-                $amount = (float) $group->sum('amount');
-                if ($amount <= 0) {
-                    continue;
-                }
+            if ($nonDepositDetails->isNotEmpty()) {
+                $grouped = $nonDepositDetails->groupBy(function ($detail) {
+                    return $detail->coa_id ?? 'default';
+                });
 
-                $coa = $coaKey === 'default'
-                    ? $defaultBankCoa
-                    : ChartOfAccount::find($group->first()->coa_id);
+                foreach ($grouped as $coaKey => $group) {
+                    $amount = (float) $group->sum('amount');
+                    if ($amount <= 0) {
+                        continue;
+                    }
 
-                if (!$coa) {
-                    $coa = $defaultBankCoa;
-                }
+                    $coa = $coaKey === 'default'
+                        ? $defaultBankCoa
+                        : ChartOfAccount::find($group->first()->coa_id);
 
-                if (!$coa) {
-                    Log::error('No COA found for receipt group', [
-                        'coaKey' => $coaKey,
-                        'group' => $group->toArray()
+                    if (!$coa) {
+                        $coa = $defaultBankCoa;
+                    }
+
+                    if (!$coa) {
+                        Log::error('No COA found for receipt group', [
+                            'coaKey' => $coaKey,
+                            'group' => $group->toArray()
+                        ]);
+                        throw new \Exception('Akun COA untuk metode penerimaan pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal penerimaan tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
+                    }
+
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $coa->id,
+                        'date' => $date,
+                        'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
+                        'description' => 'Bank/Cash for receipt id ' . $receipt->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
+                        'debit' => $amount,
+                        'credit' => 0,
+                        'journal_type' => 'receipt',
+                        'source_type' => \App\Models\CustomerReceipt::class,
+                        'source_id' => $receipt->id,
                     ]);
-                    throw new \Exception('Akun COA untuk metode penerimaan pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal penerimaan tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
                 }
-
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $coa->id,
-                    'date' => $date,
-                    'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
-                    'description' => 'Bank/Cash for receipt id ' . $receipt->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
-                    'debit' => $amount,
-                    'credit' => 0,
-                    'journal_type' => 'receipt',
-                    'source_type' => \App\Models\CustomerReceipt::class,
-                    'source_id' => $receipt->id,
-                ]);
+            } elseif ($cashBankAmount > 0) {
+                // If no details or all details are deposit, use receipt's coa_id or default bank coa
+                $coa = $defaultBankCoa ?: ($receipt->coa_id ? ChartOfAccount::find($receipt->coa_id) : null);
+                if ($coa) {
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $coa->id,
+                        'date' => $date,
+                        'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
+                        'description' => 'Bank/Cash for receipt id ' . $receipt->id,
+                        'debit' => $cashBankAmount,
+                        'credit' => 0,
+                        'journal_type' => 'receipt',
+                        'source_type' => \App\Models\CustomerReceipt::class,
+                        'source_id' => $receipt->id,
+                    ]);
+                } else {
+                    Log::error('No COA available for receipt debit entry', [
+                        'receipt_id' => $receipt->id,
+                        'defaultBankCoa_exists' => $defaultBankCoa ? true : false,
+                        'receipt_coa_id' => $receipt->coa_id
+                    ]);
+                    throw new \Exception('Akun Bank/Kas tidak dikonfigurasi untuk penerimaan pembayaran. Jurnal tidak dapat diseimbangkan. Silakan hubungi administrator keuangan.');
+                }
             }
-        } elseif ($cashBankAmount > 0) {
-            // If no details or all details are deposit, use receipt's coa_id or default bank coa
-            $coa = $defaultBankCoa ?: ($receipt->coa_id ? ChartOfAccount::find($receipt->coa_id) : null);
-            if ($coa) {
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $coa->id,
-                    'date' => $date,
-                    'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
-                    'description' => 'Bank/Cash for receipt id ' . $receipt->id,
-                    'debit' => $cashBankAmount,
-                    'credit' => 0,
-                    'journal_type' => 'receipt',
-                    'source_type' => \App\Models\CustomerReceipt::class,
-                    'source_id' => $receipt->id,
-                ]);
-            } else {
-                Log::error('No COA available for receipt debit entry', [
-                    'receipt_id' => $receipt->id,
-                    'defaultBankCoa_exists' => $defaultBankCoa ? true : false,
-                    'receipt_coa_id' => $receipt->coa_id
-                ]);
-                throw new \Exception('Akun Bank/Kas tidak dikonfigurasi untuk penerimaan pembayaran. Jurnal tidak dapat diseimbangkan. Silakan hubungi administrator keuangan.');
-            }
-        }
 
-        return ['status' => 'success', 'message' => 'CustomerReceipt posted to ledger', 'entries' => $entries];
+            return ['status' => 'success', 'message' => 'CustomerReceipt posted to ledger', 'entries' => $entries];
+        });
     }
 
     private function resolveDepositCoaForCustomer(\App\Models\CustomerReceipt $receipt): ?ChartOfAccount

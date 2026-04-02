@@ -3,8 +3,14 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class EditPurchaseInvoice extends EditRecord
 {
@@ -91,18 +97,52 @@ class EditPurchaseInvoice extends EditRecord
 
     protected function afterSave(): void
     {
-        // Sync invoice items
-        if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            // Delete existing items
-            $this->record->invoiceItem()->delete();
-            
-            // Create new items
-            foreach ($this->data['invoiceItem'] as $item) {
-                $item['price']    = (float) \App\Helpers\MoneyHelper::parse($item['price'] ?? 0);
-                $item['total']    = (float) \App\Helpers\MoneyHelper::parse($item['total'] ?? 0);
-                $item['quantity'] = (float) ($item['quantity'] ?? 0);
-                $this->record->invoiceItem()->create($item);
+        try {
+            if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
+                $this->record->invoiceItem()->delete();
+
+                foreach ($this->data['invoiceItem'] as $item) {
+                    $item['price']    = (float) \App\Helpers\MoneyHelper::parse($item['price'] ?? 0);
+                    $item['total']    = (float) \App\Helpers\MoneyHelper::parse($item['total'] ?? 0);
+                    $item['quantity'] = (float) ($item['quantity'] ?? 0);
+                    $this->record->invoiceItem()->create($item);
+                }
             }
+        } catch (Throwable $exception) {
+            Log::error('EditPurchaseInvoice afterSave failed', [
+                'invoice_id' => $this->record?->id,
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::warning(
+                'Invoice Pembelian Tersimpan Dengan Catatan',
+                $exception,
+                'Perubahan invoice pembelian berhasil disimpan, tetapi sinkronisasi detail item belum selesai. Periksa kembali invoice ini sebelum dilanjutkan.'
+            );
+        }
+    }
+
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        try {
+            return parent::handleRecordUpdate($record, $data);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('EditPurchaseInvoice handleRecordUpdate failed', [
+                'invoice_id' => $record->id,
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::danger(
+                'Gagal Memperbarui Invoice Pembelian',
+                $exception,
+                'Perubahan invoice pembelian belum berhasil disimpan. Periksa kembali data invoice lalu coba lagi.'
+            );
+
+            throw $exception;
         }
     }
 }

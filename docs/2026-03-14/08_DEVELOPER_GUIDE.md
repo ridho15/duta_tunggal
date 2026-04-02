@@ -338,8 +338,8 @@ Credit : Persediaan Bahan Baku        ← inventory_coa_id per product
 ### 5.6 Production Finished Goods Journal
 
 ```
-Debit  : Persediaan Barang Jadi       ← finished_goods_coa_id (from BOM)
-Credit : Work In Progress (WIP)       ← work_in_progress_coa_id
+Debit  : Persediaan Barang Jadi       ← inventory_coa_id pada Product barang jadi
+Credit : Pos Sementara Produksi       ← work_in_progress_coa_id / COA 1400.04
 ```
 
 ### 5.7 Delivery Order COGS Journal

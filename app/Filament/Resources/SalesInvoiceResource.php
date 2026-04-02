@@ -48,6 +48,38 @@ class SalesInvoiceResource extends Resource
     protected static ?string $navigationGroup = 'Finance - Penjualan';
     protected static ?int $navigationSort = 1;
 
+    protected static function resolveCoaIdByCodes(array $codes): ?int
+    {
+        $codes = array_values(array_unique(array_filter($codes)));
+
+        if (empty($codes)) {
+            return null;
+        }
+
+        $accounts = \App\Models\ChartOfAccount::query()
+            ->whereIn('code', $codes)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('code');
+
+        foreach ($codes as $code) {
+            if ($accounts->has($code)) {
+                return $accounts->get($code)?->id;
+            }
+        }
+
+        return null;
+    }
+
+    public static function normalizeInvoiceTaxTypeValue(?string $taxType): string
+    {
+        return match (\App\Services\TaxService::normalizeType($taxType)) {
+            'Inklusif' => 'Inklusif',
+            'Eksklusif' => 'Eksklusif',
+            default => 'None',
+        };
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -369,7 +401,7 @@ class SalesInvoiceResource extends Resource
                                         // L1: Auto-fill tipe_pajak from SO items
                                         $soForTax = SaleOrder::with('saleOrderItem')->find($saleOrderId);
                                         if ($soForTax && $soForTax->saleOrderItem->isNotEmpty()) {
-                                            $tipePajak = $soForTax->saleOrderItem->first()->tipe_pajak ?? 'None';
+                                            $tipePajak = static::normalizeInvoiceTaxTypeValue($soForTax->saleOrderItem->first()->tipe_pajak ?? 'None');
                                             $set('tipe_pajak', $tipePajak);
                                             if ($tipePajak === 'None') {
                                                 $set('ppn_rate', 0);
@@ -472,7 +504,7 @@ class SalesInvoiceResource extends Resource
 
                                         // L1: Auto-fill tipe_pajak from SO items
                                         if ($saleOrder && $saleOrder->saleOrderItem->isNotEmpty()) {
-                                            $tipePajak = $saleOrder->saleOrderItem->first()->tipe_pajak ?? 'None';
+                                            $tipePajak = static::normalizeInvoiceTaxTypeValue($saleOrder->saleOrderItem->first()->tipe_pajak ?? 'None');
                                             $set('tipe_pajak', $tipePajak);
                                             if ($tipePajak === 'None') {
                                                 $set('ppn_rate', 0);
@@ -672,10 +704,13 @@ class SalesInvoiceResource extends Resource
                                     ->options([
                                         'None'     => 'Tidak Kena Pajak (None)',
                                         'Inklusif' => 'PPN Inklusif (sudah termasuk harga)',
-                                        'Eklusif'  => 'PPN Eksklusif (ditambah ke harga)',
+                                        'Eksklusif'  => 'PPN Eksklusif (ditambah ke harga)',
                                     ])
                                     ->default('None')
                                     ->reactive()
+                                    ->afterStateHydrated(function ($component, $state) {
+                                        $component->state(static::normalizeInvoiceTaxTypeValue($state));
+                                    })
                                     ->helperText('Diisi otomatis dari Sales Order. Dapat diubah bila perlu.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $activePpnRate = \App\Models\TaxSetting::activeRate('PPN');
@@ -730,11 +765,21 @@ class SalesInvoiceResource extends Resource
 
                         // COA fields — hidden from UI, auto-populated from defaults
                         Hidden::make('ar_coa_id')
-                            ->default(fn () => \App\Models\ChartOfAccount::where('code', '1120')->first()?->id),
+                            ->default(fn () => static::resolveCoaIdByCodes([
+                                config('coa.accounts_receivable'),
+                                '1120',
+                            ])),
                         Hidden::make('revenue_coa_id')
-                            ->default(fn () => \App\Models\ChartOfAccount::where('code', '4000')->first()?->id),
+                            ->default(fn () => static::resolveCoaIdByCodes([
+                                config('coa.sales_revenue'),
+                                '4000',
+                                '4111',
+                            ])),
                         Hidden::make('ppn_keluaran_coa_id')
-                            ->default(fn () => \App\Models\ChartOfAccount::where('code', '2120.06')->first()?->id),
+                            ->default(fn () => static::resolveCoaIdByCodes([
+                                config('coa.sales_output_vat'),
+                                '2120.06',
+                            ])),
 
                         // Hidden fields
                         Hidden::make('id'),

@@ -250,6 +250,37 @@ class VendorPaymentResourceTest extends TestCase
             ]);
     }
 
+    public function test_selected_invoices_use_fallback_remaining_when_account_payable_is_missing()
+    {
+        $invoice = $this->createTestInvoice();
+
+        AccountPayable::where('invoice_id', $invoice->id)->delete();
+
+        $existingPayment = VendorPayment::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'payment_date' => now(),
+            'total_payment' => 40000,
+            'coa_id' => $this->chartOfAccount->id,
+            'payment_method' => 'Cash',
+            'status' => 'Partial',
+        ]);
+
+        VendorPaymentDetail::create([
+            'vendor_payment_id' => $existingPayment->id,
+            'invoice_id' => $invoice->id,
+            'method' => 'Cash',
+            'amount' => 40000,
+            'adjustment_amount' => 0,
+            'balance_amount' => 70000,
+            'payment_date' => now(),
+        ]);
+
+        $invoice = Invoice::with('accountPayable')->findOrFail($invoice->id);
+
+        $this->assertSame(70000.0, VendorPaymentResource::resolveInvoiceRemainingAmount($invoice));
+        $this->assertSame(70000.0, VendorPaymentResource::calculateSelectedInvoiceTotal(collect([$invoice])));
+    }
+
     public function test_form_can_be_filled_with_basic_data()
     {
         Livewire::test(VendorPaymentResource\Pages\CreateVendorPayment::class)
@@ -343,7 +374,7 @@ class VendorPaymentResourceTest extends TestCase
             ]);
     }
 
-    public function test_total_payment_field_is_not_readonly()
+    public function test_total_payment_field_exists_for_auto_calculation()
     {
         Livewire::test(VendorPaymentResource\Pages\CreateVendorPayment::class)
             ->assertFormFieldExists('total_payment')

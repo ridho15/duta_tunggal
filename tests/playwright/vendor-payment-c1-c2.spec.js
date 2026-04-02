@@ -45,6 +45,17 @@ test('C2-a: invoice checkbox list appears after payment request selected', async
   const invoiceCheckboxes = page.locator('input[type="checkbox"][value]')
   await expect.poll(async () => await invoiceCheckboxes.count(), { timeout: 10000 }).toBeGreaterThanOrEqual(0)
 
+  const checkboxContainers = page.locator('[role="group"] > div, .fi-fo-checkbox-list-option')
+  if (await checkboxContainers.count()) {
+    const firstBox = await checkboxContainers.nth(0).boundingBox()
+    const secondBox = await checkboxContainers.nth(1).boundingBox().catch(() => null)
+
+    if (firstBox && secondBox) {
+      expect(Math.abs(firstBox.x - secondBox.x)).toBeLessThanOrEqual(24)
+      expect(secondBox.y).toBeGreaterThanOrEqual(firstBox.y)
+    }
+  }
+
   if (await invoiceCheckboxes.count()) {
     await expect(invoiceCheckboxes.first()).toBeVisible()
   }

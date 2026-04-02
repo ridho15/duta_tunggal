@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Production;
+use App\Services\ManufacturingJournalService;
 use App\Services\QualityControlService;
 use Illuminate\Support\Facades\Log;
 
@@ -25,9 +26,22 @@ class ProductionObserver
 
     /**
      * Handle the Production "created" event.
+     *
+     * Posts the "Produksi In Progress" WIP journal:
+     *   Dr. 1-201  Persediaan Barang Dalam Proses - WIP INVENTORY
+     *       Cr. 1400.04 Pos Sementara Produksi  (material cost)
+     *       Cr. 5230   Biaya Tenaga Kerja Proses Produksi  (labor + overhead)
      */
     public function created(Production $production): void
     {
+        // Post WIP journal whenever production work begins
+        try {
+            app(ManufacturingJournalService::class)->generateJournalForProductionInProgress($production);
+            Log::info("ProductionObserver: WIP journal posted for production {$production->id}");
+        } catch (\Exception $e) {
+            Log::warning("ProductionObserver: Could not post WIP journal for production {$production->id}: " . $e->getMessage());
+        }
+
         if ($production->status === 'finished') {
             $this->createQualityControlForProduction($production);
         }

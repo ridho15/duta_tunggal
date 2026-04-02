@@ -4,9 +4,14 @@ namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Models\PurchaseOrder;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class CreatePurchaseInvoice extends CreateRecord
 {
@@ -45,7 +50,7 @@ class CreatePurchaseInvoice extends CreateRecord
         $data['status'] = $data['status'] ?? 'paid';
 
         // Ensure COA fields are set with defaults if not provided
-        $data['accounts_payable_coa_id'] = $data['accounts_payable_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '2110')->first()?->id;
+        $data['accounts_payable_coa_id'] = $data['accounts_payable_coa_id'] ?? \App\Models\ChartOfAccount::where('code', config('coa.accounts_payable', '2110'))->first()?->id;
         $data['ppn_masukan_coa_id'] = $data['ppn_masukan_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1170.06')->first()?->id;
         $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
         $data['expense_coa_id'] = $data['expense_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
@@ -94,14 +99,49 @@ class CreatePurchaseInvoice extends CreateRecord
 
     protected function afterCreate(): void
     {
-        // Create invoice items
-        if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            foreach ($this->data['invoiceItem'] as $item) {
-                $item['price']    = (float) \App\Helpers\MoneyHelper::parse($item['price'] ?? 0);
-                $item['total']    = (float) \App\Helpers\MoneyHelper::parse($item['total'] ?? 0);
-                $item['quantity'] = (float) ($item['quantity'] ?? 0);
-                $this->record->invoiceItem()->create($item);
+        try {
+            if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
+                foreach ($this->data['invoiceItem'] as $item) {
+                    $item['price']    = (float) \App\Helpers\MoneyHelper::parse($item['price'] ?? 0);
+                    $item['total']    = (float) \App\Helpers\MoneyHelper::parse($item['total'] ?? 0);
+                    $item['quantity'] = (float) ($item['quantity'] ?? 0);
+                    $this->record->invoiceItem()->create($item);
+                }
             }
+        } catch (Throwable $exception) {
+            Log::error('CreatePurchaseInvoice afterCreate failed', [
+                'invoice_id' => $this->record?->id,
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::warning(
+                'Invoice Pembelian Tersimpan Dengan Catatan',
+                $exception,
+                'Invoice pembelian berhasil dibuat, tetapi detail item belum berhasil disimpan seluruhnya. Periksa kembali invoice ini sebelum dilanjutkan.'
+            );
+        }
+    }
+
+    protected function handleRecordCreation(array $data): Model
+    {
+        try {
+            return parent::handleRecordCreation($data);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('CreatePurchaseInvoice handleRecordCreation failed', [
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::danger(
+                'Gagal Membuat Invoice Pembelian',
+                $exception,
+                'Invoice pembelian belum berhasil dibuat. Periksa kembali data invoice lalu coba lagi.'
+            );
+
+            throw $exception;
         }
     }
 }

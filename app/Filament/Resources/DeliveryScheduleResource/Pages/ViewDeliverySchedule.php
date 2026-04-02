@@ -41,13 +41,6 @@ class ViewDeliverySchedule extends ViewRecord
                     ->modalDescription('Tandai jadwal pengiriman ini sebagai selesai/terkirim?')
                     ->visible(fn() => in_array($this->record->status, ['on_the_way', 'pending']))
                     ->action(fn() => $this->record->update(['status' => 'delivered'])),
-                Action::make('set_partial')
-                    ->label('Sebagian Terkirim')
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('primary')
-                    ->requiresConfirmation()
-                    ->visible(fn() => in_array($this->record->status, ['on_the_way']))
-                    ->action(fn() => $this->record->update(['status' => 'partial_delivered'])),
                 Action::make('set_failed')
                     ->label('Tandai Gagal')
                     ->icon('heroicon-o-x-circle')

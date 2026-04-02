@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\LogsGlobalActivity;
 use App\Services\ManufacturingJournalService;
 use App\Services\StockReservationService;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -173,6 +174,50 @@ class MaterialIssue extends Model
         return $this->status === self::STATUS_COMPLETED;
     }
 
+    public function requiresWarehouseConfirmation(): bool
+    {
+        return $this->resolveManufacturingOrderId() !== null;
+    }
+
+    public function hasConfirmedWarehouseConfirmation(): bool
+    {
+        $manufacturingOrderId = $this->resolveManufacturingOrderId();
+
+        if (! $manufacturingOrderId) {
+            return true;
+        }
+
+        return WarehouseConfirmation::query()
+            ->where('confirmable_type', ManufacturingOrder::class)
+            ->where('confirmable_id', $manufacturingOrderId)
+            ->where('status', 'confirmed')
+            ->exists();
+    }
+
+    public function warehouseConfirmationBlockingMessage(): ?string
+    {
+        if (! $this->requiresWarehouseConfirmation() || $this->hasConfirmedWarehouseConfirmation()) {
+            return null;
+        }
+
+        return 'Pengambilan bahan baku harus melalui konfirmasi gudang pada Manufacturing Order sebelum dapat di-approve atau diselesaikan.';
+    }
+
+    protected function resolveManufacturingOrderId(): ?int
+    {
+        if ($this->manufacturing_order_id) {
+            return (int) $this->manufacturing_order_id;
+        }
+
+        if (! $this->production_plan_id) {
+            return null;
+        }
+
+        return ManufacturingOrder::query()
+            ->where('production_plan_id', $this->production_plan_id)
+            ->value('id');
+    }
+
     /**
      * Booted model events to auto generate manufacturing journals
      */
@@ -198,6 +243,16 @@ class MaterialIssue extends Model
                     'material_issue_id' => $issue->id,
                     'from' => $originalStatus,
                     'attempted_to' => $newStatus,
+                ]);
+            }
+
+            if (
+                in_array($newStatus, [self::STATUS_PENDING_APPROVAL, self::STATUS_APPROVED, self::STATUS_COMPLETED], true)
+                && $newStatus !== $originalStatus
+                && ($message = $issue->warehouseConfirmationBlockingMessage())
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => $message,
                 ]);
             }
         });

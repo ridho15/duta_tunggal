@@ -98,6 +98,7 @@ class BalanceSheetPage extends Page
         }
 
         $this->showPreview = true;
+        $this->notifyIfBalanceSheetHasIssues($this->getBalanceSheetData());
         $this->dispatch('report-updated');
     }
 
@@ -112,6 +113,24 @@ class BalanceSheetPage extends Page
             'as_of_date' => $this->as_of_date,
             'cabang_id' => $this->cabang_id,
         ]);
+    }
+
+    public function getBalanceAlertData(): ?array
+    {
+        if (!$this->showPreview) {
+            return null;
+        }
+
+        $data = $this->getBalanceSheetData();
+        if ($data['is_balanced']) {
+            return null;
+        }
+
+        return [
+            'title' => 'Neraca Tidak Seimbang',
+            'difference' => (float) $data['difference'],
+            'message' => 'Total aset tidak sama dengan total kewajiban dan ekuitas. Laporan sekarang menampilkan selisih ledger aktual tanpa penyesuaian otomatis laba ditahan.',
+        ];
     }
 
     public function getMultiPeriodData(): array
@@ -301,5 +320,19 @@ class BalanceSheetPage extends Page
     public function getHeading(): string
     {
         return 'Neraca';
+    }
+
+    protected function notifyIfBalanceSheetHasIssues(array $data): void
+    {
+        if ($data['is_balanced']) {
+            return;
+        }
+
+        Notification::make()
+            ->title('Neraca Tidak Seimbang')
+            ->warning()
+            ->persistent()
+            ->body('Selisih neraca saat ini Rp ' . number_format(abs((float) $data['difference']), 0, ',', '.') . '. Periksa jurnal sumber karena laporan tidak lagi memaksa balance lewat laba ditahan.')
+            ->send();
     }
 }

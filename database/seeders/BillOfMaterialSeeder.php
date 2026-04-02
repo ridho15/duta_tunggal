@@ -21,11 +21,10 @@ class BillOfMaterialSeeder extends Seeder
         }
 
         // Get default COA for manufacturing
-        $finishedGoodsCoa = ChartOfAccount::where('code', '1140.03')->first(); // Persediaan Barang Jadi
-        $workInProgressCoa = ChartOfAccount::where('code', '1140.02')->first(); // Persediaan Barang dalam Proses
+        $workInProgressCoa = ChartOfAccount::where('code', '1400.04')->first(); // Pos Sementara Produksi
 
-        if (!$finishedGoodsCoa || !$workInProgressCoa) {
-            $this->command?->warn('BillOfMaterialSeeder skipped: Manufacturing COA not found. Please run ManufacturingCoaSeeder first.');
+        if (!$workInProgressCoa) {
+            $this->command?->warn('BillOfMaterialSeeder skipped: Temporary production COA not found. Please seed COA 1400.04 first.');
             return;
         }
 
@@ -61,7 +60,6 @@ class BillOfMaterialSeeder extends Seeder
                     'labor_cost' => $laborCost,
                     'overhead_cost' => $overheadCost,
                     'total_cost' => 0,
-                    'finished_goods_coa_id' => $finishedGoodsCoa->id,
                     'work_in_progress_coa_id' => $workInProgressCoa->id,
                 ]
             );
@@ -110,7 +108,7 @@ class BillOfMaterialSeeder extends Seeder
         }
 
         $this->command?->info("Seeded {$bomCount} bill of materials with {$itemCount} components.");
-        $this->command?->info("Default COA set: Finished Goods ({$finishedGoodsCoa->code}) and Work in Progress ({$workInProgressCoa->code})");
+        $this->command?->info("Default COA set: Temporary Production ({$workInProgressCoa->code}) while finished goods inventory follows each product inventory COA.");
     }
 
     private function pickComponents(Collection $products, Product $finishedGood): Collection

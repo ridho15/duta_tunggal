@@ -4,10 +4,11 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
+use App\Models\DeliveryOrder;
 use App\Models\DeliverySchedule;
 use App\Models\Driver;
-use App\Models\SuratJalan;
 use App\Models\User;
+use App\Models\SuratJalan;
 use App\Models\Vehicle;
 use App\Policies\DeliverySchedulePolicy;
 use App\Services\DeliveryScheduleService;
@@ -266,8 +267,17 @@ class DeliverySchedulePermissionTest extends TestCase
     public function rekap_export_query_returns_correct_data(): void
     {
         $driver2 = Driver::factory()->create(['cabang_id' => $this->cabang->id]);
-        $sj1 = SuratJalan::factory()->create();
-        $sj2 = SuratJalan::factory()->create();
+        $deliveryOrder1 = DeliveryOrder::factory()->create(['cabang_id' => $this->cabang->id]);
+        $deliveryOrder2 = DeliveryOrder::factory()->create(['cabang_id' => $this->cabang->id]);
+
+        $suratJalan = SuratJalan::create([
+            'sj_number' => 'SJ-REKAP-001',
+            'issued_at' => now(),
+            'status' => 1,
+            'created_by' => $this->userWithAllPerms->id,
+            'cabang_id' => $this->cabang->id,
+        ]);
+        $suratJalan->deliveryOrder()->attach([$deliveryOrder1->id, $deliveryOrder2->id]);
 
         $schedule1 = DeliverySchedule::create([
             'schedule_number' => 'SCH-REKAP-001',
@@ -277,7 +287,7 @@ class DeliverySchedulePermissionTest extends TestCase
             'status'          => 'delivered',
             'cabang_id'       => $this->cabang->id,
         ]);
-        $schedule1->suratJalans()->attach([$sj1->id, $sj2->id]);
+        $schedule1->suratJalan()->attach([$suratJalan->id]);
 
         $schedule2 = DeliverySchedule::create([
             'schedule_number' => 'SCH-REKAP-002',
@@ -290,7 +300,7 @@ class DeliverySchedulePermissionTest extends TestCase
 
         // Query like the rekap export would
         $schedules = DeliverySchedule::withoutGlobalScopes()
-            ->with(['driver', 'vehicle', 'suratJalans'])
+            ->with(['driver', 'vehicle', 'suratJalan.deliveryOrder'])
             ->whereIn('driver_id', [$this->driver->id, $driver2->id])
             ->orderBy('scheduled_date')
             ->get();
@@ -299,7 +309,7 @@ class DeliverySchedulePermissionTest extends TestCase
 
         $first = $schedules->firstWhere('schedule_number', 'SCH-REKAP-001');
         $this->assertNotNull($first);
-        $this->assertCount(2, $first->suratJalans);
+        $this->assertCount(2, $first->relatedDeliveryOrders());
         $this->assertEquals('delivered', $first->status);
     }
 

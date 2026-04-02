@@ -31,7 +31,7 @@ class CashFlowReportService
     {
         $method = $filters['method'] ?? 'direct';
         $start = $startDate ? Carbon::parse($startDate)->startOfDay() : now()->startOfMonth();
-        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfDay();
+        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfMonth();
         $this->filters = $filters;
 
         if ($method === 'indirect') {
@@ -166,7 +166,11 @@ class CashFlowReportService
         }
 
         // Adjust for changes in accounts receivable (working capital)
-        $arChange = $this->calculateWorkingCapitalChange('1120', $start, $end); // Piutang
+        $arChange = $this->calculateWorkingCapitalChange(
+            $this->getConfiguredAccountPrefixes('accounts_receivable', ['1120']),
+            $start,
+            $end
+        );
         if ($arChange !== 0) {
             $adjustments[] = [
                 'key' => 'ar_change',
@@ -177,7 +181,11 @@ class CashFlowReportService
         }
 
         // Adjust for changes in inventory (working capital)
-        $inventoryChange = $this->calculateWorkingCapitalChange('1140', $start, $end); // Persediaan
+        $inventoryChange = $this->calculateWorkingCapitalChange(
+            $this->getConfiguredAccountPrefixes('inventory', ['1140', '1140.01']),
+            $start,
+            $end
+        );
         if ($inventoryChange !== 0) {
             $adjustments[] = [
                 'key' => 'inventory_change',
@@ -188,7 +196,11 @@ class CashFlowReportService
         }
 
         // Adjust for changes in accounts payable (working capital)
-        $apChange = $this->calculateWorkingCapitalChange('2110', $start, $end); // Hutang
+        $apChange = $this->calculateWorkingCapitalChange(
+            $this->getConfiguredAccountPrefixes('accounts_payable', ['2110']),
+            $start,
+            $end
+        );
         if ($apChange !== 0) {
             $adjustments[] = [
                 'key' => 'ap_change',
@@ -204,13 +216,17 @@ class CashFlowReportService
     /**
      * Calculate working capital change for a COA prefix.
      */
-    private function calculateWorkingCapitalChange(string $prefix, Carbon $start, Carbon $end): float
+    private function calculateWorkingCapitalChange(array $prefixes, Carbon $start, Carbon $end): float
     {
+        if (empty($prefixes)) {
+            return 0.0;
+        }
+
         // Get beginning balance (end of previous period)
-        $beginningBalance = $this->getAccountBalanceAtDate($prefix, $start->copy()->subDay());
+        $beginningBalance = $this->getAccountBalanceAtDate($prefixes, $start->copy()->subDay());
 
         // Get ending balance
-        $endingBalance = $this->getAccountBalanceAtDate($prefix, $end);
+        $endingBalance = $this->getAccountBalanceAtDate($prefixes, $end);
 
         // Change = Ending - Beginning
         // For cash flow, we want to see how this affects cash:
@@ -222,11 +238,19 @@ class CashFlowReportService
     /**
      * Get account balance at a specific date for given prefix.
      */
-    private function getAccountBalanceAtDate(string $prefix, Carbon $date): float
+    private function getAccountBalanceAtDate(array $prefixes, Carbon $date): float
     {
+        if (empty($prefixes)) {
+            return 0.0;
+        }
+
         $query = \App\Models\JournalEntry::query()
             ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
-            ->where('chart_of_accounts.code', 'like', $prefix . '%')
+            ->where(function (Builder $query) use ($prefixes) {
+                foreach ($prefixes as $prefix) {
+                    $query->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
+                }
+            })
             ->where('journal_entries.date', '<=', $date);
 
         $this->applyTransactionFilters($query);
@@ -515,12 +539,23 @@ class CashFlowReportService
             ->when(!empty($this->filters['cash_accounts']), function (Builder $query) {
                 $query->whereIn('cash_bank_account_id', (array) $this->filters['cash_accounts']);
             })
-            ->whereHas('accountCoa', function (Builder $query) use ($prefixes) {
-                $query->where(function (Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('code', 'like', $prefix . '%');
-                    }
-                });
+            ->where(function (Builder $query) use ($prefixes) {
+                $query
+                    ->whereHas('accountCoa', function (Builder $accountQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($accountQuery, $prefixes);
+                    })
+                    ->orWhereHas('offsetCoa', function (Builder $offsetQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($offsetQuery, $prefixes);
+                    });
+            })
+            ->where(function (Builder $query) use ($prefixes) {
+                $query
+                    ->whereDoesntHave('accountCoa', function (Builder $accountQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($accountQuery, $prefixes);
+                    })
+                    ->orWhereDoesntHave('offsetCoa', function (Builder $offsetQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($offsetQuery, $prefixes);
+                    });
             });
 
         $inflow = (clone $baseQuery)->whereIn('type', self::CASH_IN_TYPES)->sum('amount');
@@ -546,6 +581,39 @@ class CashFlowReportService
         $journalBalance = $journalDebit - $journalCredit;
 
         return $cashBankBalance + $journalBalance;
+    }
+
+    private function getConfiguredAccountPrefixes(string $configKey, array $fallbacks = []): array
+    {
+        $configuredCode = config('coa.' . $configKey);
+        $codes = array_filter([$configuredCode, ...$fallbacks]);
+        $prefixes = [];
+
+        foreach ($codes as $code) {
+            $prefixes = array_merge($prefixes, $this->expandCodeVariants((string) $code));
+        }
+
+        return array_values(array_unique(array_filter($prefixes)));
+    }
+
+    private function expandCodeVariants(string $code): array
+    {
+        $variants = [$code];
+
+        if (str_contains($code, '.')) {
+            $variants[] = strstr($code, '.', true);
+        }
+
+        return $variants;
+    }
+
+    private function applyCodePrefixConstraint(Builder $query, array $prefixes): void
+    {
+        $query->where(function (Builder $inner) use ($prefixes) {
+            foreach ($prefixes as $prefix) {
+                $inner->orWhere('code', 'like', $prefix . '%');
+            }
+        });
     }
 
     private function getCashAccountPrefixes(): array

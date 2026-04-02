@@ -183,17 +183,6 @@ class DeliveryOrderFeatureTest extends TestCase
             'confirmed_by' => $this->user->id,
         ]);
 
-        // Create and publish surat jalan before approving delivery order
-        $suratJalan = SuratJalan::create([
-            'sj_number' => 'SJ-' . now()->format('Ymd') . '-0001',
-            'issued_at' => now(),
-            'created_by' => $this->user->id,
-            'status' => 1, // Published status
-        ]);
-
-        // Attach to delivery order
-        $suratJalan->deliveryOrder()->attach($deliveryOrder->id);
-
         // Update to approved
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
 
@@ -202,6 +191,19 @@ class DeliveryOrderFeatureTest extends TestCase
             'delivery_order_id' => $deliveryOrder->id,
             'status' => 'approved',
         ]);
+    }
+
+    /** @test */
+    public function it_can_approve_delivery_order_without_surat_jalan()
+    {
+        $deliveryOrder = DeliveryOrder::factory()->create([
+            'status' => 'request_approve',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
+
+        $this->assertEquals('approved', $deliveryOrder->fresh()->status);
     }
 
     /** @test */
@@ -368,7 +370,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'request_approve');
         $this->assertEquals('request_approve', $deliveryOrder->fresh()->status);
 
-        // 3. Create and publish surat jalan before approving
+        // 3. Surat jalan remains optional and document-only for this flow
         $suratJalan = SuratJalan::create([
             'sj_number' => 'SJ-' . now()->format('Ymd') . '-0001',
             'issued_at' => now(),
@@ -465,7 +467,6 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
 
         // 1. APPROVED: Stock should be reserved
-        // Create and publish surat jalan before approving delivery order
         $suratJalan = SuratJalan::create([
             'sj_number' => 'SJ-' . now()->format('Ymd') . '-0001',
             'issued_at' => now(),

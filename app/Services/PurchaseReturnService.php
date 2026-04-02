@@ -526,7 +526,7 @@ class PurchaseReturnService
     public function submitForApproval(PurchaseReturn $purchaseReturn): bool
     {
         if ($purchaseReturn->status !== 'draft') {
-            throw new \Exception('Only draft purchase returns can be submitted for approval');
+            throw new \Exception('Retur pembelian hanya bisa diajukan saat masih berstatus draft.');
         }
 
         $purchaseReturn->update(['status' => 'pending_approval']);
@@ -539,7 +539,7 @@ class PurchaseReturnService
     public function approve(PurchaseReturn $purchaseReturn, array $data = []): bool
     {
         if ($purchaseReturn->status !== 'pending_approval') {
-            throw new \Exception('Only pending purchase returns can be approved');
+            throw new \Exception('Retur pembelian hanya bisa disetujui saat statusnya masih menunggu persetujuan.');
         }
 
         DB::transaction(function () use ($purchaseReturn, $data) {
@@ -575,7 +575,7 @@ class PurchaseReturnService
     public function reject(PurchaseReturn $purchaseReturn, array $data = []): bool
     {
         if ($purchaseReturn->status !== 'pending_approval') {
-            throw new \Exception('Only pending purchase returns can be rejected');
+            throw new \Exception('Retur pembelian hanya bisa ditolak saat statusnya masih menunggu persetujuan.');
         }
 
         $purchaseReturn->update([

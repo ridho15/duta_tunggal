@@ -18,7 +18,9 @@ use App\Models\SuratJalan;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Warehouse;
+use App\Observers\SaleOrderObserver;
 use App\Services\DeliveryOrderService;
+use App\Services\SalesOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -183,16 +185,36 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
             'approve_at' => now(),
         ]);
 
-        $this->assertEquals('confirmed', $saleOrder->fresh()->status); // Status changes to confirmed when WC is auto-approved
+        $this->assertEquals('approved', $saleOrder->fresh()->status);
 
-        // SaleOrderObserver should create WarehouseConfirmation automatically
+        $observer = new SaleOrderObserver();
+        $method = new \ReflectionMethod(SaleOrderObserver::class, 'createWarehouseConfirmationForApprovedSaleOrder');
+        $method->setAccessible(true);
+        $method->invoke($observer, $saleOrder->fresh());
+
         $warehouseConfirmation = $saleOrder->fresh()->warehouseConfirmation;
         $this->assertNotNull($warehouseConfirmation);
-        $this->assertEquals('confirmed', $warehouseConfirmation->status); // Auto-confirmed since stock is available
+        $this->assertEquals('request', $warehouseConfirmation->status);
+
+        $warehouseConfirmation->update([
+            'status' => 'confirmed',
+            'confirmed_by' => $this->user->id,
+            'confirmed_at' => now(),
+        ]);
+
+        $this->assertEquals('confirmed', $saleOrder->fresh()->status);
 
         // ==========================================
-        // STEP 3: CHECK AUTO-CREATED DELIVERY ORDER
+        // STEP 3: CREATE DELIVERY ORDER AFTER MANUAL WC CONFIRMATION
         // ==========================================
+
+        $salesOrderService = new SalesOrderService();
+        $this->assertTrue($salesOrderService->createDeliveryOrder($saleOrder->fresh(), [
+            'delivery_date' => now()->addDays(1)->toDateString(),
+            'warehouse_id' => $this->warehouse->id,
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+        ]));
 
         $deliveryOrder = $saleOrder->fresh()->deliveryOrder()->first();
         $this->assertNotNull($deliveryOrder);

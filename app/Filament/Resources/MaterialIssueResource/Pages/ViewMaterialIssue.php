@@ -29,6 +29,15 @@ class ViewMaterialIssue extends ViewRecord
                 ->modalHeading('Request Approval Material Issue')
                 ->modalDescription('Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
                 ->action(function (MaterialIssue $record) {
+                    if ($message = $record->warehouseConfirmationBlockingMessage()) {
+                        Notification::make()
+                            ->title('Konfirmasi Gudang Diperlukan')
+                            ->body($message)
+                            ->warning()
+                            ->send();
+                        return;
+                    }
+
                     // Validate stock before request approval
                     $stockValidation = $this->validateStockAvailability($record);
                     if (!$stockValidation['valid']) {
@@ -109,6 +118,15 @@ class ViewMaterialIssue extends ViewRecord
                 ->modalHeading('Approve Material Issue')
                 ->modalDescription('Setelah di-approve, Material Issue dapat diproses menjadi Completed.')
                 ->action(function (MaterialIssue $record) {
+                    if ($message = $record->warehouseConfirmationBlockingMessage()) {
+                        Notification::make()
+                            ->title('Konfirmasi Gudang Diperlukan')
+                            ->body($message)
+                            ->warning()
+                            ->send();
+                        return;
+                    }
+
                     // Validate stock before approval
                     $stockValidation = $this->validateStockAvailability($record);
                     if (!$stockValidation['valid']) {
@@ -195,6 +213,15 @@ class ViewMaterialIssue extends ViewRecord
                 ->modalHeading('Selesaikan Material Issue')
                 ->modalDescription('Apakah Anda yakin ingin menyelesaikan Material Issue ini? Stock akan dikurangi dan journal entry akan dibuat.')
                 ->action(function (MaterialIssue $record) {
+                    if ($message = $record->warehouseConfirmationBlockingMessage()) {
+                        Notification::make()
+                            ->title('Konfirmasi Gudang Diperlukan')
+                            ->body($message)
+                            ->warning()
+                            ->send();
+                        return;
+                    }
+
                     // Validate stock before completion
                     $stockValidation = $this->validateStockAvailability($record);
                     if (!$stockValidation['valid']) {

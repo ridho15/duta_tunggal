@@ -167,6 +167,16 @@ class PurchaseReceiptService
         return self::$coaCache[$code];
     }
 
+    protected function getUnbilledPurchaseFallbackCodes(): array
+    {
+        return [
+            config('coa.unbilled_purchase', '2100.10'),
+            '2100.10',
+            '2190.10',
+            '1180.01',
+        ];
+    }
+
 
     /**
      * Post inventory for purchase receipt item after quality control approval.
@@ -218,8 +228,8 @@ class PurchaseReceiptService
         }
 
         $product = $item->product;
-        $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes(['1140.10', '1140.01']);
-        $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes([config('coa.inventory', '1140.01'), '1140.10']);
+        $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes($this->getUnbilledPurchaseFallbackCodes());
 
         if (! $inventoryCoa || ! $unbilledPurchaseCoa) {
             return $this->skipWithWarning('Missing required COA configuration', [
@@ -511,12 +521,12 @@ class PurchaseReceiptService
 
         // 2. Debit the unbilled purchase account (reverse the original credit)
         // Prefer liability COA for unbilled purchases when zeroing out
-        $unbilledCoaForZero = $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        $unbilledCoaForZero = $this->resolveCoaByCodes($this->getUnbilledPurchaseFallbackCodes());
         $coaIdForZero = $unbilledCoaForZero?->id ?? $this->getCoaByCode('1180.01')->id;
 
         $entries[] = [
             'date' => now(),
-            'coa_id' => $coaIdForZero, // Unbilled Purchase COA (prefer 2100.10)
+            'coa_id' => $coaIdForZero,
             'debit' => round($totalDebit, 2),
             'credit' => 0,
             'description' => 'Zero out temporary procurement positions - ' . $receipt->receipt_number,
@@ -609,7 +619,7 @@ class PurchaseReceiptService
 
         // Find unbilled purchase COA from product configuration. If not set on product,
         // prefer liability COA for unbilled purchases created at receipt time
-        $unbilledPurchaseCoa = $product?->unbilledPurchaseCoa?->exists ? $product->unbilledPurchaseCoa : $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        $unbilledPurchaseCoa = $product?->unbilledPurchaseCoa?->exists ? $product->unbilledPurchaseCoa : $this->resolveCoaByCodes($this->getUnbilledPurchaseFallbackCodes());
         if (! $unbilledPurchaseCoa) {
             return $this->skipWithWarning('No unbilled purchase COA configured for product and no default liability COA found', [
                 'item_id' => $item->id,
@@ -825,11 +835,15 @@ class PurchaseReceiptService
         $dppTotal = 0.0;
         $taxTotal = 0.0;
         $taxRates = [];
+        $acceptedLineCount = 0;
+        $taxableLineCount = 0;
 
         foreach ($receipt->purchaseReceiptItem as $receiptItem) {
             if ($receiptItem->qty_accepted <= 0) {
                 continue;
             }
+
+            $acceptedLineCount++;
 
             $poItem = $receiptItem->purchaseOrderItem;
             $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
@@ -845,11 +859,13 @@ class PurchaseReceiptService
                 // unitPrice is net, tax computed on top
                 $dppLine = $lineGross;
                 $taxLine = round($dppLine * ($rate / 100), 2);
+                $taxableLineCount++;
                 $taxRates[] = $rate;
             } else { // Inklusif
                 // unitPrice includes tax
                 $dppLine = round($lineGross / (1 + ($rate / 100)), 2);
                 $taxLine = round($lineGross - $dppLine, 2);
+                $taxableLineCount++;
                 $taxRates[] = $rate;
             }
 
@@ -868,7 +884,7 @@ class PurchaseReceiptService
 
         // Determine invoice-wide ppn_rate only when all taxable items share the same rate
         $ppnRate = 0;
-        if (!empty($taxRates)) {
+        if (!empty($taxRates) && $taxableLineCount === $acceptedLineCount) {
             $uniqueRates = array_values(array_unique($taxRates));
             if (count($uniqueRates) === 1) {
                 $ppnRate = $uniqueRates[0];

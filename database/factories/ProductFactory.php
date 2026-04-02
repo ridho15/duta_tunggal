@@ -41,14 +41,14 @@ class ProductFactory extends Factory
             'jumlah_kelipatan_gudang_besar' => $this->faker->numberBetween(1, 50),
             'jumlah_jual_kategori_banyak' => $this->faker->numberBetween(1, 100),
             'kode_merk' => 'MRK-' . $this->faker->unique()->numerify('###'),
-            'inventory_coa_id' => $this->resolveCoaId('1140.10'),
+            'inventory_coa_id' => $this->resolveFirstCoaId(['1140.01', '1140.10']),
             'sales_coa_id' => $this->resolveCoaId('4100.10'),
             'sales_return_coa_id' => $this->resolveCoaId('4120.10'),
             'sales_discount_coa_id' => $this->resolveCoaId('4110.10'),
             'goods_delivery_coa_id' => $this->resolveCoaId('1140.20'),
             'cogs_coa_id' => $this->resolveCoaId('5100.10'),
             'purchase_return_coa_id' => $this->resolveCoaId('5120.10'),
-            'unbilled_purchase_coa_id' => $this->resolveCoaId('2190.10'),
+            'unbilled_purchase_coa_id' => $this->resolveFirstCoaId(['2100.10', '2190.10']),
         ];
     }
 
@@ -78,5 +78,17 @@ class ProductFactory extends Factory
         $cache[$code] = ChartOfAccount::where('code', $code)->value('id');
 
         return $cache[$code];
+    }
+
+    private function resolveFirstCoaId(array $codes): ?int
+    {
+        foreach ($codes as $code) {
+            $coaId = $this->resolveCoaId($code);
+            if ($coaId) {
+                return $coaId;
+            }
+        }
+
+        return null;
     }
 }

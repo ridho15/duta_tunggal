@@ -683,7 +683,7 @@ due_date, amount, created_at, updated_at
 ```sql
 id, cabang_id, product_id, quantity, code, nama_bom, note,
 is_active, uom_id, labor_cost, overhead_cost, total_cost,
-finished_goods_coa_id, work_in_progress_coa_id,
+work_in_progress_coa_id,
 created_at, updated_at
 ```
 

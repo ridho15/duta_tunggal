@@ -10,6 +10,11 @@ class DeliveryScheduleObserver
     public function updated(DeliverySchedule $schedule): void
     {
         $originalStatus = $schedule->getOriginal('status');
+
+        if ($originalStatus !== 'on_the_way' && $schedule->status === 'on_the_way') {
+            app(DeliveryScheduleService::class)->startRelatedDeliveryOrders($schedule);
+        }
+
         if ($originalStatus !== 'delivered' && $schedule->status === 'delivered') {
             app(DeliveryScheduleService::class)->completeRelatedDeliveryOrders($schedule);
         }

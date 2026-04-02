@@ -55,8 +55,7 @@ Mendefinisikan "resep" produksi — material apa saja, berapa quantity, dan bera
 | `overhead_cost` | Biaya overhead |
 | `material_cost_display` | Total biaya bahan (read-only, auto-hitung) |
 | `total_cost_display` | Total biaya = material + labor + overhead (read-only) |
-| `finished_goods_coa_id` | COA Persediaan Barang Jadi |
-| `work_in_progress_coa_id` | COA Barang Dalam Proses (WIP) |
+| `work_in_progress_coa_id` | COA Pos Sementara Produksi (WIP) |
 | `is_active` | Toggle aktif/nonaktif |
 | **Repeater: Items (Bahan Baku)** | Satu baris per material |
 | ↳ `product_id` | Produk bahan baku |

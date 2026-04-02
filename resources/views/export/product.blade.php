@@ -25,7 +25,7 @@
         <tr>
             <td>{{ $product->sku }}</td>
             <td>{{ $product->name }}</td>
-            <td>({{ $product->cabang->kode }}) {{ $product->cabang->nama }}</td>
+            <td>{{ $product->cabang_id ? '(' . $product->cabang->kode . ') ' . $product->cabang->nama : 'Semua Cabang' }}</td>
             <td>{{ $product->productCategory->name }}</td>
             <td>{{ $product->sell_price }}</td>
             <td>{{ $product->cost_price }}</td>

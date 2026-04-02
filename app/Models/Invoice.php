@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Scopes\CabangScope;
+use App\Services\TaxService;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -148,6 +150,40 @@ class Invoice extends Model
         $this->attributes['due_date'] = $value;
     }
 
+    protected function normalizeMoneyAttribute(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (float) MoneyHelper::parse($value);
+    }
+
+    public function setSubtotalAttribute(mixed $value): void
+    {
+        $this->attributes['subtotal'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setTotalAttribute(mixed $value): void
+    {
+        $this->attributes['total'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setDppAttribute(mixed $value): void
+    {
+        $this->attributes['dpp'] = $this->normalizeMoneyAttribute($value);
+    }
+
+    public function setTaxAttribute(mixed $value): void
+    {
+        $this->attributes['tax'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setPpnRateAttribute(mixed $value): void
+    {
+        $this->attributes['ppn_rate'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
     /**
      * Ensure other_fee always returns an array even when stored as integer 0 or null in DB.
      */
@@ -202,13 +238,31 @@ class Invoice extends Model
         return $sum;
     }
 
+    public function getTaxTypeDisplayAttribute(): string
+    {
+        return TaxService::normalizeType($this->tipe_pajak ?? null);
+    }
+
+    public function getEffectivePpnRateAttribute(): float
+    {
+        $ppnRate = (float) ($this->ppn_rate ?? 0);
+
+        if ($ppnRate > 0) {
+            return $ppnRate;
+        }
+
+        $legacyTaxRate = (float) ($this->tax ?? 0);
+
+        return $legacyTaxRate > 0 ? $legacyTaxRate : 0.0;
+    }
+
     /**
      * Computed PPN amount (nominal PPN in IDR) = DPP × ppn_rate / 100
      */
     public function getPpnAmountAttribute(): float
     {
-        $dpp = (float) ($this->dpp ?? $this->subtotal ?? 0);
-        $rate = (float) ($this->ppn_rate ?? 0);
+        $dpp = (float) ($this->subtotal ?? $this->dpp ?? 0);
+        $rate = $this->effective_ppn_rate;
         return $rate > 0 ? round($dpp * $rate / 100, 2) : 0.0;
     }
 

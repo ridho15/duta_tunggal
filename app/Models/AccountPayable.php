@@ -99,6 +99,19 @@ class AccountPayable extends Model
         });
 
         static::updated(function ($accountPayable) {
+            if ($accountPayable->wasChanged('paid') && ! $accountPayable->wasChanged('remaining')) {
+                $expectedRemaining = (float) $accountPayable->total - (float) $accountPayable->paid;
+
+                if ((float) $accountPayable->remaining !== $expectedRemaining) {
+                    $accountPayable->forceFill([
+                        'remaining' => $expectedRemaining,
+                        'status' => $expectedRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
+                    ])->saveQuietly();
+
+                    return;
+                }
+            }
+
             // Hapus ageing schedule ketika account payable lunas
             if ($accountPayable->status === PaymentStatus::PAID->value && $accountPayable->wasChanged('status')) {
                 if ($accountPayable->ageingSchedule) {

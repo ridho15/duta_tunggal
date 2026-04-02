@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SalesInvoiceResource\Pages;
 
+use App\Helpers\MoneyHelper;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\SaleOrder;
 use Filament\Actions;
@@ -37,14 +38,16 @@ class CreateSalesInvoice extends CreateRecord
             foreach ($this->data['invoiceItem'] as $item) {
                 // Calculate subtotal if not provided
                 $quantity = (float) ($item['quantity'] ?? 0);
-                $price = (float) ($item['price'] ?? 0);
+                $price = (float) MoneyHelper::parse($item['price'] ?? 0);
                 $subtotal = $quantity * $price;
                 
                 $itemData = array_merge($item, [
-                    'subtotal' => $subtotal,
-                    'discount' => 0,
-                    'tax_rate' => 0,
-                    'tax_amount' => 0,
+                    'price' => $price,
+                    'subtotal' => (float) MoneyHelper::parse($item['subtotal'] ?? $subtotal),
+                    'discount' => (float) MoneyHelper::parse($item['discount'] ?? 0),
+                    'tax_rate' => (float) MoneyHelper::parse($item['tax_rate'] ?? 0),
+                    'tax_amount' => (float) MoneyHelper::parse($item['tax_amount'] ?? 0),
+                    'total' => (float) MoneyHelper::parse($item['total'] ?? $subtotal),
                 ]);
                 
                 $this->record->invoiceItem()->create($itemData);

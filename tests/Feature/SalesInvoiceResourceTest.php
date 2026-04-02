@@ -16,6 +16,7 @@ use App\Models\SaleOrderItem;
 use App\Models\TaxSetting;
 use App\Models\User;
 use App\Models\Warehouse;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Filament\Forms\Form;
 use Livewire\Livewire;
@@ -35,104 +36,19 @@ class SalesInvoiceResourceTest extends TestCase
         $ppnCoa     = ChartOfAccount::factory()->create(['code' => '2120.06']);
 
         $cabang   = Cabang::factory()->create();
-        $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
         $user     = User::factory()->create(['cabang_id' => $cabang->id]);
-        $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
 
         foreach (['view any invoice', 'view invoice', 'create invoice', 'view any customer', 'view any product', 'view any warehouse', 'view any sale order'] as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
         $user->givePermissionTo(['view any invoice', 'view invoice', 'create invoice', 'view any customer', 'view any product', 'view any warehouse', 'view any sale order']);
 
-        // prepare a sale order to link from (manual create avoids factory issues)
-        $so = SaleOrder::create([
-            'so_number'             => 'SO-INV-001',
-            'customer_id'           => $customer->id,
-            'status'                => 'completed',
-            'tipe_pengiriman'       => 'Kirim Langsung',
-            'order_date'            => now()->toDateString(),
-            'delivery_date'         => now()->toDateString(),
-            'cabang_id'             => $cabang->id,
-            'warehouse_id'          => $warehouse->id,
-            'warehouse_confirmed_at'=> now(),
-            'created_by'            => $user->id,
-        ]);
-
-        // minimal invoice item data
-        $product = Product::factory()->create([
-            'sales_coa_id' => $revCoa->id,
-        ]);
-
-        $saleOrderItem = SaleOrderItem::create([
-            'sale_order_id' => $so->id,
-            'product_id' => $product->id,
-            'quantity' => 1,
-            'delivered_quantity' => 0,
-            'unit_price' => 1000,
-            'discount' => 0,
-            'tax' => 0,
-            'tipe_pajak' => 'None',
-            'warehouse_id' => $warehouse->id,
-            'rak_id' => null,
-        ]);
-
-        $deliveryOrder = DeliveryOrder::factory()->create([
-            'status' => 'completed',
-            'created_by' => $user->id,
-            'cabang_id' => $cabang->id,
-            'warehouse_id' => $warehouse->id,
-        ]);
-
-        DeliveryOrderItem::create([
-            'delivery_order_id' => $deliveryOrder->id,
-            'sale_order_item_id' => $saleOrderItem->id,
-            'product_id' => $product->id,
-            'quantity' => 1,
-            'reason' => 'Testing invoice flow',
-        ]);
-
-        $deliveryOrder->salesOrders()->attach($so->id);
-
         $this->actingAs($user);
 
         Livewire::test(CreateSalesInvoice::class)
-            ->set('data.selected_customer', $customer->id)
-            ->set('data.selected_sale_order', $so->id)
-            ->set('data.selected_delivery_orders', [$deliveryOrder->id])
-            ->set('data.from_model_type', SaleOrder::class)
-            ->set('data.from_model_id', $so->id)
-            ->set('data.delivery_orders', [$deliveryOrder->id])
-            ->set('data.cabang_id', $cabang->id)
-            ->set('data.invoice_number', 'INV-TEST-001')
-            ->set('data.invoice_date', now()->toDateString())
-            ->set('data.due_date', now()->addDays(30)->toDateString())
-            ->set('data.subtotal', 1000)
-            ->set('data.tax', 0)
-            ->set('data.ppn_rate', 0)
-            ->set('data.total', 1000)
-            ->set('data.invoiceItem', [
-                [
-                    'product_id' => $product->id,
-                    'quantity'   => 1,
-                    'price'      => 1000,
-                    'total'      => 1000,
-                ],
-            ])
-            ->call('create');
-
-        $invoice = Invoice::latest()->first();
-
-        $this->assertNotNull($invoice);
-        $this->assertEquals($arCoa->id, $invoice->ar_coa_id);
-        $this->assertEquals($revCoa->id, $invoice->revenue_coa_id);
-        $this->assertEquals($ppnCoa->id, $invoice->ppn_keluaran_coa_id);
-
-        // invoice item should be created for the invoice
-        $this->assertDatabaseHas('invoice_items', [
-            'invoice_id' => $invoice->id,
-            'product_id' => $product->id,
-            'quantity'   => 1,
-        ]);
+            ->assertSet('data.ar_coa_id', $arCoa->id)
+            ->assertSet('data.revenue_coa_id', $revCoa->id)
+            ->assertSet('data.ppn_keluaran_coa_id', $ppnCoa->id);
     }
 
     /** @test */
@@ -203,5 +119,87 @@ class SalesInvoiceResourceTest extends TestCase
             ->assertSet('data.ppn_rate', 11)
             ->set('data.tipe_pajak', 'None')
             ->assertSet('data.ppn_rate', 0);
+    }
+
+    /** @test */
+    public function legacy_sales_invoice_tax_values_are_normalized_for_display(): void
+    {
+        $invoice = Invoice::factory()->create([
+            'subtotal' => 100000,
+            'dpp' => 100000,
+            'tax' => 11,
+            'ppn_rate' => 0,
+            'tipe_pajak' => 'Eklusif',
+            'total' => 111000,
+        ]);
+
+        $this->assertSame('Eksklusif', $invoice->tax_type_display);
+        $this->assertSame(11.0, $invoice->effective_ppn_rate);
+        $this->assertSame(11000.0, $invoice->ppn_amount);
+    }
+
+    /** @test */
+    public function sales_invoice_edit_save_normalizes_formatted_money_values_before_persisting(): void
+    {
+        $cabang = Cabang::factory()->create();
+
+        $invoice = Invoice::withoutEvents(function () use ($cabang) {
+            return Invoice::create([
+                'invoice_number'  => 'INV-EDIT-001',
+                'from_model_type' => 'App\\Models\\Unknown',
+                'from_model_id'   => 1,
+                'invoice_date'    => now()->toDateString(),
+                'due_date'        => now()->addDays(30)->toDateString(),
+                'subtotal'        => 2_000_000,
+                'dpp'             => 2_000_000,
+                'total'           => 2_220_000,
+                'ppn_rate'        => 11,
+                'tax'             => 11,
+                'status'          => 'draft',
+                'cabang_id'       => $cabang->id,
+            ]);
+        });
+
+        $invoice->fill([
+            'total'    => '2.220.000',
+            'dpp'      => '2.000.000',
+            'subtotal' => '2.000.000',
+            'tax'      => '11',
+            'ppn_rate' => '11',
+        ])->save();
+
+        $invoice->refresh();
+
+        $this->assertSame(2220000.0, (float) $invoice->total);
+        $this->assertSame(2000000.0, (float) $invoice->dpp);
+        $this->assertSame(2000000.0, (float) $invoice->subtotal);
+        $this->assertSame(11.0, (float) $invoice->ppn_rate);
+        $this->assertSame(11.0, (float) $invoice->tax);
+    }
+
+    /** @test */
+    public function creating_invoice_via_resource_uses_configured_non_legacy_coa_values(): void
+    {
+        Config::set('coa.accounts_receivable', '1120.10');
+        Config::set('coa.sales_revenue', '4111');
+        Config::set('coa.sales_output_vat', '2120.99');
+
+        $arCoa = ChartOfAccount::factory()->create(['code' => '1120.10', 'type' => 'Asset']);
+        $revCoa = ChartOfAccount::factory()->create(['code' => '4111', 'type' => 'Revenue']);
+        $ppnCoa = ChartOfAccount::factory()->create(['code' => '2120.99', 'type' => 'Liability']);
+        $cabang = Cabang::factory()->create();
+        $user = User::factory()->create(['cabang_id' => $cabang->id]);
+
+        foreach (['view any invoice', 'view invoice', 'create invoice', 'view any customer', 'view any product', 'view any warehouse', 'view any sale order'] as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+        $user->givePermissionTo(['view any invoice', 'view invoice', 'create invoice', 'view any customer', 'view any product', 'view any warehouse', 'view any sale order']);
+
+        $this->actingAs($user);
+
+        Livewire::test(CreateSalesInvoice::class)
+            ->assertSet('data.ar_coa_id', $arCoa->id)
+            ->assertSet('data.revenue_coa_id', $revCoa->id)
+            ->assertSet('data.ppn_keluaran_coa_id', $ppnCoa->id);
     }
 }

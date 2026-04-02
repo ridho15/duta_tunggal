@@ -6,6 +6,7 @@ use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Services\PurchaseReturnService;
+use App\Support\ProcurementFailureNotifier;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -93,9 +94,21 @@ class PurchaseReceiptItemObserver
             Log::error("PurchaseReceiptItemObserver: Database error for PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
             Log::error("PurchaseReceiptItemObserver: SQL: " . $e->getSql());
             Log::error("PurchaseReceiptItemObserver: Bindings: " . json_encode($e->getBindings()));
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Otomatis Belum Selesai',
+                $e,
+                'Penerimaan barang tersimpan, tetapi retur otomatis untuk item yang ditolak belum berhasil disinkronkan. Silakan periksa data retur pembelian.'
+            );
         } catch (\Exception $e) {
             Log::error("PurchaseReceiptItemObserver: Failed to auto-create PurchaseReturn for PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
             Log::error("PurchaseReceiptItemObserver: Stack trace: " . $e->getTraceAsString());
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Otomatis Belum Selesai',
+                $e,
+                'Penerimaan barang tersimpan, tetapi retur otomatis untuk item yang ditolak belum berhasil disinkronkan. Silakan periksa data retur pembelian.'
+            );
         }
     }
 
@@ -141,6 +154,12 @@ class PurchaseReceiptItemObserver
 
         } catch (\Exception $e) {
             Log::error("PurchaseReceiptItemObserver: Failed to delete related PurchaseReturn for deleted PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Pembelian Belum Selesai',
+                $e,
+                'Perubahan item penerimaan tersimpan, tetapi pembaruan retur pembelian terkait belum berhasil disinkronkan.'
+            );
         }
     }
 
@@ -221,6 +240,12 @@ class PurchaseReceiptItemObserver
         } catch (\Exception $e) {
             Log::error("PurchaseReceiptItemObserver: Failed to sync PurchaseReturn for updated PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
             Log::error("PurchaseReceiptItemObserver: Stack trace: " . $e->getTraceAsString());
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Pembelian Belum Selesai',
+                $e,
+                'Perubahan item penerimaan tersimpan, tetapi pembaruan retur pembelian terkait belum berhasil disinkronkan.'
+            );
         }
     }
 }

@@ -3,9 +3,12 @@
 namespace App\Observers;
 
 use App\Enums\PaymentStatus;
+use App\Models\ChartOfAccount;
+use App\Models\Deposit;
 use App\Models\Invoice;
 use App\Models\VendorPayment;
 use App\Services\LedgerPostingService;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
 class VendorPaymentObserver
@@ -15,6 +18,16 @@ class VendorPaymentObserver
     public function __construct()
     {
         $this->ledger = new LedgerPostingService();
+    }
+
+    public function creating(VendorPayment $payment): void
+    {
+        $this->guardDepositRequirements($payment);
+    }
+
+    public function updating(VendorPayment $payment): void
+    {
+        $this->guardDepositRequirements($payment);
     }
 
     public function updated(VendorPayment $payment)
@@ -285,5 +298,104 @@ class VendorPaymentObserver
 
             $remainingPayment -= $paymentAmount;
         }
+    }
+
+    protected function guardDepositRequirements(VendorPayment $payment): void
+    {
+        if (!$this->shouldValidateDepositRequirements($payment)) {
+            return;
+        }
+
+        $depositAmount = $this->resolveRequestedDepositAmount($payment);
+        if ($depositAmount <= 0) {
+            return;
+        }
+
+        $supplierName = $payment->supplier?->perusahaan ?? $payment->supplier?->name ?? 'supplier ini';
+        $availableDeposits = Deposit::where('from_model_type', 'App\Models\Supplier')
+            ->where('from_model_id', $payment->supplier_id)
+            ->where('status', 'active')
+            ->where('remaining_amount', '>', 0)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        if ($availableDeposits->isEmpty()) {
+            $message = "Supplier {$supplierName} tidak memiliki deposit aktif yang tersedia untuk pembayaran ini.";
+            $this->notifyDepositValidationFailure('Deposit Tidak Tersedia', $message);
+            throw new \RuntimeException($message);
+        }
+
+        $totalAvailableDeposit = (float) $availableDeposits->sum('remaining_amount');
+        if ($totalAvailableDeposit + 0.0001 < $depositAmount) {
+            $message = "Saldo deposit supplier {$supplierName} tidak mencukupi. Tersedia Rp "
+                . number_format($totalAvailableDeposit, 0, ',', '.')
+                . ', dibutuhkan Rp '
+                . number_format($depositAmount, 0, ',', '.');
+            $this->notifyDepositValidationFailure('Saldo Deposit Tidak Mencukupi', $message);
+            throw new \RuntimeException($message);
+        }
+
+        if (!$this->resolveDepositCoa()) {
+            $message = 'Akun deposit / uang muka supplier tidak ditemukan. Simpan COA deposit lebih dulu sebelum pembayaran diproses.';
+            $this->notifyDepositValidationFailure('COA Deposit Belum Dikonfigurasi', $message);
+            throw new \RuntimeException($message);
+        }
+    }
+
+    protected function shouldValidateDepositRequirements(VendorPayment $payment): bool
+    {
+        $activeStatuses = ['partial', 'paid'];
+        $currentStatus = strtolower((string) $payment->status);
+        $originalStatus = strtolower((string) $payment->getOriginal('status'));
+        $paymentMethod = strtolower((string) $payment->payment_method);
+
+        $statusRequiresPosting = in_array($currentStatus, $activeStatuses, true);
+        $statusJustActivated = $payment->exists && $currentStatus !== $originalStatus && in_array($currentStatus, $activeStatuses, true);
+        $depositMethod = $paymentMethod === 'deposit';
+        $detailsContainDeposit = $payment->exists
+            ? $payment->vendorPaymentDetail()->whereRaw('LOWER(method) = ?', ['deposit'])->exists()
+            : false;
+
+        return ($statusRequiresPosting || $statusJustActivated) && ($depositMethod || $detailsContainDeposit);
+    }
+
+    protected function resolveRequestedDepositAmount(VendorPayment $payment): float
+    {
+        $details = $payment->exists ? $payment->vendorPaymentDetail()->get() : collect();
+        $depositDetailsAmount = (float) $details
+            ->filter(fn ($detail) => strtolower((string) $detail->method) === 'deposit')
+            ->sum('amount');
+
+        if ($depositDetailsAmount > 0) {
+            return $depositDetailsAmount;
+        }
+
+        return strtolower((string) $payment->payment_method) === 'deposit'
+            ? (float) $payment->total_payment
+            : 0.0;
+    }
+
+    protected function resolveDepositCoa(): ?ChartOfAccount
+    {
+        foreach (['1150.01', '1150.02', '1150'] as $code) {
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa) {
+                return $coa;
+            }
+        }
+
+        return ChartOfAccount::where('name', 'LIKE', '%UANG MUKA%')->first();
+    }
+
+    protected function notifyDepositValidationFailure(string $title, string $message): void
+    {
+        Notification::make()
+            ->title($title)
+            ->body($message)
+            ->danger()
+            ->persistent()
+            ->send();
+
+        Log::warning($title . ': ' . $message);
     }
 }

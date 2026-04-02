@@ -341,42 +341,6 @@ class SuratJalanResource extends Resource
                                 echo $pdf->stream();
                             }, 'Surat_Jalan_' . $record->sj_number . '.pdf');
                         }),
-                    Action::make('mark_as_sent')
-                        ->label('Mark as Sent')
-                        ->color('primary')
-                        ->icon('heroicon-o-paper-airplane')
-                        ->requiresConfirmation()
-                        ->modalHeading('Tandai DO sebagai Terkirim')
-                        ->modalDescription('Semua Delivery Order dalam Surat Jalan ini akan ditandai sebagai Terkirim. Lakukan ini setelah barang benar-benar dikirim ke customer.')
-                        ->modalSubmitActionLabel('Ya, Tandai Terkirim')
-                        ->visible(function ($record) {
-                            return $record->status >= 1; // J2: available for all published SJs
-                        })
-                        ->action(function ($record) {
-                            $record->loadMissing('deliveryOrder');
-                            $marked = 0;
-                            foreach ($record->deliveryOrder as $do) {
-                                if ($do->status === 'approved') {
-                                    try {
-                                        app(\App\Services\DeliveryOrderService::class)->updateStatus(deliveryOrder: $do, status: 'sent');
-                                        $marked++;
-                                    } catch (\Throwable $e) {
-                                        \Illuminate\Support\Facades\Log::error('SuratJalan: Failed to mark DO as sent', [
-                                            'surat_jalan_id' => $record->id,
-                                            'do_id' => $do->id,
-                                            'error' => $e->getMessage(),
-                                        ]);
-                                        HelperController::sendNotification(
-                                            isSuccess: false,
-                                            title: 'Gagal Update DO',
-                                            message: 'DO #' . $do->do_number . ' gagal ditandai terkirim: ' . $e->getMessage()
-                                        );
-                                    }
-                                }
-                            }
-
-                            HelperController::sendNotification(isSuccess: true, title: 'Terkirim', message: $marked > 0 ? "{$marked} Delivery Order berhasil ditandai sebagai Terkirim. Proses selanjutnya: Tim Finance perlu menerbitkan Invoice untuk setiap Delivery Order yang telah terkirim." : 'Semua DO sudah berstatus Terkirim. Proses selanjutnya: Tim Finance perlu menerbitkan Invoice untuk Delivery Order tersebut.');
-                        }),
                 ])
             ], position: ActionsPosition::BeforeCells)
             ->bulkActions([
@@ -391,7 +355,7 @@ class SuratJalanResource extends Resource
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order dalam satu perjalanan.</li>' .
                             '<li><strong>Status:</strong> <em>Terbit</em> (otomatis saat dibuat). Surat Jalan langsung aktif dan siap digunakan untuk pengiriman.</li>' .
-                            '<li><strong>Actions:</strong> <em>Edit</em> (draft only), <em>Delete</em> (draft only), <em>Download Document</em> (jika ada file), <em>Download Surat</em> (PDF terbit), <em>Tandai Terkirim</em> (konfirmasi pengiriman berhasil).</li>' .
+                            '<li><strong>Actions:</strong> <em>Edit</em>, <em>Delete</em>, <em>Download Document</em> (jika ada file), <em>Download Surat</em> (PDF terbit).</li>' .
                             '<li><strong>Grouping:</strong> Satu Surat Jalan dapat mencakup multiple Delivery Order untuk efisiensi pengiriman ke customer yang sama.</li>' .
                             '<li><strong>PDF:</strong> Download PDF Surat Jalan tersedia untuk keperluan pengiriman.</li>' .
                         '</ul>' .

@@ -8,6 +8,7 @@ use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\QualityControlService;
 use App\Services\ReturnProductService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -16,6 +17,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ViewQualityControlPurchase extends ViewRecord
 {
@@ -86,13 +89,25 @@ class ViewQualityControlPurchase extends ViewRecord
                     return null;
                 })
                 ->action(function (array $data, $record) {
-                    $qualityControlService = app(QualityControlService::class);
-                    $qualityControlService->completeQualityControl($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");
-                    
-                    // Only check PO completion for QC from PurchaseReceiptItem, not PurchaseOrderItem
-                    if ($record->from_model_type === 'App\Models\PurchaseReceiptItem') {
-                        $qualityControlService->checkPenerimaanBarang($record);
+                    try {
+                        $qualityControlService = app(QualityControlService::class);
+                        $qualityControlService->completeQualityControl($record, $data);
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");
+
+                        if ($record->from_model_type === 'App\Models\PurchaseReceiptItem') {
+                            $qualityControlService->checkPenerimaanBarang($record);
+                        }
+                    } catch (Throwable $exception) {
+                        Log::error('ViewQualityControlPurchase complete action failed', [
+                            'quality_control_id' => $record->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Menyelesaikan QC Pembelian',
+                            $exception,
+                            'QC pembelian belum berhasil diselesaikan. Periksa hasil QC, gudang return, dan data item yang diproses lalu coba lagi.'
+                        );
                     }
                 })
         ];

@@ -1,26 +1,5 @@
 @if (is_array($invoices) && count($invoices) > 0)
 
-    <!-- Payment Mode Selection -->
-    <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <label class="block text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">Mode Pembayaran:</label>
-        <div class="flex space-x-4">
-            <label class="flex items-center">
-                <input type="radio" name="payment_mode" value="full"
-                    class="payment-mode-radio text-blue-600 border-blue-300 focus:ring-blue-500" checked>
-                <span class="ml-2 text-sm text-blue-900 dark:text-blue-100">Pembayaran Penuh (Total Invoice)</span>
-            </label>
-            <label class="flex items-center">
-                <input type="radio" name="payment_mode" value="partial"
-                    class="payment-mode-radio text-blue-600 border-blue-300 focus:ring-blue-500">
-                <span class="ml-2 text-sm text-blue-900 dark:text-blue-100">Pembayaran Sebagian (Isi Manual)</span>
-            </label>
-        </div>
-        <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
-            <strong>Penuh:</strong> Total pembayaran = jumlah total invoice yang dicentang<br>
-            <strong>Sebagian:</strong> Total pembayaran = jumlah yang diisi di kolom Receipt
-        </p>
-    </div>
-
     <style>
         /* Style for auto-calculated fields */
         .auto-calculated-field input {
@@ -151,7 +130,9 @@
                                 <input type="checkbox"
                                     class="invoice-checkbox rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:focus:ring-blue-600"
                                     value="{{ $invoice['id'] }}" data-remaining="{{ $invoice['remaining'] }}"
-                                    {{ in_array($invoice['id'], $selectedInvoices) ? 'checked' : '' }}>
+                                    data-cabang-id="{{ $invoice['cabang_id'] ?? '' }}"
+                                    {{ in_array($invoice['id'], $selectedInvoices) ? 'checked' : '' }}
+                                    onchange="handleInvoiceCheckboxChange(this)">
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                                 {{ $invoice['invoice_number'] }}
@@ -163,17 +144,20 @@
                                 Rp. {{ number_format($invoice['total'], 0, ',', '.') }}
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap">
-                                <input type="number"
+                                <input type="text"
                                     class="receipt-input block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                                    placeholder="0" min="0" max="{{ $invoice['remaining'] }}"
+                                    placeholder="0" inputmode="numeric" autocomplete="off"
                                     data-invoice-id="{{ $invoice['id'] }}" data-remaining="{{ $invoice['remaining'] }}"
-                                    value="{{ $invoice['receipt'] }}" style="min-width: 140px;">
+                                    value="{{ ! empty($invoice['receipt']) ? number_format((float) $invoice['receipt'], 0, ',', '.') : '' }}"
+                                    oninput="handleReceiptInputChange(this, 'input')"
+                                    onchange="handleReceiptInputChange(this, 'change')"
+                                    onblur="handleReceiptInputChange(this, 'blur')" style="min-width: 140px;">
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap">
-                                <input type="number"
+                                <input type="text"
                                     class="balance-input block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-600 text-gray-500 dark:text-gray-400 sm:text-sm cursor-not-allowed"
                                     placeholder="0" readonly data-invoice-id="{{ $invoice['id'] }}"
-                                    value="{{ $invoice['balance'] }}" style="min-width: 140px;">
+                                    value="{{ $invoice['balance'] === '' || $invoice['balance'] === null ? '' : number_format((float) $invoice['balance'], 0, ',', '.') }}" style="min-width: 140px;">
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap">
                                 <select
@@ -275,9 +259,6 @@
         function toggleAllInvoices(selectAllCheckbox) {
             console.log('🔄 [TABLE] Toggle all invoices:', selectAllCheckbox.checked);
             const checkboxes = document.querySelectorAll('.invoice-checkbox');
-            const paymentMode = document.querySelector('.payment-mode-radio:checked')?.value || 'full';
-
-            console.log('Current payment mode:', paymentMode);
             console.log('Processing', checkboxes.length, 'checkboxes');
 
             checkboxes.forEach((checkbox, index) => {
@@ -288,24 +269,14 @@
                 const remaining = parseFloat(checkbox.dataset.remaining || 0);
 
                 if (selectAllCheckbox.checked) {
-                    if (paymentMode === 'full') {
-                        receiptInput.value = remaining;
-                        console.log(`Set checkbox ${index} (invoice ${checkbox.value}) receipt to ${remaining}`);
-                    } else {
-                        // In partial mode, don't auto-fill, let user decide
-                        console.log(`Checkbox ${index} checked but partial mode - not auto-filling`);
+                    if (!receiptInput.value || parseFloat(String(receiptInput.value).replace(/[^\d.-]/g, '')) === 0) {
+                        receiptInput.value = formatRupiahAmount(remaining);
                     }
+                    updateReceiptAmount(checkbox.value, remaining);
                 } else {
                     receiptInput.value = '';
-                    console.log(`Cleared checkbox ${index} receipt`);
+                    updateReceiptAmount(checkbox.value, 0);
                 }
-
-                // Trigger events
-                ['input', 'change'].forEach(eventType => {
-                    receiptInput.dispatchEvent(new Event(eventType, {
-                        bubbles: true
-                    }));
-                });
             });
 
             // Update using main function
@@ -344,7 +315,7 @@
                 const row = checkbox.closest('tr');
                 const receiptInput = row.querySelector('.receipt-input');
                 const receiptValue = receiptInput.value || '0';
-                const receiptAmount = parseFloat(receiptValue.replace(/[^\d.-]/g, '')) || 0;
+                const receiptAmount = parseReceiptValue(receiptValue);
                 invoiceReceipts[invoiceId] = receiptAmount;
                 totalPaymentAmount += receiptAmount;
 
@@ -383,6 +354,8 @@
         }
 
         function updateTotalPaymentField(totalAmount) {
+            const formattedTotal = Math.round(parseFloat(totalAmount) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
             // Try multiple approaches to find the total payment field
             let totalPaymentField = null;
 
@@ -422,7 +395,7 @@
 
                 totalPaymentField.disabled = false;
                 totalPaymentField.readOnly = false;
-                totalPaymentField.value = totalAmount;
+                totalPaymentField.value = formattedTotal;
 
                 // Trigger multiple events to ensure Filament reactivity
                 ['input', 'change', 'blur', 'keyup'].forEach(eventType => {
@@ -444,7 +417,7 @@
                     if (window.Livewire && window.Livewire.all && window.Livewire.all().length > 0) {
                         const component = window.Livewire.all()[0];
                         if (component.set) {
-                            component.set('total_payment', totalAmount);
+                            component.set('total_payment', formattedTotal);
                         }
                     }
                 } catch (e) {
@@ -459,7 +432,7 @@
         }
 
         function updateReceiptAmount(invoiceId, amount) {
-            const numericAmount = parseFloat(amount) || 0;
+            let numericAmount = parseFloat(String(amount).replace(/[^\d.-]/g, '')) || 0;
             const checkbox = document.querySelector(`.invoice-checkbox[value="${invoiceId}"]`);
             const row = checkbox.closest('tr');
             const receiptInput = row.querySelector('.receipt-input');
@@ -469,26 +442,22 @@
             // Validate amount doesn't exceed remaining
             if (numericAmount > remaining) {
                 alert(`Pembayaran tidak boleh melebihi sisa tagihan: Rp. ${remaining.toLocaleString('id-ID')}`);
-                receiptInput.value = remaining;
-                amount = remaining;
+                numericAmount = remaining;
+                receiptInput.value = formatRupiahAmount(remaining);
             }
 
             // Calculate and update balance (remaining - receipt)
             const balance = remaining - numericAmount;
-            balanceInput.value = balance;
+            balanceInput.value = formatRupiahAmount(balance);
 
             // Auto-check checkbox if amount > 0, uncheck if amount = 0
             if (numericAmount > 0 && !checkbox.checked) {
                 checkbox.checked = true;
-                updateSelectedInvoices();
             } else if (numericAmount === 0 && checkbox.checked) {
                 checkbox.checked = false;
-                updateSelectedInvoices();
-            } else {
-                if (typeof window.calculateTotalPayment === 'function') {
-                    window.calculateTotalPayment();
-                }
             }
+
+            updateSelectedInvoices();
 
             // Auto-fill adjustment COA if there's a balance
             if (balance > 0) {
@@ -537,44 +506,6 @@
                     select.dispatchEvent(new Event('change'));
                 }
             });
-        }
-
-        function handlePaymentModeChange(mode) {
-            console.log('🎛️ [TABLE] Payment mode changed to:', mode);
-            const checkboxes = document.querySelectorAll('.invoice-checkbox');
-
-            if (mode === 'full') {
-                // Pembayaran Penuh: Auto-fill dengan remaining amount untuk yang dicentang
-                console.log('Full payment mode - auto-filling checked invoices with remaining amounts');
-                checkboxes.forEach(checkbox => {
-                    if (checkbox.checked) {
-                        const row = checkbox.closest('tr');
-                        const receiptInput = row.querySelector('.receipt-input');
-                        const remaining = parseFloat(checkbox.dataset.remaining || 0);
-
-                        console.log(`Setting invoice ${checkbox.value} receipt to ${remaining}`);
-                        receiptInput.value = remaining;
-
-                        // Trigger input events
-                        ['input', 'change'].forEach(eventType => {
-                            receiptInput.dispatchEvent(new Event(eventType, {
-                                bubbles: true
-                            }));
-                        });
-                    }
-                });
-            } else if (mode === 'partial') {
-                // Pembayaran Sebagian: Biarkan user mengisi manual, jangan clear yang sudah ada
-                console.log('Partial payment mode - keeping current receipt values');
-                // Tidak perlu melakukan apa-apa, user bisa isi manual
-            }
-
-            // Update total payment calculation using main function
-            if (window.updateSelectedInvoicesMain) {
-                window.updateSelectedInvoicesMain();
-            } else {
-                updateSelectedInvoices();
-            }
         }
 
         function updateAdjustmentDescription(invoiceId, description) {
@@ -636,23 +567,21 @@
         // calculateTotalPayment function is now handled by the separate JavaScript init component
         // This ensures no conflicts and a single source of truth for calculations
 
-        // Auto-fill receipt amount when checkbox is checked
         function handleCheckboxChange(checkbox) {
             console.log('handleCheckboxChange');
+            const row = checkbox.closest('tr');
+            const receiptInput = row.querySelector('.receipt-input');
+
             if (checkbox.checked) {
-                const row = checkbox.closest('tr');
-                const receiptInput = row.querySelector('.receipt-input');
                 const remaining = parseFloat(checkbox.dataset.remaining || 0);
 
-                // Only auto-fill if receipt input is empty
-                if (!receiptInput.value || parseFloat(receiptInput.value) === 0) {
-                    receiptInput.value = remaining;
-                    updateReceiptAmount(checkbox.value, remaining);
+                if (!receiptInput.value || parseFloat(String(receiptInput.value).replace(/[^\d.-]/g, '')) === 0) {
+                    receiptInput.value = formatRupiahAmount(remaining);
                 }
+
+                updateReceiptAmount(checkbox.value, remaining);
             } else {
                 // Clear receipt amount when unchecked
-                const row = checkbox.closest('tr');
-                const receiptInput = row.querySelector('.receipt-input');
                 receiptInput.value = '';
                 updateReceiptAmount(checkbox.value, 0);
             }
@@ -660,9 +589,12 @@
 
         // Add event listeners when page loads or when ViewField is rendered
         function initializeEventListeners() {
-            // Check if already initialized to avoid duplicates
-            if (window.invoiceTableListenersInitialized) {
-                return;
+            if (
+                window.updateSelectedInvoicesMain &&
+                typeof window.handleInvoiceCheckboxChange === 'function' &&
+                typeof window.handleReceiptInputChange === 'function'
+            ) {
+                return true;
             }
 
             // Check if invoice table exists
@@ -671,8 +603,15 @@
                 return false;
             }
 
-            // Mark as initialized
-            window.invoiceTableListenersInitialized = true;
+            document.querySelectorAll('.receipt-input').forEach(input => {
+                const parsed = parseReceiptValue(input.value);
+                input.value = input.value ? formatRupiahAmount(parsed) : '';
+            });
+
+            document.querySelectorAll('.balance-input').forEach(input => {
+                const parsed = parseReceiptValue(input.value);
+                input.value = input.value === '' ? '' : formatRupiahAmount(parsed);
+            });
 
             // Add event listeners for invoice checkboxes
             const checkboxes = document.querySelectorAll('.invoice-checkbox');
@@ -682,7 +621,7 @@
                     checkbox.setAttribute('data-events-attached', 'true');
 
                     checkbox.addEventListener('change', function() {
-                        updateSelectedInvoices();
+                        handleCheckboxChange(this);
                     });
                 }
             });
@@ -696,16 +635,19 @@
 
                     input.addEventListener('input', function(e) {
                         const invoiceId = this.getAttribute('data-invoice-id');
+                        this.value = this.value ? formatRupiahAmount(parseReceiptValue(this.value)) : '';
                         updateReceiptAmount(invoiceId, this.value);
                     });
 
                     input.addEventListener('change', function(e) {
                         const invoiceId = this.getAttribute('data-invoice-id');
+                        this.value = this.value ? formatRupiahAmount(parseReceiptValue(this.value)) : '';
                         updateReceiptAmount(invoiceId, this.value);
                     });
 
                     input.addEventListener('blur', function(e) {
                         const invoiceId = this.getAttribute('data-invoice-id');
+                        this.value = this.value ? formatRupiahAmount(parseReceiptValue(this.value)) : '';
                         updateReceiptAmount(invoiceId, this.value);
                     });
                 }
@@ -752,6 +694,24 @@
                 applyAdjustmentSelect2();
             });
         }, 500);
+
+        window.addEventListener('refreshInvoiceTable', function () {
+            setTimeout(function() {
+                initializeEventListeners();
+                loadSelect2Assets().then(function() {
+                    applyAdjustmentSelect2();
+                });
+            }, 150);
+        });
+
+        document.addEventListener('livewire:navigated', function () {
+            setTimeout(function() {
+                initializeEventListeners();
+                loadSelect2Assets().then(function() {
+                    applyAdjustmentSelect2();
+                });
+            }, 150);
+        });
     </script>
 @else
     <div class="text-center py-8 text-gray-500 dark:text-gray-400">

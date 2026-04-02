@@ -16,7 +16,11 @@ if (!$po) {
 
 // Check supplier
 $supp = DB::table('suppliers')->where('id', $po->supplier_id)->first();
-echo 'Supplier: ' . ($supp ? "id={$supp->id} code={$supp->kode_supplier} name={$supp->perusahaan}" : 'NOT FOUND') . PHP_EOL;
+echo 'Supplier: ' . ($supp ? 'id=' . $supp->id . ' name=' . ($supp->perusahaan ?? $supp->name ?? '-') : 'NOT FOUND') . PHP_EOL;
+
+// Check cabang
+$cabang = DB::table('cabangs')->where('id', $po->cabang_id)->first();
+echo 'Cabang: ' . ($cabang ? "id={$cabang->id} kode={$cabang->kode} name={$cabang->nama}" : 'NOT FOUND') . PHP_EOL;
 
 // Check receipts
 $receipts = DB::table('purchase_receipts')->where('purchase_order_id', $po->id)->get();
@@ -46,6 +50,6 @@ foreach ($receipts as $r) {
 
 // Also check if supplier has the right kode_supplier
 echo PHP_EOL . 'Checking supplier by SUPP001:' . PHP_EOL;
-$supp2 = DB::table('suppliers')->where('kode_supplier', 'SUPP001')->first();
-echo $supp2 ? "  Found: id={$supp2->id} name={$supp2->perusahaan}" : "  NOT FOUND by kode_supplier=SUPP001";
+$supp2 = DB::table('suppliers')->where('code', 'SUPP001')->first();
+echo $supp2 ? "  Found: id={$supp2->id} name={$supp2->perusahaan}" : "  NOT FOUND by code=SUPP001";
 echo PHP_EOL;

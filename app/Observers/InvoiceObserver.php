@@ -282,23 +282,31 @@ class InvoiceObserver
         $date = $invoice->invoice_date ?? Carbon::now()->toDateString();
 
         // Get COAs from invoice or fallback to defaults
-        $arCoa = $invoice->arCoa ?? \App\Models\ChartOfAccount::where('code', '1120')->first(); // Accounts Receivable
-        $revenueCoa = $invoice->revenueCoa ?? \App\Models\ChartOfAccount::where('code', '4000')->first(); // Revenue/Sales
-        $ppnKeluaranCoa = $invoice->ppnKeluaranCoa ?? \App\Models\ChartOfAccount::where('code', '2120.06')->first(); // PPn Keluaran
-        $discountCoa = \App\Models\ChartOfAccount::where('code', '4100.01')->first(); // Sales Discount
-        $biayaPengirimanCoa = $invoice->biayaPengirimanCoa ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first(); // Biaya Pengiriman
+        $arCodes = $this->getConfiguredSalesCoaCodes('accounts_receivable', ['1120']);
+        $revenueCodes = $this->getConfiguredSalesCoaCodes('sales_revenue', ['4000', '4111']);
+
+        $arCoa = $invoice->arCoa?->exists ? $invoice->arCoa : $this->resolveCoaByCodes($arCodes);
+        $revenueCoa = $invoice->revenueCoa?->exists ? $invoice->revenueCoa : $this->resolveCoaByCodes($revenueCodes, 'Revenue');
+        $ppnKeluaranCoa = $invoice->ppnKeluaranCoa?->exists
+            ? $invoice->ppnKeluaranCoa
+            : $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_output_vat', ['2120.06']), 'Liability');
+        $discountCoa = $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_discount', ['4100.01']), 'Expense');
+        $biayaPengirimanCoa = $invoice->biayaPengirimanCoa?->exists
+            ? $invoice->biayaPengirimanCoa
+            : $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_shipping', ['6100.02']), 'Expense');
 
         if (!$arCoa || !$revenueCoa) {
             Log::error('postSalesInvoice: essential COA mapping missing — cannot post invoice', [
                 'invoice_id'    => $invoice->id,
                 'ar_coa_found'  => $arCoa  ? $arCoa->code  : null,
                 'rev_coa_found' => $revenueCoa ? $revenueCoa->code : null,
-                'hint'          => 'Pastikan Chart of Account dengan kode 1120 (AR) dan 4000 (Revenue) sudah ada',
+                'expected_ar_codes' => $arCodes,
+                'expected_revenue_codes' => $revenueCodes,
             ]);
             throw new \RuntimeException(
                 "COA mapping tidak ditemukan untuk invoice {$invoice->invoice_number} — "
-                . "Kode 1120 (AR): " . ($arCoa ? 'OK' : 'TIDAK ADA') . ', '
-                . "Kode 4000 (Revenue): " . ($revenueCoa ? 'OK' : 'TIDAK ADA')
+                . 'Piutang Dagang: ' . ($arCoa ? 'OK' : 'TIDAK ADA') . ' [' . implode(', ', $arCodes) . '], '
+                . 'Penjualan: ' . ($revenueCoa ? 'OK' : 'TIDAK ADA') . ' [' . implode(', ', $revenueCodes) . ']'
             );
         }
 
@@ -426,6 +434,39 @@ class InvoiceObserver
         $this->postCostOfSalesEntries($invoice, $date);
     }
 
+    private function getConfiguredSalesCoaCodes(string $configKey, array $fallbacks = []): array
+    {
+        return array_values(array_unique(array_filter([
+            config('coa.' . $configKey),
+            ...$fallbacks,
+        ])));
+    }
+
+    private function resolveCoaByCodes(array $codes, ?string $type = null): ?\App\Models\ChartOfAccount
+    {
+        if (empty($codes)) {
+            return null;
+        }
+
+        $query = \App\Models\ChartOfAccount::query()
+            ->whereIn('code', $codes)
+            ->where('is_active', true);
+
+        if ($type !== null) {
+            $query->where('type', $type);
+        }
+
+        $accounts = $query->get()->keyBy('code');
+
+        foreach ($codes as $code) {
+            if ($accounts->has($code)) {
+                return $accounts->get($code);
+            }
+        }
+
+        return null;
+    }
+
     protected function postCostOfSalesEntries(Invoice $invoice, string $date): void
     {
         $invoice->loadMissing([
@@ -474,7 +515,9 @@ class InvoiceObserver
         }
 
         if (empty($debitTotals) || empty($creditTotals)) {
-            return;
+            throw new \RuntimeException(
+                'Sales invoice tidak dapat diposting karena HPP / release barang terkirim tidak dapat dihitung. Pastikan item invoice atau delivery order memiliki cost_price dan mapping COA yang valid.'
+            );
         }
 
         foreach ($debitTotals as $debitData) {

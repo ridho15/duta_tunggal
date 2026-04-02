@@ -83,26 +83,26 @@ class ViewSalesInvoice extends ViewRecord
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
                                     ->rupiah(),
-                                TextEntry::make('tipe_pajak')
+                                TextEntry::make('tax_type_display')
                                     ->label('Tipe Pajak')
                                     ->badge()
                                     ->color(fn ($state) => match ($state) {
-                                        'None' => 'gray',
+                                        'Non Pajak' => 'gray',
                                         'Inklusif' => 'info',
-                                        'Eklusif' => 'warning',
+                                        'Eksklusif' => 'warning',
                                         default => 'gray',
                                     }),
-                                TextEntry::make('ppn_rate')
+                                TextEntry::make('effective_ppn_rate')
                                     ->label('PPN Rate (%)')
                                     ->suffix('%')
-                                    ->visible(fn ($record) => ($record->tipe_pajak ?? 'None') !== 'None'),
+                                    ->visible(fn ($record) => (float) ($record->effective_ppn_rate ?? 0) > 0),
                             ]),
                         Grid::make(4)
                             ->schema([
                                 TextEntry::make('ppn_amount')
                                     ->label('Nominal PPN (Rp)')
                                     ->rupiah()
-                                    ->visible(fn ($record) => ($record->tipe_pajak ?? 'None') !== 'None' && $record->ppn_amount > 0),
+                                    ->visible(fn ($record) => (float) ($record->ppn_amount ?? 0) > 0),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
                                     ->rupiah(),

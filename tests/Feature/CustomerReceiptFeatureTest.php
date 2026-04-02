@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AccountReceivable;
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerReceipt;
 use App\Models\DeliveryOrder;
@@ -24,6 +25,21 @@ class CustomerReceiptFeatureTest extends TestCase
     {
         parent::setUp();
         $this->seed(\Database\Seeders\CabangSeeder::class);
+
+        foreach ([
+            ['code' => '1120', 'name' => 'Piutang Dagang', 'type' => 'Asset'],
+            ['code' => '4000', 'name' => 'Penjualan', 'type' => 'Revenue'],
+            ['code' => '2120.06', 'name' => 'PPN Keluaran', 'type' => 'Liability'],
+            ['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset'],
+            ['code' => '5100.10', 'name' => 'HPP Barang', 'type' => 'Expense'],
+            ['code' => '6100.02', 'name' => 'Biaya Pengiriman', 'type' => 'Expense'],
+            ['code' => '4100.01', 'name' => 'Diskon Penjualan', 'type' => 'Expense'],
+        ] as $coa) {
+            ChartOfAccount::firstOrCreate(
+                ['code' => $coa['code']],
+                ['name' => $coa['name'], 'type' => $coa['type'], 'is_active' => true]
+            );
+        }
     }
 
     public function test_can_create_customer_receipt_with_cash_payment()

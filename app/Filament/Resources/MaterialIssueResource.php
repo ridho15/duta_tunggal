@@ -224,14 +224,9 @@ class MaterialIssueResource extends Resource
                             })
                             ->mutateRelationshipDataBeforeFillUsing(function ($data) {
                                 if ($data['product_id'] && $data['warehouse_id']) {
-                                    $inventoryStock = InventoryStock::where('product_id', $data['product_id'])
-                                        ->where('warehouse_id', $data['warehouse_id'])
-                                        ->first();
-                                    if ($inventoryStock) {
-                                        $data['available_stock_display'] = $inventoryStock->qty_available;
-                                    } else {
-                                        $data['available_stock_display'] = 0;
-                                    }
+                                    $stockMetrics = self::getStockMetrics($data['product_id'], $data['warehouse_id']);
+                                    $data['available_stock_display'] = $stockMetrics['available'];
+                                    $data['reserved_stock_display'] = $stockMetrics['reserved'];
                                 }
                                 return $data;
                             })
@@ -265,6 +260,7 @@ class MaterialIssueResource extends Resource
                                         $set('warehouse_id', null); // Reset warehouse when product changes
                                         // Reset available stock display when product changes
                                         $set('available_stock_display', '0.00');
+                                        $set('reserved_stock_display', '0.00');
                                     })
                                     ->getOptionLabelFromRecordUsing(
                                         fn(Product $record) =>
@@ -361,13 +357,12 @@ class MaterialIssueResource extends Resource
                                         $productId = $get('product_id');
                                         $warehouseId = $state;
                                         if ($productId && $warehouseId) {
-                                            $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                                                ->where('warehouse_id', $warehouseId)
-                                                ->first();
-                                            $available = $stock ? $stock->qty_available : 0;
-                                            $set('available_stock_display', number_format($available, 2));
+                                            $stockMetrics = self::getStockMetrics($productId, $warehouseId);
+                                            $set('available_stock_display', number_format($stockMetrics['available'], 2, '.', ''));
+                                            $set('reserved_stock_display', number_format($stockMetrics['reserved'], 2, '.', ''));
                                         } else {
                                             $set('available_stock_display', '0.00');
+                                            $set('reserved_stock_display', '0.00');
                                         }
                                     }),
                                 Select::make('rak_id')
@@ -385,7 +380,7 @@ class MaterialIssueResource extends Resource
                                             return \App\Models\Rak::whereHas('inventoryStock', function ($q) use ($productId, $warehouseId) {
                                                 $q->where('product_id', $productId)
                                                     ->where('warehouse_id', $warehouseId)
-                                                    ->whereRaw('qty_available - qty_reserved > 0');
+                                                    ->whereRaw('qty_available > 0');
                                             })
                                                 ->orderBy('name')
                                                 ->get()
@@ -415,40 +410,51 @@ class MaterialIssueResource extends Resource
                                     ->disabled(fn(callable $get) => !$get('warehouse_id'))
                                     ->helperText('Rak akan tersedia setelah gudang dipilih. Rak dengan stock tersedia akan diprioritaskan jika produk sudah dipilih.'),
                                 Forms\Components\TextInput::make('available_stock_display')
-                                    ->label('Stock Tersedia')
+                                    ->label('Stock Available')
+                                    ->helperText('Stok bebas pakai setelah dikurangi reservasi aktif.')
                                     ->disabled()
                                     ->reactive()
                                     ->dehydrated(false)
                                     ->default(function ($get) {
-                                        $productId = $get('product_id');
-                                        $warehouseId = $get('warehouse_id');
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
 
-                                        if ($productId && $warehouseId) {
-                                            $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                                                ->where('warehouse_id', $warehouseId)
-                                                ->first();
-                                            return number_format($stock ? $stock->qty_available : 0, 2);
-                                        }
-
-                                        return '0.00';
+                                        return number_format($stockMetrics['available'], 2, '.', '');
                                     })
                                     ->extraInputAttributes(function ($get) {
-                                        $productId = $get('product_id');
-                                        $warehouseId = $get('warehouse_id');
                                         $quantity = (float) $get('quantity');
 
-                                        if ($productId && $warehouseId) {
-                                            $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                                                ->where('warehouse_id', $warehouseId)
-                                                ->first();
-                                            $available = $stock ? $stock->qty_available : 0;
-                                            if ($available >= $quantity) {
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
+
+                                        if ($get('product_id') && $get('warehouse_id')) {
+                                            if ($stockMetrics['available'] >= $quantity) {
                                                 return ['class' => 'text-green-600 font-semibold'];
                                             } else {
                                                 return ['class' => 'text-red-600 font-semibold'];
                                             }
                                         }
                                         return ['class' => 'text-gray-500'];
+                                    }),
+                                Forms\Components\TextInput::make('reserved_stock_display')
+                                    ->label('Stock Reserved')
+                                    ->helperText('Total stok yang sedang direservasi di gudang ini.')
+                                    ->disabled()
+                                    ->reactive()
+                                    ->dehydrated(false)
+                                    ->default(function ($get) {
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
+
+                                        return number_format($stockMetrics['reserved'], 2, '.', '');
+                                    })
+                                    ->extraInputAttributes(function ($get) {
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
+
+                                        if (! $get('product_id') || ! $get('warehouse_id')) {
+                                            return ['class' => 'text-gray-500'];
+                                        }
+
+                                        return $stockMetrics['reserved'] > 0
+                                            ? ['class' => 'text-amber-600 font-semibold']
+                                            : ['class' => 'text-gray-500'];
                                     }),
 
                                 Forms\Components\Textarea::make('notes')
@@ -656,6 +662,15 @@ class MaterialIssueResource extends Resource
                         ->modalHeading('Request Approval Material Issue')
                         ->modalDescription('Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
                         ->action(function (MaterialIssue $record) {
+                            if ($message = $record->warehouseConfirmationBlockingMessage()) {
+                                Notification::make()
+                                    ->title('Konfirmasi Gudang Diperlukan')
+                                    ->body($message)
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
                             // Validate stock before request approval
                             $stockValidation = static::validateStockAvailability($record);
                             if (!$stockValidation['valid']) {
@@ -733,6 +748,15 @@ class MaterialIssueResource extends Resource
                         ->modalHeading('Approve Material Issue')
                         ->modalDescription('Setelah di-approve, Material Issue dapat diproses menjadi Completed.')
                         ->action(function (MaterialIssue $record) {
+                            if ($message = $record->warehouseConfirmationBlockingMessage()) {
+                                Notification::make()
+                                    ->title('Konfirmasi Gudang Diperlukan')
+                                    ->body($message)
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
                             // Validate stock before approval
                             $stockValidation = static::validateStockAvailability($record);
                             if (!$stockValidation['valid']) {
@@ -819,6 +843,15 @@ class MaterialIssueResource extends Resource
                         ->modalHeading('Selesaikan Material Issue')
                         ->modalDescription('Apakah Anda yakin ingin menyelesaikan Material Issue ini? Stock akan dikurangi dan journal entry akan dibuat.')
                         ->action(function (MaterialIssue $record) {
+                            if ($message = $record->warehouseConfirmationBlockingMessage()) {
+                                Notification::make()
+                                    ->title('Konfirmasi Gudang Diperlukan')
+                                    ->body($message)
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
                             // Validate stock before completion
                             $stockValidation = static::validateStockAvailability($record);
                             if (!$stockValidation['valid']) {
@@ -890,8 +923,8 @@ class MaterialIssueResource extends Resource
                             '<li><strong>Integration:</strong> Terintegrasi dengan <em>Production Plan</em> (dibuat otomatis), <em>Manufacturing Order</em> (proses produksi), dan <em>Inventory</em> (pengurangan stock).</li>' .
                             '<li><strong>Actions:</strong> <em>Request Approval</em> (draft → pending), <em>Approve/Reject</em> (pending → approved/rejected), <em>Complete</em> (approved → completed, stock berkurang), <em>Generate Journal</em> (untuk akuntansi).</li>' .
                             '<li><strong>Permissions:</strong> <em>view any material issue</em>, <em>create material issue</em>, <em>update material issue</em>, <em>delete material issue</em>, <em>restore material issue</em>, <em>force-delete material issue</em>.</li>' .
-                            '<li><strong>Stock Management:</strong> Stock bahan baku otomatis berkurang saat completed. Sistem mencegah pengambilan jika stock tidak mencukupi.</li>' .
-                            '<li><strong>Accounting:</strong> Journal entry otomatis dibuat untuk mencatat pengeluaran bahan baku ke Work in Progress (WIP).</li>' .
+                            '<li><strong>Stock Management:</strong> Stock bahan baku otomatis di-reserve saat approved lalu dikonsumsi saat completed. Sistem mencegah pengambilan jika stock tidak mencukupi.</li>' .
+                            '<li><strong>Accounting:</strong> Journal entry otomatis dibuat untuk mencatat pengeluaran bahan baku ke Pos Sementara Produksi.</li>' .
                         '</ul>' .
                     '</div>' .
                 '</details>'
@@ -945,12 +978,19 @@ class MaterialIssueResource extends Resource
                 ->first();
 
             $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $reservedQty = $inventoryStock ? $inventoryStock->qty_reserved : 0;
+            $ownReservedQty = self::getReservedQuantityForIssue(
+                $materialIssue,
+                $item->product_id,
+                $item->warehouse_id ?? $materialIssue->warehouse_id
+            );
+            $effectiveQty = $availableQty + $ownReservedQty;
             $requiredQty = $item->quantity;
 
-            if ($availableQty <= 0) {
-                $outOfStock[] = "{$item->product->name} (Stock: 0)";
-            } elseif ($availableQty < $requiredQty) {
-                $insufficientStock[] = "{$item->product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            if ($effectiveQty <= 0) {
+                $outOfStock[] = "{$item->product->name} (Available: {$availableQty}, Reserved: {$reservedQty})";
+            } elseif ($effectiveQty < $requiredQty) {
+                $insufficientStock[] = "{$item->product->name} (Dibutuhkan: {$requiredQty}, Available: {$availableQty}, Reserved: {$reservedQty}, Reserved Dokumen Ini: {$ownReservedQty})";
             }
         }
 
@@ -972,5 +1012,38 @@ class MaterialIssueResource extends Resource
             'valid' => true,
             'message' => 'Stock tersedia untuk semua item'
         ];
+    }
+
+    protected static function getStockMetrics(?int $productId, ?int $warehouseId): array
+    {
+        if (! $productId || ! $warehouseId) {
+            return [
+                'available' => 0.0,
+                'reserved' => 0.0,
+            ];
+        }
+
+        $inventoryStock = InventoryStock::query()
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->first();
+
+        return [
+            'available' => (float) ($inventoryStock->qty_available ?? 0),
+            'reserved' => (float) ($inventoryStock->qty_reserved ?? 0),
+        ];
+    }
+
+    protected static function getReservedQuantityForIssue(MaterialIssue $materialIssue, int $productId, ?int $warehouseId): float
+    {
+        if (! $materialIssue->id || ! $warehouseId) {
+            return 0.0;
+        }
+
+        return (float) \App\Models\StockReservation::query()
+            ->where('material_issue_id', $materialIssue->id)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->sum('quantity');
     }
 }

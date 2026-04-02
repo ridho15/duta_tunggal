@@ -3,9 +3,12 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ViewPurchaseInvoice extends ViewRecord
 {
@@ -46,11 +49,25 @@ class ViewPurchaseInvoice extends ViewRecord
                 ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
                 ->modalSubmitActionLabel('Yes, Mark as Sent')
                 ->action(function ($record) {
-                    $record->update(['status' => 'sent']);
-                    \Filament\Notifications\Notification::make()
-                        ->title('Invoice marked as sent')
-                        ->success()
-                        ->send();
+                    try {
+                        $record->update(['status' => 'sent']);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Invoice berhasil ditandai sebagai terkirim')
+                            ->success()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        Log::error('ViewPurchaseInvoice mark_as_sent failed', [
+                            'invoice_id' => $record->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Mengubah Status Invoice',
+                            $exception,
+                            'Status invoice pembelian belum berhasil diperbarui. Silakan coba lagi.'
+                        );
+                    }
                 }),
             Actions\Action::make('print_invoice')
                 ->label('Cetak Invoice')

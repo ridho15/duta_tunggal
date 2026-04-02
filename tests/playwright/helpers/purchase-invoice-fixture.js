@@ -14,6 +14,16 @@ export function ensurePurchaseInvoiceFixture() {
   execSync('php scripts/setup_purchase_invoice_playwright_data.php', { stdio: 'inherit' })
 }
 
+function getFixtureCabangName() {
+  try {
+    const output = execSync('php scripts/debug_purchase_invoice_fixture.php', { encoding: 'utf8' })
+    const match = output.match(/^Cabang:\s+.*name=(.+)$/m)
+    return match ? match[1].trim() : ''
+  } catch {
+    return ''
+  }
+}
+
 async function selectFirstChoicesOption(page, labelText, searchTerm = '') {
   const wrapper = page.locator('.fi-fo-field-wrp').filter({ has: page.locator(`label:has-text("${labelText}")`) }).first()
   await expect(wrapper).toBeVisible()
@@ -47,7 +57,8 @@ export async function chooseFixtureSupplier(page) {
 }
 
 export async function chooseFixtureCabang(page) {
-  await selectFirstChoicesOption(page, 'Cabang', 'Cabang Sawahlunto')
+  const cabangName = getFixtureCabangName() || 'Cabang Pusat Jakarta'
+  await selectFirstChoicesOption(page, 'Cabang', cabangName)
 }
 
 export async function chooseFixtureOrderRequest(page) {

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ChartOfAccount;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
@@ -22,11 +23,34 @@ class CustomerReceiptJournalIntegrationTest extends TestCase
     {
         parent::setUp();
 
-        // Run essential seeders
         $this->seed([
             \Database\Seeders\CabangSeeder::class,
             \Database\Seeders\CurrencySeeder::class,
             \Database\Seeders\UnitOfMeasureSeeder::class,
+        ]);
+
+        ChartOfAccount::firstOrCreate([
+            'code' => '1111.01',
+        ], [
+            'name' => 'Kas Kecil',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+
+        ChartOfAccount::firstOrCreate([
+            'code' => config('coa.accounts_receivable', '1120'),
+        ], [
+            'name' => 'Piutang Usaha',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+
+        ChartOfAccount::firstOrCreate([
+            'code' => config('coa.customer_deposit'),
+        ], [
+            'name' => 'Deposit Pelanggan',
+            'type' => 'Liability',
+            'is_active' => true,
         ]);
     }
 
@@ -51,6 +75,8 @@ class CustomerReceiptJournalIntegrationTest extends TestCase
             'customer_id' => $customer->id,
             'selected_invoices' => [$invoice->id],
             'total_payment' => 1000000,
+            'payment_method' => 'Cash',
+            'coa_id' => ChartOfAccount::where('code', '1111.01')->value('id'),
             'status' => 'Paid'
         ]);
 
@@ -93,6 +119,8 @@ class CustomerReceiptJournalIntegrationTest extends TestCase
             'customer_id' => $customer->id,
             'selected_invoices' => [$invoice->id],
             'total_payment' => 1000000,
+            'payment_method' => 'Cash',
+            'coa_id' => ChartOfAccount::where('code', '1111.01')->value('id'),
             'status' => 'Paid'
         ]);
 
@@ -143,6 +171,8 @@ class CustomerReceiptJournalIntegrationTest extends TestCase
             'customer_id' => $customer->id,
             'selected_invoices' => [$invoice->id],
             'total_payment' => 1000000,
+            'payment_method' => 'Cash',
+            'coa_id' => ChartOfAccount::where('code', '1111.01')->value('id'),
             'status' => 'Paid'
         ]);
 

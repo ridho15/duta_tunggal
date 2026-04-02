@@ -5,32 +5,27 @@ namespace App\Filament\Resources;
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\CustomerReceiptResource\Pages;
 use App\Filament\Resources\CustomerReceiptResource\Pages\ViewCustomerReceipt;
-use App\Http\Controllers\HelperController;
+use App\Helpers\MoneyHelper;
 use App\Models\Cabang;
-use App\Models\AccountReceivable;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerReceipt;
-use App\Models\Deposit;
+use App\Models\CustomerReceiptItem;
 use App\Models\Invoice;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\ViewField;
 use Filament\Forms\Form;
-use Filament\Infolists\Infolist;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\Section as InfoSection;
 use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\Section as InfoSection;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -55,6 +50,92 @@ class CustomerReceiptResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    protected static function getPaymentMethodOptions(): array
+    {
+        return [
+            'Cash' => 'Cash',
+            'Transfer' => 'Transfer',
+            'Giro' => 'Giro',
+            'Cheque' => 'Cheque',
+            'Deposit' => 'Deposit',
+        ];
+    }
+
+    protected static function getCoaQueryByPaymentMethod(?string $paymentMethod): Builder
+    {
+        $normalizedPaymentMethod = strtolower(trim((string) $paymentMethod));
+
+        return match ($normalizedPaymentMethod) {
+            'cash' => ChartOfAccount::query()
+                ->where('is_active', true)
+                ->where(function ($builder) {
+                    $builder->where('code', 'LIKE', '111%')
+                        ->where(function ($nested) {
+                            $nested->where('name', 'LIKE', '%kas%')
+                                ->orWhere('name', 'LIKE', '%tunai%');
+                        });
+                }),
+            'transfer', 'bank transfer', 'cheque', 'giro' => ChartOfAccount::query()
+                ->where('is_active', true)
+                ->where(function ($builder) {
+                    $builder->where('code', 'LIKE', '111%')
+                        ->where(function ($nested) {
+                            $nested->where('name', 'LIKE', '%bank%')
+                                ->orWhere('name', 'LIKE', '%rekening%')
+                                ->orWhere('name', 'LIKE', '%giro%')
+                                ->orWhere('name', 'LIKE', '%cek%')
+                                ->orWhere('name', 'LIKE', '%cheque%');
+                        });
+                }),
+            'deposit' => ChartOfAccount::query()
+                ->where('is_active', true)
+                ->where(function ($builder) {
+                    $builder->where('code', config('coa.customer_deposit'))
+                        ->orWhere(function ($nested) {
+                            $nested->where('type', 'liability')
+                                ->where(function ($liabilityBuilder) {
+                                    $liabilityBuilder->where('name', 'LIKE', '%deposit%')
+                                        ->orWhere('name', 'LIKE', '%titipan%')
+                                        ->orWhere('name', 'LIKE', '%uang muka pelanggan%');
+                                });
+                        });
+                }),
+            default => ChartOfAccount::query()->where('is_active', true),
+        };
+    }
+
+    public static function getDefaultCoaIdByPaymentMethod(?string $paymentMethod): ?int
+    {
+        $query = static::getCoaQueryByPaymentMethod($paymentMethod);
+
+        return $query->orderBy('code')->value('id');
+    }
+
+    public static function getCoaOptionsByPaymentMethod(?string $paymentMethod): array
+    {
+        return static::getCoaQueryByPaymentMethod($paymentMethod)
+            ->orderBy('code')
+            ->get()
+            ->mapWithKeys(fn (ChartOfAccount $coa) => [$coa->id => "({$coa->code}) {$coa->name}"])
+            ->toArray();
+    }
+
+    public static function resolveInvoiceRemainingAmount(Invoice $invoice): float
+    {
+        $accountReceivable = $invoice->accountReceivable;
+
+        if ($accountReceivable?->getKey()) {
+            return max(0, (float) MoneyHelper::parse($accountReceivable->remaining ?? 0));
+        }
+
+        $paidTotal = (float) CustomerReceiptItem::query()
+            ->where('invoice_id', $invoice->id)
+            ->selectRaw('COALESCE(SUM(amount), 0) as paid_total')
+            ->value('paid_total');
+
+        return max(0, (float) MoneyHelper::parse($invoice->total ?? 0) - $paidTotal);
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -71,7 +152,7 @@ class CustomerReceiptResource extends Resource
                                     ->searchable()
                                     ->reactive()
                                     ->validationMessages([
-                                        'required' => 'Customer belum dipilih'
+                                        'required' => 'Customer belum dipilih',
                                     ])
                                     ->getOptionLabelFromRecordUsing(function (Customer $customer) {
                                         return "({$customer->code}) {$customer->name}";
@@ -87,9 +168,9 @@ class CustomerReceiptResource extends Resource
                                         }
 
                                         $set('selected_invoices', []);
-                                        $set('total_payment', 0);
+                                        $set('total_payment', self::formatMoneyState(0));
                                         $set('payment_adjustment', 0);
-                                        
+
                                         // Force refresh ViewField component
                                         $livewire->dispatch('refreshInvoiceTable');
                                     })
@@ -100,26 +181,29 @@ class CustomerReceiptResource extends Resource
                                     ->required()
                                     ->default(now())
                                     ->validationMessages([
-                                        'required' => 'Tanggal pembayaran wajib diisi'
+                                        'required' => 'Tanggal pembayaran wajib diisi',
                                     ]),
                                 Select::make('cabang_id')
                                     ->label('Cabang')
+                                    ->preload()
                                     ->searchable()
                                     ->options(Cabang::all()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     }))
                                     ->visible(function () {
                                         $manageType = Auth::user()?->manage_type ?? [];
+
                                         return in_array('all', is_array($manageType) ? $manageType : [$manageType]);
                                     })
                                     ->default(function () {
                                         $manageType = Auth::user()?->manage_type ?? [];
+
                                         return in_array('all', is_array($manageType) ? $manageType : [$manageType]) ? null : Auth::user()?->cabang_id;
                                     })
                                     ->required()
                                     ->helperText('Pilih cabang untuk customer receipt ini')
                                     ->validationMessages([
-                                        'required' => 'Cabang wajib dipilih'
+                                        'required' => 'Cabang wajib dipilih',
                                     ]),
                             ]),
 
@@ -133,150 +217,184 @@ class CustomerReceiptResource extends Resource
                                     ->extraAttributes(['wire:key' => 'invoice-table'])
                                     ->viewData(function ($get, $record) {
                                         $customerId = $get('customer_id');
-                                        
+
                                         logger()->info('ViewField viewData called', [
                                             'customer_id' => $customerId,
-                                            'record_id' => $record ? $record->id : null
+                                            'record_id' => $record ? $record->id : null,
                                         ]);
-                                        
-                                        if (!$customerId) {
+
+                                        if (! $customerId) {
                                             logger()->info('No customer_id, returning message');
+
                                             return [
-                                                'invoices' => [], 
+                                                'invoices' => [],
                                                 'selectedInvoices' => [],
-                                                'message' => 'Silahkan pilih customer terlebih dahulu'
+                                                'message' => 'Silahkan pilih customer terlebih dahulu',
                                             ];
                                         }
 
                                         // Get existing invoice receipts data
                                         $existingInvoiceReceipts = [];
-                                        if ($record && !empty($record->invoice_receipts)) {
-                                            $existingInvoiceReceipts = is_array($record->invoice_receipts) 
-                                                ? $record->invoice_receipts 
+                                        if ($record && ! empty($record->invoice_receipts)) {
+                                            $existingInvoiceReceipts = is_array($record->invoice_receipts)
+                                                ? $record->invoice_receipts
                                                 : json_decode($record->invoice_receipts, true) ?? [];
                                         }
 
                                         // Get existing selected invoices for edit mode
                                         $existingSelectedInvoices = [];
-                                        if ($record && !empty($record->selected_invoices)) {
-                                            $existingSelectedInvoices = is_array($record->selected_invoices) 
-                                                ? $record->selected_invoices 
+                                        if ($record && ! empty($record->selected_invoices)) {
+                                            $existingSelectedInvoices = is_array($record->selected_invoices)
+                                                ? $record->selected_invoices
                                                 : json_decode($record->selected_invoices, true) ?? [];
                                         }
 
                                         // Get invoices for selected customer
                                         logger()->info('Building invoice query for customer', ['customer_id' => $customerId]);
-                                        
+
                                         // Query invoices that are from SaleOrder for this customer
                                         // Use join instead of whereHas to avoid polymorphic relation issues
                                         $invoicesQuery = Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
                                             ->where('invoices.from_model_type', 'App\Models\SaleOrder')
-                                            ->join('sale_orders', function($join) use ($customerId) {
+                                            ->join('sale_orders', function ($join) use ($customerId) {
                                                 $join->on('invoices.from_model_id', '=', 'sale_orders.id')
-                                                     ->where('sale_orders.customer_id', '=', $customerId)
-                                                     ->whereIn('sale_orders.status', ['confirmed', 'received', 'completed']) // Only invoiceable orders
-                                                     ->whereNull('sale_orders.deleted_at');
-                                            })
-                                            ->whereHas('accountReceivable', function ($query) {
-                                                $query->where('remaining', '>', 0);
+                                                    ->where('sale_orders.customer_id', '=', $customerId)
+                                                    ->whereIn('sale_orders.status', ['confirmed', 'received', 'completed']) // Only invoiceable orders
+                                                    ->whereNull('sale_orders.deleted_at');
                                             })
                                             ->select('invoices.*') // Select only invoice columns to avoid conflicts
                                             ->distinct(); // Ensure no duplicates
-                                        
+
                                         logger()->info('Invoice query built', [
                                             'sql' => $invoicesQuery->toSql(),
-                                            'bindings' => $invoicesQuery->getBindings()
+                                            'bindings' => $invoicesQuery->getBindings(),
                                         ]);
 
                                         $invoices = $invoicesQuery->get()
                                             ->load(['accountReceivable']) // Load relations separately to avoid conflicts
                                             ->map(function ($invoice) use ($existingInvoiceReceipts, $existingSelectedInvoices) {
-                                                $receiptAmount = $existingInvoiceReceipts[$invoice->id] ?? '';
-                                                $accountReceivable = $invoice->accountReceivable;
-                                                
-                                                // Calculate remaining amount
-                                                if ($accountReceivable) {
-                                                    $remaining = $accountReceivable->remaining;
-                                                    // If this invoice was previously selected and has receipt amount,
-                                                    // add back the receipt amount to show original remaining
-                                                    if (in_array($invoice->id, $existingSelectedInvoices) && $receiptAmount) {
-                                                        $remaining = $remaining + $receiptAmount;
-                                                    }
-                                                } else {
-                                                    $remaining = $invoice->total;
+                                                $receiptAmount = (float) ($existingInvoiceReceipts[$invoice->id] ?? 0);
+                                                $remaining = self::resolveInvoiceRemainingAmount($invoice);
+
+                                                if (in_array($invoice->id, $existingSelectedInvoices, true) && $receiptAmount > 0) {
+                                                    $remaining += $receiptAmount;
                                                 }
-                                                
-                                                $balance = $receiptAmount ? ($remaining - $receiptAmount) : '';
-                                                
+
+                                                $balance = $receiptAmount > 0 ? ($remaining - $receiptAmount) : '';
+
                                                 return [
                                                     'id' => $invoice->id,
                                                     'invoice_number' => $invoice->invoice_number,
                                                     'customer_name' => $invoice->customer_name_display,
+                                                    'cabang_id' => $invoice->cabang_id,
                                                     'total' => $invoice->total,
                                                     'remaining' => $remaining,
-                                                    'receipt' => $receiptAmount,
+                                                    'receipt' => $receiptAmount > 0 ? $receiptAmount : '',
                                                     'balance' => $balance,
                                                     'payment_balance' => '',
                                                     'adjustment_description' => '',
                                                 ];
                                             });
-                                        
+
                                         logger()->info('Invoices query result', [
                                             'count' => $invoices->count(),
                                             'invoice_ids' => $invoices->pluck('id')->toArray(),
-                                            'customer_id' => $customerId
+                                            'customer_id' => $customerId,
                                         ]);
 
                                         // Convert Collection to Array for Blade component
                                         $invoicesArray = $invoices->toArray();
 
-                                        $message = $invoices->isEmpty() 
-                                            ? 'Invoice customer belum ada' 
+                                        $message = $invoices->isEmpty()
+                                            ? 'Invoice customer belum ada'
                                             : '';
 
                                         $selectedInvoices = $get('selected_invoices') ?? [];
-                                        
+
                                         // Ensure selectedInvoices is always an array
                                         if (is_string($selectedInvoices)) {
                                             $selectedInvoices = json_decode($selectedInvoices, true) ?? [];
                                         }
-                                        if (!is_array($selectedInvoices)) {
+                                        if (! is_array($selectedInvoices)) {
                                             $selectedInvoices = [];
                                         }
 
                                         return [
                                             'invoices' => $invoicesArray,
                                             'selectedInvoices' => $selectedInvoices,
-                                            'message' => $message
+                                            'message' => $message,
                                         ];
                                     })
-                                    ->visible(fn ($get) => !empty($get('customer_id'))),
+                                    ->visible(fn($get) => ! empty($get('customer_id'))),
 
                                 Hidden::make('selected_invoices')
                                     ->default('[]')
                                     ->dehydrated(true)
                                     ->reactive()
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function ($set, $state) {
+                                        $selectedInvoices = $state;
+
+                                        if (is_string($selectedInvoices)) {
+                                            $selectedInvoices = json_decode($selectedInvoices, true) ?? [];
+                                        }
+
+                                        if (! is_array($selectedInvoices) || empty($selectedInvoices)) {
+                                            return;
+                                        }
+
+                                            $lastSelectedInvoiceId = (int) end($selectedInvoices);
+                                        $invoiceCabangId = Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
+                                                ->whereKey($lastSelectedInvoiceId)
+                                            ->value('cabang_id');
+
+                                        if ($invoiceCabangId) {
+                                            $set('cabang_id', $invoiceCabangId);
+                                        }
+                                    })
                                     ->extraAttributes([
                                         'wire:model' => 'data.selected_invoices',
                                         'data-field' => 'selected_invoices',
-                                        'style' => 'font-family: monospace; font-size: 12px;'
+                                        'style' => 'font-family: monospace; font-size: 12px;',
                                     ])
                                     ->helperText('Invoice IDs yang dipilih (diupdate otomatis oleh JavaScript)'),
-                                    
+
                                 Hidden::make('invoice_receipts')
                                     ->default('{}')
                                     ->dehydrated(true)
                                     ->reactive()
+                                    ->live(onBlur: true)
                                     ->extraAttributes([
                                         'wire:model' => 'data.invoice_receipts',
                                         'data-field' => 'invoice_receipts',
-                                        'style' => 'font-family: monospace; font-size: 12px;'
+                                        'style' => 'font-family: monospace; font-size: 12px;',
                                     ])
                                     ->helperText('Data pembayaran per invoice (diupdate otomatis oleh JavaScript)'),
-                                    
+
                                 ViewField::make('javascript_init_main')
                                     ->view('components.customer-receipt-javascript-init')
                                     ->dehydrated(false),
+                            ]),
+
+                        // Notes and Payment Method Section
+                        Section::make()
+                            ->columns(2)
+                            ->schema([
+                                Select::make('payment_method')
+                                    ->label('Payment Method')
+                                    ->options(static::getPaymentMethodOptions())
+                                    ->default('Cash')
+                                    ->required()
+                                    ->native(false)
+                                    ->live()
+                                    ->afterStateUpdated(function ($set, $state) {
+                                        $set('coa_id', static::getDefaultCoaIdByPaymentMethod($state));
+                                    }),
+
+                                Textarea::make('notes')
+                                    ->label('Catatan')
+                                    ->rows(3)
+                                    ->columnSpan(1),
                             ]),
 
                         // Payment Details Section
@@ -298,57 +416,39 @@ class CustomerReceiptResource extends Resource
                                     ->extraAttributes([
                                         'class' => 'auto-calculated-field',
                                         'data-field' => 'total_payment',
-                                        'style' => 'background-color: #f9fafb;' // Light gray background to indicate it's auto-calculated
+                                        'style' => 'background-color: #f9fafb;', // Light gray background to indicate it's auto-calculated
                                     ])
-                                    ->helperText('Total ini dihitung otomatis berdasarkan invoice yang dipilih')
+                                    ->helperText('Total ini mengikuti jumlah receipt yang diisi manual untuk invoice yang dipilih')
                                     ->validationMessages([
                                         'required' => 'Total pembayaran wajib diisi',
-                                        'numeric' => 'Total pembayaran harus berupa angka'
+                                        'numeric' => 'Total pembayaran harus berupa angka',
                                     ]),
 
                                 Select::make('coa_id')
                                     ->label('COA')
+                                    ->native(false)
                                     ->preload()
                                     ->searchable(['code', 'name'])
                                     ->reactive()
-                                    ->options(function () {
-                                        return ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                            return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                        });
+                                    ->default(function ($get) {
+                                        return static::getDefaultCoaIdByPaymentMethod($get('payment_method') ?: 'Cash');
+                                    })
+                                    ->afterStateHydrated(function ($set, $get, $state) {
+                                        if (blank($state)) {
+                                            $set('coa_id', static::getDefaultCoaIdByPaymentMethod($get('payment_method') ?: 'Cash'));
+                                        }
+                                    })
+                                    ->options(function ($get) {
+                                        return static::getCoaOptionsByPaymentMethod($get('payment_method'));
                                     })
                                     ->extraAttributes([
-                                        'id' => 'main-coa-field'
+                                        'id' => 'main-coa-field',
                                     ])
                                     ->validationMessages([
-                                        'required' => 'COA belum dipilih'
+                                        'required' => 'COA belum dipilih',
                                     ])
-                                    ->required(fn ($get) => $get('payment_method') !== 'Deposit')
-                                    ->hidden(fn ($get) => $get('payment_method') === 'Deposit'),
-                            ]),
-
-                        // Notes and Payment Method Section
-                        Section::make()
-                            ->columns(2)
-                            ->schema([
-                                Textarea::make('notes')
-                                    ->label('Catatan')
-                                    ->rows(3)
-                                    ->columnSpan(1),
-
-                                Radio::make('payment_method')
-                                    ->label('Payment Method')
-                                    ->inline()
-                                    ->required()
-                                    ->options([
-                                        'Cash' => 'Cash',
-                                        'Bank Transfer' => 'Bank Transfer',
-                                        'Credit' => 'Credit',
-                                        'Deposit' => 'Deposit'
-                                    ])
-                                    ->columnSpan(1)
-                                    ->validationMessages([
-                                        'required' => 'Metode pembayaran wajib dipilih'
-                                    ]),
+                                    ->helperText('Daftar COA menyesuaikan metode pembayaran, namun tetap bisa dipilih manual.')
+                                    ->required(),
                             ]),
 
                         // Hidden fields for backward compatibility
@@ -371,7 +471,7 @@ class CustomerReceiptResource extends Resource
                                 Placeholder::make('payment_items_info')
                                     ->label('')
                                     ->content('Detail pembayaran per invoice akan ditampilkan setelah Customer Receipt disimpan. Anda hanya perlu memilih invoice di tabel di atas dan sistem akan membuat detail pembayaran secara otomatis.')
-                                    ->columnSpanFull()
+                                    ->columnSpanFull(),
                             ])
                             ->collapsible()
                             ->collapsed(false),
@@ -400,6 +500,10 @@ class CustomerReceiptResource extends Resource
                     ->date()
                     ->sortable(),
 
+                TextColumn::make('payment_method')
+                    ->label('Payment Method')
+                    ->badge(),
+
                 TextColumn::make('total_payment')
                     ->label('Total Payment')
                     ->rupiah()
@@ -413,29 +517,17 @@ class CustomerReceiptResource extends Resource
                     ->badge()
                     ->color('info'),
 
-                TextColumn::make('payment_method')
-                    ->label('Method')
-                    ->formatStateUsing(function ($state) {
-                        return $state ?? 'Cash';
-                    })
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'Cash' => 'success',
-                        'Bank Transfer' => 'info',
-                        'Credit' => 'warning',
-                        'Deposit' => 'primary',
-                        default => 'gray',
-                    }),
-
                 TextColumn::make('remaining_balance')
                     ->label('AR Status')
                     ->getStateUsing(function ($record) {
                         $items = $record->customerReceiptItem;
-                        if ($items->isEmpty()) return 'No Items';
-                        
+                        if ($items->isEmpty()) {
+                            return 'No Items';
+                        }
+
                         $totalRemaining = 0;
                         $allPaid = true;
-                        
+
                         foreach ($items as $item) {
                             $ar = \App\Models\AccountReceivable::where('invoice_id', $item->invoice_id)->first();
                             if ($ar) {
@@ -445,7 +537,7 @@ class CustomerReceiptResource extends Resource
                                 }
                             }
                         }
-                        
+
                         if ($allPaid) {
                             return 'Fully Paid';
                         } else {
@@ -459,6 +551,7 @@ class CustomerReceiptResource extends Resource
                         } elseif (str_contains($state, 'remaining')) {
                             return 'warning';
                         }
+
                         return 'gray';
                     }),
 
@@ -473,6 +566,7 @@ class CustomerReceiptResource extends Resource
                     ->label('COA')
                     ->formatStateUsing(function ($state, $record) {
                         $coa = $record->coa;
+
                         return $coa ? "({$coa->code}) {$coa->name}" : '-';
                     })
                     ->toggleable()
@@ -483,7 +577,7 @@ class CustomerReceiptResource extends Resource
                     ->badge()
                     ->colors([
                         'secondary' => 'Draft',
-                        'warning' => 'Partial', 
+                        'warning' => 'Partial',
                         'success' => 'Paid',
                     ]),
 
@@ -504,13 +598,8 @@ class CustomerReceiptResource extends Resource
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('payment_method')
-                    ->label('Metode Pembayaran')
-                    ->options([
-                        'Cash' => 'Cash',
-                        'Bank Transfer' => 'Bank Transfer',
-                        'Credit' => 'Credit',
-                        'Deposit' => 'Deposit',
-                    ]),
+                    ->label('Payment Method')
+                    ->options(static::getPaymentMethodOptions()),
                 SelectFilter::make('status')
                     ->label('Status')
                     ->options([
@@ -526,7 +615,7 @@ class CustomerReceiptResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
-                ])
+                ]),
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
@@ -538,21 +627,20 @@ class CustomerReceiptResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Customer Receipt (Penerimaan Pembayaran Pelanggan)</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Customer Receipt adalah record penerimaan pembayaran dari pelanggan untuk melunasi invoice penjualan yang telah diterbitkan.</li>' .
-                            '<li><strong>Metode Pembayaran:</strong> <em>Cash</em> (tunai), <em>Bank Transfer</em> (transfer bank), <em>Check</em> (cek), <em>Giro</em> (bilyet giro), atau <em>Other</em> (metode lainnya).</li>' .
-                            '<li><strong>Komponen Utama:</strong> <em>Customer</em> (pelanggan pembayar), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), <em>Payment Method</em> (metode pembayaran).</li>' .
-                            '<li><strong>Multiple Invoices:</strong> Satu customer receipt dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
-                            '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
-                            '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Customer Match</em> - invoice harus milik customer yang sama.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Invoice</em> (pelunasan), <em>Account Receivable</em> (pengurangan piutang), <em>Journal Entry</em> (otomatis buat jurnal), <em>Cash/Bank Account</em> (penambahan saldo), dan <em>Deposit</em> (untuk overpayment).</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail receipt), <em>Edit</em> (ubah receipt), <em>Delete</em> (hapus receipt), <em>Print Receipt</em> (cetak bukti pembayaran), <em>Generate Journal</em> (buat jurnal entry).</li>' .
-                            '<li><strong>Permissions:</strong> <em>view any customer receipt</em>, <em>create customer receipt</em>, <em>update customer receipt</em>, <em>delete customer receipt</em>, <em>restore customer receipt</em>, <em>force-delete customer receipt</em>.</li>' .
-                            '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Cash/Bank Account dan credit Account Receivable. Overpayment akan dicatat sebagai customer deposit.</li>' .
-                            '<li><strong>Reporting:</strong> Menyediakan data untuk accounts receivable aging, cash receipt journal, dan customer payment history tracking.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Customer Receipt adalah record penerimaan pembayaran dari pelanggan untuk melunasi invoice penjualan yang telah diterbitkan.</li>' .
+                    '<li><strong>Komponen Utama:</strong> <em>Customer</em> (pelanggan pembayar), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), dan <em>COA</em> penerimaan pembayaran.</li>' .
+                    '<li><strong>Multiple Invoices:</strong> Satu customer receipt dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
+                    '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
+                    '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Customer Match</em> - invoice harus milik customer yang sama.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan <em>Invoice</em> (pelunasan), <em>Account Receivable</em> (pengurangan piutang), <em>Journal Entry</em> (otomatis buat jurnal), dan <em>Cash/Bank Account</em> (penambahan saldo).</li>' .
+                    '<li><strong>Actions:</strong> <em>View</em> (lihat detail receipt), <em>Edit</em> (ubah receipt), <em>Delete</em> (hapus receipt).</li>' .
+                    '<li><strong>Permissions:</strong> <em>view any customer receipt</em>, <em>create customer receipt</em>, <em>update customer receipt</em>, <em>delete customer receipt</em>, <em>restore customer receipt</em>, <em>force-delete customer receipt</em>.</li>' .
+                    '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Cash/Bank Account dan credit Account Receivable. Overpayment akan dicatat sebagai customer deposit.</li>' .
+                    '<li><strong>Reporting:</strong> Menyediakan data untuk accounts receivable aging, cash receipt journal, dan customer payment history tracking.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 
@@ -565,6 +653,11 @@ class CustomerReceiptResource extends Resource
                 'coa',
                 'customerReceiptItem.invoice',
             ]);
+    }
+
+    private static function formatMoneyState($value): string
+    {
+        return number_format((float) MoneyHelper::parse($value ?? 0), 0, ',', '.');
     }
 
     public static function infolist(Infolist $infolist): Infolist
@@ -581,19 +674,6 @@ class CustomerReceiptResource extends Resource
                         TextEntry::make('total_payment')
                             ->label('Total Pembayaran')
                             ->rupiah(),
-                        TextEntry::make('payment_method')
-                            ->label('Metode Pembayaran')
-                            ->formatStateUsing(function ($state) {
-                                return $state ?? 'Cash';
-                            })
-                            ->badge()
-                            ->color(fn (string $state): string => match ($state) {
-                                'Cash' => 'success',
-                                'Bank Transfer' => 'info',
-                                'Credit' => 'warning', 
-                                'Deposit' => 'primary',
-                                default => 'gray',
-                            }),
                         TextEntry::make('ntpn')
                             ->label('NTPN')
                             ->placeholder('Not set')
@@ -603,13 +683,14 @@ class CustomerReceiptResource extends Resource
                             ->label('Chart of Account')
                             ->formatStateUsing(function ($state, $record) {
                                 $coa = $record->coa;
+
                                 return $coa ? "({$coa->code}) {$coa->name}" : 'Not set';
                             }),
                         TextEntry::make('status')
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
+                            ->color(fn(string $state): string => match ($state) {
                                 'Draft' => 'gray',
-                                'Partial' => 'warning', 
+                                'Partial' => 'warning',
                                 'Paid' => 'success',
                                 default => 'gray',
                             }),
@@ -633,9 +714,9 @@ class CustomerReceiptResource extends Resource
                                 TextEntry::make('method')
                                     ->label('Metode')
                                     ->badge()
-                                    ->color(fn (string $state): string => match ($state) {
+                                    ->color(fn(string $state): string => match ($state) {
                                         'Cash' => 'success',
-                                        'Bank Transfer' => 'info', 
+                                        'Bank Transfer' => 'info',
                                         'Credit' => 'warning',
                                         'Deposit' => 'primary',
                                         default => 'gray',
@@ -647,7 +728,7 @@ class CustomerReceiptResource extends Resource
                             ->columns(4)
                             ->columnSpanFull(),
                     ])
-                    ->visible(fn ($record) => $record->customerReceiptItem->count() > 0),
+                    ->visible(fn($record) => $record->customerReceiptItem->count() > 0),
 
                 InfoSection::make('Status Account Receivable')
                     ->schema([
@@ -655,15 +736,17 @@ class CustomerReceiptResource extends Resource
                             ->label('Ringkasan Pembayaran')
                             ->formatStateUsing(function ($state, $record) {
                                 $items = $record->customerReceiptItem;
-                                if ($items->isEmpty()) return 'Tidak ada pembayaran tercatat';
-                                
+                                if ($items->isEmpty()) {
+                                    return 'Tidak ada pembayaran tercatat';
+                                }
+
                                 $summaryData = [];
-                                
+
                                 foreach ($items as $item) {
                                     if ($item->invoice) {
                                         // Get Account Receivable for this invoice
                                         $ar = \App\Models\AccountReceivable::where('invoice_id', $item->invoice_id)->first();
-                                        
+
                                         if ($ar) {
                                             $percentage = $ar->total > 0 ? ($ar->paid / $ar->total) * 100 : 0;
                                             $summaryData[] = [
@@ -673,7 +756,7 @@ class CustomerReceiptResource extends Resource
                                                 'remaining' => $ar->remaining,
                                                 'percentage' => $percentage,
                                                 'status' => $ar->status,
-                                                'this_payment' => $item->amount
+                                                'this_payment' => $item->amount,
                                             ];
                                         } else {
                                             // If no AR record, show basic info
@@ -684,27 +767,27 @@ class CustomerReceiptResource extends Resource
                                                 'remaining' => $item->invoice->total - $item->amount,
                                                 'percentage' => ($item->amount / $item->invoice->total) * 100,
                                                 'status' => 'Partial',
-                                                'this_payment' => $item->amount
+                                                'this_payment' => $item->amount,
                                             ];
                                         }
                                     }
                                 }
-                                
+
                                 if (empty($summaryData)) {
                                     return 'Data pembayaran tidak ditemukan';
                                 }
-                                
+
                                 $html = '';
                                 foreach ($summaryData as $data) {
                                     $statusColor = $data['status'] === PaymentStatus::PAID->value ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
                                     $progressWidth = min(100, $data['percentage']);
-                                    
+
                                     $html .= '<div class="border border-gray-200 rounded-lg p-4 mb-3 bg-white">';
                                     $html .= '<div class="flex justify-between items-start mb-3">';
                                     $html .= '<h4 class="font-semibold text-gray-900">' . $data['invoice_number'] . '</h4>';
                                     $html .= '<span class="px-2 py-1 text-xs font-semibold rounded-full ' . $statusColor . '">' . $data['status'] . '</span>';
                                     $html .= '</div>';
-                                    
+
                                     $html .= '<div class="grid grid-cols-2 gap-4 text-sm mb-3">';
                                     $html .= '<div>';
                                     $html .= '<span class="text-gray-600">Total Invoice:</span><br>';
@@ -723,7 +806,7 @@ class CustomerReceiptResource extends Resource
                                     $html .= '<span class="font-semibold text-lg text-red-600">Rp ' . number_format($data['remaining'], 0, ',', '.') . '</span>';
                                     $html .= '</div>';
                                     $html .= '</div>';
-                                    
+
                                     // Progress Bar
                                     $html .= '<div class="mb-2">';
                                     $html .= '<div class="flex justify-between text-xs text-gray-600 mb-1">';
@@ -734,17 +817,17 @@ class CustomerReceiptResource extends Resource
                                     $html .= '<div class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: ' . $progressWidth . '%"></div>';
                                     $html .= '</div>';
                                     $html .= '</div>';
-                                    
+
                                     $html .= '</div>';
                                 }
-                                
+
                                 return $html;
                             })
                             ->html()
                             ->columnSpanFull(),
                     ])
                     ->columns(1)
-                    ->visible(fn ($record) => $record->customerReceiptItem->count() > 0),
+                    ->visible(fn($record) => $record->customerReceiptItem->count() > 0),
 
                 InfoSection::make('History Pembayaran Invoice')
                     ->schema([
@@ -752,10 +835,12 @@ class CustomerReceiptResource extends Resource
                             ->label('Riwayat Semua Pembayaran')
                             ->formatStateUsing(function ($state, $record) {
                                 $items = $record->customerReceiptItem;
-                                if ($items->isEmpty()) return 'Tidak ada pembayaran';
-                                
+                                if ($items->isEmpty()) {
+                                    return 'Tidak ada pembayaran';
+                                }
+
                                 $html = '';
-                                
+
                                 foreach ($items as $item) {
                                     if ($item->invoice) {
                                         // Get all payments for this invoice
@@ -763,19 +848,19 @@ class CustomerReceiptResource extends Resource
                                             ->where('invoice_id', $item->invoice_id)
                                             ->orderBy('payment_date', 'desc')
                                             ->get();
-                                        
+
                                         $html .= '<div class="border border-gray-200 rounded-lg p-4 mb-4 bg-white">';
                                         $html .= '<h4 class="font-semibold text-gray-900 mb-3">Invoice: ' . $item->invoice->invoice_number . '</h4>';
-                                        
+
                                         if ($allPayments->count() > 0) {
                                             $html .= '<div class="space-y-2">';
-                                            
+
                                             foreach ($allPayments as $payment) {
                                                 $isCurrentPayment = $payment->customer_receipt_id == $record->id;
                                                 $bgColor = $isCurrentPayment ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200';
                                                 $textColor = $isCurrentPayment ? 'text-blue-900' : 'text-gray-900';
                                                 $badge = $isCurrentPayment ? '<span class="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded-full">Pembayaran Ini</span>' : '';
-                                                
+
                                                 $html .= '<div class="flex justify-between items-center p-3 border rounded ' . $bgColor . '">';
                                                 $html .= '<div class="' . $textColor . '">';
                                                 $html .= '<div class="font-medium">Receipt #' . ($payment->customer_receipt_id ?: 'N/A') . $badge . '</div>';
@@ -787,7 +872,7 @@ class CustomerReceiptResource extends Resource
                                                 $html .= '</div>';
                                                 $html .= '</div>';
                                             }
-                                            
+
                                             // Total payments
                                             $totalPayments = $allPayments->sum('amount');
                                             $html .= '<div class="border-t border-gray-200 pt-3 mt-3">';
@@ -796,23 +881,23 @@ class CustomerReceiptResource extends Resource
                                             $html .= '<span class="text-lg">Rp ' . number_format($totalPayments, 0, ',', '.') . '</span>';
                                             $html .= '</div>';
                                             $html .= '</div>';
-                                            
+
                                             $html .= '</div>';
                                         } else {
                                             $html .= '<p class="text-gray-500 italic">Belum ada pembayaran tercatat</p>';
                                         }
-                                        
+
                                         $html .= '</div>';
                                     }
                                 }
-                                
+
                                 return $html;
                             })
                             ->html()
                             ->columnSpanFull(),
                     ])
                     ->columns(1)
-                    ->visible(fn ($record) => $record->customerReceiptItem->count() > 0),
+                    ->visible(fn($record) => $record->customerReceiptItem->count() > 0),
 
                 InfoSection::make('Journal Entries')
                     ->schema([
@@ -820,12 +905,12 @@ class CustomerReceiptResource extends Resource
                             ->label('Jurnal Akuntansi')
                             ->formatStateUsing(function ($state, $record) {
                                 $entries = \App\Models\JournalEntry::where(function ($q) use ($record) {
-                                        $q->where('source_type', \App\Models\CustomerReceipt::class)
-                                          ->where('source_id', $record->id);
-                                    })
+                                    $q->where('source_type', \App\Models\CustomerReceipt::class)
+                                        ->where('source_id', $record->id);
+                                })
                                     ->orWhere(function ($q) use ($record) {
                                         $q->where('source_type', \App\Models\CustomerReceiptItem::class)
-                                          ->whereIn('source_id', $record->customerReceiptItem->pluck('id'));
+                                            ->whereIn('source_id', $record->customerReceiptItem->pluck('id'));
                                     })
                                     ->orderBy('date')
                                     ->get();
@@ -834,7 +919,7 @@ class CustomerReceiptResource extends Resource
                                     return '<p class="text-gray-400 italic text-sm">Belum ada journal entry tercatat untuk receipt ini. <a href="/admin/journal-entries" class="text-primary-600 underline">Lihat semua jurnal →</a></p>';
                                 }
 
-                                $html  = '<div class="overflow-x-auto">';
+                                $html = '<div class="overflow-x-auto">';
                                 $html .= '<table class="w-full text-sm border-collapse">';
                                 $html .= '<thead><tr class="bg-gray-100 text-gray-700">';
                                 $html .= '<th class="text-left p-2 border border-gray-200">Tanggal</th>';
@@ -844,14 +929,14 @@ class CustomerReceiptResource extends Resource
                                 $html .= '<th class="text-right p-2 border border-gray-200">Kredit (Rp)</th>';
                                 $html .= '</tr></thead><tbody>';
 
-                                $totalDebit  = 0;
+                                $totalDebit = 0;
                                 $totalCredit = 0;
                                 foreach ($entries as $entry) {
                                     $accountCode = $entry->coa?->code ?? '-';
                                     $accountName = $entry->coa?->name ?? '-';
-                                    $debit  = (float) ($entry->debit ?? 0);
+                                    $debit = (float) ($entry->debit ?? 0);
                                     $credit = (float) ($entry->credit ?? 0);
-                                    $totalDebit  += $debit;
+                                    $totalDebit += $debit;
                                     $totalCredit += $credit;
 
                                     $html .= '<tr class="hover:bg-gray-50">';
@@ -870,6 +955,7 @@ class CustomerReceiptResource extends Resource
                                 $html .= '</tr>';
 
                                 $html .= '</tbody></table></div>';
+
                                 return $html;
                             })
                             ->html()

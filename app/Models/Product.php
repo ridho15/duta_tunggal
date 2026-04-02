@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Product extends Model
 {
@@ -38,6 +40,8 @@ class Product extends Model
         'purchase_return_coa_id',
         'unbilled_purchase_coa_id',
         'temporary_procurement_coa_id',
+        'manufacturing_labor_coa_id',
+        'manufacturing_overhead_coa_id',
         'is_active',
     ];
 
@@ -59,6 +63,18 @@ class Product extends Model
     public function scopeInactive($query)
     {
         return $query->where('is_active', false);
+    }
+
+    public function scopeForCabang(Builder $query, ?int $cabangId): Builder
+    {
+        if (! $cabangId) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $branchQuery) use ($cabangId) {
+            $branchQuery->where('cabang_id', $cabangId)
+                ->orWhereNull('cabang_id');
+        });
     }
 
     public function suppliers()
@@ -136,6 +152,16 @@ class Product extends Model
         return $this->belongsTo(ChartOfAccount::class, 'temporary_procurement_coa_id')->withDefault();
     }
 
+    public function manufacturingLaborCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'manufacturing_labor_coa_id')->withDefault();
+    }
+
+    public function manufacturingOverheadCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'manufacturing_overhead_coa_id')->withDefault();
+    }
+
     public function stockMovement()
     {
         return $this->hasMany(StockMovement::class, 'product_id');
@@ -173,7 +199,20 @@ class Product extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope(new \App\Models\Scopes\CabangScope);
+        static::addGlobalScope('product_cabang', function (Builder $builder) {
+            $user = Auth::user();
+
+            if (! $user || ! $user->cabang_id) {
+                return;
+            }
+
+            $manageType = $user->manage_type ?? [];
+            if (is_array($manageType) && in_array('all', $manageType)) {
+                return;
+            }
+
+            $builder->forCabang((int) $user->cabang_id);
+        });
 
         static::deleting(function ($product) {
             if ($product->isForceDeleting()) {

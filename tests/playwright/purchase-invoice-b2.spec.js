@@ -49,8 +49,8 @@ test('B2-b: PPN nominal follows DPP × rate after selecting fixture receipt', as
   let poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   await expect(poCheckbox).toBeVisible()
   if (!(await poCheckbox.isEnabled())) {
-    poCheckbox = page.locator('input[type="checkbox"][wire\\:model\\.live*="selected_purchase_orders"]:not([disabled])').first()
-    await expect(poCheckbox).toBeVisible({ timeout: 5000 })
+    await clickCheckboxByLabel(page, FIXTURE.poNumber)
+    poCheckbox = await checkCheckboxByLabel(page, FIXTURE.poNumber)
   }
   await expect(poCheckbox).toBeEnabled({ timeout: 5000 })
   await poCheckbox.click({ force: true })
@@ -99,4 +99,24 @@ test('B2-b: PPN nominal follows DPP × rate after selecting fixture receipt', as
   await expect(dppInput).toHaveValue(/^\d{1,3}(\.\d{3})*(,\d+)?$/)
   await expect(ppnAmountInput).toHaveValue(/^\d{1,3}(\.\d{3})*(,\d+)?$/)
   await expect(totalInput).toHaveValue(/^\d{1,3}(\.\d{3})*(,\d+)?$/)
+})
+
+test('B2-c: purchase receipt fees section is shown before manual other fees', async ({ page }) => {
+  await openCreatePage(page)
+
+  const body = await page.textContent('body')
+  expect(body).not.toMatch(ERR)
+
+  const receiptFeeLabel = page.getByText('Biaya Lain dari Purchase Receipt').first()
+  const manualFeeLabel = page.getByText('Biaya Lain - lain').first()
+
+  await expect(receiptFeeLabel).toBeVisible()
+  await expect(manualFeeLabel).toBeVisible()
+
+  const receiptBox = await receiptFeeLabel.boundingBox()
+  const manualBox = await manualFeeLabel.boundingBox()
+
+  expect(receiptBox).not.toBeNull()
+  expect(manualBox).not.toBeNull()
+  expect(receiptBox.y).toBeLessThan(manualBox.y)
 })

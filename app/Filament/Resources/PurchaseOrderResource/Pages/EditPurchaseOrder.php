@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Http\Controllers\HelperController;
 use App\Services\PurchaseOrderService;
+use App\Support\ProcurementFailureNotifier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Actions;
@@ -12,8 +13,11 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class EditPurchaseOrder extends EditRecord
 {
@@ -56,7 +60,7 @@ class EditPurchaseOrder extends EditRecord
                         ]);
                         Notification::make()
                             ->title('Gagal Mengkonfirmasi PO')
-                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Purchase order belum dapat dikonfirmasi. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }
@@ -89,7 +93,7 @@ class EditPurchaseOrder extends EditRecord
                         ]);
                         Notification::make()
                             ->title('Gagal Menolak PO')
-                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Purchase order belum dapat dikembalikan ke draft. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }
@@ -122,7 +126,7 @@ class EditPurchaseOrder extends EditRecord
                         ]);
                         Notification::make()
                             ->title('Gagal Request Close')
-                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Permintaan penutupan purchase order belum berhasil diajukan. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }
@@ -148,8 +152,46 @@ class EditPurchaseOrder extends EditRecord
 
     protected function afterSave()
     {
-        $purchaseOrderService = app(PurchaseOrderService::class);
-        $purchaseOrderService->updateTotalAmount($this->getRecord());
+        try {
+            $purchaseOrderService = app(PurchaseOrderService::class);
+            $purchaseOrderService->updateTotalAmount($this->getRecord());
+        } catch (Throwable $exception) {
+            Log::error('EditPurchaseOrder afterSave failed', [
+                'purchase_order_id' => $this->getRecord()?->id,
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::warning(
+                'Purchase Order Tersimpan Dengan Catatan',
+                $exception,
+                'Perubahan purchase order berhasil disimpan, tetapi total belum berhasil disinkronkan. Periksa kembali data totalnya.'
+            );
+        }
+    }
+
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        try {
+            return parent::handleRecordUpdate($record, $data);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('EditPurchaseOrder handleRecordUpdate failed', [
+                'purchase_order_id' => $record->id,
+                'po_number' => $record->po_number,
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::danger(
+                'Gagal Memperbarui Purchase Order',
+                $exception,
+                'Perubahan purchase order belum berhasil disimpan. Periksa kembali data pembelian lalu coba lagi.'
+            );
+
+            throw $exception;
+        }
     }
 
     protected function getRedirectUrl(): ?string

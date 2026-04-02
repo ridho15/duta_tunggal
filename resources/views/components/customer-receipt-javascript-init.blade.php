@@ -1,6 +1,10 @@
 <script>
 // Main function to update selected invoices and total payment
-function updateSelectedInvoices() {
+function updateSelectedInvoices(preferredCheckbox = null) {
+    if (!preferredCheckbox && window.__customerReceiptPreferredInvoiceCheckbox) {
+        preferredCheckbox = window.__customerReceiptPreferredInvoiceCheckbox;
+    }
+
     const selectedIds = [];
     const invoiceReceipts = {};
     let totalPaymentAmount = 0;
@@ -20,13 +24,77 @@ function updateSelectedInvoices() {
         invoiceReceipts[invoiceId] = receiptAmount;
         totalPaymentAmount += receiptAmount;
     });
-    
-    // Update readonly fields
-    updateField('selected_invoices', JSON.stringify(selectedIds));
-    updateField('invoice_receipts', JSON.stringify(invoiceReceipts));
+
+    syncInvoiceSelectionFields(selectedIds, invoiceReceipts);
+
+    setTimeout(() => {
+        syncCabangFromSelectedInvoices(checkboxes, preferredCheckbox);
+    }, 250);
     
     // Update total payment field with focus preservation
     updateTotalPaymentField(totalPaymentAmount, true);
+}
+
+function syncInvoiceSelectionFields(selectedIds, invoiceReceipts) {
+    const selectedInvoicesValue = JSON.stringify(selectedIds);
+    const invoiceReceiptsValue = JSON.stringify(invoiceReceipts);
+
+    const fieldConfigs = [
+        {
+            value: selectedInvoicesValue,
+            selectors: [
+                '#data\\.selected_invoices',
+                'input[wire\\:model="data.selected_invoices"]',
+                'input[wire\\:model\.live="data.selected_invoices"]',
+                'input[name="selected_invoices"]',
+            ],
+        },
+        {
+            value: invoiceReceiptsValue,
+            selectors: [
+                '#data\\.invoice_receipts',
+                'input[wire\\:model="data.invoice_receipts"]',
+                'input[wire\\:model\.live="data.invoice_receipts"]',
+                'input[name="invoice_receipts"]',
+            ],
+        },
+    ];
+
+    fieldConfigs.forEach(({ value, selectors }) => {
+        for (const selector of selectors) {
+            const field = document.querySelector(selector);
+
+            if (!field) {
+                continue;
+            }
+
+            field.value = value;
+            ['input', 'change', 'blur'].forEach((eventType) => {
+                field.dispatchEvent(new Event(eventType, { bubbles: true }));
+            });
+
+            break;
+        }
+    });
+
+    const selectedInvoicesField = document.querySelector('#data\\.selected_invoices');
+    let componentRoot = selectedInvoicesField;
+
+    while (componentRoot) {
+        if (componentRoot.hasAttribute && componentRoot.hasAttribute('wire:id')) {
+            break;
+        }
+
+        componentRoot = componentRoot.parentElement;
+    }
+
+    const rootComponentId = componentRoot ? componentRoot.getAttribute('wire:id') : null;
+    const rootComponent = rootComponentId && window.Livewire?.find ? window.Livewire.find(rootComponentId) : null;
+
+    if (rootComponent && typeof rootComponent.set === 'function') {
+        rootComponent.set('data.selected_invoices', selectedIds);
+        rootComponent.set('data.invoice_receipts', invoiceReceipts);
+    }
 }
 
 // Debounced version for input events
@@ -49,10 +117,184 @@ function formatAsInteger(value) {
 // Helper function to parse receipt input value
 function parseReceiptValue(inputValue) {
     if (!inputValue) return 0;
-    // Remove any non-numeric characters except decimal point
-    const cleanValue = inputValue.toString().replace(/[^\d.-]/g, '');
-    const numValue = parseFloat(cleanValue) || 0;
-    return Math.round(numValue); // Return as integer
+    // Dots are thousand separators in Indonesian format (e.g. "1.000.000")
+    // Strip them first so parseFloat does not stop at the second dot
+    const cleanValue = inputValue.toString().replace(/\./g, '').replace(/[^\d]/g, '');
+    return parseInt(cleanValue, 10) || 0;
+}
+
+function formatRupiahAmount(value) {
+    const numericValue = parseFloat(value) || 0;
+    return Math.round(numericValue).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function syncCabangFromSelectedInvoices(checkboxes = document.querySelectorAll('.invoice-checkbox:checked'), preferredCheckbox = null) {
+    const selectedCheckboxes = Array.from(checkboxes);
+
+    if (selectedCheckboxes.length === 0) {
+        return;
+    }
+
+    const preferredCabangId = preferredCheckbox && preferredCheckbox.checked
+        ? preferredCheckbox.dataset.cabangId
+        : null;
+
+    const cabangId = preferredCabangId || selectedCheckboxes
+        .map((checkbox) => checkbox.dataset.cabangId)
+        .find((value) => value !== undefined && value !== null && value !== '');
+
+    if (!cabangId) {
+        return;
+    }
+
+    const normalizedCabangId = cabangId.toString();
+
+    updateCabangFieldValue(normalizedCabangId);
+    setLivewireFieldValue('cabang_id', normalizedCabangId);
+}
+
+function updateCabangFieldValue(value) {
+    const selectors = [
+        '#data\\.cabang_id',
+        '[id="data.cabang_id"]',
+        'select[name="data.cabang_id"]',
+        'select[name="cabang_id"]',
+        '[wire\\:model="data.cabang_id"]',
+        '[wire\\:model\.live="data.cabang_id"]',
+        '[data-field="cabang_id"] select',
+        '[data-field="cabang_id"] [x-ref="input"]',
+    ];
+
+    let cabangField = null;
+
+    for (const selector of selectors) {
+        try {
+            cabangField = document.querySelector(selector);
+            if (cabangField) {
+                break;
+            }
+        } catch (error) {
+            // Continue searching.
+        }
+    }
+
+    if (!cabangField) {
+        updateField('cabang_id', value);
+        return false;
+    }
+
+    if (cabangField.tagName === 'SELECT') {
+        const matchingOption = Array.from(cabangField.options).find((option) => option.value === value);
+
+        if (matchingOption) {
+            cabangField.value = value;
+            matchingOption.selected = true;
+        } else {
+            cabangField.value = value;
+        }
+
+        ['input', 'change', 'blur'].forEach((eventType) => {
+            cabangField.dispatchEvent(new Event(eventType, { bubbles: true }));
+        });
+
+        const choicesContainer = cabangField.closest('.choices');
+        if (choicesContainer) {
+            const selectedLabel = choicesContainer.querySelector('.choices__inner .choices__item--selectable');
+
+            if (selectedLabel && matchingOption) {
+                selectedLabel.textContent = matchingOption.textContent;
+                selectedLabel.dataset.value = matchingOption.value;
+            }
+        }
+    }
+
+    updateField('cabang_id', value);
+
+    return true;
+}
+
+function setLivewireFieldValue(fieldName, value) {
+    const selectors = [
+        `[data-field="${fieldName}"]`,
+        `#data\\.${fieldName}`,
+        `[name="data.${fieldName}"]`,
+        `select[name="data.${fieldName}"]`,
+        `input[name="data.${fieldName}"]`,
+        `input[name="${fieldName}"]`,
+        `input[type="hidden"][id="data.${fieldName}"]`,
+        `[wire\\:model="data.${fieldName}"]`,
+        `[wire\\:model\.live="data.${fieldName}"]`,
+        `[wire\\:model\.defer="data.${fieldName}"]`,
+        `input[wire\\:model.live="data.${fieldName}"]`,
+        `select[wire\\:model.live="data.${fieldName}"]`,
+    ];
+
+    let field = null;
+
+    for (const selector of selectors) {
+        try {
+            field = document.querySelector(selector);
+            if (field) {
+                break;
+            }
+        } catch (error) {
+            // Continue searching.
+        }
+    }
+
+    if (!field) {
+        return false;
+    }
+
+    if ('value' in field) {
+        field.value = value;
+
+        ['input', 'change', 'blur'].forEach((eventType) => {
+            field.dispatchEvent(new Event(eventType, { bubbles: true }));
+        });
+    }
+
+    let componentRoot = field;
+
+    while (componentRoot) {
+        if (componentRoot.hasAttribute && componentRoot.hasAttribute('wire:id')) {
+            break;
+        }
+
+        componentRoot = componentRoot.parentElement;
+    }
+
+    const componentId = componentRoot ? componentRoot.getAttribute('wire:id') : null;
+    const component = componentId && window.Livewire?.find ? window.Livewire.find(componentId) : null;
+
+    if (component && typeof component.set === 'function') {
+        component.set(`data.${fieldName}`, value);
+        return true;
+    }
+
+    if (field._x_model && typeof field._x_model.set === 'function') {
+        field._x_model.set(value);
+        return true;
+    }
+
+    return false;
+}
+
+function normalizeReceiptInputValue(input) {
+    const rawValue = input.value;
+
+    if (!rawValue) {
+        return 0;
+    }
+
+    const parsedValue = parseReceiptValue(rawValue);
+    const formattedValue = formatRupiahAmount(parsedValue);
+
+    if (input.value !== formattedValue) {
+        input.value = formattedValue;
+    }
+
+    return parsedValue;
 }
 
 // Helper function to update form fields reliably
@@ -130,7 +372,28 @@ function updateField(fieldName, value) {
         field.readOnly = false;
         
         // Update the field
-        field.value = value;
+        if (field._x_model && typeof field._x_model.set === 'function') {
+            field._x_model.set(value);
+        }
+
+        if (field.tagName === 'SELECT') {
+            const matchingOption = Array.from(field.options).find((option) => option.value === value);
+
+            if (matchingOption) {
+                field.value = matchingOption.value;
+                matchingOption.selected = true;
+
+                Array.from(field.options).forEach((option) => {
+                    if (option !== matchingOption) {
+                        option.selected = false;
+                    }
+                });
+            } else {
+                field.value = value;
+            }
+        } else {
+            field.value = value;
+        }
         
         // Trigger comprehensive events for Filament reactivity
         const events = ['input', 'change', 'blur', 'keyup'];
@@ -147,6 +410,43 @@ function updateField(fieldName, value) {
             }));
         } catch (e) {
             // Custom event failed
+        }
+
+        try {
+            if (window.Livewire) {
+                const livewireFieldName = fieldName.startsWith('data.') ? fieldName : `data.${fieldName}`;
+                let componentRoot = field;
+
+                while (componentRoot) {
+                    if (componentRoot.hasAttribute && componentRoot.hasAttribute('wire:id')) {
+                        break;
+                    }
+
+                    componentRoot = componentRoot.parentElement;
+                }
+
+                const componentId = componentRoot ? componentRoot.getAttribute('wire:id') : null;
+                const component = componentId && window.Livewire.find ? window.Livewire.find(componentId) : (window.Livewire.all && window.Livewire.all().length > 0 ? window.Livewire.all()[0] : null);
+                const valueCandidates = [
+                    () => component && component.set && component.set(livewireFieldName, value),
+                    () => component && component.$wire && component.$wire.set && component.$wire.set(livewireFieldName, value),
+                    () => component && component.$wire && component.$wire.$set && component.$wire.$set(livewireFieldName, value),
+                    () => component && component.$set && component.$set(livewireFieldName, value),
+                ];
+
+                for (const update of valueCandidates) {
+                    try {
+                        const result = update();
+                        if (result !== undefined) {
+                            break;
+                        }
+                    } catch (candidateError) {
+                        // Try the next Livewire setter shape.
+                    }
+                }
+            }
+        } catch (e) {
+            // Livewire backup update failed
         }
         
         // Verify the update
@@ -223,7 +523,8 @@ function updateTotalPaymentField(totalAmount, preserveFocus = true) {
         
         // Set the value
         const oldValue = totalPaymentField.value;
-        totalPaymentField.value = totalAmount;
+        const formattedTotal = formatRupiahAmount(totalAmount);
+        totalPaymentField.value = formattedTotal;
         
         // Trigger comprehensive events for Filament/Livewire reactivity
         const events = ['input', 'change'];
@@ -234,7 +535,7 @@ function updateTotalPaymentField(totalAmount, preserveFocus = true) {
         // Additional Filament-specific events
         totalPaymentField.dispatchEvent(new CustomEvent('wire:model', { 
             bubbles: true, 
-            detail: { value: totalAmount } 
+            detail: { value: formattedTotal } 
         }));
         
         // Restore original states immediately
@@ -269,7 +570,7 @@ function updateTotalPaymentField(totalAmount, preserveFocus = true) {
                 if (window.Livewire.all && window.Livewire.all().length > 0) {
                     const component = window.Livewire.all()[0];
                     if (component.set) {
-                        component.set('data.total_payment', totalAmount);
+                        component.set('data.total_payment', formattedTotal);
                     }
                 }
             }
@@ -281,21 +582,17 @@ function updateTotalPaymentField(totalAmount, preserveFocus = true) {
 
 // Function to handle checkbox changes
 function handleInvoiceCheckboxChange(checkbox) {
+    window.__customerReceiptPreferredInvoiceCheckbox = checkbox;
+
     const row = checkbox.closest('tr');
     const receiptInput = row.querySelector('.receipt-input');
-    const remaining = parseFloat(checkbox.dataset.remaining || 0);
     
     if (checkbox.checked) {
-        // Check payment mode
-        const paymentMode = document.querySelector('.payment-mode-radio:checked')?.value || 'full';
-        
-        if (paymentMode === 'full') {
-            // For full payment, auto-fill with remaining amount as integer
-            if (!receiptInput.value || parseFloat(receiptInput.value) === 0) {
-                receiptInput.value = formatAsInteger(remaining);
-            }
+        const remaining = parseFloat(checkbox.dataset.remaining || 0);
+
+        if (!receiptInput.value || parseReceiptValue(receiptInput.value) === 0) {
+            receiptInput.value = formatRupiahAmount(remaining);
         }
-        // For partial payment, don't auto-fill
     } else {
         // Clear receipt amount when unchecked
         receiptInput.value = '';
@@ -307,28 +604,13 @@ function handleInvoiceCheckboxChange(checkbox) {
     });
     
     // Update selected invoices and total
-    updateSelectedInvoices();
+    updateSelectedInvoices(checkbox);
 }
 
 // Function to handle receipt input changes
 function handleReceiptInputChange(input, eventType) {
     const invoiceId = input.getAttribute('data-invoice-id');
-    const rawValue = input.value;
-    
-    // Store cursor position
-    const cursorPosition = input.selectionStart;
-    
-    // Parse the value but don't format immediately if user is typing
-    let cleanValue = parseReceiptValue(rawValue);
-    
-    // Only format/update the input value on blur or when value is finalized
-    if (eventType === 'blur' || eventType === 'change') {
-        // Update input with clean integer value only on blur/change
-        const formattedValue = cleanValue > 0 ? cleanValue.toString() : '';
-        if (input.value !== formattedValue) {
-            input.value = formattedValue;
-        }
-    }
+    let cleanValue = normalizeReceiptInputValue(input);
     
     const checkbox = document.querySelector(`.invoice-checkbox[value="${invoiceId}"]`);
     
@@ -339,7 +621,7 @@ function handleReceiptInputChange(input, eventType) {
         // Validate amount doesn't exceed remaining
         if (cleanValue > remainingInteger) {
             alert(`Pembayaran tidak boleh melebihi sisa tagihan: Rp. ${remainingInteger.toLocaleString('id-ID')}`);
-            input.value = remainingInteger.toString();
+            input.value = formatRupiahAmount(remainingInteger);
             cleanValue = remainingInteger;
         }
         
@@ -349,41 +631,35 @@ function handleReceiptInputChange(input, eventType) {
         } else if (cleanValue === 0 && checkbox.checked) {
             checkbox.checked = false;
         }
+
+        if (checkbox.checked) {
+            window.__customerReceiptPreferredInvoiceCheckbox = checkbox;
+        }
     }
     
     // Use debounced update for input events, immediate update for change/blur
     if (eventType === 'input') {
         updateSelectedInvoicesDebounced();
     } else {
-        updateSelectedInvoices();
-    }
-    
-    // Restore cursor position for input events (not blur/change)
-    if (eventType === 'input' && cursorPosition !== null) {
-        setTimeout(() => {
-            try {
-                input.setSelectionRange(cursorPosition, cursorPosition);
-            } catch (e) {
-                // Cursor position restoration failed
-            }
-        }, 10);
+        updateSelectedInvoices(checkbox);
     }
 }
 
 // Initialize event listeners
 function initializeCustomerReceiptEvents() {
-    // Prevent duplicate initialization
-    if (window.customerReceiptEventsInitialized) {
-        return true;
-    }
-    
     // Check if invoice checkboxes exist
     const checkboxes = document.querySelectorAll('.invoice-checkbox');
     if (checkboxes.length === 0) {
         return false;
     }
-    
-    window.customerReceiptEventsInitialized = true;
+
+    document.querySelectorAll('.receipt-input').forEach(input => {
+        input.value = input.value ? formatRupiahAmount(parseReceiptValue(input.value)) : '';
+    });
+
+    document.querySelectorAll('.balance-input').forEach(input => {
+        input.value = input.value === '' ? '' : formatRupiahAmount(parseReceiptValue(input.value));
+    });
     
     // Add event listeners for invoice checkboxes
     checkboxes.forEach((checkbox, index) => {
@@ -431,51 +707,68 @@ function initializeCustomerReceiptEvents() {
         selectAllCheckbox.addEventListener('change', function() {
             document.querySelectorAll('.invoice-checkbox').forEach(checkbox => {
                 checkbox.checked = this.checked;
+                const row = checkbox.closest('tr');
+                const receiptInput = row.querySelector('.receipt-input');
+                const remaining = parseFloat(checkbox.dataset.remaining || 0);
+
+                if (this.checked) {
+                    receiptInput.value = formatRupiahAmount(remaining);
+                } else {
+                    receiptInput.value = '';
+                }
+
                 handleInvoiceCheckboxChange(checkbox);
             });
         });
     }
     
-    // Add event listeners for payment mode radios
-    const paymentModeRadios = document.querySelectorAll('.payment-mode-radio');
-    
-    paymentModeRadios.forEach(radio => {
-        if (!radio.hasAttribute('data-events-attached')) {
-            radio.setAttribute('data-events-attached', 'true');
-            radio.addEventListener('change', function() {
-                handlePaymentModeChange(this.value);
-            });
-        }
-    });
-    
     return true;
 }
 
-// Handle payment mode changes
-function handlePaymentModeChange(mode) {
-    const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
-    
-    if (mode === 'full') {
-        // Auto-fill checked invoices with remaining amounts as integers
-        checkboxes.forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            const receiptInput = row.querySelector('.receipt-input');
-            const remaining = parseFloat(checkbox.dataset.remaining || 0);
-            
-            receiptInput.value = formatAsInteger(remaining);
-        });
+function scheduleCustomerReceiptEventInit(delay = 100) {
+    setTimeout(() => {
+        initializeCustomerReceiptEvents();
+    }, delay);
+}
+
+function initializeCustomerReceiptDelegatedEvents() {
+    if (window.__customerReceiptDelegatedEventsAttached) {
+        return;
     }
-    // For partial mode, don't change existing values
-    
-    updateSelectedInvoices();
+
+    window.__customerReceiptDelegatedEventsAttached = true;
+
+    document.addEventListener('change', function (event) {
+        const target = event.target;
+
+        if (target && target.classList && target.classList.contains('invoice-checkbox')) {
+            handleInvoiceCheckboxChange(target);
+            return;
+        }
+
+        if (target && target.classList && target.classList.contains('receipt-input')) {
+            handleReceiptInputChange(target, 'change');
+        }
+    });
+
+    document.addEventListener('input', function (event) {
+        const target = event.target;
+
+        if (target && target.classList && target.classList.contains('receipt-input')) {
+            handleReceiptInputChange(target, 'input');
+        }
+    });
 }
 
 // Make functions globally available
 window.updateSelectedInvoices = updateSelectedInvoices;
 window.updateSelectedInvoicesMain = updateSelectedInvoices;
+window.parseReceiptValue = parseReceiptValue;
+window.formatRupiahAmount = formatRupiahAmount;
 window.handleInvoiceCheckboxChange = handleInvoiceCheckboxChange;
 window.handleReceiptInputChange = handleReceiptInputChange;
 window.initializeCustomerReceiptEvents = initializeCustomerReceiptEvents;
+window.initializeCustomerReceiptDelegatedEvents = initializeCustomerReceiptDelegatedEvents;
 
 // Initialize with retry mechanism
 function tryInitialize() {
@@ -488,9 +781,23 @@ function tryInitialize() {
 // Start initialization
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(tryInitialize, 500);
+        initializeCustomerReceiptDelegatedEvents();
+        scheduleCustomerReceiptEventInit(500);
     });
 } else {
-    setTimeout(tryInitialize, 500);
+    initializeCustomerReceiptDelegatedEvents();
+    scheduleCustomerReceiptEventInit(500);
 }
+
+window.addEventListener('refreshInvoiceTable', function () {
+    scheduleCustomerReceiptEventInit(150);
+});
+
+document.addEventListener('livewire:navigated', function () {
+    scheduleCustomerReceiptEventInit(150);
+});
+
+document.addEventListener('livewire:update', function () {
+    scheduleCustomerReceiptEventInit(150);
+});
 </script>

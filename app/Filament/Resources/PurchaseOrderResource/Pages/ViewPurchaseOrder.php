@@ -6,6 +6,7 @@ use App\Filament\Resources\PurchaseOrderResource;
 use App\Http\Controllers\HelperController;
 use App\Models\Asset;
 use App\Models\ChartOfAccount;
+use App\Support\ProcurementFailureNotifier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Actions;
@@ -59,7 +60,7 @@ class ViewPurchaseOrder extends ViewRecord
                         ]);
                         Notification::make()
                             ->title('Gagal Menyetujui PO')
-                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Purchase order belum dapat disetujui. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }
@@ -101,7 +102,7 @@ class ViewPurchaseOrder extends ViewRecord
                         ]);
                         Notification::make()
                             ->title('Failed to Complete Purchase Order')
-                            ->body($e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Purchase order belum dapat diselesaikan. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }
@@ -156,7 +157,7 @@ class ViewPurchaseOrder extends ViewRecord
                         ]);
                         Notification::make()
                             ->title('Gagal Mengkonfirmasi')
-                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Status purchase order belum dapat diperbarui. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }
@@ -189,7 +190,7 @@ class ViewPurchaseOrder extends ViewRecord
                         ]);
                         Notification::make()
                             ->title('Gagal Menolak PO')
-                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Purchase order belum dapat dikembalikan ke draft. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }
@@ -223,7 +224,7 @@ class ViewPurchaseOrder extends ViewRecord
                         ]);
                         Notification::make()
                             ->title('Gagal Request Close')
-                            ->body('Terjadi kesalahan: ' . $e->getMessage())
+                            ->body(ProcurementFailureNotifier::message($e, 'Permintaan penutupan purchase order belum berhasil diajukan. Silakan coba lagi.'))
                             ->danger()
                             ->send();
                     }

@@ -78,7 +78,7 @@ test('C3-b: total payment field is auto-calculated and read-only', async ({ page
     expect(readOnlyAttr).not.toBeNull()
 
     const totalValue = (await totalPaymentInput.inputValue()).trim()
-    expect(totalValue).toMatch(/^[\d.]*$/)
+    expect(totalValue).toMatch(/^\d{1,3}(\.\d{3})*$/)
   } else {
     const updatedBody = await page.textContent('body')
     expect(updatedBody).toMatch(/vendor payment|payment method|pilih invoice/i)

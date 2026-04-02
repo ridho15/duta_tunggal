@@ -10,10 +10,20 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { execSync } from 'node:child_process'
+
+test.describe.configure({ mode: 'serial' })
 
 test.use({ storageState: 'playwright/.auth/user.json' })
 
 const ERR = /Fatal error|Whoops!|Something went wrong|DateMalformedStringException/i
+const QUOTATION_NUMBER = 'QT-PW-SO-001'
+const STOCKED_WAREHOUSE = 'PW-SO-STOCK-A'
+const EMPTY_WAREHOUSE = 'PW-SO-STOCK-B'
+
+test.beforeAll(async () => {
+  execSync('php scripts/setup_sale_order_from_quotation_playwright_data.php', { stdio: 'inherit' })
+})
 
 async function assertHealthy(page) {
   await page.waitForLoadState('networkidle')
@@ -23,57 +33,172 @@ async function assertHealthy(page) {
   return body || ''
 }
 
+async function chooseReferQuotation(page) {
+  await page.goto('/admin/sale-orders/create')
+  await assertHealthy(page)
+
+  const optionsCombobox = page.getByRole('combobox').nth(0)
+  await expect(optionsCombobox).toBeVisible()
+  await optionsCombobox.click()
+
+  const referQuotationOption = page.getByRole('option', { name: /Refer Quotation/i }).first()
+  await expect(referQuotationOption).toBeVisible()
+  await referQuotationOption.click()
+  await page.waitForTimeout(400)
+
+  const quotationCombobox = page.getByRole('combobox').nth(1)
+  await expect(quotationCombobox).toBeVisible()
+  await quotationCombobox.click()
+
+  const quotationOption = page.getByRole('option', { name: new RegExp(QUOTATION_NUMBER) }).first()
+  await expect(quotationOption).toBeVisible()
+  await quotationOption.click()
+  await page.waitForTimeout(1200)
+  await page.getByRole('heading', { name: /Buat Sales Order/i }).click()
+  await page.waitForTimeout(200)
+}
+
+async function addWarehouseAllocation(page, quantity = '3') {
+  const addAllocationButton = page.getByRole('button', { name: /Tambahkan ke alokasi Gudang/i }).first()
+  await expect(addAllocationButton).toBeVisible()
+  await addAllocationButton.click()
+  await page.waitForTimeout(700)
+
+  const warehouseGroup = page.locator('div').filter({ hasText: /Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini\./ }).first()
+  const warehouseCombobox = warehouseGroup.getByRole('combobox').first()
+  await warehouseCombobox.click()
+  await page.waitForTimeout(300)
+
+  const body = await page.textContent('body')
+  expect(body || '').toContain(STOCKED_WAREHOUSE)
+  expect(body || '').not.toContain(EMPTY_WAREHOUSE)
+
+  const stockedWarehouseChoice = page
+    .locator('.choices__list--dropdown .choices__item--choice:not(.choices__placeholder):not(.is-disabled)')
+    .filter({ hasText: new RegExp(STOCKED_WAREHOUSE) })
+    .first()
+  await expect(stockedWarehouseChoice).toHaveCount(1)
+
+  const warehouseSelect = page.locator('select[id*="warehouseAllocations"][id*="warehouse_id"]').first()
+  const warehouseSelectId = await warehouseSelect.getAttribute('id')
+  const warehouseValue = await stockedWarehouseChoice.getAttribute('data-value')
+
+  expect(warehouseSelectId).toBeTruthy()
+  expect(warehouseValue).toBeTruthy()
+
+  const warehouseStateApplied = await page.evaluate(({ fieldPath, value }) => {
+    const field = document.getElementById(fieldPath)
+    const componentId = field?.closest('[wire\\:id]')?.getAttribute('wire:id')
+    if (!componentId || !window.Livewire?.find) {
+      return false
+    }
+
+    const component = window.Livewire.find(componentId)
+    if (!component?.set) {
+      return false
+    }
+
+    component.set(fieldPath, value)
+    return true
+  }, {
+    fieldPath: warehouseSelectId,
+    value: warehouseValue,
+  })
+  expect(warehouseStateApplied).toBe(true)
+  await page.waitForTimeout(500)
+
+  const allocationQtyInput = page.locator('input[id*="warehouseAllocations"][id*="quantity"]').first()
+  await expect(allocationQtyInput).toBeVisible()
+  await allocationQtyInput.fill(quantity)
+  await allocationQtyInput.press('Tab')
+  await page.waitForTimeout(400)
+}
+
+async function fillRequiredSaleOrderFields(page, soNumber) {
+  const soNumberInput = page.locator('#data\\.so_number').first()
+  await expect(soNumberInput).toBeVisible()
+  await soNumberInput.fill(soNumber)
+
+  const orderDateInput = page.locator('#data\\.order_date').first()
+  await expect(orderDateInput).toBeVisible()
+  await orderDateInput.fill(new Date().toISOString().slice(0, 10))
+
+  const shippingOption = page.getByText(/Kirim Ke Customer|Kirim Langsung/i).first()
+  if (await shippingOption.count()) {
+    await shippingOption.click()
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Test 1: tempo_pembayaran auto-fill saat pilih quotation di form SO create
 // ---------------------------------------------------------------------------
 test('SO form: memilih quotation otomatis mengisi tempo_pembayaran', async ({ page }) => {
-  await page.goto('/admin/sale-orders/create')
-  await assertHealthy(page)
-
-  // Pilih opsi "Refer Quotation"
-  const optionsSelect = page.locator('select[id*="options_form"]').first()
-    .or(page.getByRole('combobox').filter({ hasText: /None|Refer/i }).first())
-
-  // Try to find and set options_form to "Refer Quotation" (value=2)
-  const optField = page.locator('[id*="options_form"]').first()
-  if (await optField.isVisible().catch(() => false)) {
-    await optField.click()
-    const opt2 = page.getByRole('option', { name: /Refer Quotation/i }).first()
-    if (await opt2.isVisible().catch(() => false)) {
-      await opt2.click()
-      await page.waitForTimeout(400)
-    }
-  }
-
-  // Cari quotation_id select yang muncul setelah pilih "Refer Quotation"
-  const quotationSelect = page.locator('[id*="quotation_id"]').first()
-  if (!(await quotationSelect.isVisible().catch(() => false))) {
-    // Jika tidak ada quotation dropdown, skip test
-    const body = await page.textContent('body')
-    expect(body || '').toMatch(/quotation|penjualan|options/i)
-    return
-  }
-
-  await quotationSelect.click()
-  // Ambil opsi pertama yang tersedia
-  const firstOption = page.getByRole('option').first()
-  if (!(await firstOption.isVisible().catch(() => false))) {
-    // Tidak ada quotation approved — skip test tapi jangan fail
-    return
-  }
-  await firstOption.click()
-  await page.waitForTimeout(800) // tunggu afterStateUpdated
+  await chooseReferQuotation(page)
 
   // Pastikan tempo_pembayaran terisi
   const tempoInput = page.locator('[id*="tempo_pembayaran"]').first()
-  if (await tempoInput.isVisible().catch(() => false)) {
-    const tempoVal = await tempoInput.inputValue()
-    // Nilai harus > 0 jika quotation punya tempo_pembayaran
-    // Minimal: field tidak kosong / 0 jika quotation memiliki tempo
-    expect(tempoVal === '' || /^\d+$/.test(tempoVal)).toBe(true)
-  }
+  await expect(tempoInput).toBeVisible()
+  await expect(tempoInput).toHaveValue('21')
 
   await assertHealthy(page)
+})
+
+test('SO form: quotation mengisi total amount dan subtotal dengan format rupiah konsisten', async ({ page }) => {
+  await chooseReferQuotation(page)
+
+  const totalAmountInput = page.locator('#data\\.total_amount').first()
+  await expect(totalAmountInput).toBeVisible()
+  const totalAmount = await totalAmountInput.inputValue()
+  expect(totalAmount).toMatch(/^\d{1,3}(\.\d{3})+$/)
+
+  const subtotalInput = page.locator('input[id*="saleOrderItem"][id*="subtotal"]').first()
+  await expect(subtotalInput).toBeVisible()
+  const subtotal = await subtotalInput.inputValue()
+  expect(subtotal).toMatch(/^\d{1,3}(\.\d{3})+$/)
+
+  const parsedTotal = Number(totalAmount.replace(/\./g, ''))
+  const parsedSubtotal = Number(subtotal.replace(/\./g, ''))
+  expect(parsedTotal).toBeGreaterThan(0)
+  expect(parsedSubtotal).toBeGreaterThan(0)
+})
+
+test('SO form: alokasi gudang hanya menampilkan gudang yang punya inventory stock untuk produk quotation', async ({ page }) => {
+  await chooseReferQuotation(page)
+
+  const addAllocationButton = page.getByRole('button', { name: /Tambahkan ke alokasi Gudang/i }).first()
+  await expect(addAllocationButton).toBeVisible()
+  await addAllocationButton.click()
+  await page.waitForTimeout(700)
+
+  const warehouseGroup = page.locator('div').filter({ hasText: /Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini\./ }).first()
+  const warehouseCombobox = warehouseGroup.getByRole('combobox').first()
+  await warehouseCombobox.click()
+  await page.waitForTimeout(300)
+
+  const body = await page.textContent('body')
+  expect(body || '').toContain(STOCKED_WAREHOUSE)
+  expect(body || '').not.toContain(EMPTY_WAREHOUSE)
+})
+
+test('SO form: submit berhasil setelah memilih alokasi gudang terfilter dari quotation', async ({ page }) => {
+  await chooseReferQuotation(page)
+
+  const soNumber = `SO-PW-CRT-${Date.now()}`
+  await fillRequiredSaleOrderFields(page, soNumber)
+  await addWarehouseAllocation(page)
+
+  const submitButton = page.getByRole('button', { name: /^Buat$/ }).last()
+
+  await submitButton.click()
+  await page.waitForFunction(
+    () => /\/admin\/sale-orders\/\d+(?:\/edit)?$/.test(window.location.pathname),
+    { timeout: 15000 },
+  )
+  await page.waitForLoadState('networkidle')
+
+  const body = await assertHealthy(page)
+  expect(page.url()).toMatch(/\/admin\/sale-orders\/\d+(?:\/edit)?$/)
+  expect(body).toContain(soNumber)
 })
 
 // ---------------------------------------------------------------------------

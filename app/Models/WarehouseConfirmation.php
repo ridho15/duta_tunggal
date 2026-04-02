@@ -158,45 +158,17 @@ class WarehouseConfirmation extends Model
                             'so_id' => $wc->confirmable_id,
                         ]);
 
-                        // Legacy flow: auto-create DO from confirmed SO-linked WC
-                        $wc->refresh();
-                        $wc->load('warehouseConfirmationItems.saleOrderItem.product');
-                        static::createDeliveryOrderForConfirmedWarehouseConfirmation($wc);
                     }
                 }
             }
 
-            // SO-linked WC reverts confirmed → request: delete the auto-created DO
-            if (strtolower($originalStatus) === 'confirmed'
-                && strtolower($newStatus) === 'request'
-                && $wc->confirmable_type === SaleOrder::class) {
-                $so = $wc->confirmable;
-                if ($so) {
-                    $existingDO = $so->deliveryOrder()->first();
-                    if ($existingDO) {
-                        $existingDO->delete();
-                        Log::info('DO deleted due to WC revert to request', [
-                            'do_id' => $existingDO->id,
-                            'wc_id' => $wc->id,
-                        ]);
-                    }
-                }
-            }
         });
 
         static::deleting(function ($wc) {
-            // SO-linked WC deleted: cascade delete linked DO & revert SO status
+            // SO-linked WC deleted: revert SO status
             if ($wc->confirmable_type === SaleOrder::class) {
                 $so = $wc->confirmable;
                 if ($so) {
-                    $existingDO = $so->deliveryOrder()->first();
-                    if ($existingDO) {
-                        $existingDO->delete();
-                        Log::info('DO deleted due to WC deletion', [
-                            'do_id' => $existingDO->id,
-                            'wc_id' => $wc->id,
-                        ]);
-                    }
                     $so->update([
                         'status'                 => 'request_approve',
                         'warehouse_confirmed_at' => null,
@@ -228,123 +200,4 @@ class WarehouseConfirmation extends Model
         });
     }
 
-    // ─── Legacy helper: auto-create DO when a SO-linked WC gets confirmed ────
-
-    /**
-     * Create a Delivery Order automatically when a SO-linked WC is confirmed (legacy flow).
-     * In the new DO-centric flow, DOs are created first and WCs are auto-generated per warehouse.
-     */
-    protected static function createDeliveryOrderForConfirmedWarehouseConfirmation(WarehouseConfirmation $wc): void
-    {
-        if ($wc->confirmable_type !== SaleOrder::class) {
-            return;
-        }
-
-        $so = $wc->confirmable;
-        if (!$so) {
-            return;
-        }
-
-        Log::info('WC: Creating DO for confirmed SO-linked WC', [
-            'wc_id' => $wc->id,
-            'so_id' => $wc->confirmable_id,
-        ]);
-
-        $wc->loadMissing('confirmable.customer', 'warehouseConfirmationItems.saleOrderItem.product');
-
-        // Don't create a second DO if one already exists for this SO
-        $existingDO = $so->deliveryOrder()->first();
-        if ($existingDO) {
-            if ($existingDO->deliveryOrderItem()->count() === 0 && $wc->warehouseConfirmationItems->isNotEmpty()) {
-                Log::info('Existing DO has no items — adding items now', ['do_id' => $existingDO->id]);
-                foreach ($wc->warehouseConfirmationItems as $wcItem) {
-                    if ($wcItem->status === 'confirmed' && $wcItem->confirmed_qty > 0) {
-                        try {
-                            DeliveryOrderItem::create([
-                                'delivery_order_id'  => $existingDO->id,
-                                'sale_order_item_id' => $wcItem->sale_order_item_id,
-                                'product_id'         => $wcItem->saleOrderItem->product_id ?? null,
-                                'quantity'           => $wcItem->confirmed_qty,
-                                'reason'             => 'From warehouse confirmation',
-                            ]);
-                        } catch (\Throwable $e) {
-                            Log::error('Failed to add item to existing DO', [
-                                'do_id' => $existingDO->id,
-                                'error' => $e->getMessage(),
-                            ]);
-                        }
-                    }
-                }
-            } else {
-                Log::info('DO already exists for SO — skipping creation', ['do_id' => $existingDO->id]);
-                \Filament\Notifications\Notification::make()
-                    ->title('Gagal Membuat Delivery Order')
-                    ->danger()
-                    ->body('Delivery Order sudah ada untuk Sales Order ini.')
-                    ->send();
-            }
-            return;
-        }
-
-        if (!in_array($so->tipe_pengiriman, ['Kirim Langsung', 'Ambil Sendiri'])) {
-            Log::info('Skipping DO creation — unrecognized tipe_pengiriman', [
-                'tipe_pengiriman' => $so->tipe_pengiriman,
-            ]);
-            return;
-        }
-
-        $warehouseId = $wc->warehouseConfirmationItems->first()?->warehouse_id;
-        $driver      = \App\Models\Driver::first();
-        $vehicle     = \App\Models\Vehicle::first();
-        $doNumber    = \App\Services\DeliveryOrderService::generateStaticDoNumber();
-
-        try {
-            $deliveryOrder = DeliveryOrder::create([
-                'do_number'     => $doNumber,
-                'delivery_date' => now()->toDateString(),
-                'driver_id'     => $driver?->id,
-                'vehicle_id'    => $vehicle?->id,
-                'warehouse_id'  => $warehouseId,
-                'status'        => 'draft',
-                'notes'         => 'Auto-generated from confirmed WC #' . $wc->id,
-                'created_by'    => $wc->confirmed_by ?? $so->approve_by ?? \App\Models\User::first()?->id,
-                'cabang_id'     => $so->cabang_id
-                    ?? Auth::user()?->cabang_id
-                    ?? \App\Models\Cabang::first()?->id,
-            ]);
-
-            foreach ($wc->warehouseConfirmationItems as $wcItem) {
-                if ($wcItem->status === 'confirmed' && $wcItem->confirmed_qty > 0) {
-                    DeliveryOrderItem::create([
-                        'delivery_order_id'  => $deliveryOrder->id,
-                        'sale_order_item_id' => $wcItem->sale_order_item_id,
-                        'product_id'         => $wcItem->saleOrderItem->product_id ?? null,
-                        'quantity'           => $wcItem->confirmed_qty,
-                        'reason'             => 'From warehouse confirmation',
-                    ]);
-                }
-            }
-
-            $so->deliveryOrder()->attach($deliveryOrder->id);
-
-            Log::info('DO created from confirmed SO-linked WC', [
-                'do_id'     => $deliveryOrder->id,
-                'do_number' => $deliveryOrder->do_number,
-                'wc_id'     => $wc->id,
-                'so_id'     => $wc->confirmable_id,
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('WC: Failed to auto-create DO', [
-                'wc_id' => $wc->id,
-                'so_id' => $wc->confirmable_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            \Filament\Notifications\Notification::make()
-                ->title('Gagal Membuat Delivery Order')
-                ->danger()
-                ->body('Terjadi kesalahan saat membuat Delivery Order otomatis. Silakan cek log.')
-                ->send();
-        }
-    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SalesInvoiceResource\Pages;
 
+use App\Helpers\MoneyHelper;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\DeliveryOrder;
 use Filament\Actions;
@@ -21,6 +22,8 @@ class EditSalesInvoice extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
+
         // Load related data for form
         if ($this->record->from_model_type === 'App\Models\SaleOrder') {
             $data['selected_customer'] = $this->record->fromModel->customer_id ?? null;
@@ -81,6 +84,8 @@ class EditSalesInvoice extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
+
         // Remove temporary fields
         unset($data['selected_customer']);
         unset($data['selected_sale_order']);
@@ -99,15 +104,17 @@ class EditSalesInvoice extends EditRecord
 
             foreach ($this->data['invoiceItem'] as $item) {
                 $quantity = (float) ($item['quantity'] ?? 0);
-                $price    = (float) ($item['price'] ?? 0);
+                $price    = (float) MoneyHelper::parse($item['price'] ?? 0);
 
                 // Ensure all NOT NULL columns are provided even when the
                 // Repeater only captured the 4 visible fields.
                 $itemData = array_merge($item, [
-                    'subtotal'   => $item['subtotal']   ?? ($quantity * $price),
-                    'discount'   => $item['discount']   ?? 0,
-                    'tax_rate'   => $item['tax_rate']   ?? 0,
-                    'tax_amount' => $item['tax_amount'] ?? 0,
+                    'price'      => $price,
+                    'subtotal'   => (float) MoneyHelper::parse($item['subtotal'] ?? ($quantity * $price)),
+                    'discount'   => (float) MoneyHelper::parse($item['discount'] ?? 0),
+                    'tax_rate'   => (float) MoneyHelper::parse($item['tax_rate'] ?? 0),
+                    'tax_amount' => (float) MoneyHelper::parse($item['tax_amount'] ?? 0),
+                    'total'      => (float) MoneyHelper::parse($item['total'] ?? ($quantity * $price)),
                 ]);
 
                 $this->record->invoiceItem()->create($itemData);

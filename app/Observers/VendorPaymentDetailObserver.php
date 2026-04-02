@@ -3,95 +3,46 @@
 namespace App\Observers;
 
 use App\Enums\PaymentStatus;
-use App\Http\Controllers\HelperController;
 use App\Models\AccountPayable;
 use App\Models\ChartOfAccount;
 use App\Models\Deposit;
-use App\Models\DepositLog;
-use App\Models\JournalEntry;
-use Illuminate\Support\Facades\Log;
 use App\Models\VendorPaymentDetail;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class VendorPaymentDetailObserver
 {
+    public function creating(VendorPaymentDetail $vendorPaymentDetail): void
+    {
+        $this->guardDepositRequirements($vendorPaymentDetail);
+    }
+
     /**
      * Handle the VendorPaymentDetail "created" event.
      */
     public function created(VendorPaymentDetail $vendorPaymentDetail): void
     {
-        $accountPayable = AccountPayable::where('invoice_id', $vendorPaymentDetail->invoice_id)->first();
         $vendorPayment = $vendorPaymentDetail->vendorPayment;
-        // Update account payable
-        if ($accountPayable) {
-            $totalReduction = $vendorPaymentDetail->amount + ($vendorPaymentDetail->adjustment_amount ?? 0);
-            $newPaid = min($accountPayable->paid + $vendorPaymentDetail->amount, $accountPayable->total); // hanya kas masuk dicatat di paid
-            $newRemaining = max(0, $accountPayable->remaining - $totalReduction);
-            $accountPayable->update([
-                'paid' => $newPaid,
-                'remaining' => $newRemaining,
-                'status' => $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
-            ]);
-        }
-        // Status & invoice synchronization now handled centrally after header creation.
 
         $detailMethod = strtolower($vendorPaymentDetail->method ?? $vendorPayment->payment_method ?? '');
         if ($detailMethod === 'deposit') {
-            // VALIDATION: Check if supplier has available deposits before processing
             $availableDeposits = Deposit::where('from_model_type', 'App\Models\Supplier')
                 ->where('from_model_id', $vendorPayment->supplier_id)
                 ->where('status', 'active')
                 ->where('remaining_amount', '>', 0)
-                ->orderBy('created_at', 'asc') // FIFO - oldest deposits first
+                ->orderBy('created_at', 'asc')
                 ->get();
 
-            if ($availableDeposits->isEmpty()) {
-                // Use notification instead of exception for better UX
-                Notification::make()
-                    ->title('Deposit Tidak Tersedia')
-                    ->body("Supplier {$vendorPayment->supplier->perusahaan} tidak memiliki deposit yang tersedia untuk pembayaran. Silakan pilih metode pembayaran lain atau buat deposit terlebih dahulu.")
-                    ->danger()
-                    ->persistent()
-                    ->send();
-
-                // Log for debugging but don't stop the process
-                Log::warning("No available deposits for supplier {$vendorPayment->supplier->perusahaan} during payment creation");
-
-                // Skip deposit processing but continue with other logic
-                return;
-            }
-
-            // Check if total available deposit balance is sufficient
-            $totalAvailableDeposit = $availableDeposits->sum('remaining_amount');
-            if ($totalAvailableDeposit < $vendorPaymentDetail->amount) {
-                // Use notification instead of exception
-                Notification::make()
-                    ->title('Saldo Deposit Tidak Mencukupi')
-                    ->body("Saldo deposit supplier {$vendorPayment->supplier->perusahaan} tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($vendorPaymentDetail->amount, 0, ',', '.'))
-                    ->danger()
-                    ->persistent()
-                    ->send();
-
-                // Log for debugging
-                Log::warning("Insufficient deposit balance for supplier {$vendorPayment->supplier->perusahaan}. Available: {$totalAvailableDeposit}, Required: {$vendorPaymentDetail->amount}");
-
-                // Skip deposit processing but continue with other logic
-                return;
-            }
-
-            // Process deposits if validation passes
             $remainingPaymentAmount = $vendorPaymentDetail->amount;
 
             foreach ($availableDeposits as $deposit) {
                 if ($remainingPaymentAmount <= 0) {
-                    break; // Payment fully covered
+                    break;
                 }
 
                 $amountToUse = min($remainingPaymentAmount, $deposit->remaining_amount);
 
-                // Update deposit balances
                 $deposit->remaining_amount -= $amountToUse;
                 $deposit->used_amount += $amountToUse;
 
@@ -111,11 +62,21 @@ class VendorPaymentDetailObserver
                 $remainingPaymentAmount -= $amountToUse;
             }
 
-            // If payment couldn't be fully covered by available deposits (shouldn't happen due to validation above)
             if ($remainingPaymentAmount > 0) {
-                // Log warning or handle insufficient deposit balance
                 Log::warning("Insufficient deposit balance for vendor payment detail ID {$vendorPaymentDetail->id}. Remaining amount: {$remainingPaymentAmount}");
             }
+        }
+
+        $accountPayable = AccountPayable::where('invoice_id', $vendorPaymentDetail->invoice_id)->first();
+        if ($accountPayable) {
+            $totalReduction = $vendorPaymentDetail->amount + ($vendorPaymentDetail->adjustment_amount ?? 0);
+            $newPaid = min($accountPayable->paid + $vendorPaymentDetail->amount, $accountPayable->total);
+            $newRemaining = max(0, $accountPayable->remaining - $totalReduction);
+            $accountPayable->update([
+                'paid' => $newPaid,
+                'remaining' => $newRemaining,
+                'status' => $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
+            ]);
         }
 
         if ($vendorPaymentDetail->coa_id) {
@@ -144,6 +105,19 @@ class VendorPaymentDetailObserver
         //
     }
 
+    public function updating(VendorPaymentDetail $vendorPaymentDetail): void
+    {
+        $willUseDeposit = strtolower((string) ($vendorPaymentDetail->method ?? $vendorPaymentDetail->vendorPayment?->payment_method)) === 'deposit';
+
+        if ($willUseDeposit && (
+            $vendorPaymentDetail->isDirty('method')
+            || $vendorPaymentDetail->isDirty('amount')
+            || $vendorPaymentDetail->isDirty('vendor_payment_id')
+        )) {
+            $this->guardDepositRequirements($vendorPaymentDetail);
+        }
+    }
+
     /**
      * Handle the VendorPaymentDetail "deleted" event.
      */
@@ -166,5 +140,74 @@ class VendorPaymentDetailObserver
     public function forceDeleted(VendorPaymentDetail $vendorPaymentDetail): void
     {
         //
+    }
+
+    protected function guardDepositRequirements(VendorPaymentDetail $vendorPaymentDetail): void
+    {
+        $vendorPayment = $vendorPaymentDetail->vendorPayment;
+        $detailMethod = strtolower((string) ($vendorPaymentDetail->method ?? $vendorPayment?->payment_method));
+
+        if ($detailMethod !== 'deposit') {
+            return;
+        }
+
+        if (!$vendorPayment) {
+            throw new \RuntimeException('Vendor payment tidak ditemukan untuk detail pembayaran deposit.');
+        }
+
+        $supplierName = $vendorPayment->supplier?->perusahaan ?? $vendorPayment->supplier?->name ?? 'supplier ini';
+        $availableDeposits = Deposit::where('from_model_type', 'App\Models\Supplier')
+            ->where('from_model_id', $vendorPayment->supplier_id)
+            ->where('status', 'active')
+            ->where('remaining_amount', '>', 0)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        if ($availableDeposits->isEmpty()) {
+            $message = "Supplier {$supplierName} tidak memiliki deposit aktif yang tersedia untuk pembayaran ini.";
+            $this->notifyDepositValidationFailure('Deposit Tidak Tersedia', $message);
+            throw new \RuntimeException($message);
+        }
+
+        $requiredAmount = (float) $vendorPaymentDetail->amount;
+        $totalAvailableDeposit = (float) $availableDeposits->sum('remaining_amount');
+        if ($totalAvailableDeposit + 0.0001 < $requiredAmount) {
+            $message = "Saldo deposit supplier {$supplierName} tidak mencukupi. Tersedia Rp "
+                . number_format($totalAvailableDeposit, 0, ',', '.')
+                . ', dibutuhkan Rp '
+                . number_format($requiredAmount, 0, ',', '.');
+            $this->notifyDepositValidationFailure('Saldo Deposit Tidak Mencukupi', $message);
+            throw new \RuntimeException($message);
+        }
+
+        if (!$this->resolveDepositCoa()) {
+            $message = 'Akun deposit / uang muka supplier tidak ditemukan. Simpan COA deposit lebih dulu sebelum detail pembayaran dibuat.';
+            $this->notifyDepositValidationFailure('COA Deposit Belum Dikonfigurasi', $message);
+            throw new \RuntimeException($message);
+        }
+    }
+
+    protected function resolveDepositCoa(): ?ChartOfAccount
+    {
+        foreach (['1150.01', '1150.02', '1150'] as $code) {
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa) {
+                return $coa;
+            }
+        }
+
+        return ChartOfAccount::where('name', 'LIKE', '%UANG MUKA%')->first();
+    }
+
+    protected function notifyDepositValidationFailure(string $title, string $message): void
+    {
+        Notification::make()
+            ->title($title)
+            ->body($message)
+            ->danger()
+            ->persistent()
+            ->send();
+
+        Log::warning($title . ': ' . $message);
     }
 }

@@ -7,6 +7,7 @@ use App\Filament\Resources\BillOfMaterialResource\Pages\ViewBillOfMaterial;
 use App\Http\Controllers\HelperController;
 use App\Models\BillOfMaterial;
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
 use App\Models\Product;
 use App\Models\UnitOfMeasure;
 use App\Services\BillOfMaterialService;
@@ -100,9 +101,12 @@ class BillOfMaterialResource extends Resource
                                 return "({$product->sku}) {$product->name}";
                             })
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $product = Product::find($state);
+                                $product = self::findProductForForm($state);
                                 if ($product) {
                                     $set('uom_id', $product->uom_id);
+                                    $set('work_in_progress_coa_id', self::getDefaultTemporaryProductionCoaId());
+                                    $set('labor_coa_id', $product->manufacturing_labor_coa_id);
+                                    $set('overhead_coa_id', $product->manufacturing_overhead_coa_id);
                                     $listConversions = [];
                                     foreach ($product->unitConversions as $index => $conversion) {
                                         $listConversions[$index] = [
@@ -119,8 +123,7 @@ class BillOfMaterialResource extends Resource
                                 'exists' => 'Produk tidak ditemukan !'
                             ])
                             ->relationship('product', 'name', function (Builder $query, $get) {
-                                $query->where('is_manufacture', true)
-                                    ->where('cabang_id', $get('cabang_id'));
+                                $query->withoutGlobalScopes()->where('is_manufacture', true);
                             }),
                         Select::make('uom_id')
                             ->label('Unif Of Measure (Satuan)')
@@ -140,118 +143,6 @@ class BillOfMaterialResource extends Resource
                             ->required()
                             ->numeric()
                             ->default(0.00),
-                        Fieldset::make('Biaya Produksi')
-                            ->schema([
-                                TextInput::make('labor_cost')
-                                    ->label('Biaya Tenaga Kerja Langsung (TKL)')
-                                    ->helperText('Biaya tenaga kerja untuk memproduksi produk ini')
-                                    ->indonesianMoney()
-                                    ->default(0)
-                                    ->reactive()
-                                    ->afterStateUpdated(fn($set, $get) => self::updateTotalCost($set, $get)),
-                                TextInput::make('overhead_cost')
-                                    ->label('Biaya Overhead')
-                                    ->default(0)
-                                    ->reactive()
-                                    ->indonesianMoney()
-                                    ->afterStateUpdated(fn($state, $set, $get) => self::updateTotalCost($set, $get)),
-                                Placeholder::make('material_cost_display')
-                                    ->label('Biaya Material')
-                                    ->reactive()
-                                    ->content(function ($get) {
-                                        $items = $get('items') ?? [];
-                                        $materialCost = 0;
-                                        foreach ($items as $item) {
-                                            $unitPrice = HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
-                                            $quantity = (float) ($item['quantity'] ?? 0);
-                                            $materialCost += ($unitPrice * $quantity);
-                                        }
-                                        return 'Rp ' . number_format($materialCost, 0, ',', '.');
-                                    }),
-                                Placeholder::make('total_cost_display')
-                                    ->label('Total Biayas')
-                                    ->reactive()
-                                    ->content(function ($get) {
-                                        $materialCost = 0;
-                                        $items = $get('items') ?? [];
-                                        foreach ($items as $item) {
-                                            $unitPrice = HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
-                                            $quantity = (float) ($item['quantity'] ?? 0);
-                                            $materialCost += ($unitPrice * $quantity);
-                                        }
-                                        $laborCost = HelperController::parseIndonesianMoney($get('labor_cost'));
-                                        $overheadCost = HelperController::parseIndonesianMoney($get('overhead_cost'));
-                                        $totalCost = $materialCost + $laborCost + $overheadCost;
-                                        return 'Rp ' . number_format($totalCost, 0, ',', '.');
-                                    }),
-                                Hidden::make('total_cost')
-                                    ->dehydrated()
-                                    ->mutateDehydratedStateUsing(function ($state, $get) {
-                                        $materialCost = 0;
-                                        $items = $get('items') ?? [];
-                                        foreach ($items as $item) {
-                                            $unitPrice = (float) ($item['unit_price'] ?? 0);
-                                            $quantity = (float) ($item['quantity'] ?? 0);
-                                            $materialCost += ($unitPrice * $quantity);
-                                        }
-
-                                        $laborCost = (float) $get('labor_cost');
-                                        $overheadCost = (float) $get('overhead_cost');
-                                        return $materialCost + $laborCost + $overheadCost;
-                                    }),
-                            ])
-                            ->columns(2),
-                        Fieldset::make('Pengaturan Akuntansi')
-                            ->schema([
-                                Select::make('finished_goods_coa_id')
-                                    ->label('COA Persediaan Barang Jadi')
-                                    ->helperText('COA untuk mencatat persediaan barang jadi setelah produksi selesai')
-                                    ->relationship('finishedGoodsCoa', 'name')
-                                    ->getOptionLabelFromRecordUsing(function ($record) {
-                                        return "({$record->code}) {$record->name}";
-                                    })
-                                    ->searchable(['code', 'name'])
-                                    ->preload()
-                                    ->nullable(),
-                                Select::make('work_in_progress_coa_id')
-                                    ->label('COA Persediaan Barang Dalam Proses')
-                                    ->helperText('COA untuk mencatat persediaan barang dalam proses selama produksi')
-                                    ->relationship('workInProgressCoa', 'name')
-                                    ->getOptionLabelFromRecordUsing(function ($record) {
-                                        return "({$record->code}) {$record->name}";
-                                    })
-                                    ->searchable(['code', 'name'])
-                                    ->preload()
-                                    ->nullable(),
-                            ])
-                            ->columns(2),
-                        Textarea::make('note')
-                            ->label('Catatan')
-                            ->nullable(),
-                        Toggle::make('is_active')
-                            ->required(),
-                        Repeater::make('satuan_konversi')
-                            ->columnSpanFull()
-                            ->columns(2)
-                            ->reactive()
-                            ->disabled()
-                            ->label("Satuan Konversi")
-                            ->schema([
-                                Select::make('uom_id')
-                                    ->label('Satuan')
-                                    ->preload()
-                                    ->disabled()
-                                    ->reactive()
-                                    ->searchable()
-                                    ->options(function () {
-                                        return UnitOfMeasure::get()->pluck('name', 'id');
-                                    }),
-                                TextInput::make('nilai_konversi')
-                                    ->label('Nilai Konversi')
-                                    ->reactive()
-                                    ->disabled()
-                                    ->numeric(),
-                            ]),
                         Repeater::make('items')
                             ->relationship()
                             ->columnSpanFull()
@@ -260,7 +151,6 @@ class BillOfMaterialResource extends Resource
                                     ->icon('heroicon-o-plus-circle');
                             })
                             ->mutateRelationshipDataBeforeSaveUsing(function (array $data) {
-                                // Ensure numeric values are stored correctly
                                 if (isset($data['unit_price'])) {
                                     $data['unit_price'] = HelperController::parseIndonesianMoney($data['unit_price']);
                                 }
@@ -274,16 +164,17 @@ class BillOfMaterialResource extends Resource
                             })
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data) {
                                 $listConversions = [];
-                                $product = Product::find($data['product_id']);
-                                foreach ($product->unitConversions as $index => $conversion) {
-                                    $listConversions[$index] = [
-                                        'uom_id' => $conversion->uom_id,
-                                        'nilai_konversi' => $conversion->nilai_konversi
-                                    ];
+                                $product = self::findProductForForm($data['product_id'] ?? null);
+                                if ($product) {
+                                    foreach ($product->unitConversions as $index => $conversion) {
+                                        $listConversions[$index] = [
+                                            'uom_id' => $conversion->uom_id,
+                                            'nilai_konversi' => $conversion->nilai_konversi
+                                        ];
+                                    }
                                 }
                                 $data['satuan_konversi'] = $listConversions;
 
-                                // Convert string values to numeric for proper calculations
                                 if (isset($data['unit_price'])) {
                                     $data['unit_price'] = HelperController::parseIndonesianMoney($data['unit_price']);
                                 }
@@ -307,7 +198,7 @@ class BillOfMaterialResource extends Resource
                                         'exists' => 'Material tidak tersedia !'
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $product = Product::find($state);
+                                        $product = self::findProductForForm($state);
                                         if ($product) {
                                             $set('uom_id', $product->uom_id);
                                             $set('unit_price', $product->cost_price);
@@ -320,7 +211,6 @@ class BillOfMaterialResource extends Resource
                                             }
 
                                             $set('satuan_konversi', $listConversions);
-                                            // Update subtotal and total cost after setting unit_price
                                             $quantity = (float) ($get('quantity') ?? 0);
                                             $set('subtotal', $product->cost_price * $quantity);
                                             self::updateTotalCost($set, $get);
@@ -344,11 +234,9 @@ class BillOfMaterialResource extends Resource
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $productId = $get('product_id');
-                                        $product = $productId ? Product::with('unitConversions')->find($productId) : null;
+                                        $product = $productId ? self::findProductForForm($productId) : null;
                                         if (!$product || !$state) return;
 
-                                        // Check if selected UOM is an alternative UOM with a conversion factor
-                                        // nilai_konversi: 1 base unit = nilai_konversi alternative units
                                         $conversions = $get('satuan_konversi') ?? [];
                                         $convFactor = null;
                                         foreach ($conversions as $conv) {
@@ -359,15 +247,10 @@ class BillOfMaterialResource extends Resource
                                         }
 
                                         if ($convFactor !== null && $convFactor > 0) {
-                                            // 1 base unit = convFactor alternative units
-                                            // => unit_price per alternative unit = cost_price / convFactor
-                                            // Example: base=kg/Rp10.000, 1kg=1000g => price/g = 10000/1000 = Rp10
                                             $newUnitPrice = (float)$product->cost_price / $convFactor;
                                         } elseif ((int)$state === (int)$product->uom_id) {
-                                            // Selected UOM is the product's base UOM
                                             $newUnitPrice = (float)$product->cost_price;
                                         } else {
-                                            // Unknown UOM — keep current unit_price
                                             return;
                                         }
 
@@ -437,7 +320,146 @@ class BillOfMaterialResource extends Resource
                                             ->reactive()
                                             ->required(),
                                     ])
+                            ]),
+                        Fieldset::make('Biaya Produksi')
+                            ->schema([
+                                TextInput::make('labor_cost')
+                                    ->label('Biaya Tenaga Kerja Langsung (TKL)')
+                                    ->helperText('Biaya tenaga kerja untuk memproduksi produk ini')
+                                    ->indonesianMoney()
+                                    ->default(0)
+                                    ->reactive()
+                                    ->afterStateUpdated(fn($set, $get) => self::updateTotalCost($set, $get)),
+                                TextInput::make('overhead_cost')
+                                    ->label('Biaya Overhead')
+                                    ->default(0)
+                                    ->reactive()
+                                    ->indonesianMoney()
+                                    ->afterStateUpdated(fn($state, $set, $get) => self::updateTotalCost($set, $get)),
+                                Placeholder::make('material_cost_display')
+                                    ->label('Biaya Material')
+                                    ->reactive()
+                                    ->content(function ($get) {
+                                        $items = $get('items') ?? [];
+                                        $materialCost = 0;
+                                        foreach ($items as $item) {
+                                            $unitPrice = HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
+                                            $quantity = (float) ($item['quantity'] ?? 0);
+                                            $materialCost += ($unitPrice * $quantity);
+                                        }
+                                        return 'Rp ' . number_format($materialCost, 0, ',', '.');
+                                    }),
+                                Placeholder::make('total_cost_display')
+                                    ->label('Total Biayas')
+                                    ->reactive()
+                                    ->content(function ($get) {
+                                        $materialCost = 0;
+                                        $items = $get('items') ?? [];
+                                        foreach ($items as $item) {
+                                            $unitPrice = HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
+                                            $quantity = (float) ($item['quantity'] ?? 0);
+                                            $materialCost += ($unitPrice * $quantity);
+                                        }
+                                        $laborCost = HelperController::parseIndonesianMoney($get('labor_cost'));
+                                        $overheadCost = HelperController::parseIndonesianMoney($get('overhead_cost'));
+                                        $totalCost = $materialCost + $laborCost + $overheadCost;
+                                        return 'Rp ' . number_format($totalCost, 0, ',', '.');
+                                    }),
+                                Hidden::make('total_cost')
+                                    ->dehydrated()
+                                    ->mutateDehydratedStateUsing(function ($state, $get) {
+                                        $materialCost = 0;
+                                        $items = $get('items') ?? [];
+                                        foreach ($items as $item) {
+                                            $unitPrice = (float) ($item['unit_price'] ?? 0);
+                                            $quantity = (float) ($item['quantity'] ?? 0);
+                                            $materialCost += ($unitPrice * $quantity);
+                                        }
+
+                                        $laborCost = (float) $get('labor_cost');
+                                        $overheadCost = (float) $get('overhead_cost');
+                                        return $materialCost + $laborCost + $overheadCost;
+                                    }),
                             ])
+                            ->columns(2),
+                        Fieldset::make('Pengaturan Akuntansi')
+                            ->schema([
+                                Placeholder::make('finished_goods_coa_label')
+                                    ->label('COA Persediaan Barang Produksi')
+                                    ->content(function ($get) {
+                                        $product = Product::withoutGlobalScopes()->with('inventoryCoa')->find($get('product_id'));
+
+                                        if (!$product || !$product->inventoryCoa || !$product->inventoryCoa->id) {
+                                            return 'Mengikuti COA persediaan pada product yang dipilih.';
+                                        }
+
+                                        return "({$product->inventoryCoa->code}) {$product->inventoryCoa->name}";
+                                    }),
+                                Select::make('work_in_progress_coa_id')
+                                    ->label('COA Pos Sementara Produksi')
+                                    ->helperText('Dipakai saat pengambilan bahan baku sampai QC produksi selesai.')
+                                    ->relationship('workInProgressCoa', 'name')
+                                    ->getOptionLabelFromRecordUsing(function ($record) {
+                                        return "({$record->code}) {$record->name}";
+                                    })
+                                    ->searchable(['code', 'name'])
+                                    ->preload()
+                                    ->default(fn () => self::getDefaultTemporaryProductionCoaId())
+                                    ->afterStateHydrated(function ($set, $state) {
+                                        if (!$state) {
+                                            $set('work_in_progress_coa_id', self::getDefaultTemporaryProductionCoaId());
+                                        }
+                                    })
+                                    ->nullable(),
+                                Select::make('labor_coa_id')
+                                    ->label('COA TKL Produksi')
+                                    ->helperText('Default mengikuti product yang dipilih, tetapi bisa dioverride per BOM.')
+                                    ->relationship('laborCoa', 'name')
+                                    ->getOptionLabelFromRecordUsing(function ($record) {
+                                        return "({$record->code}) {$record->name}";
+                                    })
+                                    ->searchable(['code', 'name'])
+                                    ->preload()
+                                    ->nullable(),
+                                Select::make('overhead_coa_id')
+                                    ->label('COA Overhead Produksi')
+                                    ->helperText('Default mengikuti product yang dipilih, tetapi bisa dioverride per BOM.')
+                                    ->relationship('overheadCoa', 'name')
+                                    ->getOptionLabelFromRecordUsing(function ($record) {
+                                        return "({$record->code}) {$record->name}";
+                                    })
+                                    ->searchable(['code', 'name'])
+                                    ->preload()
+                                    ->nullable(),
+                            ])
+                            ->columns(2),
+                        Textarea::make('note')
+                            ->label('Catatan')
+                            ->nullable(),
+                        Toggle::make('is_active')
+                            ->required(),
+                        Repeater::make('satuan_konversi')
+                            ->columnSpanFull()
+                            ->columns(2)
+                            ->reactive()
+                            ->disabled()
+                            ->label("Satuan Konversi")
+                            ->schema([
+                                Select::make('uom_id')
+                                    ->label('Satuan')
+                                    ->preload()
+                                    ->disabled()
+                                    ->reactive()
+                                    ->searchable()
+                                    ->options(function () {
+                                        return UnitOfMeasure::get()->pluck('name', 'id');
+                                    }),
+                                TextInput::make('nilai_konversi')
+                                    ->label('Nilai Konversi')
+                                    ->reactive()
+                                    ->disabled()
+                                    ->numeric(),
+                            ]),
 
                     ])
             ]);
@@ -510,14 +532,8 @@ class BillOfMaterialResource extends Resource
                         return 'Rp ' . number_format($state, 2, ',', '.');
                     })
                     ->toggleable(isToggledHiddenByDefault: false),
-                TextColumn::make('finishedGoodsCoa.code')
-                    ->label('COA Barang Jadi')
-                    ->formatStateUsing(function ($state, $record) {
-                        return $state ? "({$state}) {$record->finishedGoodsCoa->name}" : '-';
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('workInProgressCoa.code')
-                    ->label('COA Barang Dalam Proses')
+                    ->label('COA Pos Sementara Produksi')
                     ->formatStateUsing(function ($state, $record) {
                         return $state ? "({$state}) {$record->workInProgressCoa->name}" : '-';
                     })
@@ -603,7 +619,7 @@ class BillOfMaterialResource extends Resource
                             '<li><strong>Komponen Utama:</strong> <em>Material Items</em> (bahan baku), <em>Biaya Tenaga Kerja</em> (TKL), <em>Biaya Overhead</em> (BOP), dan <em>COA Akuntansi</em> untuk persediaan.</li>' .
                             '<li><strong>Validasi:</strong> Produk harus bertipe manufacture, material harus bertipe raw material. Unit konversi otomatis terdeteksi dari produk.</li>' .
                             '<li><strong>Perhitungan Biaya:</strong> <em>Material Cost</em> = jumlah bahan × harga satuan, <em>Total Cost</em> = Material + TKL + BOP. Biaya tersimpan untuk costing produksi.</li>' .
-                            '<li><strong>COA Integration:</strong> <em>Finished Goods COA</em> untuk persediaan barang jadi, <em>Work in Progress COA</em> untuk barang dalam proses produksi.</li>' .
+                            '<li><strong>COA Integration:</strong> Persediaan barang produksi mengikuti COA persediaan pada product, sedangkan proses material issue memakai <em>Pos Sementara Produksi</em>.</li>' .
                             '<li><strong>Actions:</strong> <em>Create/Edit</em> BOM, <em>Generate Code</em> otomatis, <em>View Production Plans</em> yang menggunakan BOM ini.</li>' .
                             '<li><strong>Permissions:</strong> <em>view any bill of material</em>, <em>create bill of material</em>, <em>update bill of material</em>, <em>delete bill of material</em>.</li>' .
                             '<li><strong>Integration:</strong> Terintegrasi dengan Production Plans, Manufacturing Orders, dan sistem costing untuk perhitungan harga pokok produksi.</li>' .
@@ -611,6 +627,24 @@ class BillOfMaterialResource extends Resource
                     '</div>' .
                 '</details>'
             ));
+    }
+
+    protected static function getDefaultTemporaryProductionCoaId(): ?int
+    {
+        return ChartOfAccount::query()
+            ->where('code', '1400.04')
+            ->value('id');
+    }
+
+    protected static function findProductForForm(?int $productId): ?Product
+    {
+        if (! $productId) {
+            return null;
+        }
+
+        return Product::withoutGlobalScopes()
+            ->with(['unitConversions', 'inventoryCoa'])
+            ->find($productId);
     }
 
     protected static function updateTotalCost(callable $set, callable $get): void

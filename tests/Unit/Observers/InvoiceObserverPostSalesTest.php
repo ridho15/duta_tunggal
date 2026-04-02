@@ -5,10 +5,13 @@ namespace Tests\Unit\Observers;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\JournalEntry;
+use App\Models\Product;
 use App\Models\SaleOrder;
 use App\Observers\InvoiceObserver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
@@ -44,6 +47,8 @@ class InvoiceObserverPostSalesTest extends TestCase
         ChartOfAccount::create(['code' => '1120',    'name' => 'Piutang Dagang',  'type' => 'Asset']);
         ChartOfAccount::create(['code' => '4000',    'name' => 'Penjualan',       'type' => 'Revenue']);
         ChartOfAccount::create(['code' => '2120.06', 'name' => 'PPn Keluaran',    'type' => 'Liability']);
+        ChartOfAccount::create(['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset']);
+        ChartOfAccount::create(['code' => '5100.10', 'name' => 'HPP Barang',      'type' => 'Expense']);
         ChartOfAccount::create(['code' => '6100.02', 'name' => 'Biaya Pengiriman','type' => 'Expense']);
         ChartOfAccount::create(['code' => '4100.01', 'name' => 'Diskon Penjualan','type' => 'Expense']);
     }
@@ -68,6 +73,27 @@ class InvoiceObserverPostSalesTest extends TestCase
         $invoice->saveQuietly();
 
         return $invoice;
+    }
+
+    private function attachInvoiceItemWithCostBasis(Invoice $invoice, array $overrides = []): void
+    {
+        $product = Product::factory()->create(array_merge([
+            'cost_price' => 20_000,
+            'cogs_coa_id' => ChartOfAccount::where('code', '5100.10')->value('id'),
+            'goods_delivery_coa_id' => ChartOfAccount::where('code', '1140.20')->value('id'),
+            'sales_coa_id' => ChartOfAccount::where('code', '4000')->value('id'),
+        ], $overrides['product'] ?? []));
+
+        InvoiceItem::factory()->create(array_merge([
+            'invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'price' => 50_000,
+            'subtotal' => 100_000,
+            'total' => 100_000,
+            'tax_rate' => 0,
+            'tax_amount' => 0,
+        ], $overrides['item'] ?? []));
     }
 
     // ─── Bug A: dd() replaced by RuntimeException ────────────────────────────
@@ -141,6 +167,7 @@ class InvoiceObserverPostSalesTest extends TestCase
             'tax'       => 11,          // rate in percent (NOT monetary amount)
             'total'     => 111_500_000, // intentional 500k discrepancy to verify derived is NOT used
         ]);
+        $this->attachInvoiceItemWithCostBasis($invoice);
 
         $this->observer->postSalesInvoice($invoice);
 
@@ -164,6 +191,7 @@ class InvoiceObserverPostSalesTest extends TestCase
         $this->makeCoas();
 
         $invoice = $this->makeInvoice();
+        $this->attachInvoiceItemWithCostBasis($invoice);
 
         $this->observer->postSalesInvoice($invoice);
         $countAfterFirst = JournalEntry::where('source_id', $invoice->id)->count();
@@ -186,6 +214,7 @@ class InvoiceObserverPostSalesTest extends TestCase
         Log::spy();
 
         $invoice = $this->makeInvoice();
+        $this->attachInvoiceItemWithCostBasis($invoice);
         $this->observer->postSalesInvoice($invoice);
 
         Log::shouldHaveReceived('info')
@@ -208,5 +237,72 @@ class InvoiceObserverPostSalesTest extends TestCase
         Log::shouldHaveReceived('error')
             ->withArgs(fn($msg) => str_contains($msg, 'postSalesInvoice'))
             ->once();
+    }
+
+    /** @test */
+    public function it_throws_when_cost_of_sales_cannot_be_derived_and_rolls_back_sales_journals(): void
+    {
+        $this->makeCoas();
+
+        $invoice = $this->makeInvoice();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Sales invoice tidak dapat diposting karena HPP / release barang terkirim tidak dapat dihitung');
+
+        try {
+            $this->observer->postSalesInvoice($invoice);
+        } finally {
+            $count = JournalEntry::where('source_type', Invoice::class)
+                ->where('source_id', $invoice->id)
+                ->count();
+
+            $this->assertSame(0, $count);
+        }
+    }
+
+    /** @test */
+    public function it_can_post_using_configured_non_legacy_coa_codes(): void
+    {
+        Config::set('coa.accounts_receivable', '1120.10');
+        Config::set('coa.sales_revenue', '4111');
+        Config::set('coa.sales_output_vat', '2120.99');
+        Config::set('coa.sales_shipping', '6100.22');
+
+        ChartOfAccount::create(['code' => '1120.10', 'name' => 'Piutang Dagang Regional', 'type' => 'Asset']);
+        ChartOfAccount::create(['code' => '4111', 'name' => 'Pendapatan Penjualan', 'type' => 'Revenue']);
+        ChartOfAccount::create(['code' => '2120.99', 'name' => 'PPN Keluaran Regional', 'type' => 'Liability']);
+        ChartOfAccount::create(['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset']);
+        ChartOfAccount::create(['code' => '5100.10', 'name' => 'HPP Barang', 'type' => 'Expense']);
+        ChartOfAccount::create(['code' => '6100.22', 'name' => 'Biaya Pengiriman Regional', 'type' => 'Expense']);
+        ChartOfAccount::create(['code' => '4100.01', 'name' => 'Diskon Penjualan', 'type' => 'Expense']);
+
+        $invoice = $this->makeInvoice([
+            'tax' => 0,
+            'ppn_rate' => 0,
+            'ar_coa_id' => ChartOfAccount::where('code', '1120.10')->value('id'),
+            'revenue_coa_id' => ChartOfAccount::where('code', '4111')->value('id'),
+            'ppn_keluaran_coa_id' => ChartOfAccount::where('code', '2120.99')->value('id'),
+        ]);
+
+        $this->attachInvoiceItemWithCostBasis($invoice, [
+            'product' => [
+                'sales_coa_id' => ChartOfAccount::where('code', '4111')->value('id'),
+            ],
+        ]);
+
+        $this->observer->postSalesInvoice($invoice);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => Invoice::class,
+            'source_id' => $invoice->id,
+            'coa_id' => ChartOfAccount::where('code', '1120.10')->value('id'),
+            'description' => 'Sales Invoice - Accounts Receivable',
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => Invoice::class,
+            'source_id' => $invoice->id,
+            'coa_id' => ChartOfAccount::where('code', '4111')->value('id'),
+        ]);
     }
 }

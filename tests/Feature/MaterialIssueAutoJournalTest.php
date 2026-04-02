@@ -35,8 +35,8 @@ beforeEach(function () {
     if (!ChartOfAccount::where('code', '1140.02')->exists()) {
         ChartOfAccount::create(['code' => '1140.02', 'name' => 'Persediaan Barang Dalam Proses', 'type' => 'asset']);
     }
-    if (!ChartOfAccount::where('code', '1140.03')->exists()) {
-        ChartOfAccount::create(['code' => '1140.03', 'name' => 'Persediaan Barang Jadi', 'type' => 'asset']);
+    if (!ChartOfAccount::where('code', '1140.02')->exists()) {
+        ChartOfAccount::create(['code' => '1140.02', 'name' => 'Persediaan Barang Produksi', 'type' => 'asset']);
     }
 });
 

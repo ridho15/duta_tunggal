@@ -34,6 +34,40 @@ class DeliveryScheduleService
     }
 
     /**
+     * K3: When delivery schedule starts shipping, mark related DOs as sent.
+     */
+    public function startRelatedDeliveryOrders(DeliverySchedule $schedule): int
+    {
+        $deliveryOrders = $schedule->relatedDeliveryOrders();
+
+        $startedCount = 0;
+
+        foreach ($deliveryOrders as $deliveryOrder) {
+            if (! $deliveryOrder instanceof DeliveryOrder) {
+                continue;
+            }
+
+            if (in_array($deliveryOrder->status, ['sent', 'received', 'completed', 'closed'])) {
+                continue;
+            }
+
+            try {
+                $deliveryOrder->update(['status' => 'sent']);
+                $startedCount++;
+            } catch (\Throwable $e) {
+                Log::warning('DeliveryScheduleService: failed to start related DO', [
+                    'delivery_schedule_id' => $schedule->id,
+                    'delivery_order_id' => $deliveryOrder->id,
+                    'do_number' => $deliveryOrder->do_number,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $startedCount;
+    }
+
+    /**
      * K3: When delivery schedule is delivered, mark all related DOs to completed.
      *
      * Transition strategy:
@@ -42,12 +76,7 @@ class DeliveryScheduleService
      */
     public function completeRelatedDeliveryOrders(DeliverySchedule $schedule): int
     {
-        $schedule->loadMissing('suratJalans.deliveryOrder');
-
-        $deliveryOrders = $schedule->suratJalans
-            ->flatMap(fn ($sj) => $sj->deliveryOrder)
-            ->unique('id')
-            ->values();
+        $deliveryOrders = $schedule->relatedDeliveryOrders();
 
         $completedCount = 0;
 

@@ -37,7 +37,7 @@ class WarehouseConfirmationResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $label = 'Konfirmasi Gudang';
 
@@ -407,7 +407,7 @@ class WarehouseConfirmationResource extends Resource
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Konfirmasi Gudang adalah proses validasi dari warehouse terhadap Sales Order atau Manufacturing Order sebelum eksekusi.</li>' .
                             '<li><strong>Status Flow:</strong> Request → Confirmed/Partial Confirmed/Rejected. Gudang memberikan konfirmasi kesiapan stok dan logistik.</li>' .
-                            '<li><strong>Related Orders:</strong> Untuk flow DO baru, WC dibuat otomatis dari Delivery Order saat request stock dan diproses manual oleh gudang.</li>' .
+                            '<li><strong>Related Orders:</strong> Untuk flow DO baru, WC dibuat saat Delivery Order dibuat dan selalu diproses manual oleh gudang.</li>' .
                             '<li><strong>Actions:</strong> Gunakan aksi <em>Approve</em> atau <em>Reject</em> untuk memproses request. Reject wajib isi alasan.</li>' .
                             '<li><strong>Tracking:</strong> Mencatat siapa yang mengkonfirmasi (Confirmed By) dan kapan dikonfirmasi (Confirmed At).</li>' .
                             '<li><strong>Integration:</strong> Status WC otomatis menyinkronkan status Delivery Order terkait.</li>' .

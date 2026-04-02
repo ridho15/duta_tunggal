@@ -10,10 +10,10 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
-use App\Models\Warehouse;
 use App\Services\CustomerService;
 use App\Services\QuotationService;
 use App\Services\SalesOrderService;
+use App\Support\WarehouseStockOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Checkbox;
@@ -1127,18 +1127,19 @@ class QuotationResource extends Resource
                                                 ->label('Gudang')
                                                 ->searchable()
                                                 ->preload()
-                                                ->options(function () {
-                                                    return Warehouse::where('status', 1)->pluck('name', 'id')->map(function ($name, $id) {
-                                                        $warehouse = Warehouse::find($id);
-                                                        return "({$warehouse->kode}) {$name}";
-                                                    });
+                                                ->options(function ($get) {
+                                                    return WarehouseStockOptions::forProduct(
+                                                        $get('product_id'),
+                                                        $get('warehouse_id'),
+                                                    );
                                                 })
+                                                ->helperText('Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini.')
                                                 ->required()
                                                 ->validationMessages([
                                                     'required' => 'Gudang wajib dipilih'
                                                 ])
-                                                ->default(function () {
-                                                    return Warehouse::where('status', 1)->first()?->id;
+                                                ->default(function ($get) {
+                                                    return array_key_first(WarehouseStockOptions::forProduct($get('product_id')));
                                                 })
                                                 ->reactive()
                                                 ->afterStateUpdated(function ($set) {

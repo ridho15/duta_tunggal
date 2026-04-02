@@ -37,6 +37,8 @@ test('K3-b: delivery-schedules create includes status delivered option', async (
   const body = await page.textContent('body')
   expect(body).not.toMatch(ERR)
   expect(body).toContain('Selesai / Terkirim')
+  expect(body).toContain('Delivery Order')
+  expect(body).not.toContain('Pilih satu atau lebih Surat Jalan untuk jadwal ini')
 })
 
 test('B1-a: purchase-invoices create shows non-editable pricing helper', async ({ page }) => {

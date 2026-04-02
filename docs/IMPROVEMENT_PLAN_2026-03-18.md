@@ -4,6 +4,59 @@
 
 ---
 
+## Update Audit Ledger & Balance Sheet (1 April 2026)
+
+### Update Cash Flow Follow-up (1 April 2026)
+- Blocker cash flow pada `finance-report-design` sudah ditutup.
+- Perbaikan utama di `CashFlowReportService`:
+  - opening balance sekarang menghitung transaksi yang menyentuh akun kas/bank di sisi `account_coa` maupun `offset_coa`,
+  - internal transfer antar akun kas/bank tidak ikut mendistorsi opening balance,
+  - indirect working-capital adjustment sekarang memakai prefix berbasis konfigurasi COA + fallback legacy, bukan satu prefix hardcoded saja,
+  - default periode service disamakan dengan UI report (`startOfMonth` s/d `endOfMonth`).
+- Test cash flow juga distabilkan agar tidak flaky saat run di awal bulan dan agar fixture receipt/invoice tidak memicu observer posting yang memang bukan fokus suite cash flow.
+
+### Bukti Validasi Cash Flow Terbaru
+- `tests/Feature/CashFlowPageTest.php` + `tests/Feature/CashFlowReportServiceTest.php`: **28 passed, 0 failed**.
+- `tests/playwright/finance-report-design.spec.js`: **25 passed, 0 failed**.
+- Dengan hasil ini, blocker `500 Internal Server Error` pada halaman cash flow tidak lagi muncul pada scope verifikasi finance report design.
+
+### Perubahan Implementasi Terkonfirmasi
+- Vendor payment deposit sekarang **fail-fast** di dua lapis:
+  - `LedgerPostingService::postVendorPayment()` menolak posting jika COA deposit supplier tidak ditemukan dan rollback seluruh jurnal.
+  - `VendorPaymentObserver` dan `VendorPaymentDetailObserver` sekarang memvalidasi lebih awal saat create/update agar:
+    - supplier wajib punya deposit aktif,
+    - saldo deposit wajib cukup,
+    - COA deposit wajib tersedia.
+- Balance sheet tidak lagi memaksa angka menjadi seimbang lewat penyesuaian retained earnings/laba ditahan.
+- Halaman balance sheet sekarang menampilkan **warning selisih aktual** di UI dan notification saat preview dibuka.
+
+### Bukti Backend Test Terbaru
+- Regression suite terfokus vendor payment + balance sheet: **91 passed, 0 failed**.
+- Coverage yang tervalidasi mencakup:
+  - fail-hard vendor payment deposit di service,
+  - fail-early vendor payment deposit di observer,
+  - balance sheet `difference` aktual,
+  - warning data untuk halaman balance sheet legacy dan report page baru.
+
+### Bukti Playwright Terbaru
+- `tests/playwright/tc-bs.spec.js`: **6 passed, 0 failed**.
+- Suite ini sudah disesuaikan ke UI balance sheet saat ini:
+  - tidak lagi mengasumsikan teks `Balanced`,
+  - tidak lagi mencari blok `Auto Balance`,
+  - menerima status `Neraca Seimbang` maupun `Neraca Tidak Seimbang` sesuai data ledger aktual.
+
+### Temuan Baru Saat Verifikasi E2E
+- Temuan cash flow sebelumnya sudah ditindaklanjuti dan tervalidasi lulus.
+- Balance sheet tetap bukan sumber kegagalan pada scope finance-report-design.
+
+### Status Ringkas
+- Hardening vendor payment deposit: **selesai**.
+- Balance sheet honesty / no masking: **selesai**.
+- Playwright balance sheet: **selesai**.
+- Playwright finance-report-design global: **selesai, cash flow blocker tertutup**.
+
+---
+
 ## Verifikasi Playwright Lanjutan (19 Maret 2026)
 
 ### Hasil Terverifikasi Selesai

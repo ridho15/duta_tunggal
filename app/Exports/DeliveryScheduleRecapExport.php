@@ -66,7 +66,7 @@ class DeliveryScheduleRecapSummarySheet implements FromCollection, WithHeadings,
     {
         return [
             'No', 'No. Jadwal', 'Driver', 'Kendaraan',
-            'Tanggal Keberangkatan', 'Jumlah Surat Jalan',
+            'Tanggal Keberangkatan', 'Jumlah Delivery Order',
             'Status', 'Catatan',
         ];
     }
@@ -74,7 +74,7 @@ class DeliveryScheduleRecapSummarySheet implements FromCollection, WithHeadings,
     public function collection(): Collection
     {
         $query = DeliverySchedule::withoutGlobalScopes()
-            ->with(['driver', 'vehicle', 'suratJalans'])
+            ->with(['driver', 'vehicle', 'suratJalan.deliveryOrder'])
             ->whereIn('driver_id', $this->driverIds);
 
         if ($this->dateFrom) {
@@ -90,7 +90,6 @@ class DeliveryScheduleRecapSummarySheet implements FromCollection, WithHeadings,
             'pending'           => 'Menunggu Keberangkatan',
             'on_the_way'        => 'Sedang Berjalan',
             'delivered'         => 'Selesai / Terkirim',
-            'partial_delivered' => 'Sebagian Terkirim',
             'failed'            => 'Gagal',
             'cancelled'         => 'Dibatalkan',
         ];
@@ -105,7 +104,7 @@ class DeliveryScheduleRecapSummarySheet implements FromCollection, WithHeadings,
                 $schedule->driver->name ?? '-',
                 $schedule->vehicle->plate ?? '-',
                 $schedule->scheduled_date ? \Carbon\Carbon::parse($schedule->scheduled_date)->format('d/m/Y H:i') : '-',
-                $schedule->suratJalans->count(),
+                $schedule->relatedDeliveryOrders()->count(),
                 $statusLabels[$schedule->status] ?? strtoupper($schedule->status),
                 $schedule->notes ?? '',
             ]);
@@ -169,14 +168,14 @@ class DeliveryScheduleRecapDriverSheet implements FromCollection, WithHeadings, 
     {
         return [
             'No', 'No. Jadwal', 'Tanggal Keberangkatan',
-            'Kendaraan', 'No. Surat Jalan', 'Status', 'Catatan',
+            'Kendaraan', 'No. Delivery Order', 'Status', 'Catatan',
         ];
     }
 
     public function collection(): Collection
     {
         $query = DeliverySchedule::withoutGlobalScopes()
-            ->with(['vehicle', 'suratJalans'])
+            ->with(['vehicle', 'suratJalan.deliveryOrder'])
             ->where('driver_id', $this->driver->id);
 
         if ($this->dateFrom) {
@@ -192,7 +191,6 @@ class DeliveryScheduleRecapDriverSheet implements FromCollection, WithHeadings, 
             'pending'           => 'Menunggu Keberangkatan',
             'on_the_way'        => 'Sedang Berjalan',
             'delivered'         => 'Selesai / Terkirim',
-            'partial_delivered' => 'Sebagian Terkirim',
             'failed'            => 'Gagal',
             'cancelled'         => 'Dibatalkan',
         ];
@@ -201,14 +199,14 @@ class DeliveryScheduleRecapDriverSheet implements FromCollection, WithHeadings, 
         $no   = 1;
 
         foreach ($schedules as $schedule) {
-            $sjNumbers = $schedule->suratJalans->pluck('sj_number')->implode(', ') ?: '-';
+            $doNumbers = $schedule->relatedDeliveryOrders()->pluck('do_number')->implode(', ') ?: '-';
 
             $data->push([
                 $no++,
                 $schedule->schedule_number,
                 $schedule->scheduled_date ? \Carbon\Carbon::parse($schedule->scheduled_date)->format('d/m/Y H:i') : '-',
                 $schedule->vehicle->plate ?? '-',
-                $sjNumbers,
+                $doNumbers,
                 $statusLabels[$schedule->status] ?? strtoupper($schedule->status),
                 $schedule->notes ?? '',
             ]);

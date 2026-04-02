@@ -88,7 +88,6 @@ Audit komprehensif telah dilakukan terhadap modul **Manufacturing / Production**
 [1] BillOfMaterial (BOM)
      ├── product_id (finished good)
      ├── work_in_progress_coa_id
-     ├── finished_goods_coa_id
      └── items[] (bahan baku + qty + unit_price)
           │
           ▼
@@ -112,7 +111,7 @@ Audit komprehensif telah dilakukan terhadap modul **Manufacturing / Production**
           │    → qty_reserved- (observer tidak dipanggil)
           ├── MaterialIssueObserver::createStockMovements() [type=manufacture_out, skip_stock_update=true]
           ├── ManufacturingJournalService::generateJournalForMaterialIssue()
-          │    → Dr. 1140.02 (WIP / BOM.work_in_progress_coa_id)
+          │    → Dr. 1400.04 (Pos Sementara Produksi / BOM.work_in_progress_coa_id)
           │    → Cr. [per item] product.inventory_coa_id
           └── MaterialIssueObserver::createManufacturingOrder()
                → ManufacturingOrder created (status: in_progress)
@@ -128,8 +127,8 @@ Audit komprehensif telah dilakukan terhadap modul **Manufacturing / Production**
 [5] QualityControlManufacture (status: pending → completed)
      └── QualityControlService::completeQualityControl()
           ├── ManufacturingJournalService::generateJournalForProductionCompletion()
-          │    → Dr. BOM.finished_goods_coa_id (FG / fallback 1140.03)
-          │    → Cr. BOM.work_in_progress_coa_id (WIP / fallback 1140.02)
+          │    → Dr. Product.inventory_coa_id (FG / fallback 1140.03)
+          │    → Cr. BOM.work_in_progress_coa_id (Pos Sementara Produksi / fallback 1400.04)
           └── StockMovement created (type=manufacture_in)
                → StockMovementObserver: qty_available+ untuk FG
 ```

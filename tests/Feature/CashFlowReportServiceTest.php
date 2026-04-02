@@ -15,6 +15,39 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+function createCashFlowInvoice(array $attributes): Invoice
+{
+    return Invoice::withoutEvents(fn () => Invoice::create($attributes));
+}
+
+function createCashFlowReceipt(array $attributes): CustomerReceipt
+{
+    return CustomerReceipt::withoutEvents(fn () => CustomerReceipt::create($attributes));
+}
+
+function createCashFlowReceiptItem(array $attributes): CustomerReceiptItem
+{
+    return CustomerReceiptItem::withoutEvents(fn () => CustomerReceiptItem::create($attributes));
+}
+
+beforeEach(function () {
+    Carbon::setTestNow('2026-03-15 00:00:00');
+
+    ChartOfAccount::firstOrCreate(
+        ['code' => '1120'],
+        ['name' => 'Piutang Dagang', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    ChartOfAccount::firstOrCreate(
+        ['code' => '4000'],
+        ['name' => 'Penjualan', 'type' => 'Revenue', 'is_active' => true]
+    );
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
+});
+
 dataset('cashFlowSetup', function () {
     return [
         'service' => app(CashFlowReportService::class),
@@ -71,7 +104,7 @@ test('service can generate direct method cash flow report', function () {
         'status' => 'approved',
     ])->create();
 
-    $invoice = \App\Models\Invoice::create([
+    $invoice = createCashFlowInvoice([
         'invoice_number' => 'INV-001',
         'from_model_type' => \App\Models\SaleOrder::class,
         'from_model_id' => $saleOrder->id,
@@ -84,7 +117,7 @@ test('service can generate direct method cash flow report', function () {
         'status' => 'paid',
     ]);
 
-    $receipt = \App\Models\CustomerReceipt::create([
+    $receipt = createCashFlowReceipt([
         'invoice_id' => $invoice->id,
         'customer_id' => $customer->id,
         'payment_date' => now()->subDays(5)->toDateString(),
@@ -99,7 +132,7 @@ test('service can generate direct method cash flow report', function () {
         'payment_adjustment' => 0,
     ]);
 
-    \App\Models\CustomerReceiptItem::create([
+    createCashFlowReceiptItem([
         'customer_receipt_id' => $receipt->id,
         'invoice_id' => $invoice->id,
         'method' => 'Cash',
@@ -221,7 +254,7 @@ test('service validates net change calculation', function () {
         'status' => 'approved',
     ])->create();
 
-    $invoice = \App\Models\Invoice::create([
+    $invoice = createCashFlowInvoice([
         'invoice_number' => 'INV-002',
         'from_model_type' => \App\Models\SaleOrder::class,
         'from_model_id' => $saleOrder->id,
@@ -234,7 +267,7 @@ test('service validates net change calculation', function () {
         'status' => 'paid',
     ]);
 
-    $receipt = \App\Models\CustomerReceipt::create([
+    $receipt = createCashFlowReceipt([
         'invoice_id' => $invoice->id,
         'customer_id' => $customer->id,
         'payment_date' => now()->subDays(5)->toDateString(),
@@ -249,7 +282,7 @@ test('service validates net change calculation', function () {
         'payment_adjustment' => 0,
     ]);
 
-    \App\Models\CustomerReceiptItem::create([
+    createCashFlowReceiptItem([
         'customer_receipt_id' => $receipt->id,
         'invoice_id' => $invoice->id,
         'method' => 'Cash',
@@ -320,7 +353,7 @@ test('service filters by date range correctly', function () {
         'status' => 'approved',
     ])->create();
 
-    $invoice = \App\Models\Invoice::create([
+    $invoice = createCashFlowInvoice([
         'invoice_number' => 'INV-003',
         'from_model_type' => \App\Models\SaleOrder::class,
         'from_model_id' => $saleOrder->id,
@@ -333,7 +366,7 @@ test('service filters by date range correctly', function () {
         'status' => 'paid',
     ]);
 
-    $receipt = \App\Models\CustomerReceipt::create([
+    $receipt = createCashFlowReceipt([
         'invoice_id' => $invoice->id,
         'customer_id' => $customer->id,
         'payment_date' => now()->subDays(7)->toDateString(),
@@ -348,7 +381,7 @@ test('service filters by date range correctly', function () {
         'payment_adjustment' => 0,
     ]);
 
-    \App\Models\CustomerReceiptItem::create([
+    createCashFlowReceiptItem([
         'customer_receipt_id' => $receipt->id,
         'invoice_id' => $invoice->id,
         'method' => 'Cash',
@@ -500,7 +533,7 @@ test('service calculates opening balance correctly', function () {
         'status' => 'approved',
     ])->create();
 
-    $invoice = \App\Models\Invoice::create([
+    $invoice = createCashFlowInvoice([
         'invoice_number' => 'INV-005',
         'from_model_type' => \App\Models\SaleOrder::class,
         'from_model_id' => $saleOrder->id,
@@ -513,7 +546,7 @@ test('service calculates opening balance correctly', function () {
         'status' => 'paid',
     ]);
 
-    $receipt = \App\Models\CustomerReceipt::create([
+    $receipt = createCashFlowReceipt([
         'invoice_id' => $invoice->id,
         'customer_id' => $customer->id,
         'payment_date' => now()->subDays(5)->toDateString(),
@@ -528,7 +561,7 @@ test('service calculates opening balance correctly', function () {
         'payment_adjustment' => 0,
     ]);
 
-    \App\Models\CustomerReceiptItem::create([
+    createCashFlowReceiptItem([
         'customer_receipt_id' => $receipt->id,
         'invoice_id' => $invoice->id,
         'method' => 'Cash',
@@ -577,7 +610,7 @@ test('service handles multiple cash accounts correctly', function () {
         'status' => 'approved',
     ])->create();
 
-    $invoice = \App\Models\Invoice::create([
+    $invoice = createCashFlowInvoice([
         'invoice_number' => 'INV-006',
         'from_model_type' => \App\Models\SaleOrder::class,
         'from_model_id' => $saleOrder->id,
@@ -590,7 +623,7 @@ test('service handles multiple cash accounts correctly', function () {
         'status' => 'paid',
     ]);
 
-    $receipt = \App\Models\CustomerReceipt::create([
+    $receipt = createCashFlowReceipt([
         'invoice_id' => $invoice->id,
         'customer_id' => $customer->id,
         'payment_date' => now()->subDays(5)->toDateString(),
@@ -605,7 +638,7 @@ test('service handles multiple cash accounts correctly', function () {
         'payment_adjustment' => 0,
     ]);
 
-    \App\Models\CustomerReceiptItem::create([
+    createCashFlowReceiptItem([
         'customer_receipt_id' => $receipt->id,
         'invoice_id' => $invoice->id,
         'method' => 'Cash',
@@ -726,7 +759,7 @@ test('service handles null dates correctly', function () {
     $report = $service->generate(null, null, ['method' => 'direct']);
 
     expect($report['period']['start'])->toBe(now()->startOfMonth()->toDateString());
-    expect($report['period']['end'])->toBe(now()->endOfDay()->toDateString());
+    expect($report['period']['end'])->toBe(now()->endOfMonth()->toDateString());
 });
 
 test('branch filter limits cash bank outflows', function () {
@@ -769,7 +802,7 @@ test('branch filter limits cash bank outflows', function () {
         'status' => 'approved',
     ])->create();
 
-    $invoice = Invoice::create([
+    $invoice = createCashFlowInvoice([
         'invoice_number' => 'INV-001',
         'from_model_type' => SaleOrder::class,
         'from_model_id' => $saleOrder->id,
@@ -782,7 +815,7 @@ test('branch filter limits cash bank outflows', function () {
         'status' => 'paid',
     ]);
 
-    $receipt = CustomerReceipt::create([
+    $receipt = createCashFlowReceipt([
         'invoice_id' => $invoice->id,
         'customer_id' => $customer->id,
         'payment_date' => '2025-10-10',
@@ -797,7 +830,7 @@ test('branch filter limits cash bank outflows', function () {
         'payment_adjustment' => 0,
     ]);
 
-    CustomerReceiptItem::create([
+    createCashFlowReceiptItem([
         'customer_receipt_id' => $receipt->id,
         'invoice_id' => $invoice->id,
         'method' => 'Cash',

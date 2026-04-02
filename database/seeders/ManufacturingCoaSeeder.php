@@ -28,15 +28,9 @@ class ManufacturingCoaSeeder extends Seeder
             ],
             [
                 'code' => '1140.02',
-                'name' => 'Persediaan Barang dalam Proses',
+                'name' => 'Persediaan Barang Produksi',
                 'type' => 'Asset',
-                'description' => 'Barang yang sedang dalam proses produksi (Work In Progress/WIP)',
-            ],
-            [
-                'code' => '1140.03',
-                'name' => 'Persediaan Barang Jadi',
-                'type' => 'Asset',
-                'description' => 'Barang hasil produksi yang siap untuk dijual',
+                'description' => 'Persediaan hasil produksi yang mengikuti COA inventory pada product manufacture',
             ],
         ];
 

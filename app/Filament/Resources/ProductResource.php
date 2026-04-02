@@ -77,16 +77,34 @@ class ProductResource extends Resource
      * @var array<string, string>
      */
     protected static array $defaultProductAccountCodes = [
-        'inventory' => '1140.10',
+        'inventory' => '1140.02',
         'sales' => '4100.10',
         'sales_return' => '4120.10',
         'sales_discount' => '4110.10',
         'goods_delivery' => '1140.20',
         'cogs' => '5100.10',
         'purchase_return' => '5120.10',
-        'unbilled_purchase' => '2190.10',
+        'unbilled_purchase' => '2100.10',
         'temporary_procurement' => '2100.10',
+        'manufacturing_labor' => '5230',
+        'manufacturing_overhead' => '6000',
     ];
+
+    protected static function formatCabangLabel(?Product $product): string
+    {
+        if (! $product?->cabang_id) {
+            return 'Semua Cabang';
+        }
+
+        $kode = $product->cabang?->kode;
+        $nama = $product->cabang?->nama;
+
+        if (! $kode && ! $nama) {
+            return 'Semua Cabang';
+        }
+
+        return trim("({$kode}) {$nama}");
+    }
 
     public static function form(Form $form): Form
     {
@@ -94,6 +112,44 @@ class ProductResource extends Resource
             ->schema([
                 Fieldset::make('Form Product')
                     ->schema([
+                        Toggle::make('is_manufacture')
+                            ->label('Diproduksi (Barang Jadi)')
+                            ->helperText('Centang jika produk ini adalah hasil produksi (barang jadi siap jual)')
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                if ($state) {
+                                    $set('is_raw_material', false);
+                                    $productionInventoryCoa = ChartOfAccount::where('code', '1140.02')->first();
+                                    if ($productionInventoryCoa) {
+                                        $set('inventory_coa_id', $productionInventoryCoa->id);
+                                    }
+
+                                    if (! $get('manufacturing_labor_coa_id')) {
+                                        $set('manufacturing_labor_coa_id', self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_labor'] ?? null));
+                                    }
+
+                                    if (! $get('manufacturing_overhead_coa_id')) {
+                                        $set('manufacturing_overhead_coa_id', self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_overhead'] ?? null));
+                                    }
+                                } elseif (! $get('is_raw_material')) {
+                                    $set('inventory_coa_id', null);
+                                }
+                            }),
+                        Toggle::make('is_raw_material')
+                            ->label('Bahan Baku')
+                            ->helperText('Centang jika produk ini adalah bahan baku untuk produksi')
+                            ->reactive()
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                if ($state) {
+                                    $set('is_manufacture', false);
+                                    $rawMaterialInventoryCoa = ChartOfAccount::where('code', '1140.01')->first();
+                                    if ($rawMaterialInventoryCoa) {
+                                        $set('inventory_coa_id', $rawMaterialInventoryCoa->id);
+                                    }
+                                } elseif (! $get('is_manufacture')) {
+                                    $set('inventory_coa_id', null);
+                                }
+                            }),
                         TextInput::make('sku')
                             ->label('SKU')
                             ->validationMessages([
@@ -135,10 +191,7 @@ class ProductResource extends Resource
                             ->reactive()
                             ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
                             ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Cabang harus dipilih'
-                            ]),
+                            ->helperText('Kosongkan cabang jika produk ini bisa digunakan di semua cabang.'),
                         Select::make('product_category_id')
                             ->label('Product Category')
                             ->searchable()
@@ -149,7 +202,6 @@ class ProductResource extends Resource
                             ->validationMessages([
                                 'required' => 'Kategori produk harus dipilih'
                             ]),
-
                         TextInput::make('cost_price')
                             ->label('Harga Beli Asli (Rp)')
                             ->required()
@@ -283,41 +335,6 @@ class ProductResource extends Resource
                                         'numeric' => 'Nilai konversi harus berupa angka'
                                     ]),
                             ]),
-
-                        Toggle::make('is_manufacture')
-                            ->label('Diproduksi (Barang Jadi)')
-                            ->helperText('Centang jika produk ini adalah hasil produksi (barang jadi siap jual)')
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                // Jika dicentang sebagai barang jadi, pastikan bukan bahan baku
-                                if ($state) {
-                                    $set('is_raw_material', false);
-                                    $finishedGoodsCoa = ChartOfAccount::where('code', '1140.03')->first();
-                                    if ($finishedGoodsCoa) {
-                                        $set('inventory_coa_id', $finishedGoodsCoa->id);
-                                    }
-                                } elseif (!$get('is_raw_material')) {
-                                    // Jika tidak diproduksi dan bukan bahan baku, reset COA
-                                    $set('inventory_coa_id', null);
-                                }
-                            }),
-                        Toggle::make('is_raw_material')
-                            ->label('Bahan Baku')
-                            ->helperText('Centang jika produk ini adalah bahan baku untuk produksi')
-                            ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                // Jika dicentang sebagai bahan baku, pastikan bukan barang jadi
-                                if ($state) {
-                                    $set('is_manufacture', false);
-                                    $rawMaterialCoa = ChartOfAccount::where('code', '1140.01')->first();
-                                    if ($rawMaterialCoa) {
-                                        $set('inventory_coa_id', $rawMaterialCoa->id);
-                                    }
-                                } elseif (!$get('is_manufacture')) {
-                                    // Jika bukan bahan baku dan tidak diproduksi, reset COA
-                                    $set('inventory_coa_id', null);
-                                }
-                            }),
                         Toggle::make('is_active')
                             ->label('Status Aktif')
                             ->default(true)
@@ -400,6 +417,24 @@ class ProductResource extends Resource
                             ->searchable()
                             ->preload()
                             ->nullable(),
+                        Select::make('manufacturing_labor_coa_id')
+                            ->label('COA TKL Produksi')
+                            ->helperText('Default akun kredit untuk biaya tenaga kerja langsung saat costing produksi otomatis dibuat.')
+                            ->options(fn() => self::getCoaOptions('Expense'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_labor'] ?? null))
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->visible(fn($get) => (bool) $get('is_manufacture')),
+                        Select::make('manufacturing_overhead_coa_id')
+                            ->label('COA Overhead Produksi')
+                            ->helperText('Default akun kredit untuk biaya overhead produksi saat costing otomatis dibuat.')
+                            ->options(fn() => self::getCoaOptions('Expense'))
+                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_overhead'] ?? null))
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->visible(fn($get) => (bool) $get('is_manufacture')),
                     ])
                     ->columnSpanFull(),
             ]);
@@ -473,14 +508,23 @@ class ProductResource extends Resource
                     ->searchable(),
                 TextColumn::make('cabang')
                     ->label('Cabang')
-                    ->sortable()
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->kode}) {$state->nama}";
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw('CASE WHEN cabang_id IS NULL THEN 1 ELSE 0 END ' . $direction)
+                            ->orderBy('cabang_id', $direction);
+                    })
+                    ->formatStateUsing(function ($state, Product $record) {
+                        return self::formatCabangLabel($record);
                     })
                     ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('cabang', function ($query) use ($search) {
-                            return $query->where('kode', 'LIKE', '%' . $search . '%')
-                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                        return $query->where(function (Builder $branchQuery) use ($search) {
+                            $branchQuery->whereHas('cabang', function ($query) use ($search) {
+                                return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                    ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                            });
+
+                            if (str_contains(strtolower('semua cabang'), strtolower((string) $search))) {
+                                $branchQuery->orWhereNull('cabang_id');
+                            }
                         });
                     }),
                 TextColumn::make('suppliers')
@@ -886,12 +930,8 @@ class ProductResource extends Resource
                                             }))
                                             ->preload()
                                             ->searchable()
-                                            ->required()
                                             ->reactive()
                                             ->disabled()
-                                            ->validationMessages([
-                                                'required' => 'Cabang belum dipilih'
-                                            ])
                                             ->default(function ($record) {
                                                 return $record->cabang_id;
                                             }),
@@ -922,7 +962,10 @@ class ProductResource extends Resource
                                                 return "Produk : ";
                                             })
                                             ->options(function ($get) {
-                                                return Product::where('cabang_id', $get('cabang_id'))->get()->pluck('sku', 'id');
+                                                return Product::query()
+                                                    ->forCabang($get('cabang_id'))
+                                                    ->orderBy('sku')
+                                                    ->pluck('sku', 'id');
                                             })
                                             ->required(),
                                         TextInput::make('biaya')
