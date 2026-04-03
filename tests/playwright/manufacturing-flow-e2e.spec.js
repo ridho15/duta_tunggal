@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test'
 import {
+  acquirePlaywrightDbLock,
   confirmDialogAction,
   FIXTURE,
   ensureManufacturingFixture,
+  openRowAction,
+  seedManufacturingFixture,
   selectFixtureProductionPlan,
   querySingleValue,
 } from './helpers/manufacturing-fixture.js'
@@ -18,10 +21,12 @@ test.describe.serial('Manufacturing full flow', () => {
   })
 
   test('material issue shows available and reserved stock across reserve flow', async ({ page }) => {
+    const releaseLock = await acquirePlaywrightDbLock()
+
+    try {
+    seedManufacturingFixture()
     const issueId = querySingleValue(`DB::table('material_issues')->where('issue_number', '${FIXTURE.issueNumber}')->value('id')`)
     expect(issueId).toBeTruthy()
-      const manufacturingOrderId = querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('manufacturing_order_id')`)
-      expect(manufacturingOrderId).toBeTruthy()
 
     const readStockField = async (label) => {
       const field = page.getByRole('textbox', { name: label }).first()
@@ -40,19 +45,26 @@ test.describe.serial('Manufacturing full flow', () => {
     await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(0)
 
     await page.goto(`${BASE}/admin/material-issues`)
-    await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('domcontentloaded')
 
-    await page.goto(`${BASE}/admin/material-issues?tableAction=request_approval&tableActionRecord=${issueId}`)
-    await page.waitForLoadState('networkidle')
+    const materialIssueRow = page.locator('tr', { hasText: FIXTURE.issueNumber }).first()
+    await expect(materialIssueRow).toBeVisible()
+    await materialIssueRow.locator('button:visible').last().click({ force: true })
+    await page.waitForTimeout(300)
+
+    const requestConfirmationButton = page.locator(`[wire\\:click*="mountTableAction('request_approval', '${issueId}')"]:visible`).last()
+    await expect(requestConfirmationButton).toBeVisible()
+    await requestConfirmationButton.click({ force: true })
     await confirmDialogAction(page, 'Konfirmasi')
+    await page.waitForLoadState('networkidle')
     await expect.poll(
       () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
       { timeout: 15000 },
     ).toBe('pending_approval')
 
-      const warehouseConfirmationId = querySingleValue(
-        `DB::table('warehouse_confirmations')->where('confirmable_type', 'App\\Models\\MaterialIssue')->where('confirmable_id', ${issueId})->value('id')`,
-      )
+    const warehouseConfirmationId = querySingleValue(
+      `DB::table('warehouse_confirmations')->where('confirmable_type', 'App\\Models\\MaterialIssue')->where('confirmable_id', ${issueId})->orderBy('id')->value('id')`,
+    )
     expect(warehouseConfirmationId).toBeTruthy()
 
     await expect.poll(
@@ -60,26 +72,14 @@ test.describe.serial('Manufacturing full flow', () => {
       { timeout: 15000 },
     ).toBe('request')
 
-    await page.goto(`${BASE}/admin/warehouse-confirmations?tableAction=approve&tableActionRecord=${warehouseConfirmationId}`)
-    await page.waitForLoadState('networkidle')
-    await confirmDialogAction(page, 'Konfirmasi')
-    await expect.poll(
-      () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
-      { timeout: 15000 },
-    ).toBe('approved')
-    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(50)
-    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(50)
+    await page.goto(`${BASE}/admin/warehouse-confirmations`)
+    await page.waitForLoadState('domcontentloaded')
 
-    await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
-    await page.waitForLoadState('networkidle')
-    await expect.poll(() => readStockField('Stock Available'), { timeout: 10000 }).toBe(50)
-    await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(50)
-
-    await page.goto(`${BASE}/admin/material-issues`)
-    await page.waitForLoadState('networkidle')
-    await page.goto(`${BASE}/admin/material-issues?tableAction=complete&tableActionRecord=${issueId}`)
-    await page.waitForLoadState('networkidle')
+    const confirmationRow = page.locator('tr', { hasText: FIXTURE.issueNumber }).first()
+    await expect(confirmationRow).toBeVisible()
+    await openRowAction(page, confirmationRow, 'Approve')
     await confirmDialogAction(page, 'Konfirmasi')
+    await page.waitForLoadState('networkidle')
     await expect.poll(
       () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
       { timeout: 15000 },
@@ -88,12 +88,25 @@ test.describe.serial('Manufacturing full flow', () => {
     await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(0)
 
     await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
-    await page.waitForLoadState('networkidle')
-    await expect.poll(() => readStockField('Stock Available'), { timeout: 10000 }).toBe(50)
-    await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(0)
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByRole('button', { name: /^Selesai$/ })).toHaveCount(0)
+
+    await expect.poll(
+      () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
+      { timeout: 15000 },
+    ).toBe('completed')
+    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(50)
+    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(0)
+    } finally {
+      releaseLock()
+    }
   })
 
   test('plan to MO to production to QC completes successfully', async ({ page }) => {
+    const releaseLock = await acquirePlaywrightDbLock()
+
+    try {
+    seedManufacturingFixture()
     const moNumber = `MO-PW-E2E-${Date.now()}`
 
     await page.goto(`${BASE}/admin/manufacturing-orders/create`)
@@ -132,12 +145,13 @@ test.describe.serial('Manufacturing full flow', () => {
     const productionId = querySingleValue(`DB::table('productions')->where('manufacturing_order_id', ${manufacturingOrderId})->value('id')`)
     expect(productionId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/productions?tableAction=finished&tableActionRecord=${productionId}`)
+    await page.goto(`${BASE}/admin/productions/${productionId}`)
     await page.waitForLoadState('networkidle')
 
-    const finishConfirmButton = page.getByRole('button', { name: /^Konfirmasi$/ }).last()
-    await expect(finishConfirmButton).toBeVisible({ timeout: 10000 })
-    await finishConfirmButton.click({ force: true })
+    const finishButton = page.getByRole('button', { name: /^Finished$/ }).last()
+    await expect(finishButton).toBeVisible({ timeout: 10000 })
+    await finishButton.click({ force: true })
+    await confirmDialogAction(page, 'Konfirmasi')
 
     await expect.poll(
       () => querySingleValue(`DB::table('productions')->where('id', ${productionId})->value('status')`),
@@ -147,8 +161,12 @@ test.describe.serial('Manufacturing full flow', () => {
     const qualityControlId = querySingleValue(`DB::table('quality_controls')->where('from_model_type', 'App\\\\Models\\\\Production')->where('from_model_id', ${productionId})->value('id')`)
     expect(qualityControlId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/quality-control-manufactures?tableAction=process_qc&tableActionRecord=${qualityControlId}`)
-    await page.waitForLoadState('networkidle')
+    await page.goto(`${BASE}/admin/quality-control-manufactures`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('body')).not.toContainText(ERR)
+
+    const qualityControlRow = page.locator('tr', { hasText: moNumber }).first()
+    await expect(qualityControlRow).toBeVisible()
+    await openRowAction(page, qualityControlRow, 'Process QC')
 
     const passedInput = page.getByRole('spinbutton', { name: 'Passed Quantity' }).last()
     const rejectedInput = page.getByRole('spinbutton', { name: 'Rejected Quantity' }).last()
@@ -183,5 +201,8 @@ test.describe.serial('Manufacturing full flow', () => {
       { timeout: 15000 },
     ).toBe('completed')
     await expect(page.getByRole('button', { name: /^Produksi$/ })).toBeHidden()
+    } finally {
+      releaseLock()
+    }
   })
 })

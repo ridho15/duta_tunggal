@@ -47,10 +47,18 @@ class PurchaseReceiptResource extends Resource
 {
     protected static ?string $model = PurchaseReceipt::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
 
     // Group label updated to indicate Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
+
+    protected static ?string $navigationLabel = 'Penerimaan Pembelian';
+
+    protected static ?string $modelLabel = 'Penerimaan Pembelian';
+
+    protected static ?string $pluralModelLabel = 'Penerimaan Pembelian';
 
     protected static ?int $navigationSort = 4;
 

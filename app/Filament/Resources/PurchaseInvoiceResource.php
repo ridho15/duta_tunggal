@@ -48,8 +48,10 @@ class PurchaseInvoiceResource extends Resource
     protected static ?string $navigationLabel = 'Invoice Pembelian';
     protected static ?string $modelLabel = 'Invoice Pembelian';
     protected static ?string $pluralModelLabel = 'Invoice Pembelian';
-    protected static ?string $navigationGroup = 'Finance - Pembelian';
+    protected static ?string $navigationGroup = 'Keuangan Pembelian';
     protected static ?int $navigationSort = 9;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static function formatMoneyState(mixed $value): string
     {

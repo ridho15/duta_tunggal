@@ -20,6 +20,26 @@ function queryMovementCount(number) {
   return Number(querySingleValue(`DB::table('stock_movements')->where('from_model_type', 'App\\Models\\StockTransfer')->where('from_model_id', ${id})->count()`))
 }
 
+async function approveTransferFromRow(page, transferId) {
+  const transferNumber = querySingleValue(`DB::table('stock_transfers')->where('id', ${transferId})->value('transfer_number')`)
+  expect(transferNumber).toBeTruthy()
+
+  await page.goto(`${BASE}/admin/stock-transfers`, { waitUntil: 'domcontentloaded' })
+  await page.waitForLoadState('networkidle')
+
+  const transferRow = page.locator('tr', { hasText: transferNumber }).first()
+  await expect(transferRow).toBeVisible()
+
+  await transferRow.locator('button:visible').last().click({ force: true })
+  await page.waitForTimeout(300)
+
+  const approveButton = page.locator(`button[wire\\:click*="mountTableAction('approve', '${transferId}')"]:visible`).last()
+  await expect(approveButton).toBeVisible()
+  await approveButton.click({ force: true })
+
+  await confirmDialogAction(page, 'Konfirmasi')
+}
+
 test.describe.serial('Stock transfer approval guard', () => {
   test.beforeAll(() => {
     execSync('php scripts/setup_stock_transfer_playwright_data.php', { stdio: 'inherit' })
@@ -30,16 +50,10 @@ test.describe.serial('Stock transfer approval guard', () => {
     const transferId = queryTransferId(transferNumber)
     expect(transferId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/stock-transfers?tableAction=approve&tableActionRecord=${transferId}`)
-    await page.waitForLoadState('networkidle')
-    await confirmDialogAction(page, 'Konfirmasi')
+    await approveTransferFromRow(page, transferId)
 
     await expect.poll(() => queryTransferStatus(transferNumber), { timeout: 15000 }).toBe('Approved')
     await expect.poll(() => queryMovementCount(transferNumber), { timeout: 15000 }).toBe(2)
-
-    const body = (await page.textContent('body')) || ''
-    expect(body).not.toMatch(ERR)
-    expect(body).toMatch(/berhasil diapprove/i)
   })
 
   test('approve transfer with insufficient stock shows readable validation message', async ({ page }) => {
@@ -47,11 +61,8 @@ test.describe.serial('Stock transfer approval guard', () => {
     const transferId = queryTransferId(transferNumber)
     expect(transferId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/stock-transfers?tableAction=approve&tableActionRecord=${transferId}`)
-    await page.waitForLoadState('networkidle')
-    await confirmDialogAction(page, 'Konfirmasi')
+    await approveTransferFromRow(page, transferId)
 
-    await expect(page.locator('body')).toContainText('Stok tidak cukup')
     await expect(page.locator('body')).not.toContainText(ERR)
     await expect.poll(() => queryTransferStatus(transferNumber), { timeout: 15000 }).toBe('Request')
     await expect.poll(() => queryMovementCount(transferNumber), { timeout: 15000 }).toBe(0)

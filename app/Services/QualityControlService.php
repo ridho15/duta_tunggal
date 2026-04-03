@@ -690,23 +690,19 @@ class QualityControlService
         }
 
         // Fallback: actual material issues for this MO (older flow, no in-progress WIP journal)
-        $issuesTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
-            ->where('status', 'completed')
-            ->where('type', 'issue')
-            ->sum('total_cost');
-        $returnsTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
-            ->where('status', 'completed')
-            ->where('type', 'return')
-            ->sum('total_cost');
+        $issuesTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($mo, 'issue');
+        $returnsTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($mo, 'return');
         $actualMaterialCost = (float)$issuesTotal - (float)$returnsTotal;
 
         if ($actualMaterialCost <= 0 && $mo->production_plan_id) {
-            // Also check by production_plan_id (legacy path)
-            $issuesTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+            // Also check legacy plan-only issues that were not yet linked to a manufacturing order.
+            $issuesTotal = \App\Models\MaterialIssue::whereNull('manufacturing_order_id')
+                ->where('production_plan_id', $mo->production_plan_id)
                 ->where('status', 'completed')
                 ->where('type', 'issue')
                 ->sum('total_cost');
-            $returnsTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+            $returnsTotal = \App\Models\MaterialIssue::whereNull('manufacturing_order_id')
+                ->where('production_plan_id', $mo->production_plan_id)
                 ->where('status', 'completed')
                 ->where('type', 'return')
                 ->sum('total_cost');
@@ -727,6 +723,26 @@ class QualityControlService
         $laborCost     = (float)($bom->labor_cost ?? 0);
         $overheadCost  = (float)($bom->overhead_cost ?? 0);
         return max(0, ($materialCost + $laborCost + $overheadCost) * (float)$mo->productionPlan->quantity);
+    }
+
+    protected function sumCompletedMaterialIssueTotalForManufacturingOrder(
+        \App\Models\ManufacturingOrder $mo,
+        string $type
+    ): float {
+        $issuesTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
+            ->where('status', 'completed')
+            ->where('type', $type)
+            ->sum('total_cost');
+
+        if ($issuesTotal > 0 || ! $mo->production_plan_id) {
+            return (float) $issuesTotal;
+        }
+
+        return (float) \App\Models\MaterialIssue::whereNull('manufacturing_order_id')
+            ->where('production_plan_id', $mo->production_plan_id)
+            ->where('status', 'completed')
+            ->where('type', $type)
+            ->sum('total_cost');
     }
 
     /**
@@ -888,8 +904,11 @@ class QualityControlService
             return;
         }
 
-        $purchaseOrder = $purchaseOrderItem->purchaseOrder;
-        if (!$purchaseOrder) {
+        $purchaseOrder = \App\Models\PurchaseOrder::withoutGlobalScopes()
+            ->with('purchaseOrderCurrency')
+            ->find($purchaseOrderItem->purchase_order_id);
+
+        if (!$purchaseOrder || !$purchaseOrder->id) {
             return;
         }
 

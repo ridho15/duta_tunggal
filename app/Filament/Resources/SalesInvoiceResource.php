@@ -45,8 +45,10 @@ class SalesInvoiceResource extends Resource
     protected static ?string $navigationLabel = 'Invoice Penjualan';
     protected static ?string $modelLabel = 'Invoice Penjualan';
     protected static ?string $pluralModelLabel = 'Invoice Penjualan';
-    protected static ?string $navigationGroup = 'Finance - Penjualan';
+    protected static ?string $navigationGroup = 'Keuangan Penjualan';
     protected static ?int $navigationSort = 1;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static function resolveCoaIdByCodes(array $codes): ?int
     {

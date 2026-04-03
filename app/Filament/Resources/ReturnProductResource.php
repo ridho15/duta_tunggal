@@ -41,6 +41,8 @@ class ReturnProductResource extends Resource
 {
     protected static ?string $model = ReturnProduct::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-x-mark';
 
     protected static ?string $navigationGroup = 'Gudang';

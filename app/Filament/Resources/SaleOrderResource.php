@@ -62,12 +62,13 @@ class SaleOrderResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    // Group label updated to include English hint per request
-    protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
+    protected static ?string $navigationGroup = 'Penjualan';
 
-    protected static ?string $navigationLabel = 'Penjualan (Sales Order)';
+    protected static ?string $navigationLabel = 'Pesanan Penjualan';
 
-    protected static ?string $pluralModelLabel = 'Penjualan (Sales Orders)';
+    protected static ?string $modelLabel = 'Pesanan Penjualan';
+
+    protected static ?string $pluralModelLabel = 'Pesanan Penjualan';
 
     // Ensure Penjualan group appears after Pembelian
     protected static ?int $navigationSort = 2;

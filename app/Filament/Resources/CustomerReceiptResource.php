@@ -46,9 +46,17 @@ class CustomerReceiptResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
+
+    protected static ?string $navigationLabel = 'Penerimaan Pelanggan';
+
+    protected static ?string $modelLabel = 'Penerimaan Pelanggan';
+
+    protected static ?string $pluralModelLabel = 'Penerimaan Pelanggan';
 
     protected static ?int $navigationSort = 3;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static function getPaymentMethodOptions(): array
     {

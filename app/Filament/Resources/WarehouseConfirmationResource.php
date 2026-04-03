@@ -36,6 +36,8 @@ class WarehouseConfirmationResource extends Resource
 {
     protected static ?string $model = WarehouseConfirmation::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-check-badge';
 
     protected static ?string $navigationGroup = 'Gudang';

@@ -14,9 +14,11 @@ class BukuBesarPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Buku Besar (General Ledger)';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 1;
 
@@ -166,6 +168,6 @@ class BukuBesarPage extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 }

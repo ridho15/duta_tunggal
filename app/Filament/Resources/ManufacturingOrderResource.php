@@ -45,10 +45,16 @@ class ManufacturingOrderResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
+
+    protected static ?string $navigationLabel = 'Perintah Produksi';
+
+    protected static ?string $modelLabel = 'Perintah Produksi';
+
+    protected static ?string $pluralModelLabel = 'Perintah Produksi';
 
     // Position Manufacturing Order as the 4th group
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {

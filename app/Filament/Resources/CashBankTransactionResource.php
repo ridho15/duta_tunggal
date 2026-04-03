@@ -42,9 +42,11 @@ class CashBankTransactionResource extends Resource
 {
     protected static ?string $model = CashBankTransaction::class;
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
     protected static ?string $modelLabel = 'Transaksi Kas & Bank';
     protected static ?int $navigationSort = 6;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {

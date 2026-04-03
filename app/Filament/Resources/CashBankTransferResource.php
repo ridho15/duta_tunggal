@@ -36,13 +36,13 @@ class CashBankTransferResource extends Resource
 {
     protected static ?string $model = CashBankTransfer::class;
     protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
     protected static ?string $modelLabel = 'Transfer Kas & Bank';
     protected static ?int $navigationSort = 4;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 
     public static function form(Form $form): Form

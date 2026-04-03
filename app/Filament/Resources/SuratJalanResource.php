@@ -42,13 +42,13 @@ class SuratJalanResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Delivery Order';
+    protected static ?string $navigationGroup = 'Pengiriman';
 
     protected static ?int $navigationSort = 2;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 
     public static function form(Form $form): Form

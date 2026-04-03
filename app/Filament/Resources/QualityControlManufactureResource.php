@@ -47,9 +47,13 @@ class QualityControlManufactureResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
 
-    protected static ?string $navigationLabel = 'Quality Control Manufacture';
+    protected static ?string $navigationLabel = 'Kontrol Kualitas Produksi';
+
+    protected static ?string $modelLabel = 'Kontrol Kualitas Produksi';
+
+    protected static ?string $pluralModelLabel = 'Kontrol Kualitas Produksi';
 
     protected static ?int $navigationSort = 6;
 

@@ -10,13 +10,20 @@ use Illuminate\Support\Carbon;
 
 class CostOfGoodsManufacturingPage extends Page
 {
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string $view = 'filament.pages.cost-of-goods-manufacturing-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Cost of Goods Manufacturing';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 8;
 

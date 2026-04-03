@@ -180,23 +180,6 @@ class ItemsRelationManager extends RelationManager
                                 ->warning()
                                 ->send();
                         }),
-                    Tables\Actions\Action::make('complete')
-                        ->label('Selesai')
-                        ->icon('heroicon-o-check')
-                        ->color('success')
-                        ->visible(fn(MaterialIssueItem $record) => $record->isApproved())
-                        ->requiresConfirmation()
-                        ->modalHeading('Selesaikan Item')
-                        ->modalDescription('Apakah Anda yakin ingin menyelesaikan item ini? Stock akan dikurangi.')
-                        ->action(function (MaterialIssueItem $record) {
-                            $record->update(['status' => MaterialIssueItem::STATUS_COMPLETED]);
-
-                            Notification::make()
-                                ->title('Item Diselesaikan')
-                                ->body("Item {$record->product->name} telah diselesaikan.")
-                                ->success()
-                                ->send();
-                        }),
                 ]),
             ],position:ActionsPosition::BeforeColumns)
             ->bulkActions([

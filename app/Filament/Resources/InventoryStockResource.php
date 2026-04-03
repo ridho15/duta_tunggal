@@ -30,6 +30,8 @@ class InventoryStockResource extends Resource
 {
     protected static ?string $model = InventoryStock::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
 
     protected static ?string $navigationGroup = 'Gudang';

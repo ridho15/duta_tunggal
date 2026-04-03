@@ -38,6 +38,8 @@ class StockTransferResource extends Resource
 {
     protected static ?string $model = StockTransfer::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrows-up-down';
 
     protected static ?string $modelLabel = 'Transfer Stock';

@@ -12,6 +12,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class LedgerPostingServiceTest extends TestCase
@@ -38,7 +39,7 @@ class LedgerPostingServiceTest extends TestCase
         ChartOfAccount::create(['code' => '1170.06', 'name' => 'PPN Masukan', 'type' => 'Asset']);
     }
 
-    /** @test */
+    #[Test]
     public function post_invoice_without_receipt_debits_inventory()
     {
         $supplier = Supplier::factory()->create();
@@ -92,7 +93,7 @@ class LedgerPostingServiceTest extends TestCase
         $this->assertEquals('2110', $apEntry->coa->code);
     }
 
-    /** @test */
+    #[Test]
     public function post_invoice_with_receipt_debits_unbilled_purchase()
     {
         $supplier = Supplier::factory()->create();
@@ -151,7 +152,7 @@ class LedgerPostingServiceTest extends TestCase
         $this->assertEquals('2110', $apEntry->coa->code);
     }
 
-    /** @test */
+    #[Test]
     public function post_invoice_with_legacy_tax_and_other_fees_uses_tax_as_rate()
     {
         $supplier = Supplier::factory()->create();
@@ -224,7 +225,7 @@ class LedgerPostingServiceTest extends TestCase
         $this->assertEquals('2110', $apEntry->coa->code);
     }
 
-    /** @test */
+    #[Test]
     public function post_invoice_ignores_zero_value_other_fee_rows()
     {
         $supplier = Supplier::factory()->create();
@@ -286,7 +287,7 @@ class LedgerPostingServiceTest extends TestCase
         $this->assertEquals('2110', $apEntry->coa->code);
     }
 
-    /** @test */
+    #[Test]
     public function post_invoice_ignores_fractional_rounding_residue_without_other_fees()
     {
         $supplier = Supplier::factory()->create();
@@ -335,7 +336,7 @@ class LedgerPostingServiceTest extends TestCase
         $this->assertSame(0, (int) $invoice->other_fee_total);
     }
 
-    /** @test */
+    #[Test]
     public function reverse_invoice_journal_entries_creates_mirror_entries_for_legacy_invoice_sources()
     {
         $invoice = Invoice::factory()->create([

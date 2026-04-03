@@ -23,8 +23,9 @@ use Illuminate\Support\Facades\Auth;
 class BankReconciliationResource extends Resource
 {
     protected static ?string $model = BankReconciliation::class;
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
     protected static ?string $modelLabel = 'Rekonsiliasi Bank';
     protected static ?int $navigationSort = 2;
 

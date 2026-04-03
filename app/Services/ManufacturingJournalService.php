@@ -359,15 +359,8 @@ class ManufacturingJournalService
         $overheadCost = (float) ($bom->overhead_cost ?? 0);
 
         // Adjust with actual material issues and returns
-        $issuesTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
-            ->where('status', 'completed')
-            ->where('type', 'issue')
-            ->sum('total_cost');
-
-        $returnsTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
-            ->where('status', 'completed')
-            ->where('type', 'return')
-            ->sum('total_cost');
+        $issuesTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($mo, 'issue');
+        $returnsTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($mo, 'return');
 
         $actualMaterialCost = $issuesTotal - $returnsTotal;
         $materialCostToUse = $actualMaterialCost > 0 ? $actualMaterialCost : $materialCost * (float) $mo->productionPlan->quantity;
@@ -624,16 +617,9 @@ class ManufacturingJournalService
             return;
         }
 
-        // Material cost = net of completed material issues for this MO
-        $issuesTotal = \App\Models\MaterialIssue::where(function ($q) use ($manufacturingOrder) {
-            $q->where('manufacturing_order_id', $manufacturingOrder->id)
-              ->orWhere('production_plan_id', $manufacturingOrder->production_plan_id);
-        })->where('status', 'completed')->where('type', 'issue')->sum('total_cost');
-
-        $returnsTotal = \App\Models\MaterialIssue::where(function ($q) use ($manufacturingOrder) {
-            $q->where('manufacturing_order_id', $manufacturingOrder->id)
-              ->orWhere('production_plan_id', $manufacturingOrder->production_plan_id);
-        })->where('status', 'completed')->where('type', 'return')->sum('total_cost');
+                // Material cost = net of completed material issues for this MO
+                $issuesTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($manufacturingOrder, 'issue');
+                $returnsTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($manufacturingOrder, 'return');
         $materialCost = max(0, (float)$issuesTotal - (float)$returnsTotal);
 
         // Labor + overhead cost = BOM amounts × production plan quantity
@@ -735,6 +721,24 @@ class ManufacturingJournalService
                 ]);
             }
         });
+    }
+
+    protected function sumCompletedMaterialIssueTotalForManufacturingOrder(\App\Models\ManufacturingOrder $mo, string $type): float
+    {
+        $issuesTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
+            ->where('status', 'completed')
+            ->where('type', $type)
+            ->sum('total_cost');
+
+        if ($issuesTotal > 0 || ! $mo->production_plan_id) {
+            return (float) $issuesTotal;
+        }
+
+        return (float) \App\Models\MaterialIssue::whereNull('manufacturing_order_id')
+            ->where('production_plan_id', $mo->production_plan_id)
+            ->where('status', 'completed')
+            ->where('type', $type)
+            ->sum('total_cost');
     }
 
     protected function resolveTemporaryProductionCoa(): ?ChartOfAccount

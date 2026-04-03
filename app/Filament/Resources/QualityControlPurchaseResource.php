@@ -49,11 +49,17 @@ class QualityControlPurchaseResource extends Resource
 {
     protected static ?string $model = QualityControl::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-arrow-down';
 
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
 
-    protected static ?string $navigationLabel = 'Quality Control Purchase';
+    protected static ?string $navigationLabel = 'Kontrol Kualitas Pembelian';
+
+    protected static ?string $modelLabel = 'Kontrol Kualitas Pembelian';
+
+    protected static ?string $pluralModelLabel = 'Kontrol Kualitas Pembelian';
 
     protected static ?int $navigationSort = 3;
 

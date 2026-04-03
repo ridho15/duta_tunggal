@@ -41,11 +41,17 @@ class VendorPaymentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
 
-    protected static ?string $navigationLabel = 'Payment Vendor';
+    protected static ?string $navigationLabel = 'Pembayaran Vendor';
+
+    protected static ?string $modelLabel = 'Pembayaran Vendor';
+
+    protected static ?string $pluralModelLabel = 'Pembayaran Vendor';
 
     protected static ?int $navigationSort = 2;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {

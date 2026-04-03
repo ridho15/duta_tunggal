@@ -30,13 +30,13 @@ class JournalEntryResource extends Resource
 
     // Show Journal Entries in sidebar and expose the Profit & Loss page under it
     protected static ?string $navigationLabel = 'Journal Entry';
-    protected static bool $shouldRegisterNavigation = true;
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $modelLabel = 'Journal Entry';
 
     protected static ?string $pluralModelLabel = 'Journal Entries';
 
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
 
     protected static ?int $navigationSort = 1;
 

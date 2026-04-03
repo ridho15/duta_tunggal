@@ -1,5 +1,8 @@
 import { execSync } from 'node:child_process'
+import { mkdirSync, rmdirSync } from 'node:fs'
 import { expect } from '@playwright/test'
+
+const PLAYWRIGHT_DB_LOCK_PATH = '/tmp/duta-tunggal-playwright-db.lock'
 
 export const FIXTURE = {
   planNumber: 'PP-PW-MFG-001',
@@ -11,8 +14,50 @@ export const FIXTURE = {
   issueNumber: 'MI-PW-MFG-001',
 }
 
-export function ensureManufacturingFixture() {
+function withDirectoryLock(lockPath, callback) {
+  for (;;) {
+    try {
+      mkdirSync(lockPath)
+      break
+    } catch (error) {
+      if (error.code !== 'EEXIST') {
+        throw error
+      }
+
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
+    }
+  }
+
+  try {
+    return callback()
+  } finally {
+    rmdirSync(lockPath)
+  }
+}
+
+export function seedManufacturingFixture() {
   execSync('php scripts/setup_manufacturing_playwright_data.php', { stdio: 'inherit' })
+}
+
+export function ensureManufacturingFixture() {
+  return withDirectoryLock(PLAYWRIGHT_DB_LOCK_PATH, () => {
+    seedManufacturingFixture()
+  })
+}
+
+export async function acquirePlaywrightDbLock() {
+  for (;;) {
+    try {
+      mkdirSync(PLAYWRIGHT_DB_LOCK_PATH)
+      return () => rmdirSync(PLAYWRIGHT_DB_LOCK_PATH)
+    } catch (error) {
+      if (error.code !== 'EEXIST') {
+        throw error
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+  }
 }
 
 export function querySingleValue(expression) {
@@ -54,8 +99,9 @@ export async function openRowAction(page, row, actionLabel) {
   const actionToggle = row.locator('button:visible').last()
   await expect(actionToggle).toBeVisible()
   await actionToggle.click({ force: true })
+  await page.waitForTimeout(200)
 
-  const action = page.locator('button, a').filter({ hasText: new RegExp(`^${actionLabel}$`, 'i') }).last()
+  const action = page.locator('[role="menuitem"]:visible, button:visible, a:visible').filter({ hasText: new RegExp(actionLabel, 'i') }).last()
   await expect(action).toBeVisible()
   await action.click({ force: true })
 }
@@ -65,8 +111,12 @@ export async function confirmDialogAction(page, actionLabel) {
     name: new RegExp(`^(${actionLabel}|Konfirmasi|Submit|Simpan|Complete)$`, 'i'),
   }).last()
 
-  if (await primarySubmit.count()) {
-    await expect(primarySubmit).toBeVisible()
+  const becameVisible = await primarySubmit.waitFor({ state: 'visible', timeout: 2000 }).then(
+    () => true,
+    () => false,
+  )
+
+  if (becameVisible) {
     await primarySubmit.click({ force: true })
     await page.waitForTimeout(1500)
   }

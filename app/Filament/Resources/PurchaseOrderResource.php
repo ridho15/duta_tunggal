@@ -69,14 +69,18 @@ class PurchaseOrderResource extends Resource
 {
     protected static ?string $model = PurchaseOrder::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     // Group label updated to include English hint per request
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
 
-    protected static ?string $navigationLabel = 'Pembelian';
+    protected static ?string $navigationLabel = 'Pesanan Pembelian';
 
-    protected static ?string $pluralModelLabel = 'Pembelian';
+    protected static ?string $modelLabel = 'Pesanan Pembelian';
+
+    protected static ?string $pluralModelLabel = 'Pesanan Pembelian';
 
     protected static ?int $navigationSort = 2;
 

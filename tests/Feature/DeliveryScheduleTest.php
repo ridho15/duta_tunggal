@@ -4,10 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\Cabang;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\DeliverySchedule;
 use App\Models\Driver;
+use App\Models\JournalEntry;
+use App\Models\ChartOfAccount;
+use App\Models\Customer;
+use App\Models\Product;
+use App\Models\SaleOrder;
+use App\Models\SaleOrderItem;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\Warehouse;
 use App\Filament\Resources\DeliveryScheduleResource;
 use App\Filament\Resources\DeliveryScheduleResource\Pages\CreateDeliverySchedule;
 use App\Services\DeliveryScheduleService;
@@ -358,6 +366,102 @@ class DeliveryScheduleTest extends TestCase
         $this->assertEquals('delivered', $schedule->fresh()->status);
         $this->assertEquals('completed', $deliveryOrder1->fresh()->status);
         $this->assertEquals('completed', $deliveryOrder2->fresh()->status);
+    }
+
+    #[Test]
+    public function it_creates_journal_entries_when_schedule_starts_shipping_not_when_delivered(): void
+    {
+        $customer = Customer::factory()->create(['cabang_id' => $this->cabang->id]);
+        $warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+
+        $inventoryCoa = ChartOfAccount::create([
+            'code' => '1140.10',
+            'name' => 'Inventory',
+            'type' => 'asset',
+            'level' => 3,
+            'is_active' => true,
+        ]);
+
+        $goodsDeliveryCoa = ChartOfAccount::create([
+            'code' => '1140.20',
+            'name' => 'Cost of Goods Sold',
+            'type' => 'expense',
+            'level' => 3,
+            'is_active' => true,
+        ]);
+
+        $product = Product::factory()->create([
+            'inventory_coa_id' => $inventoryCoa->id,
+            'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
+            'cost_price' => 1000,
+        ]);
+
+        $saleOrder = SaleOrder::factory()->create([
+            'customer_id' => $customer->id,
+            'status' => 'confirmed',
+        ]);
+
+        $saleOrderItem = SaleOrderItem::factory()->create([
+            'sale_order_id' => $saleOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 5,
+            'unit_price' => 1500,
+        ]);
+
+        $deliveryOrder = DeliveryOrder::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $warehouse->id,
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::factory()->create([
+            'delivery_order_id' => $deliveryOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 3,
+            'sale_order_item_id' => $saleOrderItem->id,
+        ]);
+
+        $suratJalan = SuratJalan::create([
+            'sj_number' => 'SJ-JOURNAL-0001',
+            'issued_at' => now(),
+            'status' => 1,
+            'created_by' => $this->user->id,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $suratJalan->deliveryOrder()->attach([$deliveryOrder->id]);
+
+        $this->assertSame(0, JournalEntry::count());
+
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'SCH-JOURNAL-0001',
+            'scheduled_date' => now(),
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'status' => 'pending',
+            'cabang_id' => $this->cabang->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $schedule->suratJalan()->attach([$suratJalan->id]);
+
+        $schedule->update(['status' => 'on_the_way']);
+
+        $this->assertSame('sent', $deliveryOrder->fresh()->status);
+        $this->assertGreaterThan(0, JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->count());
+
+        $journalCountAfterOnTheWay = JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->count();
+
+        $schedule->update(['status' => 'delivered']);
+
+        $this->assertSame('completed', $deliveryOrder->fresh()->status);
+        $this->assertSame($journalCountAfterOnTheWay, JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->count());
     }
 
     #[Test]

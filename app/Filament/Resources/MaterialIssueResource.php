@@ -30,13 +30,13 @@ class MaterialIssueResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
 
     protected static ?string $navigationLabel = 'Pengambilan Bahan Baku';
 
     protected static ?string $modelLabel = 'Pengambilan Bahan Baku';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {
@@ -845,55 +845,6 @@ class MaterialIssueResource extends Resource
                                 ->title('Material Issue Ditolak')
                                 ->body("Material Issue {$record->issue_number} telah ditolak.")
                                 ->warning()
-                                ->send();
-                        }),
-                    Tables\Actions\Action::make('complete')
-                        ->label('Selesai')
-                        ->icon('heroicon-o-check')
-                        ->color('success')
-                        ->visible(function (MaterialIssue $record) {
-                            $currentUser = \Illuminate\Support\Facades\Auth::user();
-                            if (!$currentUser) return false;
-
-                            // Super Admin can complete all approved records
-                            if ($currentUser->hasRole('Super Admin')) {
-                                return $record->isApproved();
-                            }
-
-                            // Users with 'approve warehouse' permission can complete approved records
-                            return $record->isApproved() && userHasPermission('approve warehouse');
-                        })
-                        ->requiresConfirmation()
-                        ->modalHeading('Selesaikan Material Issue')
-                        ->modalDescription('Apakah Anda yakin ingin menyelesaikan Material Issue ini? Stock akan dikurangi dan journal entry akan dibuat.')
-                        ->action(function (MaterialIssue $record) {
-                            if ($message = $record->warehouseConfirmationBlockingMessage()) {
-                                Notification::make()
-                                    ->title('Konfirmasi Gudang Diperlukan')
-                                    ->body($message)
-                                    ->warning()
-                                    ->send();
-                                return;
-                            }
-
-                            // Validate stock before completion
-                            $stockValidation = static::validateStockAvailability($record);
-                            if (!$stockValidation['valid']) {
-                                Notification::make()
-                                    ->title('Tidak Dapat Menyelesaikan Material Issue')
-                                    ->body($stockValidation['message'])
-                                    ->danger()
-                                    ->duration(10000)
-                                    ->send();
-                                return;
-                            }
-
-                            $record->update(['status' => MaterialIssue::STATUS_COMPLETED]);
-
-                            Notification::make()
-                                ->title('Material Issue Diselesaikan')
-                                ->body("Material Issue {$record->issue_number} telah diselesaikan. Stock dikurangi dan journal entry dibuat.")
-                                ->success()
                                 ->send();
                         }),
                     Tables\Actions\Action::make('generate_journal')

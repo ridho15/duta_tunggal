@@ -28,7 +28,7 @@ class ArApManagementPage extends Page implements HasTable
 
     protected static string $view = 'filament.pages.ar-ap-management-page';
 
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
 
     protected static ?string $navigationLabel = 'AR & AP Management';
 
@@ -46,7 +46,7 @@ class ArApManagementPage extends Page implements HasTable
     // Add this to help with debugging
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 
     public string $activeTab = 'ar';

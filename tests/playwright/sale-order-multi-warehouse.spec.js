@@ -13,6 +13,7 @@ import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
 
 test.use({ storageState: 'playwright/.auth/user.json' })
+test.describe.configure({ mode: 'serial' })
 
 const BASE = 'http://localhost:8009'
 const ERR = /Fatal error|Whoops!|Something went wrong/i
@@ -31,24 +32,21 @@ async function assertHealthy(page) {
 }
 
 async function getSaleOrderHref(page) {
-  await page.goto(`${BASE}/admin/sale-orders`)
+  const saleOrderId = execSync(
+    `php artisan tinker --execute="echo DB::table('sale_orders')->where('so_number', '${SO_NUMBER}')->value('id');"`,
+    { encoding: 'utf8' },
+  ).trim()
+
+  expect(saleOrderId).toBeTruthy()
+
+  await page.goto(`${BASE}/admin/sale-orders/${saleOrderId}`)
   await page.waitForLoadState('networkidle')
   await expect(page).not.toHaveURL(/login/)
 
   const body = await page.textContent('body')
   expect(body || '').not.toMatch(ERR)
 
-  const row = page.locator('tr, .fi-ta-row').filter({ hasText: SO_NUMBER }).first()
-  await expect(row).toBeVisible()
-
-  const hrefs = await row.locator('a[href*="/admin/sale-orders/"]').evaluateAll((els) =>
-    els
-      .map((el) => el.getAttribute('href'))
-      .filter((href) => href && /\/admin\/sale-orders\/\d+$/.test(href))
-  )
-
-  expect(hrefs.length).toBeGreaterThan(0)
-  return hrefs[0]
+  return `${BASE}/admin/sale-orders/${saleOrderId}`
 }
 
 // ---------------------------------------------------------------------------

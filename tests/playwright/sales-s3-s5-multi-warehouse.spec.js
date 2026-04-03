@@ -27,7 +27,7 @@ test('S3-a: Sale Order create exposes multi-warehouse allocation schema', async 
 })
 
 test('S5-a: Delivery Order create exposes multi-warehouse source schema', async ({ page }) => {
-  await page.goto('/admin/delivery-orders/create')
+  await page.goto('/admin/delivery-orders/create', { waitUntil: 'domcontentloaded' })
   await assertPageHealthy(page)
 
   const fromSalesWrapper = page
@@ -64,7 +64,7 @@ test('S5-a: Delivery Order create exposes multi-warehouse source schema', async 
 })
 
 test('S5-b: Delivery Order create still enforces sales-first flow before branch context', async ({ page }) => {
-  await page.goto('/admin/delivery-orders/create')
+  await page.goto('/admin/delivery-orders/create', { waitUntil: 'domcontentloaded' })
   const body = await assertPageHealthy(page)
 
   const fromSalesLabel = page.getByText('From Sales', { exact: false }).first()

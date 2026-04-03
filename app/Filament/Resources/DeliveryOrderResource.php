@@ -56,9 +56,17 @@ class DeliveryOrderResource extends Resource
 {
     protected static ?string $model = DeliveryOrder::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
 
-    protected static ?string $navigationGroup = 'Delivery Order';
+    protected static ?string $navigationGroup = 'Pengiriman';
+
+    protected static ?string $navigationLabel = 'Perintah Pengiriman';
+
+    protected static ?string $modelLabel = 'Perintah Pengiriman';
+
+    protected static ?string $pluralModelLabel = 'Perintah Pengiriman';
 
     // Position Delivery Order after Penjualan groups
     protected static ?int $navigationSort = 1;

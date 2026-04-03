@@ -49,10 +49,18 @@ class OrderRequestResource extends Resource
 {
     protected static ?string $model = OrderRequest::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-arrow-down';
 
     // Part of the Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
+
+    protected static ?string $navigationLabel = 'Permintaan Pembelian';
+
+    protected static ?string $modelLabel = 'Permintaan Pembelian';
+
+    protected static ?string $pluralModelLabel = 'Permintaan Pembelian';
 
     protected static ?int $navigationSort = 1;
 

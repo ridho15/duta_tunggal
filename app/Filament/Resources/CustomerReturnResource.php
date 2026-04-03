@@ -32,13 +32,13 @@ class CustomerReturnResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-uturn-left';
 
-    protected static ?string $navigationGroup = 'Customer Return';
+    protected static ?string $navigationGroup = 'Retur Pelanggan';
 
-    protected static ?string $navigationLabel = 'Customer Return';
+    protected static ?string $navigationLabel = 'Retur Pelanggan';
 
-    protected static ?string $modelLabel = 'Customer Return';
+    protected static ?string $modelLabel = 'Retur Pelanggan';
 
-    protected static ?string $pluralModelLabel = 'Customer Returns';
+    protected static ?string $pluralModelLabel = 'Retur Pelanggan';
 
     protected static ?int $navigationSort = 10;
 

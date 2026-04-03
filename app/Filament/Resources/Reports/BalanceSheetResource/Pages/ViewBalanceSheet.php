@@ -24,6 +24,7 @@ class ViewBalanceSheet extends Page
     protected static string $view = 'filament.pages.reports.balance-sheet';
 
     public bool $showPreview = false;
+    public bool $classic_view = false;
 
     public ?string $as_of_date = null; // position date
     public ?string $cabang_id = null; // single branch selection for compatibility
@@ -111,6 +112,9 @@ class ViewBalanceSheet extends Page
                     Toggle::make('include_zero_balances')->label('Sertakan Saldo 0')
                         ->visible(fn(Get $get) => $get('display_mode') !== 'with_zero')
                         ->helperText('Tampilkan akun dengan saldo 0'),
+                    Toggle::make('classic_view')->label('Tampilan Klasik (Dua Kolom)')
+                        ->helperText('Tampilkan neraca dalam format dua kolom klasik seperti laporan akuntansi')
+                        ->reactive(),
                 ]),
         ];
     }
@@ -161,6 +165,172 @@ class ViewBalanceSheet extends Page
         // Sum per account with its own opening balance & normal balance
         return $accounts->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
     }
+
+    /**
+     * Get report data formatted for the classic two-column balance sheet layout.
+     * Returns asset groups and liability/equity groups each as a flat list of
+     * parent→children sections suitable for a side-by-side table render.
+     */
+    public function getClassicReportData(): array
+    {
+        $asOf = $this->as_of_date ? Carbon::parse($this->as_of_date)->endOfDay() : now()->endOfDay();
+        $showZero = (bool) ($this->include_zero_balances ?? false);
+
+        $assets = ChartOfAccount::whereIn('type', ['Asset', 'Contra Asset'])
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('code')
+            ->get();
+
+        $liabilities = ChartOfAccount::where('type', 'Liability')
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('code')
+            ->get();
+
+        $equities = ChartOfAccount::where('type', 'Equity')
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('code')
+            ->get();
+
+        // Build classic parent→child groups
+        $assetGroups     = $this->buildClassicGroups($assets, $asOf, $showZero);
+        $liabilityGroups = $this->buildClassicGroups($liabilities, $asOf, $showZero);
+        $equityGroups    = $this->buildClassicGroups($equities, $asOf, $showZero);
+
+        // Grand totals
+        $totalAssets           = $assets->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
+        $totalLiabilities      = $liabilities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
+        $totalEquityAccounts   = $equities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
+        $retained              = $this->getRetainedEarnings($asOf);
+        $current               = $this->getCurrentEarnings($asOf);
+        $totalEquity           = $totalEquityAccounts + $retained + $current;
+        $totalLiabAndEquity    = $totalLiabilities + $totalEquity;
+        $difference            = $totalAssets - $totalLiabAndEquity;
+
+        return [
+            'asset_groups'                => $assetGroups,
+            'liability_groups'            => $liabilityGroups,
+            'equity_groups'               => $equityGroups,
+            'retained_earnings'           => $retained,
+            'current_earnings'            => $current,
+            'total_assets'                => $totalAssets,
+            'total_liabilities'           => $totalLiabilities,
+            'total_equity'                => $totalEquity,
+            'total_liabilities_and_equity' => $totalLiabAndEquity,
+            'is_balanced'                 => abs($difference) < 0.01,
+            'difference'                  => $difference,
+        ];
+    }
+
+    /**
+     * Build parent→children groups for the classic two-column balance sheet.
+     *
+     * Groups accounts by their direct parent_id.  Each group contains:
+     *   parent_code, parent_name, children[], total, total_label
+     *
+     * Accounts whose parent is not in the same collection are treated as
+     * stand-alone rows in an "Uncategorised" group.
+     *
+     * @param  \Illuminate\Support\Collection $accounts  Active COA records of the relevant type
+     * @param  \Carbon\Carbon                 $asOf
+     * @param  bool                           $showZero  Whether to include zero-balance child rows
+     * @return array
+     */
+    protected function buildClassicGroups($accounts, Carbon $asOf, bool $showZero = false): array
+    {
+        // Pre-compute balance for every account (avoids N+1 compared to individual queries)
+        $accountsById = $accounts->keyBy('id')->map(function ($coa) use ($asOf) {
+            $coa->computed_balance = $this->calculateBalanceForCoa($coa, $asOf);
+            return $coa;
+        });
+
+        $accountIdSet    = $accountsById->keys()->toArray();
+        // IDs that appear as parent_id for at least one other account in this collection
+        $referencedParentIds = $accountsById
+            ->pluck('parent_id')
+            ->filter()
+            ->unique()
+            ->intersect($accountIdSet)
+            ->toArray();
+
+        // Group accounts by parent_id
+        $grouped = $accountsById->groupBy('parent_id');
+        $groups  = [];
+
+        // Iterate over each parent that IS referenced inside the collection
+        foreach ($referencedParentIds as $parentId) {
+            $parent = $accountsById->get($parentId);
+            if (!$parent) {
+                continue;
+            }
+
+            $children   = ($grouped->get($parentId) ?? collect())->sortBy('code')->values();
+            $childItems = [];
+            $groupTotal = 0.0;
+
+            foreach ($children as $child) {
+                // Skip children that are themselves parent accounts (they get their own group)
+                if (in_array($child->id, $referencedParentIds, true)) {
+                    continue;
+                }
+
+                $balance = (float) $child->computed_balance;
+                if (!$showZero && abs($balance) < 0.005) {
+                    continue;
+                }
+
+                $childItems[] = [
+                    'code'    => $child->code,
+                    'name'    => $child->name,
+                    'balance' => $balance,
+                ];
+                $groupTotal += $balance;
+            }
+
+            if (!empty($childItems) || $showZero) {
+                $groups[] = [
+                    'parent_code'  => $parent->code,
+                    'parent_name'  => $parent->name,
+                    'children'     => $childItems,
+                    'total'        => $groupTotal,
+                    'total_label'  => 'TOTAL ' . mb_strtoupper($parent->name),
+                ];
+            }
+        }
+
+        // Accounts with no parent inside the collection become standalone leaf groups
+        $standaloneAccounts = $accountsById->filter(function ($a) use ($accountIdSet, $referencedParentIds) {
+            $parentInCollection = $a->parent_id && in_array($a->parent_id, $accountIdSet, true);
+            $isSelfParent       = in_array($a->id, $referencedParentIds, true);
+            return !$parentInCollection && !$isSelfParent;
+        })->sortBy('code')->values();
+
+        foreach ($standaloneAccounts as $acct) {
+            $balance = (float) $acct->computed_balance;
+            if (!$showZero && abs($balance) < 0.005) {
+                continue;
+            }
+            $groups[] = [
+                'parent_code' => $acct->code,
+                'parent_name' => $acct->name,
+                'children'    => [[
+                    'code'    => $acct->code,
+                    'name'    => $acct->name,
+                    'balance' => $balance,
+                ]],
+                'total'       => $balance,
+                'total_label' => 'TOTAL ' . mb_strtoupper($acct->name),
+            ];
+        }
+
+        // Sort by parent code ascending
+        usort($groups, fn ($a, $b) => strcmp($a['parent_code'], $b['parent_code']));
+
+        return $groups;
+    }
+
 
     protected function calculateBalanceForCoa(ChartOfAccount $coa, Carbon $asOf): float
     {

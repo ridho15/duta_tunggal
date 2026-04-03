@@ -56,8 +56,7 @@ class QuotationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
 
-    // Keep resource label, but group renamed to include english hint
-    protected static ?string $navigationGroup = 'Penjualan (Sales Order)';
+    protected static ?string $navigationGroup = 'Penjualan';
 
     protected static ?int $navigationSort = 1;
 

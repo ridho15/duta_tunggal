@@ -37,7 +37,7 @@ class MyDashboard extends Dashboard
 {
     use HasFiltersForm;
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Finance';
     protected static ?string $navigationLabel = 'Dashboard Finance';
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
     protected static ?int $navigationSort = 6;

@@ -336,3 +336,99 @@ class ManufacturingJournalTest extends TestCase
         );
     }
 }
+
+it('uses only manufacturing order linked material issues for production wip cost', function () {
+    $branch = Cabang::factory()->create();
+    $user = User::factory()->create(['cabang_id' => $branch->id]);
+    $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
+    $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
+    $category = ProductCategory::factory()->create();
+
+    $wipCoa = ChartOfAccount::firstOrCreate(
+        ['code' => '1-201'],
+        ['name' => 'PERSEDIAAN BARANG DALAM PROSES - WIP INVENTORY', 'type' => 'Asset', 'is_active' => true]
+    );
+    $tempCoa = ChartOfAccount::firstOrCreate(
+        ['code' => '1400.04'],
+        ['name' => 'POS SEMENTARA PRODUKSI', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    $finishedGood = Product::factory()->create([
+        'name' => 'WIP Scope Finished Good',
+        'sku' => 'FG-WIP-SCOPE',
+        'cabang_id' => $branch->id,
+        'product_category_id' => $category->id,
+        'uom_id' => $uom->id,
+        'is_manufacture' => true,
+        'is_raw_material' => false,
+    ]);
+
+    $productionPlan = ProductionPlan::create([
+        'plan_number' => 'PLAN-WIP-SCOPE',
+        'name' => 'WIP Scope Plan',
+        'source_type' => 'manual',
+        'product_id' => $finishedGood->id,
+        'quantity' => 1,
+        'uom_id' => $uom->id,
+        'start_date' => now(),
+        'end_date' => now()->addDay(),
+        'status' => 'scheduled',
+        'warehouse_id' => $warehouse->id,
+        'cabang_id' => $branch->id,
+        'created_by' => $user->id,
+    ]);
+
+    $manufacturingOrder = ManufacturingOrder::create([
+        'mo_number' => 'MO-WIP-SCOPE',
+        'production_plan_id' => $productionPlan->id,
+        'status' => 'in_progress',
+        'start_date' => now(),
+    ]);
+
+    MaterialIssue::withoutEvents(function () use ($productionPlan, $manufacturingOrder, $warehouse) {
+        MaterialIssue::create([
+            'issue_number' => 'MI-WIP-SCOPE-1',
+            'production_plan_id' => $productionPlan->id,
+            'manufacturing_order_id' => $manufacturingOrder->id,
+            'warehouse_id' => $warehouse->id,
+            'issue_date' => now(),
+            'type' => 'issue',
+            'status' => 'completed',
+            'total_cost' => 800,
+            'created_by' => null,
+        ]);
+
+        MaterialIssue::create([
+            'issue_number' => 'MI-WIP-SCOPE-2',
+            'production_plan_id' => $productionPlan->id,
+            'manufacturing_order_id' => null,
+            'warehouse_id' => $warehouse->id,
+            'issue_date' => now(),
+            'type' => 'issue',
+            'status' => 'completed',
+            'total_cost' => 1200,
+            'created_by' => null,
+        ]);
+    });
+
+    $production = Production::withoutEvents(function () use ($manufacturingOrder) {
+        return Production::create([
+            'production_number' => 'PROD-WIP-SCOPE',
+            'manufacturing_order_id' => $manufacturingOrder->id,
+            'production_date' => now(),
+            'status' => 'draft',
+        ]);
+    });
+
+    app(ManufacturingJournalService::class)->generateJournalForProductionInProgress($production->fresh());
+
+    $entries = JournalEntry::where('journal_type', 'manufacturing_wip')
+        ->where('reference', 'PROD-WIP-SCOPE')
+        ->get();
+
+    expect($entries)->toHaveCount(2)
+        ->and((float) $entries->sum('debit'))->toBe(800.0)
+        ->and((float) $entries->sum('credit'))->toBe(800.0)
+        ->and($entries->where('coa_id', $tempCoa->id))->toHaveCount(1)
+        ->and($entries->where('coa_id', $wipCoa->id))->toHaveCount(1);
+});

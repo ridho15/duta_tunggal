@@ -32,6 +32,8 @@ class StockMovementResource extends Resource
 {
     protected static ?string $model = StockMovement::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
 
     protected static ?string $navigationGroup = 'Gudang';

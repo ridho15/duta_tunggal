@@ -33,6 +33,8 @@ class StockAdjustmentResource extends Resource
 {
     protected static ?string $model = StockAdjustment::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
     protected static ?string $navigationGroup = 'Gudang';

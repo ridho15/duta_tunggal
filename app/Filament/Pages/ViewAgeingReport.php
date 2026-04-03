@@ -47,6 +47,11 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
         $this->as_of_date = now()->format('Y-m-d');
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public function form(Form $form): Form
     {
         return $form

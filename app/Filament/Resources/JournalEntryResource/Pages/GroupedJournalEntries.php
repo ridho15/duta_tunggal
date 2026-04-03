@@ -26,7 +26,7 @@ class GroupedJournalEntries extends Page
 
     protected static ?string $title = 'Journal Entries - Grouped by Parent COA';
     // Register this page for navigation so it can be accessed
-    protected static bool $shouldRegisterNavigation = true;
+    protected static bool $shouldRegisterNavigation = false;
     // Make the page title/navigation label explicit (useful in breadcrumbs and
     // for clarity if the page is ever exposed in sub-navigation). Also set the
     // parent item so, if registered in the future, it will be grouped under

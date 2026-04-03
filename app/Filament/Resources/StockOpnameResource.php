@@ -31,6 +31,8 @@ class StockOpnameResource extends Resource
 {
     protected static ?string $model = StockOpname::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static ?string $navigationGroup = 'Gudang';

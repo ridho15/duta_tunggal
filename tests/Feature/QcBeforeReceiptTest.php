@@ -14,12 +14,14 @@ use App\Models\PurchaseReceiptPhoto;
 use App\Models\PurchaseReceiptItemPhoto;
 use App\Models\JournalEntry;
 use App\Models\Product;
+use App\Models\QualityControl;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\QualityControlService;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class QcBeforeReceiptTest extends TestCase
@@ -57,7 +59,7 @@ class QcBeforeReceiptTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function qc_from_po_item_creates_receipt_and_posts_journals()
     {
         $po = PurchaseOrder::factory()->create([
@@ -102,16 +104,23 @@ class QcBeforeReceiptTest extends TestCase
             'qty_accepted' => 5,
         ]);
 
-        $this->assertTrue(
-            \App\Models\JournalEntry::where('journal_type', 'inventory')
-                ->where('description', 'like', '%QC Inventory - Debit inventory for QC passed items%')
-                ->exists()
-        );
-        $this->assertTrue(
-            \App\Models\JournalEntry::where('journal_type', 'inventory')
-                ->where('description', 'like', '%QC Inventory - Credit temporary procurement for QC passed items%')
-                ->exists()
-        );
+        $receiptItem = PurchaseReceiptItem::where('purchase_receipt_id', $receipt->id)
+            ->where('product_id', $this->product->id)
+            ->first();
+
+        $this->assertNotNull($receiptItem);
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => PurchaseReceiptItem::class,
+            'source_id' => $receiptItem->id,
+            'journal_type' => 'inventory',
+            'description' => 'Debit inventory for receipt item ' . $receiptItem->id,
+        ]);
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => PurchaseReceiptItem::class,
+            'source_id' => $receiptItem->id,
+            'journal_type' => 'inventory',
+            'description' => 'Inventory Posting - Credit unbilled purchase for receipt item ' . $receiptItem->id,
+        ]);
 
         $purchaseReceiptService = app(\App\Services\PurchaseReceiptService::class);
         $result = $purchaseReceiptService->postPurchaseReceipt($receipt);
@@ -119,7 +128,7 @@ class QcBeforeReceiptTest extends TestCase
         $this->assertEquals('posted', $result['status']);
     }
 
-    /** @test */
+    #[Test]
     public function qc_from_po_item_copies_purchase_order_biaya_to_receipt()
     {
         $po = PurchaseOrder::factory()->create([
@@ -175,7 +184,7 @@ class QcBeforeReceiptTest extends TestCase
         $this->assertEquals(1, (int) $receiptBiaya->masuk_invoice);
     }
 
-    /** @test */
+    #[Test]
     public function qc_handles_rejected_quantities_correctly()
     {
         // create approved purchase order and item
@@ -235,7 +244,7 @@ class QcBeforeReceiptTest extends TestCase
         $this->assertEquals(7.0, (float) $inventoryStock->qty_available); // only accepted qty in inventory
     }
 
-    /** @test */
+    #[Test]
     public function qc_approval_updates_inventory_stock()
     {
         // create approved purchase order and item
@@ -296,7 +305,7 @@ class QcBeforeReceiptTest extends TestCase
         $this->assertEquals('purchase_in', $stockMovement->type);
     }
 
-    /** @test */
+    #[Test]
     public function qc_rejection_prevents_inventory_update()
     {
         $po = PurchaseOrder::factory()->create([
@@ -342,12 +351,7 @@ class QcBeforeReceiptTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     * QC completion should not crash when the product has no COA accounts
-     * configured (relations return default models with null ids).  In that
-     * circumstance the service skips journal creation entirely.
-     */
+    #[Test]
     public function qc_with_missing_coa_accounts_skips_journals()
     {
         $po = PurchaseOrder::factory()->create([

@@ -1,0 +1,192 @@
+<?php
+
+namespace App\Exports;
+
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Font;
+use Carbon\Carbon;
+
+/**
+ * Excel export for the Profit & Loss Multiple By Division report.
+ *
+ * Accepts the array produced by ProfitLossMultiDivisionService::generate().
+ */
+class ProfitLossMultiDivisionExport implements FromArray, ShouldAutoSize, WithTitle, WithEvents
+{
+    private array $reportData;
+
+    public function __construct(array $reportData)
+    {
+        $this->reportData = $reportData;
+    }
+
+    public function title(): string
+    {
+        return 'Profit Loss Multi Division';
+    }
+
+    public function array(): array
+    {
+        $data      = $this->reportData;
+        $divisions = $data['divisions']       ?? [];
+        $divIds    = array_column($divisions, 'id');
+        $rows      = [];
+
+        // ── Header rows ──────────────────────────────────────────────────────
+        $rows[] = ['PT. DUTA TUNGGAL'];
+        $rows[] = ['PROFIT LOSS MULTIPLE BY DIVISION'];
+        $start  = $data['period']['start'] ?? '';
+        $end    = $data['period']['end']   ?? '';
+        $rows[] = [
+            'As Of : ' . Carbon::parse($start)->format('d-F-Y') .
+            ' to '     . Carbon::parse($end)->format('d-F-Y'),
+        ];
+        $rows[] = [];
+
+        // ── Column header row ────────────────────────────────────────────────
+        $headerRow = ['AccountNo', 'AccountName'];
+        foreach ($divisions as $div) {
+            $name = strtoupper($div['nama'] ?? $div['kode']);
+            $headerRow[] = $name . ' Balance';
+            $headerRow[] = $name . ' Vtc%';
+        }
+        $rows[] = $headerRow;
+
+        $fmt = fn ($v) => number_format((float) $v, 2, '.', ',');
+
+        // ── Helper: build a data row ─────────────────────────────────────────
+        $makeRow = function (string $code, string $label, array $balances, array $revenue) use ($divIds, $fmt): array {
+            $row = [$code, $label];
+            foreach ($divIds as $d) {
+                $b    = $balances[$d] ?? 0.0;
+                $rev  = $revenue[$d]  ?? 0.0;
+                $vtc  = $rev != 0 ? round(($b / $rev) * 100, 2) : 0.0;
+                $row[] = $fmt($b);
+                $row[] = $fmt($vtc);
+            }
+            return $row;
+        };
+
+        $totalRevenue = $data['total_revenue'] ?? array_fill_keys($divIds, 0.0);
+
+        // ── Revenue section ──────────────────────────────────────────────────
+        foreach ($data['revenue_rows'] ?? [] as $row) {
+            if ($row['type'] === 'section_header') {
+                $rows[] = ['', strtoupper($row['name'])];
+            } elseif ($row['type'] === 'account') {
+                $rows[] = $makeRow($row['code'], '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
+            } elseif (in_array($row['type'], ['subtotal', 'total_revenue'])) {
+                $rows[] = $makeRow('', $row['name'], $row['balances'] ?? [], $totalRevenue);
+            }
+        }
+        $rows[] = [];
+
+        // ── COGS section ─────────────────────────────────────────────────────
+        foreach ($data['cogs_rows'] ?? [] as $row) {
+            if ($row['type'] === 'section_header') {
+                $rows[] = ['', strtoupper($row['name'])];
+            } elseif ($row['type'] === 'account') {
+                $rows[] = $makeRow($row['code'], '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
+            } elseif (in_array($row['type'], ['subtotal', 'total_cogs'])) {
+                $rows[] = $makeRow('', $row['name'], $row['balances'] ?? [], $totalRevenue);
+            }
+        }
+        if (empty($data['cogs_rows'])) {
+            $rows[] = $makeRow('', 'Total Cost Of Goods Sold', array_fill_keys($divIds, 0.0), $totalRevenue);
+        }
+
+        // ── Gross Profit ─────────────────────────────────────────────────────
+        $rows[] = $makeRow('', 'Gross Profit', $data['gross_profit'] ?? [], $totalRevenue);
+        $rows[] = [];
+
+        // ── Operating Expenses ───────────────────────────────────────────────
+        foreach ($data['opex_sections'] ?? [] as $section) {
+            foreach ($section['rows'] as $row) {
+                if ($row['type'] === 'section_header') {
+                    $rows[] = ['', strtoupper($row['name'])];
+                } elseif ($row['type'] === 'account') {
+                    $rows[] = $makeRow($row['code'], '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
+                } elseif ($row['type'] === 'subtotal') {
+                    $rows[] = $makeRow('', $row['name'], $row['balances'] ?? [], $totalRevenue);
+                }
+            }
+        }
+        $rows[] = $makeRow('', 'Total Operating Expenses', $data['total_opex'] ?? [], $totalRevenue);
+        $rows[] = $makeRow('', 'Operating Profit (EBIT)', $data['operating_profit'] ?? [], $totalRevenue);
+        $rows[] = [];
+
+        // ── Other Income / Expense ───────────────────────────────────────────
+        foreach ($data['other_rows'] ?? [] as $row) {
+            $rows[] = $makeRow($row['code'] ?? '', '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
+        }
+
+        // ── Net Profit ───────────────────────────────────────────────────────
+        $rows[] = $makeRow('', 'Net Profit', $data['net_profit'] ?? [], $totalRevenue);
+
+        return $rows;
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $data  = $this->reportData;
+                $divCount = count($data['divisions'] ?? []);
+
+                // ── Company name row (row 1) ─────────────────────────────────
+                $sheet->getStyle('A1')->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 13, 'color' => ['argb' => 'FFCC0000']],
+                ]);
+
+                // ── Report title row (row 2) ─────────────────────────────────
+                $sheet->getStyle('A2')->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 12],
+                ]);
+
+                // ── Column header row (row 5) ────────────────────────────────
+                $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(2 + $divCount * 2);
+                $headerRange = 'A5:' . $lastCol . '5';
+                $sheet->getStyle($headerRange)->applyFromArray([
+                    'font'      => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+                    'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF2B5FA5']],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                ]);
+
+                // ── Highlight Gross Profit row ──────────────────────────────
+                $highestRow = $sheet->getHighestRow();
+                for ($r = 1; $r <= $highestRow; $r++) {
+                    $cellVal = $sheet->getCell('B' . $r)->getValue();
+                    if ($cellVal === 'Gross Profit') {
+                        $gpRange = 'A' . $r . ':' . $lastCol . $r;
+                        $sheet->getStyle($gpRange)->applyFromArray([
+                            'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF06B6D4']],
+                        ]);
+                    }
+                    if ($cellVal === 'Net Profit' || $cellVal === 'Net Loss') {
+                        $npRange = 'A' . $r . ':' . $lastCol . $r;
+                        $sheet->getStyle($npRange)->applyFromArray([
+                            'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF065F46']],
+                        ]);
+                    }
+                    // Bold subtotals / totals
+                    if (str_starts_with((string) $cellVal, 'Total ') || $cellVal === 'Operating Profit (EBIT)') {
+                        $sheet->getStyle('B' . $r)->applyFromArray([
+                            'font' => ['bold' => true],
+                        ]);
+                    }
+                }
+            },
+        ];
+    }
+}

@@ -34,7 +34,15 @@ class AccountReceivableResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance - Penjualan';
+    protected static ?string $navigationGroup = 'Keuangan Penjualan';
+
+    protected static ?string $navigationLabel = 'Piutang Usaha';
+
+    protected static ?string $modelLabel = 'Piutang Usaha';
+
+    protected static ?string $pluralModelLabel = 'Piutang Usaha';
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?int $navigationSort = 2;
 

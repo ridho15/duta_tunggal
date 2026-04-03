@@ -14,13 +14,20 @@ use Illuminate\Support\Collection;
  */
 class JournalConsolidationPage extends Page
 {
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string $view = 'filament.pages.journal-consolidation-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-table-cells';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Journal List of Consolidation';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 13;
 

@@ -31,9 +31,9 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
 
     protected static string $view = 'filament.pages.income-statement-page';
 
-    protected static ?string $navigationLabel = 'Trial Balance';
+    protected static ?string $navigationLabel = 'Laporan Laba Rugi (Legacy)';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 2;
 
@@ -377,7 +377,7 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
 
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 
     public function getTitle(): string

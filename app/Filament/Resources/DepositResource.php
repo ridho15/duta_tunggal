@@ -46,9 +46,11 @@ class DepositResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-currency-pound';
 
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
 
     protected static ?int $navigationSort = 5;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {

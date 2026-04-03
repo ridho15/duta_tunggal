@@ -9,13 +9,20 @@ use Illuminate\Support\Carbon;
 
 class DrillDownFinancialReportPage extends Page
 {
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string $view = 'filament.pages.drill-down-financial-report-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-magnifying-glass-plus';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Drill Down Financial Report';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 5;
 

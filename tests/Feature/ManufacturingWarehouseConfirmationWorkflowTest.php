@@ -19,7 +19,7 @@ use App\Models\WarehouseConfirmation;
 use App\Services\ManufacturingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     \Tests\TestCase::disableBaseSeeding();
@@ -184,7 +184,7 @@ test('manufacturing material issue can move to pending approval before warehouse
         ->and($materialIssue->fresh()->approved_at)->toBeNull();
 });
 
-test('confirmed manufacturing warehouse confirmation auto approves pending material issue', function () {
+test('confirmed manufacturing warehouse confirmation keeps material issue pending without item confirmation', function () {
     $context = createManufacturingApprovalContext();
 
     $materialIssue = MaterialIssue::create([
@@ -228,9 +228,9 @@ test('confirmed manufacturing warehouse confirmation auto approves pending mater
         ->where('warehouse_id', $context['warehouse']->id)
         ->firstOrFail();
 
-    expect($materialIssue->fresh()->status)->toBe(MaterialIssue::STATUS_APPROVED)
-        ->and($materialIssue->fresh()->approved_by)->toBe($context['user']->id)
-        ->and($materialIssue->fresh()->approved_at)->not->toBeNull()
-        ->and((float) $stock->qty_available)->toBe(95.0)
-        ->and((float) $stock->qty_reserved)->toBe(5.0);
+    expect($materialIssue->fresh()->status)->toBe(MaterialIssue::STATUS_PENDING_APPROVAL)
+        ->and($materialIssue->fresh()->approved_by)->toBeNull()
+        ->and($materialIssue->fresh()->approved_at)->toBeNull()
+        ->and((float) $stock->qty_available)->toBe(100.0)
+        ->and((float) $stock->qty_reserved)->toBe(0.0);
 });

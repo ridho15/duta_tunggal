@@ -25,13 +25,17 @@ use Carbon\Carbon;
 
 class AgeingReportResource extends Resource
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $model = AccountReceivable::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Aging Report (AR/AP)';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 25;
 

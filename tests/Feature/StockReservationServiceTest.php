@@ -13,9 +13,11 @@ use App\Models\SaleOrderItem;
 use App\Models\StockReservation;
 use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
+use App\Services\ManufacturingService;
 use App\Services\SalesOrderService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -84,7 +86,7 @@ class StockReservationServiceTest extends TestCase
     //            and decrements qty_available.
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_sr_001_reserve_stock_increases_reserved_and_decreases_available(): void
     {
         ['materialIssue' => $mi, 'inventoryStock' => $stock] =
@@ -108,7 +110,7 @@ class StockReservationServiceTest extends TestCase
     //            and restores qty_available.
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_sr_002_release_reservation_decreases_reserved_and_restores_available(): void
     {
         ['materialIssue' => $mi, 'inventoryStock' => $stock] =
@@ -137,7 +139,7 @@ class StockReservationServiceTest extends TestCase
     //            InsufficientStockException (guard in SalesOrderService::confirm).
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_sr_003_over_reservation_throws_insufficient_stock_exception(): void
     {
         $warehouse = Warehouse::factory()->create();
@@ -173,7 +175,7 @@ class StockReservationServiceTest extends TestCase
     //            still throws InsufficientStockException (no negative stock).
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_sr_004_concurrent_reservation_never_produces_negative_available(): void
     {
         $warehouse = Warehouse::factory()->create();
@@ -224,7 +226,7 @@ class StockReservationServiceTest extends TestCase
     //            qty_available (SalesOrderService::cancel).
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_sr_005_cancel_sale_order_releases_stock_reservations(): void
     {
         $warehouse = Warehouse::factory()->create();
@@ -272,7 +274,7 @@ class StockReservationServiceTest extends TestCase
     //            at the lower value (stock is genuinely used up).
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_sr_006_consume_reservation_decreases_reserved_and_leaves_available_low(): void
     {
         ['materialIssue' => $mi, 'inventoryStock' => $stock] =
@@ -283,6 +285,18 @@ class StockReservationServiceTest extends TestCase
         $stock->refresh();
         $this->assertEquals(20, $stock->qty_reserved);
         $this->assertEquals(80, $stock->qty_available);
+
+        // Warehouse confirmation is now required per material issue item before completion.
+        app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($mi);
+        $mi->load('warehouseConfirmations.warehouseConfirmationItems');
+
+        $mi->warehouseConfirmations->each(function ($confirmation): void {
+            $item = $confirmation->warehouseConfirmationItems->sole();
+            $item->update([
+                'status' => 'confirmed',
+                'confirmed_qty' => $item->requested_qty,
+            ]);
+        });
 
         // Mark material issue as completed so consume can proceed
         $mi->update(['status' => MaterialIssue::STATUS_COMPLETED]);

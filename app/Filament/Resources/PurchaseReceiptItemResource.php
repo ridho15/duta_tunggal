@@ -35,7 +35,7 @@ class PurchaseReceiptItemResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-chevron-up-down';
 
     // Put Purchase Receipt Item under the Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
 
     protected static ?int $navigationSort = 6;
 

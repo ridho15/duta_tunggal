@@ -2,6 +2,194 @@
 <style>
     /* ── Finance Report – Shared Styles ── */
     .fr-page { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+
+    /* ── Classic Two-Column Balance Sheet ── */
+    .bs-classic-wrapper {
+        font-family: Arial, 'Helvetica Neue', sans-serif;
+        font-size: 12px;
+        color: #222;
+        background: #fff;
+        padding: 0;
+    }
+    /* Header */
+    .bs-classic-header {
+        text-align: center;
+        padding: 12px 0 8px;
+        border-bottom: 2px solid #00a8cc;
+    }
+    .bs-classic-company {
+        font-size: 15px;
+        font-weight: 800;
+        color: #0d2b4e;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .bs-classic-title {
+        font-size: 26px;
+        font-weight: 900;
+        background: linear-gradient(90deg, #00bcd4 0%, #0288d1 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 0.06em;
+        line-height: 1.2;
+        margin: 2px 0;
+    }
+    .bs-classic-date {
+        font-size: 12px;
+        font-weight: 700;
+        color: #e65100;
+        margin-top: 2px;
+    }
+    /* Outer two-column table */
+    .bs-outer-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+    .bs-outer-table > thead > tr > th {
+        background: linear-gradient(135deg, #0097a7 0%, #006064 100%);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 800;
+        text-align: center;
+        padding: 8px 4px;
+        letter-spacing: 0.05em;
+        border: 1px solid #006064;
+    }
+    .bs-outer-table > thead > tr.bs-col-sub-header > th {
+        background: #e0f7fa;
+        font-size: 11px;
+        font-weight: 700;
+        color: #004d40;
+        padding: 4px 6px;
+        border: 1px solid #b2ebf2;
+    }
+    .bs-outer-table > thead > tr.bs-col-sub-header > th:first-child {
+        border-right: 2px solid #00acc1;
+    }
+    /* Column separator */
+    .bs-col-left {
+        width: 50%;
+        vertical-align: top;
+        border-right: 2px solid #00acc1;
+        padding: 0;
+    }
+    .bs-col-right {
+        width: 50%;
+        vertical-align: top;
+        padding: 0;
+    }
+    /* Sub-header inside each column */
+    .bs-sub-header-row {
+        display: flex;
+        background: #e0f7fa;
+        border-bottom: 1px solid #b2ebf2;
+        font-size: 10px;
+        font-weight: 700;
+        color: #004d40;
+    }
+    .bs-sub-header-row .bs-th-code  { width: 90px; padding: 4px 6px; border-right: 1px solid #b2ebf2; }
+    .bs-sub-header-row .bs-th-name  { flex: 1; padding: 4px 6px; border-right: 1px solid #b2ebf2; }
+    .bs-sub-header-row .bs-th-bal   { width: 110px; padding: 4px 6px; text-align: right; }
+    /* Inner account table */
+    .bs-inner-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    /* Parent (section) row */
+    .bs-parent-row td {
+        background: #b2ebf2;
+        font-weight: 800;
+        font-size: 11px;
+        color: #004d40;
+        padding: 4px 6px;
+        border-bottom: 1px solid #80deea;
+    }
+    .bs-parent-td-code { width: 90px; }
+    .bs-parent-td-name { }
+    /* Child row */
+    .bs-child-row td {
+        font-size: 11px;
+        color: #333;
+        padding: 3px 6px;
+        border-bottom: 1px solid #e8f5e9;
+    }
+    .bs-child-row:hover td { background: #f9fbe7; }
+    .bs-td-code  { width: 90px; font-family: 'Courier New', monospace; color: #546e7a; font-size: 10px; }
+    .bs-td-name  { }
+    .bs-td-child-name { padding-left: 4px; }
+    .bs-td-amount {
+        width: 110px;
+        text-align: right;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .bs-negative { color: #c62828 !important; }
+    /* Total row */
+    .bs-total-row td {
+        font-weight: 800;
+        font-size: 11px;
+        color: #0d47a1;
+        padding: 4px 6px;
+        background: #e3f2fd;
+        border-top: 1px solid #90caf9;
+        border-bottom: 2px solid #42a5f5;
+    }
+    .bs-total-row .bs-td-amount {
+        font-weight: 800;
+        color: #0d47a1;
+    }
+    .bs-total-row .bs-negative { color: #c62828 !important; }
+    /* Grand total footer row */
+    .bs-grand-total-row td {
+        background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 900;
+        padding: 7px 8px;
+        border-top: 3px solid #0d47a1;
+    }
+    .bs-grand-total-row td:first-child {
+        border-right: 2px solid #fff;
+    }
+    .bs-grand-total-amount { text-align: right; font-family: 'Courier New', monospace; }
+    /* Balance status row */
+    .bs-status-row td {
+        text-align: center;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 5px;
+    }
+    .bs-status-ok   { background: #e8f5e9; color: #1b5e20; }
+    .bs-status-fail { background: #ffebee; color: #b71c1c; }
+    /* Footer */
+    .bs-classic-footer {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 6px 4px;
+        font-size: 10px;
+        color: #546e7a;
+        border-top: 1px solid #b0bec5;
+        margin-top: 4px;
+    }
+    /* Unbalanced warning */
+    .bs-unbalanced-warning {
+        background: #fff3e0;
+        border: 1px solid #ffb74d;
+        color: #e65100;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+    /* Print overrides */
+    @media print {
+        .no-print, .fi-topbar, .fi-sidebar, .fi-page-header, nav { display: none !important; }
+        .bs-classic-wrapper { padding: 0; }
+        .bs-outer-table { page-break-inside: auto; }
+    }
     /* Report header */
     .fr-report-header {
         background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
@@ -88,12 +276,209 @@
 
         @if($this->showPreview)
 
+        @if($this->classic_view)
+        {{-- ================================================================ --}}
+        {{--  CLASSIC TWO-COLUMN BALANCE SHEET (matches printed format image)  --}}
+        {{-- ================================================================ --}}
+        @php
+            $cd      = $this->getClassicReportData();
+            $asOfDate = $this->as_of_date ?? now()->format('Y-m-d');
+            $asOfFormatted = \Carbon\Carbon::parse($asOfDate)->translatedFormat('d-F-Y');
+            // Helper: format a monetary value in the classic style
+            $fmtAmt = function($v) {
+                if ($v < 0) return '(' . number_format(abs($v), 2, '.', ',') . ')';
+                return number_format($v, 2, '.', ',');
+            };
+            $isNeg = fn($v) => $v < 0;
+        @endphp
+
+        <div class="bs-classic-wrapper bg-white rounded-xl p-4 shadow mt-4">
+            {{-- Header --}}
+            <div class="bs-classic-header">
+                <div class="bs-classic-company">{{ config('app.name', 'PT. DUTA TUNGGAL') }}</div>
+                <div class="bs-classic-title">BALANCE SHEET</div>
+                <div class="bs-classic-date">As Of : {{ $asOfFormatted }}</div>
+            </div>
+
+            {{-- Unbalanced warning --}}
+            @if(!$cd['is_balanced'])
+            <div class="bs-unbalanced-warning">
+                &#9888; Neraca tidak seimbang — selisih: {{ $fmtAmt($cd['difference']) }}
+            </div>
+            @endif
+
+            {{-- Two-column outer table --}}
+            <table class="bs-outer-table">
+                <thead>
+                    <tr>
+                        <th>ASSET</th>
+                        <th>LIABILITIES &amp; EQUITY</th>
+                    </tr>
+                    <tr class="bs-col-sub-header">
+                        <th>
+                            <div class="bs-sub-header-row">
+                                <span class="bs-th-code">Account No</span>
+                                <span class="bs-th-name">Account Name</span>
+                                <span class="bs-th-bal">Balance</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="bs-sub-header-row">
+                                <span class="bs-th-code">Account No</span>
+                                <span class="bs-th-name">Account Name</span>
+                                <span class="bs-th-bal">Balance</span>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        {{-- ── LEFT COLUMN: ASSETS ── --}}
+                        <td class="bs-col-left">
+                            <table class="bs-inner-table">
+                                @forelse($cd['asset_groups'] as $group)
+                                    {{-- Parent row --}}
+                                    <tr class="bs-parent-row">
+                                        <td class="bs-td-code bs-parent-td-code">{{ $group['parent_code'] }}</td>
+                                        <td class="bs-parent-td-name" colspan="2">{{ $group['parent_name'] }}</td>
+                                    </tr>
+                                    {{-- Children --}}
+                                    @foreach($group['children'] as $child)
+                                    <tr class="bs-child-row">
+                                        <td class="bs-td-code">{{ $child['code'] }}</td>
+                                        <td class="bs-td-name bs-td-child-name">-- {{ $child['name'] }}</td>
+                                        <td class="bs-td-amount {{ $isNeg($child['balance']) ? 'bs-negative' : '' }}">
+                                            {{ $fmtAmt($child['balance']) }}
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                    {{-- Total row --}}
+                                    <tr class="bs-total-row">
+                                        <td class="bs-td-code"></td>
+                                        <td style="font-weight:800;">{{ $group['total_label'] }}</td>
+                                        <td class="bs-td-amount {{ $isNeg($group['total']) ? 'bs-negative' : '' }}">
+                                            <strong>{{ $fmtAmt($group['total']) }}</strong>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="3" style="padding:8px 6px;color:#9e9e9e;font-style:italic;">Tidak ada data aset.</td></tr>
+                                @endforelse
+                            </table>
+                        </td>
+
+                        {{-- ── RIGHT COLUMN: LIABILITIES & EQUITY ── --}}
+                        <td class="bs-col-right">
+                            <table class="bs-inner-table">
+                                {{-- Liabilities --}}
+                                @foreach($cd['liability_groups'] as $group)
+                                    <tr class="bs-parent-row">
+                                        <td class="bs-td-code bs-parent-td-code">{{ $group['parent_code'] }}</td>
+                                        <td class="bs-parent-td-name" colspan="2">{{ $group['parent_name'] }}</td>
+                                    </tr>
+                                    @foreach($group['children'] as $child)
+                                    <tr class="bs-child-row">
+                                        <td class="bs-td-code">{{ $child['code'] }}</td>
+                                        <td class="bs-td-name bs-td-child-name">-- {{ $child['name'] }}</td>
+                                        <td class="bs-td-amount {{ $isNeg($child['balance']) ? 'bs-negative' : '' }}">
+                                            {{ $fmtAmt($child['balance']) }}
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                    <tr class="bs-total-row">
+                                        <td class="bs-td-code"></td>
+                                        <td style="font-weight:800;">{{ $group['total_label'] }}</td>
+                                        <td class="bs-td-amount {{ $isNeg($group['total']) ? 'bs-negative' : '' }}">
+                                            <strong>{{ $fmtAmt($group['total']) }}</strong>
+                                        </td>
+                                    </tr>
+                                @endforeach
+
+                                {{-- Equity --}}
+                                @foreach($cd['equity_groups'] as $group)
+                                    <tr class="bs-parent-row">
+                                        <td class="bs-td-code bs-parent-td-code">{{ $group['parent_code'] }}</td>
+                                        <td class="bs-parent-td-name" colspan="2">{{ $group['parent_name'] }}</td>
+                                    </tr>
+                                    @foreach($group['children'] as $child)
+                                    <tr class="bs-child-row">
+                                        <td class="bs-td-code">{{ $child['code'] }}</td>
+                                        <td class="bs-td-name bs-td-child-name">-- {{ $child['name'] }}</td>
+                                        <td class="bs-td-amount {{ $isNeg($child['balance']) ? 'bs-negative' : '' }}">
+                                            {{ $fmtAmt($child['balance']) }}
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                    <tr class="bs-total-row">
+                                        <td class="bs-td-code"></td>
+                                        <td style="font-weight:800;">{{ $group['total_label'] }}</td>
+                                        <td class="bs-td-amount {{ $isNeg($group['total']) ? 'bs-negative' : '' }}">
+                                            <strong>{{ $fmtAmt($group['total']) }}</strong>
+                                        </td>
+                                    </tr>
+                                @endforeach
+
+                                {{-- Retained Earnings (if any) --}}
+                                @if(abs($cd['retained_earnings']) > 0.005)
+                                <tr class="bs-child-row">
+                                    <td class="bs-td-code"></td>
+                                    <td class="bs-td-name bs-td-child-name">-- Laba Ditahan (Retained Earnings)</td>
+                                    <td class="bs-td-amount {{ $isNeg($cd['retained_earnings']) ? 'bs-negative' : '' }}">
+                                        {{ $fmtAmt($cd['retained_earnings']) }}
+                                    </td>
+                                </tr>
+                                @endif
+
+                                @if(empty($cd['liability_groups']) && empty($cd['equity_groups']))
+                                    <tr><td colspan="3" style="padding:8px 6px;color:#9e9e9e;font-style:italic;">Tidak ada data kewajiban & ekuitas.</td></tr>
+                                @endif
+                            </table>
+                        </td>
+                    </tr>
+                </tbody>
+                {{-- Grand total footer --}}
+                <tfoot>
+                    <tr class="bs-grand-total-row">
+                        <td>
+                            TOTAL ASSET
+                            <span class="bs-grand-total-amount" style="float:right;">{{ $fmtAmt($cd['total_assets']) }}</span>
+                        </td>
+                        <td>
+                            TOTAL LIABILITIES &amp; EQUITY
+                            <span class="bs-grand-total-amount" style="float:right;">{{ $fmtAmt($cd['total_liabilities_and_equity']) }}</span>
+                        </td>
+                    </tr>
+                    <tr class="bs-status-row">
+                        <td colspan="2" class="{{ $cd['is_balanced'] ? 'bs-status-ok' : 'bs-status-fail' }}">
+                            @if($cd['is_balanced'])
+                                &#10003; Neraca Seimbang — Total Aset = Total Kewajiban &amp; Ekuitas
+                            @else
+                                &#9888; Neraca Tidak Seimbang — Selisih: {{ $fmtAmt($cd['difference']) }}
+                            @endif
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            {{-- Footer --}}
+            <div class="bs-classic-footer no-print">
+                <span>Designed by : Key Software Accounting</span>
+                <span>{{ config('app.name', 'PT. DUTA TUNGGAL') }} &mdash; {{ $asOfFormatted }}</span>
+            </div>
+
+            {{-- Actions --}}
+            <div class="fr-actions no-print" style="margin-top:0.75rem;">
+                <x-filament::button wire:click="$refresh" color="primary" icon="heroicon-m-arrow-path">Refresh</x-filament::button>
+                <x-filament::button onclick="window.print()" color="gray" icon="heroicon-m-printer">Cetak</x-filament::button>
+            </div>
+        </div>
+
+        @else
+        {{-- ─────────── STANDARD (EXISTING) LAYOUT ─────────── --}}
         @php
             $data = $this->getReportData();
             $asOfDate = $this->as_of_date ?? now()->format('Y-m-d');
         @endphp
 
-        {{-- Report Header --}}
         <div class="fr-report-header">
             <div class="fr-company-name">{{ config('app.name', 'PT Duta Tunggal') }}</div>
             <div class="fr-report-type">LAPORAN POSISI KEUANGAN (NERACA)</div>
@@ -274,6 +659,8 @@
             <x-filament::button wire:click="$refresh" color="primary" icon="heroicon-m-arrow-path">Refresh</x-filament::button>
             <x-filament::button onclick="window.print()" color="gray" icon="heroicon-m-printer">Cetak</x-filament::button>
         </div>
+
+        @endif {{-- end @if($this->classic_view) --}}
 
         @else
 

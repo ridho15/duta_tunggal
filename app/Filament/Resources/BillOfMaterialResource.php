@@ -42,7 +42,13 @@ class BillOfMaterialResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-in';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
+
+    protected static ?string $navigationLabel = 'Daftar Material';
+
+    protected static ?string $modelLabel = 'Daftar Material';
+
+    protected static ?string $pluralModelLabel = 'Daftar Material';
 
     protected static ?int $navigationSort = 1;
 
@@ -84,8 +90,8 @@ class BillOfMaterialResource extends Resource
                             ->required()
                             ->searchable()
                             ->preload()
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->validationMessages([
                                 'required' => 'Cabang belum dipilih',
                                 'exists' => 'Cabang tidak ditemukan !'
@@ -354,7 +360,7 @@ class BillOfMaterialResource extends Resource
                                         return 'Rp ' . number_format($materialCost, 0, ',', '.');
                                     }),
                                 Placeholder::make('total_cost_display')
-                                    ->label('Total Biayas')
+                                    ->label('Total Biaya')
                                     ->reactive()
                                     ->content(function ($get) {
                                         $materialCost = 0;
@@ -408,7 +414,7 @@ class BillOfMaterialResource extends Resource
                                     })
                                     ->searchable(['code', 'name'])
                                     ->preload()
-                                    ->default(fn () => self::getDefaultTemporaryProductionCoaId())
+                                    ->default(fn() => self::getDefaultTemporaryProductionCoaId())
                                     ->afterStateHydrated(function ($set, $state) {
                                         if (!$state) {
                                             $set('work_in_progress_coa_id', self::getDefaultTemporaryProductionCoaId());
@@ -441,6 +447,7 @@ class BillOfMaterialResource extends Resource
                             ->label('Catatan')
                             ->nullable(),
                         Toggle::make('is_active')
+                            ->default(true)
                             ->required(),
                         Repeater::make('satuan_konversi')
                             ->columnSpanFull()
@@ -570,7 +577,7 @@ class BillOfMaterialResource extends Resource
                     ->options(function () {
                         $user = Auth::user();
                         $manageType = $user?->manage_type ?? [];
-                        
+
                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                             return \App\Models\Cabang::where('id', $user?->cabang_id)
                                 ->get()
@@ -578,7 +585,7 @@ class BillOfMaterialResource extends Resource
                                     return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                 });
                         }
-                        
+
                         return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
                             return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                         });
@@ -618,18 +625,18 @@ class BillOfMaterialResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Bill of Material (BOM)</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Bill of Material (BOM) adalah daftar bahan baku dan komponen yang diperlukan untuk memproduksi satu unit produk jadi, termasuk biaya produksi.</li>' .
-                            '<li><strong>Komponen Utama:</strong> <em>Material Items</em> (bahan baku), <em>Biaya Tenaga Kerja</em> (TKL), <em>Biaya Overhead</em> (BOP), dan <em>COA Akuntansi</em> untuk persediaan.</li>' .
-                            '<li><strong>Validasi:</strong> Produk harus bertipe manufacture, material harus bertipe raw material. Unit konversi otomatis terdeteksi dari produk.</li>' .
-                            '<li><strong>Perhitungan Biaya:</strong> <em>Material Cost</em> = jumlah bahan × harga satuan, <em>Total Cost</em> = Material + TKL + BOP. Biaya tersimpan untuk costing produksi.</li>' .
-                            '<li><strong>COA Integration:</strong> Persediaan barang produksi mengikuti COA persediaan pada product, sedangkan proses material issue memakai <em>Pos Sementara Produksi</em>.</li>' .
-                            '<li><strong>Actions:</strong> <em>Create/Edit</em> BOM, <em>Generate Code</em> otomatis, <em>View Production Plans</em> yang menggunakan BOM ini.</li>' .
-                            '<li><strong>Permissions:</strong> <em>view any bill of material</em>, <em>create bill of material</em>, <em>update bill of material</em>, <em>delete bill of material</em>.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan Production Plans, Manufacturing Orders, dan sistem costing untuk perhitungan harga pokok produksi.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Bill of Material (BOM) adalah daftar bahan baku dan komponen yang diperlukan untuk memproduksi satu unit produk jadi, termasuk biaya produksi.</li>' .
+                    '<li><strong>Komponen Utama:</strong> <em>Material Items</em> (bahan baku), <em>Biaya Tenaga Kerja</em> (TKL), <em>Biaya Overhead</em> (BOP), dan <em>COA Akuntansi</em> untuk persediaan.</li>' .
+                    '<li><strong>Validasi:</strong> Produk harus bertipe manufacture, material harus bertipe raw material. Unit konversi otomatis terdeteksi dari produk.</li>' .
+                    '<li><strong>Perhitungan Biaya:</strong> <em>Material Cost</em> = jumlah bahan × harga satuan, <em>Total Cost</em> = Material + TKL + BOP. Biaya tersimpan untuk costing produksi.</li>' .
+                    '<li><strong>COA Integration:</strong> Persediaan barang produksi mengikuti COA persediaan pada product, sedangkan proses material issue memakai <em>Pos Sementara Produksi</em>.</li>' .
+                    '<li><strong>Actions:</strong> <em>Create/Edit</em> BOM, <em>Generate Code</em> otomatis, <em>View Production Plans</em> yang menggunakan BOM ini.</li>' .
+                    '<li><strong>Permissions:</strong> <em>view any bill of material</em>, <em>create bill of material</em>, <em>update bill of material</em>, <em>delete bill of material</em>.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan Production Plans, Manufacturing Orders, dan sistem costing untuk perhitungan harga pokok produksi.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 

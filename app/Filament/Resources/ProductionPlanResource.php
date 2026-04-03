@@ -44,7 +44,7 @@ class ProductionPlanResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
 
     protected static ?string $navigationLabel = 'Rencana Produksi';
 

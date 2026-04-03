@@ -19,7 +19,7 @@ use App\Models\WarehouseConfirmationItem;
 use App\Services\ManufacturingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     \Tests\TestCase::disableBaseSeeding();
@@ -220,7 +220,7 @@ test('material issue warehouse confirmation is created per material item', funct
     });
 });
 
-test('material issue becomes approved when all confirmation items are approved', function () {
+test('material issue becomes completed when all confirmation items are approved', function () {
     $context = createMaterialIssueConfirmationContext();
 
     app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($context['materialIssue']);
@@ -240,7 +240,7 @@ test('material issue becomes approved when all confirmation items are approved',
         ]);
     });
 
-    expect($context['materialIssue']->fresh()->status)->toBe(MaterialIssue::STATUS_APPROVED)
+    expect($context['materialIssue']->fresh()->status)->toBe(MaterialIssue::STATUS_COMPLETED)
         ->and($context['materialIssue']->fresh()->hasConfirmedWarehouseConfirmation())->toBeTrue();
 
     WarehouseConfirmation::query()

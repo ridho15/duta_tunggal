@@ -17,7 +17,14 @@ if (!fs.existsSync(authDir)) {
  */
 test('setup auth state', async ({ page }) => {
   await page.goto('/admin/login');
-  await expect(page).toHaveTitle(/Masuk|Login/);
+
+  const currentPath = new URL(page.url()).pathname;
+  if (!currentPath.endsWith('/login')) {
+    await page.context().storageState({ path: 'playwright/.auth/user.json' });
+    return;
+  }
+
+  await expect(page).toHaveTitle(/Masuk|Login|Duta Tunggal ERP/);
 
   await page.locator('#data\\.email').fill('superadmin@gmail.com');
   await page.locator('#data\\.password').fill('superadmin');

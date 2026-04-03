@@ -25,6 +25,7 @@ use Database\Seeders\SupplierSeeder;
 use Database\Seeders\UnitOfMeasureSeeder;
 use Database\Seeders\WarehouseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class QualityControlCompleteTest extends TestCase
@@ -47,7 +48,7 @@ class QualityControlCompleteTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function qc_complete_with_rejected_products_creates_return_product()
     {
         // Create purchase order and receipt
@@ -165,7 +166,7 @@ class QualityControlCompleteTest extends TestCase
         $this->assertEquals($product->id, $returnItem->product_id);
     }
 
-    /** @test */
+    #[Test]
     public function qc_inventory_posting_throws_when_required_coa_is_missing_and_creates_no_side_effects()
     {
         ChartOfAccount::whereIn('code', ['1140.10', '1140.01', '1180.01', '1400.01', '2100.10', '2190.10'])

@@ -30,9 +30,11 @@ class AgeingScheduleResource extends Resource
 {
     protected static ?string $model = AgeingSchedule::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
 
     protected static ?int $navigationSort = 3;
 

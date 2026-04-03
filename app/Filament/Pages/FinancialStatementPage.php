@@ -10,13 +10,20 @@ use Illuminate\Support\Carbon;
 
 class FinancialStatementPage extends Page
 {
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string $view = 'filament.pages.financial-statement-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Financial Statement';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 7;
 

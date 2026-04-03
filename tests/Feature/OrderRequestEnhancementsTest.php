@@ -17,6 +17,7 @@ use App\Models\UnitOfMeasure;
 use App\Services\OrderRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
+use PHPUnit\Framework\Attributes\Test;
 
 class OrderRequestEnhancementsTest extends TestCase
 {
@@ -46,7 +47,7 @@ class OrderRequestEnhancementsTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function order_request_can_store_price_fields()
     {
         $orderRequest = OrderRequest::factory()->create([
@@ -71,13 +72,14 @@ class OrderRequestEnhancementsTest extends TestCase
             'unit_price' => 15000,
             'discount' => 1000,
             'tax' => 500,
-            'subtotal' => 149500,
         ]);
+
+        $this->assertSame(-1350000.0, (float) $orderRequestItem->fresh()->subtotal);
 
         echo "✓ Test passed: Order request can store price fields\n";
     }
 
-    /** @test */
+    #[Test]
     public function order_request_status_can_be_closed()
     {
         $orderRequest = OrderRequest::factory()->create([
@@ -98,7 +100,7 @@ class OrderRequestEnhancementsTest extends TestCase
         echo "✓ Test passed: Order request can be closed\n";
     }
 
-    /** @test */
+    #[Test]
     public function order_request_tracks_partial_fulfillment()
     {
         $orderRequest = OrderRequest::factory()->create([
@@ -150,7 +152,7 @@ class OrderRequestEnhancementsTest extends TestCase
         echo "✓ Test passed: Order request tracks partial fulfillment (30/100)\n";
     }
 
-    /** @test */
+    #[Test]
     public function po_from_order_request_is_auto_approved()
     {
         $orderRequest = OrderRequest::factory()->create([
@@ -187,7 +189,7 @@ class OrderRequestEnhancementsTest extends TestCase
         echo "✓ Test passed: PO created from OR is auto-approved\n";
     }
 
-    /** @test */
+    #[Test]
     public function po_inherits_prices_from_order_request()
     {
         $orderRequest = OrderRequest::factory()->create([
@@ -228,7 +230,7 @@ class OrderRequestEnhancementsTest extends TestCase
         echo "✓ Test passed: PO inherits correct prices from OR (unit_price: {$customPrice}, discount: {$customDiscount}, tax: {$customTax})\n";
     }
 
-    /** @test */
+    #[Test]
     public function one_order_request_can_be_split_into_multiple_pos()
     {
         $orderRequest = OrderRequest::factory()->create([

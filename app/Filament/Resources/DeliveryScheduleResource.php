@@ -47,9 +47,11 @@ class DeliveryScheduleResource extends Resource
 {
     protected static ?string $model = DeliverySchedule::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static ?string $navigationGroup = 'Delivery Order';
+    protected static ?string $navigationGroup = 'Pengiriman';
 
     protected static ?string $navigationLabel = 'Penjadwalan Pengiriman';
 

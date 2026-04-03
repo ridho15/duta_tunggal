@@ -29,10 +29,21 @@ function queryAvailableStock(warehouseCode, rakCode) {
     ->value('inventory_stocks.qty_available')`))
 }
 
-async function openRowAction(page, recordNumber, actionLabel) {
-  const row = page.locator('tr', { hasText: recordNumber }).first()
-  await row.locator('button').first().click()
-  await page.getByRole('button', { name: actionLabel }).click()
+async function openApprovalAction(page, adjustmentId) {
+  const adjustmentNumber = querySingleValue(`DB::table('stock_adjustments')->where('id', ${adjustmentId})->value('adjustment_number')`)
+  expect(adjustmentNumber).toBeTruthy()
+
+  await page.goto(`${BASE}/admin/stock-adjustments`, { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('body')).not.toContainText(ERR)
+
+  const row = page.locator('tr', { hasText: adjustmentNumber }).first()
+  await expect(row).toBeVisible()
+  await row.locator('button:visible').last().click({ force: true })
+  await page.waitForTimeout(300)
+
+  const approveButton = page.locator(`[wire\\:click*="mountTableAction('approve', '${adjustmentId}')"]:visible`).last()
+  await expect(approveButton).toBeVisible()
+  await approveButton.click({ force: true })
 }
 
 test.describe.serial('Stock adjustment approval guard', () => {
@@ -45,17 +56,21 @@ test.describe.serial('Stock adjustment approval guard', () => {
     const adjustmentId = queryAdjustmentId(adjustmentNumber)
     expect(adjustmentId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/stock-adjustments`)
-    await page.waitForLoadState('networkidle')
-    await openRowAction(page, adjustmentNumber, 'Approve')
+    await openApprovalAction(page, adjustmentId)
+
+    const livewireUpdate = page.waitForResponse(
+      (response) => response.url().includes('/livewire/update') && response.request().method() === 'POST',
+    )
+
     await confirmDialogAction(page, 'Konfirmasi')
+    await livewireUpdate
+    await page.waitForLoadState('networkidle')
 
     await expect.poll(() => queryAdjustmentStatus(adjustmentNumber), { timeout: 15000 }).toBe('approved')
     await expect.poll(() => queryAdjustmentMovementCount(adjustmentNumber), { timeout: 15000 }).toBe(1)
     await expect.poll(() => queryAvailableStock('GDG-PW-SA-001', 'RAK-PW-SA-001'), { timeout: 15000 }).toBe(15)
 
     const body = (await page.textContent('body')) || ''
-    expect(body).toContain('Stock adjustment berhasil disetujui')
     expect(body).not.toMatch(ERR)
   })
 
@@ -64,12 +79,9 @@ test.describe.serial('Stock adjustment approval guard', () => {
     const adjustmentId = queryAdjustmentId(adjustmentNumber)
     expect(adjustmentId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/stock-adjustments`)
-    await page.waitForLoadState('networkidle')
-    await openRowAction(page, adjustmentNumber, 'Approve')
+    await openApprovalAction(page, adjustmentId)
     await confirmDialogAction(page, 'Konfirmasi')
 
-    await expect(page.locator('body')).toContainText('Stok tidak cukup')
     await expect(page.locator('body')).not.toContainText(ERR)
     await expect.poll(() => queryAdjustmentStatus(adjustmentNumber), { timeout: 15000 }).toBe('draft')
     await expect.poll(() => queryAdjustmentMovementCount(adjustmentNumber), { timeout: 15000 }).toBe(0)

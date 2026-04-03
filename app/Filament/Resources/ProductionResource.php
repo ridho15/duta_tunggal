@@ -37,7 +37,13 @@ class ProductionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-in';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
+
+    protected static ?string $navigationLabel = 'Produksi';
+
+    protected static ?string $modelLabel = 'Produksi';
+
+    protected static ?string $pluralModelLabel = 'Produksi';
 
     protected static ?int $navigationSort = 5;
 

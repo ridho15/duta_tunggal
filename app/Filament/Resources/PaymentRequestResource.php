@@ -32,11 +32,13 @@ class PaymentRequestResource extends Resource
     protected static ?string $model = PaymentRequest::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?string $navigationLabel = 'Payment Request';
-    protected static ?string $modelLabel = 'Payment Request';
-    protected static ?string $pluralModelLabel = 'Payment Requests';
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationLabel = 'Permintaan Pembayaran';
+    protected static ?string $modelLabel = 'Permintaan Pembayaran';
+    protected static ?string $pluralModelLabel = 'Permintaan Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
     protected static ?int $navigationSort = 1;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {

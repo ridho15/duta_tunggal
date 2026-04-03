@@ -28,9 +28,11 @@ class VoucherRequestResource extends Resource
 {
     protected static ?string $model = VoucherRequest::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
     
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
     
     protected static ?string $navigationLabel = 'Pengajuan Voucher';
     

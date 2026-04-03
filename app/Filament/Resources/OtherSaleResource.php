@@ -30,9 +30,11 @@ class OtherSaleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Penjualan Lainnya';
 
-    protected static ?string $navigationGroup = 'Finance - Penjualan';
+    protected static ?string $navigationGroup = 'Keuangan Penjualan';
 
     protected static ?int $navigationSort = 3;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {

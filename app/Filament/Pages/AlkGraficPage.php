@@ -14,13 +14,20 @@ use Illuminate\Support\Carbon;
  */
 class AlkGraficPage extends Page
 {
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string $view = 'filament.pages.alk-grafic-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-chart-pie';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'ALK Grafik (Analisis Laporan Keuangan)';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 12;
 

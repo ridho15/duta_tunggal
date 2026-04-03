@@ -25,6 +25,7 @@ use Database\Seeders\ProductSeeder;
 use Database\Seeders\UnitOfMeasureSeeder;
 use Database\Seeders\WarehouseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class QualityControlManufactureTest extends TestCase
@@ -52,12 +53,13 @@ class QualityControlManufactureTest extends TestCase
         $this->qcService = app(QualityControlService::class);
     }
 
-    /** @test */
+    #[Test]
     public function qc_manufacture_complete_creates_stock_movement_and_updates_inventory()
     {
         // Arrange: Create manufacturing order and production
         $cabang = Cabang::first();
         $product = Product::factory()->create([
+            'sku' => 'QC-MFG-FG-' . strtoupper(uniqid()),
             'name' => 'Test Product',
             'cabang_id' => $cabang->id,
             'inventory_coa_id' => ChartOfAccount::create([
@@ -82,6 +84,7 @@ class QualityControlManufactureTest extends TestCase
 
         // Create BOM items (materials needed for production)
         $materialProduct = Product::factory()->create([
+            'sku' => 'QC-MFG-RM-' . strtoupper(uniqid()),
             'name' => 'Raw Material',
             'cost_price' => 50, // Set cost price for material
             'cabang_id' => $cabang->id,
@@ -250,11 +253,14 @@ class QualityControlManufactureTest extends TestCase
         echo "Expected: in_progress (since 8 < 10)\n";
     }
 
-    /** @test */
+    #[Test]
     public function qc_manufacture_complete_with_all_quantity_passed_updates_mo_status()
     {
         // Arrange: Create manufacturing order and production
-        $product = Product::factory()->create(['name' => 'Test Product 2']);
+        $product = Product::factory()->create([
+            'sku' => 'QC-MFG-FG2-' . strtoupper(uniqid()),
+            'name' => 'Test Product 2',
+        ]);
         $warehouse = Warehouse::first();
         $cabang = Cabang::first();
         $uom = \App\Models\UnitOfMeasure::first(); // Get a valid UOM

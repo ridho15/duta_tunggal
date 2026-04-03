@@ -35,9 +35,17 @@ class AccountPayableResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance - Pembelian';
+    protected static ?string $navigationGroup = 'Keuangan Pembelian';
+
+    protected static ?string $navigationLabel = 'Utang Usaha';
+
+    protected static ?string $modelLabel = 'Utang Usaha';
+
+    protected static ?string $pluralModelLabel = 'Utang Usaha';
 
     protected static ?int $navigationSort = 4;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {

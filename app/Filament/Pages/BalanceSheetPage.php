@@ -16,7 +16,7 @@ class BalanceSheetPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-scale';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Neraca (Balance Sheet) - Legacy';
 
