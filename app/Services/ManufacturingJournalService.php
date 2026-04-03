@@ -7,26 +7,12 @@ use App\Models\JournalEntry;
 use App\Models\MaterialIssue;
 use App\Models\Production;
 use App\Models\ProductionPlan;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class ManufacturingJournalService
 {
     protected const TEMPORARY_PRODUCTION_CODES = ['1400.04', '1150', '1140'];
-
-    protected function notifyAndThrow(string $message, string $title = 'Jurnal Manufaktur Gagal'): void
-    {
-        if (! app()->runningInConsole()) {
-            Notification::make()
-                ->title($title)
-                ->body($message)
-                ->danger()
-                ->send();
-        }
-
-        throw new \Exception($message);
-    }
 
     /**
      * Generate journal entries for material issue (Pengambilan Bahan Baku)
@@ -36,7 +22,7 @@ class ManufacturingJournalService
     public function generateJournalForMaterialIssue(MaterialIssue $materialIssue): void
     {
         if ($materialIssue->type !== 'issue' || !$materialIssue->isCompleted()) {
-            $this->notifyAndThrow('Material issue harus bertipe "issue" dan berstatus "completed".');
+            throw new \Exception('Material issue harus bertipe "issue" dan berstatus "completed".');
         }
 
         // Load material issue items with their relationships
@@ -61,7 +47,7 @@ class ManufacturingJournalService
                 'production_plan_id' => $materialIssue->production_plan_id,
                 'searched_codes' => self::TEMPORARY_PRODUCTION_CODES,
             ]);
-            $this->notifyAndThrow('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
+            throw new \Exception('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
         }
 
         DB::transaction(function () use ($materialIssue, $bdpCoa, $totalCost) {
@@ -102,7 +88,7 @@ class ManufacturingJournalService
                                      $this->resolveCoaByCodes(['1-101', '1140.10', '1140.01', '1140']));
 
                 if (!$productInventoryCoa) {
-                    $this->notifyAndThrow('COA persediaan tidak ditemukan untuk produk: ' . $item->product->name . '. Atur COA pada Material Issue Item, Product, atau pastikan COA 1-101 (Persediaan Bahan Baku) tersedia.');
+                    throw new \Exception('COA persediaan tidak ditemukan untuk produk: ' . $item->product->name . '. Atur COA pada Material Issue Item, Product, atau pastikan COA 1-101 (Persediaan Bahan Baku) tersedia.');
                 }
 
                 $creditEntry = JournalEntry::create([
@@ -150,7 +136,7 @@ class ManufacturingJournalService
     public function generateJournalForMaterialReturn(MaterialIssue $materialIssue): void
     {
         if ($materialIssue->type !== 'return' || !$materialIssue->isCompleted()) {
-            $this->notifyAndThrow('Material issue harus bertipe "return" dan berstatus "completed".');
+            throw new \Exception('Material issue harus bertipe "return" dan berstatus "completed".');
         }
 
         // Load material issue items with their relationships
@@ -175,7 +161,7 @@ class ManufacturingJournalService
                 'production_plan_id' => $materialIssue->production_plan_id,
                 'searched_codes' => self::TEMPORARY_PRODUCTION_CODES,
             ]);
-            $this->notifyAndThrow('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
+            throw new \Exception('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
         }
 
         DB::transaction(function () use ($materialIssue, $bdpCoa, $totalCost) {
@@ -200,7 +186,7 @@ class ManufacturingJournalService
                                      $this->resolveCoaByCodes(['1-101', '1140.10', '1140.01', '1140']));
 
                 if (!$productInventoryCoa) {
-                    $this->notifyAndThrow('COA persediaan tidak ditemukan untuk produk: ' . $item->product->name . '. Atur COA pada Material Issue Item, Product, atau pastikan COA 1-101 (Persediaan Bahan Baku) tersedia.');
+                    throw new \Exception('COA persediaan tidak ditemukan untuk produk: ' . $item->product->name . '. Atur COA pada Material Issue Item, Product, atau pastikan COA 1-101 (Persediaan Bahan Baku) tersedia.');
                 }
 
                 $debitEntry = JournalEntry::create([
@@ -264,12 +250,12 @@ class ManufacturingJournalService
     public function generateJournalForProductionCompletion(Production $production): void
     {
         if ($production->status !== 'finished') {
-            $this->notifyAndThrow('Produksi harus berstatus "finished".');
+            throw new \Exception('Produksi harus berstatus "finished".');
         }
 
         $manufacturingOrder = $production->manufacturingOrder;
         if (!$manufacturingOrder) {
-            $this->notifyAndThrow('Produksi tidak memiliki Manufacturing Order terkait.');
+            throw new \Exception('Produksi tidak memiliki Manufacturing Order terkait.');
         }
 
         // Load required relationships
@@ -279,7 +265,7 @@ class ManufacturingJournalService
             ?? $manufacturingOrder->productionPlan?->billOfMaterial;
 
         if (!$bom) {
-            $this->notifyAndThrow('BOM aktif tidak ditemukan untuk Manufacturing Order: ' . $manufacturingOrder->mo_number . '.');
+            throw new \Exception('BOM aktif tidak ditemukan untuk Manufacturing Order: ' . $manufacturingOrder->mo_number . '.');
         }
 
         $this->syncLaborAndOverheadAllocations($manufacturingOrder, Carbon::parse($production->production_date), $production->production_number);
@@ -290,18 +276,18 @@ class ManufacturingJournalService
         // - Plus any labor & overhead allocations posted to BDP and linked to this MO
         $totalCost = $this->calculateManufacturingOrderBDPTotal($manufacturingOrder);
         if ($totalCost <= 0) {
-            $this->notifyAndThrow('Total biaya BDP untuk MO bernilai nol atau negatif; jurnal penyelesaian tidak dapat dibuat.');
+            throw new \Exception('Total biaya BDP untuk MO bernilai nol atau negatif; jurnal penyelesaian tidak dapat dibuat.');
         }
 
         $bdpCoa = $this->resolveTemporaryProductionCoa();
         if (!$bdpCoa) {
-            $this->notifyAndThrow('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
+            throw new \Exception('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
         }
 
         $finishedProduct = $manufacturingOrder->productionPlan->product;
         $barangJadiCoa = $this->resolveFinishedGoodsInventoryCoa($finishedProduct);
         if (!$barangJadiCoa) {
-            $this->notifyAndThrow('COA persediaan barang jadi tidak ditemukan pada product. Pastikan inventory COA product sudah diatur.');
+            throw new \Exception('COA persediaan barang jadi tidak ditemukan pada product. Pastikan inventory COA product sudah diatur.');
         }
 
         DB::transaction(function () use ($production, $bdpCoa, $barangJadiCoa, $totalCost, $manufacturingOrder) {
@@ -359,7 +345,7 @@ class ManufacturingJournalService
         $bom = $mo->productionPlan?->billOfMaterial;
 
         if (!$bom || !$bom->is_active) {
-            $this->notifyAndThrow('BOM aktif tidak ditemukan untuk Manufacturing Order: ' . $mo->mo_number . '.');
+            throw new \Exception('BOM aktif tidak ditemukan untuk Manufacturing Order: ' . $mo->mo_number . '.');
         }
 
         $bom->loadMissing('items.product');
@@ -411,18 +397,18 @@ class ManufacturingJournalService
         $totalCost = $laborCost + $overheadCost;
 
         if ($totalCost <= 0) {
-            $this->notifyAndThrow('Total biaya tenaga kerja dan overhead harus lebih besar dari 0.');
+            throw new \Exception('Total biaya tenaga kerja dan overhead harus lebih besar dari 0.');
         }
 
         $bdpCoa = $this->resolveTemporaryProductionCoa();
         if (!$bdpCoa) {
-            $this->notifyAndThrow('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
+            throw new \Exception('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
         }
 
         $expenseCoa = $expenseCoa ?? $this->resolveDefaultManufacturingExpenseCoaId();
 
         if (!$expenseCoa) {
-            $this->notifyAndThrow('COA beban tidak ditemukan. Silakan pilih COA beban yang valid.');
+            throw new \Exception('COA beban tidak ditemukan. Silakan pilih COA beban yang valid.');
         }
 
         DB::transaction(function () use ($bdpCoa, $expenseCoa, $totalCost, $reference, $date, $description, $manufacturingOrder) {
@@ -525,11 +511,11 @@ class ManufacturingJournalService
             ?? $this->resolveManufacturingCreditCoaId($bom, $product, 'overhead');
 
         if ($laborAmount > 0 && ! $laborExpenseCoaId) {
-            $this->notifyAndThrow('COA TKL produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
+            throw new \Exception('COA TKL produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
         }
 
         if ($overheadAmount > 0 && ! $overheadExpenseCoaId) {
-            $this->notifyAndThrow('COA overhead produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
+            throw new \Exception('COA overhead produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
         }
 
         DB::transaction(function () use ($manufacturingOrder, $date, $reference, $temporaryProductionCoa, $laborExpenseCoaId, $overheadExpenseCoaId, $laborAmount, $overheadAmount) {
@@ -654,27 +640,22 @@ class ManufacturingJournalService
 
         $wipCoa = $this->resolveCoaByCodes(['1-201']);
         if (!$wipCoa) {
-            $this->notifyAndThrow('COA Persediaan Barang Dalam Proses - WIP (1-201) tidak ditemukan. Pastikan COA 1-201 tersedia.');
+            throw new \Exception('COA Persediaan Barang Dalam Proses - WIP (1-201) tidak ditemukan. Pastikan COA 1-201 tersedia.');
         }
         $posSementaraCoa = $this->resolveTemporaryProductionCoa();
         if (!$posSementaraCoa) {
-            $this->notifyAndThrow('COA Pos Sementara Produksi (1400.04) tidak ditemukan.');
+            throw new \Exception('COA Pos Sementara Produksi (1400.04) tidak ditemukan.');
         }
         $finishedProduct = $manufacturingOrder->productionPlan?->product;
         $laborCoaId = $this->resolveManufacturingCreditCoaId($bom, $finishedProduct, 'labor');
-        $overheadCoaId = $this->resolveManufacturingCreditCoaId($bom, $finishedProduct, 'overhead');
 
         if ($laborAmount > 0 && ! $laborCoaId) {
-            $this->notifyAndThrow('COA TKL produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
-        }
-
-        if ($overheadAmount > 0 && ! $overheadCoaId) {
-            $this->notifyAndThrow('COA overhead produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
+            throw new \Exception('COA TKL produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
         }
 
         DB::transaction(function () use (
             $production, $manufacturingOrder, $wipCoa, $posSementaraCoa,
-            $totalWipCost, $materialCost, $laborAmount, $overheadAmount, $laborCoaId, $overheadCoaId
+            $totalWipCost, $materialCost, $laborOverheadCost, $laborCoaId
         ) {
             $branchId    = app(\App\Services\JournalBranchResolver::class)->resolve($production);
             $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($production);
@@ -723,31 +704,14 @@ class ManufacturingJournalService
                 ]);
             }
 
-            if ($laborAmount > 0) {
+            if ($laborOverheadCost > 0) {
                 JournalEntry::create([
                     'coa_id'       => $laborCoaId,
                     'date'         => $date,
                     'reference'    => $reference,
                     'description'  => $description . ' (tenaga kerja proses produksi)',
                     'debit'        => 0,
-                    'credit'       => $laborAmount,
-                    'journal_type' => 'manufacturing_wip',
-                    'cabang_id'    => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id'   => $projectId,
-                    'source_type'  => Production::class,
-                    'source_id'    => $production->id,
-                ]);
-            }
-
-            if ($overheadAmount > 0) {
-                JournalEntry::create([
-                    'coa_id'       => $overheadCoaId,
-                    'date'         => $date,
-                    'reference'    => $reference,
-                    'description'  => $description . ' (overhead proses produksi)',
-                    'debit'        => 0,
-                    'credit'       => $overheadAmount,
+                    'credit'       => $laborOverheadCost,
                     'journal_type' => 'manufacturing_wip',
                     'cabang_id'    => $branchId,
                     'department_id' => $departmentId,

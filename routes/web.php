@@ -6,6 +6,7 @@ use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Appearance;
 use App\Http\Controllers\Reports\StockReportController;
+use App\Http\Controllers\Reports\FinancialReportPreviewController;
 use App\Http\Controllers\InventoryCardController;
 
 Route::middleware('auth')->group(function () {
@@ -62,6 +63,13 @@ Route::get('exports/download/{filename}', function ($filename) {
 Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::get('/reports/stock-report/preview', [StockReportController::class, 'preview'])
         ->name('reports.stock-report.preview');
+
+    // Financial report standalone previews (no Filament layout)
+    Route::get('/reports/balance-sheet/preview',   [FinancialReportPreviewController::class, 'balanceSheet'])->name('reports.balance-sheet.preview');
+    Route::get('/reports/profit-and-loss/preview', [FinancialReportPreviewController::class, 'profitAndLoss'])->name('reports.profit-and-loss.preview');
+    Route::get('/reports/cash-flow/preview',       [FinancialReportPreviewController::class, 'cashFlow'])->name('reports.cash-flow.preview');
+    Route::get('/reports/hpp/preview',             [FinancialReportPreviewController::class, 'hpp'])->name('reports.hpp.preview');
+    Route::get('/reports/ageing-report/preview',   [FinancialReportPreviewController::class, 'ageingReport'])->name('reports.ageing-report.preview');
 
     // Kartu Persediaan — print / PDF / Excel
     Route::get('/reports/inventory-card/print',          [InventoryCardController::class, 'printView'])->name('inventory-card.print');

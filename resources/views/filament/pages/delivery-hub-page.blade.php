@@ -1,30 +1,54 @@
 <x-filament-panels::page>
-    @php
-        $items = [
-            ['label' => 'Perintah Pengiriman', 'url' => \App\Filament\Resources\DeliveryOrderResource::getUrl()],
-            ['label' => 'Penjadwalan Pengiriman', 'url' => \App\Filament\Resources\DeliveryScheduleResource::getUrl()],
-            ['label' => 'Surat Jalan', 'url' => \App\Filament\Resources\SuratJalanResource::getUrl()],
-        ];
-    @endphp
+@php
+    $accentColor = '#0891b2';
+    $accentLight = '#67e8f9';
+    $iconBg      = '#ecfeff';
+    $heroFrom    = '#ecfeff';
+    $heroTo      = '#a5f3fc';
+    $items = [
+        ['label' => 'Perintah Pengiriman',    'url' => \App\Filament\Resources\DeliveryOrderResource::getUrl(),   'icon' => 'document-text',  'desc' => 'Instruksi pengiriman pesanan pelanggan'],
+        ['label' => 'Penjadwalan Pengiriman', 'url' => \App\Filament\Resources\DeliveryScheduleResource::getUrl(),'icon' => 'calendar-days',  'desc' => 'Atur jadwal & rute pengiriman'],
+        ['label' => 'Surat Jalan',            'url' => \App\Filament\Resources\SuratJalanResource::getUrl(),       'icon' => 'truck',          'desc' => 'Dokumen pengiriman barang ke pelanggan'],
+    ];
+@endphp
 
-    <style>
-        .delivery-hub-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:1.25rem; box-shadow:0 6px 20px rgba(15,23,42,.05); }
-        .delivery-hub-title { font-size:1.125rem; font-weight:700; color:#111827; margin-bottom:.75rem; }
-        .delivery-hub-note { color:#4b5563; font-size:.875rem; }
-        .delivery-hub-grid { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); margin-top:.75rem; }
-        .delivery-hub-link { display:block; border:1px solid #bfdbfe; border-radius:14px; padding:1rem; background:linear-gradient(135deg,#eff6ff,#f8fafc); color:#1f2937; text-decoration:none; font-weight:600; }
-        .delivery-hub-link:hover { border-color:#60a5fa; background:linear-gradient(135deg,#dbeafe,#eff6ff); }
-    </style>
+@include('filament.pages.partials.hub-styles')
 
-    <div class="space-y-4" id="delivery-hub">
-        <section class="delivery-hub-card">
-            <div class="delivery-hub-title">Pusat Pengiriman</div>
-            <div class="delivery-hub-note">Modul pengiriman dipusatkan di sini agar navigasi lebih rapih dan konsisten.</div>
-            <div class="delivery-hub-grid">
-                @foreach ($items as $item)
-                    <a href="{{ $item['url'] }}" class="delivery-hub-link">{{ $item['label'] }}</a>
-                @endforeach
-            </div>
-        </section>
+<div id="delivery-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
+
+    {{-- Hero --}}
+    <div class="hubv2-hero" style="background:linear-gradient(135deg,{{ $heroFrom }},{{ $heroTo }});">
+        <div class="hubv2-hero-icon" style="color:{{ $accentColor }};">
+            <x-heroicon-o-truck class="w-9 h-9" />
+        </div>
+        <div class="hubv2-hero-body">
+            <div class="hubv2-hero-badge">Modul ERP &middot; Pengiriman</div>
+            <h1 class="hubv2-hero-title">Pusat Pengiriman</h1>
+            <p class="hubv2-hero-subtitle">Kelola perintah pengiriman, jadwal, dan surat jalan dari satu halaman terpadu.</p>
+        </div>
+        <div class="hubv2-hero-meta">
+            <span class="hubv2-hero-meta-num">{{ count($items) }}</span>
+            <span class="hubv2-hero-meta-lbl">Modul</span>
+        </div>
     </div>
+
+    {{-- Cards --}}
+    <div class="hubv2-grid">
+        @foreach($items as $item)
+        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
+            <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
+                <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
+            </div>
+            <div class="hubv2-cb">
+                <span class="hubv2-cl">{{ $item['label'] }}</span>
+                <span class="hubv2-cd">{{ $item['desc'] }}</span>
+            </div>
+            <div class="hubv2-ca">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </div>
+        </a>
+        @endforeach
+    </div>
+
+</div>
 </x-filament-panels::page>

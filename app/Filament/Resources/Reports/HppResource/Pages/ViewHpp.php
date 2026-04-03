@@ -125,8 +125,7 @@ class ViewHpp extends Page
 
     public function getPreviewUrl(): string
     {
-        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        return route('reports.hpp.preview', array_filter([
             'startDate' => $this->startDate,
             'endDate' => $this->endDate,
             'branchIds' => array_filter($this->branchIds),

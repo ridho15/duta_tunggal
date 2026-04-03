@@ -55,7 +55,7 @@ class BukuBesarPage extends Page
 
     public function resetReport(): void
     {
-        $this->redirect(url()->current());
+        $this->redirect(static::getUrl());
     }
 
     public function mount(Request $request): void
@@ -75,7 +75,7 @@ class BukuBesarPage extends Page
 
     public function getPreviewUrl(): string
     {
-        return url()->current() . '?' . http_build_query(array_filter([
+        return static::getUrl() . '?' . http_build_query(array_filter([
             'preview' => 1,
             'start' => $this->start_date,
             'end' => $this->end_date,
@@ -105,7 +105,7 @@ class BukuBesarPage extends Page
 
     /**
      * Livewire hook when coa_ids is updated from the frontend.
-     * We log it to help debugging whether Livewire receives the change.
+        $this->redirect(static::getUrl());
      */
     public function updatedCoaIds($value): void
     {
@@ -114,7 +114,7 @@ class BukuBesarPage extends Page
     }
 
     /**
-     * Method to be called from Alpine when COA selection changes.
+        return static::getUrl() . '?' . http_build_query(array_filter([
      * This sets the view mode and updates the selected COAs.
      */
     public function selectCoas($coaIds): void

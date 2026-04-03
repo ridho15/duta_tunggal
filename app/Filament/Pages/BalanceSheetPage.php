@@ -103,12 +103,12 @@ class BalanceSheetPage extends Page
 
     public function resetReport(): void
     {
-        $this->redirect(url()->current());
+        $this->redirect(static::getUrl());
     }
 
     public function getPreviewUrl(): string
     {
-        return url()->current() . '?' . http_build_query(array_filter([
+        return static::getUrl() . '?' . http_build_query(array_filter([
             'preview' => 1,
             'as_of' => $this->as_of_date,
             'cabang_id' => $this->cabang_id,

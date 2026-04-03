@@ -1,30 +1,53 @@
 <x-filament-panels::page>
-    @php
-        $items = [
-            ['label' => 'Laporan Penjualan', 'url' => \App\Filament\Pages\SalesReportPage::getUrl()],
-            ['label' => 'Laporan Pembelian', 'url' => \App\Filament\Pages\PurchaseReportPage::getUrl()],
-        ];
-    @endphp
+@php
+    $accentColor = '#0d9488';
+    $accentLight = '#5eead4';
+    $iconBg      = '#f0fdfa';
+    $heroFrom    = '#f0fdfa';
+    $heroTo      = '#ccfbf1';
+    $items = [
+        ['label' => 'Laporan Penjualan',  'url' => \App\Filament\Pages\SalesReportPage::getUrl(),    'icon' => 'chart-bar',    'desc' => 'Rekap transaksi & performa penjualan'],
+        ['label' => 'Laporan Pembelian',  'url' => \App\Filament\Pages\PurchaseReportPage::getUrl(), 'icon' => 'shopping-cart', 'desc' => 'Rekap transaksi & aktivitas pembelian'],
+    ];
+@endphp
 
-    <style>
-        .operational-hub-wrap { display:grid; gap:1rem; }
-        .operational-hub-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:1.25rem; box-shadow:0 6px 20px rgba(15,23,42,.05); }
-        .operational-hub-title { font-size:1.125rem; font-weight:700; color:#111827; }
-        .operational-hub-note { color:#4b5563; font-size:.875rem; margin-top:.5rem; }
-        .operational-hub-grid { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); margin-top:.75rem; }
-        .operational-hub-link { display:block; border:1px solid #d1fae5; border-radius:14px; padding:1rem; background:linear-gradient(135deg,#ecfdf5,#f8fafc); color:#1f2937; text-decoration:none; font-weight:600; }
-        .operational-hub-link:hover { border-color:#34d399; background:linear-gradient(135deg,#d1fae5,#ecfdf5); }
-    </style>
+@include('filament.pages.partials.hub-styles')
 
-    <div class="operational-hub-wrap" id="operational-report-hub">
-        <section class="operational-hub-card">
-            <div class="operational-hub-title">Pusat Laporan Operasional</div>
-            <div class="operational-hub-note">Laporan operasional yang sering dipakai digabung di satu parent menu agar navigasi lebih singkat.</div>
-            <div class="operational-hub-grid">
-                @foreach ($items as $item)
-                    <a href="{{ $item['url'] }}" class="operational-hub-link">{{ $item['label'] }}</a>
-                @endforeach
-            </div>
-        </section>
+<div id="operational-report-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
+
+    {{-- Hero --}}
+    <div class="hubv2-hero" style="background:linear-gradient(135deg,{{ $heroFrom }},{{ $heroTo }});">
+        <div class="hubv2-hero-icon" style="color:{{ $accentColor }};">
+            <x-heroicon-o-clipboard-document-list class="w-9 h-9" />
+        </div>
+        <div class="hubv2-hero-body">
+            <div class="hubv2-hero-badge">Modul ERP &middot; Laporan Operasional</div>
+            <h1 class="hubv2-hero-title">Laporan Operasional</h1>
+            <p class="hubv2-hero-subtitle">Akses laporan penjualan dan pembelian secara cepat dari satu halaman.</p>
+        </div>
+        <div class="hubv2-hero-meta">
+            <span class="hubv2-hero-meta-num">{{ count($items) }}</span>
+            <span class="hubv2-hero-meta-lbl">Laporan</span>
+        </div>
     </div>
+
+    {{-- Cards --}}
+    <div class="hubv2-grid">
+        @foreach($items as $item)
+        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
+            <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
+                <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
+            </div>
+            <div class="hubv2-cb">
+                <span class="hubv2-cl">{{ $item['label'] }}</span>
+                <span class="hubv2-cd">{{ $item['desc'] }}</span>
+            </div>
+            <div class="hubv2-ca">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </div>
+        </a>
+        @endforeach
+    </div>
+
+</div>
 </x-filament-panels::page>

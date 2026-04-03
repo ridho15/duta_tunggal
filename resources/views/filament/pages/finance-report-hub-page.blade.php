@@ -1,59 +1,82 @@
 <x-filament-panels::page>
-    @php
-        $sections = [
-            [
-                'title' => 'Laporan Utama',
-                'items' => [
-                    ['label' => 'Neraca (Balance Sheet)', 'url' => \App\Filament\Resources\Reports\BalanceSheetResource::getUrl()],
-                    ['label' => 'Laporan Laba Rugi (P&L)', 'url' => \App\Filament\Resources\Reports\ProfitAndLossResource::getUrl()],
-                    ['label' => 'Neraca Saldo (Trial Balance)', 'url' => \App\Filament\Pages\TrialBalancePage::getUrl()],
-                    ['label' => 'Buku Besar', 'url' => \App\Filament\Pages\BukuBesarPage::getUrl()],
-                    ['label' => 'Laporan Arus Kas', 'url' => \App\Filament\Resources\Reports\CashFlowResource::getUrl()],
-                ],
+@php
+    $accentColor = '#1d4ed8';
+    $accentLight = '#93c5fd';
+    $iconBg      = '#eff6ff';
+    $heroFrom    = '#eff6ff';
+    $heroTo      = '#dbeafe';
+    $sections = [
+        [
+            'title' => 'Laporan Utama',
+            'items' => [
+                ['label' => 'Neraca (Balance Sheet)',       'url' => \App\Filament\Resources\Reports\BalanceSheetResource::getUrl(),  'icon' => 'chart-bar',             'desc' => 'Posisi aset, liabilitas & ekuitas'],
+                ['label' => 'Laporan Laba Rugi (P&L)',      'url' => \App\Filament\Resources\Reports\ProfitAndLossResource::getUrl(), 'icon' => 'arrow-trending-up',     'desc' => 'Kinerja pendapatan & beban operasional'],
+                ['label' => 'Neraca Saldo (Trial Balance)', 'url' => \App\Filament\Pages\TrialBalancePage::getUrl(),                  'icon' => 'table-cells',           'desc' => 'Saldo debet/kredit per akun'],
+                ['label' => 'Buku Besar',                  'url' => \App\Filament\Pages\BukuBesarPage::getUrl(),                     'icon' => 'book-open',             'desc' => 'Rincian mutasi per akun COA'],
+                ['label' => 'Laporan Arus Kas',             'url' => \App\Filament\Resources\Reports\CashFlowResource::getUrl(),     'icon' => 'banknotes',             'desc' => 'Aliran dana masuk & keluar perusahaan'],
             ],
-            [
-                'title' => 'Analisis & Pendukung',
-                'items' => [
-                    ['label' => 'HPP / Cost of Goods Sold', 'url' => \App\Filament\Resources\Reports\HppResource::getUrl()],
-                    ['label' => 'Cost of Goods Manufacturing', 'url' => \App\Filament\Pages\CostOfGoodsManufacturingPage::getUrl()],
-                    ['label' => 'Aging Report (AR/AP)', 'url' => \App\Filament\Resources\Reports\AgeingReportResource::getUrl()],
-                    ['label' => 'Profit per Divisi', 'url' => \App\Filament\Pages\ProfitLossMultiDivisionPage::getUrl()],
-                    ['label' => 'Drill Down Financial Report', 'url' => \App\Filament\Pages\DrillDownFinancialReportPage::getUrl()],
-                    ['label' => 'Financial Statement', 'url' => \App\Filament\Pages\FinancialStatementPage::getUrl()],
-                    ['label' => 'ALK Grafik', 'url' => \App\Filament\Pages\AlkGraficPage::getUrl()],
-                    ['label' => 'Journal Consolidation', 'url' => \App\Filament\Pages\JournalConsolidationPage::getUrl()],
-                ],
+        ],
+        [
+            'title' => 'Analisis & Pendukung',
+            'items' => [
+                ['label' => 'HPP / Cost of Goods Sold',      'url' => \App\Filament\Resources\Reports\HppResource::getUrl(),                 'icon' => 'calculator',              'desc' => 'Hitung biaya pokok penjualan'],
+                ['label' => 'Cost of Goods Manufacturing',   'url' => \App\Filament\Pages\CostOfGoodsManufacturingPage::getUrl(),            'icon' => 'cog-6-tooth',             'desc' => 'Biaya produksi barang selesai'],
+                ['label' => 'Aging Report (AR/AP)',           'url' => \App\Filament\Resources\Reports\AgeingReportResource::getUrl(),        'icon' => 'clock',                   'desc' => 'Analisis umur piutang & hutang'],
+                ['label' => 'Profit per Divisi',              'url' => \App\Filament\Pages\ProfitLossMultiDivisionPage::getUrl(),             'icon' => 'chart-pie',               'desc' => 'Laba rugi per unit bisnis/divisi'],
+                ['label' => 'Drill Down Financial Report',   'url' => \App\Filament\Pages\DrillDownFinancialReportPage::getUrl(),            'icon' => 'magnifying-glass-circle', 'desc' => 'Analisis mendalam per pos keuangan'],
+                ['label' => 'Financial Statement',           'url' => \App\Filament\Pages\FinancialStatementPage::getUrl(),                  'icon' => 'document-chart-bar',      'desc' => 'Laporan keuangan gabungan lengkap'],
+                ['label' => 'ALK Grafik',                    'url' => \App\Filament\Pages\AlkGraficPage::getUrl(),                          'icon' => 'presentation-chart-line', 'desc' => 'Visualisasi analisis laporan keuangan'],
+                ['label' => 'Journal Consolidation',         'url' => \App\Filament\Pages\JournalConsolidationPage::getUrl(),               'icon' => 'server-stack',            'desc' => 'Konsolidasi jurnal lintas divisi'],
             ],
-        ];
-    @endphp
+        ],
+    ];
+    $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
+@endphp
 
-    <style>
-        .report-hub-grid { display:grid; gap:1rem; }
-        .report-hub-section { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:1.25rem; box-shadow:0 6px 20px rgba(15,23,42,.05); }
-        .report-hub-title { font-size:1.125rem; font-weight:700; color:#111827; margin-bottom:.75rem; }
-        .report-hub-list { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
-        .report-hub-card { display:block; border:1px solid #dbeafe; border-radius:14px; padding:1rem; background:linear-gradient(135deg,#eff6ff,#f8fafc); color:#1f2937; text-decoration:none; font-weight:600; }
-        .report-hub-card:hover { border-color:#60a5fa; background:linear-gradient(135deg,#dbeafe,#eff6ff); }
-        .report-hub-note { color:#4b5563; font-size:.875rem; }
-    </style>
+@include('filament.pages.partials.hub-styles')
 
-    <div class="space-y-4" id="finance-report-hub">
-        <div class="report-hub-section">
-            <div class="report-hub-title">Pusat Laporan Keuangan</div>
-            <div class="report-hub-note">Menu laporan keuangan dikonsolidasikan di sini agar sidebar tetap ringkas, sementara semua route laporan lama tetap bisa diakses.</div>
+<div id="finance-report-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
+
+    {{-- Hero --}}
+    <div class="hubv2-hero" style="background:linear-gradient(135deg,{{ $heroFrom }},{{ $heroTo }});">
+        <div class="hubv2-hero-icon" style="color:{{ $accentColor }};">
+            <x-heroicon-o-document-chart-bar class="w-9 h-9" />
         </div>
-
-        <div class="report-hub-grid">
-            @foreach ($sections as $section)
-                <section class="report-hub-section">
-                    <h2 class="report-hub-title">{{ $section['title'] }}</h2>
-                    <div class="report-hub-list">
-                        @foreach ($section['items'] as $item)
-                            <a href="{{ $item['url'] }}" class="report-hub-card">{{ $item['label'] }}</a>
-                        @endforeach
-                    </div>
-                </section>
-            @endforeach
+        <div class="hubv2-hero-body">
+            <div class="hubv2-hero-badge">Modul ERP &middot; Laporan Keuangan</div>
+            <h1 class="hubv2-hero-title">Laporan Keuangan</h1>
+            <p class="hubv2-hero-subtitle">Akses neraca, laba rugi, trial balance, arus kas, dan laporan analisis keuangan dari satu halaman.</p>
+        </div>
+        <div class="hubv2-hero-meta">
+            <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>
+            <span class="hubv2-hero-meta-lbl">Laporan</span>
         </div>
     </div>
+
+    {{-- Sections --}}
+    @foreach($sections as $section)
+    <div class="hubv2-sh">
+        <span class="hubv2-sh-dot"></span>
+        <span class="hubv2-sh-name">{{ $section['title'] }}</span>
+        <span class="hubv2-sh-rule"></span>
+    </div>
+    <div class="hubv2-grid">
+        @foreach($section['items'] as $item)
+        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
+            <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
+                <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
+            </div>
+            <div class="hubv2-cb">
+                <span class="hubv2-cl">{{ $item['label'] }}</span>
+                <span class="hubv2-cd">{{ $item['desc'] }}</span>
+            </div>
+            <div class="hubv2-ca">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </div>
+        </a>
+        @endforeach
+    </div>
+    @endforeach
+
+</div>
 </x-filament-panels::page>

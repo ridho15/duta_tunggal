@@ -11,7 +11,7 @@ class AccountPayableQuery
     public static function base(): Builder
     {
         return AccountPayable::query()
-            ->where('status', '!=', PaymentStatus::PAID->value)
+            ->where('account_payables.status', '!=', PaymentStatus::PAID->value)
             ->whereNull('deleted_at');
     }
 
@@ -26,7 +26,7 @@ class AccountPayableQuery
         }
 
         if (isset($tableFilters['status']['values']) && !empty($tableFilters['status']['values'])) {
-            $query->whereIn('status', $tableFilters['status']['values']);
+            $query->whereIn('account_payables.status', $tableFilters['status']['values']);
         }
 
         if (isset($tableFilters['amount_range']) && !empty($tableFilters['amount_range'])) {
@@ -48,7 +48,7 @@ class AccountPayableQuery
         if (isset($tableFilters['overdue']['isActive']) && $tableFilters['overdue']['isActive']) {
             $query->whereHas('invoice', function (Builder $query) {
                 $query->where('due_date', '<', now());
-            })->where('status', PaymentStatus::UNPAID->value);
+            })->where('account_payables.status', PaymentStatus::UNPAID->value);
         }
 
         if (isset($tableFilters['date_range']) && !empty($tableFilters['date_range'])) {
@@ -94,7 +94,7 @@ class AccountPayableQuery
                         $query->where('due_date', '<', $now->copy()->subDays(60));
                         break;
                 }
-            })->where('status', PaymentStatus::UNPAID->value);
+            })->where('account_payables.status', PaymentStatus::UNPAID->value);
         }
 
         return $query;

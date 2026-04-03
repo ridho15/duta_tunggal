@@ -330,7 +330,7 @@ class AccountReceivableResource extends Resource
                     ->query(function (Builder $query): Builder {
                         return $query->whereHas('invoice', function (Builder $query) {
                             $query->where('due_date', '<', now());
-                        })->where('status', PaymentStatus::UNPAID->value);
+                            })->where('account_receivables.status', PaymentStatus::UNPAID->value);
                     })
                     ->toggle(),
                     

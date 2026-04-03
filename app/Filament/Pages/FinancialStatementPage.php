@@ -69,7 +69,7 @@ class FinancialStatementPage extends Page
     public function resetReport(): void
     {
         $this->showPreview = false;
-        $this->redirect(url()->current());
+        $this->redirect(static::getUrl());
     }
 
     public function mount(): void
@@ -83,7 +83,7 @@ class FinancialStatementPage extends Page
 
     public function getPreviewUrl(): string
     {
-        return url()->current() . '?' . http_build_query(array_filter([
+        return static::getUrl() . '?' . http_build_query(array_filter([
             'preview' => 1,
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,

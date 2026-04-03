@@ -1,32 +1,56 @@
 <x-filament-panels::page>
-    @php
-        $items = [
-            ['label' => 'Permintaan Pembelian', 'url' => \App\Filament\Resources\OrderRequestResource::getUrl()],
-            ['label' => 'Pesanan Pembelian', 'url' => \App\Filament\Resources\PurchaseOrderResource::getUrl()],
-            ['label' => 'Kontrol Kualitas Pembelian', 'url' => \App\Filament\Resources\QualityControlPurchaseResource::getUrl()],
-            ['label' => 'Penerimaan Pembelian', 'url' => \App\Filament\Resources\PurchaseReceiptResource::getUrl()],
-            ['label' => 'Retur Pembelian', 'url' => \App\Filament\Resources\PurchaseReturnResource::getUrl()],
-        ];
-    @endphp
+@php
+    $accentColor = '#ea580c';
+    $accentLight = '#fdba74';
+    $iconBg      = '#fff7ed';
+    $heroFrom    = '#fff7ed';
+    $heroTo      = '#fed7aa';
+    $items = [
+        ['label' => 'Permintaan Pembelian',      'url' => \App\Filament\Resources\OrderRequestResource::getUrl(),          'icon' => 'document-text',    'desc' => 'Ajukan permintaan bahan/barang ke supplier'],
+        ['label' => 'Pesanan Pembelian',          'url' => \App\Filament\Resources\PurchaseOrderResource::getUrl(),         'icon' => 'shopping-cart',    'desc' => 'Buat & kelola purchase order ke vendor'],
+        ['label' => 'Kontrol Kualitas Pembelian', 'url' => \App\Filament\Resources\QualityControlPurchaseResource::getUrl(),'icon' => 'beaker',           'desc' => 'Inspeksi kualitas barang yang diterima'],
+        ['label' => 'Penerimaan Pembelian',       'url' => \App\Filament\Resources\PurchaseReceiptResource::getUrl(),       'icon' => 'inbox-arrow-down', 'desc' => 'Konfirmasi penerimaan barang dari supplier'],
+        ['label' => 'Retur Pembelian',            'url' => \App\Filament\Resources\PurchaseReturnResource::getUrl(),        'icon' => 'arrow-uturn-left', 'desc' => 'Kembalikan barang tidak sesuai ke supplier'],
+    ];
+@endphp
 
-    <style>
-        .purchase-hub-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:1.25rem; box-shadow:0 6px 20px rgba(15,23,42,.05); }
-        .purchase-hub-title { font-size:1.125rem; font-weight:700; color:#111827; margin-bottom:.75rem; }
-        .purchase-hub-note { color:#4b5563; font-size:.875rem; }
-        .purchase-hub-grid { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); margin-top:.75rem; }
-        .purchase-hub-link { display:block; border:1px solid #fed7aa; border-radius:14px; padding:1rem; background:linear-gradient(135deg,#fff7ed,#fffbeb); color:#1f2937; text-decoration:none; font-weight:600; }
-        .purchase-hub-link:hover { border-color:#fb923c; background:linear-gradient(135deg,#ffedd5,#fff7ed); }
-    </style>
+@include('filament.pages.partials.hub-styles')
 
-    <div class="space-y-4" id="purchase-hub">
-        <section class="purchase-hub-card">
-            <div class="purchase-hub-title">Pusat Pembelian</div>
-            <div class="purchase-hub-note">Modul pembelian dikonsolidasikan di sini agar sidebar lebih singkat tanpa memutus route yang sudah ada.</div>
-            <div class="purchase-hub-grid">
-                @foreach ($items as $item)
-                    <a href="{{ $item['url'] }}" class="purchase-hub-link">{{ $item['label'] }}</a>
-                @endforeach
-            </div>
-        </section>
+<div id="purchase-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
+
+    {{-- Hero --}}
+    <div class="hubv2-hero" style="background:linear-gradient(135deg,{{ $heroFrom }},{{ $heroTo }});">
+        <div class="hubv2-hero-icon" style="color:{{ $accentColor }};">
+            <x-heroicon-o-shopping-bag class="w-9 h-9" />
+        </div>
+        <div class="hubv2-hero-body">
+            <div class="hubv2-hero-badge">Modul ERP &middot; Pembelian</div>
+            <h1 class="hubv2-hero-title">Pusat Pembelian</h1>
+            <p class="hubv2-hero-subtitle">Kelola seluruh proses pembelian — dari permintaan hingga penerimaan &amp; retur barang.</p>
+        </div>
+        <div class="hubv2-hero-meta">
+            <span class="hubv2-hero-meta-num">{{ count($items) }}</span>
+            <span class="hubv2-hero-meta-lbl">Modul</span>
+        </div>
     </div>
+
+    {{-- Cards --}}
+    <div class="hubv2-grid">
+        @foreach($items as $item)
+        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
+            <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
+                <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
+            </div>
+            <div class="hubv2-cb">
+                <span class="hubv2-cl">{{ $item['label'] }}</span>
+                <span class="hubv2-cd">{{ $item['desc'] }}</span>
+            </div>
+            <div class="hubv2-ca">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </div>
+        </a>
+        @endforeach
+    </div>
+
+</div>
 </x-filament-panels::page>

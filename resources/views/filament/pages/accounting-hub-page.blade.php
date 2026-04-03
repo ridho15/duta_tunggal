@@ -1,52 +1,75 @@
 <x-filament-panels::page>
-    @php
-        $sections = [
-            [
-                'title' => 'Jurnal & Kendali Akuntansi',
-                'items' => [
-                    ['label' => 'Journal Entries', 'url' => \App\Filament\Resources\JournalEntryResource::getUrl()],
-                    ['label' => 'Journal Entries (Grouped)', 'url' => \App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries::getUrl()],
-                    ['label' => 'AR & AP Management', 'url' => \App\Filament\Pages\ArApManagementPage::getUrl()],
-                    ['label' => 'Rekonsiliasi Bank', 'url' => \App\Filament\Resources\BankReconciliationResource::getUrl()],
-                ],
+@php
+    $accentColor = '#ca8a04';
+    $accentLight = '#fde047';
+    $iconBg      = '#fefce8';
+    $heroFrom    = '#fef9c3';
+    $heroTo      = '#fde68a';
+    $sections = [
+        [
+            'title' => 'Jurnal & Kendali Akuntansi',
+            'items' => [
+                ['label' => 'Journal Entries',            'url' => \App\Filament\Resources\JournalEntryResource::getUrl(),                        'icon' => 'book-open',          'desc' => 'Input & kelola jurnal akuntansi'],
+                ['label' => 'Journal Entries (Grouped)',  'url' => \App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries::getUrl(),'icon' => 'table-cells',        'desc' => 'Tampilan jurnal terkelompok per transaksi'],
+                ['label' => 'AR & AP Management',         'url' => \App\Filament\Pages\ArApManagementPage::getUrl(),                              'icon' => 'arrows-right-left',  'desc' => 'Monitor piutang & hutang secara terpadu'],
+                ['label' => 'Rekonsiliasi Bank',          'url' => \App\Filament\Resources\BankReconciliationResource::getUrl(),                  'icon' => 'building-library',   'desc' => 'Cocokkan mutasi bank dengan pembukuan'],
             ],
-            [
-                'title' => 'Schedule & Voucher',
-                'items' => [
-                    ['label' => 'Ageing Schedule', 'url' => \App\Filament\Resources\AgeingScheduleResource::getUrl()],
-                    ['label' => 'Pengajuan Voucher', 'url' => \App\Filament\Resources\VoucherRequestResource::getUrl()],
-                ],
+        ],
+        [
+            'title' => 'Schedule & Voucher',
+            'items' => [
+                ['label' => 'Ageing Schedule',   'url' => \App\Filament\Resources\AgeingScheduleResource::getUrl(),  'icon' => 'clock',   'desc' => 'Analisis umur piutang & hutang'],
+                ['label' => 'Pengajuan Voucher', 'url' => \App\Filament\Resources\VoucherRequestResource::getUrl(), 'icon' => 'ticket',  'desc' => 'Ajukan voucher kas/biaya untuk approval'],
             ],
-        ];
-    @endphp
+        ],
+    ];
+    $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
+@endphp
 
-    <style>
-        .hub-grid { display:grid; gap:1rem; }
-        .hub-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:1.25rem; box-shadow:0 6px 20px rgba(15,23,42,.05); }
-        .hub-title { font-size:1.125rem; font-weight:700; color:#111827; margin-bottom:.75rem; }
-        .hub-note { color:#4b5563; font-size:.875rem; }
-        .hub-list { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); margin-top:.75rem; }
-        .hub-link { display:block; border:1px solid #fde68a; border-radius:14px; padding:1rem; background:linear-gradient(135deg,#fef3c7,#fffbeb); color:#1f2937; text-decoration:none; font-weight:600; }
-        .hub-link:hover { border-color:#f59e0b; background:linear-gradient(135deg,#fde68a,#fef3c7); }
-    </style>
+@include('filament.pages.partials.hub-styles')
 
-    <div class="space-y-4" id="accounting-hub">
-        <section class="hub-card">
-            <div class="hub-title">Pusat Akuntansi</div>
-            <div class="hub-note">Menu akuntansi dipusatkan di halaman ini agar group Finance - Akuntansi tetap ringkas, sementara URL lama tetap dapat diakses.</div>
-        </section>
+<div id="accounting-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
 
-        <div class="hub-grid">
-            @foreach ($sections as $section)
-                <section class="hub-card">
-                    <h2 class="hub-title">{{ $section['title'] }}</h2>
-                    <div class="hub-list">
-                        @foreach ($section['items'] as $item)
-                            <a href="{{ $item['url'] }}" class="hub-link">{{ $item['label'] }}</a>
-                        @endforeach
-                    </div>
-                </section>
-            @endforeach
+    {{-- Hero --}}
+    <div class="hubv2-hero" style="background:linear-gradient(135deg,{{ $heroFrom }},{{ $heroTo }});">
+        <div class="hubv2-hero-icon" style="color:{{ $accentColor }};">
+            <x-heroicon-o-calculator class="w-9 h-9" />
+        </div>
+        <div class="hubv2-hero-body">
+            <div class="hubv2-hero-badge">Modul ERP &middot; Akuntansi Keuangan</div>
+            <h1 class="hubv2-hero-title">Pusat Akuntansi</h1>
+            <p class="hubv2-hero-subtitle">Kelola jurnal, rekonsiliasi bank, AR/AP, ageing, dan pengajuan voucher dari satu halaman.</p>
+        </div>
+        <div class="hubv2-hero-meta">
+            <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>
+            <span class="hubv2-hero-meta-lbl">Modul</span>
         </div>
     </div>
+
+    {{-- Sections --}}
+    @foreach($sections as $section)
+    <div class="hubv2-sh">
+        <span class="hubv2-sh-dot"></span>
+        <span class="hubv2-sh-name">{{ $section['title'] }}</span>
+        <span class="hubv2-sh-rule"></span>
+    </div>
+    <div class="hubv2-grid">
+        @foreach($section['items'] as $item)
+        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
+            <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
+                <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
+            </div>
+            <div class="hubv2-cb">
+                <span class="hubv2-cl">{{ $item['label'] }}</span>
+                <span class="hubv2-cd">{{ $item['desc'] }}</span>
+            </div>
+            <div class="hubv2-ca">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </div>
+        </a>
+        @endforeach
+    </div>
+    @endforeach
+
+</div>
 </x-filament-panels::page>

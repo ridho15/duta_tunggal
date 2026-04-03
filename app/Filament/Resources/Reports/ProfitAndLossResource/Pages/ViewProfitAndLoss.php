@@ -82,8 +82,7 @@ class ViewProfitAndLoss extends Page
 
     public function getPreviewUrl(): string
     {
-        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        return route('reports.profit-and-loss.preview', array_filter([
             'startDate' => $this->startDate,
             'endDate' => $this->endDate,
             'cabang_id' => $this->cabang_id,

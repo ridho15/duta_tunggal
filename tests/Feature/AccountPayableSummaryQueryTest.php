@@ -7,6 +7,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Support\AccountPayableQuery;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -82,4 +83,36 @@ test('account payable summary query excludes paid and soft deleted records', fun
 
     expect((float) $query->sum('remaining'))->toBe(150000.0)
         ->and($query->count())->toBe(1);
+});
+
+test('overdue filter works on a joined account payable query without ambiguous status columns', function () {
+    $invoice = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $this->purchaseOrder->id,
+            'total' => 200000,
+            'due_date' => now()->subDays(10),
+        ]);
+    });
+
+    AccountPayable::create([
+        'invoice_id' => $invoice->id,
+        'supplier_id' => $this->supplier->id,
+        'total' => 200000,
+        'paid' => 0,
+        'remaining' => 200000,
+        'status' => PaymentStatus::UNPAID->value,
+        'created_by' => $this->user->id,
+    ]);
+
+    $query = AccountPayable::query()
+        ->leftJoin('invoices', 'account_payables.invoice_id', '=', 'invoices.id')
+        ->select('account_payables.*');
+
+    $filtered = AccountPayableQuery::applyTableFilters($query, [
+        'overdue' => ['isActive' => true],
+    ]);
+
+    expect($filtered->count())->toBe(1)
+        ->and($filtered->sum('remaining'))->toBe(200000);
 });

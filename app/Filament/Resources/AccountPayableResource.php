@@ -434,7 +434,7 @@ class AccountPayableResource extends Resource
                     ->query(function (Builder $query): Builder {
                         return $query->whereHas('invoice', function (Builder $query) {
                             $query->where('due_date', '<', now());
-                        })->where('status', PaymentStatus::UNPAID->value);
+                        })->where('account_payables.status', PaymentStatus::UNPAID->value);
                     })
                     ->toggle(),
                     
@@ -518,7 +518,7 @@ class AccountPayableResource extends Resource
                                     $query->where('due_date', '<', $now->copy()->subDays(60));
                                     break;
                             }
-                        })->where('status', PaymentStatus::UNPAID->value);
+                        })->where('account_payables.status', PaymentStatus::UNPAID->value);
                     }),
                 
                 Tables\Filters\Filter::make('invoice_date_range')

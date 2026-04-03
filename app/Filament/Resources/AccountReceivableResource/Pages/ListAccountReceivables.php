@@ -24,11 +24,11 @@ class ListAccountReceivables extends ListRecords
         ];
     }
 
-    public function getTitle(): string
-    {
-        $totalAmount = $this->getFilteredQuery()->sum('remaining');
-        return 'Account Receivable - ' . MoneyHelper::rupiah($totalAmount);
-    }
+    // public function getTitle(): string
+    // {
+    //     $totalAmount = $this->getFilteredQuery()->sum('remaining');
+    //     return 'Account Receivable - ' . MoneyHelper::rupiah($totalAmount);
+    // }
 
     protected function getFilteredQuery(): Builder
     {

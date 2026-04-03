@@ -280,8 +280,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
     public function getPreviewUrl(): string
     {
-        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        return route('reports.ageing-report.preview', array_filter([
             'as_of_date' => $this->as_of_date,
             'cabang_id' => $this->cabang_id,
             'report_type' => $this->report_type,

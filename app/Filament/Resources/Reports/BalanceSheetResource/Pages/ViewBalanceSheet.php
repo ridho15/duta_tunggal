@@ -95,8 +95,7 @@ class ViewBalanceSheet extends Page
 
     public function getPreviewUrl(): string
     {
-        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        return route('reports.balance-sheet.preview', array_filter([
             'as_of_date' => $this->as_of_date,
             'cabang_id' => $this->cabang_id,
             'show_comparison' => $this->show_comparison ? 1 : 0,

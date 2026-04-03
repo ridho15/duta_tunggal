@@ -1,53 +1,76 @@
 <x-filament-panels::page>
-    @php
-        $sections = [
-            [
-                'title' => 'Transaksi Gudang',
-                'items' => [
-                    ['label' => 'Stock Transfer', 'url' => \App\Filament\Resources\StockTransferResource::getUrl()],
-                    ['label' => 'Stock Adjustment', 'url' => \App\Filament\Resources\StockAdjustmentResource::getUrl()],
-                    ['label' => 'Stock Opname', 'url' => \App\Filament\Resources\StockOpnameResource::getUrl()],
-                    ['label' => 'Return Product', 'url' => \App\Filament\Resources\ReturnProductResource::getUrl()],
-                ],
+@php
+    $accentColor = '#059669';
+    $accentLight = '#6ee7b7';
+    $iconBg      = '#ecfdf5';
+    $heroFrom    = '#ecfdf5';
+    $heroTo      = '#a7f3d0';
+    $sections = [
+        [
+            'title' => 'Transaksi Gudang',
+            'items' => [
+                ['label' => 'Stock Transfer',    'url' => \App\Filament\Resources\StockTransferResource::getUrl(),         'icon' => 'arrows-right-left',        'desc' => 'Pindahkan stok antar gudang/lokasi'],
+                ['label' => 'Stock Adjustment',  'url' => \App\Filament\Resources\StockAdjustmentResource::getUrl(),       'icon' => 'adjustments-horizontal',   'desc' => 'Koreksi selisih stok secara manual'],
+                ['label' => 'Stock Opname',      'url' => \App\Filament\Resources\StockOpnameResource::getUrl(),           'icon' => 'clipboard-document-check', 'desc' => 'Hitung fisik persediaan gudang'],
+                ['label' => 'Return Product',    'url' => \App\Filament\Resources\ReturnProductResource::getUrl(),         'icon' => 'arrow-uturn-left',          'desc' => 'Proses pengembalian produk dari pelanggan'],
             ],
-            [
-                'title' => 'Monitoring & Konfirmasi',
-                'items' => [
-                    ['label' => 'Inventory Stock', 'url' => \App\Filament\Resources\InventoryStockResource::getUrl()],
-                    ['label' => 'Stock Movement', 'url' => \App\Filament\Resources\StockMovementResource::getUrl()],
-                    ['label' => 'Konfirmasi Gudang', 'url' => \App\Filament\Resources\WarehouseConfirmationResource::getUrl()],
-                ],
+        ],
+        [
+            'title' => 'Monitoring & Konfirmasi',
+            'items' => [
+                ['label' => 'Inventory Stock',   'url' => \App\Filament\Resources\InventoryStockResource::getUrl(),        'icon' => 'archive-box',              'desc' => 'Monitor posisi stok real-time'],
+                ['label' => 'Stock Movement',    'url' => \App\Filament\Resources\StockMovementResource::getUrl(),         'icon' => 'arrow-trending-up',        'desc' => 'Riwayat mutasi masuk/keluar stok'],
+                ['label' => 'Konfirmasi Gudang', 'url' => \App\Filament\Resources\WarehouseConfirmationResource::getUrl(), 'icon' => 'check-badge',              'desc' => 'Persetujuan penerimaan/pengeluaran gudang'],
             ],
-        ];
-    @endphp
+        ],
+    ];
+    $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
+@endphp
 
-    <style>
-        .wh-grid { display:grid; gap:1rem; }
-        .wh-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:1.25rem; box-shadow:0 6px 20px rgba(15,23,42,.05); }
-        .wh-title { font-size:1.125rem; font-weight:700; color:#111827; margin-bottom:.75rem; }
-        .wh-note { color:#4b5563; font-size:.875rem; }
-        .wh-list { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); margin-top:.75rem; }
-        .wh-link { display:block; border:1px solid #bbf7d0; border-radius:14px; padding:1rem; background:linear-gradient(135deg,#ecfdf5,#f8fafc); color:#1f2937; text-decoration:none; font-weight:600; }
-        .wh-link:hover { border-color:#34d399; background:linear-gradient(135deg,#d1fae5,#ecfdf5); }
-    </style>
+@include('filament.pages.partials.hub-styles')
 
-    <div class="space-y-4" id="warehouse-hub">
-        <section class="wh-card">
-            <div class="wh-title">Pusat Gudang</div>
-            <div class="wh-note">Menu gudang yang padat digabung di sini agar sidebar lebih pendek, tanpa mengubah route modul gudang yang sudah dipakai.</div>
-        </section>
+<div id="warehouse-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
 
-        <div class="wh-grid">
-            @foreach ($sections as $section)
-                <section class="wh-card">
-                    <h2 class="wh-title">{{ $section['title'] }}</h2>
-                    <div class="wh-list">
-                        @foreach ($section['items'] as $item)
-                            <a href="{{ $item['url'] }}" class="wh-link">{{ $item['label'] }}</a>
-                        @endforeach
-                    </div>
-                </section>
-            @endforeach
+    {{-- Hero --}}
+    <div class="hubv2-hero" style="background:linear-gradient(135deg,{{ $heroFrom }},{{ $heroTo }});">
+        <div class="hubv2-hero-icon" style="color:{{ $accentColor }};">
+            <x-heroicon-o-archive-box class="w-9 h-9" />
+        </div>
+        <div class="hubv2-hero-body">
+            <div class="hubv2-hero-badge">Modul ERP &middot; Gudang</div>
+            <h1 class="hubv2-hero-title">Pusat Gudang</h1>
+            <p class="hubv2-hero-subtitle">Kelola transaksi gudang, kontrol stok, dan konfirmasi penerimaan/pengeluaran barang.</p>
+        </div>
+        <div class="hubv2-hero-meta">
+            <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>
+            <span class="hubv2-hero-meta-lbl">Modul</span>
         </div>
     </div>
+
+    {{-- Sections --}}
+    @foreach($sections as $section)
+    <div class="hubv2-sh">
+        <span class="hubv2-sh-dot"></span>
+        <span class="hubv2-sh-name">{{ $section['title'] }}</span>
+        <span class="hubv2-sh-rule"></span>
+    </div>
+    <div class="hubv2-grid">
+        @foreach($section['items'] as $item)
+        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
+            <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
+                <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
+            </div>
+            <div class="hubv2-cb">
+                <span class="hubv2-cl">{{ $item['label'] }}</span>
+                <span class="hubv2-cd">{{ $item['desc'] }}</span>
+            </div>
+            <div class="hubv2-ca">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </div>
+        </a>
+        @endforeach
+    </div>
+    @endforeach
+
+</div>
 </x-filament-panels::page>
