@@ -23,15 +23,19 @@ class ListAccountPayables extends ListRecords
         ];
     }
 
-    // public function getTitle(): string
-    // {
-    //     $totalAmount = $this->getFilteredQuery()->sum('remaining');
-    //     return 'Account Payable - ' . MoneyHelper::rupiah($totalAmount);
-    // }
+    public function getTitle(): string
+    {
+        $totalAmount = $this->getFilteredQuery()->sum('account_payables.remaining');
+
+        return 'Account Payable - ' . MoneyHelper::rupiah($totalAmount);
+    }
 
     protected function getFilteredQuery(): Builder
     {
-        return AccountPayableQuery::filtered($this->tableFilters ?? []);
+        return AccountPayableQuery::applyTableFilters(
+            AccountPayableResource::getEloquentQuery(),
+            $this->tableFilters ?? []
+        );
     }
 
     protected function getHeaderWidgets(): array

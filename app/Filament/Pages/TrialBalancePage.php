@@ -152,7 +152,7 @@ class TrialBalancePage extends Page implements HasForms
 
     public function getPreviewUrl(): string
     {
-        return static::getUrl() . '?' . http_build_query(array_filter([
+        return route('reports.trial-balance.preview', array_filter([
             'preview' => 1,
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,

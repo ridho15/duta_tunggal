@@ -7,6 +7,7 @@ use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Appearance;
 use App\Http\Controllers\Reports\StockReportController;
 use App\Http\Controllers\Reports\FinancialReportPreviewController;
+use App\Http\Controllers\Reports\TrialBalancePreviewController;
 use App\Http\Controllers\InventoryCardController;
 
 Route::middleware('auth')->group(function () {
@@ -63,6 +64,9 @@ Route::get('exports/download/{filename}', function ($filename) {
 Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::get('/reports/stock-report/preview', [StockReportController::class, 'preview'])
         ->name('reports.stock-report.preview');
+
+    Route::get('/reports/trial-balance/preview', [TrialBalancePreviewController::class, 'preview'])
+        ->name('reports.trial-balance.preview');
 
     // Financial report standalone previews (no Filament layout)
     Route::get('/reports/balance-sheet/preview',   [FinancialReportPreviewController::class, 'balanceSheet'])->name('reports.balance-sheet.preview');

@@ -53,13 +53,6 @@ async function openTrialBalance(page, startDate = '2025-01-01', endDate = '2025-
         await page.waitForTimeout(200);
     }
 
-    const previewParams = new URLSearchParams({
-        preview: '1',
-        start_date: startDate,
-        end_date: endDate,
-        show_zero_balance: '0',
-    });
-
     // Click preview button and wait for the preview popup
     const previewBtn = page.getByRole('button', { name: /tampilkan laporan/i }).first()
         .or(page.getByRole('button', { name: /preview/i }).first());
@@ -69,7 +62,7 @@ async function openTrialBalance(page, startDate = '2025-01-01', endDate = '2025-
     await previewBtn.click();
 
     const popup = await popupPromise;
-    await popup.goto(`${TB_URL}?${previewParams.toString()}`);
+    await popup.waitForURL(/\/reports\/trial-balance\/preview(?:\?|$)/, { timeout: 15_000 });
     await popup.waitForLoadState('networkidle');
     await popup.bringToFront().catch(() => {});
     await popup.waitForTimeout(1_000);
@@ -187,21 +180,16 @@ test('TC-TB-UI-008 grand total row is visible at bottom of table', async ({ page
 });
 
 // ══════════════════════════════════════════════════════════════
-// TC-TB-UI-009  Reset button hides report
+// TC-TB-UI-009  Close button is visible in standalone preview
 // ══════════════════════════════════════════════════════════════
-test('TC-TB-UI-009 reset button hides the report', async ({ page }) => {
+test('TC-TB-UI-009 close button is visible in standalone preview', async ({ page }) => {
     const reportPage = await openTrialBalance(page);
 
     const report = reportPage.locator('#trial-balance-report');
     await expect(report).toBeVisible({ timeout: 10_000 });
 
-    const resetBtn = reportPage.getByRole('button', { name: /reset/i }).first();
-    await expect(resetBtn).toBeVisible({ timeout: 5_000 });
-    await resetBtn.click();
-
-    await reportPage.waitForLoadState('networkidle');
-    await reportPage.waitForTimeout(800);
-    await expect(report).not.toBeVisible();
+    const closeBtn = reportPage.getByRole('button', { name: /tutup/i }).first();
+    await expect(closeBtn).toBeVisible({ timeout: 5_000 });
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -212,4 +200,15 @@ test('TC-TB-UI-010 print button appears after report is generated', async ({ pag
 
     const printBtn = reportPage.getByRole('button', { name: /cetak/i }).first();
     await expect(printBtn).toBeVisible({ timeout: 10_000 });
+});
+
+// ══════════════════════════════════════════════════════════════
+// TC-TB-UI-011  Preview opens standalone route
+// ══════════════════════════════════════════════════════════════
+test('TC-TB-UI-011 preview opens the standalone trial balance route', async ({ page }) => {
+    const reportPage = await openTrialBalance(page);
+
+    expect(reportPage.url()).toContain('/reports/trial-balance/preview');
+    await expect(reportPage.locator('.fi-sidebar')).toHaveCount(0);
+    await expect(reportPage.locator('body')).toContainText(/Trial Balance/i);
 });
