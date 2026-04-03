@@ -237,9 +237,9 @@ Semua 29 item dari rapat peningkatan ERP telah ditangani. Perbaikan mencakup: bu
 
 ### #27 — Field pengiriman di Surat Jalan (SJ)
 **Status**: ✅ **Selesai (sesi sebelumnya)**  
-**Perubahan**: Tambah field `shipping_method`, `shipping_cost`, `shipping_tracking_number`, `shipped_at` ke tabel `surat_jalans` melalui migrasi dan model.  
-**File diubah**: `app/Models/SuratJalan.php`, `app/Filament/Resources/SuratJalanResource.php`  
-**Migrasi**: `database/migrations/2026_03_10_*_add_shipping_fields_to_surat_jalans_table.php`
+**Perubahan**: Field pengiriman pernah ditambahkan ke `surat_jalans` sebagai bagian dari iterasi awal, lalu detail pengiriman dipindahkan ke `DeliverySchedule` dan field legacy `sender_name`/`shipping_method` dihapus dari Surat Jalan.  
+**File diubah**: `app/Models/SuratJalan.php`, `app/Filament/Resources/SuratJalanResource.php`, `app/Models/DeliverySchedule.php`  
+**Migrasi terkait**: `database/migrations/2026_03_11_022738_add_shipping_fields_to_surat_jalans_table.php`, `database/migrations/2026_04_04_000001_drop_legacy_shipping_fields_from_surat_jalans_table.php`
 
 ---
 

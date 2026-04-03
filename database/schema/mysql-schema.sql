@@ -2388,8 +2388,6 @@ CREATE TABLE `surat_jalans` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `created_by` int NOT NULL,
   `document_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `sender_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `shipping_method` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `surat_jalans_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

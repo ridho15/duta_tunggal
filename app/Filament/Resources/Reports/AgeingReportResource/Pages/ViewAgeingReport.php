@@ -42,6 +42,20 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
     public ?string $cabang_id = null;
     public ?string $report_type = 'receivables'; // 'receivables', 'payables', 'both'
 
+    public function mount(): void
+    {
+        $this->as_of_date = request('as_of_date', now()->toDateString());
+        $this->cabang_id = request('cabang_id');
+        $this->report_type = request('report_type', 'receivables');
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
+        $this->form->fill([
+            'as_of_date' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+            'report_type' => $this->report_type,
+        ]);
+    }
+
     protected function getFormSchema(): array
     {
         return [
@@ -256,12 +270,22 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'as_of_date' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+            'report_type' => $this->report_type,
+        ], fn ($value) => $value !== null && $value !== ''));
     }
 
     private function getAgingSummary($type, $bucket)

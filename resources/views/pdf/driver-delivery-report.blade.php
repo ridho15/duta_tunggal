@@ -199,7 +199,7 @@
                     <span class="badge {{ $sj->status == 1 ? 'badge-terbit' : 'badge-draft' }}">
                         {{ $sj->status == 1 ? 'Terbit' : 'Draft' }}
                     </span>
-                    &nbsp;|&nbsp; Metode: {{ $sj->shipping_method ?? '-' }}
+                    &nbsp;|&nbsp; Metode: {{ $sj->shipping_method_label }}
                 </div>
 
                 <div class="sj-meta">
@@ -256,7 +256,7 @@
                         </td>
                         <td style="border:none; text-align:center; width:33%">
                             Pengirim,<br><br><br><br>
-                            <strong>{{ $sj->sender_name ?? $driver }}</strong>
+                            <strong>{{ $sj->sender_display_name }}</strong>
                         </td>
                         <td style="border:none; text-align:center; width:33%">
                             Mengetahui,<br><br><br><br>

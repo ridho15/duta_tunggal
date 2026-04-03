@@ -145,12 +145,13 @@ it('coaOptions filters by account_type', function () {
     expect(array_keys($options))->not()->toContain($this->expenseCoa->id);
 });
 
-it('generateReport sets showPreview to true', function () {
+it('generateReport builds a preview url without toggling inline preview', function () {
     $page = new DrillDownFinancialReportPage();
     $page->showPreview = false;
     $page->generateReport();
 
-    expect($page->showPreview)->toBeTrue();
+    expect($page->showPreview)->toBeFalse()
+        ->and($page->getPreviewUrl())->toContain('preview=1');
 });
 
 it('resetReport sets showPreview to false', function () {

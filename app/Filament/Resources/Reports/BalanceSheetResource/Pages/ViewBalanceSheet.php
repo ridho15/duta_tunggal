@@ -39,6 +39,32 @@ class ViewBalanceSheet extends Page
     public ?string $display_mode = 'detailed'; // 'total_only', 'parent_only', 'detailed', 'with_zero'
     public ?bool $include_zero_balances = false;
 
+    public function mount(): void
+    {
+        $this->as_of_date = request('as_of_date', now()->toDateString());
+        $this->cabang_id = request('cabang_id');
+        $this->show_comparison = filter_var(request('show_comparison', false), FILTER_VALIDATE_BOOL);
+        $this->comparison_date = request('comparison_date');
+        $this->use_multi_period = filter_var(request('use_multi_period', false), FILTER_VALIDATE_BOOL);
+        $this->selected_periods = (array) request('selected_periods', []);
+        $this->display_mode = request('display_mode', 'detailed');
+        $this->include_zero_balances = filter_var(request('include_zero_balances', false), FILTER_VALIDATE_BOOL);
+        $this->classic_view = filter_var(request('classic_view', false), FILTER_VALIDATE_BOOL);
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
+        $this->form->fill([
+            'as_of_date' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+            'show_comparison' => $this->show_comparison,
+            'comparison_date' => $this->comparison_date,
+            'use_multi_period' => $this->use_multi_period,
+            'selected_periods' => $this->selected_periods,
+            'display_mode' => $this->display_mode,
+            'include_zero_balances' => $this->include_zero_balances,
+            'classic_view' => $this->classic_view,
+        ]);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -59,13 +85,28 @@ class ViewBalanceSheet extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
-        $this->notifyIfReportHasIssues($this->getReportData());
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'as_of_date' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+            'show_comparison' => $this->show_comparison ? 1 : 0,
+            'comparison_date' => $this->comparison_date,
+            'use_multi_period' => $this->use_multi_period ? 1 : 0,
+            'selected_periods' => array_filter($this->selected_periods),
+            'display_mode' => $this->display_mode,
+            'include_zero_balances' => $this->include_zero_balances ? 1 : 0,
+            'classic_view' => $this->classic_view ? 1 : 0,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     protected function getFormSchema(): array

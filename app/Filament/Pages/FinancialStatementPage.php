@@ -63,18 +63,33 @@ class FinancialStatementPage extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
         $this->showPreview = false;
+        $this->redirect(url()->current());
     }
 
     public function mount(): void
     {
-        $this->start_date = now()->startOfMonth()->format('Y-m-d');
-        $this->end_date = now()->endOfMonth()->format('Y-m-d');
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+        $this->start_date = request('start_date', now()->startOfMonth()->format('Y-m-d'));
+        $this->end_date = request('end_date', now()->endOfMonth()->format('Y-m-d'));
+        $this->cabang_id = request('cabang_id');
+        $this->statement_type = request('statement_type', 'all');
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+            'statement_type' => $this->statement_type,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getStatementData(): array

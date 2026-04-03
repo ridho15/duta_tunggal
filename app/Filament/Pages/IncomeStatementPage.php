@@ -51,20 +51,24 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
     public bool $show_only_totals = false;
     public bool $show_parent_accounts = true;
     public bool $show_child_accounts = true;
-    public bool $show_zero_balance = false;    public function mount(): void
+    public bool $show_zero_balance = false;
+
+    public function mount(): void
     {
         // Default to current year for better data visibility
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
         $this->form->fill([
             'start_date' => request()->query('start', now()->startOfYear()->format('Y-m-d')),
             'end_date' => request()->query('end', now()->endOfYear()->format('Y-m-d')),
             'cabang_id' => request()->query('cabang_id'),
-            'show_comparison' => false,
-            'comparison_start_date' => now()->subYear()->startOfYear()->format('Y-m-d'),
-            'comparison_end_date' => now()->subYear()->endOfYear()->format('Y-m-d'),
-            'show_only_totals' => false,
-            'show_parent_accounts' => true,
-            'show_child_accounts' => true,
-            'show_zero_balance' => false,
+            'show_comparison' => filter_var(request('show_comparison', false), FILTER_VALIDATE_BOOL),
+            'comparison_start_date' => request()->query('comparison_start_date', now()->subYear()->startOfYear()->format('Y-m-d')),
+            'comparison_end_date' => request()->query('comparison_end_date', now()->subYear()->endOfYear()->format('Y-m-d')),
+            'show_only_totals' => filter_var(request('show_only_totals', false), FILTER_VALIDATE_BOOL),
+            'show_parent_accounts' => filter_var(request('show_parent_accounts', true), FILTER_VALIDATE_BOOL),
+            'show_child_accounts' => filter_var(request('show_child_accounts', true), FILTER_VALIDATE_BOOL),
+            'show_zero_balance' => filter_var(request('show_zero_balance', false), FILTER_VALIDATE_BOOL),
         ]);
     }
 
@@ -222,8 +226,7 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
-        $this->resetTable();
+        $this->redirect(url()->current());
     }
 
     public function generateReport(): void
@@ -248,12 +251,6 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
                 ->send();
             return;
         }
-
-        Notification::make()
-            ->title('Laporan diperbarui')
-            ->success()
-            ->body('Laporan Laba Rugi telah diperbarui.')
-            ->send();
 
         // Clear existing data and populate with new data
         IncomeStatementItem::truncate();
@@ -360,8 +357,24 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
         }
 
         // Refresh table data
-        $this->showPreview = true;
-        $this->resetTable();
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'start' => $this->start_date,
+            'end' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+            'show_comparison' => $this->show_comparison ? 1 : 0,
+            'comparison_start_date' => $this->comparison_start_date,
+            'comparison_end_date' => $this->comparison_end_date,
+            'show_only_totals' => $this->show_only_totals ? 1 : 0,
+            'show_parent_accounts' => $this->show_parent_accounts ? 1 : 0,
+            'show_child_accounts' => $this->show_child_accounts ? 1 : 0,
+            'show_zero_balance' => $this->show_zero_balance ? 1 : 0,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getIncomeStatementData(): array

@@ -73,16 +73,17 @@ class BalanceSheetPage extends Page
         // Default to end of current month
         $this->as_of_date = request()->query('as_of', now()->endOfMonth()->format('Y-m-d'));
         $this->cabang_id = request()->query('cabang_id');
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
         
         // Default comparison to end of previous month
-        $this->comparison_date = now()->subMonth()->endOfMonth()->format('Y-m-d');
+        $this->comparison_date = request()->query('comparison_date', now()->subMonth()->endOfMonth()->format('Y-m-d'));
         
         // Initialize multi-period with current date
-        $this->selected_periods = [$this->as_of_date];
+        $this->selected_periods = (array) request()->query('selected_periods', [$this->as_of_date]);
         
         // Default display options
-        $this->display_level = 'all';
-        $this->show_zero_balance = false;
+        $this->display_level = request()->query('display_level', 'all');
+        $this->show_zero_balance = filter_var(request('show_zero_balance', false), FILTER_VALIDATE_BOOL);
     }
 
     public function generateReport(): void
@@ -97,14 +98,25 @@ class BalanceSheetPage extends Page
             return;
         }
 
-        $this->showPreview = true;
-        $this->notifyIfBalanceSheetHasIssues($this->getBalanceSheetData());
-        $this->dispatch('report-updated');
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(url()->current());
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'as_of' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+            'comparison_date' => $this->comparison_date,
+            'display_level' => $this->display_level,
+            'show_zero_balance' => $this->show_zero_balance ? 1 : 0,
+            'selected_periods' => array_filter($this->selected_periods),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getBalanceSheetData(): array

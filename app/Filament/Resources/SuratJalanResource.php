@@ -131,18 +131,6 @@ class SuratJalanResource extends Resource
                                 'acceptedFileTypes' => 'File harus berupa PDF, JPG, atau PNG',
                                 'maxSize' => 'Ukuran file maksimal 5MB'
                             ]),
-                        TextInput::make('sender_name')
-                            ->label('Nama Pengirim')
-                            ->maxLength(255),
-                        Select::make('shipping_method')
-                            ->label('Metode Pengiriman')
-                            ->options([
-                                'Ekspedisi' => 'Ekspedisi',
-                                'Kurir Internal' => 'Kurir Internal',
-                                'Ambil Sendiri' => 'Ambil Sendiri',
-                                'Lainnya' => 'Lainnya',
-                            ])
-                            ->searchable(),
                         Hidden::make('status')
                             ->default(1), // J2: auto-terbit, tidak perlu approval
                         Hidden::make('created_by')
@@ -232,15 +220,6 @@ class SuratJalanResource extends Resource
                         return $vehicles->implode(', ') ?: '-';
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('sender_name')
-                    ->label('Nama Pengirim')
-                    ->searchable()
-                    ->toggleable(),
-                TextColumn::make('shipping_method')
-                    ->label('Metode Pengiriman')
-                    ->searchable()
-                    ->badge()
-                    ->toggleable(),
                 TextColumn::make('issued_at')
                     ->description('Tanggal Surat Jalan dibuat')
                     ->dateTime()

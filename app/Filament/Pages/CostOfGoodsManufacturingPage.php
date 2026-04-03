@@ -36,6 +36,15 @@ class CostOfGoodsManufacturingPage extends Page
     public ?int $cabang_id = null;
     public ?int $product_id = null;
 
+    public function mount(): void
+    {
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+        $this->start_date = request('start_date', now()->startOfMonth()->format('Y-m-d'));
+        $this->end_date = request('end_date', now()->endOfMonth()->format('Y-m-d'));
+        $this->cabang_id = request('cabang_id');
+        $this->product_id = request('product_id');
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -56,18 +65,23 @@ class CostOfGoodsManufacturingPage extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(url()->current());
     }
 
-    public function mount(): void
+    public function getPreviewUrl(): string
     {
-        $this->start_date = now()->startOfMonth()->format('Y-m-d');
-        $this->end_date = now()->endOfMonth()->format('Y-m-d');
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+            'product_id' => $this->product_id,
+        ], fn ($value) => $value !== null && $value !== ''));
     }
 
     public function getCogmData(): array

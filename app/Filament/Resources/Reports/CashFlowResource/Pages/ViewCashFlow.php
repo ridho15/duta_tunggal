@@ -29,10 +29,11 @@ class ViewCashFlow extends Page
 
     public function mount(): void
     {
-        $this->startDate = $this->startDate ?? now()->startOfMonth()->toDateString();
-        $this->endDate = $this->endDate ?? now()->endOfMonth()->toDateString();
-        $this->method = $this->method ?? 'direct';
-        $this->branchIds = $this->branchIds ?? [];
+        $this->startDate = request('startDate', $this->startDate ?? now()->startOfMonth()->toDateString());
+        $this->endDate = request('endDate', $this->endDate ?? now()->endOfMonth()->toDateString());
+        $this->method = request('method', $this->method ?? 'direct');
+        $this->branchIds = (array) request('branchIds', $this->branchIds ?? []);
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
 
         $this->form->fill([
             'startDate' => $this->startDate,
@@ -83,12 +84,23 @@ class ViewCashFlow extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'method' => $this->method,
+            'branchIds' => array_filter($this->branchIds),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     protected function getFormSchema(): array

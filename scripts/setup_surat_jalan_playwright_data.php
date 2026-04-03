@@ -76,8 +76,6 @@ DB::transaction(function () use ($now, $fixture) {
         'status' => 1,
         'created_by' => $user->id,
         'document_path' => null,
-        'sender_name' => null,
-        'shipping_method' => null,
         'cabang_id' => $user->cabang_id,
         'created_at' => $now,
         'updated_at' => $now,

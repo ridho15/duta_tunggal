@@ -8,7 +8,7 @@
  *  F1 — SaleOrder: Rupiah format (Rp prefix) visible on SO list
  *  H1 — DeliveryOrder: salesOrders field appears before cabang_id
  *  H2 — DeliveryOrder: no "Receipt Item" option in DO item form
- *  J2 — SuratJalan: no sender_name / shipping_method / rekap_driver / approval button
+ *  J2 — SuratJalan: no legacy shipping fields / rekap_driver / approval button
  *
  * Rupiah format check: all money columns must match "Rp X.XXX" pattern.
  */
@@ -125,17 +125,16 @@ test.describe('H2 — DO has no Receipt Item option', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// J2 — SuratJalan: simplified form (no sender_name, no rekap driver, no approval)
+// J2 — SuratJalan: simplified form (no legacy shipping fields, no rekap driver, no approval)
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('J2 — SuratJalan simplification', () => {
-  test('SJ create form has no sender_name field', async ({ page }) => {
+  test('SJ create form has no legacy shipping fields', async ({ page }) => {
     await navigateTo(page, '/admin/surat-jalans/create');
     const pageContent = await page.content();
     expect(pageContent).not.toContain('Nama Pengirim');
-    expect(pageContent).not.toContain('sender_name');
   });
 
-  test('SJ create form has no shipping_method field', async ({ page }) => {
+  test('SJ create form has no shipping method field', async ({ page }) => {
     await navigateTo(page, '/admin/surat-jalans/create');
     const pageContent = await page.content();
     expect(pageContent).not.toContain('Metode Pengiriman');

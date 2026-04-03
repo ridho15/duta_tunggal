@@ -210,12 +210,13 @@ it('asset total_assets reflects debit journal entries', function () {
     expect($data['bs']['total_assets'])->toBe(10_000_000.0);
 });
 
-it('generateReport sets showPreview to true', function () {
+it('generateReport builds a preview url without toggling inline preview', function () {
     $page = new FinancialStatementPage();
     $page->showPreview = false;
     $page->generateReport();
 
-    expect($page->showPreview)->toBeTrue();
+    expect($page->showPreview)->toBeFalse()
+        ->and($page->getPreviewUrl())->toContain('preview=1');
 });
 
 it('resetReport sets showPreview to false', function () {

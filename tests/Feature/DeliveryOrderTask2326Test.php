@@ -6,6 +6,7 @@ use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\DeliveryOrder;
+use App\Models\DeliverySchedule;
 use App\Models\Driver;
 use App\Models\Product;
 use App\Models\SaleOrder;
@@ -24,7 +25,7 @@ use Tests\TestCase;
  *  23 – "Mark as Sent" removed from DO (handled via SJ terbit)
  *  24 – DO approve action re-labeled "Konfirmasi Dana Diterima"
  *  25 – DO table shows Nomor DO, Customer, Tanggal, Status as primary columns
- *  26 – SuratJalan stores / shows sender_name & shipping_method
+ *  26 – SuratJalan shipping details come from DeliverySchedule
  */
 class DeliveryOrderTask2326Test extends TestCase
 {
@@ -118,9 +119,22 @@ class DeliveryOrderTask2326Test extends TestCase
             'issued_at'   => now(),
             'created_by'  => $this->user->id,
             'status'      => 0,
-            'sender_name' => 'Budi',
         ]);
         $sj->deliveryOrder()->attach($do->id);
+
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'DS-TASK23-001',
+            'scheduled_date'  => now()->addHour(),
+            'delivery_method' => 'internal',
+            'driver_id'       => $this->driver->id,
+            'vehicle_id'      => $this->vehicle->id,
+            'driver_name'     => null,
+            'vehicle_info'    => null,
+            'status'          => 'pending',
+            'created_by'      => $this->user->id,
+            'cabang_id'       => $this->cabang->id,
+        ]);
+        $sj->deliverySchedules()->attach($schedule->id);
 
         // Simulate SJ terbit action: mark status=1 and all linked DOs as sent
         $sj->update(['status' => 1]);
@@ -261,61 +275,85 @@ class DeliveryOrderTask2326Test extends TestCase
     // ─── Task 26 ──────────────────────────────────────────────────────────────
 
     #[Test]
-    public function task26_surat_jalan_stores_sender_name_and_shipping_method(): void
+    public function task26_surat_jalan_uses_delivery_schedule_shipping_fields(): void
     {
         $sj = SuratJalan::create([
             'sj_number'       => 'SJ-TASK26-001',
             'issued_at'       => now(),
             'created_by'      => $this->user->id,
             'status'          => 0,
-            'sender_name'     => 'Ahmad Fauzi',
-            'shipping_method' => 'Ekspedisi',
         ]);
 
-        $this->assertDatabaseHas('surat_jalans', [
-            'id'              => $sj->id,
-            'sender_name'     => 'Ahmad Fauzi',
-            'shipping_method' => 'Ekspedisi',
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'DS-TASK26-001',
+            'scheduled_date'  => now()->addHour(),
+            'delivery_method' => 'ekspedisi',
+            'driver_id'       => null,
+            'vehicle_id'      => null,
+            'driver_name'     => 'Ahmad Fauzi',
+            'vehicle_info'    => 'JNE Reguler',
+            'status'          => 'pending',
+            'created_by'      => $this->user->id,
+            'cabang_id'       => $this->cabang->id,
+        ]);
+        $sj->deliverySchedules()->attach($schedule->id);
+
+        $this->assertDatabaseHas('delivery_schedules', [
+            'id'              => $schedule->id,
+            'delivery_method' => 'ekspedisi',
+            'driver_name'     => 'Ahmad Fauzi',
         ]);
     }
 
     #[Test]
-    public function task26_sj_resource_table_shows_sender_name_and_shipping_method_columns(): void
+    public function task26_sj_resource_table_removes_legacy_shipping_columns(): void
     {
         $resourceSource = file_get_contents(
             app_path('Filament/Resources/SuratJalanResource.php')
         );
 
-        $this->assertStringContainsString("'sender_name'",     $resourceSource,
-            'SJ resource table must include sender_name column');
-        $this->assertStringContainsString("'shipping_method'", $resourceSource,
-            'SJ resource table must include shipping_method column');
+        $this->assertStringNotContainsString("'sender_name'",     $resourceSource,
+            'SJ resource should no longer include legacy shipping columns');
+        $this->assertStringNotContainsString("'shipping_method'", $resourceSource,
+            'SJ resource should no longer include legacy shipping columns');
 
-        // Verify they appear in the table() method (after public static function table)
+        // Verify they are absent from the table() method as well
         $tableStart = strpos($resourceSource, 'public static function table');
         $senderPos  = strpos($resourceSource, "'sender_name'",  $tableStart);
         $methodPos  = strpos($resourceSource, "'shipping_method'", $tableStart);
 
-        $this->assertNotFalse($senderPos,  'sender_name column must be in table()');
-        $this->assertNotFalse($methodPos,  'shipping_method column must be in table()');
+        $this->assertFalse($senderPos,  'Legacy shipping columns should be removed from table()');
+        $this->assertFalse($methodPos,  'Legacy shipping columns should be removed from table()');
     }
 
     #[Test]
-    public function task26_surat_jalan_allows_all_shipping_method_values(): void
+    public function task26_delivery_schedule_allows_delivery_method_values(): void
     {
-        $methods = ['Ekspedisi', 'Kurir Internal', 'Ambil Sendiri', 'Lainnya'];
+        $methods = ['internal', 'kurir_internal', 'ekspedisi'];
         foreach ($methods as $i => $method) {
-            $sj = SuratJalan::create([
-                'sj_number'       => "SJ-TASK26-M{$i}",
-                'issued_at'       => now(),
+            $schedule = DeliverySchedule::create([
+                'schedule_number' => "DS-TASK26-M{$i}",
+                'scheduled_date'  => now()->addHour(),
+                'delivery_method' => $method,
+                'driver_id'       => $method === 'ekspedisi' ? null : $this->driver->id,
+                'vehicle_id'      => $method === 'ekspedisi' ? null : $this->vehicle->id,
+                'driver_name'     => $method === 'ekspedisi' ? 'Ekspedisi Maju' : null,
+                'vehicle_info'    => $method === 'ekspedisi' ? 'Resi-'.($i + 1) : null,
+                'status'          => 'pending',
                 'created_by'      => $this->user->id,
-                'status'          => 0,
-                'shipping_method' => $method,
+                'cabang_id'       => $this->cabang->id,
             ]);
+            $sj = SuratJalan::create([
+                'sj_number'   => "SJ-TASK26-M{$i}",
+                'issued_at'   => now(),
+                'created_by'  => $this->user->id,
+                'status'      => 0,
+            ]);
+            $sj->deliverySchedules()->attach($schedule->id);
 
-            $this->assertDatabaseHas('surat_jalans', [
-                'id'              => $sj->id,
-                'shipping_method' => $method,
+            $this->assertDatabaseHas('delivery_schedules', [
+                'id'              => $schedule->id,
+                'delivery_method' => $method,
             ]);
         }
     }

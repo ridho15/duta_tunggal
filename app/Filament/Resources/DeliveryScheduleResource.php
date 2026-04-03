@@ -346,7 +346,7 @@ class DeliveryScheduleResource extends Resource
             return sprintf(
                 '<li><strong>%s</strong> - %s</li>',
                 e($suratJalan->sj_number),
-                e($suratJalan->shipping_method ?? 'Metode pengiriman tidak tersedia')
+                e($suratJalan->shipping_method_label)
             );
         })->implode('');
 

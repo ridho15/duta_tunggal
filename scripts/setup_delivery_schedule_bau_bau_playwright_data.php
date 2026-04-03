@@ -95,8 +95,6 @@ DB::transaction(function () {
             'status' => 1,
             'created_by' => $user->id,
             'document_path' => null,
-            'sender_name' => null,
-            'shipping_method' => null,
             'cabang_id' => $bauBau->id,
         ]
     );
@@ -109,8 +107,6 @@ DB::transaction(function () {
             'status' => 1,
             'created_by' => $user->id,
             'document_path' => null,
-            'sender_name' => null,
-            'shipping_method' => null,
             'cabang_id' => $bauBau->id,
         ]
     );

@@ -41,6 +41,16 @@ class JournalConsolidationPage extends Page
     public ?string $journal_type = null;
     public bool $group_by_branch = true;
 
+    public function mount(): void
+    {
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+        $this->start_date = request('start_date', now()->startOfMonth()->format('Y-m-d'));
+        $this->end_date = request('end_date', now()->endOfMonth()->format('Y-m-d'));
+        $this->branch_ids = (array) request('branch_ids', []);
+        $this->journal_type = request('journal_type');
+        $this->group_by_branch = filter_var(request('group_by_branch', true), FILTER_VALIDATE_BOOL);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -61,18 +71,24 @@ class JournalConsolidationPage extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(url()->current());
     }
 
-    public function mount(): void
+    public function getPreviewUrl(): string
     {
-        $this->start_date = now()->startOfMonth()->format('Y-m-d');
-        $this->end_date = now()->endOfMonth()->format('Y-m-d');
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'branch_ids' => array_filter($this->branch_ids),
+            'journal_type' => $this->journal_type,
+            'group_by_branch' => $this->group_by_branch ? 1 : 0,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getConsolidationData(): array

@@ -545,8 +545,8 @@ class DeliveryOrderResource extends Resource
                         TextEntry::make('shipping_method')
                             ->label('Metode Pengiriman')
                             ->getStateUsing(function ($record) {
-                                $suratJalan = $record->suratJalan()->where('status', 1)->first() ?? $record->suratJalan()->first();
-                                return $suratJalan?->shipping_method ?? '-';
+                                $deliverySchedule = $record->deliverySchedules()->with('driver')->orderByDesc('scheduled_date')->orderByDesc('id')->first();
+                                return $deliverySchedule?->delivery_method_label ?? '-';
                             })
                             ->placeholder('-'),
                         TextEntry::make('notes'),

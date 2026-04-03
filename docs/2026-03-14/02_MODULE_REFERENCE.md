@@ -208,9 +208,10 @@ draft ──► sent ──► received ──► approved/closed
 **Field Utama:**
 - `sj_number` — Auto-generated
 - `issued_at` — Tanggal terbit
-- `sender_name` — Nama pengirim
-- `shipping_method` — Metode pengiriman
 - `status` — draft/issued/signed
+
+**Catatan:**
+- Detail pengiriman seperti nama driver/ekspedisi dan metode pengiriman sekarang dikelola di `DeliverySchedule`.
 
 **Actions:**
 1. `terbit` — Setujui SJ (status → 1) — TIDAK auto-mark DO sebagai sent

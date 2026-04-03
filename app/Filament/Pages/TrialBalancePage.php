@@ -51,11 +51,13 @@ class TrialBalancePage extends Page implements HasForms
 
     public function mount(): void
     {
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
         $this->form->fill([
-            'start_date'        => now()->startOfYear()->format('Y-m-d'),
-            'end_date'          => now()->format('Y-m-d'),
-            'cabang_id'         => null,
-            'show_zero_balance' => false,
+            'start_date'        => request('start_date', now()->startOfYear()->format('Y-m-d')),
+            'end_date'          => request('end_date', now()->format('Y-m-d')),
+            'cabang_id'         => request('cabang_id'),
+            'show_zero_balance' => filter_var(request('show_zero_balance', false), FILTER_VALIDATE_BOOL),
         ]);
     }
 
@@ -140,12 +142,23 @@ class TrialBalancePage extends Page implements HasForms
         $this->end_date          = $data['end_date'];
         $this->cabang_id         = $data['cabang_id'] ?? null;
         $this->show_zero_balance = $data['show_zero_balance'] ?? false;
-        $this->showPreview       = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(url()->current());
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+            'show_zero_balance' => $this->show_zero_balance ? 1 : 0,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     /**

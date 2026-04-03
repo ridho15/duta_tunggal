@@ -258,9 +258,10 @@ id, delivery_order_id, status, user_id, notes, created_at, updated_at
 ```sql
 id, sj_number, issued_at, signed_by (FK→users),
 status, created_by (FK→users), document_path,
-sender_name, shipping_method,
 created_at, updated_at
 ```
+
+> Catatan: field legacy `sender_name` dan `shipping_method` sudah dipindahkan ke `delivery_schedules` dan kemudian dihapus dari tabel `surat_jalans`.
 
 #### `surat_jalan_delivery_order` (pivot N:M)
 ```sql

@@ -5,6 +5,7 @@ namespace Tests\Feature\ERP;
 use App\Models\Cabang;
 use App\Models\Customer;
 use App\Models\DeliveryOrder;
+use App\Models\DeliverySchedule;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\Product;
@@ -20,7 +21,7 @@ use Tests\TestCase;
  *
  * Tests items #17, #18, #19:
  *  #17 SJ created for all customer types including direct selling (Ambil Sendiri)
- *  #18 SJ stores sender_name and shipping_method
+ *  #18 Shipping details live on DeliverySchedule, not SuratJalan
  *  #19 Mark-as-Sent action: approving SJ marks linked DOs as 'sent'
  */
 class SuratJalanTest extends TestCase
@@ -74,8 +75,6 @@ class SuratJalanTest extends TestCase
             'signed_by'      => $this->user->id,
             'status'         => 0,
             'created_by'     => $this->user->id,
-            'sender_name'    => 'Gudang Utama',
-            'shipping_method' => 'Ambil Sendiri',
         ]);
 
         $sj->deliveryOrder()->attach($do->id);
@@ -114,8 +113,6 @@ class SuratJalanTest extends TestCase
             'signed_by'       => $this->user->id,
             'status'          => 0,
             'created_by'      => $this->user->id,
-            'sender_name'     => 'Warehouse A',
-            'shipping_method' => 'Ekspedisi',
         ]);
 
         $sj->deliveryOrder()->attach($do->id);
@@ -129,7 +126,7 @@ class SuratJalanTest extends TestCase
     // ─── #18 SJ STORES SHIPPING INFORMATION ──────────────────────────────────
 
     /** @test */
-    public function surat_jalan_stores_sender_name(): void
+    public function surat_jalan_uses_delivery_schedule_shipping_details(): void
     {
         $sj = SuratJalan::create([
             'sj_number'       => 'SJ-SHIP-' . now()->format('YmdHis'),
@@ -137,20 +134,35 @@ class SuratJalanTest extends TestCase
             'signed_by'       => $this->user->id,
             'status'          => 0,
             'created_by'      => $this->user->id,
-            'sender_name'     => 'PT Duta Tunggal Gudang Pusat',
-            'shipping_method' => 'Kurir Internal',
         ]);
 
-        $this->assertDatabaseHas('surat_jalans', [
-            'id'          => $sj->id,
-            'sender_name' => 'PT Duta Tunggal Gudang Pusat',
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'DS-SHIP-' . now()->format('YmdHis'),
+            'scheduled_date'  => now()->addHour(),
+            'delivery_method' => 'kurir_internal',
+            'driver_id'       => $this->driver->id,
+            'vehicle_id'      => $this->vehicle->id,
+            'driver_name'     => 'PT Duta Tunggal Gudang Pusat',
+            'vehicle_info'    => 'B-1234-XYZ',
+            'status'          => 'pending',
+            'created_by'      => $this->user->id,
+            'cabang_id'       => $this->cabang->id,
         ]);
 
-        $this->assertEquals('PT Duta Tunggal Gudang Pusat', $sj->fresh()->sender_name);
+        $sj->deliverySchedules()->attach($schedule->id);
+
+        $this->assertDatabaseHas('delivery_schedules', [
+            'id'              => $schedule->id,
+            'delivery_method'  => 'kurir_internal',
+            'driver_name'      => 'PT Duta Tunggal Gudang Pusat',
+        ]);
+
+        $this->assertEquals('PT Duta Tunggal Gudang Pusat', $sj->fresh()->sender_display_name);
+        $this->assertEquals('Kurir Internal', $sj->fresh()->shipping_method_label);
     }
 
     /** @test */
-    public function surat_jalan_stores_shipping_method(): void
+    public function surat_jalan_without_delivery_schedule_has_no_shipping_details(): void
     {
         $sj = SuratJalan::create([
             'sj_number'       => 'SJ-METHOD-' . now()->format('YmdHis'),
@@ -158,20 +170,16 @@ class SuratJalanTest extends TestCase
             'signed_by'       => $this->user->id,
             'status'          => 0,
             'created_by'      => $this->user->id,
-            'sender_name'     => 'Gudang',
-            'shipping_method' => 'JNE Reguler',
         ]);
 
-        $this->assertDatabaseHas('surat_jalans', [
-            'id'              => $sj->id,
-            'shipping_method' => 'JNE Reguler',
-        ]);
+        $this->assertDatabaseHas('surat_jalans', ['id' => $sj->id]);
 
-        $this->assertEquals('JNE Reguler', $sj->fresh()->shipping_method);
+        $this->assertEquals('-', $sj->fresh()->sender_display_name);
+        $this->assertEquals('-', $sj->fresh()->shipping_method_label);
     }
 
     /** @test */
-    public function surat_jalan_shipping_method_can_be_null(): void
+    public function surat_jalan_can_be_created_without_shipping_fields(): void
     {
         $sj = SuratJalan::create([
             'sj_number'   => 'SJ-NONULL-' . now()->format('YmdHis'),
@@ -179,11 +187,11 @@ class SuratJalanTest extends TestCase
             'signed_by'   => $this->user->id,
             'status'      => 0,
             'created_by'  => $this->user->id,
-            'sender_name' => null,
         ]);
 
         $this->assertDatabaseHas('surat_jalans', ['id' => $sj->id]);
-        $this->assertNull($sj->fresh()->shipping_method);
+        $this->assertEquals('-', $sj->fresh()->sender_display_name);
+        $this->assertEquals('-', $sj->fresh()->shipping_method_label);
     }
 
     // ─── #19 APPROVING SJ MARKS DOs AS SENT ──────────────────────────────────
@@ -217,7 +225,6 @@ class SuratJalanTest extends TestCase
             'signed_by'   => $this->user->id,
             'status'      => 0,
             'created_by'  => $this->user->id,
-            'sender_name' => 'Gudang',
         ]);
 
         $sj->deliveryOrder()->attach([$do1->id, $do2->id]);

@@ -36,6 +36,16 @@ class DrillDownFinancialReportPage extends Page
     public ?string $end_date = null;
     public ?int $cabang_id = null;
 
+    public function mount(): void
+    {
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+        $this->account_type = request('account_type');
+        $this->coa_id = request('coa_id');
+        $this->start_date = request('start_date', now()->startOfMonth()->format('Y-m-d'));
+        $this->end_date = request('end_date', now()->endOfMonth()->format('Y-m-d'));
+        $this->cabang_id = request('cabang_id');
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -56,18 +66,25 @@ class DrillDownFinancialReportPage extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
         $this->showPreview = false;
+        $this->redirect(url()->current());
     }
 
-    public function mount(): void
+    public function getPreviewUrl(): string
     {
-        $this->start_date = now()->startOfMonth()->format('Y-m-d');
-        $this->end_date = now()->endOfMonth()->format('Y-m-d');
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'account_type' => $this->account_type,
+            'coa_id' => $this->coa_id,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+        ], fn ($value) => $value !== null && $value !== ''));
     }
 
     public function updatedAccountType(): void

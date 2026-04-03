@@ -2,6 +2,7 @@
 
 use App\Models\Cabang;
 use App\Models\Customer;
+use App\Models\DeliverySchedule;
 use App\Models\DeliveryOrder;
 use App\Models\JournalEntry;
 use App\Models\SaleOrder;
@@ -56,7 +57,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
     public function journal_entries_are_created_when_delivery_order_status_becomes_sent()
     {
         // Create required data
-        $cabang = Cabang::factory()->create();
+        $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
         $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
         $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
 
@@ -121,11 +122,81 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
         }
     }
 
+
+    #[Test]
+    public function starting_delivery_schedule_for_direct_linked_delivery_order_marks_it_sent_and_creates_journals()
+    {
+        $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
+        $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
+        $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
+
+        $inventoryCoa = ChartOfAccount::where('code', '1140.10')->first();
+        $cogsCoa = ChartOfAccount::where('code', '1140.20')->first();
+
+        $product = Product::factory()->create([
+            'inventory_coa_id' => $inventoryCoa->id,
+            'goods_delivery_coa_id' => $cogsCoa->id,
+            'cost_price' => 25000,
+        ]);
+
+        $saleOrder = SaleOrder::factory()->create([
+            'customer_id' => $customer->id,
+            'status' => 'confirmed',
+        ]);
+
+        $saleOrderItem = \App\Models\SaleOrderItem::factory()->create([
+            'sale_order_id' => $saleOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 4,
+            'unit_price' => 50000,
+        ]);
+
+        $deliveryOrder = DeliveryOrder::factory()->create([
+            'status' => 'approved',
+            'warehouse_id' => $warehouse->id,
+            'cabang_id' => $cabang->id,
+        ]);
+
+        DeliveryOrderItem::factory()->create([
+            'delivery_order_id' => $deliveryOrder->id,
+            'product_id' => $product->id,
+            'quantity' => 4,
+            'sale_order_item_id' => $saleOrderItem->id,
+        ]);
+
+        $schedule = DeliverySchedule::create([
+            'schedule_number' => 'SCH-JOURNAL-0001',
+            'scheduled_date' => now(),
+            'delivery_method' => 'internal',
+            'status' => 'pending',
+            'created_by' => 1,
+            'cabang_id' => $cabang->id,
+        ]);
+
+        $schedule->deliveryOrders()->attach($deliveryOrder->id);
+
+        $started = app(\App\Services\DeliveryScheduleService::class)->startRelatedDeliveryOrders($schedule->fresh());
+
+        $this->assertSame(1, $started);
+        $this->assertDatabaseHas('delivery_orders', [
+            'id' => $deliveryOrder->id,
+            'status' => 'sent',
+        ]);
+
+        $journalEntries = JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->get();
+
+        $this->assertCount(2, $journalEntries);
+        $this->assertEquals(100000.0, (float) $journalEntries->sum('debit'));
+        $this->assertEquals(100000.0, (float) $journalEntries->sum('credit'));
+    }
+
     #[Test]
     public function journal_entries_are_updated_when_delivery_order_quantity_is_changed_after_sent()
     {
         // Create required data
-        $cabang = Cabang::factory()->create();
+        $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
         $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
         $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
 
@@ -213,7 +284,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
     public function journal_entries_are_deleted_when_delivery_order_is_soft_deleted()
     {
         // Create required data
-        $cabang = Cabang::factory()->create();
+        $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
         $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
         $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
 

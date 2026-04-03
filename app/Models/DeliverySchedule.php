@@ -75,16 +75,23 @@ class DeliverySchedule extends Model
 
     public function relatedDeliveryOrders(): Collection
     {
-        $this->loadMissing('suratJalan.deliveryOrder');
+        $this->loadMissing('deliveryOrders', 'suratJalan.deliveryOrder');
 
-        return $this->suratJalan
+        $directDeliveryOrders = $this->deliveryOrders instanceof Collection
+            ? $this->deliveryOrders
+            : $this->deliveryOrders()->get();
+
+        $suratJalanDeliveryOrders = $this->suratJalan
             ->flatMap(function (SuratJalan $suratJalan) {
                 $deliveryOrders = $suratJalan->getRelationValue('deliveryOrder');
 
                 return $deliveryOrders instanceof Collection
                     ? $deliveryOrders
                     : $suratJalan->deliveryOrder()->get();
-            })
+            });
+
+        return $directDeliveryOrders
+            ->concat($suratJalanDeliveryOrders)
             ->unique('id')
             ->values();
     }
@@ -127,6 +134,16 @@ class DeliverySchedule extends Model
             'failed'            => 'Gagal',
             'cancelled'         => 'Dibatalkan',
             default             => ucfirst($this->status),
+        };
+    }
+
+    public function getDeliveryMethodLabelAttribute(): string
+    {
+        return match ($this->delivery_method) {
+            'internal'       => 'Internal (Driver Perusahaan)',
+            'kurir_internal' => 'Kurir Internal',
+            'ekspedisi'      => 'Ekspedisi / Pihak Ketiga',
+            default          => $this->delivery_method ? ucfirst(str_replace('_', ' ', $this->delivery_method)) : '-',
         };
     }
 

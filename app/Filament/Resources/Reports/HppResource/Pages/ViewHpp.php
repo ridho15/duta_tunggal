@@ -28,9 +28,16 @@ class ViewHpp extends Page
 
     public function mount(): void
     {
-        $this->startDate = now()->startOfMonth()->subMonths(11)->toDateString();
-        $this->endDate = now()->endOfMonth()->toDateString();
-        $this->branchIds = [];
+        $this->startDate = request('startDate', now()->startOfMonth()->subMonths(11)->toDateString());
+        $this->endDate = request('endDate', now()->endOfMonth()->toDateString());
+        $this->branchIds = (array) request('branchIds', []);
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
+        $this->form->fill([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'branchIds' => $this->branchIds,
+        ]);
     }
 
     protected function getFormSchema(): array
@@ -108,12 +115,22 @@ class ViewHpp extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'branchIds' => array_filter($this->branchIds),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getReportData(): array

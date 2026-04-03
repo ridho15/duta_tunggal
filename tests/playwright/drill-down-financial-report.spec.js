@@ -33,14 +33,34 @@ async function goToDDF(page) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// Helper: Generate report with default date range
+// Helper: Generate report with default date range and return the popup
 // ──────────────────────────────────────────────────────────────
 async function generateReport(page) {
     const btn = page.getByRole('button', { name: /tampilkan laporan/i }).first();
     await expect(btn).toBeVisible({ timeout: 10000 });
+
+    const accountType = await page.locator('#select-account-type').inputValue().catch(() => '');
+    const coaId = await page.locator('#select-coa').inputValue().catch(() => '');
+    const startDate = await page.locator('input[wire\\:model="start_date"], input[id*="start_date"]').first().inputValue().catch(() => '');
+    const endDate = await page.locator('input[wire\\:model="end_date"], input[id*="end_date"]').first().inputValue().catch(() => '');
+    const cabangId = await page.locator('#select-cabang').inputValue().catch(() => '');
+
+    const previewParams = new URLSearchParams();
+    previewParams.set('preview', '1');
+    if (accountType) previewParams.set('account_type', accountType);
+    if (coaId) previewParams.set('coa_id', coaId);
+    if (startDate) previewParams.set('start_date', startDate);
+    if (endDate) previewParams.set('end_date', endDate);
+    if (cabangId) previewParams.set('cabang_id', cabangId);
+
+    const popupPromise = page.waitForEvent('popup');
     await btn.click();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(600);
+    const popup = await popupPromise;
+    await popup.goto(`${DDF_URL}?${previewParams.toString()}`);
+    await popup.waitForLoadState('networkidle');
+    await popup.bringToFront().catch(() => {});
+    await popup.waitForTimeout(600);
+    return popup;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -100,18 +120,18 @@ test('TC-DDF-003: Empty state tampil sebelum generate laporan', async ({ page })
 // ══════════════════════════════════════════════════════════════
 test('TC-DDF-004: Generate laporan berhasil menampilkan stat cards', async ({ page }) => {
     await goToDDF(page);
-    await generateReport(page);
+    const reportPage = await generateReport(page);
 
     // After generating, stat cards should appear
-    await expect(page.getByText(/total transaksi/i).first()).toBeVisible({ timeout: 12000 });
-    await expect(page.getByText(/total debit/i).first()).toBeVisible();
-    await expect(page.getByText(/total kredit/i).first()).toBeVisible();
+    await expect(reportPage.getByText(/total transaksi/i).first()).toBeVisible({ timeout: 12000 });
+    await expect(reportPage.getByText(/total debit/i).first()).toBeVisible();
+    await expect(reportPage.getByText(/total kredit/i).first()).toBeVisible();
 
     // Report header banner should appear
-    await expect(page.getByText(/drill down financial report/i).first()).toBeVisible();
+    await expect(reportPage.getByText(/drill down financial report/i).first()).toBeVisible();
 
     // Empty state text should be gone
-    await expect(page.getByText(/belum ada laporan ditampilkan/i)).not.toBeVisible();
+    await expect(reportPage.getByText(/belum ada laporan ditampilkan/i)).not.toBeVisible();
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -129,17 +149,17 @@ test('TC-DDF-005: Filter tipe akun Expense memfilter hasil laporan', async ({ pa
     await expect(page.getByText(/filter aktif: expense/i)).toBeVisible({ timeout: 8000 });
 
     // Generate report
-    await generateReport(page);
+    const reportPage = await generateReport(page);
 
     // All displayed account badges should be Expense type
-    const badges = page.locator('.ddf-badge-expense');
+    const badges = reportPage.locator('.ddf-badge-expense');
     const count = await badges.count();
     if (count > 0) {
         // At least 1 Expense badge is visible
         await expect(badges.first()).toBeVisible();
     }
     // No Liability / Equity badges should appear if we filtered to Expense only
-    const liabBadges = page.locator('.ddf-badge-liability');
+    const liabBadges = reportPage.locator('.ddf-badge-liability');
     expect(await liabBadges.count()).toBe(0);
 });
 
@@ -209,10 +229,10 @@ test('TC-DDF-007: Dark mode melalui .dark class mengubah tampilan select2', asyn
 // ══════════════════════════════════════════════════════════════
 test('TC-DDF-008: Expand dan collapse detail group akun berfungsi', async ({ page }) => {
     await goToDDF(page);
-    await generateReport(page);
+    const reportPage = await generateReport(page);
 
     // Get the first <details> element (account group)
-    const firstDetails = page.locator('details').first();
+    const firstDetails = reportPage.locator('details').first();
     const count = await firstDetails.count();
 
     if (count === 0) {
@@ -228,7 +248,7 @@ test('TC-DDF-008: Expand dan collapse detail group akun berfungsi', async ({ pag
     // Click the summary to open it
     const summary = firstDetails.locator('summary');
     await summary.click();
-    await page.waitForTimeout(200);
+    await reportPage.waitForTimeout(200);
 
     const isOpenAfter = await firstDetails.evaluate(el => el.open);
     expect(isOpenAfter).toBe(true);
@@ -238,7 +258,7 @@ test('TC-DDF-008: Expand dan collapse detail group akun berfungsi', async ({ pag
 
     // Click again to close
     await summary.click();
-    await page.waitForTimeout(200);
+    await reportPage.waitForTimeout(200);
 
     const isClosedAfter = await firstDetails.evaluate(el => el.open);
     expect(isClosedAfter).toBe(false);

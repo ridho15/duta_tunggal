@@ -7,6 +7,7 @@ use App\Models\ManufacturingOrder;
 use App\Models\MaterialIssueItem;
 use App\Services\ManufacturingJournalService;
 use Carbon\Carbon;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -85,8 +86,12 @@ class MaterialIssueObserver
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            // Re-throw to see the error
-            throw $e;
+
+            Notification::make()
+                ->title('Gagal Membuat Jurnal Material Issue')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
         }
     }
 

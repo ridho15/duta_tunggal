@@ -222,7 +222,7 @@
 **Status: SELESAI**
 
 **File:** `app/Filament/Resources/SuratJalanResource.php` baris ~91  
-**Yang dilakukan:** Query DO untuk SJ tidak memiliki filter `tipe_pengiriman`. Opsi `'Ambil Sendiri'` tersedia di `shipping_method`. Semua jenis SO bisa memiliki SJ.
+**Yang dilakukan:** Query DO untuk SJ tidak memiliki filter `tipe_pengiriman`. Opsi `'Ambil Sendiri'` tetap didukung melalui `DeliverySchedule.delivery_method`. Semua jenis SO bisa memiliki SJ.
 
 ---
 
@@ -280,7 +280,7 @@
 **Status: SELESAI**
 
 **File:** `app/Filament/Resources/SuratJalanResource.php` baris ~108, ~112, ~206, ~210  
-**Yang dilakukan:** Field `sender_name` dan `shipping_method` tersedia di form SJ dan ditampilkan di tabel SJ.
+**Yang dilakukan:** Field detail pengiriman dipindahkan ke `DeliverySchedule`; Surat Jalan hanya menampilkan ringkasan dari schedule terkait.
 
 ---
 

@@ -32,6 +32,26 @@ class ViewProfitAndLoss extends Page
     public ?string $compareStartDate = null;
     public ?string $compareEndDate = null;
 
+    public function mount(): void
+    {
+        $this->startDate = request('startDate', now()->startOfMonth()->toDateString());
+        $this->endDate = request('endDate', now()->endOfMonth()->toDateString());
+        $this->cabang_id = request('cabang_id');
+        $this->compare = filter_var(request('compare', false), FILTER_VALIDATE_BOOL);
+        $this->compareStartDate = request('compareStartDate');
+        $this->compareEndDate = request('compareEndDate');
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
+        $this->form->fill([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'cabang_id' => $this->cabang_id,
+            'compare' => $this->compare,
+            'compareStartDate' => $this->compareStartDate,
+            'compareEndDate' => $this->compareEndDate,
+        ]);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -52,12 +72,25 @@ class ViewProfitAndLoss extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'cabang_id' => $this->cabang_id,
+            'compare' => $this->compare ? 1 : 0,
+            'compareStartDate' => $this->compareStartDate,
+            'compareEndDate' => $this->compareEndDate,
+        ], fn ($value) => $value !== null && $value !== ''));
     }
 
     protected function getFormSchema(): array

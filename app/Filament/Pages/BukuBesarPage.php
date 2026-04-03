@@ -50,12 +50,12 @@ class BukuBesarPage extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(url()->current());
     }
 
     public function mount(Request $request): void
@@ -63,6 +63,7 @@ class BukuBesarPage extends Page
         // default dates to current month
         $this->start_date = $request->query('start', now()->startOfMonth()->format('Y-m-d'));
         $this->end_date = $request->query('end', now()->endOfMonth()->format('Y-m-d'));
+        $this->showPreview = filter_var($request->query('preview', false), FILTER_VALIDATE_BOOL);
 
         // optional preselected coa
         $coaId = $request->query('coa_id');
@@ -70,6 +71,17 @@ class BukuBesarPage extends Page
             $this->coa_ids = [$coaId];
             $this->view_mode = 'by_coa';
         }
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return url()->current() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'start' => $this->start_date,
+            'end' => $this->end_date,
+            'coa_id' => !empty($this->coa_ids) ? $this->coa_ids[0] : null,
+            'view_mode' => $this->view_mode,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getCoaOptionsProperty(): array

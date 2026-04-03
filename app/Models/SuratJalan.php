@@ -18,8 +18,6 @@ class SuratJalan extends Model
         'status',
         'created_by',
         'document_path',
-        'sender_name',
-        'shipping_method',
         'cabang_id',
     ];
 
@@ -36,6 +34,39 @@ class SuratJalan extends Model
             'surat_jalan_id',
             'delivery_schedule_id'
         )->withTimestamps();
+    }
+
+    public function primaryDeliverySchedule(): ?DeliverySchedule
+    {
+        return $this->deliverySchedules()
+            ->with('driver')
+            ->orderByDesc('scheduled_date')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    public function getSenderDisplayNameAttribute(): string
+    {
+        $deliverySchedule = $this->primaryDeliverySchedule();
+
+        if (! $deliverySchedule) {
+            return '-';
+        }
+
+        return $deliverySchedule->delivery_method === 'ekspedisi'
+            ? ($deliverySchedule->driver_name ?: $deliverySchedule->vehicle_info ?: '-')
+            : ($deliverySchedule->driver?->name ?: $deliverySchedule->driver_name ?: '-');
+    }
+
+    public function getShippingMethodLabelAttribute(): string
+    {
+        $deliverySchedule = $this->primaryDeliverySchedule();
+
+        if (! $deliverySchedule) {
+            return '-';
+        }
+
+        return $deliverySchedule->delivery_method_label;
     }
 
     public function signedBy()

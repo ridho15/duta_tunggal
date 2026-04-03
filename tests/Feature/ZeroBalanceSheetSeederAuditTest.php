@@ -12,12 +12,14 @@ use App\Models\DeliveryOrderItemWarehouseSource;
 use App\Models\DeliverySchedule;
 use App\Models\InventoryStock;
 use App\Models\Invoice;
+use App\Models\JournalEntry;
 use App\Models\PaymentRequest;
 use App\Models\Product;
 use App\Models\Rak;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\SaleOrderItemWarehouseAllocation;
+use App\Models\StockMovement;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Models\Supplier;
@@ -152,6 +154,49 @@ test('zero balance sheet seeder clears transactional tables and preserves master
             'approved_by' => null,
         ]);
 
+        StockMovement::create([
+            'product_id' => $product->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 2,
+            'value' => 100000,
+            'type' => 'purchase_in',
+            'reference_id' => 1,
+            'date' => now()->toDateString(),
+            'notes' => 'Audit stock movement row',
+            'meta' => ['source' => 'zero_balance_audit'],
+            'rak_id' => $rak->id,
+            'from_model_type' => null,
+            'from_model_id' => null,
+        ]);
+
+        $equityAccount = ChartOfAccount::where('type', 'Equity')->firstOrFail();
+
+        JournalEntry::create([
+            'coa_id' => $chartOfAccountId = ChartOfAccount::where('code', '1-1300')->firstOrFail()->id,
+            'date' => now()->toDateString(),
+            'reference' => 'AUDIT-001',
+            'description' => 'Audit journal entry',
+            'debit' => 100000,
+            'credit' => 0,
+            'journal_type' => 'opening_balance',
+            'cabang_id' => $branch->id,
+            'source_type' => 'manual',
+            'source_id' => 1,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $equityAccount->id,
+            'date' => now()->toDateString(),
+            'reference' => 'AUDIT-001',
+            'description' => 'Audit journal offset',
+            'debit' => 0,
+            'credit' => 100000,
+            'journal_type' => 'opening_balance',
+            'cabang_id' => $branch->id,
+            'source_type' => 'manual',
+            'source_id' => 1,
+        ]);
+
         $stockAdjustment = StockAdjustment::factory()->create([
             'warehouse_id' => $warehouse->id,
             'created_by' => $user->id,
@@ -196,8 +241,10 @@ test('zero balance sheet seeder clears transactional tables and preserves master
     $this->seed(\Database\Seeders\ZeroBalanceSheetSeeder::class);
 
     expect(PaymentRequest::count())->toBe(0)
+    ->and(JournalEntry::count())->toBe(0)
         ->and(StockAdjustment::count())->toBe(0)
         ->and(StockAdjustmentItem::count())->toBe(0)
+    ->and(StockMovement::count())->toBe(0)
         ->and(CustomerReturn::count())->toBe(0)
         ->and(CustomerReturnItem::count())->toBe(0)
         ->and(DeliverySchedule::count())->toBe(0)

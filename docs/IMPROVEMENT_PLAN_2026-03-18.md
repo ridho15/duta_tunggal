@@ -939,7 +939,7 @@ draft → submitted → request_stock → approved (semua WC approved)
 #### J2. Surat Jalan: Simplifikasi Field ✅ DONE (2026-03-18)
 **File:** Surat Jalan Resource
 
-- [x] Hapus field `sender_name` (nama pengirim)
+- [x] Hapus field legacy `sender_name` dari Surat Jalan
 - [x] Hapus field `delivery_method` (metode pengiriman) — pindah ke DeliverySchedule
 - [x] Hapus approval flow (tidak perlu di-approve/setujui)
 - [x] Hapus status `failed` / `gagal kirim`

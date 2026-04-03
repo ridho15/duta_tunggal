@@ -258,3 +258,12 @@
         @endif
     </div>
 </x-filament::page>
+<script>
+window.addEventListener('open-report-preview', event => {
+    const url = event.detail?.url ?? event.detail?.[0]?.url;
+
+    if (url) {
+        window.open(url, '_blank', 'noopener');
+    }
+});
+</script>

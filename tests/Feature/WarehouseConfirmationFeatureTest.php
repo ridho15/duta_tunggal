@@ -228,7 +228,7 @@ describe('Warehouse Confirmation Feature', function () {
 
         // Should throw exception or return false
         expect(fn() => $this->salesOrderService->confirmWarehouse($saleOrder, $confirmationData))
-            ->toThrow(Exception::class, 'Sales Order must be approved before warehouse confirmation');
+            ->toThrow(Exception::class, 'Sales Order harus disetujui terlebih dahulu sebelum konfirmasi gudang.');
     });
 
     it('updates SO status after warehouse confirmation', function () {
@@ -372,5 +372,14 @@ describe('Warehouse Confirmation Feature', function () {
             'rak_id' => $this->rak->id,
             'status' => 'confirmed'
         ]);
+    });
+
+    it('does not mutate sale order item quantity from warehouse confirmation resource input', function () {
+        $resourceSource = file_get_contents(
+            app_path('Filament/Resources/WarehouseConfirmationResource.php')
+        );
+
+        expect($resourceSource)->not->toContain("SaleOrderItem::where('id', \$saleOrderItemId)->update(['quantity' => \$state])");
+        expect($resourceSource)->not->toContain("->update(['quantity' => \$state])");
     });
 });
