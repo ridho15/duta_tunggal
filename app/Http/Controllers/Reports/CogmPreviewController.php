@@ -52,6 +52,10 @@ class CogmPreviewController extends Controller
             $filters['branches'] = [$cabangId];
         }
 
+        if ($productId) {
+            $filters['product_id'] = (int) $productId;
+        }
+
         // Manufacturing orders in period
         $moQuery = ManufacturingOrder::whereBetween('created_at', [$start, $end]);
         if ($cabangId) {

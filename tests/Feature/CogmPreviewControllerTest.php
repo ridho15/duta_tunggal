@@ -3,11 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\Cabang;
+use App\Models\BillOfMaterial;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Models\ManufacturingOrder;
+use App\Models\MaterialIssue;
+use App\Models\Product;
+use App\Models\Production;
+use App\Models\ProductionPlan;
+use App\Models\QualityControl;
 use App\Models\Reports\HppOverheadItem;
 use App\Models\Reports\HppPrefix;
+use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\Reports\HppReportService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -71,6 +80,34 @@ class CogmPreviewControllerTest extends TestCase
                 && $report['cogm'] === $branchExpected['cogm'];
         });
         $branchResponse->assertSee('Rp 5.150');
+    }
+
+    public function test_preview_report_filters_cogm_values_by_product(): void
+    {
+        Carbon::setTestNow('2025-02-01 00:00:00');
+
+        [$productA] = $this->seedProductScopedData();
+        $user = User::factory()->create();
+
+        $expected = app(HppReportService::class)->generate('2025-01-01', '2025-01-31', [
+            'product_id' => $productA->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('reports.cogm.preview', [
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-01-31',
+            'product_id' => $productA->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('report', function (array $report) use ($expected) {
+            return $report['raw_material_used'] === $expected['raw_materials']['used']
+                && $report['labor_cost'] === $expected['direct_labor']
+                && $report['overhead'] === $expected['overhead']['total']
+                && $report['closing_wip'] === $expected['wip']['closing']
+                && $report['cogm'] === $expected['cogm'];
+        });
+        $response->assertSee('Rp 300');
     }
 
     private function seedHppConfiguration(): void
@@ -248,5 +285,305 @@ class CogmPreviewControllerTest extends TestCase
             'source_type' => self::class,
             'source_id' => 0,
         ]);
+    }
+
+    private function seedProductScopedData(): array
+    {
+        $branch = Cabang::factory()->create(['nama' => 'Branch Product Filter']);
+        $uom = UnitOfMeasure::factory()->create();
+        $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
+        $owner = User::factory()->create(['cabang_id' => $branch->id]);
+
+        $wipCoa = ChartOfAccount::create([
+            'code' => '1150.001',
+            'name' => 'Persediaan Barang Dalam Proses',
+            'type' => 'Asset',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        $laborCoa = ChartOfAccount::create([
+            'code' => '5230.001',
+            'name' => 'Biaya Tenaga Kerja Proses Produksi',
+            'type' => 'Expense',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        $overheadCoa = ChartOfAccount::create([
+            'code' => '6100.001',
+            'name' => 'Biaya Overhead Produksi',
+            'type' => 'Expense',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        $productA = Product::factory()->create(['name' => 'Produk A', 'cabang_id' => $branch->id, 'uom_id' => $uom->id]);
+        $productB = Product::factory()->create(['name' => 'Produk B', 'cabang_id' => $branch->id, 'uom_id' => $uom->id]);
+
+        $bomA = BillOfMaterial::factory()->create([
+            'product_id' => $productA->id,
+            'cabang_id' => $branch->id,
+            'uom_id' => $uom->id,
+            'quantity' => 1,
+            'labor_cost' => 20,
+            'overhead_cost' => 10,
+            'is_active' => true,
+        ]);
+
+        $bomB = BillOfMaterial::factory()->create([
+            'product_id' => $productB->id,
+            'cabang_id' => $branch->id,
+            'uom_id' => $uom->id,
+            'quantity' => 1,
+            'labor_cost' => 25,
+            'overhead_cost' => 15,
+            'is_active' => true,
+        ]);
+
+        $planA = ProductionPlan::factory()->create([
+            'product_id' => $productA->id,
+            'bill_of_material_id' => $bomA->id,
+            'quantity' => 10,
+            'uom_id' => $uom->id,
+            'warehouse_id' => $warehouse->id,
+            'cabang_id' => $branch->id,
+            'created_by' => $owner->id,
+        ]);
+
+        $planB = ProductionPlan::factory()->create([
+            'product_id' => $productB->id,
+            'bill_of_material_id' => $bomB->id,
+            'quantity' => 8,
+            'uom_id' => $uom->id,
+            'warehouse_id' => $warehouse->id,
+            'cabang_id' => $branch->id,
+            'created_by' => $owner->id,
+        ]);
+
+        $moA = ManufacturingOrder::factory()->create([
+            'production_plan_id' => $planA->id,
+            'cabang_id' => $branch->id,
+            'created_at' => '2025-01-05 09:00:00',
+            'updated_at' => '2025-01-05 09:00:00',
+        ]);
+
+        $moB = ManufacturingOrder::factory()->create([
+            'production_plan_id' => $planB->id,
+            'cabang_id' => $branch->id,
+            'created_at' => '2025-01-06 09:00:00',
+            'updated_at' => '2025-01-06 09:00:00',
+        ]);
+
+        $productionA = Production::create([
+            'production_number' => 'PROD-A-001',
+            'manufacturing_order_id' => $moA->id,
+            'quantity_produced' => 10,
+            'production_date' => '2025-01-10',
+            'status' => 'finished',
+            'created_at' => '2025-01-10 08:00:00',
+            'updated_at' => '2025-01-10 08:00:00',
+        ]);
+
+        $productionB = Production::create([
+            'production_number' => 'PROD-B-001',
+            'manufacturing_order_id' => $moB->id,
+            'quantity_produced' => 8,
+            'production_date' => '2025-01-12',
+            'status' => 'finished',
+            'created_at' => '2025-01-12 08:00:00',
+            'updated_at' => '2025-01-12 08:00:00',
+        ]);
+
+        $qcA = QualityControl::create([
+            'qc_number' => 'QC-A-001',
+            'inspected_by' => $owner->id,
+            'passed_quantity' => 4,
+            'rejected_quantity' => 0,
+            'quantity_received' => 4,
+            'status' => 1,
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $productA->id,
+            'date_send_stock' => '2025-01-20',
+            'from_model_id' => $productionA->id,
+            'from_model_type' => Production::class,
+            'cabang_id' => $branch->id,
+            'created_at' => '2025-01-20 10:00:00',
+            'updated_at' => '2025-01-20 10:00:00',
+        ]);
+
+        $qcB = QualityControl::create([
+            'qc_number' => 'QC-B-001',
+            'inspected_by' => $owner->id,
+            'passed_quantity' => 2,
+            'rejected_quantity' => 0,
+            'quantity_received' => 2,
+            'status' => 1,
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $productB->id,
+            'date_send_stock' => '2025-01-21',
+            'from_model_id' => $productionB->id,
+            'from_model_type' => Production::class,
+            'cabang_id' => $branch->id,
+            'created_at' => '2025-01-21 10:00:00',
+            'updated_at' => '2025-01-21 10:00:00',
+        ]);
+
+        MaterialIssue::create([
+            'issue_number' => 'MI-A-ISSUE',
+            'production_plan_id' => $planA->id,
+            'manufacturing_order_id' => $moA->id,
+            'warehouse_id' => $warehouse->id,
+            'issue_date' => '2025-01-09',
+            'type' => 'issue',
+            'status' => MaterialIssue::STATUS_COMPLETED,
+            'total_cost' => 500,
+            'created_by' => $owner->id,
+            'created_at' => '2025-01-09 08:00:00',
+            'updated_at' => '2025-01-09 08:00:00',
+        ]);
+
+        MaterialIssue::create([
+            'issue_number' => 'MI-A-RETURN',
+            'production_plan_id' => $planA->id,
+            'manufacturing_order_id' => $moA->id,
+            'warehouse_id' => $warehouse->id,
+            'issue_date' => '2025-01-11',
+            'type' => 'return',
+            'status' => MaterialIssue::STATUS_COMPLETED,
+            'total_cost' => 50,
+            'created_by' => $owner->id,
+            'created_at' => '2025-01-11 08:00:00',
+            'updated_at' => '2025-01-11 08:00:00',
+        ]);
+
+        MaterialIssue::create([
+            'issue_number' => 'MI-B-ISSUE',
+            'production_plan_id' => $planB->id,
+            'manufacturing_order_id' => $moB->id,
+            'warehouse_id' => $warehouse->id,
+            'issue_date' => '2025-01-09',
+            'type' => 'issue',
+            'status' => MaterialIssue::STATUS_COMPLETED,
+            'total_cost' => 700,
+            'created_by' => $owner->id,
+            'created_at' => '2025-01-09 09:00:00',
+            'updated_at' => '2025-01-09 09:00:00',
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $wipCoa->id,
+            'date' => '2025-01-10',
+            'reference' => 'PROD-A-001',
+            'description' => 'Produksi in progress - MO A',
+            'debit' => 750,
+            'credit' => 0,
+            'journal_type' => 'manufacturing_wip',
+            'cabang_id' => $branch->id,
+            'source_type' => Production::class,
+            'source_id' => $productionA->id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $laborCoa->id,
+            'date' => '2025-01-10',
+            'reference' => 'PROD-A-001',
+            'description' => 'Produksi in progress - MO A (tenaga kerja langsung)',
+            'debit' => 0,
+            'credit' => 200,
+            'journal_type' => 'manufacturing_wip',
+            'cabang_id' => $branch->id,
+            'source_type' => Production::class,
+            'source_id' => $productionA->id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $overheadCoa->id,
+            'date' => '2025-01-10',
+            'reference' => 'PROD-A-001',
+            'description' => 'Produksi in progress - MO A (overhead produksi)',
+            'debit' => 0,
+            'credit' => 100,
+            'journal_type' => 'manufacturing_wip',
+            'cabang_id' => $branch->id,
+            'source_type' => Production::class,
+            'source_id' => $productionA->id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $wipCoa->id,
+            'date' => '2025-01-20',
+            'reference' => 'QC-A-001',
+            'description' => 'Penyelesaian produksi - MO A (Produk A)',
+            'debit' => 0,
+            'credit' => 300,
+            'journal_type' => 'manufacturing_completion',
+            'cabang_id' => $branch->id,
+            'source_type' => QualityControl::class,
+            'source_id' => $qcA->id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $wipCoa->id,
+            'date' => '2025-01-12',
+            'reference' => 'PROD-B-001',
+            'description' => 'Produksi in progress - MO B',
+            'debit' => 920,
+            'credit' => 0,
+            'journal_type' => 'manufacturing_wip',
+            'cabang_id' => $branch->id,
+            'source_type' => Production::class,
+            'source_id' => $productionB->id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $laborCoa->id,
+            'date' => '2025-01-12',
+            'reference' => 'PROD-B-001',
+            'description' => 'Produksi in progress - MO B (tenaga kerja langsung)',
+            'debit' => 0,
+            'credit' => 200,
+            'journal_type' => 'manufacturing_wip',
+            'cabang_id' => $branch->id,
+            'source_type' => Production::class,
+            'source_id' => $productionB->id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $overheadCoa->id,
+            'date' => '2025-01-12',
+            'reference' => 'PROD-B-001',
+            'description' => 'Produksi in progress - MO B (overhead produksi)',
+            'debit' => 0,
+            'credit' => 120,
+            'journal_type' => 'manufacturing_wip',
+            'cabang_id' => $branch->id,
+            'source_type' => Production::class,
+            'source_id' => $productionB->id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $wipCoa->id,
+            'date' => '2025-01-21',
+            'reference' => 'QC-B-001',
+            'description' => 'Penyelesaian produksi - MO B (Produk B)',
+            'debit' => 0,
+            'credit' => 220,
+            'journal_type' => 'manufacturing_completion',
+            'cabang_id' => $branch->id,
+            'source_type' => QualityControl::class,
+            'source_id' => $qcB->id,
+        ]);
+
+        return [$productA, $productB];
     }
 }

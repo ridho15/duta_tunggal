@@ -4,7 +4,12 @@ namespace App\Services\Reports;
 
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Models\ManufacturingOrder;
+use App\Models\MaterialIssue;
 use App\Models\Product;
+use App\Models\Production;
+use App\Models\ProductionPlan;
+use App\Models\QualityControl;
 use App\Models\Reports\HppOverheadItem;
 use App\Models\Reports\HppPrefix;
 use App\Models\StockMovement;
@@ -27,10 +32,15 @@ class HppReportService
         $this->filters = $filters;
         $this->rawMaterialProductIds = null;
 
-    $rawMaterialAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('raw_material_inventory'));
-    $rawMaterialPurchaseAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('raw_material_purchase'));
-    $directLaborAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('direct_labor'));
-    $wipAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('wip_inventory'));
+        $productId = isset($filters['product_id']) ? (int) $filters['product_id'] : null;
+        if ($productId) {
+            return $this->generateProductScoped($productId, $start, $end);
+        }
+
+        $rawMaterialAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('raw_material_inventory'));
+        $rawMaterialPurchaseAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('raw_material_purchase'));
+        $directLaborAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('direct_labor'));
+        $wipAccounts = $this->getAccountsByPrefixes($this->getPrefixValues('wip_inventory'));
 
         $openingRawMaterial = $this->calculateRawMaterialBalance($rawMaterialAccounts, $start->copy()->subDay());
         $closingRawMaterial = $this->calculateRawMaterialBalance($rawMaterialAccounts, $end);
@@ -98,6 +108,274 @@ class HppReportService
             'cogm' => round($cogm, 2),
             'variance_analysis' => $this->calculateVarianceAnalysis($start, $end),
         ];
+    }
+
+    private function generateProductScoped(int $productId, Carbon $start, Carbon $end): array
+    {
+        $scope = $this->buildProductScope($productId);
+
+        $rawMaterialUsed = $this->calculateProductRawMaterialUsed(
+            $scope['production_plan_ids'],
+            $scope['manufacturing_order_ids'],
+            $start,
+            $end,
+        );
+
+        [$directLabor, $totalOverhead] = $this->calculateProductLaborAndOverhead(
+            $scope['production_ids'],
+            $scope['manufacturing_order_ids'],
+            $start,
+            $end,
+        );
+
+        $openingWip = $this->calculateProductWipBalance(
+            $scope['production_ids'],
+            $scope['quality_control_ids'],
+            $start->copy()->subDay(),
+        );
+
+        $closingWip = $this->calculateProductWipBalance(
+            $scope['production_ids'],
+            $scope['quality_control_ids'],
+            $end,
+        );
+
+        $totalProductionCost = max(0, round($rawMaterialUsed + $directLabor + $totalOverhead, 2));
+        $cogm = max(0, round($totalProductionCost + $openingWip - $closingWip, 2));
+
+        return [
+            'period' => [
+                'start' => $start->toDateString(),
+                'end' => $end->toDateString(),
+            ],
+            'raw_materials' => [
+                'opening' => 0.0,
+                'purchases' => 0.0,
+                'available' => 0.0,
+                'closing' => 0.0,
+                'used' => round($rawMaterialUsed, 2),
+            ],
+            'direct_labor' => round($directLabor, 2),
+            'overhead' => [
+                'items' => [],
+                'total' => round($totalOverhead, 2),
+            ],
+            'production_cost' => round($totalProductionCost, 2),
+            'wip' => [
+                'opening' => round($openingWip, 2),
+                'closing' => round($closingWip, 2),
+            ],
+            'cogm' => round($cogm, 2),
+            'variance_analysis' => $this->calculateVarianceAnalysis($start, $end),
+        ];
+    }
+
+    private function buildProductScope(int $productId): array
+    {
+        $branchIds = $this->getBranchFilterIds();
+
+        $productionPlanIds = ProductionPlan::query()
+            ->where('product_id', $productId)
+            ->when(! empty($branchIds), fn (Builder $query) => $query->whereIn('cabang_id', $branchIds))
+            ->pluck('id');
+
+        if ($productionPlanIds->isEmpty()) {
+            return [
+                'production_plan_ids' => collect(),
+                'manufacturing_order_ids' => collect(),
+                'production_ids' => collect(),
+                'quality_control_ids' => collect(),
+            ];
+        }
+
+        $manufacturingOrderIds = ManufacturingOrder::query()
+            ->whereIn('production_plan_id', $productionPlanIds)
+            ->when(! empty($branchIds), fn (Builder $query) => $query->whereIn('cabang_id', $branchIds))
+            ->pluck('id');
+
+        $productionIds = Production::query()
+            ->whereIn('manufacturing_order_id', $manufacturingOrderIds)
+            ->pluck('id');
+
+        $qualityControlIds = $productionIds->isEmpty()
+            ? collect()
+            : QualityControl::query()
+                ->where('product_id', $productId)
+                ->where('from_model_type', Production::class)
+                ->whereIn('from_model_id', $productionIds)
+                ->when(! empty($branchIds), fn (Builder $query) => $query->whereIn('cabang_id', $branchIds))
+                ->pluck('id');
+
+        return [
+            'production_plan_ids' => $productionPlanIds,
+            'manufacturing_order_ids' => $manufacturingOrderIds,
+            'production_ids' => $productionIds,
+            'quality_control_ids' => $qualityControlIds,
+        ];
+    }
+
+    private function calculateProductRawMaterialUsed(Collection $productionPlanIds, Collection $manufacturingOrderIds, Carbon $start, Carbon $end): float
+    {
+        if ($productionPlanIds->isEmpty() && $manufacturingOrderIds->isEmpty()) {
+            return 0.0;
+        }
+
+        $query = MaterialIssue::query()
+            ->where('status', MaterialIssue::STATUS_COMPLETED)
+            ->whereDate('issue_date', '>=', $start->toDateString())
+            ->whereDate('issue_date', '<=', $end->toDateString())
+            ->where(function (Builder $builder) use ($productionPlanIds, $manufacturingOrderIds) {
+                if ($productionPlanIds->isNotEmpty()) {
+                    $builder->whereIn('production_plan_id', $productionPlanIds);
+                }
+
+                if ($manufacturingOrderIds->isNotEmpty()) {
+                    $method = $productionPlanIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $builder->{$method}('manufacturing_order_id', $manufacturingOrderIds);
+                }
+            });
+
+        $issues = (float) (clone $query)->where('type', 'issue')->sum('total_cost');
+        $returns = (float) (clone $query)->where('type', 'return')->sum('total_cost');
+
+        return round(max(0, $issues - $returns), 2);
+    }
+
+    private function calculateProductLaborAndOverhead(Collection $productionIds, Collection $manufacturingOrderIds, Carbon $start, Carbon $end): array
+    {
+        if ($productionIds->isNotEmpty()) {
+            $wipQuery = JournalEntry::query()
+                ->where('journal_type', 'manufacturing_wip')
+                ->where('source_type', Production::class)
+                ->whereIn('source_id', $productionIds)
+                ->whereDate('date', '>=', $start->toDateString())
+                ->whereDate('date', '<=', $end->toDateString());
+
+            $laborFromWip = (float) (clone $wipQuery)
+                ->where('description', 'like', '%tenaga kerja langsung%')
+                ->sum('credit');
+
+            $overheadFromWip = (float) (clone $wipQuery)
+                ->where('description', 'like', '%overhead produksi%')
+                ->sum('credit');
+
+            if ($laborFromWip > 0 || $overheadFromWip > 0) {
+                return [round($laborFromWip, 2), round($overheadFromWip, 2)];
+            }
+        }
+
+        if ($manufacturingOrderIds->isNotEmpty()) {
+            $allocationQuery = JournalEntry::query()
+                ->where('journal_type', 'manufacturing_allocation')
+                ->where('source_type', ManufacturingOrder::class)
+                ->whereIn('source_id', $manufacturingOrderIds)
+                ->whereDate('date', '>=', $start->toDateString())
+                ->whereDate('date', '<=', $end->toDateString());
+
+            $laborFromAllocation = (float) (clone $allocationQuery)
+                ->where(function (Builder $builder) {
+                    $builder->where('description', 'like', '%(TKL)%')
+                        ->orWhere('description', 'like', '% TKL%')
+                        ->orWhere('description', 'like', '%tenaga kerja%');
+                })
+                ->sum('credit');
+
+            $overheadFromAllocation = (float) (clone $allocationQuery)
+                ->where(function (Builder $builder) {
+                    $builder->where('description', 'like', '%(BOP)%')
+                        ->orWhere('description', 'like', '% BOP%')
+                        ->orWhere('description', 'like', '%overhead%');
+                })
+                ->sum('credit');
+
+            if ($laborFromAllocation > 0 || $overheadFromAllocation > 0) {
+                return [round($laborFromAllocation, 2), round($overheadFromAllocation, 2)];
+            }
+        }
+
+        $fallbackLabor = 0.0;
+        $fallbackOverhead = 0.0;
+
+        ManufacturingOrder::query()
+            ->with('productionPlan.billOfMaterial')
+            ->whereIn('id', $manufacturingOrderIds)
+            ->where(function (Builder $query) use ($start, $end) {
+                $query->whereBetween('created_at', [$start, $end])
+                    ->orWhereBetween('start_date', [$start, $end]);
+            })
+            ->get()
+            ->each(function (ManufacturingOrder $manufacturingOrder) use (&$fallbackLabor, &$fallbackOverhead) {
+                $plan = $manufacturingOrder->productionPlan;
+                $bom = $plan?->billOfMaterial;
+
+                if (! $plan || ! $bom) {
+                    return;
+                }
+
+                $quantity = (float) ($plan->quantity ?? 0);
+                $fallbackLabor += (float) ($bom->labor_cost ?? 0) * $quantity;
+                $fallbackOverhead += (float) ($bom->overhead_cost ?? 0) * $quantity;
+            });
+
+        return [round($fallbackLabor, 2), round($fallbackOverhead, 2)];
+    }
+
+    private function calculateProductWipBalance(Collection $productionIds, Collection $qualityControlIds, Carbon $asOf): float
+    {
+        if ($productionIds->isEmpty() && $qualityControlIds->isEmpty()) {
+            return 0.0;
+        }
+
+        $wipAccounts = $this->getProductWipAccounts();
+        if ($wipAccounts->isEmpty()) {
+            return 0.0;
+        }
+
+        $query = JournalEntry::query()
+            ->whereIn('coa_id', $wipAccounts->pluck('id'))
+            ->whereDate('date', '<=', $asOf->toDateString())
+            ->where(function (Builder $builder) use ($productionIds, $qualityControlIds) {
+                if ($productionIds->isNotEmpty()) {
+                    $builder->where(function (Builder $sourceQuery) use ($productionIds) {
+                        $sourceQuery->where('source_type', Production::class)
+                            ->whereIn('source_id', $productionIds);
+                    });
+                }
+
+                if ($qualityControlIds->isNotEmpty()) {
+                    $method = $productionIds->isNotEmpty() ? 'orWhere' : 'where';
+                    $builder->{$method}(function (Builder $sourceQuery) use ($qualityControlIds) {
+                        $sourceQuery->where('source_type', QualityControl::class)
+                            ->whereIn('source_id', $qualityControlIds);
+                    });
+                }
+            });
+
+        $debit = (float) (clone $query)->sum('debit');
+        $credit = (float) (clone $query)->sum('credit');
+
+        return round(max(0, $debit - $credit), 2);
+    }
+
+    private function getProductWipAccounts(): Collection
+    {
+        return $this->getAccountsByPrefixes($this->getPrefixValues('wip_inventory'))
+            ->concat(ChartOfAccount::query()->whereIn('code', ['1-201', '1150.001'])->get())
+            ->unique('id')
+            ->values();
+    }
+
+    private function getBranchFilterIds(): array
+    {
+        $branches = array_values(array_filter((array) ($this->filters['branches'] ?? [])));
+
+        if (! empty($branches)) {
+            return array_map('intval', $branches);
+        }
+
+        $cabangId = $this->filters['cabang_id'] ?? null;
+
+        return $cabangId ? [(int) $cabangId] : [];
     }
 
     private function getAccountsByPrefixes(array $prefixes): Collection
@@ -470,7 +748,9 @@ class HppReportService
     private function calculateVarianceAnalysis(Carbon $start, Carbon $end): array
     {
         // Get production cost entries for the period
-        $productionEntries = \App\Models\ProductionCostEntry::whereBetween('production_date', [$start->toDateString(), $end->toDateString()])->get();
+        $productionEntries = \App\Models\ProductionCostEntry::whereBetween('production_date', [$start->toDateString(), $end->toDateString()])
+            ->when($this->filters['product_id'] ?? null, fn (Builder $query, $productId) => $query->where('product_id', $productId))
+            ->get();
 
         if ($productionEntries->isEmpty()) {
             return [
