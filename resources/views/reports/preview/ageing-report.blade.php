@@ -73,12 +73,25 @@
     </div>
 
     <div class="report-wrap">
+        @php
+            $buckets = [
+                'Current' => ['cls' => 'current', 'vcls' => 'current', 'icon' => '&#128994;'],
+                '31–60' => ['cls' => 'd31_60', 'vcls' => 'yellow', 'icon' => '&#128993;'],
+                '61–90' => ['cls' => 'd61_90', 'vcls' => 'orange', 'icon' => '&#128992;'],
+                '>90' => ['cls' => 'over90', 'vcls' => 'red', 'icon' => '&#128308;'],
+            ];
+        @endphp
+
         <div class="rh">
             <div class="rh-name">{{ config('app.name', 'PT Duta Tunggal') }}</div>
             <div class="rh-type">AGEING REPORT
-                @if($reportType === 'receivables') — Account Receivables
-                @elseif($reportType === 'payables') — Account Payables
-                @else — AR &amp; AP@endif
+                @if($reportType === 'receivables')
+                    — Account Receivables
+                @elseif($reportType === 'payables')
+                    — Account Payables
+                @else
+                    — AR &amp; AP
+                @endif
             </div>
             <div class="rh-date">Per Tanggal {{ \Carbon\Carbon::parse($asOfDate)->isoFormat('D MMMM GGGG') }}</div>
         </div>
@@ -87,7 +100,6 @@
         @if($reportType !== 'payables')
         <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem;color:#374151;">&#128200; Account Receivables — Aging Summary</div>
         <div class="grid-4 no-print">
-            @php $buckets = ['Current'=>['cls'=>'current','vcls'=>'current','icon'=>'&#128994;'],'31–60'=>['cls'=>'d31_60','vcls'=>'yellow','icon'=>'&#128993;'],'61–90'=>['cls'=>'d61_90','vcls'=>'orange','icon'=>'&#128992;'],'>90'=>['cls'=>'over90','vcls'=>'red','icon'=>'&#128308;']]; @endphp
             @foreach($buckets as $bucket => $conf)
             <div class="badge-card {{ $conf['cls'] }}">
                 <div class="badge-label">{!! $conf['icon'] !!} {{ $bucket === 'Current' ? '0–30 hari' : ($bucket === '>90' ? '&gt;90 hari' : $bucket . ' hari') }}</div>

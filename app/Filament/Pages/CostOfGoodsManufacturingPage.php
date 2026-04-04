@@ -5,11 +5,22 @@ namespace App\Filament\Pages;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Models\ManufacturingOrder;
+use App\Models\Cabang;
+use App\Models\Product;
 use Filament\Pages\Page;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Form;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Section;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Carbon;
 
-class CostOfGoodsManufacturingPage extends Page
+class CostOfGoodsManufacturingPage extends Page implements HasForms
 {
+    use InteractsWithForms;
+
     public static function shouldRegisterNavigation(): bool
     {
         return false;
@@ -39,10 +50,62 @@ class CostOfGoodsManufacturingPage extends Page
     public function mount(): void
     {
         $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
-        $this->start_date = request('start_date', now()->startOfMonth()->format('Y-m-d'));
-        $this->end_date = request('end_date', now()->endOfMonth()->format('Y-m-d'));
-        $this->cabang_id = request('cabang_id');
-        $this->product_id = request('product_id');
+
+        $this->form->fill([
+            'start_date' => request('start_date', now()->startOfMonth()->format('Y-m-d')),
+            'end_date'   => request('end_date', now()->endOfMonth()->format('Y-m-d')),
+            'cabang_id'  => request('cabang_id'),
+            'product_id' => request('product_id'),
+        ]);
+    }
+
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Section::make('Filter Laporan Harga Pokok Produksi')
+                    ->schema([
+                        DatePicker::make('start_date')
+                            ->label('Tanggal Mulai')
+                            ->required()
+                            ->displayFormat('d/m/Y')
+                            ->default(now()->startOfMonth()),
+
+                        DatePicker::make('end_date')
+                            ->label('Tanggal Akhir')
+                            ->required()
+                            ->displayFormat('d/m/Y')
+                            ->default(now()->endOfMonth()),
+
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->options(function () {
+                                return Cabang::all()->mapWithKeys(function ($cabang) {
+                                    return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                });
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('Semua Cabang')
+                            ->getSearchResultsUsing(function (string $search) {
+                                return Cabang::where('nama', 'like', "%{$search}%")
+                                    ->orWhere('kode', 'like', "%{$search}%")
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(fn ($c) => [$c->id => "({$c->kode}) {$c->nama}"]);
+                            }),
+
+                        Select::make('product_id')
+                            ->label('Produk')
+                            ->options(function () {
+                                return Product::query()->get()
+                                    ->mapWithKeys(fn ($p) => [$p->id => "{$p->sku} - {$p->name}"]);
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('Semua Produk'),
+                    ])->columns(4),
+            ]);
     }
 
     protected function getHeaderActions(): array
@@ -53,6 +116,14 @@ class CostOfGoodsManufacturingPage extends Page
                 ->icon('heroicon-o-eye')
                 ->color('primary')
                 ->action(fn () => $this->generateReport()),
+
+            \Filament\Actions\Action::make('print')
+                ->label('Cetak')
+                ->icon('heroicon-o-printer')
+                ->color('info')
+                ->visible(fn () => $this->showPreview)
+                ->url(fn () => $this->getPreviewUrl())
+                ->openUrlInNewTab(),
 
             \Filament\Actions\Action::make('reset')
                 ->label('Reset')
@@ -65,6 +136,31 @@ class CostOfGoodsManufacturingPage extends Page
 
     public function generateReport(): void
     {
+        $data = $this->form->getState();
+
+        if (empty($data['start_date']) || empty($data['end_date'])) {
+            Notification::make()
+                ->title('Error')
+                ->danger()
+                ->body('Tanggal mulai dan akhir harus diisi.')
+                ->send();
+            return;
+        }
+
+        if ($data['start_date'] > $data['end_date']) {
+            Notification::make()
+                ->title('Error')
+                ->danger()
+                ->body('Tanggal mulai tidak boleh lebih besar dari tanggal akhir.')
+                ->send();
+            return;
+        }
+
+        $this->start_date = $data['start_date'];
+        $this->end_date   = $data['end_date'];
+        $this->cabang_id  = $data['cabang_id'] ?? null;
+        $this->product_id = $data['product_id'] ?? null;
+
         $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
@@ -75,13 +171,12 @@ class CostOfGoodsManufacturingPage extends Page
 
     public function getPreviewUrl(): string
     {
-        return static::getUrl() . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        return route('reports.cogm.preview', array_filter([
             'start_date' => $this->start_date,
-            'end_date' => $this->end_date,
-            'cabang_id' => $this->cabang_id,
+            'end_date'   => $this->end_date,
+            'cabang_id'  => $this->cabang_id,
             'product_id' => $this->product_id,
-        ], fn ($value) => $value !== null && $value !== ''));
+        ], fn ($v) => $v !== null && $v !== ''));
     }
 
     public function getCogmData(): array
@@ -93,7 +188,6 @@ class CostOfGoodsManufacturingPage extends Page
         $start = Carbon::parse($this->start_date)->startOfDay();
         $end = Carbon::parse($this->end_date)->endOfDay();
 
-        // Fetch manufacturing orders in period
         $moQuery = ManufacturingOrder::whereBetween('created_at', [$start, $end]);
         if ($this->cabang_id) {
             $moQuery->where('cabang_id', $this->cabang_id);
@@ -103,22 +197,17 @@ class CostOfGoodsManufacturingPage extends Page
         }
         $orders = $moQuery->with(['productionPlan.product', 'productionPlan.billOfMaterial'])->get();
 
-        // Aggregate from journal entries for COGM-related accounts
-        // Raw material consumption (Material Issue journal entries)
         $rawMaterialCoa = ChartOfAccount::where('name', 'like', '%Bahan Baku%')
             ->orWhere('name', 'like', '%Raw Material%')
             ->orWhere('name', 'like', '%Material Issue%')
             ->pluck('id');
-
         $laborCoa = ChartOfAccount::where('name', 'like', '%Tenaga Kerja%')
             ->orWhere('name', 'like', '%Direct Labor%')
             ->orWhere('name', 'like', '%Upah%')
             ->pluck('id');
-
         $overheadCoa = ChartOfAccount::where('name', 'like', '%Overhead%')
             ->orWhere('name', 'like', '%BOP%')
             ->pluck('id');
-
         $wipCoa = ChartOfAccount::where('name', 'like', '%WIP%')
             ->orWhere('name', 'like', '%Barang Dalam Proses%')
             ->pluck('id');
@@ -150,17 +239,13 @@ class CostOfGoodsManufacturingPage extends Page
 
     protected function sumJe($ids, $start, $end, string $col): float
     {
-        if (empty($ids) || (is_object($ids) && $ids->isEmpty())) return 0.0;
+        if (empty($ids) || (is_object($ids) && $ids->isEmpty())) {
+            return 0.0;
+        }
         return (float) JournalEntry::whereIn('coa_id', $ids)
             ->whereBetween('date', [$start, $end])
             ->when($this->cabang_id, fn ($q) => $q->where('cabang_id', $this->cabang_id))
             ->sum($col);
     }
-
-    public function getProductOptionsProperty(): array
-    {
-        return \App\Models\Product::query()->get()
-            ->mapWithKeys(fn ($p) => [$p->id => "{$p->sku} - {$p->name}"])
-            ->toArray();
-    }
 }
+

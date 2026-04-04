@@ -303,8 +303,6 @@ class DeliveryOrderService
             ];
         }
 
-        $this->createJournalEntriesForDelivery($deliveryOrder);
-
         $date = $deliveryOrder->delivery_date ?? Carbon::now()->toDateString();
 
         // Create stock movements for physical inventory reduction

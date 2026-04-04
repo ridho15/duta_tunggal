@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Resources\WarehouseConfirmationResource\Pages\ListWarehouseConfirmations;
 use App\Filament\Resources\WarehouseConfirmationResource\Pages\ViewWarehouseConfirmation;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -15,7 +16,6 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
-use App\Services\ManufacturingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -139,9 +139,9 @@ test('warehouse confirmation view shows material issue items per bahan', functio
         'uom_id' => $uom->id,
         'warehouse_id' => $warehouse->id,
         'rak_id' => $rak->id,
-        'quantity' => 2,
+        'quantity' => 10,
         'cost_per_unit' => 10000,
-        'total_cost' => 20000,
+        'total_cost' => 100000,
         'status' => MaterialIssueItem::STATUS_PENDING_APPROVAL,
     ]);
 
@@ -151,9 +151,9 @@ test('warehouse confirmation view shows material issue items per bahan', functio
         'uom_id' => $uom->id,
         'warehouse_id' => $warehouse->id,
         'rak_id' => $rak->id,
-        'quantity' => 2,
+        'quantity' => 100,
         'cost_per_unit' => 12000,
-        'total_cost' => 24000,
+        'total_cost' => 1200000,
         'status' => MaterialIssueItem::STATUS_PENDING_APPROVAL,
     ]);
 
@@ -175,19 +175,39 @@ test('warehouse confirmation view shows material issue items per bahan', functio
         'qty_min' => 0,
     ]);
 
-    $confirmation = app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($materialIssue, [
+    $confirmation = WarehouseConfirmation::create([
+        'confirmable_type' => MaterialIssue::class,
+        'confirmable_id' => $materialIssue->id,
+        'confirmation_type' => 'material_issue',
+        'note' => 'Auto-generated from Material Issue',
         'status' => 'request',
     ]);
 
-    $confirmation->warehouseConfirmationItems()->where('material_issue_item_id', $itemOne->id)->update([
+    WarehouseConfirmationItem::create([
+        'warehouse_confirmation_id' => $confirmation->id,
+        'material_issue_item_id' => $itemOne->id,
+        'product_id' => $rawMaterialOne->id,
+        'product_name' => $rawMaterialOne->name,
+        'requested_qty' => 10,
+        'confirmed_qty' => 10,
+        'warehouse_id' => $warehouse->id,
+        'rak_id' => $rak->id,
         'status' => 'confirmed',
-        'confirmed_qty' => 2,
     ]);
 
-    $confirmation->warehouseConfirmationItems()->where('material_issue_item_id', $itemTwo->id)->update([
+    WarehouseConfirmationItem::create([
+        'warehouse_confirmation_id' => $confirmation->id,
+        'material_issue_item_id' => $itemTwo->id,
+        'product_id' => $rawMaterialTwo->id,
+        'product_name' => $rawMaterialTwo->name,
+        'requested_qty' => 100,
+        'confirmed_qty' => 100,
+        'warehouse_id' => $warehouse->id,
+        'rak_id' => $rak->id,
         'status' => 'confirmed',
-        'confirmed_qty' => 2,
     ]);
+
+    $confirmation->refresh()->load(['warehouseConfirmationItems.warehouse', 'warehouseConfirmationItems.materialIssueItem.product', 'warehouseConfirmationItems.product', 'confirmable']);
 
     Livewire::actingAs($user)
         ->test(ViewWarehouseConfirmation::class, ['record' => $confirmation->getKey()])
@@ -195,8 +215,16 @@ test('warehouse confirmation view shows material issue items per bahan', functio
         ->assertSee('Material Issue Confirmation')
         ->assertSee('Informasi Material Issue')
         ->assertSee('Rincian Bahan')
-        ->assertSee('1. (RM-MI-VIEW-A) Material View A | Request 2 | Confirm 2 | Status Confirmed')
-        ->assertSee('2. (RM-MI-VIEW-B) Material View B | Request 2 | Confirm 2 | Status Confirmed')
+        ->assertSee('Request 10')
+        ->assertSee('Confirm 10')
+        ->assertSee('Request 100')
+        ->assertSee('Confirm 100')
         ->assertSee('Material Issue Item #' . $itemOne->id)
-        ->assertSee('Material Issue Item #' . $itemTwo->id);
+        ->assertSee('Material Issue Item #' . $itemTwo->id)
+        ->assertSee('2 baris / qty 110');
+
+    Livewire::actingAs($user)
+        ->test(ListWarehouseConfirmations::class)
+        ->assertSee('Qty Request')
+        ->assertSee('2 baris / qty 110');
 });

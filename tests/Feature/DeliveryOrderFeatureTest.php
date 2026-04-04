@@ -487,23 +487,28 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals(80, $stockAfterApproved->qty_available); // 100 - 20
         $this->assertEquals(20, $stockAfterApproved->qty_reserved); // +20
 
-        // 2. SENT: Reservation should be released, stock available again, accounting posted
+        // 2. RESERVATION RELEASE: stock should be available again
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
 
-        // Verify journals were created automatically by observer
+        // Journal entries should not be created until the DO is completed
         $journalCount = \App\Models\JournalEntry::where('source_type', \App\Models\DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
             ->count();
-        $this->assertGreaterThan(0, $journalCount, 'Journals should be created automatically when status changes to sent');
+        $this->assertSame(0, $journalCount, 'Journals should not be created during reservation release');
 
-        $stockAfterSent = InventoryStock::where('product_id', $this->product->id)
+        $stockAfterReservationRelease = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
-        $this->assertEquals(100, $stockAfterSent->qty_available); // Back to 100
-        $this->assertEquals(0, $stockAfterSent->qty_reserved); // Reservation released
+        $this->assertEquals(100, $stockAfterReservationRelease->qty_available); // Back to 100
+        $this->assertEquals(0, $stockAfterReservationRelease->qty_reserved); // Reservation released
 
-        // 3. COMPLETED: Stock should be permanently reduced
+        // 3. COMPLETED: Stock should be permanently reduced and journals should be created
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'completed');
+
+        $journalCountAfterCompleted = \App\Models\JournalEntry::where('source_type', \App\Models\DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->count();
+        $this->assertGreaterThan(0, $journalCountAfterCompleted, 'Journals should be created when status changes to completed');
 
         $stockAfterCompleted = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)

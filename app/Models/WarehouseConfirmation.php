@@ -96,7 +96,7 @@ class WarehouseConfirmation extends Model
             return '-';
         }
 
-        $totalQty = rtrim(rtrim((string) $items->sum('requested_qty'), '0'), '.');
+        $totalQty = (string) $items->sum('requested_qty');
 
         if ($items->count() === 1) {
             return $totalQty;
@@ -123,14 +123,14 @@ class WarehouseConfirmation extends Model
                 $item->source_item_display,
                 $item->product_display,
                 $item->warehouse?->name ?? '-',
-                rtrim(rtrim((string) $item->requested_qty, '0'), '.')
+                (string) $item->requested_qty
             );
         }
 
         return sprintf(
             '%d item request | Qty %s',
             $items->count(),
-            rtrim(rtrim((string) $items->sum('requested_qty'), '0'), '.')
+            (string) $items->sum('requested_qty')
         );
     }
 

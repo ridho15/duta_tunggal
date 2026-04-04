@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CustomerReceiptResource\Pages;
 use App\Filament\Resources\CustomerReceiptResource;
 use Filament\Actions;
 use Filament\Actions\EditAction;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Actions\Action;
 
@@ -14,10 +15,14 @@ class ViewCustomerReceipt extends ViewRecord
 
     public function mount(int|string $record): void
     {
-        $this->record = $this->resolveRecord($record);
+        parent::mount($record);
 
-        // Load journal entries with COA relationship
-        $this->record->load(['journalEntries.coa']);
+        $this->record->loadMissing(['customerReceiptItem.invoice', 'journalEntries.coa']);
+    }
+
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return CustomerReceiptResource::infolist($infolist);
     }
 
     protected function getHeaderActions(): array

@@ -58,8 +58,10 @@ class StockReservationService
                     throw new \Exception("Stok untuk produk {$item->product_id} di warehouse {$warehouseId} tidak ditemukan.");
                 }
 
-                if ((float) $inventoryStock->qty_available < (float) $item->quantity) {
-                    throw new \Exception("Stok tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$inventoryStock->qty_available}, dibutuhkan: {$item->quantity}.");
+                $freeQty = (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved;
+
+                if ($freeQty < (float) $item->quantity) {
+                    throw new \Exception("Stok tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$freeQty}, dibutuhkan: {$item->quantity}.");
                 }
 
                 StockReservation::create([
@@ -76,6 +78,7 @@ class StockReservationService
                         'product_id' => $item->product_id,
                         'warehouse_id' => $warehouseId,
                         'current_qty_reserved' => $inventoryStock->qty_reserved,
+                        'current_qty_available' => $inventoryStock->qty_available,
                     ]);
 
                     // NOTE: qty_reserved is automatically incremented by StockReservationObserver when StockReservation is created
@@ -161,7 +164,7 @@ class StockReservationService
                     ->first();
 
                 if ($inventoryStock) {
-                    // Only decrement reserved stock (stock is consumed, not returned to available)
+                    $inventoryStock->decrement('qty_available', $reservation->quantity);
                     $inventoryStock->decrement('qty_reserved', $reservation->quantity);
 
                     Log::info('Manually updated stock for consumed reservation', [
@@ -208,8 +211,7 @@ class StockReservationService
             return 0;
         }
 
-        // Since qty_available is now decremented when reserved, available stock = qty_available
-        return $inventoryStock->qty_available;
+        return max(0, (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved);
     }
 
     /**

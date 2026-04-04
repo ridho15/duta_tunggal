@@ -194,7 +194,8 @@ class ManufacturingService
 
             // Use quantity as the required amount
             $required = (float) ($item['quantity'] ?? 0);
-            if ($inventoryStock->qty_available < $required) {
+            $available = (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved;
+            if ($available < $required) {
                 return false;
             }
         }
@@ -333,7 +334,7 @@ class ManufacturingService
                 ->where('warehouse_id', $productionPlan->warehouse_id)
                 ->first();
 
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $availableQty = $inventoryStock ? (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved : 0;
 
             if ($availableQty <= 0) {
                 $outOfStock[] = "{$bomItem->product->name} (Stock: 0)";

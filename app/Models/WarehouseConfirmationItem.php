@@ -99,8 +99,8 @@ class WarehouseConfirmationItem extends Model
         return sprintf(
             '%s | Request %s | Confirm %s | Gudang %s | Status %s',
             $productDisplay,
-            rtrim(rtrim((string) $this->requested_qty, '0'), '.'),
-            rtrim(rtrim((string) $this->confirmed_qty, '0'), '.'),
+            (string) $this->requested_qty,
+            (string) $this->confirmed_qty,
             $this->warehouse?->name ?? '-',
             ucfirst((string) $this->status)
         );

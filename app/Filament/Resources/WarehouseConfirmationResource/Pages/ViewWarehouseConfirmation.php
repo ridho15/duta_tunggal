@@ -164,7 +164,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->getStateUsing(function ($record) {
                                 $count = $record->warehouseConfirmationItems->count();
                                 $qty = (float) $record->warehouseConfirmationItems->sum('requested_qty');
-                                return "{$count} baris / qty {$qty}";
+                                return "{$count} baris / qty " . (string) $qty;
                             }),
                         Infolists\Components\TextEntry::make('do_status_display')
                             ->label('Status DO')
@@ -219,7 +219,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->getStateUsing(function ($record) {
                                 $count = $record->warehouseConfirmationItems->count();
                                 $qty = (float) $record->warehouseConfirmationItems->sum('requested_qty');
-                                return "{$count} baris / qty {$qty}";
+                                return "{$count} baris / qty " . (string) $qty;
                             }),
                         Infolists\Components\TextEntry::make('mi_material_items_display')
                             ->label('Rincian Bahan')
@@ -233,8 +233,8 @@ class ViewWarehouseConfirmation extends ViewRecord
                                         '%d. %s | Request %s | Confirm %s | Status %s',
                                         $index + 1,
                                         $item->product_display,
-                                        rtrim(rtrim((string) $item->requested_qty, '0'), '.'),
-                                        rtrim(rtrim((string) $item->confirmed_qty, '0'), '.'),
+                                        (string) $item->requested_qty,
+                                        (string) $item->confirmed_qty,
                                         ucfirst((string) $item->status)
                                     ))
                                     ->implode("\n");

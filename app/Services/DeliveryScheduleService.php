@@ -34,7 +34,7 @@ class DeliveryScheduleService
     }
 
     /**
-     * K3: When delivery schedule starts shipping, mark related DOs as sent.
+     * K3: When delivery schedule starts shipping, move related DOs into the reservation-release stage.
      */
     public function startRelatedDeliveryOrders(DeliverySchedule $schedule): int
     {

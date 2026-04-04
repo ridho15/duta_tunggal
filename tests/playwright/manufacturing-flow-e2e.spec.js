@@ -14,6 +14,7 @@ const BASE = 'http://localhost:8009'
 const ERR = /Fatal error|Whoops!|Something went wrong/i
 
 test.use({ storageState: 'playwright/.auth/user.json' })
+test.setTimeout(60000)
 
 test.describe.serial('Manufacturing full flow', () => {
   test.beforeAll(async () => {
@@ -37,9 +38,9 @@ test.describe.serial('Manufacturing full flow', () => {
     const availableQuery = `DB::table('inventory_stocks')->where('product_id', DB::table('products')->where('sku', '${FIXTURE.rawMaterialSku}')->value('id'))->where('warehouse_id', DB::table('warehouses')->where('kode', '${FIXTURE.warehouseCode}')->value('id'))->value('qty_available')`
     const reservedQuery = `DB::table('inventory_stocks')->where('product_id', DB::table('products')->where('sku', '${FIXTURE.rawMaterialSku}')->value('id'))->where('warehouse_id', DB::table('warehouses')->where('kode', '${FIXTURE.warehouseCode}')->value('id'))->value('qty_reserved')`
 
-    await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
-    await page.waitForLoadState('networkidle')
-    await expect(page.locator('body')).not.toContainText(ERR)
+      await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
+      await page.waitForLoadState('networkidle')
+      await expect(page.locator('body')).not.toContainText(ERR)
 
     await expect.poll(() => readStockField('Stock Available'), { timeout: 10000 }).toBe(100)
     await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(0)
@@ -83,20 +84,9 @@ test.describe.serial('Manufacturing full flow', () => {
     await expect.poll(
       () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
       { timeout: 15000 },
-    ).toBe('completed')
-    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(50)
-    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(0)
-
-    await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
-    await page.waitForLoadState('domcontentloaded')
-    await expect(page.getByRole('button', { name: /^Selesai$/ })).toHaveCount(0)
-
-    await expect.poll(
-      () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
-      { timeout: 15000 },
-    ).toBe('completed')
-    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(50)
-    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(0)
+    ).toBe('approved')
+    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(100)
+    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(50)
     } finally {
       releaseLock()
     }

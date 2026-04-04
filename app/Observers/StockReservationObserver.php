@@ -90,6 +90,17 @@ class StockReservationObserver
             }
 
             $qtyToUpdate = (float) ($quantity ?? $stockReservation->quantity);
+            $isMaterialIssueReservation = $stockReservation->material_issue_id !== null;
+
+            if ($isMaterialIssueReservation) {
+                if ($operation === 'increment') {
+                    $inventoryStock->increment('qty_reserved', $qtyToUpdate);
+                } elseif ($operation === 'decrement') {
+                    $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
+                }
+
+                return;
+            }
 
             if ($operation === 'increment') {
                 $inventoryStock->increment('qty_reserved', $qtyToUpdate);

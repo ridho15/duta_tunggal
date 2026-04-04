@@ -31,19 +31,19 @@ class DeliveryOrderObserver
             $this->handleApprovedStatus($deliveryOrder);
         }
 
-        // Jika status berubah ke 'sent', hapus stock reservations
+        // Jika status berubah ke 'sent', lepaskan stock reservations
         if ($originalStatus !== 'sent' && $newStatus === 'sent') {
-            $this->handleSentStatus($deliveryOrder);
+            $this->handleReservationReleaseStatus($deliveryOrder);
         }
 
-        // Jika status berubah ke 'completed', update related sales orders to completed
+        // Jika status berubah ke 'completed', posting jurnal dan update related sales orders
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
             $this->handleCompletedStatus($deliveryOrder);
         }
 
-        // Jika status sudah 'sent' dan ada perubahan quantity, update journal entries
-        if ($newStatus === 'sent' && $this->hasQuantityChanges($deliveryOrder)) {
-            $this->handleQuantityUpdateAfterSent($deliveryOrder);
+        // Jika status sudah 'completed' dan ada perubahan quantity, update journal entries
+        if ($newStatus === 'completed' && $this->hasQuantityChanges($deliveryOrder)) {
+            $this->handleQuantityUpdateAfterCompleted($deliveryOrder);
         }
     }
 
@@ -118,18 +118,15 @@ class DeliveryOrderObserver
     }
 
     /**
-     * Handle when Delivery Order status becomes 'sent'
-     * Release qty_reserved by deleting stock reservations and create journal entries for goods delivery
+     * Handle when Delivery Order enters the reservation-release stage.
+     * Release qty_reserved by deleting stock reservations.
      */
-    protected function handleSentStatus(DeliveryOrder $deliveryOrder): void
+    protected function handleReservationReleaseStatus(DeliveryOrder $deliveryOrder): void
     {
-        Log::info('DeliveryOrderObserver: Handling sent status', [
+        Log::info('DeliveryOrderObserver: Handling reservation release', [
             'delivery_order_id' => $deliveryOrder->id,
             'do_number' => $deliveryOrder->do_number,
         ]);
-
-        // Create journal entries for goods delivery
-        $this->createJournalEntriesForDelivery($deliveryOrder);
 
         // Hapus stock reservations yang terkait dengan delivery order ini
         $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
@@ -141,7 +138,7 @@ class DeliveryOrderObserver
 
         // Update delivered_quantity untuk semua sale order items yang terkait.
         // Wrapped in a transaction with lockForUpdate to prevent race conditions
-        // when multiple DOs for the same SO are sent concurrently.
+        // when multiple DOs untuk SO yang sama diproses bersamaan.
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             if ($item->sale_order_item_id) {
                 DB::transaction(function () use ($item) {
@@ -150,7 +147,7 @@ class DeliveryOrderObserver
                         ->first();
 
                     if ($saleOrderItem) {
-                        // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
+                        // Hitung total delivered quantity dari semua delivery orders yang sudah diproses/completed
                         $totalDelivered = $saleOrderItem->deliveryOrderItems()
                             ->whereHas('deliveryOrder', function ($query) {
                                 $query->whereIn('status', ['sent', 'received', 'completed']);
@@ -176,6 +173,8 @@ class DeliveryOrderObserver
             'delivery_order_id' => $deliveryOrder->id,
             'do_number' => $deliveryOrder->do_number,
         ]);
+
+        $this->createJournalEntriesForDelivery($deliveryOrder);
 
         // Load delivery order items with related data for stock movements
         $deliveryOrder->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
@@ -361,12 +360,12 @@ class DeliveryOrderObserver
     }
 
     /**
-     * Handle quantity updates after delivery order status is 'sent'
+    * Handle quantity updates after delivery order status is 'completed'
      * Update journal entries to reflect new quantities
      */
-    public function handleQuantityUpdateAfterSent(DeliveryOrder $deliveryOrder): void
+    public function handleQuantityUpdateAfterCompleted(DeliveryOrder $deliveryOrder): void
     {
-        Log::info('DeliveryOrderObserver: Handling quantity update after sent', [
+        Log::info('DeliveryOrderObserver: Handling quantity update after completed', [
             'delivery_order_id' => $deliveryOrder->id,
             'do_number' => $deliveryOrder->do_number,
         ]);
@@ -414,7 +413,7 @@ class DeliveryOrderObserver
     }
 
     /**
-     * Create journal entries for delivery order (extracted from handleSentStatus)
+    * Create journal entries for delivery order (extracted from the status transition handlers)
      */
     protected function createJournalEntriesForDelivery(DeliveryOrder $deliveryOrder): void
     {

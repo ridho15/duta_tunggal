@@ -83,7 +83,7 @@ class StockReservationServiceTest extends TestCase
 
     // -------------------------------------------------------------------------
     // TC-SR-001: reserveStockForMaterialIssue() increments qty_reserved
-    //            and decrements qty_available.
+    //            without reducing qty_available.
     // -------------------------------------------------------------------------
 
     #[Test]
@@ -96,7 +96,7 @@ class StockReservationServiceTest extends TestCase
 
         $stock->refresh();
         $this->assertEquals(10, $stock->qty_reserved);
-        $this->assertEquals(90, $stock->qty_available);
+        $this->assertEquals(100, $stock->qty_available);
 
         $this->assertDatabaseHas('stock_reservations', [
             'material_issue_id' => $mi->id,
@@ -107,7 +107,7 @@ class StockReservationServiceTest extends TestCase
 
     // -------------------------------------------------------------------------
     // TC-SR-002: releaseStockReservationsForMaterialIssue() decrements qty_reserved
-    //            and restores qty_available.
+    //            while leaving qty_available unchanged.
     // -------------------------------------------------------------------------
 
     #[Test]
@@ -120,7 +120,7 @@ class StockReservationServiceTest extends TestCase
         $this->stockService->reserveStockForMaterialIssue($mi);
         $stock->refresh();
         $this->assertEquals(10, $stock->qty_reserved);
-        $this->assertEquals(90, $stock->qty_available);
+        $this->assertEquals(100, $stock->qty_available);
 
         // Then release
         $this->stockService->releaseStockReservationsForMaterialIssue($mi);
@@ -270,8 +270,8 @@ class StockReservationServiceTest extends TestCase
 
     // -------------------------------------------------------------------------
     // TC-SR-006: consumeReservedStockForMaterialIssue() permanently consumes
-    //            stock: qty_reserved decreases back to 0, qty_available stays
-    //            at the lower value (stock is genuinely used up).
+    //            stock: qty_reserved decreases back to 0 and qty_available
+    //            drops on completion.
     // -------------------------------------------------------------------------
 
     #[Test]
@@ -284,7 +284,7 @@ class StockReservationServiceTest extends TestCase
         $this->stockService->reserveStockForMaterialIssue($mi);
         $stock->refresh();
         $this->assertEquals(20, $stock->qty_reserved);
-        $this->assertEquals(80, $stock->qty_available);
+        $this->assertEquals(100, $stock->qty_available);
 
         // Warehouse confirmation is now required per material issue item before completion.
         app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($mi);
@@ -302,12 +302,12 @@ class StockReservationServiceTest extends TestCase
         $mi->update(['status' => MaterialIssue::STATUS_COMPLETED]);
         $mi->refresh();
 
-        // Consume: qty_reserved → 0, qty_available stays at 80 (permanently consumed)
+        // Consume: qty_reserved → 0, qty_available drops by the consumed amount
         $this->stockService->consumeReservedStockForMaterialIssue($mi);
 
         $stock->refresh();
         $this->assertEquals(0,  $stock->qty_reserved,  'Reserved should be 0 after consumption');
-        $this->assertEquals(80, $stock->qty_available,  'Available should remain low — stock is consumed');
+        $this->assertEquals(80, $stock->qty_available,  'Available should drop on completion — stock is consumed');
 
         $this->assertDatabaseMissing('stock_reservations', [
             'material_issue_id' => $mi->id,

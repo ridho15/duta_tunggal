@@ -292,6 +292,13 @@ class MaterialIssueTest extends TestCase
         // Approve the material issue to create reservations
         $materialIssue->update(['status' => MaterialIssue::STATUS_APPROVED]);
 
+        $reservedStock = InventoryStock::where('product_id', $this->rawMaterial->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
+
+        $this->assertEquals(5, $reservedStock->qty_reserved);
+        $this->assertEquals(100, $reservedStock->qty_available);
+
         // Complete the material issue
         $materialIssue->update(['status' => MaterialIssue::STATUS_COMPLETED]);
 
@@ -452,7 +459,7 @@ class MaterialIssueTest extends TestCase
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
 
-        $this->assertEquals(95, $updatedStock->qty_available); // Stock should be reduced when reserved
+        $this->assertEquals(100, $updatedStock->qty_available); // Reserved stock should not reduce available until completion
         $this->assertEquals(5, $updatedStock->qty_reserved); // And reserved should increase
     }
 

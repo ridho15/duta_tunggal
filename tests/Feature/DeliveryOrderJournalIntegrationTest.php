@@ -54,7 +54,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function journal_entries_are_created_when_delivery_order_status_becomes_sent()
+    public function journal_entries_are_created_when_delivery_order_status_becomes_completed()
     {
         // Create required data
         $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
@@ -101,8 +101,8 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
         // Initially no journal entries
         $this->assertEquals(0, JournalEntry::count());
 
-        // Change status to 'sent' - this should create journal entries
-        $deliveryOrder->update(['status' => 'sent']);
+        // Change status to 'completed' - this should create journal entries
+        $deliveryOrder->update(['status' => 'completed']);
 
         // Journal entries should be created
         $this->assertGreaterThan(0, JournalEntry::count());
@@ -124,7 +124,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
 
 
     #[Test]
-    public function starting_delivery_schedule_for_direct_linked_delivery_order_marks_it_sent_and_creates_journals()
+    public function starting_delivery_schedule_for_direct_linked_delivery_order_releases_reservations_and_creates_journals_on_completion()
     {
         $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
         $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
@@ -183,6 +183,14 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
             'status' => 'sent',
         ]);
 
+        $this->assertSame(0, JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->count());
+
+        $schedule->update(['status' => 'delivered']);
+
+        $this->assertSame('completed', $deliveryOrder->fresh()->status);
+
         $journalEntries = JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
             ->get();
@@ -193,7 +201,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function journal_entries_are_updated_when_delivery_order_quantity_is_changed_after_sent()
+    public function journal_entries_are_updated_when_delivery_order_quantity_is_changed_after_completed()
     {
         // Create required data
         $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
@@ -237,8 +245,8 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
             'sale_order_item_id' => $saleOrderItem->id,
         ]);
 
-        // Change status to 'sent' to create initial journal entries
-        $deliveryOrder->update(['status' => 'sent']);
+        // Change status to 'completed' to create initial journal entries
+        $deliveryOrder->update(['status' => 'completed']);
 
         $initialJournalCount = JournalEntry::count();
         $this->assertGreaterThan(0, $initialJournalCount);
@@ -259,7 +267,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
 
         // Manually trigger the observer since quantity changes on items don't automatically trigger delivery order observer
         $deliveryOrderObserver = app(\App\Observers\DeliveryOrderObserver::class);
-        $deliveryOrderObserver->handleQuantityUpdateAfterSent($deliveryOrder);
+        $deliveryOrderObserver->handleQuantityUpdateAfterCompleted($deliveryOrder);
 
         // Journal entries count should remain the same (entries are updated, not added)
         $this->assertEquals($initialJournalCount, JournalEntry::count());
@@ -325,8 +333,8 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
             'sale_order_item_id' => $saleOrderItem->id,
         ]);
 
-        // Change status to 'sent' to create journal entries
-        $deliveryOrder->update(['status' => 'sent']);
+        // Change status to 'completed' to create journal entries
+        $deliveryOrder->update(['status' => 'completed']);
 
         $initialJournalCount = JournalEntry::count();
         $this->assertGreaterThan(0, $initialJournalCount);

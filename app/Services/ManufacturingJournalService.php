@@ -390,7 +390,8 @@ class ManufacturingJournalService
         float $overheadCost,
         string $reference,
         Carbon $date,
-        ?int $expenseCoa = null,
+        ?int $laborExpenseCoa = null,
+        ?int $overheadExpenseCoa = null,
         string $description = 'Alokasi biaya TKL & BOP ke produksi',
         ?\App\Models\ManufacturingOrder $manufacturingOrder = null
     ): void {
@@ -405,13 +406,29 @@ class ManufacturingJournalService
             throw new \Exception('COA Pos Sementara Produksi tidak ditemukan. Pastikan COA 1400.04 tersedia.');
         }
 
-        $expenseCoa = $expenseCoa ?? $this->resolveDefaultManufacturingExpenseCoaId();
+        $laborExpenseCoa = $laborExpenseCoa ?? $this->resolveDefaultManufacturingLaborCoaId();
+        $overheadExpenseCoa = $overheadExpenseCoa ?? $this->resolveDefaultManufacturingOverheadCoaId();
 
-        if (!$expenseCoa) {
-            throw new \Exception('COA beban tidak ditemukan. Silakan pilih COA beban yang valid.');
+        if ($laborCost > 0 && ! $laborExpenseCoa) {
+            throw new \Exception('COA TKL produksi tidak ditemukan. Silakan pilih COA TKL yang valid.');
         }
 
-        DB::transaction(function () use ($bdpCoa, $expenseCoa, $totalCost, $reference, $date, $description, $manufacturingOrder) {
+        if ($overheadCost > 0 && ! $overheadExpenseCoa) {
+            throw new \Exception('COA overhead produksi tidak ditemukan. Silakan pilih COA overhead yang valid.');
+        }
+
+        DB::transaction(function () use (
+            $bdpCoa,
+            $laborExpenseCoa,
+            $overheadExpenseCoa,
+            $laborCost,
+            $overheadCost,
+            $totalCost,
+            $reference,
+            $date,
+            $description,
+            $manufacturingOrder
+        ) {
             // Debit: Barang Dalam Proses
             JournalEntry::create([
                 'coa_id' => $bdpCoa->id,
@@ -426,19 +443,35 @@ class ManufacturingJournalService
                 'source_id' => $manufacturingOrder ? $manufacturingOrder->id : null,
             ]);
 
-            // Credit: Beban/Kas
-            JournalEntry::create([
-                'coa_id' => $expenseCoa,
-                'date' => $date,
-                'reference' => $reference,
-                'description' => $description,
-                'debit' => 0,
-                'credit' => $totalCost,
-                'journal_type' => 'manufacturing_allocation',
-                'cabang_id' => null,
-                'source_type' => $manufacturingOrder ? \App\Models\ManufacturingOrder::class : null,
-                'source_id' => $manufacturingOrder ? $manufacturingOrder->id : null,
-            ]);
+            if ($laborCost > 0) {
+                JournalEntry::create([
+                    'coa_id' => $laborExpenseCoa,
+                    'date' => $date,
+                    'reference' => $reference,
+                    'description' => $description . ' (TKL)',
+                    'debit' => 0,
+                    'credit' => $laborCost,
+                    'journal_type' => 'manufacturing_allocation',
+                    'cabang_id' => null,
+                    'source_type' => $manufacturingOrder ? \App\Models\ManufacturingOrder::class : null,
+                    'source_id' => $manufacturingOrder ? $manufacturingOrder->id : null,
+                ]);
+            }
+
+            if ($overheadCost > 0) {
+                JournalEntry::create([
+                    'coa_id' => $overheadExpenseCoa,
+                    'date' => $date,
+                    'reference' => $reference,
+                    'description' => $description . ' (BOP)',
+                    'debit' => 0,
+                    'credit' => $overheadCost,
+                    'journal_type' => 'manufacturing_allocation',
+                    'cabang_id' => null,
+                    'source_type' => $manufacturingOrder ? \App\Models\ManufacturingOrder::class : null,
+                    'source_id' => $manufacturingOrder ? $manufacturingOrder->id : null,
+                ]);
+            }
         });
     }
 
@@ -648,14 +681,19 @@ class ManufacturingJournalService
         }
         $finishedProduct = $manufacturingOrder->productionPlan?->product;
         $laborCoaId = $this->resolveManufacturingCreditCoaId($bom, $finishedProduct, 'labor');
+        $overheadCoaId = $this->resolveManufacturingCreditCoaId($bom, $finishedProduct, 'overhead');
 
         if ($laborAmount > 0 && ! $laborCoaId) {
             throw new \Exception('COA TKL produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
         }
 
+        if ($overheadAmount > 0 && ! $overheadCoaId) {
+            throw new \Exception('COA overhead produksi belum dikonfigurasi pada product/BOM dan fallback tidak ditemukan.');
+        }
+
         DB::transaction(function () use (
             $production, $manufacturingOrder, $wipCoa, $posSementaraCoa,
-            $totalWipCost, $materialCost, $laborOverheadCost, $laborCoaId
+            $totalWipCost, $materialCost, $laborAmount, $overheadAmount, $laborCoaId, $overheadCoaId
         ) {
             $branchId    = app(\App\Services\JournalBranchResolver::class)->resolve($production);
             $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($production);
@@ -704,14 +742,31 @@ class ManufacturingJournalService
                 ]);
             }
 
-            if ($laborOverheadCost > 0) {
+            if ($laborAmount > 0) {
                 JournalEntry::create([
                     'coa_id'       => $laborCoaId,
                     'date'         => $date,
                     'reference'    => $reference,
-                    'description'  => $description . ' (tenaga kerja proses produksi)',
+                    'description'  => $description . ' (tenaga kerja langsung)',
                     'debit'        => 0,
-                    'credit'       => $laborOverheadCost,
+                    'credit'       => $laborAmount,
+                    'journal_type' => 'manufacturing_wip',
+                    'cabang_id'    => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id'   => $projectId,
+                    'source_type'  => Production::class,
+                    'source_id'    => $production->id,
+                ]);
+            }
+
+            if ($overheadAmount > 0) {
+                JournalEntry::create([
+                    'coa_id'       => $overheadCoaId,
+                    'date'         => $date,
+                    'reference'    => $reference,
+                    'description'  => $description . ' (overhead produksi)',
+                    'debit'        => 0,
+                    'credit'       => $overheadAmount,
                     'journal_type' => 'manufacturing_wip',
                     'cabang_id'    => $branchId,
                     'department_id' => $departmentId,

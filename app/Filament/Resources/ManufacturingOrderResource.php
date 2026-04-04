@@ -408,8 +408,9 @@ class ManufacturingOrderResource extends Resource
 
             // Get current stock from inventory
             $currentStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
-                ->where('qty_available', '>', 0)
-                ->sum('qty_available');
+                ->whereRaw('(qty_available - qty_reserved) > 0')
+                ->get()
+                ->sum(fn ($stock) => (float) $stock->qty_available - (float) $stock->qty_reserved);
 
             $availabilityPercentage = $currentStock >= $requiredQuantity ? 100 : ($currentStock > 0 ? ($currentStock / $requiredQuantity) * 100 : 0);
 

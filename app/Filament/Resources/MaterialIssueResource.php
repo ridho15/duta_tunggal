@@ -369,7 +369,7 @@ class MaterialIssueResource extends Resource
                                             return \App\Models\Rak::whereHas('inventoryStock', function ($q) use ($productId, $warehouseId) {
                                                 $q->where('product_id', $productId)
                                                     ->where('warehouse_id', $warehouseId)
-                                                    ->whereRaw('qty_available > 0');
+                                                    ->whereRaw('(qty_available - qty_reserved) > 0');
                                             })
                                                 ->orderBy('name')
                                                 ->get()
@@ -962,7 +962,7 @@ class MaterialIssueResource extends Resource
 
         $warehouseIds = InventoryStock::query()
             ->where('product_id', $productId)
-            ->where('qty_available', '>', 0)
+            ->whereRaw('(qty_available - qty_reserved) > 0')
             ->distinct()
             ->pluck('warehouse_id')
             ->all();
@@ -1026,14 +1026,14 @@ class MaterialIssueResource extends Resource
                 ->where('warehouse_id', $item->warehouse_id ?? $materialIssue->warehouse_id)
                 ->first();
 
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $availableQty = $inventoryStock ? (float) $inventoryStock->qty_available : 0;
             $reservedQty = $inventoryStock ? $inventoryStock->qty_reserved : 0;
             $ownReservedQty = self::getReservedQuantityForIssue(
                 $materialIssue,
                 $item->product_id,
                 $item->warehouse_id ?? $materialIssue->warehouse_id
             );
-            $effectiveQty = $availableQty + $ownReservedQty;
+            $effectiveQty = max(0, $availableQty - $reservedQty + $ownReservedQty);
             $requiredQty = $item->quantity;
 
             if ($effectiveQty <= 0) {
@@ -1077,9 +1077,12 @@ class MaterialIssueResource extends Resource
             ->where('warehouse_id', $warehouseId)
             ->first();
 
+        $availableQty = (float) ($inventoryStock->qty_available ?? 0);
+        $reservedQty = (float) ($inventoryStock->qty_reserved ?? 0);
+
         return [
-            'available' => (float) ($inventoryStock->qty_available ?? 0),
-            'reserved' => (float) ($inventoryStock->qty_reserved ?? 0),
+            'available' => max(0, $availableQty - $reservedQty),
+            'reserved' => $reservedQty,
         ];
     }
 

@@ -9,12 +9,14 @@ use App\Models\JournalEntry;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
 use App\Models\ManufacturingOrder;
+use App\Models\ProductCategory;
 use App\Models\Product;
 use App\Models\Production;
 use App\Models\ProductionPlan;
 use App\Models\UnitOfMeasure;
 use App\Models\WarehouseConfirmation;
 use App\Models\Warehouse;
+use App\Models\User;
 use App\Services\ManufacturingJournalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -334,6 +336,40 @@ class ManufacturingJournalTest extends TestCase
             (float) $wip_entries->sum('debit'),
             (float) $wip_entries->sum('credit')
         );
+    }
+
+    public function test_manual_labor_and_overhead_allocation_creates_separate_journal_lines(): void
+    {
+        $laborCoa = ChartOfAccount::where('code', '5230')->firstOrFail();
+        $overheadCoa = ChartOfAccount::where('code', '6100')->firstOrFail();
+        $bdpCoa = ChartOfAccount::where('code', '1400.04')->firstOrFail();
+
+        $manufacturingOrder = ManufacturingOrder::factory()->create([
+            'status' => 'in_progress',
+        ]);
+
+        app(ManufacturingJournalService::class)->allocateLaborAndOverhead(
+            3000,
+            1200,
+            'MAN-ALLOC-001',
+            now(),
+            null,
+            null,
+            'Alokasi manual TKL dan BOP',
+            $manufacturingOrder
+        );
+
+        $entries = JournalEntry::where('journal_type', 'manufacturing_allocation')
+            ->where('reference', 'MAN-ALLOC-001')
+            ->orderBy('id')
+            ->get();
+
+        expect($entries)->toHaveCount(3)
+            ->and($entries->where('coa_id', $bdpCoa->id))->toHaveCount(1)
+            ->and($entries->where('coa_id', $laborCoa->id))->toHaveCount(1)
+            ->and($entries->where('coa_id', $overheadCoa->id))->toHaveCount(1)
+            ->and((float) $entries->sum('debit'))->toBe(4200.0)
+            ->and((float) $entries->sum('credit'))->toBe(4200.0);
     }
 }
 

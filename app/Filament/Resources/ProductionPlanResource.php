@@ -730,7 +730,7 @@ class ProductionPlanResource extends Resource
                             if (!$defaultWarehouseId && $record->billOfMaterial && $record->billOfMaterial->items->count() > 0) {
                                 $firstMaterialId = $record->billOfMaterial->items->first()->product_id;
                                 $warehouseWithStockQuery = \App\Models\InventoryStock::where('product_id', $firstMaterialId)
-                                    ->where('qty_available', '>', 0);
+                                    ->whereRaw('(qty_available - qty_reserved) > 0');
                                 if (!empty($inheritedCabangId)) {
                                     $warehouseWithStockQuery->whereHas('warehouse', function ($q) use ($inheritedCabangId) {
                                         $q->where('cabang_id', $inheritedCabangId);
@@ -884,7 +884,7 @@ class ProductionPlanResource extends Resource
                 ->where('warehouse_id', $productionPlan->warehouse_id)
                 ->first();
 
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $availableQty = $inventoryStock ? (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved : 0;
 
             if ($availableQty <= 0) {
                 $outOfStock[] = "{$bomItem->product->name} (Stock: 0)";

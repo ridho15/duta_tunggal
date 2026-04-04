@@ -22,7 +22,7 @@ use Tests\TestCase;
 
 /**
  * Tests for Tasks 23–26:
- *  23 – "Mark as Sent" removed from DO (handled via SJ terbit)
+ *  23 – reservation-release handled via SJ terbit
  *  24 – DO approve action re-labeled "Konfirmasi Dana Diterima"
  *  25 – DO table shows Nomor DO, Customer, Tanggal, Status as primary columns
  *  26 – SuratJalan shipping details come from DeliverySchedule
@@ -100,7 +100,7 @@ class DeliveryOrderTask2326Test extends TestCase
     // ─── Task 23 ──────────────────────────────────────────────────────────────
 
     #[Test]
-    public function task23_do_status_becomes_sent_only_when_sj_terbit_action_is_triggered(): void
+    public function task23_do_status_reaches_reservation_release_only_when_sj_terbit_action_is_triggered(): void
     {
         $do = DeliveryOrder::create([
             'do_number'     => 'DO-TASK23-001',
@@ -136,7 +136,7 @@ class DeliveryOrderTask2326Test extends TestCase
         ]);
         $sj->deliverySchedules()->attach($schedule->id);
 
-        // Simulate SJ terbit action: mark status=1 and all linked DOs as sent
+        // Simulate SJ terbit action: mark status=1 and all linked DOs into reservation release
         $sj->update(['status' => 1]);
         $service = app(DeliveryOrderService::class);
         $service->updateStatus($do, 'sent');
@@ -146,11 +146,11 @@ class DeliveryOrderTask2326Test extends TestCase
     }
 
     #[Test]
-    public function task23_do_resource_has_no_standalone_mark_as_sent_action(): void
+    public function task23_do_resource_has_no_standalone_mark_as_reservation_release_action(): void
     {
-        // Parse the resource actions - ensure 'sent' action handle isn't present
+        // Parse the resource actions - ensure reservation-release action handle isn't present
         // by verifying via the table action names from the resource's getActions method.
-        // We test this indirectly: the only path to status='sent' is via SuratJalan.
+        // We test this indirectly: the only path to the release stage is via SuratJalan.
         $do = DeliveryOrder::create([
             'do_number'     => 'DO-TASK23-002',
             'delivery_date' => now()->addDays(1)->toDateString(),
@@ -166,7 +166,7 @@ class DeliveryOrderTask2326Test extends TestCase
         // is the only valid path; no Filament action on the DO record can do it alone.
         $this->assertDatabaseHas('delivery_orders', ['id' => $do->id, 'status' => 'approved']);
 
-        // DeliveryOrderResource source file must NOT contain the 'Mark as Sent' label
+        // DeliveryOrderResource source file must NOT contain a standalone reservation-release label
         $resourceSource = file_get_contents(
             app_path('Filament/Resources/DeliveryOrderResource.php')
         );

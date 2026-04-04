@@ -448,9 +448,9 @@ class DeliveryScheduleTest extends TestCase
         $schedule->update(['status' => 'on_the_way']);
 
         $this->assertSame('sent', $deliveryOrder->fresh()->status);
-        $this->assertGreaterThan(0, JournalEntry::where('source_type', DeliveryOrder::class)
+        $this->assertSame(0, JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
-            ->count());
+            ->count();
 
         $journalCountAfterOnTheWay = JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
@@ -459,7 +459,7 @@ class DeliveryScheduleTest extends TestCase
         $schedule->update(['status' => 'delivered']);
 
         $this->assertSame('completed', $deliveryOrder->fresh()->status);
-        $this->assertSame($journalCountAfterOnTheWay, JournalEntry::where('source_type', DeliveryOrder::class)
+        $this->assertGreaterThan($journalCountAfterOnTheWay, JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
             ->count());
     }

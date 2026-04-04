@@ -310,7 +310,6 @@ class CustomerReceiptResource extends Resource
                                             'customer_id' => $customerId,
                                         ]);
 
-                                        // Convert Collection to Array for Blade component
                                         $invoicesArray = $invoices->toArray();
 
                                         $message = $invoices->isEmpty()
@@ -736,7 +735,7 @@ class CustomerReceiptResource extends Resource
                             ->columns(4)
                             ->columnSpanFull(),
                     ])
-                    ->visible(fn($record) => $record->customerReceiptItem->count() > 0),
+                    ->visible(fn($record) => $record->customerReceiptItem()->exists()),
 
                 InfoSection::make('Status Account Receivable')
                     ->schema([
@@ -835,7 +834,7 @@ class CustomerReceiptResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(1)
-                    ->visible(fn($record) => $record->customerReceiptItem->count() > 0),
+                    ->visible(fn($record) => $record->customerReceiptItem()->exists()),
 
                 InfoSection::make('History Pembayaran Invoice')
                     ->schema([
@@ -905,7 +904,7 @@ class CustomerReceiptResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(1)
-                    ->visible(fn($record) => $record->customerReceiptItem->count() > 0),
+                    ->visible(fn($record) => $record->customerReceiptItem()->exists()),
 
                 InfoSection::make('Journal Entries')
                     ->schema([

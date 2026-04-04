@@ -266,21 +266,13 @@ class MaterialIssue extends Model
         $summary = $this->warehouseConfirmationStatusSummary();
 
         if ($summary['all_confirmed']) {
-            if (! $this->isApproved()) {
-                $this->update([
-                    'approved_by' => $warehouseConfirmation->confirmed_by ?? $this->approved_by ?? $this->created_by,
-                    'approved_at' => $warehouseConfirmation->confirmed_at ?? now(),
-                    'status' => self::STATUS_APPROVED,
-                ]);
-            }
-
             $result = $this->update([
                 'approved_by' => $warehouseConfirmation->confirmed_by ?? $this->approved_by ?? $this->created_by,
                 'approved_at' => $warehouseConfirmation->confirmed_at ?? now(),
-                'status' => self::STATUS_COMPLETED,
+                'status' => self::STATUS_APPROVED,
             ]);
 
-            Log::info('MaterialIssue auto-completed from confirmed warehouse confirmation', [
+            Log::info('MaterialIssue auto-approved from confirmed warehouse confirmation', [
                 'material_issue_id' => $this->id,
                 'issue_number' => $this->issue_number,
                 'warehouse_confirmation_id' => $warehouseConfirmation->id,
