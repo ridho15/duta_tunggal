@@ -19,6 +19,8 @@ class AssetDisposalResource extends Resource
 {
     protected static ?string $model = AssetDisposal::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-x-mark';
 
     protected static ?string $navigationGroup = 'Asset Management';

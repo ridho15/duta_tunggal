@@ -5,7 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\StockAdjustmentResource\Pages;
 use App\Filament\Resources\StockAdjustmentResource\RelationManagers;
 use App\Http\Controllers\HelperController;
+use App\Models\InventoryStock;
+use App\Models\Product;
 use App\Models\StockAdjustment;
+use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\StockAdjustmentService;
 use Filament\Forms;
@@ -13,6 +16,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -80,6 +84,7 @@ class StockAdjustmentResource extends Resource
 
                         Select::make('warehouse_id')
                             ->label('Gudang')
+                            ->live()
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
@@ -138,6 +143,97 @@ class StockAdjustmentResource extends Resource
                         Textarea::make('notes')
                             ->label('Catatan')
                             ->rows(3),
+
+                        Repeater::make('items')
+                            ->label('Item Adjustment')
+                            ->relationship()
+                            ->defaultItems(1)
+                            ->minItems(1)
+                            ->addActionLabel('Tambah Item')
+                            ->columnSpanFull()
+                            ->schema([
+                                Select::make('product_id')
+                                    ->label('Produk')
+                                    ->searchable()
+                                    ->preload()
+                                    ->required()
+                                    ->options(fn () => self::resolveProductOptions())
+                                    ->getSearchResultsUsing(fn (string $search) => self::resolveProductOptions($search))
+                                    ->getOptionLabelUsing(fn ($value): ?string => self::resolveProductLabel(is_numeric($value) ? (int) $value : null))
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
+                                        self::syncAdjustmentItemStockState($set, $get, $get('../../warehouse_id'), $state, $get('rak_id'));
+
+                                        if (is_numeric($state)) {
+                                            $product = Product::find((int) $state);
+                                            if ($product) {
+                                                $set('unit_cost', $product->cost_price ?? 0);
+                                            }
+                                        }
+                                    }),
+
+                                Select::make('rak_id')
+                                    ->label('Rak')
+                                    ->searchable()
+                                    ->preload()
+                                    ->required()
+                                    ->options(function (Forms\Get $get) {
+                                        return self::resolveRakOptions($get('../../warehouse_id'));
+                                    })
+                                    ->getSearchResultsUsing(function (string $search, Forms\Get $get) {
+                                        return self::resolveRakOptions($get('../../warehouse_id'), $search);
+                                    })
+                                    ->getOptionLabelUsing(fn ($value): ?string => self::resolveRakLabel(is_numeric($value) ? (int) $value : null))
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
+                                        self::syncAdjustmentItemStockState($set, $get, $get('../../warehouse_id'), $get('product_id'), $state);
+                                    }),
+
+                                TextInput::make('current_qty')
+                                    ->label('Qty Saat Ini')
+                                    ->numeric()
+                                    ->disabled()
+                                    ->dehydrated()
+                                    ->default(0),
+
+                                TextInput::make('adjusted_qty')
+                                    ->label('Qty Setelah Adjustment')
+                                    ->numeric()
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
+                                        $currentQty = (float) ($get('current_qty') ?? 0);
+                                        $adjustedQty = (float) ($state ?? 0);
+                                        $differenceQty = $adjustedQty - $currentQty;
+                                        $set('difference_qty', $differenceQty);
+                                        self::syncDifferenceValue($set, $differenceQty, $get('unit_cost'));
+                                    }),
+
+                                TextInput::make('difference_qty')
+                                    ->label('Selisih Qty')
+                                    ->disabled()
+                                    ->dehydrated(),
+
+                                TextInput::make('unit_cost')
+                                    ->label('Harga Satuan')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(0)
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
+                                        self::syncDifferenceValue($set, (float) ($get('difference_qty') ?? 0), $state);
+                                    }),
+
+                                TextInput::make('difference_value')
+                                    ->label('Nilai Selisih')
+                                    ->numeric()
+                                    ->disabled()
+                                    ->dehydrated(),
+
+                                Textarea::make('notes')
+                                    ->label('Catatan')
+                                    ->rows(2),
+                            ]),
 
                         Hidden::make('status')
                             ->default('draft'),
@@ -419,5 +515,110 @@ class StockAdjustmentResource extends Resource
             'view' => Pages\ViewStockAdjustment::route('/{record}'),
             'edit' => Pages\EditStockAdjustment::route('/{record}/edit'),
         ];
+    }
+
+    public static function resolveProductOptions(?string $search = null): array
+    {
+        $query = Product::query()->orderBy('sku')->orderBy('name');
+
+        if (filled($search)) {
+            $query->where(function (Builder $query) use ($search) {
+                $query->where('sku', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn (Product $product) => [
+                $product->id => sprintf('(%s) %s', $product->sku ?? '-', $product->name ?? '-'),
+            ])
+            ->toArray();
+    }
+
+    public static function resolveProductLabel(?int $productId): ?string
+    {
+        if (! $productId) {
+            return null;
+        }
+
+        $product = Product::find($productId);
+
+        return $product ? sprintf('(%s) %s', $product->sku ?? '-', $product->name ?? '-') : null;
+    }
+
+    public static function resolveRakOptions(?int $warehouseId = null, ?string $search = null): array
+    {
+        if (! $warehouseId) {
+            return [];
+        }
+
+        $query = Rak::query()->where('warehouse_id', $warehouseId)->orderBy('code')->orderBy('name');
+
+        if (filled($search)) {
+            $query->where(function (Builder $query) use ($search) {
+                $query->where('code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn (Rak $rak) => [
+                $rak->id => sprintf('(%s) %s', $rak->code ?? '-', $rak->name ?? '-'),
+            ])
+            ->toArray();
+    }
+
+    public static function resolveRakLabel(?int $rakId): ?string
+    {
+        if (! $rakId) {
+            return null;
+        }
+
+        $rak = Rak::find($rakId);
+
+        return $rak ? sprintf('(%s) %s', $rak->code ?? '-', $rak->name ?? '-') : null;
+    }
+
+    public static function resolveAdjustmentCurrentQty(?int $productId, ?int $warehouseId, ?int $rakId = null): float
+    {
+        if (! $productId || ! $warehouseId) {
+            return 0.0;
+        }
+
+        return InventoryStock::freeQtyFor($productId, $warehouseId, $rakId);
+    }
+
+    protected static function syncAdjustmentItemStockState(Forms\Set $set, Forms\Get $get, $warehouseId, $productId, $rakId = null): void
+    {
+        if (! $warehouseId) {
+            $set('current_qty', 0);
+            $set('difference_qty', 0);
+            return;
+        }
+
+        $currentQty = self::resolveAdjustmentCurrentQty(
+            is_numeric($productId) ? (int) $productId : null,
+            is_numeric($warehouseId) ? (int) $warehouseId : null,
+            is_numeric($rakId) ? (int) $rakId : null,
+        );
+
+        $set('current_qty', $currentQty);
+        $adjustedQty = $get('adjusted_qty');
+        if ($adjustedQty === null || $adjustedQty === '') {
+            $set('adjusted_qty', $currentQty);
+            $adjustedQty = $currentQty;
+        }
+
+        $adjustedQty = (float) $adjustedQty;
+        $set('difference_qty', $adjustedQty - $currentQty);
+    }
+
+    protected static function syncDifferenceValue(Forms\Set $set, float $differenceQty, $unitCost): void
+    {
+        $set('difference_value', $differenceQty * (float) ($unitCost ?? 0));
     }
 }

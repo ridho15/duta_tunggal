@@ -4,6 +4,7 @@ namespace App\Filament\Resources\StockAdjustmentResource\RelationManagers;
 
 use App\Models\Product;
 use App\Models\Rak;
+use App\Filament\Resources\StockAdjustmentResource;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -25,16 +26,20 @@ class StockAdjustmentItemsRelationManager extends RelationManager
         return $form
             ->schema([
                 Select::make('product_id')
-                    ->label('Product')
-                    ->options(Product::pluck('name', 'id'))
+                    ->label('Produk')
+                    ->options(fn () => StockAdjustmentResource::resolveProductOptions())
                     ->required()
                     ->searchable()
                     ->preload()
+                    ->getSearchResultsUsing(fn (string $search) => StockAdjustmentResource::resolveProductOptions($search))
+                    ->getOptionLabelUsing(fn ($value): ?string => StockAdjustmentResource::resolveProductLabel(is_numeric($value) ? (int) $value : null))
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Set $set) {
                         if ($state) {
                             $product = Product::find($state);
-                            // You can add logic to get current stock here
+                            if ($product) {
+                                $set('unit_cost', $product->cost_price ?? 0);
+                            }
                         }
                     }),
 
@@ -47,15 +52,22 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                             return [];
                         }
 
-                        return Rak::where('warehouse_id', $warehouseId)
-                            ->orderBy('name')
-                            ->pluck('name', 'id');
+                        return StockAdjustmentResource::resolveRakOptions($warehouseId);
                     })
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->getSearchResultsUsing(function (string $search) {
+                        $warehouseId = $this->getOwnerRecord()->warehouse_id ?? null;
+
+                        if (!$warehouseId) {
+                            return [];
+                        }
+
+                        return StockAdjustmentResource::resolveRakOptions($warehouseId, $search);
+                    })
+                    ->getOptionLabelUsing(fn ($value): ?string => StockAdjustmentResource::resolveRakLabel(is_numeric($value) ? (int) $value : null)),
 
                 TextInput::make('current_qty')
-                    ->label('Qty Saat Ini')
                     ->numeric()
                     ->default(0)
                     ->required(),

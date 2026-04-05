@@ -114,5 +114,98 @@ test('overdue filter works on a joined account payable query without ambiguous s
     ]);
 
     expect($filtered->count())->toBe(1)
-        ->and($filtered->sum('remaining'))->toBe(200000);
+        ->and((float) $filtered->sum('remaining'))->toBe(200000.0);
+});
+
+test('overdue grouping marks deleted invoices before overdue buckets', function () {
+    $overdueInvoice = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $this->purchaseOrder->id,
+            'total' => 300000,
+            'due_date' => now()->subDays(65),
+        ]);
+    });
+
+    $deletedInvoice = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $this->purchaseOrder->id,
+            'total' => 400000,
+            'due_date' => now()->subDays(65),
+        ]);
+    });
+    $deletedInvoice->delete();
+
+    $overduePayable = AccountPayable::create([
+        'invoice_id' => $overdueInvoice->id,
+        'supplier_id' => $this->supplier->id,
+        'total' => 300000,
+        'paid' => 0,
+        'remaining' => 300000,
+        'status' => PaymentStatus::UNPAID->value,
+        'created_by' => $this->user->id,
+    ]);
+
+    $deletedPayable = AccountPayable::create([
+        'invoice_id' => $deletedInvoice->id,
+        'supplier_id' => $this->supplier->id,
+        'total' => 400000,
+        'paid' => 0,
+        'remaining' => 400000,
+        'status' => PaymentStatus::UNPAID->value,
+        'created_by' => $this->user->id,
+    ]);
+
+    $grouped = AccountPayableQuery::withOverdueGrouping(AccountPayableQuery::base())
+        ->orderBy('account_payables.id')
+        ->pluck('overdue_group', 'account_payables.id');
+
+    expect($grouped[$overduePayable->id])->toBe('OVERDUE 60+ Days')
+        ->and($grouped[$deletedPayable->id])->toBe('DELETED INVOICE');
+});
+
+test('overdue days filter reuses shared date buckets', function () {
+    $invoice31to60 = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $this->purchaseOrder->id,
+            'total' => 275000,
+            'due_date' => now()->subDays(45),
+        ]);
+    });
+
+    $invoiceCurrent = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $this->purchaseOrder->id,
+            'total' => 180000,
+            'due_date' => now()->subDays(10),
+        ]);
+    });
+
+    $matchingPayable = AccountPayable::create([
+        'invoice_id' => $invoice31to60->id,
+        'supplier_id' => $this->supplier->id,
+        'total' => 275000,
+        'paid' => 0,
+        'remaining' => 275000,
+        'status' => PaymentStatus::UNPAID->value,
+        'created_by' => $this->user->id,
+    ]);
+
+    AccountPayable::create([
+        'invoice_id' => $invoiceCurrent->id,
+        'supplier_id' => $this->supplier->id,
+        'total' => 180000,
+        'paid' => 0,
+        'remaining' => 180000,
+        'status' => PaymentStatus::UNPAID->value,
+        'created_by' => $this->user->id,
+    ]);
+
+    $filtered = AccountPayableQuery::applyOverdueDaysFilter(AccountPayableQuery::base(), '31-60')
+        ->pluck('account_payables.id');
+
+    expect($filtered->all())->toBe([$matchingPayable->id]);
 });

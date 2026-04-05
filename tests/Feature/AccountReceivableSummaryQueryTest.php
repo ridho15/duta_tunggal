@@ -129,3 +129,104 @@ test('overdue filter works on a joined account receivable query without ambiguou
     expect($filtered->count())->toBe(1)
         ->and((float) $filtered->sum('remaining'))->toBe(200000.0);
 });
+
+test('overdue grouping marks deleted invoices before overdue buckets for receivables', function () {
+    $overdueInvoice = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $this->saleOrder->id,
+            'total' => 300000,
+            'due_date' => now()->subDays(65),
+            'cabang_id' => $this->cabang->id,
+        ]);
+    });
+
+    $deletedInvoice = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $this->saleOrder->id,
+            'total' => 400000,
+            'due_date' => now()->subDays(65),
+            'cabang_id' => $this->cabang->id,
+        ]);
+    });
+    $deletedInvoice->delete();
+
+    $overdueReceivable = AccountReceivable::create([
+        'invoice_id' => $overdueInvoice->id,
+        'customer_id' => $this->customer->id,
+        'total' => 300000,
+        'paid' => 0,
+        'remaining' => 300000,
+        'status' => PaymentStatus::UNPAID->value,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $deletedReceivable = AccountReceivable::create([
+        'invoice_id' => $deletedInvoice->id,
+        'customer_id' => $this->customer->id,
+        'total' => 400000,
+        'paid' => 0,
+        'remaining' => 400000,
+        'status' => PaymentStatus::UNPAID->value,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $grouped = AccountReceivableQuery::withOverdueGrouping(AccountReceivableQuery::base())
+        ->orderBy('account_receivables.id')
+        ->pluck('overdue_group', 'account_receivables.id');
+
+    expect($grouped[$overdueReceivable->id])->toBe('OVERDUE 60+ Days')
+        ->and($grouped[$deletedReceivable->id])->toBe('DELETED INVOICE');
+});
+
+test('overdue days filter reuses shared date buckets for receivables', function () {
+    $invoice31to60 = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $this->saleOrder->id,
+            'total' => 275000,
+            'due_date' => now()->subDays(45),
+            'cabang_id' => $this->cabang->id,
+        ]);
+    });
+
+    $invoiceCurrent = Invoice::withoutEvents(function () {
+        return Invoice::factory()->create([
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $this->saleOrder->id,
+            'total' => 180000,
+            'due_date' => now()->subDays(10),
+            'cabang_id' => $this->cabang->id,
+        ]);
+    });
+
+    $matchingReceivable = AccountReceivable::create([
+        'invoice_id' => $invoice31to60->id,
+        'customer_id' => $this->customer->id,
+        'total' => 275000,
+        'paid' => 0,
+        'remaining' => 275000,
+        'status' => PaymentStatus::UNPAID->value,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    AccountReceivable::create([
+        'invoice_id' => $invoiceCurrent->id,
+        'customer_id' => $this->customer->id,
+        'total' => 180000,
+        'paid' => 0,
+        'remaining' => 180000,
+        'status' => PaymentStatus::UNPAID->value,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $filtered = AccountReceivableQuery::applyOverdueDaysFilter(AccountReceivableQuery::base(), '31-60')
+        ->pluck('account_receivables.id');
+
+    expect($filtered->all())->toBe([$matchingReceivable->id]);
+});

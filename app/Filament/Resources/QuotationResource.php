@@ -54,6 +54,8 @@ class QuotationResource extends Resource
 {
     protected static ?string $model = Quotation::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
 
     protected static ?string $navigationGroup = 'Penjualan';
@@ -1132,7 +1134,7 @@ class QuotationResource extends Resource
                                                         $get('warehouse_id'),
                                                     );
                                                 })
-                                                ->helperText('Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini.')
+                                                ->helperText('Hanya menampilkan gudang yang memiliki stok bebas untuk produk ini.')
                                                 ->validationMessages([
                                                     'required' => 'Gudang wajib dipilih'
                                                 ])
@@ -1324,7 +1326,7 @@ class QuotationResource extends Resource
                                     'approve_at' => now(),
                                 ]);
 
-                                HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation dan disetujui karena stok tersedia. Proses selanjutnya: Tim Gudang/Logistik dapat melanjutkan ke Delivery Order.");
+                                HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation dan disetujui karena stok bebas mencukupi. Proses selanjutnya: Tim Gudang/Logistik dapat melanjutkan ke Delivery Order.");
                             } else {
                                 HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation, tetapi status tetap draft karena stok belum mencukupi. Silakan lengkapi stok terlebih dahulu sebelum request approve.");
                             }

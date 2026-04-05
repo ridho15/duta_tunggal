@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ProductionResource\Pages;
 
 use App\Filament\Resources\ProductionResource;
 use App\Http\Controllers\HelperController;
+use App\Models\JournalEntry;
 use App\Models\Production;
 use Filament\Actions;
 use Filament\Infolists\Components\Grid;
@@ -12,14 +13,28 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Tables;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 
-class ViewProduction extends ViewRecord
+class ViewProduction extends ViewRecord implements HasTable
 {
+    use InteractsWithTable;
+
     protected static string $resource = ProductionResource::class;
+    protected static string $view = 'filament.resources.production-resource.pages.view-production';
+
+    public function mount(int|string $record): void
+    {
+        $this->record = $this->resolveRecord($record);
+        $this->record->load(['manufacturingOrder.productionPlan.billOfMaterial', 'journalEntries.coa']);
+    }
 
     public function infolist(Infolist $infolist): Infolist
     {
         return $infolist
+            ->record($this->record)
             ->schema([
                 Section::make('Informasi Produksi')
                     ->schema([
@@ -104,7 +119,72 @@ class ViewProduction extends ViewRecord
                                     ->columnSpanFull(),
                             ]),
                     ]),
+
+                Section::make('Jurnal Produksi In Progress')
+                    ->schema([
+                        Grid::make(3)
+                            ->schema([
+                                TextEntry::make('journal_count')
+                                    ->label('Baris Jurnal')
+                                    ->state(fn () => $this->record->journalEntries()->count()),
+                                TextEntry::make('journal_total_debit')
+                                    ->label('Total Debit')
+                                    ->state(fn () => $this->record->journalEntries()->sum('debit'))
+                                    ->rupiah(),
+                                TextEntry::make('journal_total_credit')
+                                    ->label('Total Credit')
+                                    ->state(fn () => $this->record->journalEntries()->sum('credit'))
+                                    ->rupiah(),
+                            ]),
+
+                        TextEntry::make('journal_balance')
+                            ->label('Selisih')
+                            ->state(fn () => $this->record->journalEntries()->sum('debit') - $this->record->journalEntries()->sum('credit'))
+                            ->rupiah()
+                            ->color(fn (float $state): string => abs($state) < 0.01 ? 'success' : 'danger')
+                            ->weight('bold'),
+                    ]),
             ]);
+    }
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(
+                JournalEntry::query()
+                    ->where('source_type', Production::class)
+                    ->where('source_id', $this->record->id)
+                    ->with('coa')
+            )
+            ->columns([
+                Tables\Columns\TextColumn::make('date')
+                    ->label('Tanggal')
+                    ->date('d/m/Y')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('reference')
+                    ->label('Referensi')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('coa.name')
+                    ->label('Akun')
+                    ->getStateUsing(fn ($record) => $record->coa ? '(' . $record->coa->code . ') ' . $record->coa->name : '-'),
+                Tables\Columns\TextColumn::make('debit')
+                    ->label('Debit')
+                    ->rupiah()
+                    ->alignEnd(),
+                Tables\Columns\TextColumn::make('credit')
+                    ->label('Credit')
+                    ->rupiah()
+                    ->alignEnd(),
+                Tables\Columns\TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->wrap(),
+                Tables\Columns\TextColumn::make('journal_type')
+                    ->label('Tipe')
+                    ->badge(),
+            ])
+            ->defaultSort('id', 'asc')
+            ->paginated(false)
+            ->striped();
     }
 
     protected function getHeaderActions(): array

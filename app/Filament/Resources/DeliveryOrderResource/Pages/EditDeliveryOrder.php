@@ -170,9 +170,7 @@ class EditDeliveryOrder extends EditRecord
                             throw new ValidationException($validator);
                         }
 
-                        $availableStock = InventoryStock::where('product_id', $item['product_id'] ?? null)
-                            ->where('warehouse_id', $sourceWarehouseId)
-                            ->sum('qty_available');
+                        $availableStock = InventoryStock::freeQtyFor($item['product_id'] ?? null, $sourceWarehouseId);
 
                         if ((float) $availableStock < $sourceQtyItem) {
                             $validator = Validator::make([], []);

@@ -134,6 +134,123 @@ function createManufacturingApprovalContext(): array
     );
 }
 
+function createManufacturingObserverContext(): array
+{
+    $branch = Cabang::factory()->create();
+    $user = User::factory()->create(['cabang_id' => $branch->id]);
+    $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
+    $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
+    $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
+    $category = ProductCategory::factory()->create();
+
+    $rawCoa = ChartOfAccount::firstOrCreate(
+        ['code' => '1140.01'],
+        ['name' => 'Persediaan Bahan Baku', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    $wipCoa = ChartOfAccount::firstOrCreate(
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    $rawMaterial = Product::factory()->create([
+        'name' => 'Observer Raw Material',
+        'sku' => 'RM-OBSERVER-' . fake()->unique()->numerify('###'),
+        'cabang_id' => $branch->id,
+        'product_category_id' => $category->id,
+        'uom_id' => $uom->id,
+        'is_raw_material' => true,
+        'is_manufacture' => false,
+        'cost_price' => 10000,
+        'inventory_coa_id' => $rawCoa->id,
+    ]);
+
+    $finishedProduct = Product::factory()->create([
+        'name' => 'Observer Finished Product',
+        'sku' => 'FG-OBSERVER-' . fake()->unique()->numerify('###'),
+        'cabang_id' => $branch->id,
+        'product_category_id' => $category->id,
+        'uom_id' => $uom->id,
+        'is_raw_material' => false,
+        'is_manufacture' => true,
+        'cost_price' => 50000,
+    ]);
+
+    $bom = BillOfMaterial::create([
+        'cabang_id' => $branch->id,
+        'product_id' => $finishedProduct->id,
+        'code' => 'BOM-OBSERVER-' . fake()->unique()->numerify('###'),
+        'nama_bom' => 'Observer BOM',
+        'uom_id' => $uom->id,
+        'quantity' => 1,
+        'total_cost' => 10000,
+        'work_in_progress_coa_id' => $wipCoa->id,
+    ]);
+
+    BillOfMaterialItem::create([
+        'bill_of_material_id' => $bom->id,
+        'product_id' => $rawMaterial->id,
+        'uom_id' => $uom->id,
+        'quantity' => 1,
+        'unit_price' => 10000,
+        'subtotal' => 10000,
+    ]);
+
+    $productionPlan = ProductionPlan::create([
+        'plan_number' => 'PP-OBSERVER-' . fake()->unique()->numerify('###'),
+        'name' => 'Observer Production Plan',
+        'source_type' => 'manual',
+        'bill_of_material_id' => $bom->id,
+        'product_id' => $finishedProduct->id,
+        'quantity' => 5,
+        'uom_id' => $uom->id,
+        'start_date' => now(),
+        'end_date' => now()->addDay(),
+        'status' => 'scheduled',
+        'warehouse_id' => $warehouse->id,
+        'cabang_id' => $branch->id,
+        'created_by' => $user->id,
+    ]);
+
+    $materialIssue = MaterialIssue::create([
+        'issue_number' => 'MI-OBSERVER-' . fake()->unique()->numerify('###'),
+        'production_plan_id' => $productionPlan->id,
+        'manufacturing_order_id' => null,
+        'warehouse_id' => $warehouse->id,
+        'issue_date' => now()->toDateString(),
+        'type' => 'issue',
+        'status' => MaterialIssue::STATUS_COMPLETED,
+        'total_cost' => 10000,
+        'created_by' => $user->id,
+        'approved_by' => $user->id,
+        'approved_at' => now(),
+    ]);
+
+    MaterialIssueItem::create([
+        'material_issue_id' => $materialIssue->id,
+        'product_id' => $rawMaterial->id,
+        'uom_id' => $uom->id,
+        'warehouse_id' => $warehouse->id,
+        'rak_id' => $rak->id,
+        'quantity' => 1,
+        'cost_per_unit' => 10000,
+        'total_cost' => 10000,
+        'status' => MaterialIssueItem::STATUS_COMPLETED,
+        'inventory_coa_id' => $rawMaterial->inventory_coa_id,
+    ]);
+
+    return compact(
+        'branch',
+        'user',
+        'warehouse',
+        'rak',
+        'uom',
+        'rawMaterial',
+        'productionPlan',
+        'materialIssue'
+    );
+}
+
 test('manufacturing warehouse confirmation is stored with polymorphic manufacturing data', function () {
     $context = createManufacturingApprovalContext();
 
@@ -233,4 +350,23 @@ test('confirmed manufacturing warehouse confirmation keeps material issue pendin
         ->and($materialIssue->fresh()->approved_at)->toBeNull()
         ->and((float) $stock->qty_available)->toBe(100.0)
         ->and((float) $stock->qty_reserved)->toBe(0.0);
+});
+
+test('material issue observer creates manufacturing order without auto warehouse confirmation', function () {
+    $context = createManufacturingObserverContext();
+
+    $observer = new \App\Observers\MaterialIssueObserver();
+    $method = new \ReflectionMethod(\App\Observers\MaterialIssueObserver::class, 'createManufacturingOrder');
+    $method->setAccessible(true);
+    $method->invoke($observer, $context['materialIssue']);
+
+    $manufacturingOrder = ManufacturingOrder::query()
+        ->where('production_plan_id', $context['productionPlan']->id)
+        ->firstOrFail();
+
+    expect($manufacturingOrder->status)->toBe('draft')
+        ->and(WarehouseConfirmation::query()
+            ->where('confirmable_type', ManufacturingOrder::class)
+            ->where('confirmable_id', $manufacturingOrder->id)
+            ->exists())->toBeFalse();
 });

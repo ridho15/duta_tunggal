@@ -4,8 +4,6 @@ namespace App\Filament\Resources\ManufacturingOrderResource\Pages;
 
 use App\Filament\Resources\ManufacturingOrderResource;
 use App\Models\ProductionPlan;
-use App\Services\ManufacturingService;
-use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateManufacturingOrder extends CreateRecord
@@ -30,11 +28,5 @@ class CreateManufacturingOrder extends CreateRecord
         }
 
         return $data;
-    }
-
-    protected function afterCreate()
-    {
-        $manufacturingService = new ManufacturingService;
-        $manufacturingService->createWarehouseConfirmation($this->getRecord());
     }
 }

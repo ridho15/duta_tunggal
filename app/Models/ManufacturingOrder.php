@@ -128,7 +128,47 @@ class ManufacturingOrder extends Model
      */
     public function completedMaterialIssues()
     {
-        return $this->materialIssues()->where('status', 'completed');
+        return $this->materialIssues()->where('material_issues.status', 'completed');
+    }
+
+    public function productionStartBlockingMessage(): ?string
+    {
+        $plan = $this->productionPlan;
+        if (! $plan || ! $plan->exists || ! $plan->billOfMaterial || ! $plan->billOfMaterial->exists) {
+            return 'Bill of Material untuk Production Plan belum tersedia.';
+        }
+
+        $materialIssues = $this->materialIssues()
+            ->with('items', 'warehouseConfirmations')
+            ->get();
+
+        if ($materialIssues->isEmpty()) {
+            return 'Material Issue belum dibuat. Pengambilan bahan baku dan konfirmasi gudang harus selesai sebelum produksi dimulai.';
+        }
+
+        $incompleteIssue = $materialIssues->first(function (MaterialIssue $materialIssue) {
+            return $materialIssue->status !== MaterialIssue::STATUS_COMPLETED
+                || ! $materialIssue->hasConfirmedWarehouseConfirmation();
+        });
+
+        if ($incompleteIssue) {
+            return sprintf(
+                'Material Issue %s masih berstatus %s atau konfirmasi gudang belum selesai.',
+                $incompleteIssue->issue_number ?? ('#' . $incompleteIssue->id),
+                $incompleteIssue->status ?? '-'
+            );
+        }
+
+        if (! $this->areAllMaterialsIssued()) {
+            return 'Jumlah pengambilan bahan baku yang sudah selesai belum memenuhi kebutuhan BOM.';
+        }
+
+        return null;
+    }
+
+    public function canStartProduction(): bool
+    {
+        return $this->productionStartBlockingMessage() === null;
     }
 
     /**

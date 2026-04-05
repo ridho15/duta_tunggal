@@ -12,9 +12,9 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Actions\Action;
-use App\Models\SaleOrder;
 use App\Models\Customer;
 use App\Exports\SalesReportExport;
+use App\Services\Reports\SalesReportService;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
@@ -63,26 +63,7 @@ class SalesReportPage extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        $query = SaleOrder::query()
-            ->when($this->start_date, fn($q) => $q->whereDate('created_at', '>=', $this->start_date))
-            ->when($this->end_date, fn($q) => $q->whereDate('created_at', '<=', $this->end_date))
-            ->when($this->customer_id, fn($q) => $q->where('customer_id', $this->customer_id))
-            ->when($this->so_number, fn($q) => $q->where('so_number', 'like', '%' . $this->so_number . '%'))
-            ->when($this->status, fn($q) => $q->where('status', $this->status))
-            ->with(['customer', 'saleOrderItem']);
-
-        // Apply branch scoping
-        $user = Auth::user();
-        if ($user && !in_array('all', $user->manage_type ?? [])) {
-            $query->where('cabang_id', $user->cabang_id);
-        }
-
-        // Apply sorting
-        if ($this->sort_by_total === 'asc') {
-            $query->orderBy('total_amount', 'asc');
-        } elseif ($this->sort_by_total === 'desc') {
-            $query->orderBy('total_amount', 'desc');
-        }
+        $query = $this->salesReportService()->query($this->reportFilters(), Auth::user());
 
         return $table
             ->defaultSort('created_at', 'desc')
@@ -121,23 +102,12 @@ class SalesReportPage extends Page implements HasTable
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        return response()->streamDownload(function () {
-                            $query = $this->getFilteredQuery();
+                        $payload = $this->salesReportService()->pdfPayload($this->reportFilters(), Auth::user());
 
-                            // Clean data to ensure UTF-8 encoding
-                            $cleanData = $query->get()->map(function ($order) {
-                                return [
-                                    'so_number' => mb_convert_encoding($order->so_number ?? '', 'UTF-8', 'UTF-8'),
-                                    'created_at' => $order->created_at,
-                                    'customer_code' => mb_convert_encoding($order->customer->code ?? '-', 'UTF-8', 'UTF-8'),
-                                    'customer_name' => mb_convert_encoding($order->customer->name ?? '-', 'UTF-8', 'UTF-8'),
-                                    'total_amount' => $order->total_amount ?? 0,
-                                    'status' => mb_convert_encoding($order->status ?? '', 'UTF-8', 'UTF-8'),
-                                ];
-                            });
-
+                        return response()->streamDownload(function () use ($payload) {
                             $pdf = Pdf::loadView('reports.sales_report', [
-                                'data' => $cleanData,
+                                'rows' => $payload['rows'],
+                                'summary' => $payload['summary'],
                                 'start_date' => $this->start_date,
                                 'end_date' => $this->end_date,
                             ]);
@@ -264,27 +234,23 @@ class SalesReportPage extends Page implements HasTable
 
     private function getFilteredQuery()
     {
-        $query = SaleOrder::query()
-            ->when($this->start_date, fn($q) => $q->whereDate('created_at', '>=', $this->start_date))
-            ->when($this->end_date, fn($q) => $q->whereDate('created_at', '<=', $this->end_date))
-            ->when($this->customer_id, fn($q) => $q->where('customer_id', $this->customer_id))
-            ->when($this->so_number, fn($q) => $q->where('so_number', 'like', '%' . $this->so_number . '%'))
-            ->when($this->status, fn($q) => $q->where('status', $this->status))
-            ->with(['customer', 'saleOrderItem.product']);
+        return $this->salesReportService()->query($this->reportFilters(), Auth::user());
+    }
 
-        // Apply branch scoping
-        $user = Auth::user();
-        if ($user && !in_array('all', $user->manage_type ?? [])) {
-            $query->where('cabang_id', $user->cabang_id);
-        }
+    private function reportFilters(): array
+    {
+        return [
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'customer_id' => $this->customer_id,
+            'so_number' => $this->so_number,
+            'sort_by_total' => $this->sort_by_total,
+            'status' => $this->status,
+        ];
+    }
 
-        // Apply sorting
-        if ($this->sort_by_total === 'asc') {
-            $query->orderBy('total_amount', 'asc');
-        } elseif ($this->sort_by_total === 'desc') {
-            $query->orderBy('total_amount', 'desc');
-        }
-
-        return $query;
+    private function salesReportService(): SalesReportService
+    {
+        return app(SalesReportService::class);
     }
 }

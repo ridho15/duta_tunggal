@@ -9,6 +9,7 @@ use App\Models\AccountReceivable;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Support\AccountReceivableQuery;
+use App\Support\OverdueStatusPresenter;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
@@ -113,9 +114,8 @@ class AccountReceivableResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                return AccountReceivableQuery::applyTableFilters(
-                    AccountReceivableQuery::base()->with(['invoice.fromModel']),
-                    []
+                return AccountReceivableQuery::withOverdueGrouping(
+                    AccountReceivableQuery::base()->with(['invoice.fromModel'])
                 );
             })
             ->columns([
@@ -148,12 +148,7 @@ class AccountReceivableResource extends Resource
                     ->label('Due Date')
                     ->date('M j, Y')
                     ->sortable()
-                    ->color(function ($record) {
-                        if ($record->invoice->due_date < now() && $record->status === PaymentStatus::UNPAID->value) {
-                            return 'danger';
-                        }
-                        return 'gray';
-                    }),
+                    ->color(fn ($record) => self::overdueStatusPresenter()->dueDateColor($record)),
                     
                 TextColumn::make('total')
                     ->label('Total Amount')
@@ -191,17 +186,8 @@ class AccountReceivableResource extends Resource
                     
                 TextColumn::make('days_overdue')
                     ->label('Days Overdue')
-                    ->getStateUsing(function ($record) {
-                        if ($record->status === PaymentStatus::UNPAID->value && $record->invoice->due_date < now()) {
-                            return now()->diffInDays($record->invoice->due_date);
-                        }
-                        return 0;
-                    })
-                    ->color(function ($state) {
-                        if ($state > 30) return 'danger';
-                        if ($state > 0) return 'warning';
-                        return 'success';
-                    })
+                    ->getStateUsing(fn ($record) => self::overdueStatusPresenter()->daysOverdue($record))
+                    ->color(fn ($state) => self::overdueStatusPresenter()->daysOverdueColor($state))
                     ->badge()
                     ->sortable(),
                     
@@ -257,18 +243,7 @@ class AccountReceivableResource extends Resource
                 Tables\Grouping\Group::make('overdue_group')
                     ->label('Overdue Status')
                     ->titlePrefixedWithLabel(false)
-                    ->getTitleFromRecordUsing(function ($record) {
-                        if ($record->status === PaymentStatus::PAID->value) return '✅ PAID';
-                        
-                        $daysOverdue = $record->invoice->due_date < now() 
-                            ? now()->diffInDays($record->invoice->due_date) 
-                            : 0;
-                            
-                        if ($daysOverdue > 60) return '🚨 OVERDUE 60+ Days';
-                        if ($daysOverdue > 30) return '⚠️ OVERDUE 30+ Days';
-                        if ($daysOverdue > 0) return '⏰ OVERDUE';
-                        return '💚 CURRENT';
-                    })
+                    ->getTitleFromRecordUsing(fn ($record) => self::overdueStatusPresenter()->overdueGroupLabel($record))
                     ->collapsible(),
             ])
             ->filters([
@@ -327,12 +302,23 @@ class AccountReceivableResource extends Resource
                     
                 Tables\Filters\Filter::make('overdue')
                     ->label('Overdue Invoices')
-                    ->query(function (Builder $query): Builder {
-                        return $query->whereHas('invoice', function (Builder $query) {
-                            $query->where('due_date', '<', now());
-                            })->where('account_receivables.status', PaymentStatus::UNPAID->value);
-                    })
+                    ->query(fn (Builder $query): Builder => AccountReceivableQuery::applyOverdueFilter($query))
                     ->toggle(),
+
+                Tables\Filters\SelectFilter::make('overdue_days')
+                    ->label('Overdue Period')
+                    ->options([
+                        '1-30' => '1-30 Days',
+                        '31-60' => '31-60 Days',
+                        '60+' => '60+ Days',
+                    ])
+                    ->query(function (Builder $query, $data) {
+                        if (!$data['value']) {
+                            return $query;
+                        }
+
+                        return AccountReceivableQuery::applyOverdueDaysFilter($query, $data['value']);
+                    }),
                     
                 Tables\Filters\Filter::make('date_range')
                     ->form([
@@ -463,5 +449,10 @@ class AccountReceivableResource extends Resource
             'create' => Pages\CreateAccountReceivable::route('/create'),
             'edit' => Pages\EditAccountReceivable::route('/{record}/edit'),
         ];
+    }
+
+    public static function overdueStatusPresenter(): OverdueStatusPresenter
+    {
+        return app(OverdueStatusPresenter::class);
     }
 }

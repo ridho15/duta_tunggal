@@ -9,6 +9,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Filament\Pages\ArApManagementPage;
 use App\Filament\Pages\AlkGraficPage;
 use App\Filament\Pages\AccountingHubPage;
+use App\Filament\Pages\AssetManagementHubPage;
 use App\Filament\Pages\BalanceSheetPage;
 use App\Filament\Pages\BukuBesarPage;
 use App\Filament\Pages\CostOfGoodsManufacturingPage;
@@ -20,8 +21,12 @@ use App\Filament\Pages\FinanceReportHubPage;
 use App\Filament\Pages\FinanceSalesHubPage;
 use App\Filament\Pages\IncomeStatementPage;
 use App\Filament\Pages\JournalConsolidationPage;
+use App\Filament\Pages\ManufacturingHubPage;
+use App\Filament\Pages\MasterDataHubPage;
 use App\Filament\Pages\OperationalReportHubPage;
 use App\Filament\Pages\PaymentHubPage;
+use App\Filament\Pages\SalesHubPage;
+use App\Filament\Pages\UserRolesManagementHubPage;
 use App\Filament\Pages\TrialBalancePage;
 use App\Filament\Pages\ProfitLossMultiDivisionPage;
 use App\Filament\Pages\MyDashboard;
@@ -82,7 +87,12 @@ class AdminPanelProvider extends PanelProvider
                 JournalConsolidationPage::class,
                 OperationalReportHubPage::class,
                 PaymentHubPage::class,
+                SalesHubPage::class,
                 PurchaseHubPage::class,
+                MasterDataHubPage::class,
+                ManufacturingHubPage::class,
+                AssetManagementHubPage::class,
+                UserRolesManagementHubPage::class,
                 SalesReportPage::class,
                 PurchaseReportPage::class,
                 ViewAgeingReport::class,

@@ -3,15 +3,145 @@
 namespace App\Filament\Resources\MaterialIssueResource\Pages;
 
 use App\Filament\Resources\MaterialIssueResource;
+use App\Models\JournalEntry;
 use App\Models\MaterialIssue;
 use Filament\Actions;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Tables;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
+use Filament\Tables\Concerns\InteractsWithTable;
 use Illuminate\Support\Facades\Auth;
 
-class ViewMaterialIssue extends ViewRecord
+class ViewMaterialIssue extends ViewRecord implements HasTable
 {
+    use InteractsWithTable;
+
     protected static string $resource = MaterialIssueResource::class;
+    protected static string $view = 'filament.resources.material-issue-resource.pages.view-material-issue';
+
+    public function mount(int|string $record): void
+    {
+        $this->record = $this->resolveRecord($record);
+        $this->record->load(['items.product', 'warehouse', 'productionPlan', 'manufacturingOrder', 'journalEntries.coa']);
+    }
+
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->record($this->record)
+            ->schema([
+                Infolists\Components\Section::make('Informasi Material Issue')
+                    ->schema([
+                        Infolists\Components\Grid::make(2)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('issue_number')
+                                    ->label('Nomor Issue'),
+                                Infolists\Components\TextEntry::make('type')
+                                    ->label('Tipe')
+                                    ->badge()
+                                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                                        'issue' => 'Ambil Barang',
+                                        'return' => 'Retur Barang',
+                                        default => $state,
+                                    }),
+                                Infolists\Components\TextEntry::make('status')
+                                    ->label('Status')
+                                    ->badge()
+                                    ->color(fn (string $state): string => match ($state) {
+                                        'draft' => 'gray',
+                                        'pending_approval' => 'warning',
+                                        'approved' => 'info',
+                                        'completed' => 'success',
+                                        'rejected' => 'danger',
+                                        default => 'gray',
+                                    }),
+                                Infolists\Components\TextEntry::make('issue_date')
+                                    ->label('Tanggal')
+                                    ->date('d/m/Y'),
+                            ]),
+                        Infolists\Components\TextEntry::make('warehouse.name')
+                            ->label('Gudang')
+                            ->state(fn () => $this->record->warehouse ? '(' . $this->record->warehouse->kode . ') ' . $this->record->warehouse->name : '-'),
+                        Infolists\Components\TextEntry::make('production_plan_display')
+                            ->label('Rencana Produksi')
+                            ->state(fn () => $this->record->productionPlan ? $this->record->productionPlan->plan_number . ' - ' . $this->record->productionPlan->name : '-'),
+                        Infolists\Components\TextEntry::make('notes')
+                            ->label('Catatan')
+                            ->columnSpanFull()
+                            ->placeholder('Tidak ada catatan'),
+                    ])
+                    ->columns(2),
+
+                Infolists\Components\Section::make('Jurnal Hasil')
+                    ->schema([
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('journal_count')
+                                    ->label('Baris Jurnal')
+                                    ->state(fn () => $this->record->journalEntries()->count()),
+                                Infolists\Components\TextEntry::make('journal_total_debit')
+                                    ->label('Total Debit')
+                                    ->state(fn () => $this->record->journalEntries()->sum('debit'))
+                                    ->rupiah(),
+                                Infolists\Components\TextEntry::make('journal_total_credit')
+                                    ->label('Total Credit')
+                                    ->state(fn () => $this->record->journalEntries()->sum('credit'))
+                                    ->rupiah(),
+                            ]),
+
+                        Infolists\Components\TextEntry::make('journal_balance')
+                            ->label('Selisih')
+                            ->state(fn () => $this->record->journalEntries()->sum('debit') - $this->record->journalEntries()->sum('credit'))
+                            ->rupiah()
+                            ->color(fn (float $state): string => abs($state) < 0.01 ? 'success' : 'danger')
+                            ->weight('bold'),
+                    ]),
+            ]);
+    }
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(
+                JournalEntry::query()
+                    ->where('source_type', MaterialIssue::class)
+                    ->where('source_id', $this->record->id)
+                    ->with('coa')
+            )
+            ->columns([
+                Tables\Columns\TextColumn::make('date')
+                    ->label('Tanggal')
+                    ->date('d/m/Y')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('reference')
+                    ->label('Referensi')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('coa.name')
+                    ->label('Akun')
+                    ->getStateUsing(fn ($record) => $record->coa ? '(' . $record->coa->code . ') ' . $record->coa->name : '-'),
+                Tables\Columns\TextColumn::make('debit')
+                    ->label('Debit')
+                    ->rupiah()
+                    ->alignEnd(),
+                Tables\Columns\TextColumn::make('credit')
+                    ->label('Credit')
+                    ->rupiah()
+                    ->alignEnd(),
+                Tables\Columns\TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->wrap(),
+                Tables\Columns\TextColumn::make('journal_type')
+                    ->label('Tipe')
+                    ->badge(),
+            ])
+            ->defaultSort('date', 'asc')
+            ->paginated(false)
+            ->striped();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -57,10 +187,11 @@ class ViewMaterialIssue extends ViewRecord
 
                         if ($record->hasConfirmedWarehouseConfirmation()) {
                             $record->approveFromWarehouseConfirmation($record->latestWarehouseConfirmation() ?? $warehouseConfirmation);
+                            $record->refresh();
 
                             Notification::make()
-                                ->title('Material Issue Di-approve Otomatis')
-                                ->body("Material Issue {$record->issue_number} langsung di-approve karena konfirmasi gudang sudah confirmed.")
+                                ->title('Material Issue Diselesaikan Otomatis')
+                                ->body("Material Issue {$record->issue_number} langsung selesai karena konfirmasi gudang sudah confirmed.")
                                 ->success()
                                 ->send();
                             return;

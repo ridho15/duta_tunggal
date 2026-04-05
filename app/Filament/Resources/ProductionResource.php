@@ -35,6 +35,8 @@ class ProductionResource extends Resource
 {
     protected static ?string $model = Production::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-in';
 
     protected static ?string $navigationGroup = 'Manufaktur';
@@ -112,13 +114,13 @@ class ProductionResource extends Resource
                                 $summary = $record->getFulfillmentSummary();
 
                                 return sprintf(
-                                    'Total bahan %d | Available %d | Partial %d | Unavailable %d | Issued %d | Ready %s',
+                                    'Total bahan %d | Stok bebas cukup %d | Stok bebas sebagian %d | Stok bebas tidak cukup %d | Sudah di-issue %d | Siap %s',
                                     $summary['total_materials'] ?? 0,
                                     $summary['fully_available'] ?? 0,
                                     $summary['partially_available'] ?? 0,
                                     $summary['not_available'] ?? 0,
                                     $summary['fully_issued'] ?? 0,
-                                    ($summary['can_start_production'] ?? false) ? 'Yes' : 'No'
+                                    ($summary['can_start_production'] ?? false) ? 'Ya' : 'Tidak'
                                 );
                             })
                             ->visible(fn ($record) => (bool) $record),

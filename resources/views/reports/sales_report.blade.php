@@ -229,34 +229,34 @@
                 <tr>
                     <td class="summary-item">
                         <span class="icon">📋</span>
-                        <span class="value">{{ $data->count() }}</span>
+                        <span class="value">{{ $summary['total_orders'] }}</span>
                         <span class="label">Total Transaksi</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">💰</span>
-                        <span class="value">Rp {{ number_format($data->sum('total_amount'), 0, ',', '.') }}</span>
+                        <span class="value">Rp {{ number_format($summary['total_amount'], 0, ',', '.') }}</span>
                         <span class="label">Total Nilai</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">📊</span>
-                        <span class="value">Rp {{ $data->count() > 0 ? number_format($data->sum('total_amount') / $data->count(), 0, ',', '.') : '0' }}</span>
+                        <span class="value">Rp {{ number_format($summary['average_amount'], 0, ',', '.') }}</span>
                         <span class="label">Rata-rata per Transaksi</span>
                     </td>
                 </tr>
                 <tr>
                     <td class="summary-item">
                         <span class="icon">✅</span>
-                        <span class="value">{{ $data->where('status', 'confirmed')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['confirmed'] }}</span>
                         <span class="label">Transaksi Confirmed</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">⏳</span>
-                        <span class="value">{{ $data->where('status', 'draft')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['draft'] }}</span>
                         <span class="label">Transaksi Draft</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">🚫</span>
-                        <span class="value">{{ $data->where('status', 'canceled')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['cancelled'] }}</span>
                         <span class="label">Transaksi Canceled</span>
                     </td>
                 </tr>
@@ -278,7 +278,7 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($data as $index => $order)
+            @foreach($rows as $index => $order)
             <tr>
                 <td class="text-center">{{ $index + 1 }}</td>
                 <td>{{ $order['so_number'] }}</td>
@@ -301,7 +301,7 @@
         <tfoot>
             <tr style="background-color: #e9ecef; font-weight: bold;">
                 <td colspan="5" class="text-right">TOTAL:</td>
-                <td class="text-right">{{ number_format($data->sum('total_amount'), 0, ',', '.') }}</td>
+                <td class="text-right">{{ number_format($summary['total_amount'], 0, ',', '.') }}</td>
                 <td colspan="2"></td>
             </tr>
         </tfoot>

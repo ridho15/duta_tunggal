@@ -189,9 +189,9 @@ class InventoryReportTest extends TestCase
 
         $stockData = $data[0];
         // Calculate expected qty based on movements: initial 100 + 50 (purchase_in) - 20 (sales) = 130
-        $this->assertEquals(130.0, $stockData['Qty Tersedia']);
-        $this->assertEquals(10, $stockData['Qty Dipesan']);
-        $this->assertEquals(120.0, $stockData['Qty On Hand']); // 130 - 10
+        $this->assertEquals(130.0, $stockData['Qty Fisik']);
+        $this->assertEquals(10, $stockData['Qty Reserved']);
+        $this->assertEquals(120.0, $stockData['Qty Tersedia Bebas']); // 130 - 10
     }
 
     #[Test]

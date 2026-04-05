@@ -40,6 +40,8 @@ class BillOfMaterialResource extends Resource
 {
     protected static ?string $model = BillOfMaterial::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-in';
 
     protected static ?string $navigationGroup = 'Manufaktur';

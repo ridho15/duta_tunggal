@@ -8,6 +8,7 @@ use App\Filament\Pages\FinanceSalesHubPage;
 use App\Filament\Pages\MyDashboard;
 use App\Filament\Pages\PaymentHubPage;
 use App\Filament\Pages\PurchaseHubPage;
+use App\Filament\Pages\SalesHubPage;
 use App\Filament\Pages\WarehouseHubPage;
 use App\Filament\Resources\AccountPayableResource;
 use App\Filament\Resources\AccountReceivableResource;
@@ -88,6 +89,12 @@ test('delivery hub page is configured as the visible delivery menu entry', funct
         ->and(DeliveryHubPage::getUrl())->toContain('/admin/delivery-hub');
 });
 
+test('sales hub page is configured as the visible sales menu entry', function () {
+    expect(sidebarStaticProperty(SalesHubPage::class, 'navigationGroup'))->toBe('Penjualan')
+        ->and(sidebarStaticProperty(SalesHubPage::class, 'navigationLabel'))->toBe('Pusat Penjualan')
+        ->and(SalesHubPage::getUrl())->toContain('/admin/sales-hub');
+});
+
 test('finance sales, purchase, and payment hubs are configured as the visible transaction menu entries', function () {
     expect(sidebarStaticProperty(FinanceSalesHubPage::class, 'navigationGroup'))->toBe('Keuangan Penjualan')
         ->and(sidebarStaticProperty(FinanceSalesHubPage::class, 'navigationLabel'))->toBe('Pusat Keuangan Penjualan')
@@ -157,6 +164,8 @@ test('detailed delivery sidebar items are hidden and only exposed through the de
 
 test('detailed finance sales and purchase sidebar items are hidden and only exposed through their hubs', function () {
     foreach ([
+        SaleOrderResource::class,
+        QuotationResource::class,
         AccountReceivableResource::class,
         SalesInvoiceResource::class,
         OtherSaleResource::class,

@@ -37,6 +37,8 @@ class EditMaterialIssue extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         if (isset($data['items']) && is_array($data['items'])) {
+            $totalCost = 0;
+
             foreach ($data['items'] as $index => $item) {
                 $productId = $item['product_id'] ?? null;
                 $warehouseId = $item['warehouse_id'] ?? null;
@@ -51,22 +53,38 @@ class EditMaterialIssue extends EditRecord
                 }
 
                 if ($productId && $warehouseId) {
-                    $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                        ->where('warehouse_id', $warehouseId)
-                        ->sum('qty_available');
+                    $stockMetrics = MaterialIssueResource::getStockMetrics($productId, $warehouseId, $this->record);
+                    $effectiveStock = (float) $stockMetrics['effective'];
 
-                    if ($stock < $quantity) {
+                    if ($effectiveStock < $quantity) {
                         $product = \App\Models\Product::find($productId);
                         $productName = $product ? $product->name : 'Produk';
                         throw ValidationException::withMessages([
-                            'items.' . $index . '.quantity' => 'Stock tidak mencukupi untuk ' . $productName . '. Tersedia: ' . $stock,
+                            'items.' . $index . '.quantity' => 'Stok efektif tidak mencukupi untuk ' . $productName . '. Fisik: ' . $stockMetrics['physical'] . ', Reserved: ' . $stockMetrics['reserved'] . ', Reserved Dokumen Ini: ' . $stockMetrics['own_reserved'] . ', Efektif: ' . $effectiveStock,
                         ]);
                     }
                 }
+
+                $costPerUnit = (float) \App\Helpers\MoneyHelper::parse($item['cost_per_unit'] ?? 0);
+                $itemTotalCost = (float) \App\Helpers\MoneyHelper::parse($item['total_cost'] ?? ($quantity * $costPerUnit));
+
+                $data['items'][$index]['quantity'] = $quantity;
+                $data['items'][$index]['cost_per_unit'] = $costPerUnit;
+                $data['items'][$index]['total_cost'] = $itemTotalCost;
+
+                $totalCost += $itemTotalCost;
             }
+
+            $data['total_cost'] = $totalCost;
         }
 
         return $data;
+    }
+
+    protected function afterSave(): void
+    {
+        $this->record->load('items');
+        $this->record->update(['total_cost' => $this->record->items->sum('total_cost')]);
     }
 
     /**
@@ -74,43 +92,7 @@ class EditMaterialIssue extends EditRecord
      */
     protected function validateStockAvailability(MaterialIssue $record): array
     {
-        $insufficientStock = [];
-        $outOfStock = [];
-
-        foreach ($record->items as $item) {
-            $requiredQty = $item->quantity;
-
-            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $item->warehouse_id)
-                ->first();
-
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
-
-            if ($availableQty <= 0) {
-                $outOfStock[] = "{$item->product->name} (Stock: 0)";
-            } elseif ($availableQty < $requiredQty) {
-                $insufficientStock[] = "{$item->product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
-            }
-        }
-
-        if (!empty($outOfStock)) {
-            return [
-                'valid' => false,
-                'message' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock)
-            ];
-        }
-
-        if (!empty($insufficientStock)) {
-            return [
-                'valid' => false,
-                'message' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
-            ];
-        }
-
-        return [
-            'valid' => true,
-            'message' => 'Stock tersedia untuk semua item'
-        ];
+        return MaterialIssueResource::validateStockAvailability($record);
     }
 
     protected function getHeaderActions(): array
@@ -158,10 +140,11 @@ class EditMaterialIssue extends EditRecord
 
                         if ($record->hasConfirmedWarehouseConfirmation()) {
                             $record->approveFromWarehouseConfirmation($record->latestWarehouseConfirmation() ?? $warehouseConfirmation);
+                            $record->refresh();
 
                             Notification::make()
-                                ->title('Material Issue Di-approve Otomatis')
-                                ->body("Material Issue {$record->issue_number} langsung di-approve karena konfirmasi gudang sudah confirmed.")
+                                ->title('Material Issue Diselesaikan Otomatis')
+                                ->body("Material Issue {$record->issue_number} langsung selesai karena konfirmasi gudang sudah confirmed.")
                                 ->success()
                                 ->send();
                             return;

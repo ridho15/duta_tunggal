@@ -36,6 +36,8 @@ class CabangResource extends Resource
 {
     protected static ?string $model = Cabang::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
 
     protected static ?string $navigationLabel = 'Cabang';

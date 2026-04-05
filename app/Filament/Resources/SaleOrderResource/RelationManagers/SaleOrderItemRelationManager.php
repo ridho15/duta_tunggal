@@ -44,10 +44,9 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->helperText(function ($get) {
                                 if (!$get('product_id')) return null;
                                 
-                                $inventoryStock = \App\Models\InventoryStock::where('product_id', $get('product_id'))
-                                    ->sum('qty_available');
+                                $inventoryStock = \App\Models\InventoryStock::freeQtyFor($get('product_id'));
                                 
-                                return "Stock tersedia: " . number_format($inventoryStock, 0, ',', '.');
+                                return "Stok bebas: " . number_format($inventoryStock, 0, ',', '.');
                             })
                             ->required()
                             ->relationship('product', 'id')
@@ -64,26 +63,24 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->helperText(function ($get) {
                                 if (!$get('product_id') || !$get('quantity')) return null;
                                 
-                                $inventoryStock = \App\Models\InventoryStock::where('product_id', $get('product_id'))
-                                    ->sum('qty_available');
+                                $inventoryStock = \App\Models\InventoryStock::freeQtyFor($get('product_id'));
                                 
                                 $quantity = (float) $get('quantity');
                                 
                                 if ($inventoryStock < $quantity) {
-                                    return "⚠️ Stock tidak mencukupi! Tersedia: " . number_format($inventoryStock, 0, ',', '.');
+                                    return "⚠️ Stok bebas tidak mencukupi. Tersedia: " . number_format($inventoryStock, 0, ',', '.');
                                 } else {
-                                    return "✅ Stock tersedia: " . number_format($inventoryStock, 0, ',', '.');
+                                    return "✅ Stok bebas: " . number_format($inventoryStock, 0, ',', '.');
                                 }
                             })
                             ->rule(function ($get) {
                                 return function (string $attribute, $value, \Closure $fail) use ($get) {
                                     if (!$get('product_id')) return;
                                     
-                                    $inventoryStock = \App\Models\InventoryStock::where('product_id', $get('product_id'))
-                                        ->sum('qty_available');
+                                    $inventoryStock = \App\Models\InventoryStock::freeQtyFor($get('product_id'));
                                     
                                     if ($inventoryStock < $value) {
-                                        $fail('Quantity melebihi stock yang tersedia (' . number_format($inventoryStock, 0, ',', '.') . ')');
+                                        $fail('Quantity melebihi stok bebas (' . number_format($inventoryStock, 0, ',', '.') . ')');
                                     }
                                 };
                             })
@@ -151,10 +148,9 @@ class SaleOrderItemRelationManager extends RelationManager
                                 })
                                 ->first();
 
-                            $availableStock = $inventoryStock ? $inventoryStock->qty_available : 0;
+                            $availableStock = $inventoryStock ? $inventoryStock->free_qty : 0;
                         } else {
-                            $availableStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
-                                ->sum('qty_available');
+                            $availableStock = \App\Models\InventoryStock::freeQtyFor($record->product_id);
                         }
 
                         if ($availableStock < $state) {
@@ -164,7 +160,7 @@ class SaleOrderItemRelationManager extends RelationManager
                     })
                     ->sortable(),
                 TextColumn::make('available_stock')
-                    ->label('Stock Tersedia')
+                    ->label('Stok Bebas')
                     ->getStateUsing(function ($record) {
                         if ($record->warehouse_id) {
                             $inventoryStock = \App\Models\InventoryStock::where('product_id', $record->product_id)
@@ -174,13 +170,13 @@ class SaleOrderItemRelationManager extends RelationManager
                                 })
                                 ->first();
 
-                            return $inventoryStock ? $inventoryStock->qty_available : 0;
+                            return $inventoryStock ? $inventoryStock->free_qty : 0;
                         }
 
                         // Multi-warehouse / no specific warehouse: return total available across all warehouses
                         $stocks = \App\Models\InventoryStock::where('product_id', $record->product_id)
                             ->get();
-                        return (int) $stocks->sum('qty_available');
+                        return (int) $stocks->sum('free_qty');
                     })
                     ->badge()
                     ->color(function ($state, $record) {

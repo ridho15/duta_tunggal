@@ -154,10 +154,10 @@ class StockTransferResource extends Resource
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('from_rak_id'))->first();
                                         if ($inventoryStock) {
-                                            return "Jumlah stock {$inventoryStock->qty_available}";
+                                            return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }
 
-                                        return "Jumlah Stock 0";
+                                        return 'Jumlah stok fisik 0';
                                     })
                                     ->relationship('fromRak', 'id', function (Builder $query, $get) {
                                         $query->where('warehouse_id', $get('from_warehouse_id'));
@@ -190,10 +190,10 @@ class StockTransferResource extends Resource
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('to_rak_id'))->first();
                                         if ($inventoryStock) {
-                                            return "Jumlah Stock {$inventoryStock->qty_available}";
+                                            return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }
 
-                                        return "Jumlah Stock 0";
+                                        return 'Jumlah stok fisik 0';
                                     })
                                     ->relationship('toRak', 'id', function (Builder $query, $get) {
                                         $query->where('warehouse_id', $get('to_warehouse_id'));

@@ -8,6 +8,7 @@ use App\Models\StockAdjustmentItem;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Filament\Resources\StockAdjustmentResource;
 use App\Services\StockAdjustmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -305,6 +306,43 @@ test('adjustment belongs to approver', function () {
     ]);
 
     expect($adjustment->approver->id)->toBe($user->id);
+});
+
+test('stock adjustment resource formats product and rack labels with sku and code', function () {
+    $warehouse = Warehouse::factory()->create();
+    $product = Product::factory()->create([
+        'sku' => 'SKU-SA-001',
+        'name' => 'Stock Adjustment Product',
+    ]);
+    $rak = Rak::factory()->create([
+        'warehouse_id' => $warehouse->id,
+        'code' => 'RAK-SA-001',
+        'name' => 'Rak Stock Adjustment',
+    ]);
+
+    InventoryStock::create([
+        'product_id' => $product->id,
+        'warehouse_id' => $warehouse->id,
+        'rak_id' => $rak->id,
+        'qty_available' => 9,
+        'qty_reserved' => 4,
+        'qty_min' => 0,
+    ]);
+
+    expect(StockAdjustmentResource::resolveProductOptions())
+        ->toHaveKey($product->id)
+        ->and(StockAdjustmentResource::resolveProductOptions()[$product->id])
+        ->toBe('(SKU-SA-001) Stock Adjustment Product')
+        ->and(StockAdjustmentResource::resolveProductLabel($product->id))
+        ->toBe('(SKU-SA-001) Stock Adjustment Product')
+        ->and(StockAdjustmentResource::resolveRakOptions($warehouse->id))
+        ->toHaveKey($rak->id)
+        ->and(StockAdjustmentResource::resolveRakOptions($warehouse->id)[$rak->id])
+        ->toBe('(RAK-SA-001) Rak Stock Adjustment')
+        ->and(StockAdjustmentResource::resolveRakLabel($rak->id))
+        ->toBe('(RAK-SA-001) Rak Stock Adjustment')
+        ->and(StockAdjustmentResource::resolveAdjustmentCurrentQty($product->id, $warehouse->id, $rak->id))
+        ->toBe(5.0);
 });
 
 test('stock adjustment rak selection stays within the adjustment warehouse', function () {

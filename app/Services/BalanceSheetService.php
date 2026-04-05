@@ -71,10 +71,20 @@ class BalanceSheetService
         // Detailed liabilities breakdown logging will be performed after current/long-term classification is computed.
 
         $currentLiabilities = $allLiabilities->filter(function ($liability) {
-            return ($liability->is_current === true) || $this->inferCurrentClassification($liability, 'Liability') === true;
+            $isCurrent = $liability->is_current;
+            if ($isCurrent === null) {
+                $isCurrent = $this->inferCurrentClassification($liability, 'Liability');
+            }
+
+            return (bool) $isCurrent;
         });
         $longTermLiabilities = $allLiabilities->filter(function ($liability) {
-            return ($liability->is_current === false) || $this->inferCurrentClassification($liability, 'Liability') === false;
+            $isCurrent = $liability->is_current;
+            if ($isCurrent === null) {
+                $isCurrent = $this->inferCurrentClassification($liability, 'Liability');
+            }
+
+            return ! (bool) $isCurrent;
         });
         
         $totalCurrentLiabilities = (float) $currentLiabilities->sum('balance');

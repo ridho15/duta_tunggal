@@ -11,9 +11,9 @@ use Filament\Tables\Actions\Action;
 use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
-use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Exports\PurchaseReportExport;
+use App\Services\Reports\PurchaseReportService;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
@@ -97,10 +97,11 @@ class PurchaseReportPage extends Page implements HasTable
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        $query = $this->getFilteredQuery();
+                        $payload = $this->purchaseReportService()->pdfPayload($this->reportFilters(), Auth::user());
 
                         $pdf = Pdf::loadView('reports.purchase_report', [
-                            'data' => $query->get(),
+                            'rows' => $payload['rows'],
+                            'summary' => $payload['summary'],
                             'start_date' => $this->start_date,
                             'end_date' => $this->end_date,
                         ]);
@@ -224,26 +225,22 @@ class PurchaseReportPage extends Page implements HasTable
 
     private function getFilteredQuery()
     {
-        $query = PurchaseOrder::query()
-            ->when($this->start_date, fn($q) => $q->whereDate('order_date', '>=', $this->start_date))
-            ->when($this->end_date, fn($q) => $q->whereDate('order_date', '<=', $this->end_date))
-            ->when($this->supplier_id, fn($q) => $q->where('supplier_id', $this->supplier_id))
-            ->when($this->status, fn($q) => $q->where('status', $this->status))
-            ->with(['supplier', 'purchaseOrderItem.product']);
+        return $this->purchaseReportService()->query($this->reportFilters(), Auth::user());
+    }
 
-        // Apply branch scoping
-        $user = Auth::user();
-        if ($user && !in_array('all', $user->manage_type ?? [])) {
-            $query->where('cabang_id', $user->cabang_id);
-        }
+    private function reportFilters(): array
+    {
+        return [
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'supplier_id' => $this->supplier_id,
+            'status' => $this->status,
+            'sort_by_total' => $this->sort_by_total,
+        ];
+    }
 
-        // Apply sorting
-        if ($this->sort_by_total === 'asc') {
-            $query->orderBy('total_amount', 'asc');
-        } elseif ($this->sort_by_total === 'desc') {
-            $query->orderBy('total_amount', 'desc');
-        }
-
-        return $query;
+    private function purchaseReportService(): PurchaseReportService
+    {
+        return app(PurchaseReportService::class);
     }
 }

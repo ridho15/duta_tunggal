@@ -4,6 +4,7 @@ use App\Models\BillOfMaterial;
 use App\Models\BillOfMaterialItem;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
+use App\Models\JournalEntry;
 use App\Models\InventoryStock;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
@@ -242,6 +243,11 @@ test('material issue becomes completed when all confirmation items are approved'
 
     expect($context['materialIssue']->fresh()->status)->toBe(MaterialIssue::STATUS_COMPLETED)
         ->and($context['materialIssue']->fresh()->hasConfirmedWarehouseConfirmation())->toBeTrue();
+
+    expect(JournalEntry::query()
+        ->where('source_type', MaterialIssue::class)
+        ->where('source_id', $context['materialIssue']->id)
+        ->exists())->toBeTrue();
 
     WarehouseConfirmation::query()
         ->where('confirmable_type', MaterialIssue::class)

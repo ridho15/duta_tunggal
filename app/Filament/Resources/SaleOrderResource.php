@@ -60,6 +60,8 @@ class SaleOrderResource extends Resource
 {
     protected static ?string $model = SaleOrder::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static ?string $navigationGroup = 'Penjualan';
@@ -561,21 +563,25 @@ class SaleOrderResource extends Resource
                                         }
 
                                         // Get total stock across all locations
-                                        $totalStock = InventoryStock::where('product_id', $get('product_id'))
-                                            ->sum('qty_available');
+                                        $totalStock = InventoryStock::freeQtyFor($get('product_id'));
 
                                         if ($totalStock > 0) {
                                             // Get stock by warehouses
                                             $stockByWarehouse = InventoryStock::where('product_id', $get('product_id'))
-                                                ->where('qty_available', '>', 0)
                                                 ->with(['warehouse', 'rak'])
                                                 ->get()
                                                 ->groupBy('warehouse_id')
                                                 ->map(function ($items) {
                                                     $warehouseName = $items->first()->warehouse->name ?? 'Unknown';
-                                                    $warehouseTotal = $items->sum('qty_available');
+                                                    $warehouseTotal = $items->sum('free_qty');
+
+                                                    if ($warehouseTotal <= 0) {
+                                                        return null;
+                                                    }
+
                                                     return $warehouseName . ': ' . number_format($warehouseTotal, 0, ',', '.');
                                                 })
+                                                ->filter()
                                                 ->values()
                                                 ->take(3) // Limit to 3 warehouses for display
                                                 ->implode(' | ');
@@ -583,7 +589,7 @@ class SaleOrderResource extends Resource
                                             return "📦 Total Stock: " . number_format($totalStock, 0, ',', '.') . " (" . $stockByWarehouse . ")";
                                         }
 
-                                        return "⚠️ Tidak ada stock tersedia";
+                                        return "⚠️ Tidak ada stok bebas";
                                     })
                                     ->relationship('product', 'name')
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
@@ -643,12 +649,10 @@ class SaleOrderResource extends Resource
                                                     }
 
                                                     $productId = $get('product_id');
-                                                    $availableStock = InventoryStock::where('product_id', $productId)
-                                                        ->where('warehouse_id', $allocationWarehouseId)
-                                                        ->sum('qty_available');
+                                                    $availableStock = InventoryStock::freeQtyFor($productId, $allocationWarehouseId);
 
                                                     if ((float) $availableStock < $allocationItemQty) {
-                                                        $fail('Stock tidak mencukupi pada salah satu alokasi gudang.');
+                                                        $fail('Stok bebas tidak mencukupi pada salah satu alokasi gudang.');
                                                         return;
                                                     }
                                                 }
@@ -680,8 +684,8 @@ class SaleOrderResource extends Resource
 
                                         $allocations = collect($get('warehouseAllocations') ?? []);
                                         if ($allocations->isEmpty()) {
-                                            $totalStock = InventoryStock::where('product_id', $productId)->sum('qty_available');
-                                            return "📦 Total stok tersedia: " . number_format($totalStock, 0, ',', '.') . " | Isi alokasi gudang di atas.";
+                                            $totalStock = InventoryStock::freeQtyFor($productId);
+                                            return "📦 Total stok bebas: " . number_format($totalStock, 0, ',', '.') . " | Isi alokasi gudang di atas.";
                                         }
 
                                         $allocationQty = (float) $allocations->sum(fn($r) => (float) ($r['quantity'] ?? 0));
@@ -903,7 +907,7 @@ class SaleOrderResource extends Resource
                                                     $get('warehouse_id'),
                                                 );
                                             })
-                                            ->helperText('Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini.')
+                                            ->helperText('Hanya menampilkan gudang yang memiliki stok bebas untuk produk ini.')
                                             ->searchable()
                                             ->preload()
                                             ->required()
@@ -1109,14 +1113,14 @@ class SaleOrderResource extends Resource
                 SelectFilter::make('stock_status')
                     ->label('Status Stok')
                     ->options([
-                        'sufficient' => 'Stok Tersedia',
+                        'sufficient' => 'Stok Bebas Cukup',
                         'insufficient' => 'Kurang Stok'
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         if ($data['value'] === 'insufficient') {
                             return $query->whereHas('saleOrderItem', function (Builder $q) {
                                 $q->whereRaw('quantity > (
-                                    SELECT COALESCE(SUM(qty_available), 0) 
+                                    SELECT COALESCE(SUM(qty_available - qty_reserved), 0) 
                                     FROM inventory_stocks 
                                     WHERE inventory_stocks.product_id = sale_order_items.product_id 
                                     AND inventory_stocks.warehouse_id = sale_order_items.warehouse_id 
@@ -1128,7 +1132,7 @@ class SaleOrderResource extends Resource
                         if ($data['value'] === 'sufficient') {
                             return $query->whereDoesntHave('saleOrderItem', function (Builder $q) {
                                 $q->whereRaw('quantity > (
-                                    SELECT COALESCE(SUM(qty_available), 0) 
+                                    SELECT COALESCE(SUM(qty_available - qty_reserved), 0) 
                                     FROM inventory_stocks 
                                     WHERE inventory_stocks.product_id = sale_order_items.product_id 
                                     AND inventory_stocks.warehouse_id = sale_order_items.warehouse_id 
@@ -1626,15 +1630,24 @@ class SaleOrderResource extends Resource
                                         return 'Rp ' . number_format($subtotal, 0, ',', '.');
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('stock_tersedia')
-                                    ->label('Stock Tersedia (Semua Gudang)')
+                                    ->label('Stok Bebas (Semua Gudang)')
                                     ->columnSpan(2)
                                     ->getStateUsing(function ($record) {
                                         $stocks = \App\Models\InventoryStock::where('product_id', $record->product_id)
                                             ->with('warehouse')
                                             ->get();
-                                        $total = $stocks->sum('qty_available');
+                                        $total = $stocks->sum('free_qty');
                                         $perWh = $stocks->groupBy('warehouse_id')
-                                            ->map(fn($s) => ($s->first()->warehouse?->name ?? 'Wh#' . $s->first()->warehouse_id) . ': ' . number_format((float) $s->sum('qty_available'), 0, ',', '.'))
+                                            ->map(function ($s) {
+                                                $available = (float) $s->sum('free_qty');
+
+                                                if ($available <= 0) {
+                                                    return null;
+                                                }
+
+                                                return ($s->first()->warehouse?->name ?? 'Wh#' . $s->first()->warehouse_id) . ': ' . number_format($available, 0, ',', '.');
+                                            })
+                                            ->filter()
                                             ->values()->implode(' | ');
                                         return $total > 0
                                             ? '📦 ' . number_format((float) $total, 0, ',', '.') . ($perWh ? " ({$perWh})" : '')

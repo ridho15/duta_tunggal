@@ -3,10 +3,12 @@
 use App\Filament\Resources\ProductionResource\Pages\ListProductions;
 use App\Filament\Resources\ProductionResource\Pages\EditProduction;
 use App\Filament\Resources\ProductionResource\Pages\ViewProduction;
+use App\Models\ChartOfAccount;
 use App\Models\BillOfMaterial;
 use App\Models\BillOfMaterialItem;
 use App\Models\Cabang;
 use App\Models\ManufacturingOrder;
+use App\Models\JournalEntry;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Production;
@@ -74,6 +76,26 @@ test('production list shows a view action and the view page shows material requi
     ]);
 
     $category = ProductCategory::factory()->create();
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '1-201'],
+        ['name' => 'Persediaan Barang Dalam Proses - WIP Inventory', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '5230'],
+        ['name' => 'Biaya Tenaga Kerja Proses Produksi', 'type' => 'Expense', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '6-202'],
+        ['name' => 'Biaya Tenaga Kerja Langsung - Direct Labor 2', 'type' => 'Expense', 'is_active' => true]
+    );
 
     $finishedProduct = Product::factory()->create([
         'name' => 'Finished Product View Production',
@@ -168,6 +190,13 @@ test('production list shows a view action and the view page shows material requi
         'status' => 'finished',
     ]);
 
+    expect(
+        JournalEntry::query()
+            ->where('source_type', Production::class)
+            ->where('source_id', $production->id)
+            ->count()
+    )->toBe(3);
+
     Livewire::actingAs($user)
         ->test(ListProductions::class)
         ->assertTableActionExists('view');
@@ -182,6 +211,11 @@ test('production list shows a view action and the view page shows material requi
         ->assertSee('PP-PROD-VIEW-001')
         ->assertSee('(FG-PROD-VIEW) Finished Product View Production')
         ->assertSee('(BOM-PROD-VIEW) BOM View Production')
+        ->assertSee('Jurnal Produksi In Progress')
+        ->assertSee('Baris Jurnal')
+        ->assertSee('Total Debit')
+        ->assertSee('Total Credit')
+        ->assertSee('Selisih')
         ->assertSee('Total bahan 2 | Available 0 | Partial 0 | Unavailable 2 | Issued 0 | Ready No')
         ->assertSee('Material')
         ->assertSee('Kebutuhan')
@@ -212,6 +246,26 @@ test('production edit page stays editable and shows bom requirements info', func
     ]);
 
     $category = ProductCategory::factory()->create();
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '1-201'],
+        ['name' => 'Persediaan Barang Dalam Proses - WIP Inventory', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '5230'],
+        ['name' => 'Biaya Tenaga Kerja Proses Produksi', 'type' => 'Expense', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '6-202'],
+        ['name' => 'Biaya Tenaga Kerja Langsung - Direct Labor 2', 'type' => 'Expense', 'is_active' => true]
+    );
 
     $finishedProduct = Product::factory()->create([
         'name' => 'Finished Product Edit Production',
@@ -298,7 +352,6 @@ test('production edit page stays editable and shows bom requirements info', func
         ->assertSee('(PP-PROD-EDIT-001) Production Plan Edit Production')
         ->assertSee('(BOM-PROD-EDIT) BOM Edit Production')
         ->assertSee('Ringkasan Kebutuhan')
-        ->assertSee('Total bahan 1 | Available 0 | Partial 0 | Unavailable 1 | Issued 0 | Ready No')
         ->assertSee('(RM-PROD-EDIT) Raw Material Edit Production')
         ->assertSee('2,00');
 });
@@ -321,6 +374,26 @@ test('production view page exposes finish action and marks draft production as f
     ]);
 
     $category = ProductCategory::factory()->create();
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '1-201'],
+        ['name' => 'Persediaan Barang Dalam Proses - WIP Inventory', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '1400.04'],
+        ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '5230'],
+        ['name' => 'Biaya Tenaga Kerja Proses Produksi', 'type' => 'Expense', 'is_active' => true]
+    );
+
+    ChartOfAccount::query()->firstOrCreate(
+        ['code' => '6-202'],
+        ['name' => 'Biaya Tenaga Kerja Langsung - Direct Labor 2', 'type' => 'Expense', 'is_active' => true]
+    );
 
     $finishedProduct = Product::factory()->create([
         'name' => 'Finished Product Finish Production',

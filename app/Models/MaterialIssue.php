@@ -84,6 +84,11 @@ class MaterialIssue extends Model
         return $this->morphOne(JournalEntry::class, 'source');
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     /**
      * Calculate total cost from items
      */
@@ -266,13 +271,22 @@ class MaterialIssue extends Model
         $summary = $this->warehouseConfirmationStatusSummary();
 
         if ($summary['all_confirmed']) {
-            $result = $this->update([
-                'approved_by' => $warehouseConfirmation->confirmed_by ?? $this->approved_by ?? $this->created_by,
-                'approved_at' => $warehouseConfirmation->confirmed_at ?? now(),
+            $approvedAt = $warehouseConfirmation->confirmed_at ?? now();
+            $approvedBy = $warehouseConfirmation->confirmed_by ?? $this->approved_by ?? $this->created_by;
+
+            $this->update([
+                'approved_by' => $approvedBy,
+                'approved_at' => $approvedAt,
                 'status' => self::STATUS_APPROVED,
             ]);
 
-            Log::info('MaterialIssue auto-approved from confirmed warehouse confirmation', [
+            $result = $this->update([
+                'approved_by' => $approvedBy,
+                'approved_at' => $approvedAt,
+                'status' => self::STATUS_COMPLETED,
+            ]);
+
+            Log::info('MaterialIssue auto-completed from confirmed warehouse confirmation', [
                 'material_issue_id' => $this->id,
                 'issue_number' => $this->issue_number,
                 'warehouse_confirmation_id' => $warehouseConfirmation->id,

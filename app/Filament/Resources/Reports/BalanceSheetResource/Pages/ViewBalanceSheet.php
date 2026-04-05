@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Reports\BalanceSheetResource\Pages;
 use App\Filament\Resources\Reports\BalanceSheetResource;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Services\BalanceSheetService;
 use Filament\Resources\Pages\Page;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
@@ -12,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use App\Models\Cabang;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -163,41 +165,10 @@ class ViewBalanceSheet extends Page
     {
         $asOf = $this->as_of_date ? Carbon::parse($this->as_of_date)->endOfDay() : now()->endOfDay();
 
-        // Check for unbalanced journal entries
-        $unbalancedEntries = $this->getUnbalancedJournalEntries($asOf);
-
-        // Group COA types for Balance Sheet
-        $assets = ChartOfAccount::whereIn('type', ['Asset', 'Contra Asset'])->get();
-        $liabilities = ChartOfAccount::where('type', 'Liability')->get();
-        $equities = ChartOfAccount::where('type', 'Equity')->get();
-
-        // Sum per account to respect each account's type and opening balance
-        $assetTotal = $assets->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $liabTotal = $liabilities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $equityAccountsTotal = $equities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $retained = $this->getRetainedEarnings($asOf);
-        $current = $this->getCurrentEarnings($asOf);
-        $equityTotal = $equityAccountsTotal + $retained + $current;
-        $difference = $assetTotal - ($liabTotal + $equityTotal);
-        $balanced = abs($difference) < 0.01;
-
-        return [
-            'assets' => $this->detailByParent($assets, $asOf, positiveFor: 'Asset'),
-            'liabilities' => $this->detailByParent($liabilities, $asOf, positiveFor: 'Liability'),
-            'equity' => $this->detailByParentWithRetainedEarnings($equities, $asOf, $retained),
-            'retained_earnings' => $retained,
-            'current_earnings' => $current,
-            'asset_total' => $assetTotal,
-            'liab_total' => $liabTotal,
-            'equity_total' => $equityTotal,
-            'balanced' => $balanced,
-            'difference' => $difference,
-            'balance_warning' => $balanced
-                ? null
-                : 'Total aset tidak sama dengan total kewajiban dan ekuitas. Selisih ini mencerminkan ledger aktual dan harus ditelusuri ke jurnal sumber.',
-            'unbalanced_entries' => $unbalancedEntries,
-            'has_unbalanced_entries' => !empty($unbalancedEntries),
-        ];
+        return $this->applyDisplayMode($this->legacyReportDataFromService(
+            $this->getFullReportServiceData($asOf),
+            $asOf,
+        ));
     }
 
     protected function sumBalance($accounts, Carbon $asOf): float
@@ -216,38 +187,18 @@ class ViewBalanceSheet extends Page
         $asOf = $this->as_of_date ? Carbon::parse($this->as_of_date)->endOfDay() : now()->endOfDay();
         $showZero = (bool) ($this->include_zero_balances ?? false);
 
-        $assets = ChartOfAccount::whereIn('type', ['Asset', 'Contra Asset'])
-            ->where('is_active', true)
-            ->whereNull('deleted_at')
-            ->orderBy('code')
-            ->get();
+        $serviceData = $this->getFullReportServiceData($asOf);
+        $assetGroups = $this->buildClassicGroups($this->classicAssetAccounts($serviceData), $asOf, $showZero);
+        $liabilityGroups = $this->buildClassicGroups($this->liabilityAccounts($serviceData), $asOf, $showZero);
+        $equityGroups = $this->buildClassicGroups($this->equityAccounts($serviceData), $asOf, $showZero);
 
-        $liabilities = ChartOfAccount::where('type', 'Liability')
-            ->where('is_active', true)
-            ->whereNull('deleted_at')
-            ->orderBy('code')
-            ->get();
-
-        $equities = ChartOfAccount::where('type', 'Equity')
-            ->where('is_active', true)
-            ->whereNull('deleted_at')
-            ->orderBy('code')
-            ->get();
-
-        // Build classic parent→child groups
-        $assetGroups     = $this->buildClassicGroups($assets, $asOf, $showZero);
-        $liabilityGroups = $this->buildClassicGroups($liabilities, $asOf, $showZero);
-        $equityGroups    = $this->buildClassicGroups($equities, $asOf, $showZero);
-
-        // Grand totals
-        $totalAssets           = $assets->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $totalLiabilities      = $liabilities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $totalEquityAccounts   = $equities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $retained              = $this->getRetainedEarnings($asOf);
-        $current               = $this->getCurrentEarnings($asOf);
-        $totalEquity           = $totalEquityAccounts + $retained + $current;
-        $totalLiabAndEquity    = $totalLiabilities + $totalEquity;
-        $difference            = $totalAssets - $totalLiabAndEquity;
+        $retained = (float) ($serviceData['retained_earnings'] ?? 0);
+        $current = 0.0;
+        $totalAssets = (float) ($serviceData['total_assets'] ?? 0);
+        $totalLiabilities = (float) ($serviceData['total_liabilities'] ?? 0);
+        $totalEquity = (float) ($serviceData['total_equity'] ?? 0);
+        $totalLiabAndEquity = (float) ($serviceData['total_liabilities_and_equity'] ?? 0);
+        $difference = (float) ($serviceData['difference'] ?? 0);
 
         return [
             'asset_groups'                => $assetGroups,
@@ -259,9 +210,120 @@ class ViewBalanceSheet extends Page
             'total_liabilities'           => $totalLiabilities,
             'total_equity'                => $totalEquity,
             'total_liabilities_and_equity' => $totalLiabAndEquity,
-            'is_balanced'                 => abs($difference) < 0.01,
+            'is_balanced'                 => (bool) ($serviceData['is_balanced'] ?? abs($difference) < 0.01),
             'difference'                  => $difference,
         ];
+    }
+
+    protected function getFullReportServiceData(Carbon $asOf): array
+    {
+        return $this->balanceSheetService()->generate([
+            'as_of_date' => $asOf->toDateString(),
+            'cabang_id' => $this->resolvedCabangId(),
+            'display_level' => 'all',
+            'show_zero_balance' => true,
+        ]);
+    }
+
+    protected function legacyReportDataFromService(array $serviceData, Carbon $asOf): array
+    {
+        $unbalancedEntries = $this->getUnbalancedJournalEntries($asOf);
+        $difference = (float) ($serviceData['difference'] ?? 0);
+        $balanced = (bool) ($serviceData['is_balanced'] ?? abs($difference) < 0.01);
+
+        return [
+            'assets' => $this->detailByParent($this->legacyAssetAccounts($serviceData), $asOf, positiveFor: 'Asset'),
+            'liabilities' => $this->detailByParent($this->liabilityAccounts($serviceData), $asOf, positiveFor: 'Liability'),
+            'equity' => $this->detailByParentWithRetainedEarnings(
+                $this->equityAccounts($serviceData),
+                $asOf,
+                (float) ($serviceData['retained_earnings'] ?? 0),
+            ),
+            'retained_earnings' => (float) ($serviceData['retained_earnings'] ?? 0),
+            'current_earnings' => 0.0,
+            'asset_total' => (float) ($serviceData['total_assets'] ?? 0),
+            'liab_total' => (float) ($serviceData['total_liabilities'] ?? 0),
+            'equity_total' => (float) ($serviceData['total_equity'] ?? 0),
+            'balanced' => $balanced,
+            'difference' => $difference,
+            'balance_warning' => $balanced
+                ? null
+                : 'Total aset tidak sama dengan total kewajiban dan ekuitas. Selisih ini mencerminkan ledger aktual dan harus ditelusuri ke jurnal sumber.',
+            'unbalanced_entries' => $unbalancedEntries,
+            'has_unbalanced_entries' => !empty($unbalancedEntries),
+        ];
+    }
+
+    protected function legacyAssetAccounts(array $serviceData): Collection
+    {
+        return $this->assetAccounts($serviceData)
+            ->merge($this->contraAssetAccounts($serviceData)->map(function ($account) {
+                $legacyAccount = clone $account;
+                $legacyAccount->legacy_balance = -abs((float) ($account->balance ?? 0));
+
+                return $legacyAccount;
+            }))
+            ->sortBy('code')
+            ->values();
+    }
+
+    protected function classicAssetAccounts(array $serviceData): Collection
+    {
+        return $this->legacyAssetAccounts($serviceData);
+    }
+
+    protected function assetAccounts(array $serviceData): Collection
+    {
+        return $this->serviceAccounts($serviceData, 'current_assets')
+            ->merge($this->serviceAccounts($serviceData, 'fixed_assets'))
+            ->sortBy('code')
+            ->values();
+    }
+
+    protected function contraAssetAccounts(array $serviceData): Collection
+    {
+        return $this->serviceAccounts($serviceData, 'contra_assets');
+    }
+
+    protected function liabilityAccounts(array $serviceData): Collection
+    {
+        return $this->serviceAccounts($serviceData, 'current_liabilities')
+            ->merge($this->serviceAccounts($serviceData, 'long_term_liabilities'))
+            ->sortBy('code')
+            ->values();
+    }
+
+    protected function equityAccounts(array $serviceData): Collection
+    {
+        return $this->serviceAccounts($serviceData, 'equity');
+    }
+
+    protected function serviceAccounts(array $serviceData, string $section): Collection
+    {
+        return collect($serviceData[$section]['accounts'] ?? [])
+            ->map(function ($account) {
+                $legacyAccount = clone $account;
+                $legacyAccount->legacy_balance = (float) ($account->balance ?? 0);
+
+                return $legacyAccount;
+            })
+            ->values();
+    }
+
+    protected function resolvedCabangId(): ?int
+    {
+        if (!empty($this->cabang_id)) {
+            return (int) $this->cabang_id;
+        }
+
+        return !empty($this->branches) && count($this->branches) === 1
+            ? (int) $this->branches[0]
+            : null;
+    }
+
+    protected function balanceSheetService(): BalanceSheetService
+    {
+        return app(BalanceSheetService::class);
     }
 
     /**
@@ -282,7 +344,14 @@ class ViewBalanceSheet extends Page
     {
         // Pre-compute balance for every account (avoids N+1 compared to individual queries)
         $accountsById = $accounts->keyBy('id')->map(function ($coa) use ($asOf) {
-            $coa->computed_balance = $this->calculateBalanceForCoa($coa, $asOf);
+            if (isset($coa->legacy_balance)) {
+                $coa->computed_balance = (float) $coa->legacy_balance;
+            } elseif (isset($coa->balance)) {
+                $coa->computed_balance = (float) $coa->balance;
+            } else {
+                $coa->computed_balance = $this->calculateBalanceForCoa($coa, $asOf);
+            }
+
             return $coa;
         });
 
@@ -407,7 +476,9 @@ class ViewBalanceSheet extends Page
             $items = [];
             $subtotal = 0;
             foreach ($list as $coa) {
-                $balance = $this->sumBalance(collect([$coa]), $asOf);
+                $balance = isset($coa->legacy_balance)
+                    ? (float) $coa->legacy_balance
+                    : $this->sumBalance(collect([$coa]), $asOf);
                 $sign = ($positiveFor === 'Asset' || $positiveFor === 'Expense') ? 1 : 1; // keep positive presentation
                 $items[] = [
                     'coa' => $coa,
@@ -434,7 +505,9 @@ class ViewBalanceSheet extends Page
             $items = [];
             $subtotal = 0;
             foreach ($list as $coa) {
-                $balance = $this->sumBalance(collect([$coa]), $asOf);
+                $balance = isset($coa->legacy_balance)
+                    ? (float) $coa->legacy_balance
+                    : $this->sumBalance(collect([$coa]), $asOf);
                 
                 // Note: Retained earnings is calculated separately and added to equity total,
                 // so don't add it here to avoid double-counting
@@ -554,9 +627,6 @@ class ViewBalanceSheet extends Page
     public function getBalanceSheetData(): array
     {
         $data = $this->getReportData();
-
-        // Apply display mode filtering
-        $data = $this->applyDisplayMode($data);
 
         // Handle multi-period data if periods are selected
         if ($this->use_multi_period && !empty($this->selected_periods)) {
@@ -735,25 +805,13 @@ class ViewBalanceSheet extends Page
 
     protected function getReportDataForDate(Carbon $asOf): array
     {
-        // Clone the logic from getReportData but for a specific date
-        $unbalancedEntries = $this->getUnbalancedJournalEntries($asOf);
-
-        $assets = ChartOfAccount::whereIn('type', ['Asset', 'Contra Asset'])->get();
-        $liabilities = ChartOfAccount::where('type', 'Liability')->get();
-        $equities = ChartOfAccount::where('type', 'Equity')->get();
-
-        $assetTotal = $assets->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $liabTotal = $liabilities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $equityAccountsTotal = $equities->sum(fn ($coa) => $this->calculateBalanceForCoa($coa, $asOf));
-        $retained = $this->getRetainedEarnings($asOf);
-        $current = $this->getCurrentEarnings($asOf);
-        $equityTotal = $equityAccountsTotal + $retained + $current;
+        $serviceData = $this->getFullReportServiceData($asOf);
 
         return [
-            'asset_total' => $assetTotal,
-            'liab_total' => $liabTotal,
-            'equity_total' => $equityTotal,
-            'balanced' => abs(($assetTotal) - ($liabTotal + $equityTotal)) < 0.01,
+            'asset_total' => (float) ($serviceData['total_assets'] ?? 0),
+            'liab_total' => (float) ($serviceData['total_liabilities'] ?? 0),
+            'equity_total' => (float) ($serviceData['total_equity'] ?? 0),
+            'balanced' => (bool) ($serviceData['is_balanced'] ?? false),
         ];
     }
 

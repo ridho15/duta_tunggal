@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
-use App\Models\AccountReceivable;
-use App\Models\AccountPayable;
 use App\Models\Cabang;
+use App\Services\IncomeStatementService;
+use App\Services\Reports\AgeingReportService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 use App\Filament\Resources\Reports\BalanceSheetResource\Pages\ViewBalanceSheet;
 use App\Filament\Resources\Reports\ProfitAndLossResource\Pages\ViewProfitAndLoss;
@@ -61,7 +60,22 @@ class FinancialReportPreviewController extends Controller
         $page->compareEndDate   = $request->input('compareEndDate');
 
         try {
-            $data = $page->getReportData();
+            $report = app(IncomeStatementService::class)->generate([
+                'start_date' => $page->startDate,
+                'end_date' => $page->endDate,
+                'cabang_id' => $page->cabang_id ? (int) $page->cabang_id : null,
+            ]);
+
+            $data = [
+                'revenue' => (float) ($report['revenue']['total'] ?? 0),
+                'expense' => (float) ($report['expense']['total'] ?? 0),
+                'gross_profit' => (float) ($report['gross_profit'] ?? 0),
+                'operating_profit' => (float) ($report['operating_profit'] ?? 0),
+                'other_net' => (float) ($report['net_other_income_expense'] ?? 0),
+                'profit_before_tax' => (float) ($report['profit_before_tax'] ?? 0),
+                'tax' => (float) ($report['tax_expense']['total'] ?? 0),
+                'net_profit' => (float) ($report['net_profit'] ?? 0),
+            ];
         } catch (\Throwable $e) {
             $data = ['revenue'=>0,'expense'=>0,'gross_profit'=>0,'operating_profit'=>0,'other_net'=>0,'profit_before_tax'=>0,'tax'=>0,'net_profit'=>0];
             \Illuminate\Support\Facades\Log::error('[FinancialPreview] profitAndLoss: ' . $e->getMessage());
@@ -128,109 +142,12 @@ class FinancialReportPreviewController extends Controller
     // ── Ageing Report ─────────────────────────────────────────────────────────
     public function ageingReport(Request $request)
     {
-        $asOfDate   = $request->input('as_of_date', now()->toDateString());
-        $cabangId   = $request->input('cabang_id');
-        $reportType = $request->input('report_type', 'receivables');
-        $asOf       = Carbon::parse($asOfDate);
+        $report = app(AgeingReportService::class)->generate([
+            'as_of_date' => $request->input('as_of_date', now()->toDateString()),
+            'cabang_id' => $request->input('cabang_id'),
+            'report_type' => $request->input('report_type', 'receivables'),
+        ]);
 
-        // Closure: calc aging bucket
-        $calcBucket = function ($record) use ($asOf): string {
-            $days = 0;
-            if (!empty($record->ageingSchedule?->days_outstanding)) {
-                $days = (int) $record->ageingSchedule->days_outstanding;
-            } elseif ($record->invoice?->invoice_date) {
-                $days = (int) Carbon::parse($record->invoice->invoice_date)->diffInDays($asOf, false);
-            }
-            if ($days <= 30)  return 'Current';
-            if ($days <= 60)  return '31–60';
-            if ($days <= 90)  return '61–90';
-            return '>90';
-        };
-
-        // AR records
-        if ($reportType !== 'payables') {
-            $arQ = AccountReceivable::with(['customer','invoice','ageingSchedule','cabang'])
-                ->where('remaining', '>', 0);
-            if ($cabangId) {
-                $arQ->where('cabang_id', $cabangId);
-            }
-            $arRecords = $arQ->orderBy('id')->get();
-            foreach ($arRecords as $rec) {
-                $days = 0;
-                if (!empty($rec->ageingSchedule?->days_outstanding)) {
-                    $days = (int) $rec->ageingSchedule->days_outstanding;
-                } elseif ($rec->invoice?->invoice_date) {
-                    $days = (int) Carbon::parse($rec->invoice->invoice_date)->diffInDays($asOf, false);
-                }
-                $rec->days_outstanding_computed = $days;
-                $rec->aging_bucket_computed     = $calcBucket($rec);
-            }
-        } else {
-            $arRecords = collect();
-        }
-
-        // AP records
-        if ($reportType !== 'receivables') {
-            $apQ = AccountPayable::with(['supplier','invoice','ageingSchedule'])
-                ->where('remaining', '>', 0);
-            if ($cabangId) {
-                $apQ->whereHas('invoice', fn($q) => $q->where('cabang_id', $cabangId));
-            }
-            $apRecords = $apQ->orderBy('id')->get();
-            foreach ($apRecords as $rec) {
-                $days = 0;
-                if (!empty($rec->ageingSchedule?->days_outstanding)) {
-                    $days = (int) $rec->ageingSchedule->days_outstanding;
-                } elseif ($rec->invoice?->invoice_date) {
-                    $days = (int) Carbon::parse($rec->invoice->invoice_date)->diffInDays($asOf, false);
-                }
-                $rec->days_outstanding_computed = $days;
-                $rec->aging_bucket_computed     = $calcBucket($rec);
-            }
-        } else {
-            $apRecords = collect();
-        }
-
-        // Summaries per bucket
-        $buckets = ['Current', '31–60', '61–90', '>90'];
-        $arSummary = [];
-        $apSummary = [];
-        foreach ($buckets as $b) {
-            $arSummary[$b] = $arRecords->where('aging_bucket_computed', $b)->sum('remaining');
-            $apSummary[$b] = $apRecords->where('aging_bucket_computed', $b)->sum('remaining');
-        }
-
-        // Expected cash flow (AR/AP due within next 30 days)
-        $futureDate = now()->addDays(30);
-        $expectedInflow  = AccountReceivable::whereHas('invoice', fn($q) => $q->whereBetween('due_date', [now(), $futureDate]))->when($cabangId, fn($q) => $q->where('cabang_id', $cabangId))->sum('remaining');
-        $expectedOutflow = AccountPayable::whereHas('invoice', function ($q) use ($futureDate, $cabangId) {
-            $q->whereBetween('due_date', [now(), $futureDate]);
-            if ($cabangId) {
-                $q->where('cabang_id', $cabangId);
-            }
-        })->sum('remaining');
-
-        // Overdue AR/AP
-        $overdueAR = AccountReceivable::whereHas('invoice', fn($q) => $q->where('due_date', '<', now()))->when($cabangId, fn($q) => $q->where('cabang_id', $cabangId))->sum('remaining');
-        $overdueAP = AccountPayable::whereHas('invoice', function ($q) use ($cabangId) {
-            $q->where('due_date', '<', now());
-            if ($cabangId) {
-                $q->where('cabang_id', $cabangId);
-            }
-        })->sum('remaining');
-
-        return response(view('reports.preview.ageing-report', [
-            'arRecords'      => $arRecords,
-            'apRecords'      => $apRecords,
-            'arSummary'      => $arSummary,
-            'apSummary'      => $apSummary,
-            'asOfDate'       => $asOfDate,
-            'cabangId'       => $cabangId,
-            'reportType'     => $reportType,
-            'expectedInflow' => $expectedInflow,
-            'expectedOutflow'=> $expectedOutflow,
-            'overdueAR'      => $overdueAR,
-            'overdueAP'      => $overdueAP,
-        ]));
+        return response(view('reports.preview.ageing-report', $report));
     }
 }

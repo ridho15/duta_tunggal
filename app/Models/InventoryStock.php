@@ -56,6 +56,30 @@ class InventoryStock extends Model
      */
     public function getQtyOnHandAttribute()
     {
-        return $this->qty_available - $this->qty_reserved;
+        return $this->free_qty;
+    }
+
+    public function getFreeQtyAttribute()
+    {
+        return (float) $this->qty_available - (float) $this->qty_reserved;
+    }
+
+    public static function freeQtyFor(?int $productId, ?int $warehouseId = null, ?int $rakId = null): float
+    {
+        if (! $productId) {
+            return 0.0;
+        }
+
+        $query = static::query()->where('product_id', $productId);
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        if ($rakId) {
+            $query->where('rak_id', $rakId);
+        }
+
+        return (float) $query->get()->sum('free_qty');
     }
 }

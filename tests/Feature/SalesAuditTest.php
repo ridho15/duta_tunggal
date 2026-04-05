@@ -42,6 +42,8 @@ class SalesAuditTest extends TestCase
     protected $driver;
     protected $vehicle;
     protected $rak;
+    protected $cogsCoa;
+    protected $goodsDeliveryCoa;
 
     protected function setUp(): void
     {
@@ -117,7 +119,15 @@ class SalesAuditTest extends TestCase
         ChartOfAccount::firstOrCreate(['code' => '1112.01'], ['name' => 'Bank Default', 'type' => 'Asset']);
         ChartOfAccount::firstOrCreate(['code' => '4000'], ['name' => 'Penjualan', 'type' => 'Revenue']);
         ChartOfAccount::firstOrCreate(['code' => '2110-02'], ['name' => 'PPN Keluaran', 'type' => 'Liability']);
+        $this->cogsCoa = ChartOfAccount::firstOrCreate(['code' => '5100.10'], ['name' => 'Harga Pokok Penjualan', 'type' => 'Expense']);
+        $this->goodsDeliveryCoa = ChartOfAccount::firstOrCreate(['code' => '1140.20'], ['name' => 'Barang Terkirim', 'type' => 'Asset']);
         ChartOfAccount::reguard();
+
+        $this->product->update([
+            'cost_price' => 8000,
+            'cogs_coa_id' => $this->cogsCoa->id,
+            'goods_delivery_coa_id' => $this->goodsDeliveryCoa->id,
+        ]);
     }
 
     /** @test */
@@ -286,7 +296,7 @@ class SalesAuditTest extends TestCase
                               ->first();
         $stock->update([
             'qty_reserved' => 30,
-            'qty_available' => 70.0 // 100 - 30 reserved
+            'qty_available' => 100.0
         ]);
 
         // Refresh stock from database
@@ -303,7 +313,8 @@ class SalesAuditTest extends TestCase
         $this->assertNotNull($salesOrder->warehouse_confirmed_at);
         $this->assertNotNull($salesOrder->warehouseConfirmation);
         $this->assertEquals(30, $stock->qty_reserved);
-        $this->assertEquals(70.0, $stock->qty_available); // 100 - 30 reserved
+        $this->assertEquals(100.0, $stock->qty_available);
+        $this->assertEquals(70.0, (float) $stock->qty_available - (float) $stock->qty_reserved);
     }
 
     /** @test */

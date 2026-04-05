@@ -45,13 +45,13 @@ class ViewInventoryStock extends ViewRecord
                 Section::make('Informasi Stok')
                     ->schema([
                         TextEntry::make('qty_available')
-                            ->label('Qty Available')
+                            ->label('Qty Fisik')
                             ->numeric(),
                         TextEntry::make('qty_reserved')
                             ->label('Qty Reserved')
                             ->numeric(),
                         TextEntry::make('qty_on_hand')
-                            ->label('Qty On Hand (Available - Reserved)')
+                            ->label('Qty Bebas (Fisik - Reserved)')
                             ->numeric(),
                         TextEntry::make('qty_min')
                             ->label('Qty Minimal')

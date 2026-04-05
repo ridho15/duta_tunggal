@@ -371,6 +371,7 @@ class ManufacturingJournalTest extends TestCase
             ->and((float) $entries->sum('debit'))->toBe(4200.0)
             ->and((float) $entries->sum('credit'))->toBe(4200.0);
     }
+
 }
 
 it('uses only manufacturing order linked material issues for production wip cost', function () {

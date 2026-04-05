@@ -61,13 +61,15 @@ class StockAdjustmentService
 
                     $requiredQuantity = abs((float) $item->difference_qty);
 
-                    if ((float) $inventoryStock->qty_available < $requiredQuantity) {
+                    $freeQuantity = (float) $inventoryStock->free_qty;
+
+                    if ($freeQuantity < $requiredQuantity) {
                         throw ValidationException::withMessages([
                             'stock' => sprintf(
                                 'Stok tidak cukup untuk produk %s di rak %s. Tersedia %s, dibutuhkan %s.',
                                 $item->product?->name ?? $item->product_id,
                                 $item->rak?->name ?? '-',
-                                rtrim(rtrim((string) $inventoryStock->qty_available, '0'), '.'),
+                                rtrim(rtrim((string) $freeQuantity, '0'), '.'),
                                 rtrim(rtrim((string) $requiredQuantity, '0'), '.')
                             ),
                         ]);

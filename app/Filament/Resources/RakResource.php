@@ -25,6 +25,8 @@ class RakResource extends Resource
 {
     protected static ?string $model = Rak::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-square-2-stack';
 
     protected static ?string $navigationGroup = 'Master Data';

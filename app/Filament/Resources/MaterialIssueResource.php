@@ -36,6 +36,8 @@ class MaterialIssueResource extends Resource
 
     protected static ?string $modelLabel = 'Pengambilan Bahan Baku';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
@@ -317,12 +319,7 @@ class MaterialIssueResource extends Resource
                                     ->label('Subtotal')
                                     ->disabled()
                                     ->indonesianMoney()
-                                    ->dehydrated()
-                                    ->rules(['numeric', 'min:0'])
-                                    ->validationMessages([
-                                        'numeric' => 'Subtotal harus berupa angka.',
-                                        'min' => 'Subtotal minimal 0.',
-                                    ]),
+                                    ->dehydrated(false),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
                                     ->searchable()
@@ -1014,7 +1011,7 @@ class MaterialIssueResource extends Resource
     /**
      * Validate stock availability for material issue items
      */
-    protected static function validateStockAvailability(MaterialIssue $materialIssue): array
+    public static function validateStockAvailability(MaterialIssue $materialIssue): array
     {
         $materialIssue->loadMissing('items.product');
 

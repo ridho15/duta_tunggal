@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\Reports\ProfitLossMultiDivisionExportPresenter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -9,10 +10,7 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Font;
-use Carbon\Carbon;
 
 /**
  * Excel export for the Profit & Loss Multiple By Division report.
@@ -35,103 +33,7 @@ class ProfitLossMultiDivisionExport implements FromArray, ShouldAutoSize, WithTi
 
     public function array(): array
     {
-        $data      = $this->reportData;
-        $divisions = $data['divisions']       ?? [];
-        $divIds    = array_column($divisions, 'id');
-        $rows      = [];
-
-        // ── Header rows ──────────────────────────────────────────────────────
-        $rows[] = ['PT. DUTA TUNGGAL'];
-        $rows[] = ['PROFIT LOSS MULTIPLE BY DIVISION'];
-        $start  = $data['period']['start'] ?? '';
-        $end    = $data['period']['end']   ?? '';
-        $rows[] = [
-            'As Of : ' . Carbon::parse($start)->format('d-F-Y') .
-            ' to '     . Carbon::parse($end)->format('d-F-Y'),
-        ];
-        $rows[] = [];
-
-        // ── Column header row ────────────────────────────────────────────────
-        $headerRow = ['AccountNo', 'AccountName'];
-        foreach ($divisions as $div) {
-            $name = strtoupper($div['nama'] ?? $div['kode']);
-            $headerRow[] = $name . ' Balance';
-            $headerRow[] = $name . ' Vtc%';
-        }
-        $rows[] = $headerRow;
-
-        $fmt = fn ($v) => number_format((float) $v, 2, '.', ',');
-
-        // ── Helper: build a data row ─────────────────────────────────────────
-        $makeRow = function (string $code, string $label, array $balances, array $revenue) use ($divIds, $fmt): array {
-            $row = [$code, $label];
-            foreach ($divIds as $d) {
-                $b    = $balances[$d] ?? 0.0;
-                $rev  = $revenue[$d]  ?? 0.0;
-                $vtc  = $rev != 0 ? round(($b / $rev) * 100, 2) : 0.0;
-                $row[] = $fmt($b);
-                $row[] = $fmt($vtc);
-            }
-            return $row;
-        };
-
-        $totalRevenue = $data['total_revenue'] ?? array_fill_keys($divIds, 0.0);
-
-        // ── Revenue section ──────────────────────────────────────────────────
-        foreach ($data['revenue_rows'] ?? [] as $row) {
-            if ($row['type'] === 'section_header') {
-                $rows[] = ['', strtoupper($row['name'])];
-            } elseif ($row['type'] === 'account') {
-                $rows[] = $makeRow($row['code'], '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
-            } elseif (in_array($row['type'], ['subtotal', 'total_revenue'])) {
-                $rows[] = $makeRow('', $row['name'], $row['balances'] ?? [], $totalRevenue);
-            }
-        }
-        $rows[] = [];
-
-        // ── COGS section ─────────────────────────────────────────────────────
-        foreach ($data['cogs_rows'] ?? [] as $row) {
-            if ($row['type'] === 'section_header') {
-                $rows[] = ['', strtoupper($row['name'])];
-            } elseif ($row['type'] === 'account') {
-                $rows[] = $makeRow($row['code'], '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
-            } elseif (in_array($row['type'], ['subtotal', 'total_cogs'])) {
-                $rows[] = $makeRow('', $row['name'], $row['balances'] ?? [], $totalRevenue);
-            }
-        }
-        if (empty($data['cogs_rows'])) {
-            $rows[] = $makeRow('', 'Total Cost Of Goods Sold', array_fill_keys($divIds, 0.0), $totalRevenue);
-        }
-
-        // ── Gross Profit ─────────────────────────────────────────────────────
-        $rows[] = $makeRow('', 'Gross Profit', $data['gross_profit'] ?? [], $totalRevenue);
-        $rows[] = [];
-
-        // ── Operating Expenses ───────────────────────────────────────────────
-        foreach ($data['opex_sections'] ?? [] as $section) {
-            foreach ($section['rows'] as $row) {
-                if ($row['type'] === 'section_header') {
-                    $rows[] = ['', strtoupper($row['name'])];
-                } elseif ($row['type'] === 'account') {
-                    $rows[] = $makeRow($row['code'], '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
-                } elseif ($row['type'] === 'subtotal') {
-                    $rows[] = $makeRow('', $row['name'], $row['balances'] ?? [], $totalRevenue);
-                }
-            }
-        }
-        $rows[] = $makeRow('', 'Total Operating Expenses', $data['total_opex'] ?? [], $totalRevenue);
-        $rows[] = $makeRow('', 'Operating Profit (EBIT)', $data['operating_profit'] ?? [], $totalRevenue);
-        $rows[] = [];
-
-        // ── Other Income / Expense ───────────────────────────────────────────
-        foreach ($data['other_rows'] ?? [] as $row) {
-            $rows[] = $makeRow($row['code'] ?? '', '  ' . $row['name'], $row['balances'] ?? [], $totalRevenue);
-        }
-
-        // ── Net Profit ───────────────────────────────────────────────────────
-        $rows[] = $makeRow('', 'Net Profit', $data['net_profit'] ?? [], $totalRevenue);
-
-        return $rows;
+        return app(ProfitLossMultiDivisionExportPresenter::class)->rows($this->reportData);
     }
 
     public function registerEvents(): array

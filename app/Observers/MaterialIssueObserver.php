@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\MaterialIssue;
 use App\Models\ManufacturingOrder;
 use App\Models\MaterialIssueItem;
+use App\Models\Production;
 use App\Services\ManufacturingJournalService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -47,6 +48,7 @@ class MaterialIssueObserver
                 $this->consumeReservedStock($materialIssue);
                 $this->createStockMovements($materialIssue); // Create stock movements for record keeping
                 $this->generateJournal($materialIssue);
+                $this->syncRelatedProductionWipJournal($materialIssue);
                 $this->createManufacturingOrder($materialIssue); // Create Manufacturing Order automatically
                 $this->createProductionCostEntry($materialIssue);
                 // Release reserved stock is now handled by StockReservationService.consumeReservedStockForMaterialIssue
@@ -66,6 +68,7 @@ class MaterialIssueObserver
         // If created directly as completed, mirror update behavior
         if ($materialIssue->isCompleted()) {
             $this->generateJournal($materialIssue);
+            $this->syncRelatedProductionWipJournal($materialIssue);
             $this->createStockMovements($materialIssue);
         }
     }
@@ -92,6 +95,45 @@ class MaterialIssueObserver
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
+        }
+    }
+
+    protected function syncRelatedProductionWipJournal(MaterialIssue $materialIssue): void
+    {
+        try {
+            $materialIssue->loadMissing('manufacturingOrder.productions.qualityControl');
+
+            $productions = $materialIssue->manufacturingOrder?->productions;
+
+            if ((! $productions || $productions->isEmpty()) && $materialIssue->production_plan_id) {
+                $productions = Production::query()
+                    ->whereHas('manufacturingOrder', function ($query) use ($materialIssue) {
+                        $query->where('production_plan_id', $materialIssue->production_plan_id);
+                    })
+                    ->with('qualityControl')
+                    ->get();
+            }
+
+            if (! $productions || $productions->isEmpty()) {
+                return;
+            }
+
+            $journalService = app(ManufacturingJournalService::class);
+
+            foreach ($productions as $production) {
+                if ((int) ($production->qualityControl?->status ?? 0) === 1) {
+                    continue;
+                }
+
+                $journalService->generateJournalForProductionInProgress($production);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('MaterialIssueObserver: failed to sync related production WIP journal', [
+                'material_issue_id' => $materialIssue->id,
+                'manufacturing_order_id' => $materialIssue->manufacturing_order_id,
+                'production_plan_id' => $materialIssue->production_plan_id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -303,9 +345,6 @@ class MaterialIssueObserver
                 'status' => 'draft',
                 'items' => $items,
             ]);
-
-            // Create warehouse confirmation
-            $manufacturingService->createWarehouseConfirmation($manufacturingOrder);
 
             Log::info('MaterialIssueObserver: Manufacturing Order created successfully', [
                 'material_issue_id' => $materialIssue->id,

@@ -22,6 +22,8 @@ class AssetTransferResource extends Resource
 {
     protected static ?string $model = AssetTransfer::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
 
     protected static ?string $navigationGroup = 'Asset Management';

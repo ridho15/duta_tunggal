@@ -119,6 +119,9 @@ test('journal entry only created when approved and completed', function () {
 
     $confirmation = app(\App\Services\ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($materialIssue);
 
+    expect(\App\Models\JournalEntry::where('source_type', MaterialIssue::class)
+        ->where('source_id', $materialIssue->id)->exists())->toBeFalse();
+
     $confirmation->warehouseConfirmationItems->each(function (WarehouseConfirmationItem $item) {
         $item->update([
             'status' => 'confirmed',
@@ -128,18 +131,7 @@ test('journal entry only created when approved and completed', function () {
 
     $materialIssue = $materialIssue->fresh();
 
-    // Before approval and completion, no journal entry should exist
-    expect(\App\Models\JournalEntry::where('source_type', MaterialIssue::class)
-        ->where('source_id', $materialIssue->id)->exists())->toBeFalse();
-
-    expect($materialIssue->fresh()->status)->toBe(MaterialIssue::STATUS_APPROVED);
-
-    // Still no journal entry after approval
-    expect(\App\Models\JournalEntry::where('source_type', MaterialIssue::class)
-        ->where('source_id', $materialIssue->id)->exists())->toBeFalse();
-
-    // Complete the material issue - this should create journal entries
-    $materialIssue->update(['status' => MaterialIssue::STATUS_COMPLETED]);
+    expect($materialIssue->fresh()->status)->toBe(MaterialIssue::STATUS_COMPLETED);
 
     // Now journal entries should exist (1 debit + 1 credit per product)
     $journalEntries = \App\Models\JournalEntry::where('source_type', MaterialIssue::class)

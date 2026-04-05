@@ -268,37 +268,7 @@ class StockMovementResource extends Resource
                 TextColumn::make('fromModel')
                     ->label('Source')
                     ->formatStateUsing(function ($record) {
-                        if ($record->fromModel) {
-                            $modelType = $record->from_model_type;
-                            $modelName = match ($modelType) {
-                                'App\Models\SaleOrder' => 'Sales Order',
-                                'App\Models\PurchaseOrder' => 'Purchase Order',
-                                'App\Models\DeliveryOrder' => 'Delivery Order',
-                                'App\Models\PurchaseReceipt' => 'Purchase Receipt',
-                                'App\Models\StockTransfer' => 'Stock Transfer',
-                                'App\Models\ManufacturingOrder' => 'Manufacturing Order',
-                                'App\Models\StockAdjustment' => 'Stock Adjustment',
-                                'App\Models\QualityControl' => 'Quality Control',
-                                'App\Models\PurchaseReturn' => 'Purchase Return',
-                                default => 'Unknown'
-                            };
-
-                            $sourceNumber = match ($modelType) {
-                                'App\Models\SaleOrder' => $record->fromModel->so_number ?? 'N/A',
-                                'App\Models\PurchaseOrder' => $record->fromModel->po_number ?? 'N/A',
-                                'App\Models\DeliveryOrder' => $record->fromModel->do_number ?? 'N/A',
-                                'App\Models\PurchaseReceipt' => $record->fromModel->receipt_number ?? 'N/A',
-                                'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
-                                'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
-                                'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
-                                'App\Models\QualityControl' => $record->fromModel->qc_number ?? 'N/A',
-                                'App\Models\PurchaseReturn' => $record->fromModel->nota_retur ?? 'N/A',
-                                default => 'N/A'
-                            };
-
-                            return $modelName . ' - ' . $sourceNumber;
-                        }
-                        return '-';
+                        return $record->source_display;
                     })
                     ->searchable(query: function (Builder $query, $search) {
                         // This is complex to search, so we'll skip for now

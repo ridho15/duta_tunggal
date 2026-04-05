@@ -126,15 +126,14 @@ class CreateMaterialIssue extends CreateRecord
                     ]);
                 }
 
-                $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->sum('qty_available');
+                $stockMetrics = MaterialIssueResource::getStockMetrics($productId, $warehouseId);
+                $effectiveStock = (float) $stockMetrics['effective'];
 
-                if ($stock < $quantity) {
+                if ($effectiveStock < $quantity) {
                     $product = \App\Models\Product::find($productId);
                     $productName = $product ? $product->name : 'Produk';
                     throw ValidationException::withMessages([
-                        'items.' . $index . '.quantity' => "Stock {$productName} di gudang ini tidak mencukupi untuk item " . ($index + 1) . ". Tersedia: " . number_format($stock, 2, ',', '.') . ", diminta: " . number_format($quantity, 2, ',', '.'),
+                        'items.' . $index . '.quantity' => "Stok efektif {$productName} di gudang ini tidak mencukupi untuk item " . ($index + 1) . ". Fisik: " . number_format($stockMetrics['physical'], 2, ',', '.') . ", Reserved: " . number_format($stockMetrics['reserved'], 2, ',', '.') . ", Efektif: " . number_format($effectiveStock, 2, ',', '.') . ", diminta: " . number_format($quantity, 2, ',', '.'),
                     ]);
                 }
 
@@ -173,31 +172,31 @@ class CreateMaterialIssue extends CreateRecord
                 continue;
             }
 
-            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item['product_id'])
-                ->where('warehouse_id', $item['warehouse_id'] ?? $warehouseId)
-                ->first();
-
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
-            $requiredQty = (float) $item['quantity'];
+            $stockMetrics = MaterialIssueResource::getStockMetrics(
+                $item['product_id'],
+                $item['warehouse_id'] ?? $warehouseId
+            );
+            $effectiveQty = (float) $stockMetrics['effective'];
+            $requiredQty = (float) \App\Helpers\MoneyHelper::parse($item['quantity'] ?? 0);
 
             $product = \App\Models\Product::find($item['product_id']);
 
-            if ($availableQty <= 0) {
-                $outOfStock[] = "{$product->name} (Stock: 0)";
-            } elseif ($availableQty < $requiredQty) {
-                $insufficientStock[] = "{$product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            if ($effectiveQty <= 0) {
+                $outOfStock[] = "{$product->name} (Fisik: {$stockMetrics['physical']}, Reserved: {$stockMetrics['reserved']}, Efektif: {$stockMetrics['effective']})";
+            } elseif ($effectiveQty < $requiredQty) {
+                $insufficientStock[] = "{$product->name} (Dibutuhkan: {$requiredQty}, Fisik: {$stockMetrics['physical']}, Reserved: {$stockMetrics['reserved']}, Efektif: {$stockMetrics['effective']})";
             }
         }
 
         if (!empty($outOfStock)) {
             throw ValidationException::withMessages([
-                'items' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock)
+                'items' => 'Stok efektif habis untuk produk berikut: ' . implode(', ', $outOfStock)
             ]);
         }
 
         if (!empty($insufficientStock)) {
             throw ValidationException::withMessages([
-                'items' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
+                'items' => 'Stok efektif tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
             ]);
         }
     }

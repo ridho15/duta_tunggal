@@ -16,6 +16,22 @@ const ERR = /Fatal error|Whoops!|Something went wrong/i
 test.use({ storageState: 'playwright/.auth/user.json' })
 test.setTimeout(60000)
 
+async function navigate(page, path) {
+  await page.goto(path)
+  await page.waitForLoadState('domcontentloaded')
+
+  if (page.url().includes('/login')) {
+    await page.getByLabel('Alamat email').fill('superadmin@gmail.com')
+    await page.getByLabel('Kata sandi').fill('superadmin')
+    await page.locator('form').getByRole('button', { name: /masuk|login|sign in/i }).click()
+    await page.waitForLoadState('networkidle')
+    await page.goto(path)
+    await page.waitForLoadState('domcontentloaded')
+  }
+
+  await page.waitForLoadState('networkidle')
+}
+
 test.describe.serial('Manufacturing full flow', () => {
   test.beforeAll(async () => {
     ensureManufacturingFixture()
@@ -38,15 +54,13 @@ test.describe.serial('Manufacturing full flow', () => {
     const availableQuery = `DB::table('inventory_stocks')->where('product_id', DB::table('products')->where('sku', '${FIXTURE.rawMaterialSku}')->value('id'))->where('warehouse_id', DB::table('warehouses')->where('kode', '${FIXTURE.warehouseCode}')->value('id'))->value('qty_available')`
     const reservedQuery = `DB::table('inventory_stocks')->where('product_id', DB::table('products')->where('sku', '${FIXTURE.rawMaterialSku}')->value('id'))->where('warehouse_id', DB::table('warehouses')->where('kode', '${FIXTURE.warehouseCode}')->value('id'))->value('qty_reserved')`
 
-      await page.goto(`${BASE}/admin/material-issues/${issueId}/edit`)
-      await page.waitForLoadState('networkidle')
+      await navigate(page, `${BASE}/admin/material-issues/${issueId}/edit`)
       await expect(page.locator('body')).not.toContainText(ERR)
 
     await expect.poll(() => readStockField('Stock Available'), { timeout: 10000 }).toBe(100)
     await expect.poll(() => readStockField('Stock Reserved'), { timeout: 10000 }).toBe(0)
 
-    await page.goto(`${BASE}/admin/material-issues`)
-    await page.waitForLoadState('domcontentloaded')
+    await navigate(page, `${BASE}/admin/material-issues`)
 
     const materialIssueRow = page.locator('tr', { hasText: FIXTURE.issueNumber }).first()
     await expect(materialIssueRow).toBeVisible()
@@ -73,8 +87,7 @@ test.describe.serial('Manufacturing full flow', () => {
       { timeout: 15000 },
     ).toBe('request')
 
-    await page.goto(`${BASE}/admin/warehouse-confirmations`)
-    await page.waitForLoadState('domcontentloaded')
+    await navigate(page, `${BASE}/admin/warehouse-confirmations`)
 
     const confirmationRow = page.locator('tr', { hasText: FIXTURE.issueNumber }).first()
     await expect(confirmationRow).toBeVisible()
@@ -84,9 +97,9 @@ test.describe.serial('Manufacturing full flow', () => {
     await expect.poll(
       () => querySingleValue(`DB::table('material_issues')->where('id', ${issueId})->value('status')`),
       { timeout: 15000 },
-    ).toBe('approved')
-    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(100)
-    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(50)
+    ).toBe('completed')
+    await expect.poll(() => Number(querySingleValue(availableQuery)), { timeout: 15000 }).toBe(50)
+    await expect.poll(() => Number(querySingleValue(reservedQuery)), { timeout: 15000 }).toBe(0)
     } finally {
       releaseLock()
     }
@@ -99,9 +112,7 @@ test.describe.serial('Manufacturing full flow', () => {
     seedManufacturingFixture()
     const moNumber = `MO-PW-E2E-${Date.now()}`
 
-    await page.goto(`${BASE}/admin/manufacturing-orders/create`)
-    await page.waitForLoadState('networkidle')
-    await expect(page).not.toHaveURL(/login/)
+    await navigate(page, `${BASE}/admin/manufacturing-orders/create`)
 
     const createBody = await page.textContent('body')
     expect(createBody).not.toMatch(ERR)
@@ -135,8 +146,7 @@ test.describe.serial('Manufacturing full flow', () => {
     const productionId = querySingleValue(`DB::table('productions')->where('manufacturing_order_id', ${manufacturingOrderId})->value('id')`)
     expect(productionId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/productions/${productionId}`)
-    await page.waitForLoadState('networkidle')
+    await navigate(page, `${BASE}/admin/productions/${productionId}`)
 
     const finishButton = page.getByRole('button', { name: /^Finished$/ }).last()
     await expect(finishButton).toBeVisible({ timeout: 10000 })
@@ -151,8 +161,7 @@ test.describe.serial('Manufacturing full flow', () => {
     const qualityControlId = querySingleValue(`DB::table('quality_controls')->where('from_model_type', 'App\\\\Models\\\\Production')->where('from_model_id', ${productionId})->value('id')`)
     expect(qualityControlId).toBeTruthy()
 
-    await page.goto(`${BASE}/admin/quality-control-manufactures`, { waitUntil: 'domcontentloaded' })
-    await expect(page.locator('body')).not.toContainText(ERR)
+    await navigate(page, `${BASE}/admin/quality-control-manufactures`)
 
     const qualityControlRow = page.locator('tr', { hasText: moNumber }).first()
     await expect(qualityControlRow).toBeVisible()
@@ -183,8 +192,7 @@ test.describe.serial('Manufacturing full flow', () => {
       { timeout: 15000 },
     ).toBe('1.00')
 
-    await page.goto(`${BASE}/admin/manufacturing-orders/${manufacturingOrderId}`)
-    await page.waitForLoadState('networkidle')
+    await navigate(page, `${BASE}/admin/manufacturing-orders/${manufacturingOrderId}`)
 
     await expect.poll(
       () => querySingleValue(`DB::table('manufacturing_orders')->where('id', ${manufacturingOrderId})->value('status')`),

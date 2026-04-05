@@ -170,19 +170,14 @@ class SaleOrder extends Model
                 }
 
                 foreach ($allocations as $allocation) {
-                    $availableStock = InventoryStock::where('product_id', $item->product_id)
-                        ->where('warehouse_id', $allocation->warehouse_id)
-                        ->sum('qty_available');
+                    $availableStock = InventoryStock::freeQtyFor($item->product_id, $allocation->warehouse_id);
 
                     if ((float) $availableStock < (float) $allocation->quantity) {
                         return true;
                     }
                 }
             } else {
-                $availableStock = InventoryStock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $item->warehouse_id)
-                    ->where('rak_id', $item->rak_id)
-                    ->sum('qty_available');
+                $availableStock = InventoryStock::freeQtyFor($item->product_id, $item->warehouse_id, $item->rak_id);
 
                 if ($availableStock < $item->quantity) {
                     return true;
@@ -214,9 +209,7 @@ class SaleOrder extends Model
                 }
 
                 foreach ($allocations as $allocation) {
-                    $availableStock = InventoryStock::where('product_id', $item->product_id)
-                        ->where('warehouse_id', $allocation->warehouse_id)
-                        ->sum('qty_available');
+                    $availableStock = InventoryStock::freeQtyFor($item->product_id, $allocation->warehouse_id);
 
                     if ((float) $availableStock < (float) $allocation->quantity) {
                         $insufficientItems[] = [
@@ -228,10 +221,7 @@ class SaleOrder extends Model
                     }
                 }
             } else {
-                $availableStock = InventoryStock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $item->warehouse_id)
-                    ->where('rak_id', $item->rak_id)
-                    ->sum('qty_available');
+                $availableStock = InventoryStock::freeQtyFor($item->product_id, $item->warehouse_id, $item->rak_id);
                 if ($availableStock < $item->quantity) {
                     $insufficientItems[] = [
                         'item' => $item,

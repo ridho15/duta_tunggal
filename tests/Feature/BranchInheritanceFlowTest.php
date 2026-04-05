@@ -165,6 +165,12 @@ test('manufacturing order inherits cabang from production plan sale order source
     expect((int) $result['cabang_id'])->toBe((int) $cabangSource->id);
 });
 
+test('manufacturing order create page does not auto-create warehouse confirmation', function () {
+    $reflection = new ReflectionClass(CreateManufacturingOrder::class);
+
+    expect($reflection->hasMethod('afterCreate'))->toBeFalse();
+});
+
 test('production plan inherits cabang from selected BOM source', function () {
     $cabangSource = Cabang::factory()->create();
     $cabangWrong = Cabang::factory()->create();

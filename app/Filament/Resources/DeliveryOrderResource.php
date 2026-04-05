@@ -241,9 +241,7 @@ class DeliveryOrderResource extends Resource
                                                                 }
 
                                                                 $productId = $deliveryItem['product_id'] ?? null;
-                                                                $availableStock = InventoryStock::where('product_id', $productId)
-                                                                    ->where('warehouse_id', $sourceWarehouseId)
-                                                                    ->sum('qty_available');
+                                                                $availableStock = InventoryStock::freeQtyFor($productId, $sourceWarehouseId);
 
                                                                 if ((float) $availableStock < $sourceQtyItem) {
                                                                     $fail('Stock tidak mencukupi pada salah satu sumber gudang item delivery order.');
@@ -483,7 +481,7 @@ class DeliveryOrderResource extends Resource
                                                             $stockQuery->where('rak_id', $rakId);
                                                         }
 
-                                                        $available = (float) $stockQuery->sum('qty_available');
+                                                        $available = InventoryStock::freeQtyFor($productId, $warehouseId, $rakId);
                                                         if ($available <= 0) {
                                                             return '🚨 HABIS';
                                                         }
@@ -500,7 +498,7 @@ class DeliveryOrderResource extends Resource
                                                         $qty = (float) ($get('quantity') ?? 0);
 
                                                         if (!$productId || !$warehouseId) {
-                                                            return 'Pilih produk dan gudang sumber untuk melihat stock tersedia.';
+                                                            return 'Pilih produk dan gudang sumber untuk melihat stok bebas.';
                                                         }
 
                                                         $stockQuery = InventoryStock::where('product_id', $productId)
@@ -510,12 +508,12 @@ class DeliveryOrderResource extends Resource
                                                             $stockQuery->where('rak_id', $rakId);
                                                         }
 
-                                                        $available = (float) $stockQuery->sum('qty_available');
+                                                        $available = InventoryStock::freeQtyFor($productId, $warehouseId, $rakId);
                                                         if ($qty > 0 && $qty > $available) {
-                                                            return 'Qty melebihi stock tersedia: ' . number_format($available, 0, ',', '.');
+                                                            return 'Qty melebihi stok bebas: ' . number_format($available, 0, ',', '.');
                                                         }
 
-                                                        return 'Stock tersedia: ' . number_format($available, 0, ',', '.');
+                                                        return 'Stok bebas: ' . number_format($available, 0, ',', '.');
                                                     })
                                                     ->required(),
                                             ])

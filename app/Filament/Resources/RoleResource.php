@@ -16,6 +16,8 @@ class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
 
     // Rename Roles group to the requested label

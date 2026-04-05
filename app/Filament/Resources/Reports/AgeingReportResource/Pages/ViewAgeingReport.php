@@ -7,6 +7,7 @@ use App\Filament\Resources\Reports\AgeingReportResource;
 use App\Models\AccountReceivable;
 use App\Models\AccountPayable;
 use App\Models\Cabang;
+use App\Services\Reports\AgeingReportService;
 use Filament\Resources\Pages\Page;
 use Filament\Actions\Action;
 use Filament\Forms;
@@ -185,13 +186,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                             Placeholder::make('overdue_receivables')
                                 ->label('Overdue Receivables')
                                 ->content(function () {
-                                    $query = AccountReceivable::whereHas('invoice', function ($q) {
-                                        $q->where('due_date', '<', now());
-                                    });
-                                    if ($this->cabang_id) {
-                                        $query->where('cabang_id', $this->cabang_id);
-                                    }
-                                    $amount = $query->sum('remaining');
+                                    $amount = $this->ageingReportService()->calculateOverdue($this->ageingFilters())['receivables'];
                                     return 'Rp ' . number_format($amount, 0, ',', '.');
                                 }),
                         ]),
@@ -209,15 +204,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                             Placeholder::make('overdue_payables')
                                 ->label('Overdue Payables')
                                 ->content(function () {
-                                    $query = AccountPayable::whereHas('invoice', function ($q) {
-                                        $q->where('due_date', '<', now());
-                                    });
-                                    if ($this->cabang_id) {
-                                        $query->whereHas('invoice', function ($q) {
-                                            $q->where('cabang_id', $this->cabang_id);
-                                        });
-                                    }
-                                    $amount = $query->sum('remaining');
+                                    $amount = $this->ageingReportService()->calculateOverdue($this->ageingFilters())['payables'];
                                     return 'Rp ' . number_format($amount, 0, ',', '.');
                                 }),
                         ]),
@@ -289,56 +276,22 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
     private function getAgingSummary($type, $bucket)
     {
-        $query = $type === 'receivables' ? AccountReceivable::query() : AccountPayable::query();
+        $records = $type === 'receivables'
+            ? $this->ageingReportService()->getReceivableRecords($this->ageingFilters())
+            : $this->ageingReportService()->getPayableRecords($this->ageingFilters());
 
-        if ($this->cabang_id) {
-            if ($type === 'receivables') {
-                $query->where('cabang_id', $this->cabang_id);
-            } else {
-                $query->whereHas('invoice', function ($q) {
-                    $q->where('cabang_id', $this->cabang_id);
-                });
-            }
-        }
-
-        $amount = $query->whereHas('ageingSchedule', function ($q) use ($bucket) {
-            $q->where('bucket', $bucket);
-        })->orWhere(function ($q) use ($bucket) {
-            $q->whereDoesntHave('ageingSchedule')
-                ->whereHas('invoice', function ($invoiceQuery) use ($bucket) {
-                    $days = match ($bucket) {
-                        'Current' => 30,
-                        '31–60' => 60,
-                        '61–90' => 90,
-                        '>90' => PHP_INT_MAX,
-                    };
-
-                    $invoiceQuery->whereRaw('DATEDIFF(NOW(), invoice_date) <= ?', [$days]);
-                });
-        })->sum('remaining');
+        $amount = $records->where('aging_bucket_computed', $bucket)->sum('remaining');
 
         return 'Rp ' . number_format($amount, 0, ',', '.');
     }
 
     private function calculateExpectedCashFlow($type, $days)
     {
-        $futureDate = now()->addDays($days);
-        $query = $type === 'receivables' ? AccountReceivable::query() : AccountPayable::query();
+        $projection = $this->ageingReportService()->projectCashFlow($this->ageingFilters(), $days);
 
-        if ($this->cabang_id) {
-            if ($type === 'receivables') {
-                $query->where('cabang_id', $this->cabang_id);
-            } else {
-                $query->whereHas('invoice', function ($q) {
-                    $q->where('cabang_id', $this->cabang_id);
-                });
-            }
-        }
-
-        return $query->whereHas('invoice', function ($q) use ($futureDate) {
-            $q->where('due_date', '<=', $futureDate)
-                ->where('due_date', '>=', now());
-        })->sum('remaining');
+        return $type === 'receivables'
+            ? $projection['receivables']
+            : $projection['payables'];
     }
 
     public function table(Table $table): Table
@@ -409,7 +362,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                 TextColumn::make('days_outstanding')
                     ->label('Days Outstanding')
                     ->getStateUsing(function ($record) {
-                        return $this->calculateDaysOutstanding($record);
+                        return $this->ageingReportService()->resolveDaysOutstanding($record, $this->as_of_date ?? now());
                     }),
 
                 TextColumn::make('remaining')
@@ -420,7 +373,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                 BadgeColumn::make('aging_bucket')
                     ->label('Aging Bucket')
                     ->getStateUsing(function ($record) {
-                        return $this->calculateBucket($record);
+                        return $this->ageingReportService()->resolveBucketLabel($record, $this->as_of_date ?? now());
                     })
                     ->colors([
                         'success' => 'Current',
@@ -440,36 +393,16 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
             ->poll('30s');
     }
 
-    private function calculateBucket($record): string
+    private function ageingFilters(): array
     {
-        $ageingSchedule = $record->ageingSchedule;
-        $daysOutstanding = 0;
-
-        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
-            $daysOutstanding = $ageingSchedule->days_outstanding;
-        } elseif ($record->invoice && $record->invoice->invoice_date) {
-            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
-            $daysOutstanding = $invoiceDate->diffInDays(Carbon::parse($this->as_of_date ?? now()), false);
-        }
-
-        if ($daysOutstanding <= 30) return 'Current';
-        if ($daysOutstanding <= 60) return '31–60';
-        if ($daysOutstanding <= 90) return '61–90';
-        return '>90';
+        return [
+            'as_of_date' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+        ];
     }
 
-    private function calculateDaysOutstanding($record): int
+    private function ageingReportService(): AgeingReportService
     {
-        $ageingSchedule = $record->ageingSchedule;
-        $daysOutstanding = 0;
-
-        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
-            $daysOutstanding = $ageingSchedule->days_outstanding;
-        } elseif ($record->invoice && $record->invoice->invoice_date) {
-            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
-            $daysOutstanding = $invoiceDate->diffInDays(Carbon::parse($this->as_of_date ?? now()), false);
-        }
-
-        return $daysOutstanding;
+        return app(AgeingReportService::class);
     }
 }

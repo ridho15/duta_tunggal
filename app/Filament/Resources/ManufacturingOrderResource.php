@@ -53,6 +53,8 @@ class ManufacturingOrderResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Perintah Produksi';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     // Position Manufacturing Order as the 4th group
     protected static ?int $navigationSort = 4;
 

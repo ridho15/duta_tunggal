@@ -48,6 +48,8 @@ class ProductionPlanResource extends Resource
 
     protected static ?string $navigationLabel = 'Rencana Produksi';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
@@ -172,9 +174,14 @@ class ProductionPlanResource extends Resource
 
                         Select::make('bill_of_material_id')
                             ->label('Formula Produksi (BOM)')
-                            ->options(function ($get) {
-                                $productionPlanService = app(ProductionPlanService::class);
-                                return $productionPlanService->getBillOfMaterialOptions($get('cabang_id'));
+                            ->relationship('billOfMaterial', 'code', function (Builder $query, $get) {
+                                $query->with(['product', 'cabang'])
+                                    ->where('is_active', true);
+
+                                $cabangId = $get('cabang_id');
+                                if ($cabangId) {
+                                    $query->where('cabang_id', $cabangId);
+                                }
                             })
                             ->searchable()
                             ->preload()
@@ -184,6 +191,18 @@ class ProductionPlanResource extends Resource
                             ])
                             ->visible(fn($get) => $get('source_type') === 'manual')
                             ->reactive()
+                            ->getOptionLabelFromRecordUsing(function (BillOfMaterial $bom) {
+                                $product = $bom->product;
+                                $cabang = $bom->cabang;
+
+                                return sprintf(
+                                    '(%s) %s%s%s',
+                                    $bom->code,
+                                    $bom->nama_bom,
+                                    $product?->exists ? ' - ' . $product->name : '',
+                                    $cabang?->exists ? ' (' . $cabang->nama . ')' : ''
+                                );
+                            })
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state && $get('source_type') === 'manual') {
                                     $bom = BillOfMaterial::with(['product', 'cabang'])->find($state);

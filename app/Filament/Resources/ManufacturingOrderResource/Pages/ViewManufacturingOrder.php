@@ -30,6 +30,19 @@ class ViewManufacturingOrder extends ViewRecord
                 ->action(function () {
                     $record = $this->getRecord();
                     try {
+                        if ($message = $record->productionStartBlockingMessage()) {
+                            Log::warning('ViewManufacturingOrder start blocked by workflow guard', [
+                                'manufacturing_order_id' => $record->id,
+                                'mo_number' => $record->mo_number,
+                                'status' => $record->status,
+                                'user_id' => Auth::id(),
+                                'message' => $message,
+                            ]);
+
+                                \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: 'Gagal Memulai Produksi', message: $message);
+                            return;
+                        }
+
                         // Policy guard: transition draft -> in_progress
                         abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
 

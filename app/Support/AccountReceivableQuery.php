@@ -5,6 +5,8 @@ namespace App\Support;
 use App\Enums\PaymentStatus;
 use App\Models\AccountReceivable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AccountReceivableQuery
 {
@@ -12,7 +14,56 @@ class AccountReceivableQuery
     {
         return AccountReceivable::query()
             ->where('account_receivables.status', '!=', PaymentStatus::PAID->value)
-            ->whereNull('deleted_at');
+            ->whereNull('account_receivables.deleted_at');
+    }
+
+    public static function withOverdueGrouping(Builder $query, ?Carbon $today = null): Builder
+    {
+        $todaySql = DB::getPdo()->quote(($today ?? now())->toDateString());
+
+        return $query
+            ->leftJoin('invoices', 'account_receivables.invoice_id', '=', 'invoices.id')
+            ->select('account_receivables.*')
+            ->addSelect(DB::raw(self::overdueGroupSelect($todaySql)));
+    }
+
+    public static function applyOverdueFilter(Builder $query, ?Carbon $today = null): Builder
+    {
+        $today = ($today ?? now())->copy()->startOfDay();
+
+        return $query->whereHas('invoice', function (Builder $query) use ($today) {
+            $query->whereDate('due_date', '<', $today);
+        })->where('account_receivables.status', PaymentStatus::UNPAID->value);
+    }
+
+    public static function applyOverdueDaysFilter(Builder $query, string $value, ?Carbon $today = null): Builder
+    {
+        $today = ($today ?? now())->copy()->startOfDay();
+
+        return $query->whereHas('invoice', function (Builder $query) use ($value, $today) {
+            switch ($value) {
+                case '1-30':
+                    $query->whereBetween('due_date', [$today->copy()->subDays(30), $today->copy()->subDay()]);
+                    break;
+                case '31-60':
+                    $query->whereBetween('due_date', [$today->copy()->subDays(60), $today->copy()->subDays(31)]);
+                    break;
+                case '60+':
+                    $query->whereDate('due_date', '<', $today->copy()->subDays(60));
+                    break;
+            }
+        })->where('account_receivables.status', PaymentStatus::UNPAID->value);
+    }
+
+    protected static function overdueGroupSelect(string $todaySql): string
+    {
+        return "CASE
+            WHEN invoices.deleted_at IS NOT NULL THEN 'DELETED INVOICE'
+            WHEN invoices.due_date < {$todaySql} AND DATEDIFF({$todaySql}, invoices.due_date) > 60 THEN 'OVERDUE 60+ Days'
+            WHEN invoices.due_date < {$todaySql} AND DATEDIFF({$todaySql}, invoices.due_date) > 30 THEN 'OVERDUE 30+ Days'
+            WHEN invoices.due_date < {$todaySql} THEN 'OVERDUE'
+            ELSE 'CURRENT'
+        END AS overdue_group";
     }
 
     public static function applyTableFilters(Builder $query, ?array $tableFilters = []): Builder
@@ -48,9 +99,7 @@ class AccountReceivableQuery
         }
 
         if (isset($tableFilters['overdue']['isActive']) && $tableFilters['overdue']['isActive']) {
-            $query->whereHas('invoice', function (Builder $query) {
-                $query->where('due_date', '<', now());
-            })->where('account_receivables.status', PaymentStatus::UNPAID->value);
+            self::applyOverdueFilter($query);
         }
 
         if (isset($tableFilters['date_range']) && !empty($tableFilters['date_range'])) {
@@ -80,23 +129,7 @@ class AccountReceivableQuery
         }
 
         if (isset($tableFilters['overdue_days']['value']) && !empty($tableFilters['overdue_days']['value'])) {
-            $value = $tableFilters['overdue_days']['value'];
-
-            $query->whereHas('invoice', function (Builder $query) use ($value) {
-                $now = now();
-
-                switch ($value) {
-                    case '1-30':
-                        $query->whereBetween('due_date', [$now->copy()->subDays(30), $now->copy()->subDay()]);
-                        break;
-                    case '31-60':
-                        $query->whereBetween('due_date', [$now->copy()->subDays(60), $now->copy()->subDays(31)]);
-                        break;
-                    case '60+':
-                        $query->where('due_date', '<', $now->copy()->subDays(60));
-                        break;
-                }
-            })->where('account_receivables.status', PaymentStatus::UNPAID->value);
+            self::applyOverdueDaysFilter($query, $tableFilters['overdue_days']['value']);
         }
 
         return $query;

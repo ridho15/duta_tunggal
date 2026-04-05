@@ -7,6 +7,8 @@ use App\Filament\Resources\AccountPayableResource\Pages;
 use App\Models\AccountPayable;
 use App\Models\Invoice;
 use App\Models\Supplier;
+use App\Support\AccountPayableQuery;
+use App\Support\OverdueStatusPresenter;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
@@ -25,7 +27,6 @@ use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Filament\Resources\AccountPayableResource\RelationManagers;
 
@@ -147,24 +148,9 @@ class AccountPayableResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                // Join invoices to allow computed grouping & sorting by overdue status (including soft deleted)
-                $query->leftJoin('invoices', function ($join) {
-                    $join->on('account_payables.invoice_id', '=', 'invoices.id');
-                })
-                    ->where('account_payables.status', '!=', PaymentStatus::PAID->value) // Exclude PAID records from ageing schedule
-                    ->whereNull('account_payables.deleted_at') // Exclude soft deleted AP records from ageing schedule
-                    ->select('account_payables.*')
-                    ->addSelect(
-                        DB::raw("CASE 
-                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL AND DATEDIFF(CURDATE(), invoices.due_date) > 60 THEN 'OVERDUE 60+ Days'
-                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL AND DATEDIFF(CURDATE(), invoices.due_date) > 30 THEN 'OVERDUE 30+ Days'
-                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL THEN 'OVERDUE'
-                            WHEN invoices.deleted_at IS NOT NULL THEN 'DELETED INVOICE'
-                            ELSE 'CURRENT'
-                        END AS overdue_group")
-                    );
-                // Eager load required relations
-                return $query->with(['invoice', 'invoice.fromModel']);
+                return AccountPayableQuery::withOverdueGrouping(
+                    AccountPayableQuery::base()->with(['invoice', 'invoice.fromModel'])
+                );
             })
             ->columns([
                 TextColumn::make('invoice.invoice_number')
@@ -211,15 +197,7 @@ class AccountPayableResource extends Resource
                     ->label('Due Date')
                     ->date('M j, Y')
                     ->sortable()
-                    ->color(function ($record) {
-                        if ($record->overdue_group === 'DELETED INVOICE') {
-                            return 'danger';
-                        }
-                        if ($record->invoice && $record->invoice->due_date < now() && $record->status === PaymentStatus::UNPAID->value) {
-                            return 'danger';
-                        }
-                        return 'gray';
-                    })
+                    ->color(fn ($record) => self::overdueStatusPresenter()->dueDateColor($record))
                     ->formatStateUsing(function ($state, $record) {
                         if ($record->overdue_group === 'DELETED INVOICE') {
                             return $state . ' 🗑️ (DELETED)';
@@ -263,21 +241,8 @@ class AccountPayableResource extends Resource
                     
                 TextColumn::make('days_overdue')
                     ->label('Days Overdue')
-                    ->getStateUsing(function ($record) {
-                        if ($record->overdue_group === 'DELETED INVOICE') {
-                            return 'DELETED';
-                        }
-                        if ($record->status === PaymentStatus::UNPAID->value && $record->invoice && $record->invoice->due_date < now()) {
-                            return now()->diffInDays($record->invoice->due_date);
-                        }
-                        return 0;
-                    })
-                    ->color(function ($state, $record) {
-                        if ($state === 'DELETED') return 'danger';
-                        if ($state > 30) return 'danger';
-                        if ($state > 0) return 'warning';
-                        return 'success';
-                    })
+                    ->getStateUsing(fn ($record) => self::overdueStatusPresenter()->daysOverdue($record))
+                    ->color(fn ($state) => self::overdueStatusPresenter()->daysOverdueColor($state))
                     ->badge()
                     ->sortable(),
                     
@@ -359,20 +324,7 @@ class AccountPayableResource extends Resource
                 Tables\Grouping\Group::make('overdue_group')
                     ->label('Overdue Status')
                     ->titlePrefixedWithLabel(false)
-                    ->getTitleFromRecordUsing(function ($record) {
-                        if ($record->overdue_group === 'DELETED INVOICE') {
-                            return '🗑️ DELETED INVOICE';
-                        }
-                        
-                        // Since we exclude 'Lunas' records, overdue_group will never be 'PAID'
-                        if ($record->invoice && $record->invoice->due_date < now()) {
-                            $daysOverdue = now()->diffInDays($record->invoice->due_date);
-                            if ($daysOverdue > 60) return '🚨 OVERDUE 60+ Days';
-                            if ($daysOverdue > 30) return '⚠️ OVERDUE 30+ Days';
-                            if ($daysOverdue > 0) return '⏰ OVERDUE';
-                        }
-                        return '💚 CURRENT';
-                    })
+                    ->getTitleFromRecordUsing(fn ($record) => self::overdueStatusPresenter()->overdueGroupLabel($record))
                     ->collapsible(),
             ])
             ->filters([
@@ -431,11 +383,7 @@ class AccountPayableResource extends Resource
                     
                 Tables\Filters\Filter::make('overdue')
                     ->label('Overdue Invoices')
-                    ->query(function (Builder $query): Builder {
-                        return $query->whereHas('invoice', function (Builder $query) {
-                            $query->where('due_date', '<', now());
-                        })->where('account_payables.status', PaymentStatus::UNPAID->value);
-                    })
+                    ->query(fn (Builder $query): Builder => AccountPayableQuery::applyOverdueFilter($query))
                     ->toggle(),
                     
                 Tables\Filters\Filter::make('date_range')
@@ -503,22 +451,11 @@ class AccountPayableResource extends Resource
                         '60+' => '60+ Days',
                     ])
                     ->query(function (Builder $query, $data) {
-                        if (!$data['value']) return $query;
-                        
-                        return $query->whereHas('invoice', function (Builder $query) use ($data) {
-                            $now = now();
-                            switch ($data['value']) {
-                                case '1-30':
-                                    $query->whereBetween('due_date', [$now->copy()->subDays(30), $now->copy()->subDay()]);
-                                    break;
-                                case '31-60':
-                                    $query->whereBetween('due_date', [$now->copy()->subDays(60), $now->copy()->subDays(31)]);
-                                    break;
-                                case '60+':
-                                    $query->where('due_date', '<', $now->copy()->subDays(60));
-                                    break;
-                            }
-                        })->where('account_payables.status', PaymentStatus::UNPAID->value);
+                        if (!$data['value']) {
+                            return $query;
+                        }
+
+                        return AccountPayableQuery::applyOverdueDaysFilter($query, $data['value']);
                     }),
                 
                 Tables\Filters\Filter::make('invoice_date_range')
@@ -607,5 +544,10 @@ class AccountPayableResource extends Resource
             'view' => Pages\ViewAccountPayable::route('/{record}'),
             'edit' => Pages\EditAccountPayable::route('/{record}/edit'),
         ];
+    }
+
+    public static function overdueStatusPresenter(): OverdueStatusPresenter
+    {
+        return app(OverdueStatusPresenter::class);
     }
 }
