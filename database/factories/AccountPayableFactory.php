@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Models\AccountPayable;
 use App\Models\Invoice;
 use App\Models\Supplier;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\AccountPayable>
@@ -37,7 +38,7 @@ class AccountPayableFactory extends Factory
             'paid' => $paid,
             'remaining' => $remaining,
             'status' => $remaining > 0 ? 'Belum Lunas' : 'Lunas',
-            'created_by' => 1, // Default admin user
+            'created_by' => User::factory(),
         ];
     }
 }

@@ -162,6 +162,89 @@ class Product extends Model
         return $this->belongsTo(ChartOfAccount::class, 'manufacturing_overhead_coa_id')->withDefault();
     }
 
+    public function resolveInventoryCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'inventoryCoa',
+            [config('coa.inventory', '1140.01'), '1140.10', '1-101', '1140']
+        );
+    }
+
+    public function resolveUnbilledPurchaseCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'unbilledPurchaseCoa',
+            [config('coa.unbilled_purchase', '2100.10'), '2100.10', '2190.10', '1180.01']
+        );
+    }
+
+    public function resolveTemporaryProcurementCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'temporaryProcurementCoa',
+            ['1400.01', '1180.01']
+        );
+    }
+
+    public function resolveCogsCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'cogsCoa',
+            [config('coa.cogs', '5100.10'), '5100.10', '5000']
+        );
+    }
+
+    public function resolveGoodsDeliveryCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'goodsDeliveryCoa',
+            [config('coa.goods_delivery', '1140.20'), '1140.20', '1180.10']
+        );
+    }
+
+    public function resolvePurchaseReturnCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'purchaseReturnCoa',
+            ['5120.10', '5120', '6100.02']
+        );
+    }
+
+    public function resolveManufacturingLaborCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'manufacturingLaborCoa',
+            ['5120', '5120.10', '6-201', '6-202']
+        );
+    }
+
+    public function resolveManufacturingOverheadCoaOrDefault(): ?ChartOfAccount
+    {
+        return $this->resolveCoaRelationOrDefault(
+            'manufacturingOverheadCoa',
+            ['5130', '6100.02', '6-301', '6-302']
+        );
+    }
+
+    protected function resolveCoaRelationOrDefault(string $relation, array $fallbackCodes): ?ChartOfAccount
+    {
+        $coa = $this->{$relation};
+
+        if ($coa && $coa->exists && $coa->id) {
+            return $coa;
+        }
+
+        foreach ($fallbackCodes as $code) {
+            $fallback = ChartOfAccount::where('code', $code)->first();
+
+            if ($fallback?->id) {
+                return $fallback;
+            }
+        }
+
+        return null;
+    }
+
     public function stockMovement()
     {
         return $this->hasMany(StockMovement::class, 'product_id');

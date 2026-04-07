@@ -20,6 +20,7 @@ use Illuminate\Support\Collection;
 class HppReportService
 {
     private array $filters = [];
+    private array $dataQualityWarnings = [];
     private ?Collection $rawMaterialProductIds = null;
 
     private const RAW_MATERIAL_IN_TYPES = ['purchase_in', 'manufacture_in', 'adjustment_in'];
@@ -30,6 +31,7 @@ class HppReportService
         $start = $startDate ? Carbon::parse($startDate)->startOfDay() : now()->startOfMonth();
         $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfDay();
         $this->filters = $filters;
+        $this->dataQualityWarnings = [];
         $this->rawMaterialProductIds = null;
 
         $productId = isset($filters['product_id']) ? (int) $filters['product_id'] : null;
@@ -48,13 +50,30 @@ class HppReportService
         
         // Calculate purchases: try purchase accounts first, then inventory accounts, then stock movements
         $purchasesRawMaterial = $this->sumDebitForAccounts($rawMaterialPurchaseAccounts, $start, $end);
+        $rawMaterialPurchaseSource = 'purchase_accounts';
         if ($purchasesRawMaterial == 0) {
             // If no entries in purchase accounts, try inventory account debits (for inventory accounting)
             $purchasesRawMaterial = $this->sumDebitForAccounts($rawMaterialAccounts, $start, $end);
+            if ($purchasesRawMaterial != 0.0) {
+                $rawMaterialPurchaseSource = 'inventory_accounts';
+                $this->addDataQualityWarning(
+                    'raw_material_purchase_inventory_fallback',
+                    'Raw material purchases are being derived from inventory debits because purchase-account postings were not found.',
+                    ['start' => $start->toDateString(), 'end' => $end->toDateString()]
+                );
+            }
         }
         if ($purchasesRawMaterial == 0) {
             // If no journal entries, fall back to stock movements
             $purchasesRawMaterial = $this->calculateRawMaterialPurchasesFromStockMovements($start, $end);
+            if ($purchasesRawMaterial != 0.0) {
+                $rawMaterialPurchaseSource = 'stock_movements';
+                $this->addDataQualityWarning(
+                    'raw_material_purchase_stock_fallback',
+                    'Raw material purchases are being derived from stock movements because journal postings were not found.',
+                    ['start' => $start->toDateString(), 'end' => $end->toDateString()]
+                );
+            }
         }
         
         $totalAvailableRawMaterial = $openingRawMaterial + $purchasesRawMaterial;
@@ -107,6 +126,10 @@ class HppReportService
             ],
             'cogm' => round($cogm, 2),
             'variance_analysis' => $this->calculateVarianceAnalysis($start, $end),
+            'data_quality' => [
+                'warnings' => array_values($this->dataQualityWarnings),
+                'raw_material_purchase_source' => $rawMaterialPurchaseSource,
+            ],
         ];
     }
 
@@ -167,6 +190,10 @@ class HppReportService
             ],
             'cogm' => round($cogm, 2),
             'variance_analysis' => $this->calculateVarianceAnalysis($start, $end),
+            'data_quality' => [
+                'warnings' => array_values($this->dataQualityWarnings),
+                'raw_material_purchase_source' => 'product_scope',
+            ],
         ];
     }
 
@@ -400,6 +427,15 @@ class HppReportService
         $stockBalance = $this->calculateRawMaterialBalanceFromStockMovements($asOf);
 
         if ($this->shouldUseStockFallback($coaBalance, $stockBalance)) {
+            $this->addDataQualityWarning(
+                'raw_material_balance_stock_fallback',
+                'Raw material inventory balances are being derived from stock movements because journal balances are missing or inconsistent.',
+                [
+                    'journal_balance' => round($coaBalance, 2),
+                    'stock_balance' => round($stockBalance, 2),
+                    'as_of' => $asOf->toDateString(),
+                ]
+            );
             return $stockBalance;
         }
 
@@ -501,6 +537,15 @@ class HppReportService
         }
 
         return abs($coaBalance - $stockBalance) > 1;
+    }
+
+    private function addDataQualityWarning(string $code, string $message, array $context = []): void
+    {
+        $this->dataQualityWarnings[$code] = array_filter([
+            'code' => $code,
+            'message' => $message,
+            'context' => $context,
+        ]);
     }
 
     private function applyStockMovementFilters(Builder $query): Builder

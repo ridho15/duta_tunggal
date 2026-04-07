@@ -10,6 +10,7 @@ use App\Models\DeliveryOrderItem;
 use App\Models\Product;
 use App\Models\Warehouse;
 use App\Models\ChartOfAccount;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -129,6 +130,10 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
         $cabang = Cabang::factory()->create(['kode' => 'CJ' . substr(uniqid(), -6)]);
         $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
         $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
+        $creator = User::factory()->create([
+            'cabang_id' => $cabang->id,
+            'manage_type' => 'all',
+        ]);
 
         $inventoryCoa = ChartOfAccount::where('code', '1140.10')->first();
         $cogsCoa = ChartOfAccount::where('code', '1140.20')->first();
@@ -169,7 +174,7 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
             'scheduled_date' => now(),
             'delivery_method' => 'internal',
             'status' => 'pending',
-            'created_by' => 1,
+            'created_by' => $creator->id,
             'cabang_id' => $cabang->id,
         ]);
 

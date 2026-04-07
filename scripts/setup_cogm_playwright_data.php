@@ -7,6 +7,7 @@ $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Models\StockMovement;
 
 $now = now();
 
@@ -547,6 +548,61 @@ DB::transaction(function () use ($fixture, $now) {
             'updated_at' => $now,
         ],
     ]);
+
+    $rawMaterialSku = 'RM-PW-COGM-WARN';
+    $rawMaterialName = 'Fixture Raw Material Warning';
+    $rawMaterialProductId = DB::table('products')->where('sku', $rawMaterialSku)->value('id');
+
+    if (! $rawMaterialProductId) {
+        $rawMaterialProductId = DB::table('products')->insertGetId($filterColumns('products', [
+            'sku' => $rawMaterialSku,
+            'name' => $rawMaterialName,
+            'product_category_id' => $categoryId,
+            'cabang_id' => $cabangId,
+            'cost_price' => 75,
+            'sell_price' => 100,
+            'uom_id' => $uomId,
+            'tipe_pajak' => 'Non Pajak',
+            'pajak' => 0,
+            'jumlah_kelipatan_gudang_besar' => 1,
+            'jumlah_jual_kategori_banyak' => 1,
+            'kode_merk' => 'PW-RAW-WARN',
+            'is_manufacture' => 0,
+            'is_raw_material' => 1,
+            'is_active' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]));
+    } else {
+        DB::table('products')->where('id', $rawMaterialProductId)->update([
+            'name' => $rawMaterialName,
+            'product_category_id' => $categoryId,
+            'cabang_id' => $cabangId,
+            'uom_id' => $uomId,
+            'is_manufacture' => 0,
+            'is_raw_material' => 1,
+            'is_active' => 1,
+            'updated_at' => $now,
+        ]);
+    }
+
+    StockMovement::query()->updateOrCreate(
+        [
+            'product_id' => $rawMaterialProductId,
+            'warehouse_id' => $warehouseId,
+            'type' => 'purchase_in',
+            'date' => $now->toDateString(),
+            'notes' => 'Fixture raw material purchase without journal',
+        ],
+        [
+            'quantity' => 40,
+            'value' => 4000,
+            'from_model_type' => 'fixture',
+            'from_model_id' => 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]
+    );
 
     echo "✅ COGM fixture ready\n";
     echo "   Product A: {$fixture['product_a_sku']}\n";

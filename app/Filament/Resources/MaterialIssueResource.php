@@ -1060,12 +1060,16 @@ class MaterialIssueResource extends Resource
         ];
     }
 
-    protected static function getStockMetrics(?int $productId, ?int $warehouseId): array
+    public static function getStockMetrics(?int $productId, ?int $warehouseId, ?MaterialIssue $materialIssue = null): array
     {
         if (! $productId || ! $warehouseId) {
             return [
-                'available' => 0.0,
+                'physical' => 0.0,
                 'reserved' => 0.0,
+                'free' => 0.0,
+                'own_reserved' => 0.0,
+                'effective' => 0.0,
+                'available' => 0.0,
             ];
         }
 
@@ -1074,12 +1078,21 @@ class MaterialIssueResource extends Resource
             ->where('warehouse_id', $warehouseId)
             ->first();
 
-        $availableQty = (float) ($inventoryStock->qty_available ?? 0);
+        $physicalQty = (float) ($inventoryStock->qty_available ?? 0);
         $reservedQty = (float) ($inventoryStock->qty_reserved ?? 0);
+        $ownReservedQty = $materialIssue
+            ? self::getReservedQuantityForIssue($materialIssue, $productId, $warehouseId)
+            : 0.0;
+        $freeQty = max(0, $physicalQty - $reservedQty);
+        $effectiveQty = max(0, $physicalQty - $reservedQty + $ownReservedQty);
 
         return [
-            'available' => max(0, $availableQty - $reservedQty),
+            'physical' => $physicalQty,
             'reserved' => $reservedQty,
+            'free' => $freeQty,
+            'own_reserved' => $ownReservedQty,
+            'effective' => $effectiveQty,
+            'available' => $materialIssue ? $effectiveQty : $freeQty,
         ];
     }
 

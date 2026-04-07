@@ -895,15 +895,18 @@ class PurchaseInvoiceResource extends Resource
 
                 Infolists\Components\Section::make('Chart of Accounts')
                     ->schema([
-                        Infolists\Components\TextEntry::make('accountsPayableCoa.formatted_name')
-                            ->label('Accounts Payable COA'),
-                        Infolists\Components\TextEntry::make('ppnMasukanCoa.formatted_name')
-                            ->label('PPN Masukan COA'),
-                        Infolists\Components\TextEntry::make('inventoryCoa.formatted_name')
-                            ->label('Inventory COA'),
-                        Infolists\Components\TextEntry::make('expenseCoa.formatted_name')
+                        Infolists\Components\TextEntry::make('accounts_payable_coa_display')
+                            ->label('Accounts Payable COA')
+                            ->state(fn (Invoice $record) => self::formatCoa($record->accountsPayableCoa)),
+                        Infolists\Components\TextEntry::make('ppn_masukan_coa_display')
+                            ->label('PPN Masukan COA')
+                            ->state(fn (Invoice $record) => self::formatCoa($record->ppnMasukanCoa)),
+                        Infolists\Components\TextEntry::make('inventory_coa_display')
+                            ->label('Inventory COA')
+                            ->state(fn (Invoice $record) => self::formatCoa($record->inventoryCoa)),
+                        Infolists\Components\TextEntry::make('expense_coa_display')
                             ->label('Expense COA')
-                            ->placeholder('Not set'),
+                            ->state(fn (Invoice $record) => self::formatCoa($record->expenseCoa)),
                     ])
                     ->columns(2)
                     ->collapsed(),
@@ -933,6 +936,15 @@ class PurchaseInvoiceResource extends Resource
             'inventoryCoa',
             'expenseCoa'
         ]);
+    }
+
+    protected static function formatCoa(?\App\Models\ChartOfAccount $coa): string
+    {
+        if (! $coa || ! $coa->id || empty($coa->code)) {
+            return '-';
+        }
+
+        return $coa->code . ' - ' . $coa->name;
     }
 
     public static function table(Table $table): Table

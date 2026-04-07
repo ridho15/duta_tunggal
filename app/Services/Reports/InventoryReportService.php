@@ -178,7 +178,15 @@ class InventoryReportService
         return StockMovement::query()
             ->where('product_id', $stock->product_id)
             ->where('warehouse_id', $stock->warehouse_id)
+            ->where(function (Builder $query) use ($stock) {
+                if ($stock->rak_id === null) {
+                    $query->whereNull('rak_id');
+                } else {
+                    $query->where('rak_id', $stock->rak_id);
+                }
+            })
             ->orderBy('date', 'desc')
+            ->orderBy('created_at', 'desc')
             ->first();
     }
 

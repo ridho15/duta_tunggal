@@ -234,3 +234,80 @@ test('customer receipt create flow moves draft receipt to paid and posts journal
     expect($cashEntry)->not->toBeNull()
         ->and($arEntry)->not->toBeNull();
 });
+
+test('customer receipt item creation does not double count account receivable after create marker', function () {
+    $cashCoa = ChartOfAccount::factory()->create([
+        'code' => '1111.01',
+        'name' => 'Kas Operasional',
+        'type' => 'Asset',
+        'is_active' => true,
+    ]);
+
+    $saleOrder = SaleOrder::factory()->create([
+        'customer_id' => $this->customer->id,
+        'status' => 'completed',
+        'cabang_id' => $this->customerCabang->id,
+    ]);
+
+    $invoice = Invoice::withoutEvents(function () use ($saleOrder) {
+        return Invoice::factory()->create([
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $saleOrder->id,
+            'customer_name' => $this->customer->name,
+            'total' => 250000,
+            'status' => 'unpaid',
+        ]);
+    });
+
+    AccountReceivable::factory()->create([
+        'invoice_id' => $invoice->id,
+        'customer_id' => $this->customer->id,
+        'total' => 250000,
+        'paid' => 0,
+        'remaining' => 250000,
+        'status' => 'Belum Lunas',
+        'created_by' => $this->user->id,
+    ]);
+
+    $receipt = CustomerReceipt::withoutGlobalScopes()->create([
+        'customer_id' => $this->customer->id,
+        'payment_date' => now()->toDateString(),
+        'payment_method' => 'Cash',
+        'coa_id' => $cashCoa->id,
+        'total_payment' => 250000,
+        'selected_invoices' => [$invoice->id],
+        'invoice_receipts' => [$invoice->id => 250000],
+        'status' => 'Draft',
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    \App\Observers\CustomerReceiptObserver::markArUpdatedInCreate($receipt->id);
+
+    CustomerReceiptItem::create([
+        'customer_receipt_id' => $receipt->id,
+        'invoice_id' => $invoice->id,
+        'method' => 'Cash',
+        'amount' => 250000,
+        'coa_id' => $cashCoa->id,
+        'payment_date' => now()->toDateString(),
+    ]);
+
+    $accountReceivable = AccountReceivable::withoutGlobalScopes()->where('invoice_id', $invoice->id)->first();
+    $accountReceivable->update([
+        'paid' => 250000,
+        'remaining' => 0,
+        'status' => PaymentStatus::PAID->value,
+    ]);
+
+    $component = new CreateCustomerReceipt();
+    $reflection = new ReflectionMethod(CreateCustomerReceipt::class, 'syncReceiptStatusFromReceivables');
+    $reflection->setAccessible(true);
+    $reflection->invoke($component, $receipt->fresh());
+
+    $receipt->refresh();
+
+    expect($accountReceivable)->not->toBeNull()
+        ->and((float) $accountReceivable->paid)->toBe(250000.0)
+        ->and((float) $accountReceivable->remaining)->toBe(0.0)
+        ->and($receipt->status)->toBe('Paid');
+});

@@ -130,16 +130,18 @@ class StockOpname extends Model
         $description = 'Penyesuaian inventory hasil stock opname ' . $this->opname_number;
 
         // Get inventory adjustment account (COA)
-        $inventoryAdjustmentCoa = ChartOfAccount::where('code', '5100')->first();
-        if (!$inventoryAdjustmentCoa) {
-            $inventoryAdjustmentCoa = ChartOfAccount::whereIn('type', ['Expense', 'expense'])->first();
-        }
+        $inventoryAdjustmentCoa = $this->findFirstExistingCoa([
+            '5100',
+            '5100.10',
+            config('coa.general_expense', '6100'),
+        ]);
 
         // Get inventory account
-        $inventoryCoa = ChartOfAccount::where('code', '1100')->first();
-        if (!$inventoryCoa) {
-            $inventoryCoa = ChartOfAccount::whereIn('type', ['Asset', 'asset'])->first();
-        }
+        $inventoryCoa = $this->findFirstExistingCoa([
+            '1100',
+            config('coa.inventory', '1140.01'),
+            '1140.10',
+        ]);
 
         if (! $inventoryAdjustmentCoa || ! $inventoryCoa) {
             throw ValidationException::withMessages([
@@ -225,5 +227,21 @@ class StockOpname extends Model
                 'date' => $this->opname_date,
             ]);
         }
+    }
+
+    protected function findFirstExistingCoa(array $codes): ?ChartOfAccount
+    {
+        foreach ($codes as $code) {
+            if (! $code) {
+                continue;
+            }
+
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa?->id) {
+                return $coa;
+            }
+        }
+
+        return ChartOfAccount::whereIn('type', ['Asset', 'asset', 'Expense', 'expense'])->first();
     }
 }

@@ -7,8 +7,8 @@
     $heroTo      = '#a5f3fc';
     $items = [
         ['label' => 'Perintah Pengiriman',    'url' => \App\Filament\Resources\DeliveryOrderResource::getUrl(),   'icon' => 'document-text',  'desc' => 'Instruksi pengiriman pesanan pelanggan'],
-        ['label' => 'Penjadwalan Pengiriman', 'url' => \App\Filament\Resources\DeliveryScheduleResource::getUrl(),'icon' => 'calendar-days',  'desc' => 'Atur jadwal & rute pengiriman'],
         ['label' => 'Surat Jalan',            'url' => \App\Filament\Resources\SuratJalanResource::getUrl(),       'icon' => 'truck',          'desc' => 'Dokumen pengiriman barang ke pelanggan'],
+        ['label' => 'Penjadwalan Pengiriman', 'url' => \App\Filament\Resources\DeliveryScheduleResource::getUrl(),'icon' => 'calendar-days',  'desc' => 'Atur jadwal & rute pengiriman'],
     ];
 @endphp
 

@@ -26,7 +26,7 @@ class ViewMaterialIssue extends ViewRecord implements HasTable
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
-        $this->record->load(['items.product', 'warehouse', 'productionPlan', 'manufacturingOrder', 'journalEntries.coa']);
+        $this->record->load(['items.product', 'items.warehouse', 'items.rak', 'warehouse', 'productionPlan', 'manufacturingOrder', 'journalEntries.coa']);
     }
 
     public function infolist(Infolist $infolist): Infolist
@@ -99,6 +99,24 @@ class ViewMaterialIssue extends ViewRecord implements HasTable
                             ->rupiah()
                             ->color(fn (float $state): string => abs($state) < 0.01 ? 'success' : 'danger')
                             ->weight('bold'),
+                    ]),
+
+                Infolists\Components\Section::make('Rincian Bahan')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('material_items_summary')
+                            ->label('Ringkasan Item')
+                            ->state(function () {
+                                $items = $this->record->items;
+                                $totalQuantity = $items->sum('quantity');
+
+                                return $items->count() . ' item / qty ' . number_format((float) $totalQuantity, 2, ',', '.');
+                            })
+                            ->columnSpanFull(),
+
+                        Infolists\Components\ViewEntry::make('material_items_display')
+                            ->label('Daftar Kebutuhan Bahan')
+                            ->view('filament.infolists.material-issue-items-table')
+                            ->columnSpanFull(),
                     ]),
             ]);
     }

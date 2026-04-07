@@ -150,8 +150,8 @@ class DeliveryOrderItem extends Model
             $lineAmount = round($qtyDelivered * $costPerUnit, 2);
             if ($lineAmount <= 0) continue;
             
-            $inventoryCoa = $product?->inventoryCoa ?: $defaultInventoryCoa;
-            $goodsDeliveryCoa = $product?->goodsDeliveryCoa ?: $defaultGoodsDeliveryCoa;
+            $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?: $defaultInventoryCoa;
+            $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?: $defaultGoodsDeliveryCoa;
             
             if (!$inventoryCoa || !$goodsDeliveryCoa) continue;
             

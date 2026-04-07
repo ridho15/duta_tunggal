@@ -22,6 +22,8 @@ use App\Models\Currency;
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
+use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
@@ -161,7 +163,7 @@ test('approve with selected_items creates PO with only included items', function
 // ─────────────────────────────────────────────
 // SCENARIO 3 — Approve with quantity override in selected_items
 // ─────────────────────────────────────────────
-test('approve with selected_items respects user-edited quantity', function () {
+test('approve with selected_items keeps fulfilled quantity at zero until receipt acceptance', function () {
     $payload = [
         'create_purchase_order' => true,
         'supplier_id'           => $this->supplier->id,
@@ -192,7 +194,107 @@ test('approve with selected_items respects user-edited quantity', function () {
 
     expect((float) $poItemA->quantity)->toBe(4.0);
 
-    // fulfilled_quantity on OR item should reflect the 4 units fulfilled
+    // PO approval no longer counts as fulfillment; receipt acceptance is the source of truth.
+    $this->itemA->refresh();
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(0.0);
+});
+
+test('purchase receipt acceptance updates fulfilled quantity on the linked order request item', function () {
+    $payload = [
+        'create_purchase_order' => true,
+        'supplier_id'           => $this->supplier->id,
+        'po_number'             => 'PO-TEST-003-RCPT',
+        'order_date'            => Carbon::today()->toDateString(),
+        'selected_items'        => [
+            [
+                'item_id'      => $this->itemA->id,
+                'product_name' => 'Product A',
+                'quantity'     => 4,
+                'unit_price'   => 10000,
+                'include'      => true,
+            ],
+        ],
+    ];
+
+    $result = $this->service->approve($this->orderRequest, $payload);
+    $po = $result->fresh()->purchaseOrder;
+    $poItemA = $po->purchaseOrderItem->firstWhere('product_id', $this->productA->id);
+
+    $this->itemA->refresh();
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(0.0);
+
+    $receipt = PurchaseReceipt::factory()->create([
+        'purchase_order_id' => $po->id,
+        'receipt_date' => now(),
+        'received_by' => $this->user->id,
+        'currency_id' => $this->currency->id,
+        'status' => 'completed',
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    PurchaseReceiptItem::factory()->create([
+        'purchase_receipt_id' => $receipt->id,
+        'purchase_order_item_id' => $poItemA->id,
+        'product_id' => $this->productA->id,
+        'warehouse_id' => $this->warehouse->id,
+        'qty_received' => 4,
+        'qty_accepted' => 4,
+        'qty_rejected' => 0,
+        'status' => 'completed',
+    ]);
+
+    $this->itemA->refresh();
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(4.0);
+});
+
+test('order request fulfillment reconciliation command repairs stale fulfilled quantities from receipts', function () {
+    $payload = [
+        'create_purchase_order' => true,
+        'supplier_id'           => $this->supplier->id,
+        'po_number'             => 'PO-TEST-RECON-001',
+        'order_date'            => Carbon::today()->toDateString(),
+        'selected_items'        => [
+            [
+                'item_id'      => $this->itemA->id,
+                'product_name' => 'Product A',
+                'quantity'     => 4,
+                'unit_price'   => 10000,
+                'include'      => true,
+            ],
+        ],
+    ];
+
+    $result = $this->service->approve($this->orderRequest, $payload);
+    $po = $result->fresh()->purchaseOrder;
+    $poItemA = $po->purchaseOrderItem->firstWhere('product_id', $this->productA->id);
+
+    $receipt = PurchaseReceipt::factory()->create([
+        'purchase_order_id' => $po->id,
+        'receipt_date' => now(),
+        'received_by' => $this->user->id,
+        'currency_id' => $this->currency->id,
+        'status' => 'completed',
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    PurchaseReceiptItem::factory()->create([
+        'purchase_receipt_id' => $receipt->id,
+        'purchase_order_item_id' => $poItemA->id,
+        'product_id' => $this->productA->id,
+        'warehouse_id' => $this->warehouse->id,
+        'qty_received' => 4,
+        'qty_accepted' => 4,
+        'qty_rejected' => 0,
+        'status' => 'completed',
+    ]);
+
+    $this->itemA->update(['fulfilled_quantity' => 10]);
+
+    $this->artisan('order-request:reconcile-fulfillment', [
+        '--item-id' => $this->itemA->id,
+        '--yes' => true,
+    ])->assertExitCode(0);
+
     $this->itemA->refresh();
     expect((float) $this->itemA->fulfilled_quantity)->toBe(4.0);
 });
@@ -309,7 +411,7 @@ test('createPurchaseOrder with selected_items includes only checked items', func
 // ─────────────────────────────────────────────
 // SCENARIO 7B — manual PO item creation still backfills traceability
 // ─────────────────────────────────────────────
-test('manually created PO items linked to an OrderRequest backfill refer_item_model and update fulfillment', function () {
+test('manually created PO items linked to an OrderRequest backfill refer_item_model without fulfillment', function () {
     $this->orderRequest->update(['status' => 'approved']);
 
     $purchaseOrder = PurchaseOrder::create([
@@ -341,8 +443,8 @@ test('manually created PO items linked to an OrderRequest backfill refer_item_mo
 
     expect($poItem->refer_item_model_type)->toBe(OrderRequestItem::class)
         ->and($poItem->refer_item_model_id)->toBe($this->itemA->id)
-        ->and((float) $this->itemA->fulfilled_quantity)->toBe(10.0)
-        ->and((float) $this->itemA->remaining_quantity)->toBe(0.0);
+        ->and((float) $this->itemA->fulfilled_quantity)->toBe(0.0)
+        ->and((float) $this->itemA->remaining_quantity)->toBe(10.0);
 });
 
 // ─────────────────────────────────────────────
@@ -373,7 +475,7 @@ test('PO items have correct refer_item_model traceability after approve', functi
 // ─────────────────────────────────────────────
 // SCENARIO 9 — fulfilled_quantity updated correctly on approve
 // ─────────────────────────────────────────────
-test('fulfilled_quantity on OrderRequestItems is updated after approve', function () {
+test('fulfilled_quantity on OrderRequestItems remains zero after approve without receipt acceptance', function () {
     $payload = [
         'create_purchase_order' => true,
         'supplier_id'           => $this->supplier->id,
@@ -386,8 +488,8 @@ test('fulfilled_quantity on OrderRequestItems is updated after approve', functio
     $this->itemA->refresh();
     $this->itemB->refresh();
 
-    expect((float) $this->itemA->fulfilled_quantity)->toBe(10.0);
-    expect((float) $this->itemB->fulfilled_quantity)->toBe(5.0);
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(0.0);
+    expect((float) $this->itemB->fulfilled_quantity)->toBe(0.0);
 });
 
 test('approving an existing PO does not double count fulfilled quantities', function () {

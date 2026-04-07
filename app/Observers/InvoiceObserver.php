@@ -539,8 +539,8 @@ class InvoiceObserver
                 continue;
             }
 
-            $cogsCoa = $item->product?->cogsCoa?->exists ? $item->product->cogsCoa : $defaultCogsCoa;
-            $goodsDeliveryCoa = $item->product?->goodsDeliveryCoa?->exists ? $item->product->goodsDeliveryCoa : $defaultGoodsDeliveryCoa;
+            $cogsCoa = $item->product?->resolveCogsCoaOrDefault() ?? $defaultCogsCoa;
+            $goodsDeliveryCoa = $item->product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
 
             $this->pushCostTotals($debitTotals, $creditTotals, $lineAmount, $cogsCoa, $goodsDeliveryCoa);
         }
@@ -608,8 +608,8 @@ class InvoiceObserver
                 }
 
                 $amount = round($quantity * $costPrice, 2);
-                $cogsCoa = $item->product?->cogsCoa?->exists ? $item->product->cogsCoa : $defaultCogsCoa;
-                $goodsDeliveryCoa = $item->product?->goodsDeliveryCoa?->exists ? $item->product->goodsDeliveryCoa : $defaultGoodsDeliveryCoa;
+                $cogsCoa = $item->product?->resolveCogsCoaOrDefault() ?? $defaultCogsCoa;
+                $goodsDeliveryCoa = $item->product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
 
                 $this->pushCostTotals($debitTotals, $creditTotals, $amount, $cogsCoa, $goodsDeliveryCoa);
             }

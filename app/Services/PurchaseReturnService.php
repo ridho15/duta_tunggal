@@ -301,9 +301,7 @@ class PurchaseReturnService
                         continue;
                     }
 
-                    $inventoryCoa = ($item->product?->inventoryCoa && $item->product->inventoryCoa->id)
-                        ? $item->product->inventoryCoa
-                        : $defaultInventoryCoa;
+                    $inventoryCoa = $item->product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
 
                     if (!$inventoryCoa || !$inventoryCoa->id) {
                         Log::error('Missing inventory COA for purchase return journal line', [

@@ -359,20 +359,9 @@ class QualityControlService
         // which will return an empty ChartOfAccount instance with no id when the
         // foreign key is null.  We only treat the relation as valid when an id is
         // present; otherwise fall back to the hardcoded codes.
-        $inventoryCoa = ($product->inventoryCoa && $product->inventoryCoa->id)
-            ? $product->inventoryCoa
-            : $this->resolveCoaByCodes(['1140.10', '1140.01']);
-        $temporaryProcurementCoa = ($product->temporaryProcurementCoa && $product->temporaryProcurementCoa->id)
-            ? $product->temporaryProcurementCoa
-            : $this->resolveCoaByCodes(['1180.01', '1400.01']);
-        $unbilledPurchaseCoa = ($product->unbilledPurchaseCoa && $product->unbilledPurchaseCoa->id)
-            ? $product->unbilledPurchaseCoa
-            : $this->resolveCoaByCodes([
-                config('coa.unbilled_purchase', '2100.10'),
-                '2100.10',
-                '2190.10',
-                '1180.01',
-            ]);
+        $inventoryCoa = $product->resolveInventoryCoaOrDefault();
+        $temporaryProcurementCoa = $product->resolveTemporaryProcurementCoaOrDefault();
+        $unbilledPurchaseCoa = $product->resolveUnbilledPurchaseCoaOrDefault();
 
         // The relation may still produce a ChartOfAccount with an empty id, or the
         // fallback resolver may return null if none of the codes exist. Fail hard so
@@ -790,9 +779,8 @@ class QualityControlService
             $creditCoa = $posSementaraCoa;
         }
 
-        $barangJadiCoa = ($product->inventoryCoa && $product->inventoryCoa->id)
-            ? $product->inventoryCoa
-            : $this->resolveCoaByCodes(['1140.02']);
+        $barangJadiCoa = $product->resolveInventoryCoaOrDefault()
+            ?? $this->resolveCoaByCodes(['1140.02']);
 
         if (!$creditCoa || !$barangJadiCoa) {
             return;

@@ -202,12 +202,13 @@ class AgeingReportService
     {
         $asOf = $this->normalizeAsOfDate($asOfDate);
 
-        if (!empty($record->ageingSchedule?->days_outstanding)) {
-            return (int) $record->ageingSchedule->days_outstanding;
-        }
+        $dueDate = $record->invoice?->due_date
+            ?? $record->ageingSchedule?->due_date
+            ?? $record->invoice?->invoice_date
+            ?? $record->ageingSchedule?->invoice_date;
 
-        if ($record->invoice?->invoice_date) {
-            return (int) Carbon::parse($record->invoice->invoice_date)->diffInDays($asOf, false);
+        if ($dueDate) {
+            return (int) Carbon::parse($dueDate)->diffInDays($asOf, false);
         }
 
         return 0;

@@ -401,11 +401,13 @@ class BillOfMaterialResource extends Resource
                                     ->content(function ($get) {
                                         $product = Product::withoutGlobalScopes()->with('inventoryCoa')->find($get('product_id'));
 
-                                        if (!$product || !$product->inventoryCoa || !$product->inventoryCoa->id) {
+                                        $inventoryCoa = $product?->resolveInventoryCoaOrDefault();
+
+                                        if (! $inventoryCoa) {
                                             return 'Mengikuti COA persediaan pada product yang dipilih.';
                                         }
 
-                                        return "({$product->inventoryCoa->code}) {$product->inventoryCoa->name}";
+                                        return "({$inventoryCoa->code}) {$inventoryCoa->name}";
                                     }),
                                 Select::make('work_in_progress_coa_id')
                                     ->label('COA Pos Sementara Produksi')
@@ -451,29 +453,6 @@ class BillOfMaterialResource extends Resource
                         Toggle::make('is_active')
                             ->default(true)
                             ->required(),
-                        Repeater::make('satuan_konversi')
-                            ->columnSpanFull()
-                            ->columns(2)
-                            ->reactive()
-                            ->disabled()
-                            ->label("Satuan Konversi")
-                            ->schema([
-                                Select::make('uom_id')
-                                    ->label('Satuan')
-                                    ->preload()
-                                    ->disabled()
-                                    ->reactive()
-                                    ->searchable()
-                                    ->options(function () {
-                                        return UnitOfMeasure::get()->pluck('name', 'id');
-                                    }),
-                                TextInput::make('nilai_konversi')
-                                    ->label('Nilai Konversi')
-                                    ->reactive()
-                                    ->disabled()
-                                    ->numeric(),
-                            ]),
-
                     ])
             ]);
     }

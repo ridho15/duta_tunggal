@@ -665,7 +665,7 @@ class OrderRequestResource extends Resource
                     })
                     ->badge(),
                 TextColumn::make('fulfilled_quantity')
-                    ->label('Qty Terpenuhi')
+                    ->label('Qty Diterima (Penerimaan Barang)')
                     ->state(function ($record) {
                         return (float) $record->orderRequestItem->sum(
                             fn ($item) => (float) ($item->fulfilled_quantity ?? 0)
@@ -673,7 +673,7 @@ class OrderRequestResource extends Resource
                     })
                     ->numeric(),
                 TextColumn::make('remaining_quantity')
-                    ->label('Sisa Qty')
+                    ->label('Sisa Qty Belum Diterima')
                     ->state(function ($record) {
                         return (float) $record->orderRequestItem->sum(
                             fn ($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
@@ -1529,6 +1529,7 @@ class OrderRequestResource extends Resource
                             ->date('d/m/Y'),
                     ]),
                 \Filament\Infolists\Components\Section::make('Ringkasan Quantity')
+                    ->description('Nilai dihitung dari qty accepted pada penerimaan barang, bukan dari approval PO.')
                     ->columns(2)
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('items_count')
@@ -1538,10 +1539,10 @@ class OrderRequestResource extends Resource
                             ->label('Total Qty')
                             ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum('quantity')),
                         \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
-                            ->label('Qty Terpenuhi')
+                            ->label('Qty Diterima (Penerimaan Barang)')
                             ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum('fulfilled_quantity')),
                         \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
-                            ->label('Sisa Qty')
+                            ->label('Sisa Qty Belum Diterima')
                             ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum(
                                 fn ($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
                             )),
@@ -1563,10 +1564,10 @@ class OrderRequestResource extends Resource
                                 \Filament\Infolists\Components\TextEntry::make('quantity')
                                     ->label('Qty'),
                                 \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
-                                    ->label('Qty Terpenuhi')
+                                    ->label('Qty Diterima (Penerimaan Barang)')
                                     ->getStateUsing(fn ($record) => (float) ($record->fulfilled_quantity ?? 0)),
                                 \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
-                                    ->label('Sisa Qty')
+                                    ->label('Sisa Qty Belum Diterima')
                                     ->getStateUsing(fn ($record) => max(0, (float) $record->quantity - (float) ($record->fulfilled_quantity ?? 0))),
                                 \Filament\Infolists\Components\TextEntry::make('original_price')
                                     ->label('Harga Supplier')

@@ -10,6 +10,8 @@
         @php($raw = $report['raw_materials'])
         @php($overhead = $report['overhead'])
         @php($wip = $report['wip'])
+        @php($dataQuality = $report['data_quality'] ?? [])
+        @php($warnings = $dataQuality['warnings'] ?? [])
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="p-4 border rounded shadow-sm">
@@ -38,6 +40,18 @@
                 </div>
             @endif
         </div>
+
+        @if(!empty($warnings))
+            <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+                <div class="text-sm font-semibold">Peringatan kualitas data HPP</div>
+                <div class="mt-1 text-sm">Laporan ini memakai fallback untuk sebagian nilai. Periksa sumber posting jurnal atau stok berikut:</div>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+                    @foreach($warnings as $warning)
+                        <li>{{ is_array($warning) ? ($warning['message'] ?? json_encode($warning)) : $warning }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         <div class="overflow-x-auto border rounded-lg shadow">
             <table class="min-w-full divide-y">

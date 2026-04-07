@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\QuotationResource\Pages;
 
 use App\Filament\Resources\QuotationResource;
+use App\Http\Controllers\HelperController;
 use App\Services\QuotationService;
 use Filament\Actions;
 use Filament\Actions\DeleteAction;
@@ -33,9 +34,21 @@ class EditQuotation extends EditRecord
         $items = $data['quotationItem'] ?? [];
         $grand = 0;
         foreach ($items as $item) {
-            $grand += $item['total_price'] ?? 0;
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $grand += (float) 
+                
+                \App\Http\Controllers\HelperController::hitungSubtotal(
+                    (float) ($item['quantity'] ?? 0),
+                    (float) \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                    (float) ($item['discount'] ?? 0),
+                    (float) ($item['tax'] ?? 0),
+                    $item['tax_type'] ?? 'None'
+                );
         }
-        $data['total_amount'] = $grand;
+        $data['total_amount'] = number_format((float) HelperController::parseIndonesianMoney($grand), 0, ',', '.');
         return $data;
     }
 

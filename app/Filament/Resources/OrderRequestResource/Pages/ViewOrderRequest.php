@@ -264,12 +264,12 @@ class ViewOrderRequest extends ViewRecord
                                             'min' => 'Qty minimal 0.',
                                         ]),
                                     TextInput::make('fulfilled_quantity')
-                                        ->label('Qty Terpenuhi')
+                                        ->label('Qty Diterima (Penerimaan Barang)')
                                         ->readOnly()
                                         ->dehydrated(false)
                                         ->default(0),
                                     TextInput::make('remaining_quantity')
-                                        ->label('Sisa Qty')
+                                        ->label('Sisa Qty Belum Diterima')
                                         ->readOnly()
                                         ->dehydrated(false)
                                         ->default(0),
@@ -549,12 +549,12 @@ class ViewOrderRequest extends ViewRecord
                                             'min' => 'Qty minimal 0.',
                                         ]),
                                     TextInput::make('fulfilled_quantity')
-                                        ->label('Qty Terpenuhi')
+                                        ->label('Qty Diterima (Penerimaan Barang)')
                                         ->readOnly()
                                         ->dehydrated(false)
                                         ->default(0),
                                     TextInput::make('remaining_quantity')
-                                        ->label('Sisa Qty')
+                                        ->label('Sisa Qty Belum Diterima')
                                         ->readOnly()
                                         ->dehydrated(false)
                                         ->default(0),

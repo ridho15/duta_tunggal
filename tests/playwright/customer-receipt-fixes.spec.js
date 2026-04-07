@@ -194,6 +194,28 @@ test.describe('M3 — Journal Entries section on CustomerReceipt view', () => {
     await expect(page.getByRole('heading', { name: 'Journal Entries', exact: true })).toBeVisible({ timeout: 10_000 });
   });
 
+  test('View page shows real AR, history, and journal content', async ({ page }) => {
+    const opened = await openFirstReceipt(page);
+    if (!opened) {
+      await page.goto('/admin/customer-receipts');
+      await page.waitForLoadState('networkidle');
+      const body = await page.textContent('body');
+      expect(body).not.toMatch(/Fatal error|Whoops!|Something went wrong/i);
+      return;
+    }
+
+    const content = await page.textContent('body');
+
+    expect(content || '').toMatch(/Status Account Receivable/);
+    expect(content || '').toMatch(/History Pembayaran Invoice/);
+    expect(content || '').toMatch(/Journal Entries/);
+    expect(content || '').toMatch(/INV-PW-CR-001|INV-/i);
+    expect(content || '').toMatch(/Lunas|Belum Lunas/i);
+    expect(content || '').toMatch(/Receipt #/i);
+    expect(content || '').toMatch(/REC-/i);
+    expect(content || '').not.toMatch(/Tidak ada pembayaran tercatat|Tidak ada pembayaran|Belum ada journal entry/i);
+  });
+
   test('Journal Entries section shows Jurnal Akuntansi label', async ({ page }) => {
     const opened = await openFirstReceipt(page);
     if (!opened) {
@@ -224,6 +246,20 @@ test.describe('M4 — AR Status shows updated paid amount in Rupiah format', () 
 
     // Status AR section must be visible
     await expect(page.getByText('Status Account Receivable')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('Status AR section renders a normalized payment status label', async ({ page }) => {
+    const opened = await openFirstReceipt(page);
+    if (!opened) {
+      await page.goto('/admin/customer-receipts');
+      await page.waitForLoadState('networkidle');
+      const body = await page.textContent('body');
+      expect(body).not.toMatch(/Fatal error|Whoops!|Something went wrong/i);
+      return;
+    }
+
+    const content = await page.textContent('body');
+    expect(content || '').toMatch(/Lunas|Belum Lunas/i);
   });
 
   test('Rupiah format used for amounts in AR status section', async ({ page }) => {

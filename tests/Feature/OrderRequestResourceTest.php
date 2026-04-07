@@ -219,7 +219,7 @@ it('shows fulfilled quantity summary on the index page', function () {
 
     Livewire::actingAs($this->user)
         ->test(ListOrderRequests::class)
-        ->assertSee('Qty Terpenuhi')
+        ->assertSee('Qty Diterima (Penerimaan Barang)')
         ->assertSee('4');
 });
 
@@ -253,8 +253,8 @@ it('views order request details on the Filament view page', function () {
         ->assertSee('Rp 300.000')
         ->assertSee('Rp 33.000')
         ->assertSee('Rp 333.000')
-        ->assertSee('Qty Terpenuhi')
-        ->assertSee('Sisa Qty');
+        ->assertSee('Qty Diterima (Penerimaan Barang)')
+        ->assertSee('Sisa Qty Belum Diterima');
 });
 
 it('edits an order request through the Filament edit page', function () {

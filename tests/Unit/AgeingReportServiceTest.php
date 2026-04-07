@@ -17,7 +17,7 @@ class AgeingReportServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_assigns_bucket_boundaries_from_invoice_date_against_as_of_date(): void
+    public function test_it_assigns_bucket_boundaries_from_due_date_against_as_of_date(): void
     {
         $user = User::factory()->create();
         $branch = Cabang::factory()->create();
@@ -25,17 +25,17 @@ class AgeingReportServiceTest extends TestCase
         $asOfDate = '2025-03-31';
 
         $cases = [
-            ['suffix' => 'CUR', 'invoice_date' => '2025-03-01', 'expected_bucket' => 'Current'],
-            ['suffix' => '3160', 'invoice_date' => '2025-01-30', 'expected_bucket' => '31–60'],
-            ['suffix' => '6190', 'invoice_date' => '2024-12-31', 'expected_bucket' => '61–90'],
-            ['suffix' => 'OVER', 'invoice_date' => '2024-12-30', 'expected_bucket' => '>90'],
+            ['suffix' => 'CUR', 'invoice_date' => '2025-01-01', 'due_date' => '2025-03-15', 'expected_bucket' => 'Current'],
+            ['suffix' => '3160', 'invoice_date' => '2025-01-01', 'due_date' => '2025-02-28', 'expected_bucket' => '31–60'],
+            ['suffix' => '6190', 'invoice_date' => '2025-01-01', 'due_date' => '2025-01-15', 'expected_bucket' => '61–90'],
+            ['suffix' => 'OVER', 'invoice_date' => '2025-01-01', 'due_date' => '2024-12-30', 'expected_bucket' => '>90'],
         ];
 
         foreach ($cases as $index => $case) {
             $invoice = Invoice::factory()->create([
                 'invoice_number' => 'INV-' . $case['suffix'],
                 'invoice_date' => $case['invoice_date'],
-                'due_date' => '2025-04-30',
+                'due_date' => $case['due_date'],
                 'customer_name' => $customer->name,
                 'cabang_id' => $branch->id,
             ]);
@@ -61,6 +61,37 @@ class AgeingReportServiceTest extends TestCase
         $this->assertSame('31–60', $records[1]->aging_bucket_computed);
         $this->assertSame('61–90', $records[2]->aging_bucket_computed);
         $this->assertSame('>90', $records[3]->aging_bucket_computed);
+    }
+
+    public function test_it_resolves_payable_days_outstanding_from_due_date(): void
+    {
+        $user = User::factory()->create();
+        $branch = Cabang::factory()->create();
+        $supplier = Supplier::factory()->create(['cabang_id' => $branch->id]);
+
+        $invoice = Invoice::factory()->create([
+            'invoice_number' => 'INV-AP-DUE',
+            'invoice_date' => '2025-01-01',
+            'due_date' => '2025-02-20',
+            'supplier_name' => $supplier->perusahaan,
+            'cabang_id' => $branch->id,
+        ]);
+
+        $payable = AccountPayable::factory()->create([
+            'invoice_id' => $invoice->id,
+            'supplier_id' => $supplier->id,
+            'cabang_id' => $branch->id,
+            'total' => 100000,
+            'paid' => 0,
+            'remaining' => 100000,
+            'status' => 'Belum Lunas',
+            'created_by' => $user->id,
+        ]);
+
+        $daysOutstanding = app(AgeingReportService::class)->resolveDaysOutstanding($payable->fresh('invoice'), '2025-03-31');
+
+        $this->assertSame(39, $daysOutstanding);
+        $this->assertSame('31–60', app(AgeingReportService::class)->resolveBucketLabel($daysOutstanding));
     }
 
     public function test_it_projects_cash_flow_relative_to_as_of_date_window(): void

@@ -601,9 +601,12 @@ class ProductResource extends Resource
                 TextColumn::make('inventoryCoa.name')
                     ->label('Akun Persediaan')
                     ->formatStateUsing(function ($state, $record) {
-                        if ($record->inventoryCoa) {
-                            return $record->inventoryCoa->code . ' - ' . $record->inventoryCoa->name;
+                        $inventoryCoa = $record->resolveInventoryCoaOrDefault();
+
+                        if ($inventoryCoa) {
+                            return $inventoryCoa->code . ' - ' . $inventoryCoa->name;
                         }
+
                         return '-';
                     })
                     ->toggleable(isToggledHiddenByDefault: false),
@@ -621,19 +624,19 @@ class ProductResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('goodsDeliveryCoaDisplay')
                     ->label('Akun Barang Terkirim')
-                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->goodsDeliveryCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->resolveGoodsDeliveryCoaOrDefault()))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cogsCoaDisplay')
                     ->label('Akun Beban Pokok')
-                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->cogsCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->resolveCogsCoaOrDefault()))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('purchaseReturnCoaDisplay')
                     ->label('Akun Retur Pembelian')
-                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->purchaseReturnCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->resolvePurchaseReturnCoaOrDefault()))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('unbilledPurchaseCoaDisplay')
                     ->label('Akun Pembelian Belum Tertagih')
-                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->unbilledPurchaseCoa))
+                    ->formatStateUsing(fn($state, Product $record) => self::formatCoa($record->resolveUnbilledPurchaseCoaOrDefault()))
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->label('Status')

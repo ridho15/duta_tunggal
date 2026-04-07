@@ -223,6 +223,7 @@ class WarehouseConfirmation extends Model
             }
 
             if (in_array(strtolower((string) $wc->status), ['confirmed', 'rejected', 'partial_confirmed'], true)) {
+                static::syncLinkedMaterialIssueItems($wc);
                 static::syncMaterialIssueStatus($wc);
             }
         });
@@ -297,10 +298,45 @@ class WarehouseConfirmation extends Model
                 }
 
                 if ($wc->confirmable_type === MaterialIssue::class) {
+                    static::syncLinkedMaterialIssueItems($wc);
                     static::syncMaterialIssueStatus($wc);
                 }
             }
         });
+    }
+
+    protected static function syncLinkedMaterialIssueItems(WarehouseConfirmation $wc): void
+    {
+        if ($wc->confirmable_type !== MaterialIssue::class) {
+            return;
+        }
+
+        $materialIssue = $wc->confirmable;
+        if (! $materialIssue instanceof MaterialIssue) {
+            return;
+        }
+
+        $confirmationItems = $wc->fresh(['warehouseConfirmationItems.materialIssueItem'])?->warehouseConfirmationItems ?? collect();
+
+        foreach ($confirmationItems as $confirmationItem) {
+            $status = strtolower((string) $confirmationItem->status);
+
+            if (! $confirmationItem->material_issue_item_id || ! in_array($status, ['confirmed', 'partial_confirmed'], true)) {
+                continue;
+            }
+
+            $materialIssueItem = $confirmationItem->materialIssueItem;
+
+            if (! $materialIssueItem || ! $materialIssueItem->exists) {
+                continue;
+            }
+
+            $materialIssueItem->update([
+                'status' => MaterialIssueItem::STATUS_APPROVED,
+                'approved_by' => $wc->confirmed_by ?? $materialIssueItem->approved_by,
+                'approved_at' => $wc->confirmed_at ?? $materialIssueItem->approved_at ?? now(),
+            ]);
+        }
     }
 
     protected static function syncMaterialIssueStatus(WarehouseConfirmation $wc): void

@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Models\OrderRequestItem;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
@@ -22,6 +24,8 @@ class PurchaseReceiptItemObserver
     public function created(PurchaseReceiptItem $receiptItem)
     {
         Log::info("PurchaseReceiptItemObserver: created() called for item ID {$receiptItem->id}, qty_rejected: {$receiptItem->qty_rejected}");
+
+        $this->syncReferencedOrderRequestFulfillment($receiptItem);
 
         // Debug: Check qty_rejected type and value
         Log::info("PurchaseReceiptItemObserver: qty_rejected type: " . gettype($receiptItem->qty_rejected) . ", value: '{$receiptItem->qty_rejected}'");
@@ -116,6 +120,8 @@ class PurchaseReceiptItemObserver
     {
         Log::info("PurchaseReceiptItemObserver: updated() called for item ID {$receiptItem->id}");
 
+        $this->syncReferencedOrderRequestFulfillment($receiptItem);
+
         // Check if qty_rejected was changed
         if ($receiptItem->wasChanged('qty_rejected')) {
             $oldQtyRejected = $receiptItem->getOriginal('qty_rejected');
@@ -130,6 +136,8 @@ class PurchaseReceiptItemObserver
     public function deleted(PurchaseReceiptItem $receiptItem)
     {
         Log::info("PurchaseReceiptItemObserver: deleted() called for item ID {$receiptItem->id}");
+
+        $this->syncReferencedOrderRequestFulfillment($receiptItem);
 
         try {
             // Find and delete related PurchaseReturnItems
@@ -246,6 +254,39 @@ class PurchaseReceiptItemObserver
                 $e,
                 'Perubahan item penerimaan tersimpan, tetapi pembaruan retur pembelian terkait belum berhasil disinkronkan.'
             );
+        }
+    }
+
+    protected function syncReferencedOrderRequestFulfillment(PurchaseReceiptItem $receiptItem): void
+    {
+        if (! $receiptItem->purchase_order_item_id) {
+            return;
+        }
+
+        $purchaseOrderItem = PurchaseOrderItem::withoutGlobalScopes()
+            ->with('referItemModel.orderRequest')
+            ->find($receiptItem->purchase_order_item_id);
+
+        if (! $purchaseOrderItem || $purchaseOrderItem->refer_item_model_type !== OrderRequestItem::class) {
+            return;
+        }
+
+        $orderRequestItem = $purchaseOrderItem->referItemModel;
+        if (! $orderRequestItem || ! $orderRequestItem->exists) {
+            return;
+        }
+
+        $totalAccepted = (float) PurchaseReceiptItem::withoutGlobalScopes()
+            ->where('purchase_order_item_id', $purchaseOrderItem->id)
+            ->sum('qty_accepted');
+
+        $orderRequestItem->update([
+            'fulfilled_quantity' => $totalAccepted,
+        ]);
+
+        $orderRequest = $orderRequestItem->orderRequest;
+        if ($orderRequest) {
+            $orderRequest->syncFulfillmentStatus();
         }
     }
 }

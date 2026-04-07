@@ -77,6 +77,58 @@ class InventoryReportServiceTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_it_uses_last_movement_per_rak_for_aging(): void
+    {
+        Carbon::setTestNow('2026-04-04 10:00:00');
+
+        $fixture = $this->createInventoryFixture();
+        $warehouse = $fixture['warehouse'];
+        $product = $fixture['product'];
+
+        $otherRak = Rak::create([
+            'code' => 'RAK-S2',
+            'name' => 'Rak Service 2',
+            'warehouse_id' => $warehouse->id,
+        ]);
+
+        InventoryStock::create([
+            'product_id' => $product->id,
+            'warehouse_id' => $warehouse->id,
+            'rak_id' => $otherRak->id,
+            'qty_available' => 50,
+            'qty_reserved' => 0,
+            'qty_min' => 5,
+        ]);
+
+        StockMovement::create([
+            'product_id' => $product->id,
+            'warehouse_id' => $warehouse->id,
+            'rak_id' => $otherRak->id,
+            'type' => 'adjustment_in',
+            'quantity' => 5,
+            'value' => 5000,
+            'date' => now()->subDays(2),
+            'notes' => 'Recent movement on other rack',
+        ]);
+
+        $service = app(InventoryReportService::class);
+        $agingRows = $service->agingRows([
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $product->id,
+            'as_of_date' => '2026-04-04',
+        ]);
+
+        $rak1 = $agingRows->firstWhere('Rak', 'Rak Service');
+        $rak2 = $agingRows->firstWhere('Rak', 'Rak Service 2');
+
+        $this->assertNotNull($rak1);
+        $this->assertNotNull($rak2);
+        $this->assertSame(14, $rak1['Hari Aging']);
+        $this->assertSame(1, $rak2['Hari Aging']);
+
+        Carbon::setTestNow();
+    }
+
     private function createInventoryFixture(): array
     {
         $cabang = Cabang::factory()->create();

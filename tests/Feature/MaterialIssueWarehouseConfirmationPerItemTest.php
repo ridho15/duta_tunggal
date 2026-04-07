@@ -232,14 +232,28 @@ test('material issue becomes completed when all confirmation items are approved'
         ->with('warehouseConfirmationItems')
         ->get();
 
-    $confirmations->each(function (WarehouseConfirmation $confirmation) {
-        $item = $confirmation->warehouseConfirmationItems->sole();
+    $firstConfirmation = $confirmations->first();
+    $secondConfirmation = $confirmations->last();
 
-        $item->update([
-            'status' => 'confirmed',
-            'confirmed_qty' => $item->requested_qty,
-        ]);
-    });
+    $this->actingAs($context['user']);
+
+    $firstItem = $firstConfirmation->warehouseConfirmationItems->sole();
+    $firstItem->update([
+        'status' => 'confirmed',
+        'confirmed_qty' => $firstItem->requested_qty,
+    ]);
+
+    $firstMaterialIssueItem = $firstItem->fresh()->materialIssueItem;
+
+    expect($firstMaterialIssueItem->fresh()->status)->toBe(MaterialIssueItem::STATUS_APPROVED)
+        ->and($firstMaterialIssueItem->fresh()->approved_by)->not->toBeNull()
+        ->and($firstMaterialIssueItem->fresh()->approved_at)->not->toBeNull();
+
+    $secondItem = $secondConfirmation->warehouseConfirmationItems->sole();
+    $secondItem->update([
+        'status' => 'confirmed',
+        'confirmed_qty' => $secondItem->requested_qty,
+    ]);
 
     expect($context['materialIssue']->fresh()->status)->toBe(MaterialIssue::STATUS_COMPLETED)
         ->and($context['materialIssue']->fresh()->hasConfirmedWarehouseConfirmation())->toBeTrue();
@@ -254,6 +268,36 @@ test('material issue becomes completed when all confirmation items are approved'
         ->where('confirmable_id', $context['materialIssue']->id)
         ->get()
         ->each(fn (WarehouseConfirmation $confirmation) => expect($confirmation->fresh()->status)->toBe('confirmed'));
+});
+
+test('approving parent warehouse confirmation also approves linked material issue items', function () {
+    $context = createMaterialIssueConfirmationContext();
+
+    app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($context['materialIssue']);
+
+    $confirmation = WarehouseConfirmation::query()
+        ->where('confirmable_type', MaterialIssue::class)
+        ->where('confirmable_id', $context['materialIssue']->id)
+        ->with('warehouseConfirmationItems.materialIssueItem')
+        ->orderBy('id')
+        ->firstOrFail();
+
+    $this->actingAs($context['user']);
+
+    $confirmation->update([
+        'status' => 'confirmed',
+        'confirmed_by' => $context['user']->id,
+        'confirmed_at' => now(),
+    ]);
+
+    $linkedItem = $confirmation->fresh(['warehouseConfirmationItems.materialIssueItem'])
+        ->warehouseConfirmationItems
+        ->sole()
+        ->materialIssueItem;
+
+    expect($linkedItem->fresh()->status)->toBe(MaterialIssueItem::STATUS_APPROVED)
+        ->and($linkedItem->fresh()->approved_by)->toBe($context['user']->id)
+        ->and($linkedItem->fresh()->approved_at)->not->toBeNull();
 });
 
 test('material issue becomes rejected when any confirmation item is rejected', function () {

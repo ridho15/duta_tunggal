@@ -37,6 +37,10 @@
         tfoot td { background:linear-gradient(135deg,#1e3a8a,#1d4ed8); color:#fff; font-weight:900; padding:.75rem 1rem; font-size:.95rem; }
         tfoot td:last-child { text-align:right; font-family:monospace; }
         .overhead-item { display:flex; justify-content:space-between; font-size:.78rem; color:#64748b; padding:.15rem 0; }
+        .data-quality-warning { background:#fffbeb; border:1px solid #f59e0b; border-radius:12px; padding:1rem 1.1rem; margin-bottom:1.25rem; color:#92400e; }
+        .data-quality-warning h3 { margin:0 0 .35rem; font-size:.9rem; font-weight:800; }
+        .data-quality-warning ul { margin:.5rem 0 0; padding-left:1.1rem; }
+        .data-quality-warning li { margin:.2rem 0; }
         @media print {
             body { background:#fff; }
             .print-toolbar,.no-print { display:none !important; }
@@ -56,6 +60,8 @@
             $raw      = $report['raw_materials'];
             $overhead = $report['overhead'];
             $wip      = $report['wip'];
+            $dataQuality = $report['data_quality'] ?? [];
+            $warnings = $dataQuality['warnings'] ?? [];
         @endphp
 
         <div class="rh">
@@ -85,6 +91,18 @@
         @if(!empty($selectedBranches))
         <div style="margin-bottom:1rem;padding:.6rem 1rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.85rem;color:#1d4ed8;" class="no-print">
             &#127968; Cabang: <strong>{{ implode(', ', $selectedBranches) }}</strong>
+        </div>
+        @endif
+
+        @if(!empty($warnings))
+        <div class="data-quality-warning no-print">
+            <h3>Peringatan kualitas data HPP</h3>
+            <div>Laporan ini menggunakan fallback untuk sebagian nilai. Periksa sumber posting jurnal atau stok berikut:</div>
+            <ul>
+                @foreach($warnings as $warning)
+                    <li>{{ is_array($warning) ? ($warning['message'] ?? json_encode($warning)) : $warning }}</li>
+                @endforeach
+            </ul>
         </div>
         @endif
 

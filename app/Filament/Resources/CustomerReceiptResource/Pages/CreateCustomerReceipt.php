@@ -257,6 +257,10 @@ class CreateCustomerReceipt extends CreateRecord
     protected function afterCreate(): void
     {
         $record = $this->record;
+
+        // Mark early so CustomerReceiptObserver does not double-count AR while
+        // CustomerReceiptItemObserver triggers receipt status updates during item creation.
+        \App\Observers\CustomerReceiptObserver::markArUpdatedInCreate($record->id);
         
         
         // Create customer receipt items based on invoice_receipts data
@@ -342,10 +346,6 @@ class CreateCustomerReceipt extends CreateRecord
         
         // Recalculate total_payment from actual CustomerReceiptItems using model method
         $finalTotal = $record->recalculateTotalPayment();
-
-        // Mark that AR was already updated here so the Observer does not double-count
-        // when CustomerReceiptItemObserver triggers a receipt status change.
-        \App\Observers\CustomerReceiptObserver::markArUpdatedInCreate($record->id);
 
         // Ensure the receipt status moves out of Draft after the create flow has
         // finished updating Account Receivable balances.

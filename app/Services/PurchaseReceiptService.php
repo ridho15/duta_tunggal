@@ -7,6 +7,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 use App\Models\JournalEntry;
 use App\Models\ChartOfAccount;
+use App\Models\InventoryStock;
 use App\Models\StockMovement;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -184,33 +185,43 @@ class PurchaseReceiptService
      */
     public function postItemInventoryAfterQC(PurchaseReceiptItem $item): array
     {
-        // prevent duplicate posting
-        if (JournalEntry::where('source_type', PurchaseReceiptItem::class)
+        $item->loadMissing([
+            'purchaseOrderItem',
+            'product.inventoryCoa',
+            'product.unbilledPurchaseCoa',
+            'purchaseReceipt.currency',
+        ]);
+
+        $qtyAccepted = max(0, $item->qty_accepted ?? 0);
+        $poItem = $item->purchaseOrderItem;
+        $unitPrice = $poItem?->unit_price ?? 0;
+        $amount = round($qtyAccepted * $unitPrice, 2);
+
+        $qc = $this->resolveCompletedQcForReceiptItem($item);
+        [$movementFromType, $movementFromId] = $this->resolveReceiptItemStockSource($item, $qc);
+
+        $journalAlreadyPosted = JournalEntry::where('source_type', PurchaseReceiptItem::class)
             ->where('source_id', $item->id)
-            ->where('description', 'like', '%Inventory Stock%')
+            ->where('journal_type', 'inventory')
             ->exists()
-        ) {
+        ;
+
+        $existingMovement = $this->findReceiptItemStockMovement($item, $qc);
+
+        if ($journalAlreadyPosted && $existingMovement) {
+            $this->syncInventoryStockFromMovements($item);
+
             return $this->skipWithWarning('Item inventory already posted', [
                 'item_id' => $item->id,
             ]);
         }
 
-        $item->loadMissing([
-            'purchaseOrderItem',
-            'product.inventoryCoa',
-            'product.unbilledPurchaseCoa',
-            'purchaseReceipt.currency'
-        ]);
-
-        $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         if ($qtyAccepted <= 0) {
             return $this->skipWithWarning('No accepted quantity to post inventory', [
                 'item_id' => $item->id,
                 'qty_accepted' => $qtyAccepted,
             ]);
         }
-
-        $poItem = $item->purchaseOrderItem;
         $unitPrice = $poItem?->unit_price ?? 0;
         if ($unitPrice <= 0) {
             return $this->skipWithWarning('Invalid unit price', [
@@ -228,8 +239,8 @@ class PurchaseReceiptService
         }
 
         $product = $item->product;
-        $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes([config('coa.inventory', '1140.01'), '1140.10']);
-        $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes($this->getUnbilledPurchaseFallbackCodes());
+        $inventoryCoa = $product->resolveInventoryCoaOrDefault();
+        $unbilledPurchaseCoa = $product->resolveUnbilledPurchaseCoaOrDefault();
 
         if (! $inventoryCoa || ! $unbilledPurchaseCoa) {
             return $this->skipWithWarning('Missing required COA configuration', [
@@ -248,77 +259,48 @@ class PurchaseReceiptService
         $receiptRef = $item->purchaseReceipt?->receipt_number ?? ('PRI-' . $item->id);
         $entries = [];
 
-        // Debit inventory account
-        $entries[] = JournalEntry::create([
-            'coa_id' => $inventoryCoa->id,
-            'date' => $date,
-            'reference' => $receiptRef,
-            'description' => 'Debit inventory for receipt item ' . $item->id,
-            'debit' => round($amount, 2),
-            'credit' => 0,
-            'journal_type' => 'inventory',
-            'cabang_id' => $branchId,
-            'department_id' => $departmentId,
-            'project_id' => $projectId,
-            'source_type' => PurchaseReceiptItem::class,
-            'source_id' => $item->id,
-        ]);
+        if (! $journalAlreadyPosted) {
+            // Debit inventory account
+            $entries[] = JournalEntry::create([
+                'coa_id' => $inventoryCoa->id,
+                'date' => $date,
+                'reference' => $receiptRef,
+                'description' => 'Debit inventory for receipt item ' . $item->id,
+                'debit' => round($amount, 2),
+                'credit' => 0,
+                'journal_type' => 'inventory',
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
+                'source_type' => PurchaseReceiptItem::class,
+                'source_id' => $item->id,
+            ]);
 
-        // Credit unbilled purchase position (goods receipt / GRNI)
-        $entries[] = JournalEntry::create([
-            'coa_id' => $unbilledPurchaseCoa->id,
-            'date' => $date,
-            'reference' => $receiptRef,
-            'description' => 'Inventory Posting - Credit unbilled purchase for receipt item ' . $item->id,
-            'debit' => 0,
-            'credit' => round($amount, 2),
-            'journal_type' => 'inventory',
-            'cabang_id' => $branchId,
-            'department_id' => $departmentId,
-            'project_id' => $projectId,
-            'source_type' => PurchaseReceiptItem::class,
-            'source_id' => $item->id,
-        ]);
+            // Credit unbilled purchase position (goods receipt / GRNI)
+            $entries[] = JournalEntry::create([
+                'coa_id' => $unbilledPurchaseCoa->id,
+                'date' => $date,
+                'reference' => $receiptRef,
+                'description' => 'Inventory Posting - Credit unbilled purchase for receipt item ' . $item->id,
+                'debit' => 0,
+                'credit' => round($amount, 2),
+                'journal_type' => 'inventory',
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
+                'source_type' => PurchaseReceiptItem::class,
+                'source_id' => $item->id,
+            ]);
 
-        Log::info('postItemInventoryAfterQC: created journal entries', ['item_id' => $item->id, 'entries_count' => count($entries)]);
+            Log::info('postItemInventoryAfterQC: created journal entries', ['item_id' => $item->id, 'entries_count' => count($entries)]);
 
-        if (! $this->validateJournalBalance($entries)) {
-            Log::info('postItemInventoryAfterQC: journal entries not balanced', ['item_id' => $item->id]);
-            return ['status' => 'error', 'message' => 'Journal entries are not balanced'];
+            if (! $this->validateJournalBalance($entries)) {
+                Log::info('postItemInventoryAfterQC: journal entries not balanced', ['item_id' => $item->id]);
+                return ['status' => 'error', 'message' => 'Journal entries are not balanced'];
+            }
+
+            Log::info('postItemInventoryAfterQC: journal entries validated balanced', ['item_id' => $item->id]);
         }
-
-        Log::info('postItemInventoryAfterQC: journal entries validated balanced', ['item_id' => $item->id]);
-
-        // Create stock movement so the StockMovementObserver will update inventory quantities.
-        // Determine if this posting was triggered by a QC that originated from a PurchaseOrderItem.
-        $qc = \App\Models\QualityControl::where('from_model_type', \App\Models\PurchaseOrderItem::class)
-            ->where('from_model_id', $item->purchase_order_item_id)
-            ->where('status', 1)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        // Debug logging to assist test failures
-        Log::info('postItemInventoryAfterQC: checking for QC', [
-            'purchase_receipt_item_id' => $item->id,
-            'purchase_order_item_id' => $item->purchase_order_item_id,
-            'qc_found' => $qc?->id ?? null,
-        ]);
-
-        // Default to linking the movement to the receipt item
-        $movementFromType = PurchaseReceiptItem::class;
-        $movementFromId = $item->id;
-
-        if ($qc) {
-            // If QC exists (completed), link the stock movement to the QC instead
-            $movementFromType = \App\Models\QualityControl::class;
-            $movementFromId = $qc->id;
-        }
-
-        // Avoid duplicate stock movements for the same source (either receipt item or QC)
-        $existingMovement = StockMovement::where('from_model_type', $movementFromType)
-            ->where('from_model_id', $movementFromId)
-            ->first();
-
         if (! $existingMovement) {
             $meta = [
                 'source' => $qc ? 'quality_control' : 'purchase_receipt',
@@ -350,7 +332,152 @@ class PurchaseReceiptService
             ]);
         }
 
-        return ['status' => 'posted', 'entries' => $entries];
+        $inventoryStock = $this->syncInventoryStockFromMovements($item);
+
+        return [
+            'status' => $journalAlreadyPosted ? 'reconciled' : 'posted',
+            'entries' => $entries,
+            'inventory_stock_id' => $inventoryStock?->id,
+        ];
+    }
+
+    public function reconcileReceiptItemStock(PurchaseReceiptItem $item): array
+    {
+        $item->loadMissing([
+            'purchaseOrderItem',
+            'product.inventoryCoa',
+            'product.unbilledPurchaseCoa',
+            'purchaseReceipt.currency',
+        ]);
+
+        $qc = $this->resolveCompletedQcForReceiptItem($item);
+        [$movementFromType, $movementFromId] = $this->resolveReceiptItemStockSource($item, $qc);
+        $existingMovement = $this->findReceiptItemStockMovement($item, $qc);
+
+        if (! $existingMovement) {
+            $qtyAccepted = max(0, $item->qty_accepted ?? 0);
+            $unitPrice = (float) ($item->purchaseOrderItem?->unit_price ?? 0);
+            $amount = round($qtyAccepted * $unitPrice, 2);
+
+            if ($qtyAccepted <= 0 || $unitPrice <= 0 || $amount <= 0) {
+                return $this->skipWithWarning('Unable to reconcile stock for receipt item', [
+                    'item_id' => $item->id,
+                    'qty_accepted' => $qtyAccepted,
+                    'unit_price' => $unitPrice,
+                    'amount' => $amount,
+                ]);
+            }
+
+            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
+            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
+            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
+
+            $meta = [
+                'source' => $qc ? 'quality_control' : 'purchase_receipt',
+                'purchase_receipt_id' => $item->purchase_receipt_id,
+                'purchase_receipt_item_id' => $item->id,
+                'unit_cost' => $unitPrice,
+                'currency' => optional($item->purchaseReceipt->currency)->code,
+                'purchase_order_item_id' => $item->purchase_order_item_id,
+                'receipt_number' => $item->purchaseReceipt->receipt_number,
+            ];
+
+            if ($qc) {
+                $meta['qc_id'] = $qc->id;
+                $meta['qc_number'] = $qc->qc_number;
+            }
+
+            StockMovement::create([
+                'product_id' => $item->product_id,
+                'warehouse_id' => $item->warehouse_id,
+                'quantity' => $qtyAccepted,
+                'value' => $amount,
+                'type' => 'purchase_in',
+                'date' => $item->purchaseReceipt->receipt_date ?? now(),
+                'notes' => $qc ? 'Stock inbound from QC completion: ' . $qc->qc_number : 'Stock inbound from QC-approved receipt: ' . $item->purchaseReceipt->receipt_number,
+                'meta' => $meta,
+                'rak_id' => $item->rak_id ?? null,
+                'from_model_type' => $movementFromType,
+                'from_model_id' => $movementFromId,
+            ]);
+        }
+
+        $inventoryStock = $this->syncInventoryStockFromMovements($item);
+
+        return [
+            'status' => 'reconciled',
+            'inventory_stock_id' => $inventoryStock?->id,
+        ];
+    }
+
+    protected function resolveCompletedQcForReceiptItem(PurchaseReceiptItem $item): ?\App\Models\QualityControl
+    {
+        return \App\Models\QualityControl::where('from_model_type', \App\Models\PurchaseOrderItem::class)
+            ->where('from_model_id', $item->purchase_order_item_id)
+            ->where('status', 1)
+            ->orderBy('id', 'desc')
+            ->first();
+    }
+
+    protected function resolveReceiptItemStockSource(PurchaseReceiptItem $item, ?\App\Models\QualityControl $qc = null): array
+    {
+        return $qc
+            ? [\App\Models\QualityControl::class, $qc->id]
+            : [PurchaseReceiptItem::class, $item->id];
+    }
+
+    protected function findReceiptItemStockMovement(PurchaseReceiptItem $item, ?\App\Models\QualityControl $qc = null): ?StockMovement
+    {
+        $candidateSources = [];
+
+        if ($qc) {
+            $candidateSources[] = [\App\Models\QualityControl::class, $qc->id];
+        }
+
+        $candidateSources[] = [PurchaseReceiptItem::class, $item->id];
+
+        foreach ($candidateSources as [$sourceType, $sourceId]) {
+            $movement = StockMovement::where('from_model_type', $sourceType)
+                ->where('from_model_id', $sourceId)
+                ->first();
+
+            if ($movement) {
+                return $movement;
+            }
+        }
+
+        return null;
+    }
+
+    protected function syncInventoryStockFromMovements(PurchaseReceiptItem $item): ?InventoryStock
+    {
+        $rakId = $item->rak_id ?? null;
+        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
+        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
+
+        $movementQuery = StockMovement::query()
+            ->where('product_id', $item->product_id)
+            ->where('warehouse_id', $item->warehouse_id)
+            ->when($rakId !== null, fn ($query) => $query->where('rak_id', $rakId), fn ($query) => $query->whereNull('rak_id'));
+
+        $qtyIn = (float) (clone $movementQuery)->whereIn('type', $inTypes)->sum('quantity');
+        $qtyOut = (float) (clone $movementQuery)->whereIn('type', $outTypes)->sum('quantity');
+        $computedQty = $qtyIn - $qtyOut;
+
+        $inventoryStock = InventoryStock::firstOrNew([
+            'product_id' => $item->product_id,
+            'warehouse_id' => $item->warehouse_id,
+            'rak_id' => $rakId,
+        ]);
+
+        $inventoryStock->qty_available = $computedQty;
+        if (! $inventoryStock->exists) {
+            $inventoryStock->qty_reserved = 0;
+            $inventoryStock->qty_min = $inventoryStock->qty_min ?? 0;
+        }
+        $inventoryStock->save();
+
+        return $inventoryStock;
     }
 
     /**
@@ -403,8 +530,8 @@ class PurchaseReceiptService
         }
 
         $product = $item->product;
-        $returnCoa = $product->purchaseReturnCoa ?? $this->resolveCoaByCodes(['6100.02', '5100.10']); // Return/Expense COA
-        $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
+        $returnCoa = $product->resolvePurchaseReturnCoaOrDefault();
+        $temporaryProcurementCoa = $product->resolveTemporaryProcurementCoaOrDefault();
 
         if (! $returnCoa || ! $temporaryProcurementCoa) {
             return $this->skipWithWarning('Missing required COA configuration', [
@@ -608,7 +735,7 @@ class PurchaseReceiptService
         }
 
         $product = $item->product;
-        $temporaryProcurementCoa = $product?->temporaryProcurementCoa?->exists ? $product->temporaryProcurementCoa : null;
+        $temporaryProcurementCoa = $product?->resolveTemporaryProcurementCoaOrDefault();
 
         if (! $temporaryProcurementCoa) {
             return $this->skipWithWarning('No temporary procurement COA configured for product', [
@@ -619,7 +746,7 @@ class PurchaseReceiptService
 
         // Find unbilled purchase COA from product configuration. If not set on product,
         // prefer liability COA for unbilled purchases created at receipt time
-        $unbilledPurchaseCoa = $product?->unbilledPurchaseCoa?->exists ? $product->unbilledPurchaseCoa : $this->resolveCoaByCodes($this->getUnbilledPurchaseFallbackCodes());
+        $unbilledPurchaseCoa = $product?->resolveUnbilledPurchaseCoaOrDefault();
         if (! $unbilledPurchaseCoa) {
             return $this->skipWithWarning('No unbilled purchase COA configured for product and no default liability COA found', [
                 'item_id' => $item->id,

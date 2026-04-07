@@ -6,11 +6,13 @@ use App\Enums\PaymentStatus;
 use App\Filament\Resources\CustomerReceiptResource\Pages;
 use App\Filament\Resources\CustomerReceiptResource\Pages\ViewCustomerReceipt;
 use App\Helpers\MoneyHelper;
+use App\Models\AccountReceivable;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerReceipt;
 use App\Models\CustomerReceiptItem;
+use App\Models\JournalEntry;
 use App\Models\Invoice;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
@@ -39,6 +41,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Collection;
 
 class CustomerReceiptResource extends Resource
 {
@@ -662,6 +665,165 @@ class CustomerReceiptResource extends Resource
             ]);
     }
 
+    protected static function getReceiptItemsForDisplay(CustomerReceipt $record): Collection
+    {
+        return CustomerReceiptItem::withoutGlobalScopes()
+            ->with('invoice')
+            ->where('customer_receipt_id', $record->id)
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get();
+    }
+
+    protected static function resolveInvoiceReceipts(CustomerReceipt $record): array
+    {
+        $invoiceReceipts = $record->invoice_receipts ?? [];
+
+        if (is_string($invoiceReceipts)) {
+            $invoiceReceipts = json_decode($invoiceReceipts, true) ?? [];
+        }
+
+        return is_array($invoiceReceipts) ? $invoiceReceipts : [];
+    }
+
+    protected static function resolveSelectedInvoiceIds(CustomerReceipt $record): array
+    {
+        $selectedInvoices = $record->selected_invoices ?? [];
+
+        if (is_string($selectedInvoices)) {
+            $selectedInvoices = json_decode($selectedInvoices, true) ?? [];
+        }
+
+        return array_values(array_filter(array_map('intval', is_array($selectedInvoices) ? $selectedInvoices : [])));
+    }
+
+    protected static function getReceiptInvoiceIds(CustomerReceipt $record): Collection
+    {
+        $invoiceIds = collect(static::resolveSelectedInvoiceIds($record));
+
+        if (! empty($record->invoice_id)) {
+            $invoiceIds->push((int) $record->invoice_id);
+        }
+
+        $invoiceIds = $invoiceIds->merge(static::getReceiptItemsForDisplay($record)->pluck('invoice_id'));
+
+        $invoiceReceipts = static::resolveInvoiceReceipts($record);
+        if (! empty($invoiceReceipts)) {
+            $invoiceIds = $invoiceIds->merge(array_map('intval', array_keys($invoiceReceipts)));
+        }
+
+        return $invoiceIds
+            ->filter()
+            ->map(fn ($invoiceId) => (int) $invoiceId)
+            ->unique()
+            ->values();
+    }
+
+    protected static function normalizeAccountReceivableStatus(?string $status): string
+    {
+        $normalizedStatus = strtolower(trim((string) $status));
+
+        return match ($normalizedStatus) {
+            'lunas', 'paid', 'fully paid', 'settled' => PaymentStatus::PAID->value,
+            'belum lunas', 'unpaid', 'partial', 'outstanding' => PaymentStatus::UNPAID->value,
+            default => $status ?: '-',
+        };
+    }
+
+    protected static function isPaidAccountReceivableStatus(?string $status): bool
+    {
+        return static::normalizeAccountReceivableStatus($status) === PaymentStatus::PAID->value;
+    }
+
+    protected static function getReceiptAccountReceivableSummary(CustomerReceipt $record): array
+    {
+        $summaries = [];
+
+        foreach (static::getReceiptInvoiceIds($record) as $invoiceId) {
+            $invoice = Invoice::withoutGlobalScopes()->find($invoiceId);
+            $items = static::getReceiptItemsForDisplay($record)->where('invoice_id', $invoiceId);
+            $invoiceReceipts = static::resolveInvoiceReceipts($record);
+            $fallbackPayment = (float) ($invoiceReceipts[$invoiceId] ?? $items->sum('amount'));
+
+            $accountReceivable = AccountReceivable::withoutGlobalScopes()->where('invoice_id', $invoiceId)->first();
+
+            $invoiceTotal = (float) ($accountReceivable?->total ?? $invoice?->total ?? $fallbackPayment);
+            $totalPaid = (float) ($accountReceivable?->paid ?? $fallbackPayment);
+            $remaining = (float) ($accountReceivable?->remaining ?? max(0, $invoiceTotal - $totalPaid));
+            $status = static::normalizeAccountReceivableStatus($accountReceivable?->status ?? ($remaining <= 0 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value));
+
+            $summaries[] = [
+                'invoice_number' => $invoice?->invoice_number ?? ('#' . $invoiceId),
+                'invoice_total' => $invoiceTotal,
+                'total_paid' => $totalPaid,
+                'remaining' => $remaining,
+                'percentage' => $invoiceTotal > 0 ? min(100, ($totalPaid / $invoiceTotal) * 100) : 0,
+                'status' => $status,
+                'this_payment' => $fallbackPayment,
+            ];
+        }
+
+        return $summaries;
+    }
+
+    protected static function getReceiptPaymentHistory(CustomerReceipt $record): Collection
+    {
+        return static::getReceiptInvoiceIds($record)->map(function (int $invoiceId) use ($record) {
+            $invoice = Invoice::withoutGlobalScopes()->find($invoiceId);
+            $payments = CustomerReceiptItem::withoutGlobalScopes()
+                ->with(['customerReceipt'])
+                ->where('invoice_id', $invoiceId)
+                ->orderBy('payment_date', 'desc')
+                ->orderBy('id', 'desc')
+                ->get();
+
+            if ($payments->isEmpty()) {
+                $invoiceReceipts = static::resolveInvoiceReceipts($record);
+                $fallbackAmount = (float) ($invoiceReceipts[$invoiceId] ?? 0);
+
+                if ($fallbackAmount > 0) {
+                    $payments = collect([
+                        (object) [
+                            'customer_receipt_id' => $record->id,
+                            'payment_date' => $record->payment_date,
+                            'method' => $record->payment_method,
+                            'amount' => $fallbackAmount,
+                        ],
+                    ]);
+                }
+            }
+
+            return [
+                'invoice_number' => $invoice?->invoice_number ?? ('#' . $invoiceId),
+                'payments' => $payments,
+                'total_payments' => (float) $payments->sum('amount'),
+                'current_receipt_id' => $record->id,
+            ];
+        });
+    }
+
+    protected static function getReceiptJournalEntries(CustomerReceipt $record): Collection
+    {
+        $itemIds = static::getReceiptItemsForDisplay($record)->pluck('id')->filter()->values();
+
+        return JournalEntry::withoutGlobalScopes()
+            ->with('coa')
+            ->where(function ($query) use ($record, $itemIds) {
+                $query->where('source_type', CustomerReceipt::class)
+                    ->where('source_id', $record->id);
+
+                if ($itemIds->isNotEmpty()) {
+                    $query->orWhere(function ($itemQuery) use ($itemIds) {
+                        $itemQuery->where('source_type', CustomerReceiptItem::class)
+                            ->whereIn('source_id', $itemIds->all());
+                    });
+                }
+            })
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+    }
+
     private static function formatMoneyState($value): string
     {
         return number_format((float) MoneyHelper::parse($value ?? 0), 0, ',', '.');
@@ -741,87 +903,52 @@ class CustomerReceiptResource extends Resource
                     ->schema([
                         TextEntry::make('payment_summary')
                             ->label('Ringkasan Pembayaran')
-                            ->formatStateUsing(function ($state, $record) {
-                                $items = $record->customerReceiptItem;
-                                if ($items->isEmpty()) {
-                                    return 'Tidak ada pembayaran tercatat';
-                                }
-
-                                $summaryData = [];
-
-                                foreach ($items as $item) {
-                                    if ($item->invoice) {
-                                        // Get Account Receivable for this invoice
-                                        $ar = \App\Models\AccountReceivable::where('invoice_id', $item->invoice_id)->first();
-
-                                        if ($ar) {
-                                            $percentage = $ar->total > 0 ? ($ar->paid / $ar->total) * 100 : 0;
-                                            $summaryData[] = [
-                                                'invoice_number' => $item->invoice->invoice_number,
-                                                'invoice_total' => $ar->total,
-                                                'total_paid' => $ar->paid,
-                                                'remaining' => $ar->remaining,
-                                                'percentage' => $percentage,
-                                                'status' => $ar->status,
-                                                'this_payment' => $item->amount,
-                                            ];
-                                        } else {
-                                            // If no AR record, show basic info
-                                            $summaryData[] = [
-                                                'invoice_number' => $item->invoice->invoice_number,
-                                                'invoice_total' => $item->invoice->total,
-                                                'total_paid' => $item->amount,
-                                                'remaining' => $item->invoice->total - $item->amount,
-                                                'percentage' => ($item->amount / $item->invoice->total) * 100,
-                                                'status' => 'Partial',
-                                                'this_payment' => $item->amount,
-                                            ];
-                                        }
-                                    }
-                                }
+                            ->columnSpanFull()
+                            ->state(function ($record) {
+                                $summaryData = static::getReceiptAccountReceivableSummary($record);
 
                                 if (empty($summaryData)) {
-                                    return 'Data pembayaran tidak ditemukan';
+                                    return 'Tidak ada pembayaran tercatat';
                                 }
 
                                 $html = '';
                                 foreach ($summaryData as $data) {
-                                    $statusColor = $data['status'] === PaymentStatus::PAID->value ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+                                    $statusColor = static::isPaidAccountReceivableStatus($data['status']) ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
                                     $progressWidth = min(100, $data['percentage']);
 
-                                    $html .= '<div class="border border-gray-200 rounded-lg p-4 mb-3 bg-white">';
-                                    $html .= '<div class="flex justify-between items-start mb-3">';
-                                    $html .= '<h4 class="font-semibold text-gray-900">' . $data['invoice_number'] . '</h4>';
-                                    $html .= '<span class="px-2 py-1 text-xs font-semibold rounded-full ' . $statusColor . '">' . $data['status'] . '</span>';
+                                    $html .= '<div class="w-full min-w-0 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm mb-4">';
+                                    $html .= '<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between mb-4">';
+                                    $html .= '<h4 class="text-base font-semibold text-gray-900">' . $data['invoice_number'] . '</h4>';
+                                    $html .= '<span class="w-fit px-2 py-1 text-xs font-semibold rounded-full ' . $statusColor . '">' . $data['status'] . '</span>';
                                     $html .= '</div>';
 
-                                    $html .= '<div class="grid grid-cols-2 gap-4 text-sm mb-3">';
-                                    $html .= '<div>';
-                                    $html .= '<span class="text-gray-600">Total Invoice:</span><br>';
-                                    $html .= '<span class="font-semibold text-lg">Rp ' . number_format($data['invoice_total'], 0, ',', '.') . '</span>';
+                                    $html .= '<div class="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4 mb-4">';
+                                    $html .= '<div class="min-w-0">';
+                                    $html .= '<span class="text-gray-600">Total Invoice:</span>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg">Rp ' . number_format($data['invoice_total'], 0, ',', '.') . '</div>';
                                     $html .= '</div>';
-                                    $html .= '<div>';
-                                    $html .= '<span class="text-gray-600">Pembayaran Ini:</span><br>';
-                                    $html .= '<span class="font-semibold text-lg text-blue-600">Rp ' . number_format($data['this_payment'], 0, ',', '.') . '</span>';
+                                    $html .= '<div class="min-w-0">';
+                                    $html .= '<span class="text-gray-600">Pembayaran Ini:</span>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg text-blue-600">Rp ' . number_format($data['this_payment'], 0, ',', '.') . '</div>';
                                     $html .= '</div>';
-                                    $html .= '<div>';
-                                    $html .= '<span class="text-gray-600">Total Sudah Dibayar:</span><br>';
-                                    $html .= '<span class="font-semibold text-lg text-green-600">Rp ' . number_format($data['total_paid'], 0, ',', '.') . '</span>';
+                                    $html .= '<div class="min-w-0">';
+                                    $html .= '<span class="text-gray-600">Total Sudah Dibayar:</span>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg text-green-600">Rp ' . number_format($data['total_paid'], 0, ',', '.') . '</div>';
                                     $html .= '</div>';
-                                    $html .= '<div>';
-                                    $html .= '<span class="text-gray-600">Sisa Pembayaran:</span><br>';
-                                    $html .= '<span class="font-semibold text-lg text-red-600">Rp ' . number_format($data['remaining'], 0, ',', '.') . '</span>';
+                                    $html .= '<div class="min-w-0">';
+                                    $html .= '<span class="text-gray-600">Sisa Pembayaran:</span>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg text-red-600">Rp ' . number_format($data['remaining'], 0, ',', '.') . '</div>';
                                     $html .= '</div>';
                                     $html .= '</div>';
 
                                     // Progress Bar
-                                    $html .= '<div class="mb-2">';
-                                    $html .= '<div class="flex justify-between text-xs text-gray-600 mb-1">';
+                                    $html .= '<div class="space-y-1">';
+                                    $html .= '<div class="flex justify-between text-xs text-gray-600">';
                                     $html .= '<span>Progress Pembayaran</span>';
                                     $html .= '<span>' . number_format($data['percentage'], 1) . '%</span>';
                                     $html .= '</div>';
-                                    $html .= '<div class="w-full bg-gray-200 rounded-full h-3">';
-                                    $html .= '<div class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: ' . $progressWidth . '%"></div>';
+                                    $html .= '<div class="h-3 w-full rounded-full bg-gray-200 overflow-hidden">';
+                                    $html .= '<div class="h-3 rounded-full bg-blue-500 transition-all duration-300" style="width: ' . $progressWidth . '%"></div>';
                                     $html .= '</div>';
                                     $html .= '</div>';
 
@@ -834,68 +961,59 @@ class CustomerReceiptResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(1)
-                    ->visible(fn($record) => $record->customerReceiptItem()->exists()),
+                    ->visible(fn($record) => static::getReceiptInvoiceIds($record)->isNotEmpty()),
 
                 InfoSection::make('History Pembayaran Invoice')
                     ->schema([
                         TextEntry::make('payment_history')
                             ->label('Riwayat Semua Pembayaran')
-                            ->formatStateUsing(function ($state, $record) {
-                                $items = $record->customerReceiptItem;
-                                if ($items->isEmpty()) {
+                            ->columnSpanFull()
+                            ->state(function ($record) {
+                                $invoiceHistories = static::getReceiptPaymentHistory($record);
+
+                                if ($invoiceHistories->isEmpty()) {
                                     return 'Tidak ada pembayaran';
                                 }
 
                                 $html = '';
+                                foreach ($invoiceHistories as $history) {
+                                    $html .= '<div class="w-full min-w-0 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm mb-4">';
+                                    $html .= '<h4 class="mb-4 text-base font-semibold text-gray-900">Invoice: ' . e($history['invoice_number']) . '</h4>';
 
-                                foreach ($items as $item) {
-                                    if ($item->invoice) {
-                                        // Get all payments for this invoice
-                                        $allPayments = \App\Models\CustomerReceiptItem::with('customerReceipt')
-                                            ->where('invoice_id', $item->invoice_id)
-                                            ->orderBy('payment_date', 'desc')
-                                            ->get();
+                                    if ($history['payments']->isNotEmpty()) {
+                                        $html .= '<div class="space-y-3">';
 
-                                        $html .= '<div class="border border-gray-200 rounded-lg p-4 mb-4 bg-white">';
-                                        $html .= '<h4 class="font-semibold text-gray-900 mb-3">Invoice: ' . $item->invoice->invoice_number . '</h4>';
+                                        foreach ($history['payments'] as $payment) {
+                                            $isCurrentPayment = (int) $payment->customer_receipt_id === (int) $history['current_receipt_id'];
+                                            $bgColor = $isCurrentPayment ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200';
+                                            $textColor = $isCurrentPayment ? 'text-blue-900' : 'text-gray-900';
+                                            $badge = $isCurrentPayment ? '<span class="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded-full">Pembayaran Ini</span>' : '';
 
-                                        if ($allPayments->count() > 0) {
-                                            $html .= '<div class="space-y-2">';
-
-                                            foreach ($allPayments as $payment) {
-                                                $isCurrentPayment = $payment->customer_receipt_id == $record->id;
-                                                $bgColor = $isCurrentPayment ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200';
-                                                $textColor = $isCurrentPayment ? 'text-blue-900' : 'text-gray-900';
-                                                $badge = $isCurrentPayment ? '<span class="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded-full">Pembayaran Ini</span>' : '';
-
-                                                $html .= '<div class="flex justify-between items-center p-3 border rounded ' . $bgColor . '">';
-                                                $html .= '<div class="' . $textColor . '">';
-                                                $html .= '<div class="font-medium">Receipt #' . ($payment->customer_receipt_id ?: 'N/A') . $badge . '</div>';
-                                                $html .= '<div class="text-sm">Tanggal: ' . date('d M Y', strtotime($payment->payment_date)) . '</div>';
-                                                $html .= '<div class="text-sm">Metode: ' . $payment->method . '</div>';
-                                                $html .= '</div>';
-                                                $html .= '<div class="text-right ' . $textColor . '">';
-                                                $html .= '<div class="font-semibold text-lg">Rp ' . number_format($payment->amount, 0, ',', '.') . '</div>';
-                                                $html .= '</div>';
-                                                $html .= '</div>';
-                                            }
-
-                                            // Total payments
-                                            $totalPayments = $allPayments->sum('amount');
-                                            $html .= '<div class="border-t border-gray-200 pt-3 mt-3">';
-                                            $html .= '<div class="flex justify-between items-center font-semibold text-gray-900">';
-                                            $html .= '<span>Total Pembayaran (' . $allPayments->count() . ' transaksi):</span>';
-                                            $html .= '<span class="text-lg">Rp ' . number_format($totalPayments, 0, ',', '.') . '</span>';
+                                            $html .= '<div class="grid grid-cols-1 gap-3 rounded-xl border p-4 ' . $bgColor . ' sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">';
+                                            $html .= '<div class="' . $textColor . '">';
+                                            $html .= '<div class="font-medium">Receipt #' . e((string) ($payment->customer_receipt_id ?: 'N/A')) . $badge . '</div>';
+                                            $html .= '<div class="text-sm">Tanggal: ' . e(date('d M Y', strtotime((string) $payment->payment_date))) . '</div>';
+                                            $html .= '<div class="text-sm">Metode: ' . e((string) $payment->method) . '</div>';
+                                            $html .= '</div>';
+                                            $html .= '<div class="text-left sm:text-right ' . $textColor . '">';
+                                            $html .= '<div class="text-base font-semibold sm:text-lg">Rp ' . number_format((float) $payment->amount, 0, ',', '.') . '</div>';
                                             $html .= '</div>';
                                             $html .= '</div>';
-
-                                            $html .= '</div>';
-                                        } else {
-                                            $html .= '<p class="text-gray-500 italic">Belum ada pembayaran tercatat</p>';
                                         }
 
+                                        $html .= '<div class="mt-4 border-t border-gray-200 pt-4">';
+                                        $html .= '<div class="flex flex-col gap-1 font-semibold text-gray-900 sm:flex-row sm:items-center sm:justify-between">';
+                                        $html .= '<span>Total Pembayaran (' . $history['payments']->count() . ' transaksi):</span>';
+                                        $html .= '<span class="text-lg">Rp ' . number_format($history['total_payments'], 0, ',', '.') . '</span>';
                                         $html .= '</div>';
+                                        $html .= '</div>';
+
+                                        $html .= '</div>';
+                                    } else {
+                                        $html .= '<p class="text-gray-500 italic">Belum ada pembayaran tercatat</p>';
                                     }
+
+                                    $html .= '</div>';
                                 }
 
                                 return $html;
@@ -904,36 +1022,28 @@ class CustomerReceiptResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(1)
-                    ->visible(fn($record) => $record->customerReceiptItem()->exists()),
+                    ->visible(fn($record) => static::getReceiptInvoiceIds($record)->isNotEmpty()),
 
                 InfoSection::make('Journal Entries')
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('journal_entries_display')
                             ->label('Jurnal Akuntansi')
-                            ->formatStateUsing(function ($state, $record) {
-                                $entries = \App\Models\JournalEntry::where(function ($q) use ($record) {
-                                    $q->where('source_type', \App\Models\CustomerReceipt::class)
-                                        ->where('source_id', $record->id);
-                                })
-                                    ->orWhere(function ($q) use ($record) {
-                                        $q->where('source_type', \App\Models\CustomerReceiptItem::class)
-                                            ->whereIn('source_id', $record->customerReceiptItem->pluck('id'));
-                                    })
-                                    ->orderBy('date')
-                                    ->get();
+                            ->columnSpanFull()
+                            ->state(function ($record) {
+                                $entries = static::getReceiptJournalEntries($record);
 
                                 if ($entries->isEmpty()) {
                                     return '<p class="text-gray-400 italic text-sm">Belum ada journal entry tercatat untuk receipt ini. <a href="/admin/journal-entries" class="text-primary-600 underline">Lihat semua jurnal →</a></p>';
                                 }
 
-                                $html = '<div class="overflow-x-auto">';
-                                $html .= '<table class="w-full text-sm border-collapse">';
+                                $html = '<div class="w-full overflow-x-auto">';
+                                $html .= '<table class="w-full min-w-full border-collapse text-sm">';
                                 $html .= '<thead><tr class="bg-gray-100 text-gray-700">';
-                                $html .= '<th class="text-left p-2 border border-gray-200">Tanggal</th>';
-                                $html .= '<th class="text-left p-2 border border-gray-200">Akun</th>';
-                                $html .= '<th class="text-left p-2 border border-gray-200">Keterangan</th>';
-                                $html .= '<th class="text-right p-2 border border-gray-200">Debit (Rp)</th>';
-                                $html .= '<th class="text-right p-2 border border-gray-200">Kredit (Rp)</th>';
+                                $html .= '<th class="border border-gray-200 px-4 py-3 text-left">Tanggal</th>';
+                                $html .= '<th class="border border-gray-200 px-4 py-3 text-left">Akun</th>';
+                                $html .= '<th class="border border-gray-200 px-4 py-3 text-left">Keterangan</th>';
+                                $html .= '<th class="border border-gray-200 px-4 py-3 text-right">Debit (Rp)</th>';
+                                $html .= '<th class="border border-gray-200 px-4 py-3 text-right">Kredit (Rp)</th>';
                                 $html .= '</tr></thead><tbody>';
 
                                 $totalDebit = 0;
@@ -946,19 +1056,19 @@ class CustomerReceiptResource extends Resource
                                     $totalDebit += $debit;
                                     $totalCredit += $credit;
 
-                                    $html .= '<tr class="hover:bg-gray-50">';
-                                    $html .= '<td class="p-2 border border-gray-200">' . ($entry->date ? \Carbon\Carbon::parse($entry->date)->format('d M Y') : '-') . '</td>';
-                                    $html .= '<td class="p-2 border border-gray-200 font-medium">' . $accountCode . ' — ' . $accountName . '</td>';
-                                    $html .= '<td class="p-2 border border-gray-200 text-gray-600">' . e($entry->description ?? '') . '</td>';
-                                    $html .= '<td class="p-2 border border-gray-200 text-right">' . ($debit > 0 ? 'Rp ' . number_format($debit, 0, ',', '.') : '-') . '</td>';
-                                    $html .= '<td class="p-2 border border-gray-200 text-right">' . ($credit > 0 ? 'Rp ' . number_format($credit, 0, ',', '.') : '-') . '</td>';
+                                    $html .= '<tr class="align-top hover:bg-gray-50">';
+                                    $html .= '<td class="border border-gray-200 px-4 py-3 whitespace-nowrap">' . ($entry->date ? \Carbon\Carbon::parse($entry->date)->format('d M Y') : '-') . '</td>';
+                                    $html .= '<td class="border border-gray-200 px-4 py-3 font-medium">' . $accountCode . ' — ' . $accountName . '</td>';
+                                    $html .= '<td class="border border-gray-200 px-4 py-3 text-gray-600">' . e($entry->description ?? '') . '</td>';
+                                    $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . ($debit > 0 ? 'Rp ' . number_format($debit, 0, ',', '.') : '-') . '</td>';
+                                    $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . ($credit > 0 ? 'Rp ' . number_format($credit, 0, ',', '.') : '-') . '</td>';
                                     $html .= '</tr>';
                                 }
 
                                 $html .= '<tr class="bg-gray-50 font-semibold">';
-                                $html .= '<td colspan="3" class="p-2 border border-gray-200 text-right">Total</td>';
-                                $html .= '<td class="p-2 border border-gray-200 text-right">Rp ' . number_format($totalDebit, 0, ',', '.') . '</td>';
-                                $html .= '<td class="p-2 border border-gray-200 text-right">Rp ' . number_format($totalCredit, 0, ',', '.') . '</td>';
+                                $html .= '<td colspan="3" class="border border-gray-200 px-4 py-3 text-right">Total</td>';
+                                $html .= '<td class="border border-gray-200 px-4 py-3 text-right">Rp ' . number_format($totalDebit, 0, ',', '.') . '</td>';
+                                $html .= '<td class="border border-gray-200 px-4 py-3 text-right">Rp ' . number_format($totalCredit, 0, ',', '.') . '</td>';
                                 $html .= '</tr>';
 
                                 $html .= '</tbody></table></div>';

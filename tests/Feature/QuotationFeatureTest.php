@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
+use App\Filament\Resources\QuotationResource\Pages\EditQuotation;
 
 uses(RefreshDatabase::class);
 
@@ -738,3 +739,81 @@ test('quotation form auto-fills tax from active setting when tax type is PPN Exc
             ->set('data.quotationItem.0.tax_type', 'PPN Included')
         ->assertSet('data.quotationItem.0.tax', 11);
 });
+
+    test('quotation total amount stays formatted as rupiah on live updates and persists numerically', function () {
+        $user = User::factory()->create();
+        $permissions = [
+            'view any quotation',
+            'view quotation',
+            'create quotation',
+            'update quotation',
+            'delete quotation',
+            'view any customer',
+            'view any product',
+        ];
+
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+        $user->givePermissionTo($permissions);
+
+        $customer = Customer::factory()->create();
+        $productCategory = ProductCategory::create([
+            'name' => 'Quotation Test Category',
+            'kode' => 'QTC001',
+            'cabang_id' => $this->cabang->id,
+            'kenaikan_harga' => 0,
+        ]);
+        $product = Product::create([
+            'name' => 'Quotation Test Product',
+            'sku' => 'QTP001',
+            'cabang_id' => $this->cabang->id,
+            'product_category_id' => $productCategory->id,
+            'sell_price' => 100000,
+            'cost_price' => 80000,
+            'kode_merk' => 'QTEST',
+            'uom_id' => $this->uom->id,
+            'is_active' => true,
+            'is_manufacture' => false,
+            'is_raw_material' => false,
+        ]);
+
+        $create = Livewire::actingAs($user)
+            ->test(
+                \App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class
+            )
+            ->set('data.quotation_number', 'QO-TEST-FORM-0001')
+            ->set('data.customer_id', $customer->id)
+            ->set('data.date', now()->toDateString())
+            ->set('data.valid_until', now()->addDays(30)->toDateString())
+            ->set('data.quotationItem', [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                    'unit_price' => 100000,
+                    'discount' => 0,
+                    'tax' => 0,
+                    'tax_type' => 'None',
+                ],
+            ])
+            ->set('data.quotationItem.0.quantity', 2);
+
+        $create->assertSet('data.total_amount', '200.000');
+        $create->call('create')->assertHasNoFormErrors();
+
+        $quotation = Quotation::where('quotation_number', 'QO-TEST-FORM-0001')->first();
+
+        expect($quotation)->not->toBeNull()
+            ->and((float) $quotation->total_amount)->toBe(200000.0);
+
+        QuotationItem::query()
+            ->where('quotation_id', $quotation->id)
+            ->update(['total_price' => 200000]);
+
+        Livewire::actingAs($user)
+            ->test(EditQuotation::class, ['record' => $quotation->id])
+            ->assertFormExists()
+            ->assertFormSet([
+                'total_amount' => '200.000',
+            ]);
+    });

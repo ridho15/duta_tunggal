@@ -109,4 +109,10 @@ test('customer receipt view page renders payment history and journal entries', f
     $response->assertSee('Status Account Receivable');
     $response->assertSee('History Pembayaran Invoice');
     $response->assertSee('Journal Entries');
+    $response->assertSee($invoice->invoice_number);
+    $response->assertSee('Lunas');
+    $response->assertSee('Receipt #' . $receipt->id, false);
+    $response->assertSee('Rp 1.500.000');
+    $response->assertSee('Kas Operasional');
+    $response->assertSee('Piutang Dagang');
 });

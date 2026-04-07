@@ -40,3 +40,16 @@ test('COGM preview shows product-filtered totals matching HPP service', async ({
   await expect(page.locator('body')).toContainText(`Rp ${formatRupiah(expected.cogm)}`)
   await expect(page.locator('body')).not.toContainText('Fixture COGM Product B')
 })
+
+test('COGM preview shows the HPP data-quality warning banner when fallback data is used', async ({ page }) => {
+  await page.goto('/reports/hpp/preview?startDate=2026-04-01&endDate=2026-04-30&preview=1', {
+    waitUntil: 'networkidle',
+  })
+
+  const warningBanner = page.locator('.data-quality-warning')
+
+  await expect(warningBanner).toBeVisible({ timeout: 10_000 })
+  await expect(warningBanner).toContainText('Peringatan kualitas data HPP')
+  await expect(page.locator('body')).toContainText('Raw material purchases are being derived from inventory debits')
+  await expect(page.locator('body')).toContainText('Raw material inventory balances are being derived from stock movements')
+})

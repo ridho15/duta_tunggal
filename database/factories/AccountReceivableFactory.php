@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -23,11 +24,13 @@ class AccountReceivableFactory extends Factory
         $remaining = $total - $paid;
 
         return [
+            'invoice_id' => Invoice::factory(),
+            'customer_id' => Customer::factory(),
             'total' => $total,
             'paid' => $paid,
             'remaining' => $remaining,
             'status' => $remaining > 0 ? 'Belum Lunas' : 'Lunas',
-            'created_by' => 1,
+            'created_by' => User::factory(),
         ];
     }
 }

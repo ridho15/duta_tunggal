@@ -691,7 +691,7 @@ class PurchaseInvoiceResourceTest extends TestCase
 
         $html = view('pdf.purchase-order-invoice-2', ['invoice' => $invoice])->render();
 
-        $this->assertStringContainsString('PPN 11.00%', $html);
+        $this->assertStringContainsString('PPN 11,00%', $html);
         $this->assertStringContainsString('Biaya Transport', $html);
         $this->assertSame(1, substr_count($html, 'Biaya Transport'));
         $this->assertStringNotContainsString('Tax (', $html);

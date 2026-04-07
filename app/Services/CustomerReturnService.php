@@ -192,13 +192,24 @@ class CustomerReturnService
         }
 
         // COA: Inventory account (goods back in saleable stock)
-        $inventoryCoa = ChartOfAccount::where('code', '1101.01')->first();
+        $inventoryCoa = $this->firstExistingCoa([
+            '1101.01',
+            config('coa.inventory', '1140.01'),
+            '1140.10',
+            '1100',
+        ]);
         // COA: WIP / In-Repair holding account (goods held for repair)
-        $wipCoa       = ChartOfAccount::where('code', '1101.02')->first()
-                     ?? $inventoryCoa; // fallback to main inventory if WIP COA not set up yet
+        $wipCoa = $this->firstExistingCoa([
+            '1101.02',
+            '1-201',
+            '1140.02',
+        ]) ?? $inventoryCoa;
         // COA: COGS reversal
-        $cogsCoa      = ChartOfAccount::where('code', '5100.10')->first()
-                     ?? ChartOfAccount::where('code', '5000')->first();
+        $cogsCoa = $this->firstExistingCoa([
+            '5100.10',
+            '5000',
+            config('coa.sales_shipping', '6100.02'),
+        ]);
 
         if (! $inventoryCoa || ! $cogsCoa) {
             Log::warning('CustomerReturnService: COA account(s) not found — cannot create journal entries', [
@@ -206,7 +217,7 @@ class CustomerReturnService
                 'inventory_ok' => (bool) $inventoryCoa,
                 'cogs_ok'      => (bool) $cogsCoa,
             ]);
-            throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur customer. Diperlukan: Persediaan (1101.01) dan COGS (5100.10). Silakan hubungi administrator untuk mengkonfigurasi akun tersebut.');
+            throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur customer. Diperlukan akun persediaan dan COGS yang valid. Silakan hubungi administrator untuk mengkonfigurasi akun tersebut.');
         }
 
         // Debit Inventory (replace items) – goods physically back in stock
@@ -261,5 +272,21 @@ class CustomerReturnService
             'replace_amount' => $replaceAmount,
             'total_amount'   => $amount,
         ]);
+    }
+
+    protected function firstExistingCoa(array $codes): ?ChartOfAccount
+    {
+        foreach ($codes as $code) {
+            if (! $code) {
+                continue;
+            }
+
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa?->id) {
+                return $coa;
+            }
+        }
+
+        return null;
     }
 }

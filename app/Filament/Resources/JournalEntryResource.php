@@ -539,6 +539,8 @@ class JournalEntryResource extends Resource
 
                                         return match ($record->source_type) {
                                             'App\\Models\\PurchaseOrder' => 'Purchase Order',
+                                            'App\\Models\\PurchaseReceipt' => 'Purchase Receipt',
+                                            'App\\Models\\PurchaseReceiptItem' => 'Purchase Receipt Item',
                                             'App\\Models\\SaleOrder' => 'Sales Order',
                                             'App\\Models\\ManufacturingOrder' => 'Manufacturing Order',
                                             'App\\Models\\DeliveryOrder' => 'Delivery Order',
@@ -605,6 +607,10 @@ class JournalEntryResource extends Resource
                                         switch ($record->source_type) {
                                             case 'App\\Models\\PurchaseOrder':
                                                 return $source->po_number ?: 'N/A';
+                                            case 'App\\Models\\PurchaseReceipt':
+                                                return $source->receipt_number ?: 'N/A';
+                                            case 'App\\Models\\PurchaseReceiptItem':
+                                                return $source->purchaseReceipt?->receipt_number ?: 'N/A';
                                             case 'App\\Models\\SaleOrder':
                                                 return $source->so_number ?: 'N/A';
                                             case 'App\\Models\\ManufacturingOrder':
@@ -670,6 +676,25 @@ class JournalEntryResource extends Resource
                                             case 'App\\Models\\PurchaseOrder':
                                                 $supplierName = $source->supplier ? $source->supplier->perusahaan : 'N/A';
                                                 return "PO: {$source->po_number} - {$supplierName}";
+                                            case 'App\\Models\\PurchaseReceipt':
+                                                $supplierName = $source->purchaseOrder && $source->purchaseOrder->supplier
+                                                    ? $source->purchaseOrder->supplier->perusahaan
+                                                    : 'N/A';
+                                                return "PR: {$source->receipt_number} - {$supplierName}";
+                                            case 'App\\Models\\PurchaseReceiptItem':
+                                                $purchaseReceipt = $source->purchaseReceipt;
+                                                $supplierName = $purchaseReceipt && $purchaseReceipt->purchaseOrder && $purchaseReceipt->purchaseOrder->supplier
+                                                    ? $purchaseReceipt->purchaseOrder->supplier->perusahaan
+                                                    : 'N/A';
+                                                $receiptNumber = $purchaseReceipt?->receipt_number ?: 'N/A';
+                                                $productName = $source->product?->name;
+                                                $qtyAccepted = number_format((float) ($source->qty_accepted ?? 0), 0, ',', '.');
+
+                                                if ($productName) {
+                                                    return "PR Item #{$source->id}: {$receiptNumber} - {$supplierName} / {$productName} | Qty Diterima: {$qtyAccepted}";
+                                                }
+
+                                                return "PR Item #{$source->id}: {$receiptNumber} - {$supplierName} | Qty Diterima: {$qtyAccepted}";
                                             case 'App\\Models\\SaleOrder':
                                                 $customerName = $source->customer ? $source->customer->name : 'N/A';
                                                 return "SO: {$source->so_number} - {$customerName}";
@@ -738,6 +763,7 @@ class JournalEntryResource extends Resource
                                                 return 'Unknown Source';
                                         }
                                     })
+                                    ->url(fn ($record) => self::resolveSourceViewUrl($record), true)
                                     ->placeholder('N/A')
                                     ->columnSpanFull(),
 
@@ -751,33 +777,7 @@ class JournalEntryResource extends Resource
                                         ->label('View Source Data')
                                         ->icon('heroicon-o-eye')
                                         ->color('primary')
-                                        ->url(function ($record) {
-                                            if (!$record->source_type || !$record->source_id) {
-                                                return null;
-                                            }
-
-                                            // Generate URL based on source type using named routes
-                                            try {
-                                                return match ($record->source_type) {
-                                                    'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
-                                                    'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->source_id),
-                                                    'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->source_id),
-                                                    'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $record->source_id),
-                                                    'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $record->source_id),
-                                                    'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $record->source_id),
-                                                    'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $record->source_id),
-                                                    'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $record->source_id),
-                                                    'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
-                                                    'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
-                                                    'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
-                                                    // 'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $record->source_id), // No view route available
-                                                    default => null,
-                                                };
-                                            } catch (\Exception $e) {
-                                                // Route not found, return null to hide the action
-                                                return null;
-                                            }
-                                        })
+                                        ->url(fn ($record) => self::resolveSourceViewUrl($record))
                                         ->openUrlInNewTab()
                                         ->visible(function ($record) {
                                             if (!$record->source_type || !$record->source_id) {
@@ -795,6 +795,9 @@ class JournalEntryResource extends Resource
                                                     'App\\Models\\VendorPayment' => route('filament.admin.resources.vendor-payments.view', $record->source_id),
                                                     'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $record->source_id),
                                                     'App\\Models\\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $record->source_id),
+                                                    'App\\Models\\PurchaseReceiptItem' => $record->source?->purchase_receipt_id
+                                                        ? route('filament.admin.resources.purchase-receipts.view', $record->source->purchase_receipt_id)
+                                                        : null,
                                                     'App\\Models\\CashBankTransaction' => route('filament.admin.resources.cash-bank-transactions.view', $record->source_id),
                                                     'App\\Models\\CashBankTransfer' => route('filament.admin.resources.cash-bank-transfers.view', $record->source_id),
                                                     'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
@@ -814,8 +817,7 @@ class JournalEntryResource extends Resource
                                     ->columnSpanFull(),
                             ])
                             ->columns(2)
-                            ->collapsible()
-                            ->collapsed(),
+                                ->collapsible(),
                     ])
                     ->columns(2),
             ]);
@@ -1134,48 +1136,19 @@ class JournalEntryResource extends Resource
                         ->color('info')
                         ->visible(fn($record) => !empty($record->source_type) && !empty($record->source_id))
                         ->action(function ($record) {
-                            $sourceType = $record->source_type;
-                            $sourceId = $record->source_id;
+                            $url = self::resolveSourceViewUrl($record);
 
-                            if (!$sourceType || !$sourceId) {
+                            if (!$url) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Source Detail')
+                                    ->body("Source type: {$record->source_type}, ID: {$record->source_id}")
+                                    ->info()
+                                    ->send();
+
                                 return;
                             }
 
-                            try {
-                                // Map source_type to resource URL
-                                $url = match ($sourceType) {
-                                    'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $sourceId),
-                                    'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $sourceId),
-                                    'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $sourceId),
-                                    'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $sourceId),
-                                    'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $sourceId),
-                                    'App\\Models\\VendorPayment' => route('filament.admin.resources.vendor-payments.view', $sourceId),
-                                    'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $sourceId),
-                                    'App\\Models\\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $sourceId),
-                                    'App\\Models\\CashBankTransaction' => route('filament.admin.resources.cash-bank-transactions.view', $sourceId),
-                                    'App\\Models\\CashBankTransfer' => route('filament.admin.resources.cash-bank-transfers.view', $sourceId),
-                                    'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $sourceId),
-                                    'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $sourceId),
-                                    'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $sourceId),
-                                    'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $sourceId),
-                                    'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
-                                    'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
-                                    default => null
-                                };
-
-                                if ($url) {
-                                    return redirect($url);
-                                }
-                            } catch (\Exception $e) {
-                                // Route not found, show notification instead
-                            }
-
-                            // Fallback: show notification with source info
-                            \Filament\Notifications\Notification::make()
-                                ->title('Source Detail')
-                                ->body("Source type: {$sourceType}, ID: {$sourceId}")
-                                ->info()
-                                ->send();
+                            return redirect($url);
                         }),
 
                     Tables\Actions\Action::make('auto_reversal')
@@ -1335,14 +1308,52 @@ class JournalEntryResource extends Resource
         return $data;
     }
 
-    protected static function getInvoiceViewUrl($invoice)
+    public static function resolveSourceViewUrl($record): ?string
     {
-        if (!$invoice) return null;
+        if (!$record || !$record->source_type || !$record->source_id) {
+            return null;
+        }
+
+        try {
+            return match ($record->source_type) {
+                'App\\Models\\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->source_id),
+                'App\\Models\\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->source_id),
+                'App\\Models\\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->source_id),
+                'App\\Models\\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $record->source_id),
+                'App\\Models\\MaterialIssue' => route('filament.admin.resources.material-issues.view', $record->source_id),
+                'App\\Models\\VendorPayment' => route('filament.admin.resources.vendor-payments.view', $record->source_id),
+                'App\\Models\\CustomerReceipt' => route('filament.admin.resources.customer-receipts.view', $record->source_id),
+                'App\\Models\\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $record->source_id),
+                'App\\Models\\PurchaseReceiptItem' => $record->source?->purchase_receipt_id
+                    ? route('filament.admin.resources.purchase-receipts.view', $record->source->purchase_receipt_id)
+                    : null,
+                'App\\Models\\CashBankTransaction' => route('filament.admin.resources.cash-bank-transactions.view', $record->source_id),
+                'App\\Models\\CashBankTransfer' => route('filament.admin.resources.cash-bank-transfers.view', $record->source_id),
+                'App\\Models\\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->source_id),
+                'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $record->source_id),
+                'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $record->source_id),
+                'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $record->source_id),
+                'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
+                'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
+                default => null,
+            };
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    protected static function getInvoiceViewUrl($invoice): ?string
+    {
+        if (!$invoice) {
+            return null;
+        }
 
         // Determine if it's sales or purchase invoice based on from_model_type
         if ($invoice->from_model_type === 'App\\Models\\SaleOrder') {
             return route('filament.admin.resources.sales-invoices.view', $invoice->id);
-        } elseif ($invoice->from_model_type === 'App\\Models\\PurchaseOrder') {
+        }
+
+        if ($invoice->from_model_type === 'App\\Models\\PurchaseOrder') {
             return route('filament.admin.resources.purchase-invoices.view', $invoice->id);
         }
 

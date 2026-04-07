@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -15,6 +16,13 @@ class PurchaseReceipt extends Model
 {
     use SoftDeletes, HasFactory,LogsGlobalActivity;
     protected $table = 'purchase_receipts';
+    protected function casts(): array
+    {
+        return [
+            'receipt_date' => 'datetime',
+        ];
+    }
+
     protected $fillable = [
         'receipt_number',
         'purchase_order_id', // Now optional
@@ -55,6 +63,30 @@ class PurchaseReceipt extends Model
     public function purchaseReceiptBiaya()
     {
         return $this->hasMany(PurchaseReceiptBiaya::class, 'purchase_receipt_id');
+    }
+
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
+    public function relatedJournalEntries(): Builder
+    {
+        $receiptItemIds = $this->purchaseReceiptItem()->pluck('id')->all();
+
+        return JournalEntry::query()
+            ->with('coa')
+            ->where(function (Builder $query) use ($receiptItemIds) {
+                $query->where('source_type', self::class)
+                    ->where('source_id', $this->id);
+
+                if (! empty($receiptItemIds)) {
+                    $query->orWhere(function (Builder $query) use ($receiptItemIds) {
+                        $query->where('source_type', PurchaseReceiptItem::class)
+                            ->whereIn('source_id', $receiptItemIds);
+                    });
+                }
+            });
     }
 
     /**

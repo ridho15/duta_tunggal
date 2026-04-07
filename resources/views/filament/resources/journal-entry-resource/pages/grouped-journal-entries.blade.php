@@ -20,6 +20,34 @@
             </div>
         </div>
 
+        {{-- Filter Form --}}
+        <div class="custom-card custom-rounded custom-shadow custom-border custom-hover-shadow">
+            <div class="custom-card-header">
+                <h3 class="custom-card-title custom-flex-gap">
+                    <svg class="custom-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                    </svg>
+                    Filters
+                </h3>
+            </div>
+            <div class="custom-p-6">
+                <form wire:submit.prevent="applyFilters">
+                    {{ $this->form }}
+                    <div class="custom-mt-4">
+                        <x-filament::button type="submit" color="primary" size="sm">
+                            <svg class="custom-icon-xs custom-mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                            </svg>
+                            Apply Filters
+                        </x-filament::button>
+                        <x-filament::button wire:click="resetFilters" color="gray" size="sm" class="custom-ml-2">
+                            Reset
+                        </x-filament::button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {{-- Simple Content --}}
         <div class="custom-card custom-rounded custom-shadow custom-border custom-hover-shadow">
             <div class="custom-p-6">
@@ -773,6 +801,7 @@
         .custom-mt-1 { margin-top: 0.25rem; }
         .custom-mb-1 { margin-bottom: 0.25rem; }
         .custom-mr-1 { margin-right: 0.25rem; }
+        .custom-ml-2 { margin-left: 0.5rem; }
         .custom-text-sm-gray { font-size: 0.875rem; color: #6b7280; }
         .custom-text-lg-bold { font-size: 1.125rem; font-weight: bold; }
         .custom-currency { font-size: 1rem; }

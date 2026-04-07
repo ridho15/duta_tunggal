@@ -106,8 +106,39 @@ class WarehouseConfirmationItem extends Model
         );
     }
 
+    protected function syncLinkedMaterialIssueItemStatus(): void
+    {
+        if (! $this->material_issue_item_id) {
+            return;
+        }
+
+        $status = strtolower((string) $this->status);
+
+        if (! in_array($status, ['confirmed', 'partial_confirmed'], true)) {
+            return;
+        }
+
+        $materialIssueItem = $this->materialIssueItem()->first();
+
+        if (! $materialIssueItem || ! $materialIssueItem->exists) {
+            return;
+        }
+
+        $warehouseConfirmation = $this->warehouseConfirmation()->first();
+
+        $materialIssueItem->update([
+            'status' => MaterialIssueItem::STATUS_APPROVED,
+            'approved_by' => $warehouseConfirmation?->confirmed_by ?? $materialIssueItem->approved_by,
+            'approved_at' => $warehouseConfirmation?->confirmed_at ?? $materialIssueItem->approved_at ?? now(),
+        ]);
+    }
+
     protected static function booted()
     {
+        static::saved(function (WarehouseConfirmationItem $warehouseConfirmationItem) {
+            $warehouseConfirmationItem->syncLinkedMaterialIssueItemStatus();
+        });
+
         static::updating(function ($warehouseConfirmationItem) {
             // When item status changes, check if all items in the warehouse confirmation are confirmed
             if ($warehouseConfirmationItem->isDirty('status')) {

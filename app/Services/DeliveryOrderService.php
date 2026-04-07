@@ -400,8 +400,8 @@ class DeliveryOrderService
                 continue;
             }
 
-            $inventoryCoa = $product?->inventoryCoa?->id ? $product->inventoryCoa : $defaultInventoryCoa;
-            $goodsDeliveryCoa = $product?->goodsDeliveryCoa?->id ? $product->goodsDeliveryCoa : $defaultGoodsDeliveryCoa;
+            $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+            $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
 
             if (!$inventoryCoa || !$goodsDeliveryCoa) {
                 throw new \RuntimeException(

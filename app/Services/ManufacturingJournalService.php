@@ -83,9 +83,10 @@ class ManufacturingJournalService
                 $itemCost = $item->total_cost;
 
                 // COA hierarchy: Item-specific → Product-specific → Fallback
-                $productInventoryCoa = $item->inventory_coa_id && $item->inventoryCoa ? $item->inventoryCoa :
-                                     ($item->product->inventory_coa_id && $item->product->inventoryCoa ? $item->product->inventoryCoa :
-                                     $this->resolveCoaByCodes(['1-101', '1140.10', '1140.01', '1140']));
+                $productInventoryCoa = $item->inventory_coa_id && $item->inventoryCoa
+                    ? $item->inventoryCoa
+                    : ($item->product?->resolveInventoryCoaOrDefault()
+                        ?? $this->resolveCoaByCodes(['1-101', '1140.10', '1140.01', '1140']));
 
                 if (!$productInventoryCoa) {
                     throw new \Exception('COA persediaan tidak ditemukan untuk produk: ' . $item->product->name . '. Atur COA pada Material Issue Item, Product, atau pastikan COA 1-101 (Persediaan Bahan Baku) tersedia.');
@@ -181,9 +182,10 @@ class ManufacturingJournalService
                 $itemCost = $item->total_cost;
 
                 // COA hierarchy: Item-specific → Product-specific → Fallback
-                $productInventoryCoa = $item->inventory_coa_id && $item->inventoryCoa ? $item->inventoryCoa :
-                                     ($item->product->inventory_coa_id && $item->product->inventoryCoa ? $item->product->inventoryCoa :
-                                     $this->resolveCoaByCodes(['1-101', '1140.10', '1140.01', '1140']));
+                $productInventoryCoa = $item->inventory_coa_id && $item->inventoryCoa
+                    ? $item->inventoryCoa
+                    : ($item->product?->resolveInventoryCoaOrDefault()
+                        ?? $this->resolveCoaByCodes(['1-101', '1140.10', '1140.01', '1140']));
 
                 if (!$productInventoryCoa) {
                     throw new \Exception('COA persediaan tidak ditemukan untuk produk: ' . $item->product->name . '. Atur COA pada Material Issue Item, Product, atau pastikan COA 1-101 (Persediaan Bahan Baku) tersedia.');
@@ -834,9 +836,8 @@ class ManufacturingJournalService
 
     protected function resolveFinishedGoodsInventoryCoa(?\App\Models\Product $product): ?ChartOfAccount
     {
-        return ($product?->inventoryCoa && $product->inventoryCoa->id)
-            ? $product->inventoryCoa
-            : $this->resolveCoaByCodes(['1140.02']);
+        return $product?->resolveInventoryCoaOrDefault()
+            ?? $this->resolveCoaByCodes(['1140.02']);
     }
 
     /**

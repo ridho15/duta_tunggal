@@ -92,6 +92,15 @@ class QuotationResource extends Resource
         };
     }
 
+    protected static function formatMoneyState(mixed $amount): string
+    {
+        if ($amount === null || $amount === '') {
+            return '';
+        }
+
+        return number_format((float) HelperController::parseIndonesianMoney($amount), 0, ',', '.');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -334,7 +343,7 @@ class QuotationResource extends Resource
                                             $item->tax_type ?? 'None'
                                         );
                                     }
-                                    $component->state($total);
+                                    $component->state(static::formatMoneyState($total));
                                 }
                             }),
                         FileUpload::make('po_file_path')
@@ -403,7 +412,7 @@ class QuotationResource extends Resource
                                                 $item['tax_type'] ?? 'None'
                                             );
                                         }
-                                        $livewire->data['total_amount'] = $grandTotal;
+                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
                                     })
                                     ->relationship('product', 'name')
                                     ->searchable()
@@ -469,7 +478,7 @@ class QuotationResource extends Resource
                                                 $item['tax_type'] ?? 'None'
                                             );
                                         }
-                                        $livewire->data['total_amount'] = $grandTotal;
+                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
                                     })
                                     ->indonesianMoney(),
                                 TextInput::make('quantity')
@@ -506,7 +515,7 @@ class QuotationResource extends Resource
                                                 $item['tax_type'] ?? 'None'
                                             );
                                         }
-                                        $livewire->data['total_amount'] = $grandTotal;
+                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
                                     })
                                     ->reactive()
                                     ->default(1),
@@ -542,7 +551,7 @@ class QuotationResource extends Resource
                                                 $item['tax_type'] ?? 'None'
                                             );
                                         }
-                                        $livewire->data['total_amount'] = $grandTotal;
+                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
                                     })
                                     ->reactive()
                                     ->maxValue(100)
@@ -595,7 +604,7 @@ class QuotationResource extends Resource
                                                 $item['tax_type'] ?? 'None'
                                             );
                                         }
-                                        $livewire->data['total_amount'] = $grandTotal;
+                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
                                     })
                                     ->validationMessages([
                                         'required' => 'Tipe Pajak wajib dipilih.',
@@ -641,7 +650,7 @@ class QuotationResource extends Resource
                                                 $item['tax_type'] ?? 'None'
                                             );
                                         }
-                                        $livewire->data['total_amount'] = $grandTotal;
+                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
                                     })
                                     ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->suffix('%'),
