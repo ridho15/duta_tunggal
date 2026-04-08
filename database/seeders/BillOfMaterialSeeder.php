@@ -22,9 +22,16 @@ class BillOfMaterialSeeder extends Seeder
 
         // Get default COA for manufacturing
         $workInProgressCoa = ChartOfAccount::where('code', '1400.04')->first(); // Pos Sementara Produksi
+        $laborCoa = ChartOfAccount::query()->where('code', '5120')->first();
+        $overheadCoa = ChartOfAccount::query()->where('code', '5130')->first();
 
-        if (!$workInProgressCoa) {
+        if (! $workInProgressCoa) {
             $this->command?->warn('BillOfMaterialSeeder skipped: Temporary production COA not found. Please seed COA 1400.04 first.');
+            return;
+        }
+
+        if (! $laborCoa || ! $overheadCoa) {
+            $this->command?->warn('BillOfMaterialSeeder skipped: TKL COA 5120 or overhead COA 5130 not found. Please seed finance COA first.');
             return;
         }
 
@@ -59,6 +66,8 @@ class BillOfMaterialSeeder extends Seeder
                     'uom_id' => $product->uom_id,
                     'labor_cost' => $laborCost,
                     'overhead_cost' => $overheadCost,
+                    'labor_coa_id' => $laborCoa->id,
+                    'overhead_coa_id' => $overheadCoa->id,
                     'total_cost' => 0,
                     'work_in_progress_coa_id' => $workInProgressCoa->id,
                 ]
@@ -101,6 +110,8 @@ class BillOfMaterialSeeder extends Seeder
             $bom->forceFill([
                 'labor_cost' => $laborCost,
                 'overhead_cost' => $overheadCost,
+                'labor_coa_id' => $laborCoa->id,
+                'overhead_coa_id' => $overheadCoa->id,
                 'total_cost' => $materialCost + $laborCost + $overheadCost,
             ])->save();
 
@@ -108,7 +119,7 @@ class BillOfMaterialSeeder extends Seeder
         }
 
         $this->command?->info("Seeded {$bomCount} bill of materials with {$itemCount} components.");
-        $this->command?->info("Default COA set: Temporary Production ({$workInProgressCoa->code}) while finished goods inventory follows each product inventory COA.");
+        $this->command?->info("Default COA set: Temporary Production ({$workInProgressCoa->code}), TKL ({$laborCoa->code}), and Overhead ({$overheadCoa->code}).");
     }
 
     private function pickComponents(Collection $products, Product $finishedGood): Collection

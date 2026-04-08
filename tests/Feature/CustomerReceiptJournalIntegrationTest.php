@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AccountReceivable;
 use App\Models\ChartOfAccount;
 use App\Models\Cabang;
 use App\Models\Currency;
@@ -96,6 +97,66 @@ class CustomerReceiptJournalIntegrationTest extends TestCase
             $this->assertEquals(CustomerReceipt::class, $entry->source_type);
             $this->assertEquals($receipt->id, $entry->source_id);
         }
+    }
+
+    public function test_duplicate_selected_invoices_do_not_double_count_account_receivable_updates()
+    {
+        $customer = Customer::factory()->create();
+        $saleOrder = SaleOrder::factory()->create([
+            'customer_id' => $customer->id,
+            'status' => 'confirmed',
+        ]);
+
+        $invoice = Invoice::withoutEvents(function () use ($saleOrder) {
+            return Invoice::factory()->create([
+                'from_model_type' => SaleOrder::class,
+                'from_model_id' => $saleOrder->id,
+                'status' => 'unpaid',
+            ]);
+        });
+
+        AccountReceivable::factory()->create([
+            'invoice_id' => $invoice->id,
+            'customer_id' => $customer->id,
+            'total' => 1000000,
+            'paid' => 0,
+            'remaining' => 1000000,
+            'status' => 'Belum Lunas',
+        ]);
+
+        $receipt = CustomerReceipt::factory()->create([
+            'customer_id' => $customer->id,
+            'selected_invoices' => [$invoice->id, $invoice->id],
+            'total_payment' => 1000000,
+            'payment_method' => 'Cash',
+            'coa_id' => ChartOfAccount::where('code', '1111.01')->value('id'),
+            'status' => 'draft',
+        ]);
+
+        CustomerReceiptItem::factory()->create([
+            'customer_receipt_id' => $receipt->id,
+            'invoice_id' => $invoice->id,
+            'amount' => 1000000,
+            'method' => 'Cash',
+            'coa_id' => ChartOfAccount::where('code', '1111.01')->value('id'),
+        ]);
+
+        $receipt->update(['status' => 'paid']);
+
+        $accountReceivable = AccountReceivable::where('invoice_id', $invoice->id)->firstOrFail();
+
+        $this->assertSame(1000000.0, (float) $accountReceivable->paid);
+        $this->assertSame(0.0, (float) $accountReceivable->remaining);
+        $this->assertSame('Lunas', $accountReceivable->status);
+        $this->assertSame('paid', $invoice->fresh()->status);
+
+        $receiptEntries = JournalEntry::where('source_type', CustomerReceipt::class)
+            ->where('source_id', $receipt->id)
+            ->get();
+
+        $this->assertCount(2, $receiptEntries);
+        $this->assertSame(1000000.0, (float) $receiptEntries->sum('debit'));
+        $this->assertSame(1000000.0, (float) $receiptEntries->sum('credit'));
     }
 
     public function test_journal_entries_are_updated_when_customer_receipt_amount_is_changed()

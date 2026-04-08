@@ -3,9 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Models\ChartOfAccount;
-use App\Models\JournalEntry;
+use App\Services\Reports\DrillDownFinancialReportService;
+use App\Services\Reports\FinancialStatementReportService;
 use Filament\Pages\Page;
-use Illuminate\Support\Carbon;
 
 class DrillDownFinancialReportPage extends Page
 {
@@ -30,6 +30,8 @@ class DrillDownFinancialReportPage extends Page
 
     // Filter state
     public bool $showPreview = false;
+    public string $report_mode = 'journal';
+    public string $statement_type = 'all';
     public ?string $account_type = null;  // Asset, Liability, Equity, Revenue, Expense
     public ?int $coa_id = null;
     public ?string $start_date = null;
@@ -39,6 +41,8 @@ class DrillDownFinancialReportPage extends Page
     public function mount(): void
     {
         $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+        $this->report_mode = request('report_mode', 'journal');
+        $this->statement_type = request('statement_type', 'all');
         $this->account_type = request('account_type');
         $this->coa_id = request('coa_id');
         $this->start_date = request('start_date', now()->startOfMonth()->format('Y-m-d'));
@@ -77,8 +81,18 @@ class DrillDownFinancialReportPage extends Page
 
     public function getPreviewUrl(): string
     {
-        return static::getUrl() . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        if ($this->isFinancialStatementMode()) {
+            return route('reports.financial-statement.preview', array_filter([
+                'start_date' => $this->start_date,
+                'end_date' => $this->end_date,
+                'cabang_id' => $this->cabang_id,
+                'statement_type' => $this->statement_type,
+            ], fn ($value) => $value !== null && $value !== '' && $value !== []));
+        }
+
+        return route('reports.drill-down-financial-report.preview', array_filter([
+            'report_mode' => $this->report_mode,
+            'statement_type' => $this->statement_type,
             'account_type' => $this->account_type,
             'coa_id' => $this->coa_id,
             'start_date' => $this->start_date,
@@ -94,6 +108,14 @@ class DrillDownFinancialReportPage extends Page
         $this->coa_id = null;
     }
 
+    public function updatedReportMode(): void
+    {
+        if ($this->isFinancialStatementMode()) {
+            $this->account_type = null;
+            $this->coa_id = null;
+        }
+    }
+
     public function getCoaOptionsProperty(): array
     {
         $query = ChartOfAccount::query()->orderBy('code');
@@ -105,53 +127,52 @@ class DrillDownFinancialReportPage extends Page
             ->toArray();
     }
 
+    public function getStatementTypeOptionsProperty(): array
+    {
+        return [
+            'all' => 'Semua (Laba Rugi + Neraca)',
+            'pl' => 'Laba Rugi',
+            'bs' => 'Neraca',
+            'cogm' => 'Harga Pokok Produksi (COGM)',
+        ];
+    }
+
+    public function getStatementTypeLabelProperty(): string
+    {
+        return $this->statementTypeOptions[$this->statement_type] ?? 'Financial Statement';
+    }
+
+    public function isFinancialStatementMode(): bool
+    {
+        return $this->report_mode === 'financial_statement';
+    }
+
+    public function getFinancialStatementData(): array
+    {
+        if (! $this->showPreview || ! $this->isFinancialStatementMode()) {
+            return [];
+        }
+
+        return app(FinancialStatementReportService::class)->generate([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+            'statement_type' => $this->statement_type,
+        ]);
+    }
+
     public function getDrillDownData(): array
     {
         if (!$this->showPreview) {
             return [];
         }
 
-        $start = $this->start_date ? Carbon::parse($this->start_date)->startOfDay() : now()->startOfMonth();
-        $end = $this->end_date ? Carbon::parse($this->end_date)->endOfDay() : now()->endOfMonth();
-
-        $query = JournalEntry::query()
-            ->with('coa')
-            ->whereBetween('date', [$start, $end])
-            ->orderBy('date')
-            ->orderBy('id');
-
-        if ($this->coa_id) {
-            $query->where('coa_id', $this->coa_id);
-        } elseif ($this->account_type) {
-            $query->whereHas('coa', fn ($q) => $q->where('type', $this->account_type));
-        }
-
-        if ($this->cabang_id) {
-            $query->where('cabang_id', $this->cabang_id);
-        }
-
-        $entries = $query->get();
-
-        $grouped = $entries->groupBy('coa_id')->map(function ($lines, $coaId) {
-            $coa = $lines->first()->coa;
-            $totalDebit = $lines->sum('debit');
-            $totalCredit = $lines->sum('credit');
-            return [
-                'coa' => $coa,
-                'lines' => $lines,
-                'total_debit' => $totalDebit,
-                'total_credit' => $totalCredit,
-                'balance' => in_array(optional($coa)->type, ['Asset', 'Expense'])
-                    ? ($totalDebit - $totalCredit)
-                    : ($totalCredit - $totalDebit),
-            ];
-        });
-
-        return [
-            'grouped' => $grouped->values()->toArray(),
-            'total_debit' => $entries->sum('debit'),
-            'total_credit' => $entries->sum('credit'),
-            'count' => $entries->count(),
-        ];
+        return app(DrillDownFinancialReportService::class)->generate([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'account_type' => $this->account_type,
+            'coa_id' => $this->coa_id,
+            'cabang_id' => $this->cabang_id,
+        ]);
     }
 }

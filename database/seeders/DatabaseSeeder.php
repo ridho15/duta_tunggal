@@ -75,9 +75,9 @@ class DatabaseSeeder extends Seeder
             StockMovementSeeder::class, // ✅ TAMBAHKAN: Stock movements
             
             // Finance
+            FinanceSeeder::class,
             CashBankDemoSeeder::class,
             BankReconciliationDemoSeeder::class,
-            FinanceSeeder::class,
             OtherSaleSeeder::class, // ✅ TAMBAHKAN: Other sales (building rental, etc.)
         ]);
     }

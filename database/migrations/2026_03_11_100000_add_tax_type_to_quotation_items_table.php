@@ -13,6 +13,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('quotation_items') || Schema::hasColumn('quotation_items', 'tax_type')) {
+            return;
+        }
+
         Schema::table('quotation_items', function (Blueprint $table) {
             $table->string('tax_type', 20)->default('Exclusive')->after('tax');
         });
@@ -23,6 +27,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('quotation_items') || ! Schema::hasColumn('quotation_items', 'tax_type')) {
+            return;
+        }
+
         Schema::table('quotation_items', function (Blueprint $table) {
             $table->dropColumn('tax_type');
         });

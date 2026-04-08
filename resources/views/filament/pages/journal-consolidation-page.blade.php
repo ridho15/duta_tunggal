@@ -1,46 +1,10 @@
 <x-filament-panels::page>
     <div class="space-y-6">
-        {{-- Filter Section --}}
-        <div class="bg-white dark:bg-gray-900 shadow rounded-xl p-6 space-y-4">
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Filter Konsolidasi Jurnal</h2>
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tanggal Mulai</label>
-                    <input type="date" wire:model="start_date" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tanggal Akhir</label>
-                    <input type="date" wire:model="end_date" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Jenis Jurnal</label>
-                    <select wire:model="journal_type" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm">
-                        <option value="">-- Semua Tipe --</option>
-                        @foreach($this->journalTypeOptions as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tampilan</label>
-                    <select wire:model="group_by_branch" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm">
-                        <option value="1">Dikelompokkan per Cabang</option>
-                        <option value="0">Konsolidasi Semua Cabang</option>
-                    </select>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cabang (kosongkan untuk semua)</label>
-                <div class="flex flex-wrap gap-2">
-                    @foreach($this->branchOptions as $id => $name)
-                    <label class="flex items-center gap-1 text-sm cursor-pointer">
-                        <input type="checkbox" wire:model="branch_ids" value="{{ $id }}" class="rounded border-gray-300">
-                        <span class="text-gray-700 dark:text-gray-300">{{ $name }}</span>
-                    </label>
-                    @endforeach
-                </div>
-            </div>
+        <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100">
+            Pilih filter, lalu gunakan <strong>Tampilkan Konsolidasi</strong> untuk preview di tab baru atau langsung export Excel/PDF dari filter yang sama.
         </div>
+
+        {{ $this->form }}
 
         @if($this->showPreview)
             @php $data = $this->getConsolidationData(); @endphp

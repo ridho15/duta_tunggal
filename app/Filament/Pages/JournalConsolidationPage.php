@@ -2,18 +2,28 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\JournalEntry;
+use App\Exports\GenericViewExport;
 use App\Models\Cabang;
+use App\Services\Reports\JournalConsolidationReportService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * Journal List of Consolidation
  * Aggregates journal entries across all branches (cabang) in a consolidated view.
  */
-class JournalConsolidationPage extends Page
+class JournalConsolidationPage extends Page implements HasForms
 {
+    use InteractsWithForms;
+
     public static function shouldRegisterNavigation(): bool
     {
         return false;
@@ -49,6 +59,86 @@ class JournalConsolidationPage extends Page
         $this->branch_ids = (array) request('branch_ids', []);
         $this->journal_type = request('journal_type');
         $this->group_by_branch = filter_var(request('group_by_branch', true), FILTER_VALIDATE_BOOL);
+
+        $this->form->fill([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'branch_ids' => $this->branch_ids,
+            'journal_type' => $this->journal_type,
+            'group_by_branch' => $this->group_by_branch,
+        ]);
+    }
+
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Section::make('Filter Konsolidasi Jurnal')
+                    ->description('Pilih periode, tipe jurnal, dan cabang untuk preview atau export laporan konsolidasi.')
+                    ->schema([
+                        DatePicker::make('start_date')
+                            ->label('Tanggal Mulai')
+                            ->required()
+                            ->displayFormat('d/m/Y')
+                            ->default(now()->startOfMonth()),
+
+                        DatePicker::make('end_date')
+                            ->label('Tanggal Akhir')
+                            ->required()
+                            ->displayFormat('d/m/Y')
+                            ->default(now()->endOfMonth()),
+
+                        Select::make('journal_type')
+                            ->label('Jenis Jurnal')
+                            ->options($this->getJournalTypeOptionsProperty())
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('Semua Tipe'),
+
+                        Select::make('group_by_branch')
+                            ->label('Tampilan')
+                            ->options([
+                                1 => 'Dikelompokkan per Cabang',
+                                0 => 'Konsolidasi Semua Cabang',
+                            ])
+                            ->default(1)
+                            ->native(false),
+
+                        Select::make('branch_ids')
+                            ->label('Cabang')
+                            ->multiple()
+                            ->options($this->getBranchOptionsProperty())
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('Semua Cabang')
+                            ->helperText('Kosongkan bila ingin menampilkan semua cabang')
+                            ->getSearchResultsUsing(function (string $search): array {
+                                return Cabang::query()
+                                    ->where(function ($query) use ($search) {
+                                        $query->where('nama', 'like', "%{$search}%")
+                                            ->orWhere('kode', 'like', "%{$search}%");
+                                    })
+                                    ->orderBy('kode')
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                    ->toArray();
+                            })
+                            ->getOptionLabelsUsing(function (array $values): array {
+                                if ($values === []) {
+                                    return [];
+                                }
+
+                                return Cabang::query()
+                                    ->whereIn('id', $values)
+                                    ->orderBy('kode')
+                                    ->get()
+                                    ->mapWithKeys(fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                    ->toArray();
+                            }),
+                    ])
+                    ->columns(4),
+            ]);
     }
 
     protected function getHeaderActions(): array
@@ -60,17 +150,50 @@ class JournalConsolidationPage extends Page
                 ->color('primary')
                 ->action(fn () => $this->generateReport()),
 
+            \Filament\Actions\Action::make('export_excel')
+                ->label('Export Excel')
+                ->icon('heroicon-m-arrow-down-tray')
+                ->color('success')
+                ->action(fn () => $this->export('excel')),
+
+            \Filament\Actions\Action::make('export_pdf')
+                ->label('Export PDF')
+                ->icon('heroicon-m-document-text')
+                ->color('danger')
+                ->action(fn () => $this->export('pdf')),
+
             \Filament\Actions\Action::make('reset')
                 ->label('Reset')
                 ->icon('heroicon-o-x-circle')
                 ->color('gray')
-                ->visible(fn () => $this->showPreview)
                 ->action(fn () => $this->resetReport()),
         ];
     }
 
     public function generateReport(): void
     {
+        $this->syncFiltersFromForm();
+
+        if (! $this->start_date || ! $this->end_date) {
+            Notification::make()
+                ->title('Filter belum lengkap')
+                ->danger()
+                ->body('Tanggal mulai dan tanggal akhir harus diisi.')
+                ->send();
+
+            return;
+        }
+
+        if ($this->start_date > $this->end_date) {
+            Notification::make()
+                ->title('Rentang tanggal tidak valid')
+                ->danger()
+                ->body('Tanggal mulai tidak boleh lebih besar dari tanggal akhir.')
+                ->send();
+
+            return;
+        }
+
         $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
@@ -81,8 +204,9 @@ class JournalConsolidationPage extends Page
 
     public function getPreviewUrl(): string
     {
-        return static::getUrl() . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        $this->syncFiltersFromForm();
+
+        return route('reports.journal-consolidation.preview', array_filter([
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,
             'branch_ids' => array_filter($this->branch_ids),
@@ -97,90 +221,98 @@ class JournalConsolidationPage extends Page
             return [];
         }
 
-        $start = Carbon::parse($this->start_date)->startOfDay();
-        $end = Carbon::parse($this->end_date)->endOfDay();
+        return app(JournalConsolidationReportService::class)->generate($this->reportFilters());
+    }
 
-        $query = JournalEntry::query()
-            ->with(['coa', 'cabang'])
-            ->whereBetween('date', [$start, $end])
-            ->orderBy('date')
-            ->orderBy('transaction_id')
-            ->orderBy('id');
+    public function export(string $format = 'excel')
+    {
+        $this->syncFiltersFromForm();
 
-        if (!empty($this->branch_ids)) {
-            $query->whereIn('cabang_id', $this->branch_ids);
+        $report = app(JournalConsolidationReportService::class)->generate($this->reportFilters());
+        $selectedBranches = $this->getSelectedBranchNames();
+        $filename = 'journal-consolidation-' . now()->format('Ymd_His');
+
+        $view = view('exports.journal-consolidation', [
+            'report' => $report,
+            'selectedBranches' => $selectedBranches,
+        ]);
+
+        if ($format === 'pdf') {
+            $pdf = Pdf::loadView('exports.journal-consolidation', [
+                'report' => $report,
+                'selectedBranches' => $selectedBranches,
+            ])
+                ->setPaper('a4', 'landscape')
+                ->setOptions([
+                    'defaultFont' => 'DejaVu Sans',
+                    'isHtml5ParserEnabled' => true,
+                    'isRemoteEnabled' => true,
+                ]);
+
+            return response()->streamDownload(function () use ($pdf) {
+                echo $pdf->output();
+            }, $filename . '.pdf');
         }
 
-        if ($this->journal_type) {
-            $query->where('journal_type', $this->journal_type);
-        }
-
-        $entries = $query->get();
-
-        $totalDebit = $entries->sum('debit');
-        $totalCredit = $entries->sum('credit');
-
-        if ($this->group_by_branch) {
-            $grouped = $entries->groupBy('cabang_id')->map(function (Collection $lines, $cabangId) {
-                $cabang = $lines->first()->cabang ?? (object)['nama' => 'Tidak Diketahui'];
-                return [
-                    'cabang_name' => $cabang->nama ?? 'Tanpa Cabang',
-                    'entries'     => $lines,
-                    'total_debit' => $lines->sum('debit'),
-                    'total_credit' => $lines->sum('credit'),
-                    'balance'     => $lines->sum('debit') - $lines->sum('credit'),
-                ];
-            })->values()->toArray();
-        } else {
-            $grouped = [
-                [
-                    'cabang_name'  => 'Semua Cabang (Konsolidasi)',
-                    'entries'      => $entries,
-                    'total_debit'  => $totalDebit,
-                    'total_credit' => $totalCredit,
-                    'balance'      => $totalDebit - $totalCredit,
-                ]
-            ];
-        }
-
-        // Consolidation summary by COA
-        $coaSummary = $entries->groupBy('coa_id')->map(function (Collection $lines) {
-            $coa = $lines->first()->coa;
-            return [
-                'coa'          => $coa,
-                'total_debit'  => $lines->sum('debit'),
-                'total_credit' => $lines->sum('credit'),
-                'balance'      => $lines->sum('debit') - $lines->sum('credit'),
-            ];
-        })->sortBy(fn ($item) => optional($item['coa'])->code)->values()->toArray();
-
-        return [
-            'grouped'      => $grouped,
-            'coa_summary'  => $coaSummary,
-            'total_debit'  => $totalDebit,
-            'total_credit' => $totalCredit,
-            'balanced'     => abs($totalDebit - $totalCredit) < 0.01,
-            'count'        => $entries->count(),
-            'period'       => $start->format('d M Y') . ' s/d ' . $end->format('d M Y'),
-        ];
+        return Excel::download(new GenericViewExport($view), $filename . '.xlsx');
     }
 
     public function getBranchOptionsProperty(): array
     {
-        return Cabang::all()->mapWithKeys(fn ($c) => [$c->id => $c->nama])->toArray();
+        return Cabang::query()
+            ->orderBy('kode')
+            ->get()
+            ->mapWithKeys(fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+            ->toArray();
     }
 
     public function getJournalTypeOptionsProperty(): array
     {
         return [
-            'INV'    => 'Invoice',
-            'PAY'    => 'Payment',
-            'REC'    => 'Receipt',
-            'JV'     => 'Journal Voucher',
-            'REV'    => 'Reversal',
-            'SALES'  => 'Sales',
-            'PURCH'  => 'Purchase',
-            'MANU'   => 'Manufacturing',
+            'INV' => 'Invoice',
+            'PAY' => 'Payment',
+            'REC' => 'Receipt',
+            'JV' => 'Journal Voucher',
+            'REV' => 'Reversal',
+            'SALES' => 'Sales',
+            'PURCH' => 'Purchase',
+            'MANU' => 'Manufacturing',
+            'manual' => 'Manual',
         ];
+    }
+
+    public function getSelectedBranchNames(): array
+    {
+        if ($this->branch_ids === []) {
+            return [];
+        }
+
+        return Cabang::query()
+            ->whereIn('id', $this->branch_ids)
+            ->orderBy('nama')
+            ->pluck('nama')
+            ->toArray();
+    }
+
+    protected function reportFilters(): array
+    {
+        return [
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'branch_ids' => $this->branch_ids,
+            'journal_type' => $this->journal_type,
+            'group_by_branch' => $this->group_by_branch,
+        ];
+    }
+
+    protected function syncFiltersFromForm(): void
+    {
+        $data = $this->form->getState();
+
+        $this->start_date = $data['start_date'] ?? $this->start_date;
+        $this->end_date = $data['end_date'] ?? $this->end_date;
+        $this->branch_ids = array_values(array_filter((array) ($data['branch_ids'] ?? $this->branch_ids), fn ($value) => $value !== null && $value !== ''));
+        $this->journal_type = $data['journal_type'] ?? $this->journal_type;
+        $this->group_by_branch = filter_var($data['group_by_branch'] ?? $this->group_by_branch, FILTER_VALIDATE_BOOL);
     }
 }

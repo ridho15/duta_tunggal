@@ -90,10 +90,17 @@ class CustomerReceiptItemObserver
     {
         // Check status of all invoices in selected_invoices
         if (!empty($customerReceipt->selected_invoices)) {
+            $selectedInvoiceIds = array_values(array_unique(array_filter(array_map(
+                'intval',
+                is_array($customerReceipt->selected_invoices)
+                    ? $customerReceipt->selected_invoices
+                    : (json_decode($customerReceipt->selected_invoices, true) ?? [])
+            ))));
+
             $allPaid = true;
             $anyPartial = false;
             
-            foreach ($customerReceipt->selected_invoices as $invoiceId) {
+            foreach ($selectedInvoiceIds as $invoiceId) {
                 $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
                 if ($accountReceivable) {
                     if ($accountReceivable->remaining > 0) {

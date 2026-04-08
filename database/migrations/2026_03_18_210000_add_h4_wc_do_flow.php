@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Add delivery_order_id and rejection_reason to warehouse_confirmations (idempotent)
-        if (! Schema::hasColumn('warehouse_confirmations', 'delivery_order_id')) {
+        if (Schema::hasTable('warehouse_confirmations') && ! Schema::hasColumn('warehouse_confirmations', 'delivery_order_id')) {
             Schema::table('warehouse_confirmations', function (Blueprint $table) {
                 $table->unsignedBigInteger('delivery_order_id')->nullable()->after('sale_order_id');
                 $table->foreign('delivery_order_id')
@@ -23,7 +23,7 @@ return new class extends Migration
                       ->onDelete('set null');
             });
         }
-        if (! Schema::hasColumn('warehouse_confirmations', 'rejection_reason')) {
+        if (Schema::hasTable('warehouse_confirmations') && ! Schema::hasColumn('warehouse_confirmations', 'rejection_reason')) {
             Schema::table('warehouse_confirmations', function (Blueprint $table) {
                 $table->text('rejection_reason')->nullable()->after('note');
             });
@@ -48,6 +48,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('warehouse_confirmations')) {
+            return;
+        }
+
         Schema::table('warehouse_confirmations', function (Blueprint $table) {
             if (Schema::hasColumn('warehouse_confirmations', 'delivery_order_id')) {
                 $table->dropForeign(['delivery_order_id']);

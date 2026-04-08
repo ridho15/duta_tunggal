@@ -21,13 +21,16 @@
 import { test, expect } from '@playwright/test';
 
 const DDF_URL = '/admin/drill-down-financial-report';
+const DDF_PREVIEW_URL = '/reports/drill-down-financial-report/preview';
+
+test.setTimeout(60000);
 
 // ──────────────────────────────────────────────────────────────
 // Helper: Navigate to drill-down page and wait until loaded
 // ──────────────────────────────────────────────────────────────
 async function goToDDF(page) {
     await page.goto(DDF_URL);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // Wait for Livewire to initialise
     await page.waitForTimeout(800);
 }
@@ -39,27 +42,12 @@ async function generateReport(page) {
     const btn = page.getByRole('button', { name: /tampilkan laporan/i }).first();
     await expect(btn).toBeVisible({ timeout: 10000 });
 
-    const accountType = await page.locator('#select-account-type').inputValue().catch(() => '');
-    const coaId = await page.locator('#select-coa').inputValue().catch(() => '');
-    const startDate = await page.locator('input[wire\\:model="start_date"], input[id*="start_date"]').first().inputValue().catch(() => '');
-    const endDate = await page.locator('input[wire\\:model="end_date"], input[id*="end_date"]').first().inputValue().catch(() => '');
-    const cabangId = await page.locator('#select-cabang').inputValue().catch(() => '');
-
-    const previewParams = new URLSearchParams();
-    previewParams.set('preview', '1');
-    if (accountType) previewParams.set('account_type', accountType);
-    if (coaId) previewParams.set('coa_id', coaId);
-    if (startDate) previewParams.set('start_date', startDate);
-    if (endDate) previewParams.set('end_date', endDate);
-    if (cabangId) previewParams.set('cabang_id', cabangId);
-
     const popupPromise = page.waitForEvent('popup');
     await btn.click();
     const popup = await popupPromise;
-    await popup.goto(`${DDF_URL}?${previewParams.toString()}`);
-    await popup.waitForLoadState('networkidle');
-    await popup.bringToFront().catch(() => {});
-    await popup.waitForTimeout(600);
+    await popup.waitForLoadState('domcontentloaded');
+    await popup.waitForTimeout(500);
+
     return popup;
 }
 
@@ -122,6 +110,10 @@ test('TC-DDF-004: Generate laporan berhasil menampilkan stat cards', async ({ pa
     await goToDDF(page);
     const reportPage = await generateReport(page);
 
+    await expect(reportPage).toHaveURL(new RegExp(`${DDF_PREVIEW_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    await expect(reportPage.getByRole('link', { name: /download excel/i })).toHaveAttribute('href', /reports\/drill-down-financial-report\/download-excel/);
+    await expect(reportPage.getByRole('link', { name: /download pdf/i })).toHaveAttribute('href', /reports\/drill-down-financial-report\/download-pdf/);
+
     // After generating, stat cards should appear
     await expect(reportPage.getByText(/total transaksi/i).first()).toBeVisible({ timeout: 12000 });
     await expect(reportPage.getByText(/total debit/i).first()).toBeVisible();
@@ -151,15 +143,17 @@ test('TC-DDF-005: Filter tipe akun Expense memfilter hasil laporan', async ({ pa
     // Generate report
     const reportPage = await generateReport(page);
 
+    await expect(reportPage).toHaveURL(/account_type=Expense/);
+
     // All displayed account badges should be Expense type
-    const badges = reportPage.locator('.ddf-badge-expense');
+    const badges = reportPage.locator('.badge.expense');
     const count = await badges.count();
     if (count > 0) {
         // At least 1 Expense badge is visible
         await expect(badges.first()).toBeVisible();
     }
     // No Liability / Equity badges should appear if we filtered to Expense only
-    const liabBadges = reportPage.locator('.ddf-badge-liability');
+    const liabBadges = reportPage.locator('.badge.liability');
     expect(await liabBadges.count()).toBe(0);
 });
 
@@ -298,4 +292,24 @@ test('TC-DDF-009: Select2 COA dapat digunakan untuk mencari akun', async ({ page
 
     // Close by pressing Escape
     await page.keyboard.press('Escape');
+});
+
+// ══════════════════════════════════════════════════════════════
+// TC-DDF-010: Financial statement mode menampilkan laporan ringkasan
+// ══════════════════════════════════════════════════════════════
+test('TC-DDF-010: Financial statement mode menampilkan section laporan keuangan', async ({ page }) => {
+    await goToDDF(page);
+
+    await page.locator('#select-report-mode').selectOption('financial_statement');
+    await page.waitForTimeout(500);
+    await page.locator('#select-statement-type').selectOption('all');
+
+    await expect(page.getByText(/mode aktif: semua/i)).toBeVisible({ timeout: 8000 });
+
+    const reportPage = await generateReport(page);
+
+    await expect(reportPage).toHaveURL(/\/reports\/financial-statement\/preview/);
+    await expect(reportPage.getByText(/laporan financial statement/i).first()).toBeVisible({ timeout: 12000 });
+    await expect(reportPage.getByText(/laporan laba rugi/i).first()).toBeVisible();
+    await expect(reportPage.getByText(/neraca\s*[\/(].*balance sheet/i).first()).toBeVisible();
 });

@@ -32,6 +32,12 @@ class InventoryReportPreviewTest extends TestCase
             'type' => 'stock',
         ]))->render();
 
+        $agingRow = $service->agingRows([
+            'warehouse_id' => $fixture['warehouse']->id,
+            'product_id' => $fixture['product']->id,
+            'as_of_date' => '2026-04-04',
+        ])->first();
+
         $agingHtml = view('reports.inventory_report', $service->pdfPayload([
             'warehouse_id' => $fixture['warehouse']->id,
             'product_id' => $fixture['product']->id,
@@ -43,6 +49,9 @@ class InventoryReportPreviewTest extends TestCase
         $this->assertStringContainsString('Product Preview', $stockHtml);
         $this->assertStringContainsString('Warehouse Preview', $stockHtml);
         $this->assertStringContainsString('Normal', $stockHtml);
+
+        $this->assertSame(15, $agingRow['Hari Aging']);
+        $this->assertSame('Aktif', $agingRow['Kategori Aging']);
 
         $this->assertStringContainsString('Aging Stock Analysis', $agingHtml);
         $this->assertStringContainsString('Product Preview', $agingHtml);

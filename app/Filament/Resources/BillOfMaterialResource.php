@@ -113,8 +113,8 @@ class BillOfMaterialResource extends Resource
                                 if ($product) {
                                     $set('uom_id', $product->uom_id);
                                     $set('work_in_progress_coa_id', self::getDefaultTemporaryProductionCoaId());
-                                    $set('labor_coa_id', $product->manufacturing_labor_coa_id);
-                                    $set('overhead_coa_id', $product->manufacturing_overhead_coa_id);
+                                    $set('labor_coa_id', $product->resolveManufacturingLaborCoaOrDefault()?->id ?? self::getDefaultManufacturingLaborCoaId());
+                                    $set('overhead_coa_id', $product->resolveManufacturingOverheadCoaOrDefault()?->id ?? self::getDefaultManufacturingOverheadCoaId());
                                     $listConversions = [];
                                     foreach ($product->unitConversions as $index => $conversion) {
                                         $listConversions[$index] = [
@@ -427,23 +427,35 @@ class BillOfMaterialResource extends Resource
                                     ->nullable(),
                                 Select::make('labor_coa_id')
                                     ->label('COA TKL Produksi')
-                                    ->helperText('Default mengikuti product yang dipilih, tetapi bisa dioverride per BOM.')
+                                    ->helperText('Default mengikuti product yang dipilih, atau memakai COA TKL produksi standar jika product belum punya COA.')
                                     ->relationship('laborCoa', 'name')
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "({$record->code}) {$record->name}";
                                     })
                                     ->searchable(['code', 'name'])
                                     ->preload()
+                                    ->default(fn() => self::getDefaultManufacturingLaborCoaId())
+                                    ->afterStateHydrated(function ($set, $state) {
+                                        if (! $state) {
+                                            $set('labor_coa_id', self::getDefaultManufacturingLaborCoaId());
+                                        }
+                                    })
                                     ->nullable(),
                                 Select::make('overhead_coa_id')
                                     ->label('COA Overhead Produksi')
-                                    ->helperText('Default mengikuti product yang dipilih, tetapi bisa dioverride per BOM.')
+                                    ->helperText('Default mengikuti product yang dipilih, atau memakai COA overhead produksi standar jika product belum punya COA.')
                                     ->relationship('overheadCoa', 'name')
                                     ->getOptionLabelFromRecordUsing(function ($record) {
                                         return "({$record->code}) {$record->name}";
                                     })
                                     ->searchable(['code', 'name'])
                                     ->preload()
+                                    ->default(fn() => self::getDefaultManufacturingOverheadCoaId())
+                                    ->afterStateHydrated(function ($set, $state) {
+                                        if (! $state) {
+                                            $set('overhead_coa_id', self::getDefaultManufacturingOverheadCoaId());
+                                        }
+                                    })
                                     ->nullable(),
                             ])
                             ->columns(2),
@@ -628,6 +640,20 @@ class BillOfMaterialResource extends Resource
             ->value('id');
     }
 
+    protected static function getDefaultManufacturingLaborCoaId(): ?int
+    {
+        return ChartOfAccount::query()
+            ->where('code', '5120')
+            ->value('id');
+    }
+
+    protected static function getDefaultManufacturingOverheadCoaId(): ?int
+    {
+        return ChartOfAccount::query()
+            ->where('code', '5130')
+            ->value('id');
+    }
+
     protected static function formatMoneyState(mixed $value): string
     {
         return number_format((float) HelperController::parseIndonesianMoney($value), 0, ',', '.');
@@ -640,7 +666,7 @@ class BillOfMaterialResource extends Resource
         }
 
         return Product::withoutGlobalScopes()
-            ->with(['unitConversions', 'inventoryCoa'])
+            ->with(['unitConversions', 'inventoryCoa', 'manufacturingLaborCoa', 'manufacturingOverheadCoa'])
             ->find($productId);
     }
 

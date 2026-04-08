@@ -43,7 +43,7 @@ class FinancePurchaseSeeder extends Seeder
                     ['product' => $rawMaterial, 'qty' => 200, 'price' => 180000],
                 ],
                 'invoice' => [
-                    'number' => 'INV-AP-001',
+                    'number' => 'FIN-INV-AP-001',
                     'invoice_date' => Carbon::now()->subDays(88),
                     'due_date' => Carbon::now()->subDays(58),
                     'status' => 'partially_paid',
@@ -63,7 +63,7 @@ class FinancePurchaseSeeder extends Seeder
                     ['product' => $rawMaterial, 'qty' => 300, 'price' => 190000],
                 ],
                 'invoice' => [
-                    'number' => 'INV-AP-002',
+                    'number' => 'FIN-INV-AP-002',
                     'invoice_date' => Carbon::now()->subDays(42),
                     'due_date' => Carbon::now()->subDays(12),
                     'status' => 'paid',
@@ -137,6 +137,7 @@ class FinancePurchaseSeeder extends Seeder
                     'due_date' => $purchase['invoice']['due_date']->toDateString(),
                     'subtotal' => $subtotal,
                     'tax' => $taxAmount,
+                    'ppn_rate' => $purchase['invoice']['tax_rate'] * 100,
                     'other_fee' => 0,
                     'total' => $total,
                     'status' => $purchase['invoice']['status'],

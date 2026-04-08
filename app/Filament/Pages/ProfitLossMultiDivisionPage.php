@@ -2,15 +2,11 @@
 
 namespace App\Filament\Pages;
 
-use App\Exports\ProfitLossMultiDivisionExport;
 use App\Services\ProfitLossMultiDivisionService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Pages\Page;
-use Illuminate\Support\Carbon;
-use Maatwebsite\Excel\Facades\Excel;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProfitLossMultiDivisionPage extends Page
 {
@@ -38,6 +34,7 @@ class ProfitLossMultiDivisionPage extends Page
     {
         $this->startDate = now()->startOfYear()->format('Y-m-d');
         $this->endDate   = now()->endOfYear()->format('Y-m-d');
+        $this->showReport = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
     }
 
     // ─── Header actions ───────────────────────────────────────────────────────
@@ -56,7 +53,8 @@ class ProfitLossMultiDivisionPage extends Page
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('success')
                 ->visible(fn () => $this->showReport)
-                ->action(fn () => $this->exportExcel()),
+                ->url(fn () => $this->getExportUrl())
+                ->openUrlInNewTab(),
 
             Action::make('reset')
                 ->label('Reset')
@@ -101,25 +99,31 @@ class ProfitLossMultiDivisionPage extends Page
     public function generateReport(): void
     {
         $this->showReport = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
         $this->showReport = false;
+        $this->redirect(static::getUrl());
     }
 
-    public function exportExcel(): StreamedResponse
+    public function getPreviewUrl(): string
     {
-        $service = new ProfitLossMultiDivisionService();
-        $data    = $service->generate(
-            $this->startDate ?? now()->startOfYear()->format('Y-m-d'),
-            $this->endDate   ?? now()->endOfYear()->format('Y-m-d'),
-            $this->cabangIds ?? []
-        );
+        return route('reports.profit-loss-multi-division.preview', array_filter([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'cabangIds' => array_filter($this->cabangIds ?? []),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
+    }
 
-        $filename = 'profit-loss-multi-division-' . now()->format('Ymd-His') . '.xlsx';
-
-        return Excel::download(new ProfitLossMultiDivisionExport($data), $filename);
+    public function getExportUrl(): string
+    {
+        return route('reports.profit-loss-multi-division.excel', array_filter([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'cabangIds' => array_filter($this->cabangIds ?? []),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     // ─── Report data ──────────────────────────────────────────────────────────

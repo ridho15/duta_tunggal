@@ -26,7 +26,7 @@ beforeEach(function () {
 
     // OPEX account (no HPP/Pokok in name)
     $this->opex_account = ChartOfAccount::create([
-        'code' => '5200',
+        'code' => '6100',
         'name' => 'Beban Gaji',
         'type' => 'Expense',
         'is_active' => true,
@@ -203,6 +203,15 @@ it('returns both pl and bs when statement_type is all', function () {
     expect($data)->toHaveKey('bs');
 });
 
+it('returns cogm data when statement_type is cogm', function () {
+    $data = makePage('cogm')->getStatementData();
+
+    expect($data)->toHaveKey('cogm')
+        ->and($data['pl'])->toBeNull()
+        ->and($data['bs'])->toBeNull()
+        ->and($data['cogm'])->toBeArray();
+});
+
 it('asset total_assets reflects debit journal entries', function () {
     $data = makePage('bs')->getStatementData();
 
@@ -216,7 +225,31 @@ it('generateReport builds a preview url without toggling inline preview', functi
     $page->generateReport();
 
     expect($page->showPreview)->toBeFalse()
-        ->and($page->getPreviewUrl())->toContain('preview=1');
+    ->and($page->getPreviewUrl())->toContain('/reports/financial-statement/preview')
+    ->and($page->getPreviewUrl())->toContain('statement_type=all');
+});
+
+it('builds excel and pdf export urls for the selected filters', function () {
+    $page = new FinancialStatementPage();
+    $page->start_date = '2026-04-01';
+    $page->end_date = '2026-04-30';
+    $page->statement_type = 'pl';
+
+    expect($page->getExportUrl('excel'))->toContain('/reports/financial-statement/download-excel')
+    ->and($page->getExportUrl('excel'))->toContain('statement_type=pl')
+    ->and($page->getExportUrl('pdf'))->toContain('/reports/financial-statement/download-pdf')
+    ->and($page->getExportUrl('pdf'))->toContain('start_date=2026-04-01');
+});
+
+it('keeps cogm as a valid statement type when building urls', function () {
+    $page = new FinancialStatementPage();
+    $page->start_date = '2026-04-01';
+    $page->end_date = '2026-04-30';
+    $page->statement_type = 'cogm';
+
+    expect($page->getPreviewUrl())->toContain('statement_type=cogm')
+        ->and($page->getExportUrl('excel'))->toContain('statement_type=cogm')
+        ->and($page->getExportUrl('pdf'))->toContain('statement_type=cogm');
 });
 
 it('resetReport sets showPreview to false', function () {

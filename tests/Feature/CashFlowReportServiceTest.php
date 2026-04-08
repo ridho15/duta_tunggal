@@ -6,9 +6,13 @@ use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerReceipt;
 use App\Models\CustomerReceiptItem;
+use App\Models\Deposit;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\SaleOrder;
+use App\Models\Supplier;
+use App\Models\User;
+use App\Models\VendorPayment;
 use App\Services\Reports\CashFlowReportService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -173,6 +177,241 @@ test('service can generate direct method cash flow report', function () {
     expect($report['method'])->toBe('direct');
     expect($report['sections'])->toBeArray();
     expect($report['net_change'])->toBe(500000.0); // 1,000,000 - 500,000
+});
+
+test('service includes vendor payment journals in direct cash flow', function () {
+    app(\Database\Seeders\Finance\FinanceReportConfigSeeder::class)->run();
+
+    $service = app(CashFlowReportService::class);
+    $branch = Cabang::factory()->create(['nama' => 'Cabang Vendor Payment']);
+
+    $apCoa = ChartOfAccount::factory()->create([
+        'code' => '2110',
+        'name' => 'Hutang Dagang',
+        'type' => 'Liability',
+        'is_active' => true,
+    ]);
+
+    $cashCoa = ChartOfAccount::factory()->create([
+        'code' => '1111',
+        'name' => 'Kas',
+        'type' => 'Asset',
+        'is_active' => true,
+    ]);
+
+    JournalEntry::create([
+        'coa_id' => $apCoa->id,
+        'date' => now()->subDays(1)->toDateString(),
+        'reference' => 'PAY-001',
+        'description' => 'Vendor payment AP debit',
+        'debit' => 100000,
+        'credit' => 0,
+        'journal_type' => 'payment',
+        'cabang_id' => $branch->id,
+        'source_type' => VendorPayment::class,
+        'source_id' => 1,
+    ]);
+
+    JournalEntry::create([
+        'coa_id' => $cashCoa->id,
+        'date' => now()->subDays(1)->toDateString(),
+        'reference' => 'PAY-001',
+        'description' => 'Vendor payment cash credit',
+        'debit' => 0,
+        'credit' => 100000,
+        'journal_type' => 'payment',
+        'cabang_id' => $branch->id,
+        'source_type' => VendorPayment::class,
+        'source_id' => 1,
+    ]);
+
+    $report = $service->generate(null, null, [
+        'method' => 'direct',
+        'branches' => [$branch->id],
+    ]);
+
+    expect($report['net_change'])->toBe(-100000.0);
+    $financingSection = collect($report['sections'])->firstWhere('key', 'financing');
+    expect($financingSection)->not->toBeNull();
+    $liabilityItem = collect($financingSection['items'])->firstWhere('key', 'liability_operations');
+    expect($liabilityItem['amount'])->toBe(-100000.0);
+});
+
+test('service counts customer deposits once and excludes deposit-funded receipts from sales receipts', function () {
+    app(\Database\Seeders\Finance\FinanceReportConfigSeeder::class)->run();
+
+    $service = app(CashFlowReportService::class);
+    $branch = Cabang::factory()->create(['nama' => 'Cabang Customer Deposit']);
+    $customer = Customer::factory()->create();
+    $user = User::factory()->create();
+
+    $cashCoa = ChartOfAccount::factory()->create([
+        'code' => '1111',
+        'name' => 'Kas',
+        'type' => 'Asset',
+        'is_active' => true,
+    ]);
+
+    $depositLiabilityCoa = ChartOfAccount::factory()->create([
+        'code' => '2160',
+        'name' => 'Hutang Titipan Customer',
+        'type' => 'Liability',
+        'is_active' => true,
+    ]);
+
+    $deposit = Deposit::factory()->create([
+        'from_model_type' => Customer::class,
+        'from_model_id' => $customer->id,
+        'amount' => 750000,
+        'coa_id' => $depositLiabilityCoa->id,
+        'created_by' => $user->id,
+        'status' => 'active',
+    ]);
+
+    JournalEntry::create([
+        'coa_id' => $cashCoa->id,
+        'date' => now()->subDays(1)->toDateString(),
+        'reference' => 'DEP-' . $deposit->id,
+        'description' => 'Customer deposit cash debit',
+        'debit' => 750000,
+        'credit' => 0,
+        'journal_type' => 'deposit',
+        'cabang_id' => $branch->id,
+        'source_type' => Deposit::class,
+        'source_id' => $deposit->id,
+    ]);
+
+    JournalEntry::create([
+        'coa_id' => $depositLiabilityCoa->id,
+        'date' => now()->subDays(1)->toDateString(),
+        'reference' => 'DEP-' . $deposit->id,
+        'description' => 'Customer deposit liability credit',
+        'debit' => 0,
+        'credit' => 750000,
+        'journal_type' => 'deposit',
+        'cabang_id' => $branch->id,
+        'source_type' => Deposit::class,
+        'source_id' => $deposit->id,
+    ]);
+
+    $saleOrder = SaleOrder::factory()->state([
+        'customer_id' => $customer->id,
+        'status' => 'approved',
+    ])->create();
+
+    $invoice = createCashFlowInvoice([
+        'invoice_number' => 'INV-DEP-001',
+        'from_model_type' => SaleOrder::class,
+        'from_model_id' => $saleOrder->id,
+        'invoice_date' => now()->subDays(2)->toDateString(),
+        'due_date' => now()->subDay()->toDateString(),
+        'subtotal' => 750000,
+        'tax' => 0,
+        'other_fee' => 0,
+        'total' => 750000,
+        'status' => 'paid',
+    ]);
+
+    $receipt = createCashFlowReceipt([
+        'invoice_id' => $invoice->id,
+        'customer_id' => $customer->id,
+        'payment_date' => now()->subDay()->toDateString(),
+        'ntpn' => null,
+        'total_payment' => 750000,
+        'notes' => 'Paid from customer deposit',
+        'status' => 'Paid',
+        'payment_method' => 'Deposit',
+        'selected_invoices' => [$invoice->id],
+        'invoice_receipts' => [],
+        'diskon' => 0,
+        'payment_adjustment' => 0,
+    ]);
+
+    createCashFlowReceiptItem([
+        'customer_receipt_id' => $receipt->id,
+        'invoice_id' => $invoice->id,
+        'method' => 'Deposit',
+        'amount' => 750000,
+        'payment_date' => now()->subDay()->toDateString(),
+    ]);
+
+    $report = $service->generate(null, null, ['method' => 'direct']);
+    $operatingSection = collect($report['sections'])->firstWhere('key', 'operating');
+
+    expect($report['net_change'])->toBe(750000.0);
+    expect(collect($operatingSection['items'])->firstWhere('key', 'customer_deposits')['amount'])->toBe(750000.0);
+    expect(collect($operatingSection['items'])->firstWhere('key', 'cash_receipts_from_sales')['amount'])->toBe(0.0);
+});
+
+test('service includes supplier deposit journals in direct cash flow', function () {
+    app(\Database\Seeders\Finance\FinanceReportConfigSeeder::class)->run();
+
+    $service = app(CashFlowReportService::class);
+    $branch = Cabang::factory()->create(['nama' => 'Cabang Supplier Deposit']);
+    $supplier = Supplier::factory()->create();
+    $user = User::factory()->create();
+
+    $depositCoa = ChartOfAccount::factory()->create([
+        'code' => '1150.01',
+        'name' => 'Uang Muka Pembelian',
+        'type' => 'Asset',
+        'is_active' => true,
+    ]);
+
+    $cashCoa = ChartOfAccount::factory()->create([
+        'code' => '1111',
+        'name' => 'Kas',
+        'type' => 'Asset',
+        'is_active' => true,
+    ]);
+
+    $deposit = Deposit::create([
+        'from_model_type' => Supplier::class,
+        'from_model_id' => $supplier->id,
+        'amount' => 250000,
+        'remaining_amount' => 250000,
+        'used_amount' => 0,
+        'coa_id' => $depositCoa->id,
+        'status' => 'active',
+        'created_by' => $user->id,
+    ]);
+
+    JournalEntry::create([
+        'coa_id' => $depositCoa->id,
+        'date' => now()->subDay()->toDateString(),
+        'reference' => 'DEP-' . $deposit->id,
+        'description' => 'Deposit to supplier',
+        'debit' => 250000,
+        'credit' => 0,
+        'journal_type' => 'deposit',
+        'cabang_id' => $branch->id,
+        'source_type' => Deposit::class,
+        'source_id' => $deposit->id,
+    ]);
+
+    JournalEntry::create([
+        'coa_id' => $cashCoa->id,
+        'date' => now()->subDay()->toDateString(),
+        'reference' => 'DEP-' . $deposit->id,
+        'description' => 'Payment for deposit to supplier',
+        'debit' => 0,
+        'credit' => 250000,
+        'journal_type' => 'deposit',
+        'cabang_id' => $branch->id,
+        'source_type' => Deposit::class,
+        'source_id' => $deposit->id,
+    ]);
+
+    $report = $service->generate(null, null, [
+        'method' => 'direct',
+        'branches' => [$branch->id],
+    ]);
+
+    expect($report['net_change'])->toBe(-250000.0);
+    $operatingSection = collect($report['sections'])->firstWhere('key', 'operating');
+    expect($operatingSection)->not->toBeNull();
+    $supplierDepositItem = collect($operatingSection['items'])->firstWhere('key', 'supplier_deposits');
+    expect($supplierDepositItem['amount'])->toBe(-250000.0);
 });
 
 test('service can generate indirect method cash flow report', function () {

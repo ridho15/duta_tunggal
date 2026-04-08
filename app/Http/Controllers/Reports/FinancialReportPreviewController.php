@@ -2,11 +2,22 @@
 
 namespace App\Http\Controllers\Reports;
 
+use App\Exports\AlkGrafikExport;
+use App\Exports\GenericViewExport;
+use App\Exports\FinancialStatementExport;
+use App\Exports\ProfitLossMultiDivisionExport;
 use App\Http\Controllers\Controller;
 use App\Models\Cabang;
 use App\Services\IncomeStatementService;
+use App\Services\ProfitLossMultiDivisionService;
+use App\Services\Reports\AlkGrafikReportService;
 use App\Services\Reports\AgeingReportService;
+use App\Services\Reports\DrillDownFinancialReportService;
+use App\Services\Reports\FinancialStatementReportService;
+use App\Services\Reports\JournalConsolidationReportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 use App\Filament\Resources\Reports\BalanceSheetResource\Pages\ViewBalanceSheet;
 use App\Filament\Resources\Reports\ProfitAndLossResource\Pages\ViewProfitAndLoss;
@@ -45,6 +56,79 @@ class FinancialReportPreviewController extends Controller
             'classicView' => $page->classic_view,
             'asOfDate'    => $page->as_of_date,
         ]));
+    }
+    public function financialStatement(Request $request)
+    {
+        $report = $this->buildFinancialStatementReport($request);
+
+        return response(view('reports.preview.financial-statement', [
+            'report' => $report,
+        ]));
+    }
+
+    public function financialStatementPdf(Request $request)
+    {
+        $report = $this->buildFinancialStatementReport($request);
+        $filename = $this->financialStatementFilename($report) . '.pdf';
+
+        $pdf = Pdf::loadView('exports.financial-statement', [
+            'report' => $report,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+            ]);
+
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->output();
+        }, $filename);
+    }
+
+    public function financialStatementExcel(Request $request)
+    {
+        $report = $this->buildFinancialStatementReport($request);
+        $filename = $this->financialStatementFilename($report) . '.xlsx';
+
+        return Excel::download(new FinancialStatementExport($report), $filename);
+    }
+
+    public function alkGrafik(Request $request)
+    {
+        $report = $this->buildAlkGrafikReport($request);
+
+        return response(view('reports.preview.alk-grafik', [
+            'report' => $report,
+        ]));
+    }
+
+    public function alkGrafikPdf(Request $request)
+    {
+        $report = $this->buildAlkGrafikReport($request);
+        $filename = $this->alkGrafikFilename($report) . '.pdf';
+
+        $pdf = Pdf::loadView('exports.alk-grafik', [
+            'report' => $report,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+            ]);
+
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->output();
+        }, $filename);
+    }
+
+    public function alkGrafikExcel(Request $request)
+    {
+        $report = $this->buildAlkGrafikReport($request);
+        $filename = $this->alkGrafikFilename($report) . '.xlsx';
+
+        return Excel::download(new AlkGrafikExport($report), $filename);
     }
 
     // ── Profit & Loss ──────────────────────────────────────────────────────────
@@ -86,6 +170,23 @@ class FinancialReportPreviewController extends Controller
             'startDate' => $page->startDate,
             'endDate'   => $page->endDate,
         ]));
+    }
+
+    public function profitLossMultiDivision(Request $request)
+    {
+        $report = $this->buildProfitLossMultiDivisionReport($request);
+
+        return response(view('reports.preview.profit-loss-multi-division', [
+            'report' => $report,
+        ]));
+    }
+
+    public function profitLossMultiDivisionExcel(Request $request)
+    {
+        $report = $this->buildProfitLossMultiDivisionReport($request);
+        $filename = $this->profitLossMultiDivisionFilename() . '.xlsx';
+
+        return Excel::download(new ProfitLossMultiDivisionExport($report), $filename);
     }
 
     // ── Cash Flow ──────────────────────────────────────────────────────────────
@@ -149,5 +250,168 @@ class FinancialReportPreviewController extends Controller
         ]);
 
         return response(view('reports.preview.ageing-report', $report));
+    }
+
+    public function drillDownFinancialReport(Request $request)
+    {
+        $filters = [
+            'start_date' => $request->input('start_date', now()->startOfMonth()->toDateString()),
+            'end_date' => $request->input('end_date', now()->endOfMonth()->toDateString()),
+            'account_type' => $request->input('account_type'),
+            'coa_id' => $request->input('coa_id'),
+            'cabang_id' => $request->input('cabang_id'),
+        ];
+
+        try {
+            $report = app(DrillDownFinancialReportService::class)->generate($filters);
+        } catch (\Throwable $e) {
+            $report = [
+                'grouped' => [],
+                'total_debit' => 0.0,
+                'total_credit' => 0.0,
+                'count' => 0,
+                'filters' => $filters,
+                'period' => ($filters['start_date'] ?? now()->startOfMonth()->toDateString()) . ' s/d ' . ($filters['end_date'] ?? now()->endOfMonth()->toDateString()),
+            ];
+            \Illuminate\Support\Facades\Log::error('[FinancialPreview] drillDownFinancialReport: ' . $e->getMessage());
+        }
+
+        $selectedBranch = ! empty($report['filters']['cabang_id'])
+            ? Cabang::find($report['filters']['cabang_id'])
+            : null;
+
+        return response(view('reports.preview.drill-down-financial-report', [
+            'report' => $report,
+            'selectedBranch' => $selectedBranch,
+        ]));
+    }
+
+    public function drillDownFinancialReportPdf(Request $request)
+    {
+        $report = $this->buildDrillDownFinancialReport($request);
+        $filename = $this->drillDownFinancialReportFilename($report) . '.pdf';
+
+        $pdf = Pdf::loadView('exports.drill-down-financial-report', [
+            'report' => $report,
+        ])
+            ->setPaper('a4', 'landscape')
+            ->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+            ]);
+
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->output();
+        }, $filename);
+    }
+
+    public function drillDownFinancialReportExcel(Request $request)
+    {
+        $report = $this->buildDrillDownFinancialReport($request);
+        $filename = $this->drillDownFinancialReportFilename($report) . '.xlsx';
+
+        return Excel::download(new GenericViewExport(view('exports.drill-down-financial-report', [
+            'report' => $report,
+        ])), $filename);
+    }
+
+    // ── Journal Consolidation ───────────────────────────────────────────────
+    public function journalConsolidation(Request $request)
+    {
+        $filters = [
+            'start_date' => $request->input('start_date', now()->startOfMonth()->toDateString()),
+            'end_date' => $request->input('end_date', now()->endOfMonth()->toDateString()),
+            'branch_ids' => (array) $request->input('branch_ids', []),
+            'journal_type' => $request->input('journal_type'),
+            'group_by_branch' => filter_var($request->input('group_by_branch', true), FILTER_VALIDATE_BOOL),
+        ];
+
+        try {
+            $report = app(JournalConsolidationReportService::class)->generate($filters);
+        } catch (\Throwable $e) {
+            $report = [
+                'grouped' => [],
+                'coa_summary' => [],
+                'filters' => $filters,
+                'count' => 0,
+                'total_debit' => 0.0,
+                'total_credit' => 0.0,
+                'difference' => 0.0,
+                'balanced' => true,
+                'period' => $filters['start_date'] . ' s/d ' . $filters['end_date'],
+            ];
+            \Illuminate\Support\Facades\Log::error('[FinancialPreview] journalConsolidation: ' . $e->getMessage());
+        }
+
+        $selectedBranches = ! empty($report['filters']['branch_ids'])
+            ? Cabang::whereIn('id', $report['filters']['branch_ids'])->orderBy('nama')->get(['id', 'nama'])
+            : collect();
+
+        return response(view('reports.preview.journal-consolidation', [
+            'report' => $report,
+            'selectedBranches' => $selectedBranches,
+        ]));
+    }
+
+    protected function buildFinancialStatementReport(Request $request): array
+    {
+        return app(FinancialStatementReportService::class)->generate([
+            'start_date' => $request->input('start_date', now()->startOfMonth()->toDateString()),
+            'end_date' => $request->input('end_date', now()->endOfMonth()->toDateString()),
+            'cabang_id' => $request->input('cabang_id'),
+            'statement_type' => $request->input('statement_type', 'all'),
+        ]);
+    }
+
+    protected function buildAlkGrafikReport(Request $request): array
+    {
+        return app(AlkGrafikReportService::class)->generate([
+            'start_date' => $request->input('start_date', now()->startOfMonth()->toDateString()),
+            'end_date' => $request->input('end_date', now()->endOfMonth()->toDateString()),
+            'cabang_id' => $request->input('cabang_id'),
+        ]);
+    }
+
+    protected function buildProfitLossMultiDivisionReport(Request $request): array
+    {
+        return app(ProfitLossMultiDivisionService::class)->generate(
+            $request->input('startDate', now()->startOfYear()->toDateString()),
+            $request->input('endDate', now()->endOfYear()->toDateString()),
+            array_map('intval', array_filter((array) $request->input('cabangIds', [])))
+        );
+    }
+
+    protected function buildDrillDownFinancialReport(Request $request): array
+    {
+        return app(DrillDownFinancialReportService::class)->generate([
+            'start_date' => $request->input('start_date', now()->startOfMonth()->toDateString()),
+            'end_date' => $request->input('end_date', now()->endOfMonth()->toDateString()),
+            'account_type' => $request->input('account_type'),
+            'coa_id' => $request->input('coa_id'),
+            'cabang_id' => $request->input('cabang_id'),
+        ]);
+    }
+
+    protected function financialStatementFilename(array $report): string
+    {
+        $type = str_replace('_', '-', (string) ($report['statement_type'] ?? 'all'));
+
+        return 'financial-statement-' . $type . '-' . now()->format('Ymd_His');
+    }
+
+    protected function alkGrafikFilename(array $report): string
+    {
+        return 'alk-grafik-' . now()->format('Ymd_His');
+    }
+
+    protected function profitLossMultiDivisionFilename(): string
+    {
+        return 'profit-loss-multi-division-' . now()->format('Ymd_His');
+    }
+
+    protected function drillDownFinancialReportFilename(array $report): string
+    {
+        return 'drill-down-financial-report-' . str_replace(' ', '-', strtolower((string) ($report['filters']['account_type'] ?? 'all'))) . '-' . now()->format('Ymd_His');
     }
 }

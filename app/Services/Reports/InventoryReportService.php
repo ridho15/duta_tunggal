@@ -198,7 +198,9 @@ class InventoryReportService
             return null;
         }
 
-        return Carbon::parse($movement->date)->diffInDays($asOfDate);
+        return Carbon::parse($movement->date)
+            ->startOfDay()
+            ->diffInDays($asOfDate->copy()->startOfDay());
     }
 
     private function agingCategory(?int $days): string

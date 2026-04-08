@@ -357,6 +357,7 @@ describe('ProfitLossMultiDivisionPage', function () {
     it('sets showReport to true when generateReport is called', function () {
         Livewire::test(ProfitLossMultiDivisionPage::class)
             ->call('generateReport')
+            ->assertDispatched('open-report-preview')
             ->assertSet('showReport', true);
     });
 
@@ -397,6 +398,23 @@ describe('ProfitLossMultiDivisionPage', function () {
             ->set('endDate', '2025-12-31')
             ->call('generateReport')
             ->assertSet('showReport', true);
+    });
+
+    it('builds preview and export urls with selected filters', function () {
+        $divA = makeCabang('AA2', 'Alpha 2');
+        $divB = makeCabang('BB2', 'Beta 2');
+
+        $component = Livewire::test(ProfitLossMultiDivisionPage::class)
+            ->set('startDate', '2025-04-01')
+            ->set('endDate', '2025-04-30')
+            ->set('cabangIds', [$divA->id, $divB->id]);
+
+        $instance = $component->instance();
+
+        expect($instance->getPreviewUrl())->toContain('reports/profit-loss-multi-division/preview');
+        expect($instance->getPreviewUrl())->toContain('startDate=2025-04-01');
+        expect($instance->getPreviewUrl())->toContain('endDate=2025-04-30');
+        expect($instance->getExportUrl())->toContain('reports/profit-loss-multi-division/download-excel');
     });
 
     it('accepts specific cabangIds filter', function () {

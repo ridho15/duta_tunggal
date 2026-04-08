@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('quality_controls') || Schema::hasColumn('quality_controls', 'cabang_id')) {
+            return;
+        }
+
         Schema::table('quality_controls', function (Blueprint $table) {
             $table->foreignId('cabang_id')
                 ->nullable()
@@ -25,6 +29,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('quality_controls') || ! Schema::hasColumn('quality_controls', 'cabang_id')) {
+            return;
+        }
+
         Schema::table('quality_controls', function (Blueprint $table) {
             $table->dropConstrainedForeignId('cabang_id');
         });

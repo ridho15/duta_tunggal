@@ -162,36 +162,73 @@
 
         <div class="p-6 space-y-5">
             {{-- Row 1: 4 columns --}}
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
 
-                {{-- Tipe Akun --}}
+                {{-- Mode Laporan --}}
                 <div class="space-y-1.5">
                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        <x-heroicon-m-tag class="inline w-3.5 h-3.5 mr-1 align-text-bottom" />Tipe Akun
+                        <x-heroicon-m-rectangle-stack class="inline w-3.5 h-3.5 mr-1 align-text-bottom" />Mode Laporan
                     </label>
-                    <select id="select-account-type" wire:model.live="account_type" data-ddf-plain
+                    <select id="select-report-mode" wire:model.live="report_mode" data-ddf-plain
                         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
-                        <option value="">— Semua Tipe —</option>
-                        <option value="Asset">Asset</option>
-                        <option value="Liability">Liability</option>
-                        <option value="Equity">Equity</option>
-                        <option value="Revenue">Revenue</option>
-                        <option value="Expense">Expense</option>
+                        <option value="journal">Drill Down Jurnal</option>
+                        <option value="financial_statement">Financial Statement</option>
                     </select>
                 </div>
 
-                {{-- Akun COA (Select2) --}}
-                <div class="space-y-1.5">
-                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        <x-heroicon-m-book-open class="inline w-3.5 h-3.5 mr-1 align-text-bottom" />Akun COA
-                    </label>
-                    <select id="select-coa" wire:model="coa_id" data-ddf-select2 data-placeholder="Cari / pilih akun…">
-                        <option value="">— Semua Akun —</option>
-                        @foreach($this->coaOptions as $id => $label)
-                            <option value="{{ $id }}" {{ $this->coa_id == $id ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @if($this->isFinancialStatementMode())
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <x-heroicon-m-presentation-chart-line class="inline w-3.5 h-3.5 mr-1 align-text-bottom" />Jenis Statement
+                        </label>
+                        <select id="select-statement-type" wire:model.live="statement_type" data-ddf-plain
+                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+                            @foreach($this->statementTypeOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    {{-- Tipe Akun --}}
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <x-heroicon-m-tag class="inline w-3.5 h-3.5 mr-1 align-text-bottom" />Tipe Akun
+                        </label>
+                        <select id="select-account-type" wire:model.live="account_type" data-ddf-plain
+                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+                            <option value="">— Semua Tipe —</option>
+                            <option value="Asset">Asset</option>
+                            <option value="Liability">Liability</option>
+                            <option value="Equity">Equity</option>
+                            <option value="Revenue">Revenue</option>
+                            <option value="Expense">Expense</option>
+                        </select>
+                    </div>
+                @endif
+
+                @if(!$this->isFinancialStatementMode())
+                    {{-- Akun COA (Select2) --}}
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <x-heroicon-m-book-open class="inline w-3.5 h-3.5 mr-1 align-text-bottom" />Akun COA
+                        </label>
+                        <select id="select-coa" wire:model="coa_id" data-ddf-select2 data-placeholder="Cari / pilih akun…">
+                            <option value="">— Semua Akun —</option>
+                            @foreach($this->coaOptions as $id => $label)
+                                <option value="{{ $id }}" {{ $this->coa_id == $id ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <x-heroicon-m-book-open class="inline w-3.5 h-3.5 mr-1 align-text-bottom" />Ruang Lingkup
+                        </label>
+                        <div class="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                            Ringkasan laporan keuangan per periode dan cabang.
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Tanggal Mulai --}}
                 <div class="space-y-1.5">
@@ -212,7 +249,7 @@
                 </div>
             </div>
 
-            {{-- Row 2: Cabang + active type badge --}}
+            {{-- Row 2: Cabang + active badge --}}
             <div class="flex flex-wrap items-end gap-4">
                 <div class="space-y-1.5 w-64">
                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -226,7 +263,14 @@
                     </select>
                 </div>
 
-                @if($this->account_type)
+                @if($this->isFinancialStatementMode())
+                    <div class="mb-0.5">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700">
+                            <x-heroicon-m-funnel class="w-3 h-3" />
+                            Mode aktif: {{ $this->statementTypeLabel }}
+                        </span>
+                    </div>
+                @elseif($this->account_type)
                     <div class="mb-0.5">
                         <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border
                             @php
@@ -249,29 +293,169 @@
     </div>
 
     @if($this->showPreview)
-        @php $data = $this->getDrillDownData(); @endphp
+        @if($this->isFinancialStatementMode())
+            @php
+                $data = $this->getFinancialStatementData();
+                $pl = $data['pl'] ?? null;
+                $bs = $data['bs'] ?? null;
+                $cogm = $data['cogm'] ?? null;
+            @endphp
 
-        {{-- Print Header --}}
-        <div class="ddf-print-header">
-            <h1 class="text-2xl font-bold">Drill Down Financial Report</h1>
-            <p>Periode: {{ $this->start_date }} s/d {{ $this->end_date }}</p>
-        </div>
-
-        {{-- ===== REPORT HEADER ===== --}}
-        <div class="ddf-report-header no-print">
-            <div class="company">{{ config('app.name', 'Duta Tunggal ERP') }}</div>
-            <div class="subtitle">DRILL DOWN FINANCIAL REPORT</div>
-            <div class="period">
-                Periode:
-                {{ \Carbon\Carbon::parse($this->start_date)->isoFormat('D MMMM GGGG') }}
-                —
-                {{ \Carbon\Carbon::parse($this->end_date)->isoFormat('D MMMM GGGG') }}
-                @if($this->account_type) &bull; Tipe: {{ $this->account_type }} @endif
+            <div class="ddf-print-header">
+                <h1 class="text-2xl font-bold">Financial Statement</h1>
+                <p>Periode: {{ $this->start_date }} s/d {{ $this->end_date }}</p>
             </div>
-        </div>
 
-        {{-- ===== SUMMARY STAT CARDS ===== --}}
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
+            <div class="ddf-report-header no-print">
+                <div class="company">{{ config('app.name', 'Duta Tunggal ERP') }}</div>
+                <div class="subtitle">FINANCIAL STATEMENT</div>
+                <div class="period">
+                    {{ $this->statementTypeLabel }}
+                    &bull;
+                    {{ \Carbon\Carbon::parse($this->start_date)->isoFormat('D MMMM GGGG') }}
+                    —
+                    {{ \Carbon\Carbon::parse($this->end_date)->isoFormat('D MMMM GGGG') }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 no-print">
+                <div class="ddf-stat-card bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                    <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Pendapatan</p>
+                    <p class="mt-2 text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">Rp {{ number_format($pl['revenue'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="ddf-stat-card bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                    <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Laba Bersih</p>
+                    <p class="mt-2 text-2xl font-extrabold {{ (($pl['net_profit'] ?? 0) >= 0) ? 'text-indigo-700 dark:text-indigo-300' : 'text-rose-700 dark:text-rose-300' }}">Rp {{ number_format($pl['net_profit'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="ddf-stat-card bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                    <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total Aset</p>
+                    <p class="mt-2 text-2xl font-extrabold text-sky-700 dark:text-sky-300">Rp {{ number_format($bs['total_assets'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="ddf-stat-card bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                    <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">COGM</p>
+                    <p class="mt-2 text-2xl font-extrabold text-amber-700 dark:text-amber-300">Rp {{ number_format($cogm['cogm'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+            </div>
+
+            @if($pl)
+                <div class="bg-white dark:bg-gray-900 shadow-sm border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+                    <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">Laporan Laba Rugi</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $pl['period'] ?? '' }}</p>
+                        </div>
+                    </div>
+                    <div class="ddf-table-wrap">
+                        <table class="min-w-full text-sm">
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <tr class="bg-gray-50 dark:bg-gray-800"><td class="px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Pendapatan</td><td class="px-6 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400">Rp {{ number_format($pl['revenue'] ?? 0, 0, ',', '.') }}</td></tr>
+                                <tr><td class="px-6 py-3 text-gray-600 dark:text-gray-400 pl-10">Harga Pokok Penjualan</td><td class="px-6 py-3 text-right text-rose-700 dark:text-rose-400">(Rp {{ number_format($pl['cogs'] ?? 0, 0, ',', '.') }})</td></tr>
+                                <tr class="bg-gray-50 dark:bg-gray-800 font-semibold"><td class="px-6 py-3 text-gray-700 dark:text-gray-300">Laba Kotor</td><td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($pl['gross_profit'] ?? 0, 0, ',', '.') }}</td></tr>
+                                <tr><td class="px-6 py-3 text-gray-600 dark:text-gray-400 pl-10">Beban Operasional</td><td class="px-6 py-3 text-right text-rose-700 dark:text-rose-400">(Rp {{ number_format($pl['opex'] ?? 0, 0, ',', '.') }})</td></tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-indigo-50 dark:bg-indigo-900/20 border-t-2 border-indigo-200 dark:border-indigo-700">
+                                    <td class="px-6 py-4 text-sm font-bold text-indigo-800 dark:text-indigo-200">Laba Bersih</td>
+                                    <td class="px-6 py-4 text-right text-sm font-bold text-indigo-700 dark:text-indigo-300">Rp {{ number_format($pl['net_profit'] ?? 0, 0, ',', '.') }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
+            @if($bs)
+                <div class="bg-white dark:bg-gray-900 shadow-sm border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+                    <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">Neraca (Balance Sheet)</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Per {{ \Carbon\Carbon::parse($this->end_date)->format('d M Y') }}</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ ($bs['is_balanced'] ?? false) ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300' }}">
+                            {{ ($bs['is_balanced'] ?? false) ? 'Balanced' : 'Unbalanced' }}
+                        </span>
+                    </div>
+                    <div class="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-gray-800">
+                        <table class="min-w-full text-sm">
+                            <thead><tr class="bg-gray-50 dark:bg-gray-800"><th colspan="2" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Aset</th></tr></thead>
+                            <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
+                                @foreach(($bs['current_assets']['accounts'] ?? []) as $acc)
+                                    <tr><td class="px-6 py-2.5 text-gray-600 dark:text-gray-400"><span class="font-mono text-xs text-gray-400 mr-1">{{ $acc->code }}</span>{{ $acc->name }}</td><td class="px-6 py-2.5 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($acc->balance, 0, ',', '.') }}</td></tr>
+                                @endforeach
+                                @foreach(($bs['fixed_assets']['accounts'] ?? []) as $acc)
+                                    <tr><td class="px-6 py-2.5 text-gray-600 dark:text-gray-400"><span class="font-mono text-xs text-gray-400 mr-1">{{ $acc->code }}</span>{{ $acc->name }}</td><td class="px-6 py-2.5 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($acc->balance, 0, ',', '.') }}</td></tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot><tr class="bg-sky-50 dark:bg-sky-900/20"><td class="px-6 py-3 font-bold text-sky-800 dark:text-sky-200">Total Aset</td><td class="px-6 py-3 text-right font-bold text-sky-700 dark:text-sky-300">Rp {{ number_format($bs['total_assets'] ?? 0, 0, ',', '.') }}</td></tr></tfoot>
+                        </table>
+                        <table class="min-w-full text-sm">
+                            <thead><tr class="bg-gray-50 dark:bg-gray-800"><th colspan="2" class="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Liabilitas &amp; Ekuitas</th></tr></thead>
+                            <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
+                                @foreach(($bs['current_liabilities']['accounts'] ?? []) as $acc)
+                                    <tr><td class="px-6 py-2.5 text-gray-600 dark:text-gray-400"><span class="font-mono text-xs text-gray-400 mr-1">{{ $acc->code }}</span>{{ $acc->name }}</td><td class="px-6 py-2.5 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($acc->balance, 0, ',', '.') }}</td></tr>
+                                @endforeach
+                                @foreach(($bs['long_term_liabilities']['accounts'] ?? []) as $acc)
+                                    <tr><td class="px-6 py-2.5 text-gray-600 dark:text-gray-400"><span class="font-mono text-xs text-gray-400 mr-1">{{ $acc->code }}</span>{{ $acc->name }}</td><td class="px-6 py-2.5 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($acc->balance, 0, ',', '.') }}</td></tr>
+                                @endforeach
+                                @foreach(($bs['equity']['accounts'] ?? []) as $acc)
+                                    <tr><td class="px-6 py-2.5 text-gray-600 dark:text-gray-400"><span class="font-mono text-xs text-gray-400 mr-1">{{ $acc->code }}</span>{{ $acc->name }}</td><td class="px-6 py-2.5 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($acc->balance, 0, ',', '.') }}</td></tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot><tr class="bg-emerald-50 dark:bg-emerald-900/20"><td class="px-6 py-3 font-bold text-emerald-800 dark:text-emerald-200">Total Liabilitas + Ekuitas</td><td class="px-6 py-3 text-right font-bold text-emerald-700 dark:text-emerald-300">Rp {{ number_format($bs['total_liabilities_and_equity'] ?? 0, 0, ',', '.') }}</td></tr></tfoot>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
+            @if($cogm)
+                <div class="bg-white dark:bg-gray-900 shadow-sm border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+                    <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">Harga Pokok Produksi (COGM)</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $cogm['period']['start'] ?? $this->start_date }} — {{ $cogm['period']['end'] ?? $this->end_date }}</p>
+                        </div>
+                    </div>
+                    <div class="ddf-table-wrap">
+                        <table class="min-w-full text-sm">
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <tr class="bg-gray-50 dark:bg-gray-800"><td class="px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Bahan Baku Digunakan</td><td class="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Rp {{ number_format($cogm['raw_materials']['used'] ?? 0, 0, ',', '.') }}</td></tr>
+                                <tr><td class="px-6 py-3 text-gray-600 dark:text-gray-400 pl-10">Tenaga Kerja Langsung</td><td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($cogm['direct_labor'] ?? 0, 0, ',', '.') }}</td></tr>
+                                <tr><td class="px-6 py-3 text-gray-600 dark:text-gray-400 pl-10">Biaya Overhead Pabrik</td><td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">Rp {{ number_format($cogm['overhead']['total'] ?? 0, 0, ',', '.') }}</td></tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-amber-50 dark:bg-amber-900/20 border-t-2 border-amber-200 dark:border-amber-700">
+                                    <td class="px-6 py-4 text-sm font-bold text-amber-800 dark:text-amber-200">Harga Pokok Produksi</td>
+                                    <td class="px-6 py-4 text-right text-sm font-bold text-amber-700 dark:text-amber-300">Rp {{ number_format($cogm['cogm'] ?? 0, 0, ',', '.') }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            @endif
+        @else
+            @php $data = $this->getDrillDownData(); @endphp
+
+            {{-- Print Header --}}
+            <div class="ddf-print-header">
+                <h1 class="text-2xl font-bold">Drill Down Financial Report</h1>
+                <p>Periode: {{ $this->start_date }} s/d {{ $this->end_date }}</p>
+            </div>
+
+            {{-- ===== REPORT HEADER ===== --}}
+            <div class="ddf-report-header no-print">
+                <div class="company">{{ config('app.name', 'Duta Tunggal ERP') }}</div>
+                <div class="subtitle">DRILL DOWN FINANCIAL REPORT</div>
+                <div class="period">
+                    Periode:
+                    {{ \Carbon\Carbon::parse($this->start_date)->isoFormat('D MMMM GGGG') }}
+                    —
+                    {{ \Carbon\Carbon::parse($this->end_date)->isoFormat('D MMMM GGGG') }}
+                    @if($this->account_type) &bull; Tipe: {{ $this->account_type }} @endif
+                </div>
+            </div>
+
+            {{-- ===== SUMMARY STAT CARDS ===== --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
 
             {{-- Total Transaksi --}}
             <div class="ddf-stat-card bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm flex items-center gap-4">
@@ -308,10 +492,10 @@
                     <p class="text-xs text-gray-400 dark:text-gray-500">sisi kredit</p>
                 </div>
             </div>
-        </div>
+            </div>
 
-        {{-- ===== DETAIL TABLE ===== --}}
-        <div class="bg-white dark:bg-gray-900 shadow-sm border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+            {{-- ===== DETAIL TABLE ===== --}}
+            <div class="bg-white dark:bg-gray-900 shadow-sm border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
 
             {{-- Table Header Bar --}}
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
@@ -485,7 +669,8 @@
                 </div>
             </div>
             @endif
-        </div>
+            </div>
+        @endif
 
     @else
         {{-- Empty State --}}
@@ -497,7 +682,7 @@
             <p class="text-sm text-gray-400 dark:text-gray-500 max-w-sm">
                 Atur filter di atas sesuai kebutuhan, kemudian klik
                 <span class="font-semibold text-indigo-600 dark:text-indigo-400">Tampilkan Laporan</span>
-                untuk memuat data drill down.
+                untuk memuat laporan sesuai mode yang dipilih.
             </p>
         </div>
     @endif

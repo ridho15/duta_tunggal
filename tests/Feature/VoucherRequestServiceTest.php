@@ -3,6 +3,8 @@
 use App\Models\User;
 use App\Models\VoucherRequest;
 use App\Services\VoucherRequestService;
+use App\Models\ChartOfAccount;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 
@@ -56,6 +58,16 @@ test('it approves voucher successfully', function () {
         ->and($voucher->fresh()->approved_at)->not->toBeNull()
         ->and($voucher->fresh()->approval_notes)->toBe('Approved by test');
 });
+
+test('it rejects approval with invalid coa references when creating transaction', function () {
+    $voucher = VoucherRequest::factory()->pending()->create();
+
+    $this->service->approve($voucher, [
+        'auto_create_transaction' => true,
+        'account_coa_id' => 999999,
+        'offset_coa_id' => 888888,
+    ]);
+})->throws(ModelNotFoundException::class);
 
 test('it throws exception when approving non-pending voucher', function () {
     $voucher = VoucherRequest::factory()->create(['status' => 'draft']);

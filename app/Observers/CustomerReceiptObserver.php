@@ -77,7 +77,12 @@ class CustomerReceiptObserver
         foreach ($receipt->customerReceiptItem as $item) {
             // If selected_invoices exists, update AR for each invoice
             if (!empty($item->selected_invoices)) {
-                foreach ($item->selected_invoices as $invoiceId) {
+                $selectedInvoiceIds = array_values(array_unique(array_filter(array_map(
+                    'intval',
+                    is_array($item->selected_invoices) ? $item->selected_invoices : (json_decode($item->selected_invoices, true) ?? [])
+                ))));
+
+                foreach ($selectedInvoiceIds as $invoiceId) {
                     $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
                     if ($accountReceivable) {
                         $accountReceivable->paid      = $accountReceivable->paid + $item->amount;

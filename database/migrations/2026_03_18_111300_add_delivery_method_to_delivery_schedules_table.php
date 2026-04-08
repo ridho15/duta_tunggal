@@ -11,6 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('delivery_schedules')) {
+            return;
+        }
+
+        if (Schema::hasColumn('delivery_schedules', 'delivery_method')) {
+            return;
+        }
+
         Schema::table('delivery_schedules', function (Blueprint $table) {
             $table->string('delivery_method')->nullable()->after('vehicle_id')
                 ->comment('internal, kurir_internal, ekspedisi');
@@ -26,8 +34,16 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('delivery_schedules')) {
+            return;
+        }
+
         Schema::table('delivery_schedules', function (Blueprint $table) {
-            $table->dropColumn(['delivery_method', 'driver_name', 'vehicle_info']);
+            $columns = array_filter(['delivery_method', 'driver_name', 'vehicle_info'], fn (string $column) => Schema::hasColumn('delivery_schedules', $column));
+
+            if (! empty($columns)) {
+                $table->dropColumn($columns);
+            }
         });
     }
 };

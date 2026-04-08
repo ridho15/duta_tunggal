@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('journal_entries') || Schema::hasColumn('journal_entries', 'created_by')) {
+            return;
+        }
+
         Schema::table('journal_entries', function (Blueprint $table) {
             $table->unsignedBigInteger('created_by')->nullable()->after('cabang_id');
             $table->unsignedBigInteger('updated_by')->nullable()->after('created_by');
@@ -22,6 +26,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('journal_entries') || ! Schema::hasColumn('journal_entries', 'created_by')) {
+            return;
+        }
+
         Schema::table('journal_entries', function (Blueprint $table) {
             $table->dropColumn(['created_by', 'updated_by']);
         });

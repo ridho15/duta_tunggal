@@ -33,6 +33,10 @@ async function showReport(page) {
     await page.waitForTimeout(2_000);
 }
 
+function reportFrame(page) {
+    return page.frameLocator('iframe[title="Profit Loss Multi Division Preview"]');
+}
+
 /** Navigate to the report page and wait for it to settle. */
 async function gotoPage(page) {
     await page.goto(URL);
@@ -87,8 +91,7 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        // Main table should be present
-        const table = page.locator('#plmd-table');
+        const table = reportFrame(page).locator('#plmd-table');
         await expect(table).toBeVisible({ timeout: 12_000 });
     });
 
@@ -98,7 +101,7 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        const body = await page.locator('body').innerText();
+        const body = await reportFrame(page).locator('body').innerText();
         expect(body.toUpperCase()).toContain('DUTA TUNGGAL');
         expect(body.toUpperCase()).toContain('PROFIT LOSS MULTIPLE BY DIVISION');
     });
@@ -109,7 +112,7 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        const tableText = await page.locator('#plmd-table').innerText();
+        const tableText = await reportFrame(page).locator('#plmd-table').innerText();
         expect(tableText.toUpperCase()).toContain('ACCOUNTNO');
         expect(tableText.toUpperCase()).toContain('ACCOUNTNAME');
     });
@@ -120,7 +123,7 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        const headCells = page.locator('#plmd-table th');
+        const headCells = reportFrame(page).locator('#plmd-table th');
         const texts  = await headCells.allInnerTexts();
         const joined = texts.join(' ').toUpperCase();
 
@@ -134,7 +137,7 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        const gpRow = page.locator('#plmd-gross-profit');
+        const gpRow = reportFrame(page).locator('#plmd-gross-profit');
         await expect(gpRow).toBeVisible({ timeout: 12_000 });
 
         const text = await gpRow.innerText();
@@ -147,7 +150,7 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        const npRow = page.locator('#plmd-net-profit');
+        const npRow = reportFrame(page).locator('#plmd-net-profit');
         await expect(npRow).toBeVisible({ timeout: 12_000 });
 
         const text = await npRow.innerText();
@@ -160,17 +163,14 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        // Verify report is visible
-        await expect(page.locator('#plmd-table')).toBeVisible({ timeout: 12_000 });
+        await expect(reportFrame(page).locator('#plmd-table')).toBeVisible({ timeout: 12_000 });
 
-        // Click Reset
         const resetBtn = page.getByRole('button', { name: /reset/i }).first();
         await expect(resetBtn).toBeVisible({ timeout: 5_000 });
         await resetBtn.click();
         await page.waitForTimeout(1_500);
 
-        // Report table should be gone
-        await expect(page.locator('#plmd-table')).not.toBeVisible();
+        await expect(page.locator('iframe[title="Profit Loss Multi Division Preview"]')).toHaveCount(0);
     });
 
     // ── TC-PLMD-011: Date range filter works ─────────────────────────────────
@@ -187,8 +187,7 @@ test.describe('Profit & Loss Multiple By Division', () => {
 
         await showReport(page);
 
-        const body = await page.locator('body').innerText();
-        // Report header should contain the year 2025 in some form
+        const body = await reportFrame(page).locator('body').innerText();
         expect(body).toContain('2025');
     });
 
@@ -198,20 +197,32 @@ test.describe('Profit & Loss Multiple By Division', () => {
         await gotoPage(page);
         await showReport(page);
 
-        const body = await page.locator('body').innerText();
+        const body = await reportFrame(page).locator('body').innerText();
         expect(body.toLowerCase()).toContain('as of');
     });
 
-    // ── TC-PLMD-013: Navigation link exists ──────────────────────────────────
+    // ── TC-PLMD-013: Numeric values render correctly ────────────────────────
 
-    test('TC-PLMD-013: navigation menu contains the P&L multi-division link', async ({ page }) => {
-        await page.goto('/admin');
+    test('TC-PLMD-013: gross profit and net profit rows show formatted numeric values', async ({ page }) => {
+        await gotoPage(page);
+        await showReport(page);
+
+        const grossProfitText = await reportFrame(page).locator('#plmd-gross-profit').innerText();
+        const netProfitText = await reportFrame(page).locator('#plmd-net-profit').innerText();
+
+        expect(grossProfitText).toMatch(/\d{1,3}(?:,\d{3})*\.\d{2}/);
+        expect(netProfitText).toMatch(/\d{1,3}(?:,\d{3})*\.\d{2}/);
+    });
+
+    // ── TC-PLMD-014: Finance report hub entry exists ─────────────────────────
+
+    test('TC-PLMD-014: finance report hub contains the Profit per Divisi entry', async ({ page }) => {
+        await page.goto('/admin/finance-reports');
         await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForTimeout(1_500);
 
-        // Filament v3 sidebar uses various data attributes; fall back to full body text
-        const bodyText = await page.locator('body').innerText().catch(() => '');
-        // The nav label is "Laba Rugi Per Divisi"
-        expect(bodyText.toLowerCase()).toContain('laba rugi per divisi');
+        const hub = page.locator('#finance-report-hub');
+        await expect(hub).toBeVisible({ timeout: 8_000 });
+        await expect(hub.getByRole('link', { name: /profit per divisi/i })).toBeVisible({ timeout: 8_000 });
     });
 });

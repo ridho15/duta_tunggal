@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\VoucherRequestResource\Pages;
 use App\Filament\Resources\VoucherRequestResource\RelationManagers;
+use App\Models\CashBankTransaction;
 use App\Models\VoucherRequest;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -226,8 +227,8 @@ class VoucherRequestResource extends Resource
                 Tables\Columns\TextColumn::make('total_amount_used')
                     ->label('Sudah Digunakan')
                     ->rupiah()
-                    ->getStateUsing(fn ($record) => $record->getTotalAmountUsed())
-                    ->sortable()
+                    ->getStateUsing(fn ($record) => (float) ($record->total_amount_used ?? 0))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('total_amount_used', $direction))
                     ->toggleable()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
@@ -238,10 +239,10 @@ class VoucherRequestResource extends Resource
                 Tables\Columns\TextColumn::make('remaining_amount')
                     ->label('Sisa')
                     ->rupiah()
-                    ->getStateUsing(fn ($record) => $record->getRemainingAmount())
-                    ->sortable()
+                    ->getStateUsing(fn ($record) => (float) ($record->remaining_amount ?? (($record->amount ?? 0) - (float) ($record->total_amount_used ?? 0))))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('remaining_amount', $direction))
                     ->toggleable()
-                    ->color(fn ($record) => $record->getRemainingAmount() > 0 ? 'success' : 'gray')
+                    ->color(fn ($record) => (float) ($record->remaining_amount ?? (($record->amount ?? 0) - (float) ($record->total_amount_used ?? 0))) > 0 ? 'success' : 'gray')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
                             ->rupiah()
@@ -601,6 +602,18 @@ class VoucherRequestResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $usedAmountSubquery = CashBankTransaction::query()
+            ->selectRaw('COALESCE(SUM(voucher_amount_used), 0)')
+            ->whereColumn('voucher_request_id', 'voucher_requests.id');
+
+        $query
+            ->select('voucher_requests.*')
+            ->selectSub($usedAmountSubquery, 'total_amount_used')
+            ->selectRaw(
+                '(voucher_requests.amount - COALESCE((' . $usedAmountSubquery->toSql() . '), 0)) as remaining_amount',
+                $usedAmountSubquery->getBindings(),
+            );
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {

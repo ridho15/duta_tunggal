@@ -37,6 +37,7 @@ class FinanceSeeder extends Seeder
             (new FinanceFixedAssetSeeder($context))->run();
             (new FinanceHppSeeder($context))->run();
             (new FinanceMiscSeeder($context))->run();
+            (new AutoBalanceSeeder())->run();
         });
     }
 }

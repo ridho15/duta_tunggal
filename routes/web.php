@@ -73,11 +73,23 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         ->name('reports.cogm.preview');
 
     // Financial report standalone previews (no Filament layout)
+    Route::get('/reports/financial-statement/preview', [FinancialReportPreviewController::class, 'financialStatement'])->name('reports.financial-statement.preview');
+    Route::get('/reports/financial-statement/download-pdf', [FinancialReportPreviewController::class, 'financialStatementPdf'])->name('reports.financial-statement.pdf');
+    Route::get('/reports/financial-statement/download-excel', [FinancialReportPreviewController::class, 'financialStatementExcel'])->name('reports.financial-statement.excel');
+    Route::get('/reports/drill-down-financial-report/preview', [FinancialReportPreviewController::class, 'drillDownFinancialReport'])->name('reports.drill-down-financial-report.preview');
+    Route::get('/reports/drill-down-financial-report/download-pdf', [FinancialReportPreviewController::class, 'drillDownFinancialReportPdf'])->name('reports.drill-down-financial-report.pdf');
+    Route::get('/reports/drill-down-financial-report/download-excel', [FinancialReportPreviewController::class, 'drillDownFinancialReportExcel'])->name('reports.drill-down-financial-report.excel');
+    Route::get('/reports/alk-grafik/preview', [FinancialReportPreviewController::class, 'alkGrafik'])->name('reports.alk-grafik.preview');
+    Route::get('/reports/alk-grafik/download-pdf', [FinancialReportPreviewController::class, 'alkGrafikPdf'])->name('reports.alk-grafik.pdf');
+    Route::get('/reports/alk-grafik/download-excel', [FinancialReportPreviewController::class, 'alkGrafikExcel'])->name('reports.alk-grafik.excel');
     Route::get('/reports/balance-sheet/preview',   [FinancialReportPreviewController::class, 'balanceSheet'])->name('reports.balance-sheet.preview');
     Route::get('/reports/profit-and-loss/preview', [FinancialReportPreviewController::class, 'profitAndLoss'])->name('reports.profit-and-loss.preview');
+    Route::get('/reports/profit-loss-multi-division/preview', [FinancialReportPreviewController::class, 'profitLossMultiDivision'])->name('reports.profit-loss-multi-division.preview');
+    Route::get('/reports/profit-loss-multi-division/download-excel', [FinancialReportPreviewController::class, 'profitLossMultiDivisionExcel'])->name('reports.profit-loss-multi-division.excel');
     Route::get('/reports/cash-flow/preview',       [FinancialReportPreviewController::class, 'cashFlow'])->name('reports.cash-flow.preview');
     Route::get('/reports/hpp/preview',             [FinancialReportPreviewController::class, 'hpp'])->name('reports.hpp.preview');
     Route::get('/reports/ageing-report/preview',   [FinancialReportPreviewController::class, 'ageingReport'])->name('reports.ageing-report.preview');
+    Route::get('/reports/journal-consolidation/preview', [FinancialReportPreviewController::class, 'journalConsolidation'])->name('reports.journal-consolidation.preview');
 
     // Kartu Persediaan — print / PDF / Excel
     Route::get('/reports/inventory-card/print',          [InventoryCardController::class, 'printView'])->name('inventory-card.print');

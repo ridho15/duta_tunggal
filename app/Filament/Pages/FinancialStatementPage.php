@@ -2,11 +2,9 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\ChartOfAccount;
-use App\Models\JournalEntry;
 use App\Services\BalanceSheetService;
+use App\Services\Reports\FinancialStatementReportService;
 use Filament\Pages\Page;
-use Illuminate\Support\Carbon;
 
 class FinancialStatementPage extends Page
 {
@@ -34,7 +32,7 @@ class FinancialStatementPage extends Page
     public ?string $start_date = null;
     public ?string $end_date = null;
     public ?int $cabang_id = null;
-    public string $statement_type = 'all'; // 'all', 'pl', 'bs'
+    public string $statement_type = 'all';
 
     protected BalanceSheetService $balanceSheetService;
 
@@ -51,6 +49,19 @@ class FinancialStatementPage extends Page
                 ->icon('heroicon-o-eye')
                 ->color('primary')
                 ->action(fn () => $this->generateReport()),
+
+            \Filament\Actions\Action::make('export_excel')
+                ->label('Export Excel')
+                ->icon('heroicon-m-arrow-down-tray')
+                ->color('success')
+                ->url(fn () => $this->getExportUrl('excel')),
+
+            \Filament\Actions\Action::make('export_pdf')
+                ->label('Export PDF')
+                ->icon('heroicon-m-document-text')
+                ->color('danger')
+                ->url(fn () => $this->getExportUrl('pdf'))
+                ->openUrlInNewTab(),
 
             \Filament\Actions\Action::make('reset')
                 ->label('Reset')
@@ -78,13 +89,26 @@ class FinancialStatementPage extends Page
         $this->start_date = request('start_date', now()->startOfMonth()->format('Y-m-d'));
         $this->end_date = request('end_date', now()->endOfMonth()->format('Y-m-d'));
         $this->cabang_id = request('cabang_id');
-        $this->statement_type = request('statement_type', 'all');
+        $this->statement_type = $this->normalizeStatementType(request('statement_type', 'all'));
     }
 
     public function getPreviewUrl(): string
     {
-        return static::getUrl() . '?' . http_build_query(array_filter([
-            'preview' => 1,
+        return route('reports.financial-statement.preview', array_filter([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+            'statement_type' => $this->statement_type,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
+    }
+
+    public function getExportUrl(string $format): string
+    {
+        $route = $format === 'pdf'
+            ? 'reports.financial-statement.pdf'
+            : 'reports.financial-statement.excel';
+
+        return route($route, array_filter([
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,
             'cabang_id' => $this->cabang_id,
@@ -98,54 +122,16 @@ class FinancialStatementPage extends Page
             return [];
         }
 
-        $start = Carbon::parse($this->start_date)->startOfDay();
-        $end = Carbon::parse($this->end_date)->endOfDay();
-
-        $result = [];
-
-        // Profit & Loss
-        if (in_array($this->statement_type, ['all', 'pl'])) {
-            $revenueAccounts = ChartOfAccount::where('type', 'Revenue')->get();
-            $expenseAccounts = ChartOfAccount::where('type', 'Expense')->get();
-
-            $revenue = $this->sumAccounts($revenueAccounts->pluck('id'), $start, $end, 'credit');
-            $cogs     = $this->sumAccounts(
-                ChartOfAccount::where('type', 'Expense')
-                    ->where(fn ($q) => $q->where('name', 'like', '%HPP%')->orWhere('name', 'like', '%Pokok%'))
-                    ->pluck('id'),
-                $start, $end, 'debit'
-            );
-            $grossProfit = $revenue - $cogs;
-            $opex = $this->sumAccounts($expenseAccounts->pluck('id'), $start, $end, 'debit') - $cogs;
-            $netProfit = $grossProfit - $opex;
-
-            $result['pl'] = [
-                'revenue'      => $revenue,
-                'cogs'         => $cogs,
-                'gross_profit' => $grossProfit,
-                'opex'         => $opex,
-                'net_profit'   => $netProfit,
-                'period'       => $start->format('d M Y') . ' s/d ' . $end->format('d M Y'),
-            ];
-        }
-
-        // Balance Sheet
-        if (in_array($this->statement_type, ['all', 'bs'])) {
-            $bsData = $this->balanceSheetService->generate([
-                'as_of_date' => $this->end_date,
-                'cabang_id'  => $this->cabang_id,
-            ]);
-            $result['bs'] = $bsData;
-        }
-
-        return $result;
+        return app(FinancialStatementReportService::class)->generate([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'cabang_id' => $this->cabang_id,
+            'statement_type' => $this->statement_type,
+        ]);
     }
 
-    protected function sumAccounts($ids, $start, $end, string $column): float
+    protected function normalizeStatementType(?string $statementType): string
     {
-        if ($ids->isEmpty()) return 0.0;
-        $query = JournalEntry::whereIn('coa_id', $ids)->whereBetween('date', [$start, $end]);
-        if ($this->cabang_id) $query->where('cabang_id', $this->cabang_id);
-        return (float) $query->sum($column);
+        return in_array($statementType, ['all', 'pl', 'bs', 'cogm'], true) ? $statementType : 'all';
     }
 }
