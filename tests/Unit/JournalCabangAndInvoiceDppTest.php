@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -56,7 +57,7 @@ class JournalCabangAndInvoiceDppTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function test_invoice_dpp_keeps_explicit_value_when_provided(): void
     {
         $cabang = Cabang::create(['kode' => 'TS2', 'nama' => 'Branch 2', 'alamat' => '-']);
@@ -85,14 +86,14 @@ class JournalCabangAndInvoiceDppTest extends TestCase
 
     // ─── 2. JournalBranchResolver unit tests ─────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function test_resolver_returns_null_for_null_source(): void
     {
         $resolver = new JournalBranchResolver();
         $this->assertNull($resolver->resolve(null));
     }
 
-    /** @test */
+    #[Test]
     public function test_resolver_picks_up_direct_cabang_id_property(): void
     {
         $resolver = new JournalBranchResolver();
@@ -101,7 +102,7 @@ class JournalCabangAndInvoiceDppTest extends TestCase
         $this->assertSame(7, $resolver->resolve($source));
     }
 
-    /** @test */
+    #[Test]
     public function test_resolver_returns_null_when_no_strategy_matches(): void
     {
         $resolver = new JournalBranchResolver();
@@ -144,7 +145,7 @@ class JournalCabangAndInvoiceDppTest extends TestCase
         ], $attrs));
     }
 
-    /** @test */
+    #[Test]
     public function test_journal_entry_auto_resolves_cabang_id_from_source_model(): void
     {
         $cabang = Cabang::create(['kode' => 'BR1', 'nama' => 'Branch 1', 'alamat' => '-']);
@@ -178,7 +179,7 @@ class JournalCabangAndInvoiceDppTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function test_journal_entry_preserves_explicit_cabang_id(): void
     {
         $cabang1 = Cabang::create(['kode' => 'C1', 'nama' => 'Cabang 1', 'alamat' => '-']);
@@ -211,7 +212,7 @@ class JournalCabangAndInvoiceDppTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function test_journal_entry_stays_null_when_source_has_no_cabang(): void
     {
         $coa = $this->makeCoa('1103');

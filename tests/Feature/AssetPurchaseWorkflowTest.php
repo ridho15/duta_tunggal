@@ -13,6 +13,7 @@ use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -88,7 +89,7 @@ class AssetPurchaseWorkflowTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function test_complete_asset_purchase_workflow()
     {
         $this->actingAs($this->user);
@@ -242,7 +243,7 @@ class AssetPurchaseWorkflowTest extends TestCase
         $this->assertTrue(true, 'Complete asset purchase workflow executed successfully');
     }
 
-    /** @test */
+    #[Test]
     public function test_asset_creation_without_purchase_order()
     {
         $this->actingAs($this->user);
@@ -281,7 +282,7 @@ class AssetPurchaseWorkflowTest extends TestCase
         $this->assertNull($asset->purchase_order_item_id);
     }
 
-    /** @test */
+    #[Test]
     public function test_asset_depreciation_calculation()
     {
         $this->actingAs($this->user);
@@ -311,7 +312,7 @@ class AssetPurchaseWorkflowTest extends TestCase
         $this->assertEquals(0, $asset->accumulated_depreciation);
     }
 
-    /** @test */
+    #[Test]
     public function test_asset_purchase_flow_with_pre_set_signature()
     {
         // Step 1: Setup user with signature
@@ -454,7 +455,7 @@ class AssetPurchaseWorkflowTest extends TestCase
         $this->assertEquals($purchaseOrder->id, $asset->purchaseOrder->id);
     }
 
-    /** @test */
+    #[Test]
     public function test_asset_purchase_fails_without_user_signature()
     {
         // Create user WITHOUT signature

@@ -31,6 +31,7 @@ class BukuBesarLivewireTest extends TestCase
 
         // Test the Filament page Livewire component
         Livewire::test(BukuBesarPage::class)
+            ->set('showPreview', true)
             ->set('start_date', now()->startOfMonth()->format('Y-m-d'))
             ->set('end_date', now()->endOfMonth()->format('Y-m-d'))
             ->set('coa_ids', [$coa->id])

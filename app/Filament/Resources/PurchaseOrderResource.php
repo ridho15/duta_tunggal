@@ -113,6 +113,31 @@ class PurchaseOrderResource extends Resource
         return "({$code}) {$name}";
     }
 
+    public static function formatStatusLabel(?string $status): string
+    {
+        if (! $status) {
+            return '-';
+        }
+
+        return Str::of($status)
+            ->replace('_', ' ')
+            ->headline()
+            ->toString();
+    }
+
+    public static function getStatusColor(?string $status): string
+    {
+        return match ($status) {
+            'draft' => 'gray',
+            'approved' => 'info',
+            'partially_received' => 'warning',
+            'request_close' => 'danger',
+            'closed' => 'danger',
+            'completed', 'paid' => 'success',
+            default => 'gray',
+        };
+    }
+
     public static function resolveOrderRequestItemReference(
         ?int $orderRequestId,
         ?int $productId,
@@ -1440,30 +1465,9 @@ class PurchaseOrderResource extends Resource
                 TextColumn::make('status')
                     ->label('Status PO')
                     ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
+                        return self::formatStatusLabel($state);
                     })
-                    ->color(function ($state) {
-                        switch ($state) {
-                            case 'draft':
-                                return 'gray';
-                                break;
-                            case 'approved':
-                                return 'info';
-                                break;
-                            case 'partially_received':
-                                return 'warning';
-                                break;
-                            case 'request_close':
-                                return 'danger';
-                                break;
-                            case 'closed':
-                                return 'danger';
-                                break;
-                            case 'completed':
-                                return 'success';
-                                break;
-                        }
-                    })
+                    ->color(fn ($state) => self::getStatusColor($state))
                     ->badge(),
                 TextColumn::make('qc_status')
                     ->label('QC Status')
@@ -1613,6 +1617,7 @@ class PurchaseOrderResource extends Resource
                 'request_close' => 'bg-red-100',
                 'closed' => 'bg-red-100',
                 'completed' => 'bg-green-100',
+                'paid' => 'bg-green-100',
                 default => '',
             })
             ->description(new \Illuminate\Support\HtmlString(
@@ -1637,6 +1642,7 @@ class PurchaseOrderResource extends Resource
                         'approved' => 'Approved',
                         'partially_received' => 'Partially Received',
                         'completed' => 'Completed',
+                        'paid' => 'Paid',
                         'request_close' => 'Request Close',
                         'closed' => 'Closed',
                     ])

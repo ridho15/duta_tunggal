@@ -13,6 +13,7 @@ use App\Models\Warehouse;
 use App\Services\PurchaseReceiptService;
 use App\Services\SalesOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -42,7 +43,7 @@ class DocumentCodeGenerationTest extends TestCase
 
     // ─── Sales Order Code (SO-) ───────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function so_number_generator_produces_so_prefix(): void
     {
         $service = app(SalesOrderService::class);
@@ -52,7 +53,7 @@ class DocumentCodeGenerationTest extends TestCase
             'Sales Order number must start with SO- prefix');
     }
 
-    /** @test */
+    #[Test]
     public function so_number_generator_does_not_produce_rn_prefix(): void
     {
         // Regression test for the bug where generateSoNumber() used 'RN-' prefix
@@ -63,7 +64,7 @@ class DocumentCodeGenerationTest extends TestCase
             'Sales Order number must NOT start with RN- (that prefix belongs to Purchase Receipts)');
     }
 
-    /** @test */
+    #[Test]
     public function so_number_generator_produces_unique_codes(): void
     {
         $service  = app(SalesOrderService::class);
@@ -90,7 +91,7 @@ class DocumentCodeGenerationTest extends TestCase
         $this->assertCount(5, array_unique($numbers), 'All 5 generated SO numbers must be unique');
     }
 
-    /** @test */
+    #[Test]
     public function so_number_increments_sequentially(): void
     {
         $service  = app(SalesOrderService::class);
@@ -121,7 +122,7 @@ class DocumentCodeGenerationTest extends TestCase
         $this->assertGreaterThan($firstNum, $secondNum, 'Second number must be higher than first');
     }
 
-    /** @test */
+    #[Test]
     public function so_number_ignores_cabang_scope_for_uniqueness(): void
     {
         // Numbers must be globally unique, not just per branch
@@ -148,7 +149,7 @@ class DocumentCodeGenerationTest extends TestCase
 
     // ─── Purchase Receipt Code (RN-) ─────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function rn_number_generator_produces_rn_prefix(): void
     {
         $service  = app(PurchaseReceiptService::class);
@@ -158,7 +159,7 @@ class DocumentCodeGenerationTest extends TestCase
             'Purchase Receipt number must start with RN- prefix');
     }
 
-    /** @test */
+    #[Test]
     public function rn_number_contains_date_in_format_yyyymmdd(): void
     {
         $service  = app(PurchaseReceiptService::class);
@@ -170,7 +171,7 @@ class DocumentCodeGenerationTest extends TestCase
             "Receipt number must contain today's date ({$today})");
     }
 
-    /** @test */
+    #[Test]
     public function rn_number_generator_produces_unique_codes(): void
     {
         $service = app(PurchaseReceiptService::class);
@@ -201,7 +202,7 @@ class DocumentCodeGenerationTest extends TestCase
         $this->assertCount(5, array_unique($numbers), 'All 5 RN numbers must be unique');
     }
 
-    /** @test */
+    #[Test]
     public function rn_number_format_is_rn_date_fourdigit(): void
     {
         $service  = app(PurchaseReceiptService::class);
@@ -218,7 +219,7 @@ class DocumentCodeGenerationTest extends TestCase
 
     // ─── Invoice Code (INV-) ─────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function invoice_number_has_inv_prefix(): void
     {
         $service = app(\App\Services\InvoiceService::class);
@@ -229,7 +230,7 @@ class DocumentCodeGenerationTest extends TestCase
         $this->assertMatchesRegularExpression('/^INV-\d{8}-\d{4}$/', $num);
     }
 
-    /** @test */
+    #[Test]
     public function invoice_number_increments_across_calls(): void
     {
         $service = app(\App\Services\InvoiceService::class);

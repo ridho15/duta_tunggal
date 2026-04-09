@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\SaleOrder;
 use App\Services\InvoiceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -33,7 +34,7 @@ class InvoiceServiceFeatureTest extends TestCase
     // TC-INV-001: generateInvoiceNumber() returns INV-YYYYMMDD-XXXX format
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_inv_001_generates_invoice_number_in_correct_format(): void
     {
         $number = $this->service->generateInvoiceNumber();
@@ -47,7 +48,7 @@ class InvoiceServiceFeatureTest extends TestCase
     // TC-INV-002: generatePurchaseInvoiceNumber() uses PINV- prefix (different from INV-)
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_inv_002_purchase_invoice_uses_pinv_prefix_different_from_inv(): void
     {
         $salesNumber    = $this->service->generateInvoiceNumber();
@@ -67,7 +68,7 @@ class InvoiceServiceFeatureTest extends TestCase
     // SaleOrder-based invoice is created.
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_inv_003_auto_creates_ar_when_sales_invoice_is_created(): void
     {
         $cabang    = Cabang::factory()->create();
@@ -100,7 +101,7 @@ class InvoiceServiceFeatureTest extends TestCase
     // TC-INV-004: AR.remaining = invoice.total and AR.paid = 0 on first creation.
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_inv_004_ar_remaining_equals_total_and_paid_is_zero_on_creation(): void
     {
         $cabang    = Cabang::factory()->create();
@@ -135,7 +136,7 @@ class InvoiceServiceFeatureTest extends TestCase
     // TC-INV-005: other_fee JSON array is correctly summed by the model accessor.
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_inv_005_other_fee_json_array_summed_correctly(): void
     {
         $invoice = Invoice::factory()->make([
@@ -149,7 +150,7 @@ class InvoiceServiceFeatureTest extends TestCase
         $this->assertEquals(90_000, $invoice->other_fee_total);
     }
 
-    /** @test */
+    #[Test]
     public function tc_inv_005b_empty_other_fee_returns_zero(): void
     {
         $invoice = Invoice::factory()->make(['other_fee' => []]);
@@ -160,7 +161,7 @@ class InvoiceServiceFeatureTest extends TestCase
     // TC-INV-006: PPN calculation — dpp + ppn_amount = total
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_inv_006_ppn_dpp_plus_ppn_equals_total(): void
     {
         $subtotal  = 1_000_000;
@@ -190,7 +191,7 @@ class InvoiceServiceFeatureTest extends TestCase
     // the complete data state (all actors cooperate correctly).
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function tc_inv_007_invoice_status_becomes_paid_when_ar_remaining_reaches_zero(): void
     {
         $cabang    = Cabang::factory()->create();

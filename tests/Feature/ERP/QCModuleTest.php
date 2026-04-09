@@ -13,6 +13,7 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -83,7 +84,7 @@ class QCModuleTest extends TestCase
 
     // ─── #20 QC DISPLAYS DATE, SUPPLIER, PO NUMBER ───────────────────────────
 
-    /** @test */
+    #[Test]
     public function qc_record_has_qc_number_and_date(): void
     {
         $this->assertDatabaseHas('quality_controls', [
@@ -95,7 +96,7 @@ class QCModuleTest extends TestCase
             'QC must have a date_send_stock field');
     }
 
-    /** @test */
+    #[Test]
     public function qc_can_access_supplier_through_receipt_chain(): void
     {
         $fromModel = $this->qc->fromModel;
@@ -114,7 +115,7 @@ class QCModuleTest extends TestCase
         $this->assertEquals('PT Test Supplier', $supplier->perusahaan);
     }
 
-    /** @test */
+    #[Test]
     public function qc_can_access_po_number_through_receipt_chain(): void
     {
         $fromModel = $this->qc->fromModel;
@@ -127,7 +128,7 @@ class QCModuleTest extends TestCase
 
     // ─── #21 QC FILTERS ───────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function qc_can_be_filtered_by_date_send_stock(): void
     {
         $today      = now()->toDateString();
@@ -157,7 +158,7 @@ class QCModuleTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function qc_records_can_be_filtered_by_po_number(): void
     {
         // Create second PO with different number
@@ -188,7 +189,7 @@ class QCModuleTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function qc_records_can_be_filtered_by_supplier(): void
     {
         $supplier2 = Supplier::factory()->create(['perusahaan' => 'PT Other Supplier']);
@@ -206,7 +207,7 @@ class QCModuleTest extends TestCase
             'Must be able to filter QC by supplier');
     }
 
-    /** @test */
+    #[Test]
     public function qc_record_has_all_required_display_columns(): void
     {
         $qc = $this->qc->fresh();

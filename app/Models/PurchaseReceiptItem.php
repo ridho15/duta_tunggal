@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
+use App\Models\JournalEntry;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,7 +12,7 @@ use Illuminate\Support\Facades\Auth;
 
 class PurchaseReceiptItem extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'purchase_receipt_items';
     protected $fillable = [
         'purchase_receipt_id',
@@ -84,6 +86,11 @@ class PurchaseReceiptItem extends Model
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     public function qualityControl()
     {
         return $this->hasOne(\App\Models\QualityControl::class, 'from_model_id', 'id')
@@ -106,12 +113,5 @@ class PurchaseReceiptItem extends Model
         }
 
         return $directQualityControl;
-    }
-
-    protected static function booted()
-    {
-        // Untuk partial receipt, qty_rejected tidak dihitung otomatis
-        // User harus mengisi qty_rejected secara manual
-        // Jika qty_rejected tidak diisi, maka dianggap 0 (tidak ada yang ditolak)
     }
 }

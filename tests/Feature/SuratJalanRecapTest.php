@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SuratJalanRecapTest extends TestCase
@@ -40,7 +41,7 @@ class SuratJalanRecapTest extends TestCase
         $this->vehicle = Vehicle::factory()->create(['cabang_id' => $this->cabang->id]);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_rekap_surat_jalan_by_date_range_and_status(): void
     {
         $approvedDeliveryOrder = DeliveryOrder::factory()->create([
@@ -88,7 +89,7 @@ class SuratJalanRecapTest extends TestCase
         $this->assertTrue($records->first()->deliveryOrder->first()->relationLoaded('salesOrders'));
     }
 
-    /** @test */
+    #[Test]
     public function it_streams_a_rekap_surat_jalan_pdf_download(): void
     {
         $deliveryOrder = DeliveryOrder::factory()->create([

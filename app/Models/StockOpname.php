@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class StockOpname extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
 
     protected $table = 'stock_opnames';
 

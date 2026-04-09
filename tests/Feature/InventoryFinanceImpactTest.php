@@ -9,13 +9,14 @@ use App\Models\Product;
 use App\Models\Warehouse;
 use App\Services\BalanceSheetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class InventoryFinanceImpactTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function inventory_stock_affects_balance_sheet()
     {
         // Seed master data

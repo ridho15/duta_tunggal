@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class QualityControl extends Model
 {
-    use SoftDeletes, LogsGlobalActivity, HasFactory;
+    use SoftDeletes, LogsGlobalActivity, HasFactory, CascadesJournalEntries;
     protected $table = 'quality_controls';
     protected $fillable = [
         'qc_number',

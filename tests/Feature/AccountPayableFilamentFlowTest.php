@@ -21,6 +21,7 @@ use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AccountPayableFilamentFlowTest extends TestCase
@@ -90,7 +91,7 @@ class AccountPayableFilamentFlowTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function complete_purchase_invoice_to_vendor_payment_flow_with_form_simulation()
     {
         // === PHASE 1: Simulate Purchase Order Creation (via Filament Form) ===
@@ -299,7 +300,7 @@ class AccountPayableFilamentFlowTest extends TestCase
         $this->assertEquals(100000, $totalCredits);
     }
 
-    /** @test */
+    #[Test]
     public function account_payable_form_auto_populates_from_invoice_selection()
     {
         // Create purchase order first for the invoice relationship
@@ -349,7 +350,7 @@ class AccountPayableFilamentFlowTest extends TestCase
         $this->assertEquals('Belum Lunas', $accountPayable->status);
     }
 
-    /** @test */
+    #[Test]
     public function vendor_payment_ntpn_auto_generation_works()
     {
         // Simulate NTPN generation through form suffixAction
@@ -371,7 +372,7 @@ class AccountPayableFilamentFlowTest extends TestCase
         $this->assertEquals(15, strlen($payment->ntpn)); // NTPN + YYYYMMDD + 3 digits
     }
 
-    /** @test */
+    #[Test]
     public function account_payable_remaining_field_calculates_correctly_when_paid_is_updated()
     {
         // Create purchase order first for the invoice relationship

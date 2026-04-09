@@ -226,6 +226,10 @@ class WarehouseConfirmation extends Model
                 static::syncLinkedMaterialIssueItems($wc);
                 static::syncMaterialIssueStatus($wc);
             }
+
+            if ($wc->confirmable_type === DeliveryOrder::class) {
+                static::syncLinkedDeliveryOrderItems($wc);
+            }
         });
 
         static::updating(function ($wc) {
@@ -254,6 +258,11 @@ class WarehouseConfirmation extends Model
 
                     }
                 }
+            } elseif ($wc->isDirty('status') && $newStatus === 'rejected') {
+                $wc->warehouseConfirmationItems()->update([
+                    'status'        => 'rejected',
+                    'confirmed_qty' => 0,
+                ]);
             }
 
         });
@@ -274,10 +283,21 @@ class WarehouseConfirmation extends Model
                 }
             }
 
+            if ($wc->confirmable_type === DeliveryOrder::class) {
+                static::syncLinkedDeliveryOrderItems($wc, 'pending');
+            }
+
             if ($wc->isForceDeleting()) {
                 $wc->warehouseConfirmationItems()->forceDelete();
             } else {
                 $wc->warehouseConfirmationItems()->delete();
+            }
+        });
+
+        static::deleted(function ($wc) {
+            if ($wc->confirmable_type === DeliveryOrder::class) {
+                $do = DeliveryOrder::find($wc->confirmable_id);
+                $do?->updateStatusFromWarehouseConfirmations();
             }
         });
 
@@ -291,6 +311,7 @@ class WarehouseConfirmation extends Model
                 if ($wc->confirmable_type === DeliveryOrder::class) {
                     $do = DeliveryOrder::find($wc->confirmable_id);
                     $do?->updateStatusFromWarehouseConfirmations();
+                    static::syncLinkedDeliveryOrderItems($wc);
                 }
 
                 if ($wc->confirmable_type === ManufacturingOrder::class && strtolower((string) $wc->status) === 'confirmed') {
@@ -351,6 +372,23 @@ class WarehouseConfirmation extends Model
         }
 
         $materialIssue->approveFromWarehouseConfirmation($wc);
+    }
+
+    protected static function syncLinkedDeliveryOrderItems(WarehouseConfirmation $wc, ?string $overrideStatus = null): void
+    {
+        if ($wc->confirmable_type !== DeliveryOrder::class) {
+            return;
+        }
+
+        $wc = $wc->fresh(['warehouseConfirmationItems']);
+
+        if (! $wc) {
+            return;
+        }
+
+        $wc->warehouseConfirmationItems->each(function (WarehouseConfirmationItem $warehouseConfirmationItem) use ($overrideStatus) {
+            $warehouseConfirmationItem->syncLinkedDeliveryOrderItemStatus($overrideStatus);
+        });
     }
 
     protected static function syncPendingManufacturingMaterialIssues(WarehouseConfirmation $wc): void

@@ -14,6 +14,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -100,7 +101,7 @@ class QualityControlWorkflowTest extends TestCase
 
     // ─── Section 4: QC Variable Availability ─────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function qc_record_has_purchase_order_number_accessible(): void
     {
         $qc = QualityControl::create([
@@ -128,7 +129,7 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertStringStartsWith('PO-QC-', $poNumber);
     }
 
-    /** @test */
+    #[Test]
     public function qc_record_has_supplier_name_accessible(): void
     {
         $qc = QualityControl::create([
@@ -157,7 +158,7 @@ class QualityControlWorkflowTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function qc_record_exposes_product_and_quantity(): void
     {
         $qc = QualityControl::create([
@@ -190,7 +191,7 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertEquals(10, $totalInspected, 'Total inspected must match received qty');
     }
 
-    /** @test */
+    #[Test]
     public function qc_record_stores_status_and_notes(): void
     {
         $note = 'Scratches found on outer packaging, accepted after review';
@@ -219,7 +220,7 @@ class QualityControlWorkflowTest extends TestCase
             'QC status 0 must format as Belum diproses (Pending QC)');
     }
 
-    /** @test */
+    #[Test]
     public function qc_record_stores_inspection_date(): void
     {
         $inspectionDate = now()->toDateString();
@@ -250,7 +251,7 @@ class QualityControlWorkflowTest extends TestCase
 
     // ─── Section 5: QC Workflow (PO → Receipt → QC → Status) ────────────────
 
-    /** @test */
+    #[Test]
     public function receipt_item_appears_in_qc_module_via_from_model(): void
     {
         // The QC module sources items from PurchaseReceiptItem
@@ -277,7 +278,7 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertEquals($this->poItem->id, $source->purchase_order_item_id);
     }
 
-    /** @test */
+    #[Test]
     public function qc_passed_status_means_stock_was_updated(): void
     {
         // status=1 means "Sudah diproses" = stock has been updated (Passed QC)
@@ -303,7 +304,7 @@ class QualityControlWorkflowTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function qc_status_can_transition_from_pending_to_passed(): void
     {
         $qc = QualityControl::create([
@@ -335,7 +336,7 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertEquals(10, $fresh->passed_quantity);
     }
 
-    /** @test */
+    #[Test]
     public function qc_with_rejected_items_stores_reject_reason(): void
     {
         $rejectReason = 'Produk cacat fisik - kemasan rusak';
@@ -361,7 +362,7 @@ class QualityControlWorkflowTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function qc_passed_plus_rejected_matches_received_quantity(): void
     {
         $receivedQty = $this->receiptItem->qty_received; // 10
@@ -390,7 +391,7 @@ class QualityControlWorkflowTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function qc_po_number_visible_via_purchase_receipt_item(): void
     {
         // Verify the data chain: QC → PurchaseReceiptItem → PurchaseReceipt → PurchaseOrder
@@ -414,7 +415,7 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertEquals($this->po->po_number, $poNumber);
     }
 
-    /** @test */
+    #[Test]
     public function multiple_qc_records_for_same_receipt_have_different_qc_numbers(): void
     {
         // Two different receipt items can have QC records; each must have unique number
@@ -462,7 +463,7 @@ class QualityControlWorkflowTest extends TestCase
             'Each QC record must have a unique QC number');
     }
 
-    /** @test */
+    #[Test]
     public function journal_posting_is_skipped_when_coa_accounts_are_missing(): void
     {
         // purge COA table to simulate misconfiguration where fallback lookup fails

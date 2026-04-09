@@ -22,13 +22,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Filament\Forms\Form;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SalesInvoiceResourceTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function creating_invoice_via_resource_uses_default_coa_values(): void
     {
         // seed baseline COA records with expected codes
@@ -52,7 +53,7 @@ class SalesInvoiceResourceTest extends TestCase
             ->assertSet('data.ppn_keluaran_coa_id', $ppnCoa->id);
     }
 
-    /** @test */
+    #[Test]
     public function the_form_schema_contains_hidden_coa_fields(): void
     {
         $user = User::factory()->create();
@@ -71,7 +72,7 @@ class SalesInvoiceResourceTest extends TestCase
             ->assertFormFieldExists('ppn_keluaran_coa_id');
     }
 
-    /** @test */
+    #[Test]
     public function ppn_rate_auto_fills_from_tax_setting_when_tipe_pajak_changes(): void
     {
         $cabang   = Cabang::factory()->create();
@@ -122,7 +123,7 @@ class SalesInvoiceResourceTest extends TestCase
             ->assertSet('data.ppn_rate', 0);
     }
 
-    /** @test */
+    #[Test]
     public function legacy_sales_invoice_tax_values_are_normalized_for_display(): void
     {
         $invoice = Invoice::factory()->create([
@@ -139,7 +140,7 @@ class SalesInvoiceResourceTest extends TestCase
         $this->assertSame(11000.0, $invoice->ppn_amount);
     }
 
-    /** @test */
+    #[Test]
     public function sales_invoice_edit_save_normalizes_formatted_money_values_before_persisting(): void
     {
         $cabang = Cabang::factory()->create();
@@ -178,7 +179,7 @@ class SalesInvoiceResourceTest extends TestCase
         $this->assertSame(11.0, (float) $invoice->tax);
     }
 
-    /** @test */
+    #[Test]
     public function creating_invoice_via_resource_uses_configured_non_legacy_coa_values(): void
     {
         Config::set('coa.accounts_receivable', '1120.10');
@@ -204,7 +205,7 @@ class SalesInvoiceResourceTest extends TestCase
             ->assertSet('data.ppn_keluaran_coa_id', $ppnCoa->id);
     }
 
-    /** @test */
+    #[Test]
     public function sales_invoice_list_defaults_to_newest_first(): void
     {
         $saleOrder = SaleOrder::factory()->create();

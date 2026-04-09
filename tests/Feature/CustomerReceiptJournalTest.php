@@ -13,6 +13,7 @@ use App\Models\JournalEntry;
 use App\Models\User;
 use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CustomerReceiptJournalTest extends TestCase
@@ -84,7 +85,7 @@ class CustomerReceiptJournalTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_journal_entries_for_cash_bank_customer_receipt()
     {
         // Create invoice
@@ -156,7 +157,7 @@ class CustomerReceiptJournalTest extends TestCase
         expect($arEntry->description)->toContain('Customer receipt for receipt id');
     }
 
-    /** @test */
+    #[Test]
     public function it_only_creates_two_total_journal_entries_for_a_single_cash_receipt(): void
     {
         $invoice = Invoice::factory()->create([
@@ -213,7 +214,7 @@ class CustomerReceiptJournalTest extends TestCase
             ->count())->toBe(2);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_journal_entries_for_bank_customer_receipt()
     {
         // Create invoice
@@ -285,7 +286,7 @@ class CustomerReceiptJournalTest extends TestCase
         expect($arEntry->description)->toContain('Customer receipt for receipt id');
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_journal_entries_for_deposit_customer_receipt()
     {
         // Create deposit for customer
@@ -364,7 +365,7 @@ class CustomerReceiptJournalTest extends TestCase
         expect($arEntry->description)->toContain('Customer receipt for receipt id');
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_journal_entries_for_mixed_payment_methods()
     {
         // Create deposit for customer
@@ -468,7 +469,7 @@ class CustomerReceiptJournalTest extends TestCase
         expect($cashEntry->description)->toContain('Bank/Cash for receipt id');
     }
 
-    /** @test */
+    #[Test]
     public function it_throws_when_deposit_receipt_has_no_deposit_coa_and_rolls_back_entries()
     {
         $this->depositCoa->delete();

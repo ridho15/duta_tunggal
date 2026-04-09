@@ -4,13 +4,14 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeliveryOrder extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory,LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'delivery_orders';
     protected $fillable = [
         'do_number',
@@ -150,6 +151,10 @@ class DeliveryOrder extends Model
     {
         $wcs = $this->warehouseConfirmations()->get();
         if ($wcs->isEmpty()) {
+            if ($this->status !== 'request_stock') {
+                $this->update(['status' => 'request_stock']);
+            }
+
             return;
         }
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,7 +11,7 @@ use Illuminate\Testing\Fluent\Concerns\Has;
 
 class StockTransfer extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory,LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'stock_transfers';
     protected $fillable = [
         'transfer_number',

@@ -197,3 +197,9 @@ test('purchase order with non_ppn option disables tax fields', function () {
     // The form should render with ppn_option field
     $response->assertSee('Opsi PPN');
 });
+
+test('purchase order status presentation handles paid state', function () {
+    expect(PurchaseOrderResource::formatStatusLabel('partially_received'))->toBe('Partially Received');
+    expect(PurchaseOrderResource::formatStatusLabel('paid'))->toBe('Paid');
+    expect(PurchaseOrderResource::getStatusColor('paid'))->toBe('success');
+});

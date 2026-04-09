@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\OrderRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -83,7 +84,7 @@ class PurchaseOrderTest extends TestCase
     // Test #4 — OR items auto-populate PO items
     // ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function or_items_are_mapped_to_po_items_with_correct_data(): void
     {
         $itemA = $this->makeItem($this->productA, 5, 50000);
@@ -117,7 +118,7 @@ class PurchaseOrderTest extends TestCase
         $this->assertEquals(75000, (float) $poItemB->unit_price);
     }
 
-    /** @test */
+    #[Test]
     public function created_po_is_linked_to_order_request(): void
     {
         $item = $this->makeItem($this->productA, 2, 50000);
@@ -144,7 +145,7 @@ class PurchaseOrderTest extends TestCase
     // Test #5 — Supplier can be changed when generating PO
     // ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function po_can_be_generated_with_different_supplier_than_or_default(): void
     {
         $item = $this->makeItem($this->productA, 4, 50000);
@@ -173,7 +174,7 @@ class PurchaseOrderTest extends TestCase
     // Test #6 — Quantity in PO can be edited before approval
     // ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function po_item_quantity_can_be_edited_when_po_status_is_draft(): void
     {
         $item = $this->makeItem($this->productA, 10, 50000);
@@ -202,7 +203,7 @@ class PurchaseOrderTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function po_item_unit_price_can_be_edited_before_approval(): void
     {
         $item = $this->makeItem($this->productB, 5, 75000);
@@ -229,7 +230,7 @@ class PurchaseOrderTest extends TestCase
     // Test #7 — PO approval decreases OR remaining qty correctly
     // ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function fulfilled_quantity_on_or_item_increases_after_po_is_created(): void
     {
         $item = OrderRequestItem::create([
@@ -259,7 +260,7 @@ class PurchaseOrderTest extends TestCase
             'fulfilled_quantity should have increased after PO item was created');
     }
 
-    /** @test */
+    #[Test]
     public function remaining_quantity_is_calculated_correctly_after_partial_fulfillment(): void
     {
         $totalQty = 20;
@@ -279,7 +280,7 @@ class PurchaseOrderTest extends TestCase
             "Remaining qty should be totalQty($totalQty) - fulfilled(8) = 12");
     }
 
-    /** @test */
+    #[Test]
     public function po_is_created_with_correct_warehouse_and_cabang_from_or(): void
     {
         $item = $this->makeItem($this->productA, 3, 50000);

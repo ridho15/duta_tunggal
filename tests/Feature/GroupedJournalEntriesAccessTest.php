@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GroupedJournalEntriesAccessTest extends TestCase
@@ -22,7 +23,7 @@ class GroupedJournalEntriesAccessTest extends TestCase
         $this->artisan('db:seed', ['--class' => 'ChartOfAccountSeeder']);
     }
 
-    /** @test */
+    #[Test]
     public function unauthenticated_users_cannot_access_grouped_journal_entries()
     {
         $response = $this->get('/admin/journal-entries/grouped');
@@ -31,7 +32,7 @@ class GroupedJournalEntriesAccessTest extends TestCase
         $response->assertRedirect('/admin/login');
     }
 
-    /** @test */
+    #[Test]
     public function authenticated_users_can_access_grouped_journal_entries()
     {
         // Find or create a user with appropriate role
@@ -58,7 +59,7 @@ class GroupedJournalEntriesAccessTest extends TestCase
             ->assertSee('Grouped');
     }
 
-    /** @test */
+    #[Test]
     public function grouped_journal_entries_page_loads_with_filters()
     {
         $user = User::where('email', 'ralamzah@gmail.com')->first();
@@ -86,7 +87,7 @@ class GroupedJournalEntriesAccessTest extends TestCase
             ->assertSee('Branch');
     }
 
-    /** @test */
+    #[Test]
     public function grouped_journal_entries_route_is_registered()
     {
         $routes = collect(\Route::getRoutes())->map(function ($route) {

@@ -8,6 +8,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Services\Reports\PurchaseReportService;
+use App\Services\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -27,7 +28,6 @@ class PurchaseReportServiceTest extends TestCase
             'supplier_id' => $supplier->id,
             'po_number' => 'PO-SERVICE-001',
             'status' => 'approved',
-            'total_amount' => 600_000,
             'order_date' => '2026-04-02',
         ]);
 
@@ -36,13 +36,18 @@ class PurchaseReportServiceTest extends TestCase
             'product_id' => $product->id,
             'quantity' => 3,
             'unit_price' => 200_000,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'Non Pajak',
         ]);
+
+        app(PurchaseOrderService::class)->updateTotalAmount($approvedOrder->fresh(['purchaseOrderItem', 'purchaseOrderBiaya']));
+        $approvedOrder->refresh();
 
         $completedOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
             'po_number' => 'PO-SERVICE-002',
             'status' => 'completed',
-            'total_amount' => 150_000,
             'order_date' => '2026-04-03',
         ]);
 
@@ -51,7 +56,13 @@ class PurchaseReportServiceTest extends TestCase
             'product_id' => $product->id,
             'quantity' => 1,
             'unit_price' => 150_000,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'Non Pajak',
         ]);
+
+        app(PurchaseOrderService::class)->updateTotalAmount($completedOrder->fresh(['purchaseOrderItem', 'purchaseOrderBiaya']));
+        $completedOrder->refresh();
 
         $service = app(PurchaseReportService::class);
         $payload = $service->pdfPayload([

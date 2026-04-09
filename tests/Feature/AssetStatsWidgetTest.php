@@ -4,6 +4,7 @@ use App\Filament\Widgets\AssetStatsWidget;
 use App\Models\Asset;
 use App\Models\ChartOfAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AssetStatsWidgetTest extends TestCase
@@ -44,7 +45,7 @@ class AssetStatsWidgetTest extends TestCase
         return $method->invoke($widget);
     }
 
-    /** @test */
+    #[Test]
     public function widget_returns_correct_total_asset_count(): void
     {
         $this->createAsset();
@@ -57,7 +58,7 @@ class AssetStatsWidgetTest extends TestCase
         $this->assertEquals(3, $stats[0]->getValue());
     }
 
-    /** @test */
+    #[Test]
     public function widget_counts_only_active_and_posted_assets(): void
     {
         $this->createAsset(['status' => 'active']);
@@ -71,7 +72,7 @@ class AssetStatsWidgetTest extends TestCase
         $this->assertEquals(2, $stats[1]->getValue());
     }
 
-    /** @test */
+    #[Test]
     public function widget_counts_fully_depreciated_assets(): void
     {
         $this->createAsset(['status' => 'active']);
@@ -84,7 +85,7 @@ class AssetStatsWidgetTest extends TestCase
         $this->assertEquals(2, $stats[2]->getValue());
     }
 
-    /** @test */
+    #[Test]
     public function widget_total_value_stat_has_currency_icon(): void
     {
         $this->createAsset(['purchase_cost' => 5_000_000]);
@@ -95,7 +96,7 @@ class AssetStatsWidgetTest extends TestCase
         $this->assertStringContainsString('heroicon-m-currency-dollar', $stats[3]->getDescriptionIcon());
     }
 
-    /** @test */
+    #[Test]
     public function widget_book_value_stat_has_calculator_icon(): void
     {
         $this->createAsset(['purchase_cost' => 10_000_000, 'book_value' => 8_000_000]);
@@ -106,7 +107,7 @@ class AssetStatsWidgetTest extends TestCase
         $this->assertStringContainsString('heroicon-m-calculator', $stats[4]->getDescriptionIcon());
     }
 
-    /** @test */
+    #[Test]
     public function widget_shows_zero_when_no_assets_exist(): void
     {
         $stats = $this->getStats();
@@ -116,7 +117,7 @@ class AssetStatsWidgetTest extends TestCase
         $this->assertEquals(0, $stats[2]->getValue()); // fully_depreciated
     }
 
-    /** @test */
+    #[Test]
     public function widget_returns_five_stats(): void
     {
         $stats = $this->getStats();

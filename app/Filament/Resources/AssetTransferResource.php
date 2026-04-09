@@ -112,9 +112,9 @@ class AssetTransferResource extends Resource
                             ->required()
                             ->rules([
                                 'required',
-                                function () {
-                                    return function (string $attribute, $value, \Closure $fail) {
-                                        $fromCabangId = request()->input('from_cabang_id');
+                                function (Forms\Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $fromCabangId = $get('from_cabang_id');
                                         if ($fromCabangId && $value == $fromCabangId) {
                                             $fail('Cabang tujuan harus berbeda dengan cabang asal.');
                                         }

@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\ReturnProductService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -58,7 +59,7 @@ class CustomerReturnTest extends TestCase
 
     // ─── #27 RETURN REQUEST CREATION ─────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function return_product_can_be_created_in_draft_status(): void
     {
         $return = ReturnProduct::create([
@@ -83,7 +84,7 @@ class CustomerReturnTest extends TestCase
         $this->assertEquals('Produk rusak saat diterima', $return->reason);
     }
 
-    /** @test */
+    #[Test]
     public function return_product_can_reference_delivery_order(): void
     {
         $return = ReturnProduct::create([
@@ -104,7 +105,7 @@ class CustomerReturnTest extends TestCase
         $this->assertEquals($this->do->id, $fromModel->id);
     }
 
-    /** @test */
+    #[Test]
     public function return_number_is_stored_correctly(): void
     {
         $return = ReturnProduct::create([
@@ -125,7 +126,7 @@ class CustomerReturnTest extends TestCase
 
     // ─── #28 RETURN PRODUCT ITEM / INSPECTION ────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function return_product_item_can_be_added_to_return(): void
     {
         $doItem = DeliveryOrderItem::create([
@@ -165,7 +166,7 @@ class CustomerReturnTest extends TestCase
             'Return product must have one inspection item');
     }
 
-    /** @test */
+    #[Test]
     public function return_product_item_stores_condition_and_note(): void
     {
         $doItem = DeliveryOrderItem::create([
@@ -197,7 +198,7 @@ class CustomerReturnTest extends TestCase
         $this->assertEquals('Minor scratch, still functional', $returnItem->note);
     }
 
-    /** @test */
+    #[Test]
     public function return_product_can_have_multiple_items(): void
     {
         $product2 = Product::factory()->create();
@@ -248,7 +249,7 @@ class CustomerReturnTest extends TestCase
 
     // ─── #29 RETURN ACTION VARIANTS ──────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function return_action_reduce_quantity_only_is_stored(): void
     {
         $return = ReturnProduct::create([
@@ -267,7 +268,7 @@ class CustomerReturnTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function return_action_close_do_partial_is_stored(): void
     {
         $return = ReturnProduct::create([
@@ -286,7 +287,7 @@ class CustomerReturnTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function return_action_close_so_complete_is_stored(): void
     {
         $return = ReturnProduct::create([
@@ -305,7 +306,7 @@ class CustomerReturnTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function return_can_be_approved_and_deducts_delivery_item_quantity(): void
     {
         $doItem = DeliveryOrderItem::create([
@@ -349,7 +350,7 @@ class CustomerReturnTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function approved_return_status_is_set_by_service(): void
     {
         $doItem = DeliveryOrderItem::create([
@@ -388,7 +389,7 @@ class CustomerReturnTest extends TestCase
             'Service must set return status to approved');
     }
 
-    /** @test */
+    #[Test]
     public function all_three_return_action_values_are_valid(): void
     {
         $validActions = ['reduce_quantity_only', 'close_do_partial', 'close_so_complete'];

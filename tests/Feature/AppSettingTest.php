@@ -14,6 +14,7 @@ use App\Models\Vehicle;
 use App\Models\Warehouse;
 use App\Services\DeliveryOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -27,14 +28,14 @@ class AppSettingTest extends TestCase
     // AppSetting model unit-level tests
     // -------------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function it_returns_default_when_key_is_absent(): void
     {
         $value = AppSetting::get('non_existent_key', 'fallback');
         $this->assertSame('fallback', $value);
     }
 
-    /** @test */
+    #[Test]
     public function it_persists_and_retrieves_a_setting(): void
     {
         AppSetting::set('some_key', 'some_value', 'A test setting');
@@ -47,7 +48,7 @@ class AppSettingTest extends TestCase
         $this->assertSame('some_value', AppSetting::get('some_key'));
     }
 
-    /** @test */
+    #[Test]
     public function it_upserts_existing_setting(): void
     {
         AppSetting::set('some_key', 'first');
@@ -57,7 +58,7 @@ class AppSettingTest extends TestCase
         $this->assertSame('second', AppSetting::get('some_key'));
     }
 
-    /** @test */
+    #[Test]
     public function it_casts_truthy_strings_to_boolean_true(): void
     {
         AppSetting::set('flag', '1');
@@ -67,7 +68,7 @@ class AppSettingTest extends TestCase
         $this->assertTrue(AppSetting::get('flag2'));
     }
 
-    /** @test */
+    #[Test]
     public function it_casts_falsy_strings_to_boolean_false(): void
     {
         AppSetting::set('flag', '0');
@@ -77,21 +78,21 @@ class AppSettingTest extends TestCase
         $this->assertFalse(AppSetting::get('flag2'));
     }
 
-    /** @test */
+    #[Test]
     public function do_approval_required_returns_true_by_default(): void
     {
         // No DB row — should fall back to config/env (default true)
         $this->assertTrue(AppSetting::doApprovalRequired());
     }
 
-    /** @test */
+    #[Test]
     public function do_approval_required_returns_false_when_disabled_via_db(): void
     {
         AppSetting::set('do_approval_required', '0', 'Disable DO approval');
         $this->assertFalse(AppSetting::doApprovalRequired());
     }
 
-    /** @test */
+    #[Test]
     public function do_approval_required_returns_true_when_enabled_via_db(): void
     {
         AppSetting::set('do_approval_required', '1', 'Enable DO approval');
@@ -132,7 +133,7 @@ class AppSettingTest extends TestCase
         return $so;
     }
 
-    /** @test */
+    #[Test]
     public function when_approval_required_do_sent_action_requires_approved_status(): void
     {
         AppSetting::set('do_approval_required', '1');
@@ -176,7 +177,7 @@ class AppSettingTest extends TestCase
         $this->assertDatabaseHas('delivery_orders', ['id' => $do->id, 'status' => 'sent']);
     }
 
-    /** @test */
+    #[Test]
     public function when_approval_not_required_do_can_be_sent_from_draft(): void
     {
         AppSetting::set('do_approval_required', '0');

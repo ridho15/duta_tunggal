@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -98,7 +99,7 @@ class InvoiceObserverPostSalesTest extends TestCase
 
     // ─── Bug A: dd() replaced by RuntimeException ────────────────────────────
 
-    /** @test */
+    #[Test]
     public function it_throws_runtime_exception_when_ar_coa_is_missing(): void
     {
         // Only Revenue COA, no AR COA (code 1120)
@@ -112,7 +113,7 @@ class InvoiceObserverPostSalesTest extends TestCase
         $this->observer->postSalesInvoice($invoice);
     }
 
-    /** @test */
+    #[Test]
     public function it_throws_runtime_exception_when_revenue_coa_is_missing(): void
     {
         // Only AR COA, no Revenue COA (code 4000)
@@ -128,7 +129,7 @@ class InvoiceObserverPostSalesTest extends TestCase
 
     // ─── Bug B: DB::transaction — no partial journals left on failure ─────────
 
-    /** @test */
+    #[Test]
     public function no_partial_journals_remain_after_missing_coa_exception(): void
     {
         // Only AR COA — revenue posting will throw inside the transaction
@@ -153,7 +154,7 @@ class InvoiceObserverPostSalesTest extends TestCase
 
     // ─── Bug C: sum(items.tax_amount) used as primary; rate-based fallback for item-less invoices ───
 
-    /** @test */
+    #[Test]
     public function ppn_keluaran_credit_uses_stored_invoice_tax_not_derived_value(): void
     {
         $this->makeCoas();
@@ -185,7 +186,7 @@ class InvoiceObserverPostSalesTest extends TestCase
 
     // ─── Bug D: Duplicate posting guard ──────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function calling_post_twice_does_not_create_duplicate_entries(): void
     {
         $this->makeCoas();
@@ -206,7 +207,7 @@ class InvoiceObserverPostSalesTest extends TestCase
 
     // ─── Structured logging ───────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function successful_posting_writes_info_log(): void
     {
         $this->makeCoas();
@@ -222,7 +223,7 @@ class InvoiceObserverPostSalesTest extends TestCase
             ->atLeast()->once();
     }
 
-    /** @test */
+    #[Test]
     public function missing_coa_writes_error_log_before_throwing(): void
     {
         // No COAs at all
@@ -239,7 +240,7 @@ class InvoiceObserverPostSalesTest extends TestCase
             ->once();
     }
 
-    /** @test */
+    #[Test]
     public function it_throws_when_cost_of_sales_cannot_be_derived_and_rolls_back_sales_journals(): void
     {
         $this->makeCoas();
@@ -260,7 +261,7 @@ class InvoiceObserverPostSalesTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_can_post_using_configured_non_legacy_coa_codes(): void
     {
         Config::set('coa.accounts_receivable', '1120.10');

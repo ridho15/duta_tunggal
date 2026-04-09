@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\InvoiceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -47,7 +48,7 @@ class InvoiceTest extends TestCase
 
     // ─── #25 INVOICE NUMBER GENERATION ───────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function invoice_number_generation_produces_correct_format(): void
     {
         $number = $this->service->generateInvoiceNumber();
@@ -59,7 +60,7 @@ class InvoiceTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function invoice_number_is_sequential_and_unique(): void
     {
         $first  = $this->service->generateInvoiceNumber();
@@ -98,7 +99,7 @@ class InvoiceTest extends TestCase
             'Second invoice number must have a higher sequence than the first');
     }
 
-    /** @test */
+    #[Test]
     public function invoice_number_has_four_digit_sequence_padding(): void
     {
         $number = $this->service->generateInvoiceNumber();
@@ -109,7 +110,7 @@ class InvoiceTest extends TestCase
             'Invoice sequence suffix must be zero-padded to 4 digits');
     }
 
-    /** @test */
+    #[Test]
     public function invoice_number_generation_never_returns_duplicate(): void
     {
         $po = PurchaseOrder::factory()->create([
@@ -147,7 +148,7 @@ class InvoiceTest extends TestCase
             'All 5 generated invoice numbers must be unique');
     }
 
-    /** @test */
+    #[Test]
     public function invoice_number_generator_skips_existing_numbers(): void
     {
         $date   = now()->format('Ymd');
@@ -182,7 +183,7 @@ class InvoiceTest extends TestCase
 
     // ─── #26 EDITING INVOICE MUST NOT TRIGGER SERVER ERROR ───────────────────
 
-    /** @test */
+    #[Test]
     public function invoice_can_be_updated_without_unique_constraint_violation(): void
     {
         $po = PurchaseOrder::factory()->create([
@@ -225,7 +226,7 @@ class InvoiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function invoice_service_never_produces_a_duplicate_number_even_with_concurrent_seeding(): void
     {
         $po = PurchaseOrder::factory()->create([

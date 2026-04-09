@@ -28,6 +28,7 @@ use App\Services\PurchaseReceiptService;
 use App\Services\QualityControlService;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CompleteProcurementAccountingFlowTest extends TestCase
@@ -120,7 +121,7 @@ class CompleteProcurementAccountingFlowTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function complete_procurement_flow_with_full_accounting()
     {
         // ==========================================
@@ -582,7 +583,7 @@ class CompleteProcurementAccountingFlowTest extends TestCase
         // VERIFICATION: BUSINESS FLOW COMPLETION
         // ==========================================
         $orderRequest->refresh();
-        $this->assertEquals('approved', $orderRequest->status);
+        $this->assertEquals('complete', $orderRequest->status);
 
         $purchaseOrder->refresh();
         $this->assertEquals('completed', $purchaseOrder->status); // PO auto-completes after full receipt and QC

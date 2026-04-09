@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\TaxService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -49,7 +50,7 @@ class TaxCalculationTest extends TestCase
 
     // ─── TaxService Unit-level ────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function tax_service_eksklusif_adds_tax_on_top_of_price(): void
     {
         // Item price = 1,000,000 | Tax 12% Eksklusif
@@ -61,7 +62,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_120_000, $result['total'], 'Total = DPP + PPN for Eksklusif');
     }
 
-    /** @test */
+    #[Test]
     public function tax_service_inklusif_extracts_tax_from_gross_price(): void
     {
         // Gross = 1,120,000 already includes 12% PPN (Inklusif)
@@ -74,7 +75,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_120_000, $result['total'], 'Total = gross unchanged for Inklusif');
     }
 
-    /** @test */
+    #[Test]
     public function tax_service_non_pajak_returns_zero_ppn(): void
     {
         $result = TaxService::compute(1_000_000, 11, 'Non Pajak');
@@ -84,7 +85,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_000_000, $result['total']);
     }
 
-    /** @test */
+    #[Test]
     public function tax_service_zero_rate_returns_no_tax(): void
     {
         $result = TaxService::compute(500_000, 0, 'Eksklusif');
@@ -93,7 +94,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(500_000, $result['total']);
     }
 
-    /** @test */
+    #[Test]
     public function tax_service_normalizes_type_variants(): void
     {
         $this->assertEquals('Inklusif', TaxService::normalizeType('inklusif'));
@@ -103,14 +104,14 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals('Non Pajak', TaxService::normalizeType('non-pajak'));
     }
 
-    /** @test */
+    #[Test]
     public function tax_service_validate_negative_amount_throws(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         TaxService::compute(-100, 12, 'Eksklusif');
     }
 
-    /** @test */
+    #[Test]
     public function tax_service_validate_rate_out_of_range_throws(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -119,7 +120,7 @@ class TaxCalculationTest extends TestCase
 
     // ─── hitungSubtotal (HelperController) ───────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_eksklusif_adds_tax_to_line_total(): void
     {
         // qty=2, price=500,000, discount=0%, tax=12%, type=Eksklusif
@@ -130,7 +131,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_120_000, $result);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_inklusif_total_unchanged(): void
     {
         // qty=1, price=1,120,000 (includes PPN), discount=0, tax=12%, type=Inklusif
@@ -139,7 +140,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_120_000, $result);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_with_discount_reduces_base_before_tax(): void
     {
         // qty=1, price=1,000,000, discount=10% => after_discount=900,000
@@ -148,7 +149,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_008_000, $result);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_with_max_discount_zero_result(): void
     {
         // qty=5, price=100,000, discount=100% => after_discount=0 => total=0
@@ -158,7 +159,7 @@ class TaxCalculationTest extends TestCase
 
     // ─── SaleOrderItem tax field persistence ─────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function sale_order_item_tax_field_stores_rate_as_percent(): void
     {
         $so = SaleOrder::factory()->create([
@@ -186,7 +187,7 @@ class TaxCalculationTest extends TestCase
         $this->assertNotEquals(120_000, $item->fresh()->tax, 'tax column stores RATE not absolute amount');
     }
 
-    /** @test */
+    #[Test]
     public function sale_order_total_amount_computed_with_inklusif_tax(): void
     {
         // SalesOrderService::updateTotalAmount uses 'Inklusif' mode
@@ -217,7 +218,7 @@ class TaxCalculationTest extends TestCase
 
     // ─── QuotationItem tax ────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function quotation_item_stores_tax_rate(): void
     {
         $quotation = Quotation::factory()->create([
@@ -243,7 +244,7 @@ class TaxCalculationTest extends TestCase
 
     // ─── Invoice tax rate storage ─────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function invoice_tax_field_stores_rate_and_total_includes_ppn(): void
     {
         $subtotal = 1_000_000;
@@ -277,7 +278,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_120_000, (float) $invoice->fresh()->total);
     }
 
-    /** @test */
+    #[Test]
     public function invoice_with_eleven_percent_tax_computes_correctly(): void
     {
         $subtotal = 2_000_000;
@@ -305,7 +306,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(220_000, $computedPpn);
     }
 
-    /** @test */
+    #[Test]
     public function inklusif_formula_dpp_is_correct_at_twelve_percent(): void
     {
         // PMK 136/2023: DPP = gross * 100 / (100 + rate)
@@ -317,7 +318,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEquals(1_120_000, $result['total']);
     }
 
-    /** @test */
+    #[Test]
     public function eksklusif_formula_at_eleven_percent_matches_spec(): void
     {
         // Scenario B from spec: 11% exclusive

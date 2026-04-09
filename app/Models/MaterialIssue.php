@@ -6,6 +6,7 @@ use App\Traits\LogsGlobalActivity;
 use App\Services\ManufacturingJournalService;
 use App\Services\ManufacturingService;
 use App\Services\StockReservationService;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MaterialIssue extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
 
     protected $fillable = [
         'issue_number',

@@ -60,10 +60,17 @@ class AgeingReportExportTest extends TestCase
         $this->assertSame('Ageing Export Branch', $summaryRows[1][1]);
         $this->assertSame('Account Receivables Summary', $summaryRows[4][0]);
         $this->assertSame($expectedReceivables['total']['count'], $summaryRows[4][8]);
-        $this->assertSame('Rp 600.000', $summaryRows[5][5]);
+        $this->assertSame('Rp 600.000', $summaryRows[5][4]);
+        $this->assertSame('Rp 0', $summaryRows[5][5]);
+        $this->assertSame('Rp 0', $summaryRows[5][6]);
+        $this->assertSame('Rp 0', $summaryRows[5][7]);
         $this->assertSame('Rp 600.000', $summaryRows[5][8]);
         $this->assertSame('Account Payables Summary', $summaryRows[7][0]);
         $this->assertSame($expectedPayables['total']['count'], $summaryRows[7][8]);
+        $this->assertSame('Rp 500.000', $summaryRows[8][4]);
+        $this->assertSame('Rp 0', $summaryRows[8][5]);
+        $this->assertSame('Rp 0', $summaryRows[8][6]);
+        $this->assertSame('Rp 0', $summaryRows[8][7]);
         $this->assertSame('Rp 500.000', $summaryRows[8][8]);
         $this->assertSame('Cash Flow Projection (Next 30 Days)', $summaryRows[10][0]);
         $this->assertSame('Rp 600.000', $summaryRows[11][1]);
@@ -72,15 +79,15 @@ class AgeingReportExportTest extends TestCase
 
         $this->assertCount(1, $receivableRows);
         $this->assertSame('Export Customer', $receivableRows[0]['Customer Name']);
-        $this->assertSame(45, $receivableRows[0]['Days Outstanding']);
-        $this->assertSame('31–60', $receivableRows[0]['Aging Bucket']);
+        $this->assertSame(-8, $receivableRows[0]['Days Outstanding']);
+        $this->assertSame('Current', $receivableRows[0]['Aging Bucket']);
         $this->assertSame('Rp 600.000', $receivableRows[0]['Remaining Amount']);
         $this->assertSame('Ageing Export Branch', $receivableRows[0]['Branch']);
 
         $this->assertCount(1, $payableRows);
         $this->assertSame('Export Supplier', $payableRows[0]['Supplier Name']);
-        $this->assertSame(97, $payableRows[0]['Days Outstanding']);
-        $this->assertSame('>90', $payableRows[0]['Aging Bucket']);
+        $this->assertSame(-13, $payableRows[0]['Days Outstanding']);
+        $this->assertSame('Current', $payableRows[0]['Aging Bucket']);
         $this->assertSame('Rp 500.000', $payableRows[0]['Remaining Amount']);
 
         Carbon::setTestNow();
@@ -118,8 +125,8 @@ class AgeingReportExportTest extends TestCase
         $this->assertSame(500000.0, $payload['cashFlowProjection'][30]['payables']);
         $this->assertSame(100000.0, $payload['cashFlowProjection'][30]['net_cash_flow']);
         $this->assertSame('Export Customer', $payload['receivables'][0]['customer_name']);
-        $this->assertSame(45, $payload['receivables'][0]['days_outstanding']);
-        $this->assertSame('31–60', $payload['receivables'][0]['aging_bucket']);
+        $this->assertSame(-8, $payload['receivables'][0]['days_outstanding']);
+        $this->assertSame('Current', $payload['receivables'][0]['aging_bucket']);
         $this->assertSame(600000.0, (float) $payload['receivables'][0]['remaining_amount']);
 
         Carbon::setTestNow();

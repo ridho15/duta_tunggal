@@ -10,8 +10,15 @@
  */
 
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
+use App\Models\Driver;
+use App\Models\SaleOrder;
+use App\Models\SaleOrderItem;
+use App\Models\Rak;
+use App\Models\WarehouseConfirmationItem;
 use App\Models\WarehouseConfirmation;
 use App\Models\Warehouse;
+use App\Models\Vehicle;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -126,6 +133,132 @@ it('sets DO status to reject on mixed confirmed/rejected (any rejected wins)', f
     expect($this->do->fresh()->status)->toBe('reject');
 });
 
+it('syncs linked delivery order item status when the DO-linked WC is rejected', function () {
+    $saleOrder = SaleOrder::factory()->create([
+        'status' => 'approved',
+    ]);
+
+    $saleOrderItem = SaleOrderItem::factory()->create([
+        'sale_order_id' => $saleOrder->id,
+        'quantity' => 2,
+        'warehouse_id' => $this->warehouse->id,
+    ]);
+
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create();
+
+    $deliveryOrder = DeliveryOrder::factory()->create([
+        'status' => 'request_stock',
+        'warehouse_id' => $this->warehouse->id,
+        'driver_id' => $driver->id,
+        'vehicle_id' => $vehicle->id,
+    ]);
+
+    $deliveryOrderItem = DeliveryOrderItem::create([
+        'delivery_order_id' => $deliveryOrder->id,
+        'sale_order_item_id' => $saleOrderItem->id,
+        'product_id' => $saleOrderItem->product_id,
+        'quantity' => 2,
+        'reason' => 'Reject sync test',
+        'status' => 'pending',
+    ]);
+
+    $wc = WarehouseConfirmation::create([
+        'confirmable_type' => DeliveryOrder::class,
+        'confirmable_id' => $deliveryOrder->id,
+        'confirmation_type' => 'delivery_order',
+        'status' => 'request',
+        'note' => 'Reject sync test',
+    ]);
+
+    WarehouseConfirmationItem::create([
+        'warehouse_confirmation_id' => $wc->id,
+        'sale_order_item_id' => $saleOrderItem->id,
+        'product_id' => $saleOrderItem->product_id,
+        'product_name' => $saleOrderItem->product?->name ?? '-',
+        'requested_qty' => 2,
+        'confirmed_qty' => 0,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => null,
+        'status' => 'request',
+    ]);
+
+    $wc->update([
+        'status' => 'rejected',
+        'rejection_reason' => 'No stock available',
+        'confirmed_by' => $this->user->id,
+        'confirmed_at' => now(),
+    ]);
+
+    expect($deliveryOrderItem->fresh()->status)->toBe('rejected');
+    expect($deliveryOrder->fresh()->status)->toBe('reject');
+});
+
+it('reverts linked delivery order item status when the DO-linked WC is deleted', function () {
+    $saleOrder = SaleOrder::factory()->create([
+        'status' => 'approved',
+    ]);
+
+    $saleOrderItem = SaleOrderItem::factory()->create([
+        'sale_order_id' => $saleOrder->id,
+        'quantity' => 3,
+        'warehouse_id' => $this->warehouse->id,
+    ]);
+
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create();
+
+    $deliveryOrder = DeliveryOrder::factory()->create([
+        'status' => 'request_stock',
+        'warehouse_id' => $this->warehouse->id,
+        'driver_id' => $driver->id,
+        'vehicle_id' => $vehicle->id,
+    ]);
+
+    $deliveryOrderItem = DeliveryOrderItem::create([
+        'delivery_order_id' => $deliveryOrder->id,
+        'sale_order_item_id' => $saleOrderItem->id,
+        'product_id' => $saleOrderItem->product_id,
+        'quantity' => 3,
+        'reason' => 'Cancel sync test',
+        'status' => 'pending',
+    ]);
+
+    $wc = WarehouseConfirmation::create([
+        'confirmable_type' => DeliveryOrder::class,
+        'confirmable_id' => $deliveryOrder->id,
+        'confirmation_type' => 'delivery_order',
+        'status' => 'request',
+        'note' => 'Cancel sync test',
+    ]);
+
+    WarehouseConfirmationItem::create([
+        'warehouse_confirmation_id' => $wc->id,
+        'sale_order_item_id' => $saleOrderItem->id,
+        'product_id' => $saleOrderItem->product_id,
+        'product_name' => $saleOrderItem->product?->name ?? '-',
+        'requested_qty' => 3,
+        'confirmed_qty' => 3,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => null,
+        'status' => 'request',
+    ]);
+
+    $wc->update([
+        'status' => 'confirmed',
+        'confirmed_by' => $this->user->id,
+        'confirmed_at' => now(),
+    ]);
+
+    expect($deliveryOrderItem->fresh()->status)->toBe('confirmed');
+    expect($deliveryOrder->fresh()->status)->toBe('approved');
+
+    $wc->delete();
+
+    expect(DeliveryOrderItem::withTrashed()->find($deliveryOrderItem->id)?->status)->toBe('pending');
+    expect($deliveryOrder->fresh()->status)->toBe('request_stock');
+});
+
 it('model updated event fires updateStatusFromWarehouseConfirmations for DO-linked WC', function () {
     $wc = WarehouseConfirmation::withoutEvents(fn () => WarehouseConfirmation::factory()->create([
         'confirmable_type' => DeliveryOrder::class,
@@ -138,4 +271,70 @@ it('model updated event fires updateStatusFromWarehouseConfirmations for DO-link
 
     // Single WC confirmed → all WCs confirmed → DO approved
     expect($this->do->fresh()->status)->toBe('approved');
+});
+
+it('syncs linked delivery order item status when the DO-linked WC is confirmed', function () {
+    $saleOrder = SaleOrder::factory()->create([
+        'status' => 'approved',
+    ]);
+
+    $saleOrderItem = SaleOrderItem::factory()->create([
+        'sale_order_id' => $saleOrder->id,
+        'quantity' => 4,
+        'warehouse_id' => $this->warehouse->id,
+    ]);
+
+    $rak = Rak::factory()->create([
+        'warehouse_id' => $this->warehouse->id,
+    ]);
+
+    $driver = Driver::factory()->create();
+    $vehicle = Vehicle::factory()->create();
+
+    $deliveryOrder = DeliveryOrder::factory()->create([
+        'status' => 'request_stock',
+        'warehouse_id' => $this->warehouse->id,
+        'driver_id' => $driver->id,
+        'vehicle_id' => $vehicle->id,
+    ]);
+
+    $deliveryOrderItem = DeliveryOrderItem::create([
+        'delivery_order_id' => $deliveryOrder->id,
+        'sale_order_item_id' => $saleOrderItem->id,
+        'product_id' => $saleOrderItem->product_id,
+        'quantity' => 4,
+        'reason' => 'Warehouse confirmation sync test',
+        'status' => 'pending',
+    ]);
+
+    $wc = WarehouseConfirmation::create([
+        'confirmable_type' => DeliveryOrder::class,
+        'confirmable_id' => $deliveryOrder->id,
+        'confirmation_type' => 'delivery_order',
+        'status' => 'request',
+        'note' => 'Warehouse confirmation sync test',
+    ]);
+
+    WarehouseConfirmationItem::create([
+        'warehouse_confirmation_id' => $wc->id,
+        'sale_order_item_id' => $saleOrderItem->id,
+        'product_id' => $saleOrderItem->product_id,
+        'product_name' => $saleOrderItem->product?->name ?? '-',
+        'requested_qty' => 4,
+        'confirmed_qty' => 4,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => $rak->id,
+        'status' => 'request',
+    ]);
+
+    expect($deliveryOrderItem->fresh()->status)->toBe('requested');
+
+    $wc->update([
+        'status' => 'confirmed',
+        'confirmed_by' => $this->user->id,
+        'confirmed_at' => now(),
+    ]);
+
+    expect($deliveryOrderItem->fresh()->status)->toBe('confirmed');
+    expect($deliveryOrder->fresh()->status)->toBe('approved');
 });

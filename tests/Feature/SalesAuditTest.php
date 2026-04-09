@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -130,7 +131,7 @@ class SalesAuditTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function test_quotation_creation_and_approval_workflow()
     {
         // Create quotation
@@ -171,7 +172,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals(50, $quotation->quotationItem()->first()->quantity);
     }
 
-    /** @test */
+    #[Test]
     public function test_sales_order_creation_from_quotation()
     {
         // Create quotation first
@@ -240,7 +241,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals(50, $salesOrder->saleOrderItem()->first()->quantity);
     }
 
-    /** @test */
+    #[Test]
     public function test_warehouse_confirmation_and_stock_reservation()
     {
         // Create sales order first
@@ -317,7 +318,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals(70.0, (float) $stock->qty_available - (float) $stock->qty_reserved);
     }
 
-    /** @test */
+    #[Test]
     public function test_delivery_order_generation_from_sales_order()
     {
         // Create sales order first
@@ -384,7 +385,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals(30, $deliveryOrder->deliveryOrderItem()->first()->quantity);
     }
 
-    /** @test */
+    #[Test]
     public function test_invoice_generation_and_payment_processing()
     {
         // Create sales order and delivery order first
@@ -475,7 +476,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals(1, $receipt->customerReceiptItem()->count());
     }
 
-    /** @test */
+    #[Test]
     public function test_sales_return_processing()
     {
         // Create sales order and delivery order first
@@ -550,7 +551,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals(80, $stock->qty_available);
     }
 
-    /** @test */
+    #[Test]
     public function test_cross_module_data_integrity()
     {
         // Create complete sales flow
@@ -644,7 +645,7 @@ class SalesAuditTest extends TestCase
         // Note: invoices don't have currency_id field
     }
 
-    /** @test */
+    #[Test]
     public function test_customer_management_and_performance()
     {
         // Test customer data integrity
@@ -701,7 +702,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals(1, $approvedOrders);
     }
 
-    /** @test */
+    #[Test]
     public function test_end_to_end_sales_workflow()
     {
         // Step 1: Create quotation
@@ -877,7 +878,7 @@ class SalesAuditTest extends TestCase
         $this->assertEquals($invoice->id, $receipt->customerReceiptItem()->first()->invoice_id);
     }
 
-    /** @test */
+    #[Test]
     public function test_sales_data_validation_and_constraints()
     {
         // Test required fields validation

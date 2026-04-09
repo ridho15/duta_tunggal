@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Cabang;
+use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\Rak;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -18,6 +20,7 @@ class StockMovementTest extends TestCase
     protected $user;
     protected $cabang;
     protected $warehouse;
+    protected $rak;
     protected $product;
 
     protected function setUp(): void
@@ -35,6 +38,7 @@ class StockMovementTest extends TestCase
         ]);
         $this->cabang = Cabang::factory()->create();
         $this->warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        $this->rak = Rak::factory()->create(['warehouse_id' => $this->warehouse->id]);
         $this->product = Product::factory()->create();
 
         // Authenticate user
@@ -432,5 +436,69 @@ class StockMovementTest extends TestCase
             $this->assertNotNull($movement->quantity);
             $this->assertNotNull($movement->value);
         }
+    }
+
+    #[Test]
+    public function outbound_negative_quantity_reduces_inventory_stock()
+    {
+        InventoryStock::create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'qty_available' => 100,
+            'qty_reserved' => 0,
+        ]);
+
+        StockMovement::create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'type' => 'sales',
+            'quantity' => -5,
+            'value' => 50000,
+            'date' => now(),
+        ]);
+
+        $stock = InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->where('rak_id', $this->rak->id)
+            ->firstOrFail();
+
+        $this->assertSame(95.0, (float) $stock->qty_available);
+    }
+
+    #[Test]
+    public function updating_stock_movement_location_rebalances_inventory_between_locations()
+    {
+        $warehouse2 = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        $rak2 = Rak::factory()->create(['warehouse_id' => $warehouse2->id]);
+
+        $movement = StockMovement::create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'type' => 'purchase_in',
+            'quantity' => 10,
+            'value' => 50000,
+            'date' => now(),
+        ]);
+
+        $movement->update([
+            'warehouse_id' => $warehouse2->id,
+            'rak_id' => $rak2->id,
+        ]);
+
+        $originStock = InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->where('rak_id', $this->rak->id)
+            ->first();
+
+        $destinationStock = InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $warehouse2->id)
+            ->where('rak_id', $rak2->id)
+            ->firstOrFail();
+
+        $this->assertSame(0.0, (float) ($originStock?->qty_available ?? 0));
+        $this->assertSame(10.0, (float) $destinationStock->qty_available);
     }
 }

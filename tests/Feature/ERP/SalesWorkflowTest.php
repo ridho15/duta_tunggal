@@ -13,6 +13,7 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -51,7 +52,7 @@ class SalesWorkflowTest extends TestCase
 
     // ─── #8 QUOTATION → SO APPROVAL WORKFLOW ─────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function approved_quotation_creates_sale_order_with_request_approve_status(): void
     {
         $quotation = Quotation::factory()->create([
@@ -82,7 +83,7 @@ class SalesWorkflowTest extends TestCase
             'SO from approved quotation must start with request_approve, not draft');
     }
 
-    /** @test */
+    #[Test]
     public function draft_quotation_creates_sale_order_with_draft_status(): void
     {
         $quotation = Quotation::factory()->create([
@@ -111,7 +112,7 @@ class SalesWorkflowTest extends TestCase
 
     // ─── #9 DISCOUNT APPROVAL LOGIC ───────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function quotation_item_discount_is_stored_correctly(): void
     {
         $quotation = Quotation::factory()->create([
@@ -139,7 +140,7 @@ class SalesWorkflowTest extends TestCase
         $this->assertEquals(3375000, $expectedNet);
     }
 
-    /** @test */
+    #[Test]
     public function sale_order_item_discount_persists_to_database(): void
     {
         $so = SaleOrder::factory()->create([
@@ -167,7 +168,7 @@ class SalesWorkflowTest extends TestCase
 
     // ─── #10 PAYMENT TERM (STATUS TRANSITIONS) ────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function sale_order_follows_approval_status_transitions(): void
     {
         $so = SaleOrder::factory()->create([
@@ -200,7 +201,7 @@ class SalesWorkflowTest extends TestCase
         $this->assertEquals('closed', $so->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function sale_order_can_be_rejected(): void
     {
         $so = SaleOrder::factory()->create([
@@ -221,7 +222,7 @@ class SalesWorkflowTest extends TestCase
 
     // ─── #11 PPN FIELD LOCKED IN SALE ORDER ───────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function ppn_value_in_sale_order_item_is_stored_and_not_overwritten(): void
     {
         $so = SaleOrder::factory()->create([
@@ -256,7 +257,7 @@ class SalesWorkflowTest extends TestCase
         $this->assertEquals(360000, $taxAmount);
     }
 
-    /** @test */
+    #[Test]
     public function ppn_field_cannot_be_zero_when_set_to_twelve_percent(): void
     {
         $so = SaleOrder::factory()->create([

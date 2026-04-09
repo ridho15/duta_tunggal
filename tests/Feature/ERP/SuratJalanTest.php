@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\DeliveryOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -48,7 +49,7 @@ class SuratJalanTest extends TestCase
 
     // ─── #17 SJ FOR ALL CUSTOMER TYPES ───────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function surat_jalan_can_be_created_for_ambil_sendiri_order(): void
     {
         $so = SaleOrder::factory()->create([
@@ -86,7 +87,7 @@ class SuratJalanTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function surat_jalan_can_be_created_for_kirim_langsung_order(): void
     {
         $so = SaleOrder::factory()->create([
@@ -125,7 +126,7 @@ class SuratJalanTest extends TestCase
 
     // ─── #18 SJ STORES SHIPPING INFORMATION ──────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function surat_jalan_uses_delivery_schedule_shipping_details(): void
     {
         $sj = SuratJalan::create([
@@ -161,7 +162,7 @@ class SuratJalanTest extends TestCase
         $this->assertEquals('Kurir Internal', $sj->fresh()->shipping_method_label);
     }
 
-    /** @test */
+    #[Test]
     public function surat_jalan_without_delivery_schedule_has_no_shipping_details(): void
     {
         $sj = SuratJalan::create([
@@ -178,7 +179,7 @@ class SuratJalanTest extends TestCase
         $this->assertEquals('-', $sj->fresh()->shipping_method_label);
     }
 
-    /** @test */
+    #[Test]
     public function surat_jalan_can_be_created_without_shipping_fields(): void
     {
         $sj = SuratJalan::create([
@@ -196,7 +197,7 @@ class SuratJalanTest extends TestCase
 
     // ─── #19 APPROVING SJ MARKS DOs AS SENT ──────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function approving_surat_jalan_marks_linked_delivery_orders_as_sent(): void
     {
         $do1 = DeliveryOrder::create([
@@ -242,7 +243,7 @@ class SuratJalanTest extends TestCase
         $this->assertDatabaseHas('delivery_orders', ['id' => $do2->id, 'status' => 'sent']);
     }
 
-    /** @test */
+    #[Test]
     public function surat_jalan_approval_status_persists(): void
     {
         $sj = SuratJalan::create([

@@ -25,6 +25,7 @@ use App\Models\Warehouse;
 use App\Services\DeliveryOrderService;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CompleteSalesFlowFilamentTest extends TestCase
@@ -95,7 +96,7 @@ class CompleteSalesFlowFilamentTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function complete_sales_flow_from_quotation_to_customer_payment_with_form_simulation()
     {
         // ==========================================

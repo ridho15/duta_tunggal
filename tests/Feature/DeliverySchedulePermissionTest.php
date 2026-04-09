@@ -15,6 +15,7 @@ use App\Services\DeliveryScheduleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DeliverySchedulePermissionTest extends TestCase
@@ -82,7 +83,7 @@ class DeliverySchedulePermissionTest extends TestCase
 
     // ── Permission existence tests ─────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function all_delivery_schedule_permissions_exist_in_helper_controller(): void
     {
         $allPermissions = HelperController::listPermission();
@@ -103,7 +104,7 @@ class DeliverySchedulePermissionTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function all_delivery_schedule_permissions_exist_in_database(): void
     {
         $expected = [
@@ -128,7 +129,7 @@ class DeliverySchedulePermissionTest extends TestCase
 
     // ── Policy tests ───────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function user_with_all_permissions_passes_all_policy_checks(): void
     {
         $schedule = DeliverySchedule::create([
@@ -150,7 +151,7 @@ class DeliverySchedulePermissionTest extends TestCase
         $this->assertTrue($this->policy->rekap($this->userWithAllPerms));
     }
 
-    /** @test */
+    #[Test]
     public function user_without_permissions_fails_all_policy_checks(): void
     {
         $schedule = DeliverySchedule::create([
@@ -172,7 +173,7 @@ class DeliverySchedulePermissionTest extends TestCase
         $this->assertFalse($this->policy->rekap($this->userNoPerms));
     }
 
-    /** @test */
+    #[Test]
     public function view_only_user_can_view_but_not_create_or_modify(): void
     {
         $schedule = DeliverySchedule::create([
@@ -194,7 +195,7 @@ class DeliverySchedulePermissionTest extends TestCase
 
     // ── Role-based permission tests ────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function delivery_driver_role_has_delivery_schedule_permissions(): void
     {
         // Seed roles and permissions for this test
@@ -226,7 +227,7 @@ class DeliverySchedulePermissionTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function super_admin_has_all_delivery_schedule_permissions(): void
     {
         $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
@@ -263,7 +264,7 @@ class DeliverySchedulePermissionTest extends TestCase
 
     // ── Rekap feature tests ────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function rekap_export_query_returns_correct_data(): void
     {
         $driver2 = Driver::factory()->create(['cabang_id' => $this->cabang->id]);
@@ -313,7 +314,7 @@ class DeliverySchedulePermissionTest extends TestCase
         $this->assertEquals('delivered', $first->status);
     }
 
-    /** @test */
+    #[Test]
     public function rekap_export_filters_by_date(): void
     {
         $schedule_old = DeliverySchedule::create([
@@ -345,7 +346,7 @@ class DeliverySchedulePermissionTest extends TestCase
         $this->assertEquals('SCH-DATE-002', $filtered->first()->schedule_number);
     }
 
-    /** @test */
+    #[Test]
     public function rekap_service_generates_valid_number(): void
     {
         $service = app(DeliveryScheduleService::class);
@@ -355,7 +356,7 @@ class DeliverySchedulePermissionTest extends TestCase
         $this->assertMatchesRegularExpression('/^SCH-\d{8}-\d{4}$/', $number);
     }
 
-    /** @test */
+    #[Test]
     public function delivery_schedule_policy_is_registered(): void
     {
         // The policy should be registered in AuthServiceProvider

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
 use App\Models\Cabang;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class ProductionPlan extends Model
 {
     // use SoftDeletes, HasFactory, LogsGlobalActivity;
-    use SoftDeletes, HasFactory;
+    use SoftDeletes, HasFactory, CascadesJournalEntries;
 
     protected $table = 'production_plans';
 

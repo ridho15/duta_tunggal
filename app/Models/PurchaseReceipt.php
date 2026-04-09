@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ use App\Http\Controllers\HelperController;
 
 class PurchaseReceipt extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory,LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'purchase_receipts';
     protected function casts(): array
     {

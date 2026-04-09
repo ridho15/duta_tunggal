@@ -106,6 +106,56 @@ class WarehouseConfirmationItem extends Model
         );
     }
 
+    public function syncLinkedDeliveryOrderItemStatus(?string $overrideStatus = null): void
+    {
+        $warehouseConfirmation = $this->warehouseConfirmation()->first();
+
+        if (! $warehouseConfirmation || $warehouseConfirmation->confirmable_type !== DeliveryOrder::class) {
+            return;
+        }
+
+        if (! $this->sale_order_item_id) {
+            return;
+        }
+
+        $deliveryOrderItem = DeliveryOrderItem::query()
+            ->where('delivery_order_id', $warehouseConfirmation->confirmable_id)
+            ->where('sale_order_item_id', $this->sale_order_item_id)
+            ->first();
+
+        if (! $deliveryOrderItem) {
+            return;
+        }
+
+        $mappedStatus = $overrideStatus ?? $this->mapDeliveryOrderItemStatus();
+        $updatePayload = ['status' => $mappedStatus];
+
+        if ($overrideStatus !== null) {
+            $updatePayload['confirmed_qty'] = match (strtolower($overrideStatus)) {
+                'confirmed' => $this->requested_qty,
+                'rejected', 'pending' => 0,
+                default => $this->confirmed_qty,
+            };
+        }
+
+        if ($deliveryOrderItem->status === $mappedStatus) {
+            return;
+        }
+
+        $deliveryOrderItem->update($updatePayload);
+    }
+
+    protected function mapDeliveryOrderItemStatus(): string
+    {
+        return match (strtolower((string) $this->status)) {
+            'confirmed' => 'confirmed',
+            'partial_confirmed' => 'partial',
+            'rejected' => 'rejected',
+            'request' => 'requested',
+            default => 'pending',
+        };
+    }
+
     protected function syncLinkedMaterialIssueItemStatus(): void
     {
         if (! $this->material_issue_item_id) {
@@ -137,6 +187,7 @@ class WarehouseConfirmationItem extends Model
     {
         static::saved(function (WarehouseConfirmationItem $warehouseConfirmationItem) {
             $warehouseConfirmationItem->syncLinkedMaterialIssueItemStatus();
+            $warehouseConfirmationItem->syncLinkedDeliveryOrderItemStatus();
         });
 
         static::updating(function ($warehouseConfirmationItem) {

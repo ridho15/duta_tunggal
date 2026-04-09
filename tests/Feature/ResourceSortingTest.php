@@ -34,6 +34,7 @@ use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -127,7 +128,7 @@ class ResourceSortingTest extends TestCase
 
     // ─── Tests: created_at DESC ──────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function sale_orders_sort_newest_first(): void
     {
         $old = SaleOrder::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -136,7 +137,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(SaleOrder::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function purchase_orders_sort_newest_first(): void
     {
         $old = PurchaseOrder::factory()->create([
@@ -151,7 +152,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(PurchaseOrder::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function order_requests_sort_newest_first(): void
     {
         $old = OrderRequest::factory()->create([
@@ -166,7 +167,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(OrderRequest::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function deposits_sort_newest_first(): void
     {
         $old = Deposit::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -175,7 +176,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(Deposit::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function delivery_orders_sort_newest_first(): void
     {
         $old = DeliveryOrder::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -184,7 +185,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(DeliveryOrder::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function purchase_receipts_sort_newest_first(): void
     {
         $old = PurchaseReceipt::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -193,7 +194,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(PurchaseReceipt::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function quotations_sort_newest_first(): void
     {
         $old = Quotation::factory()->create([
@@ -208,7 +209,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(Quotation::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function journal_entries_sort_newest_first(): void
     {
         $old = JournalEntry::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -217,7 +218,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(JournalEntry::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function payment_requests_sort_newest_first(): void
     {
         $old = PaymentRequest::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -226,7 +227,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(PaymentRequest::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function voucher_requests_sort_newest_first(): void
     {
         $old = VoucherRequest::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -235,7 +236,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(VoucherRequest::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function stock_adjustments_sort_newest_first(): void
     {
         $old = StockAdjustment::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -244,7 +245,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(StockAdjustment::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function stock_transfers_sort_newest_first(): void
     {
         $old = StockTransfer::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -253,7 +254,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(StockTransfer::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function manufacturing_orders_sort_newest_first(): void
     {
         $old = ManufacturingOrder::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -262,7 +263,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(ManufacturingOrder::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function surat_jalans_sort_newest_first(): void
     {
         $old = SuratJalan::factory()->create([
@@ -279,7 +280,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(SuratJalan::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function vendor_payments_sort_newest_first(): void
     {
         $old = VendorPayment::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -288,7 +289,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(VendorPayment::query(), 'created_at', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function warehouse_confirmations_sort_newest_first(): void
     {
         $old = WarehouseConfirmation::factory()->create(['created_at' => Carbon::parse('2026-03-01')]);
@@ -299,7 +300,7 @@ class ResourceSortingTest extends TestCase
 
     // ─── Tests: domain-specific date columns ────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function invoices_sort_by_invoice_date_newest_first(): void
     {
         $old = Invoice::factory()->create(['invoice_date' => '2026-03-01']);
@@ -308,7 +309,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(Invoice::query(), 'invoice_date', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function stock_movements_sort_by_date_newest_first(): void
     {
         $old = StockMovement::factory()->create(['date' => '2026-03-01']);
@@ -317,7 +318,7 @@ class ResourceSortingTest extends TestCase
         $this->assertNewerFirst(StockMovement::query(), 'date', $new->id, $old->id);
     }
 
-    /** @test */
+    #[Test]
     public function inventory_stocks_sort_by_updated_at_newest_first(): void
     {
         // Use distinct product+warehouse+rak combos to avoid unique constraint
@@ -340,7 +341,7 @@ class ResourceSortingTest extends TestCase
 
     // ─── Edge case: identical timestamps fall back to id DESC ────────────────
 
-    /** @test */
+    #[Test]
     public function identical_created_at_timestamps_fall_back_to_id_desc(): void
     {
         $sameTime = Carbon::parse('2026-03-05 12:00:00');
@@ -352,7 +353,7 @@ class ResourceSortingTest extends TestCase
         $this->assertIdFallback(SaleOrder::query(), 'created_at', $higher->id, $lower->id);
     }
 
-    /** @test */
+    #[Test]
     public function identical_invoice_dates_fall_back_to_id_desc(): void
     {
         $sameDate = '2026-03-05';
@@ -364,7 +365,7 @@ class ResourceSortingTest extends TestCase
         $this->assertIdFallback(Invoice::query(), 'invoice_date', $higher->id, $lower->id);
     }
 
-    /** @test */
+    #[Test]
     public function identical_stock_movement_dates_fall_back_to_id_desc(): void
     {
         $sameDate = '2026-03-05';
@@ -378,7 +379,7 @@ class ResourceSortingTest extends TestCase
 
     // ─── Pagination: newest on page 1 ───────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function newest_sale_order_appears_on_first_page(): void
     {
         SaleOrder::factory()->count(20)->create(['created_at' => Carbon::parse('2026-02-01')]);
@@ -394,7 +395,7 @@ class ResourceSortingTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function oldest_sale_order_does_not_appear_on_first_page(): void
     {
         $oldest = SaleOrder::factory()->create(['created_at' => Carbon::parse('2026-01-01')]);

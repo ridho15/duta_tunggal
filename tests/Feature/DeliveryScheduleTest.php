@@ -450,7 +450,7 @@ class DeliveryScheduleTest extends TestCase
         $this->assertSame('sent', $deliveryOrder->fresh()->status);
         $this->assertSame(0, JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
-            ->count();
+            ->count());
 
         $journalCountAfterOnTheWay = JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)

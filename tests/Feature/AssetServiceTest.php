@@ -8,6 +8,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\AssetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AssetServiceTest extends TestCase
@@ -22,12 +23,12 @@ class AssetServiceTest extends TestCase
         $this->assetService = new AssetService();
     }
 
-    /** @test */
+    #[Test]
     public function it_can_post_asset_acquisition_journal()
     {
         // Create test COAs
         $assetCoa = ChartOfAccount::factory()->create(['name' => 'Asset COA', 'type' => 'asset']);
-        $supplierCoa = ChartOfAccount::factory()->create(['perusahaan' => 'Supplier COA', 'type' => 'liability']);
+        $supplierCoa = ChartOfAccount::factory()->create(['name' => 'Supplier COA', 'type' => 'liability']);
 
         // Create test asset
         $asset = Asset::factory()->create([
@@ -61,7 +62,7 @@ class AssetServiceTest extends TestCase
         $this->assertEquals('posted', $asset->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_post_asset_depreciation_journal()
     {
         // Create test COAs
@@ -100,7 +101,7 @@ class AssetServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_check_if_asset_has_posted_journals()
     {
         // Create test asset
@@ -123,7 +124,7 @@ class AssetServiceTest extends TestCase
         $this->assertTrue($this->assetService->hasPostedJournals($asset));
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_asset_journals()
     {
         // Create test asset
@@ -153,7 +154,7 @@ class AssetServiceTest extends TestCase
         $this->assertEquals($depreciationEntry->id, $journals->last()->id);
     }
 
-    /** @test */
+    #[Test]
     public function it_auto_posts_asset_acquisition_journal_when_asset_is_created_from_purchase_order()
     {
         $this->actingAs(User::factory()->create());

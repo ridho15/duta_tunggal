@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ManufacturingOrder extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
     protected $guarded = ['id'];
     protected $table = 'manufacturing_orders';
     protected $fillable = [

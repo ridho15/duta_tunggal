@@ -15,6 +15,7 @@ Scope: preview and print routes audited against automated feature coverage and a
 | `reports.balance-sheet.preview` | Yes | Verified live aggregate | Assets, liabilities, equity, and balance difference matched active database totals. |
 | `reports.profit-and-loss.preview` | Yes | Verified live aggregate | Revenue, expense, and net income matched direct journal sums. |
 | `reports.financial-statement.preview` | Yes | Verified live composite | Route test passed; live scalar summaries for BS, PL, and COGM matched the active database and the shared service payload. |
+| `filament.admin.pages.purchase-report-page` | Yes | Verified live composite | Page payload, PDF summary, and direct `PurchaseOrder` reconstruction matched the active database for the default April 2026 window. |
 | `reports.cash-flow.preview` | Yes | Verified live | April 2026 direct-method sections, opening balance, net change, and closing balance matched direct reconstruction. Snapshot produced `net_change = 50,412,870`. |
 | `reports.drill-down-financial-report.preview` | Yes | Verified live | Grouped rows, total debit, total credit, and entry count matched direct journal grouping. |
 | `reports.journal-consolidation.preview` | Yes | Verified live | Branch groups, COA summary, totals, and balance matched direct journal grouping. |
@@ -34,6 +35,7 @@ Scope: preview and print routes audited against automated feature coverage and a
 - Ageing live verification: AR rows `0`, AP rows `0`, mismatch `0`.
 - HPP live verification: all major fields matched direct DB reconstruction after applying the same stock fallback rule as the service.
 - Financial Statement live verification: route test passed, and scalar BS, PL, and COGM summaries matched the active database and shared service payload.
+- Purchase Report live verification: default page window for 2026-04-01 through 2026-04-08 matched service rows, direct `PurchaseOrder` reconstruction, and PDF summary totals exactly.
 - Journal Consolidation live verification: count, debit, credit, difference, grouped branches, and COA summary all matched.
 - Drill Down Financial Report live verification: count, totals, and grouped balances all matched.
 - Cash Flow live verification for April 2026: reconstructed direct-method sections matched the service exactly; active source snapshot included one customer receipt and four vendor-payment journals.

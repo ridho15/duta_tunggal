@@ -10,7 +10,6 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 
 class PurchaseOrderRelationManager extends RelationManager
 {
@@ -68,26 +67,10 @@ class PurchaseOrderRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->label('Status PO')
                     ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
+                        return \App\Filament\Resources\PurchaseOrderResource::formatStatusLabel($state);
                     })
                     ->color(function ($state) {
-                        switch ($state) {
-                            case 'draft':
-                                return 'gray';
-                                break;
-                            case 'partially_received':
-                                return 'warning';
-                                break;
-                            case 'request_close':
-                                return 'warning';
-                                break;
-                            case 'closed':
-                                return 'danger';
-                                break;
-                            case 'completed':
-                                return 'success';
-                                break;
-                        }
+                        return \App\Filament\Resources\PurchaseOrderResource::getStatusColor($state);
                     })
                     ->badge(),
                 TextColumn::make('expected_date')

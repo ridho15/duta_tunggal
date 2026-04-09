@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\OrderRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -71,7 +72,7 @@ class OrderRequestTest extends TestCase
     // Test #1 — Price is editable: original_price vs unit_price
     // ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function order_request_item_stores_original_and_overridden_price(): void
     {
         $item = OrderRequestItem::create([
@@ -100,7 +101,7 @@ class OrderRequestTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function order_request_item_original_price_differs_from_unit_price_after_override(): void
     {
         $masterPrice   = 150000;
@@ -126,7 +127,7 @@ class OrderRequestTest extends TestCase
     // Test #2 — PPN status field (tax_type)
     // ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function order_request_stores_ppn_included_tax_type(): void
     {
         $or = OrderRequest::factory()->create([
@@ -144,7 +145,7 @@ class OrderRequestTest extends TestCase
         $this->assertEquals('PPN Included', $or->fresh()->tax_type);
     }
 
-    /** @test */
+    #[Test]
     public function order_request_stores_ppn_excluded_tax_type(): void
     {
         $or = OrderRequest::factory()->create([
@@ -161,7 +162,7 @@ class OrderRequestTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function order_request_service_applies_correct_tipe_pajak_for_ppn_excluded(): void
     {
         $this->orderRequest->update(['tax_type' => 'PPN Excluded']);
@@ -195,7 +196,7 @@ class OrderRequestTest extends TestCase
         $this->assertEquals('Eklusif', $poItem->tipe_pajak);
     }
 
-    /** @test */
+    #[Test]
     public function order_request_service_applies_correct_tipe_pajak_for_ppn_included(): void
     {
         $this->orderRequest->update(['tax_type' => 'PPN Included']);
@@ -231,7 +232,7 @@ class OrderRequestTest extends TestCase
     // Test #3 — One OR generates multiple POs (multi-supplier)
     // ──────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function one_order_request_can_create_multiple_purchase_orders_for_different_suppliers(): void
     {
         $itemA = OrderRequestItem::create([
@@ -308,7 +309,7 @@ class OrderRequestTest extends TestCase
         $this->assertEquals(2, $this->orderRequest->purchaseOrders()->count());
     }
 
-    /** @test */
+    #[Test]
     public function or_to_po_only_includes_selected_items(): void
     {
         $itemA = OrderRequestItem::create([
@@ -350,7 +351,7 @@ class OrderRequestTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function supplier_price_from_pivot_is_used_as_default_unit_price(): void
     {
         // Attach supplier price via pivot

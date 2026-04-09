@@ -18,6 +18,7 @@ use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
 use App\Services\DeliveryOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -56,7 +57,7 @@ class DeliveryWorkflowTest extends TestCase
 
     // ─── #12 DO EXISTS FOR 'AMBIL SENDIRI' ───────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function delivery_order_is_created_for_ambil_sendiri_pickup_type(): void
     {
         // SO with Ambil Sendiri delivery type must still get a Delivery Order
@@ -89,7 +90,7 @@ class DeliveryWorkflowTest extends TestCase
             'DO must be linked to an Ambil Sendiri Sale Order');
     }
 
-    /** @test */
+    #[Test]
     public function delivery_order_is_created_for_kirim_langsung_type(): void
     {
         // SO with Kirim Langsung must get a DO for tracking purposes
@@ -122,7 +123,7 @@ class DeliveryWorkflowTest extends TestCase
 
     // ─── #13 DO AUTO-GENERATED AFTER SO APPROVAL ─────────────────────────────
 
-    /** @test */
+    #[Test]
     public function delivery_order_can_be_created_with_nullable_driver_and_vehicle(): void
     {
         // Verify the schema now allows NULL for driver_id / vehicle_id (Bug #18 fix)
@@ -143,7 +144,7 @@ class DeliveryWorkflowTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function delivery_order_is_linked_to_sale_order(): void
     {
         $so = SaleOrder::factory()->create([
@@ -176,7 +177,7 @@ class DeliveryWorkflowTest extends TestCase
 
     // ─── #14 DELIVERY_FAILED STATUS ──────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function delivery_order_status_can_be_set_to_delivery_failed(): void
     {
         $do = DeliveryOrder::create([
@@ -200,7 +201,7 @@ class DeliveryWorkflowTest extends TestCase
             'delivery_failed status must be persisted in the database');
     }
 
-    /** @test */
+    #[Test]
     public function delivery_order_can_transition_from_approved_to_delivery_failed(): void
     {
         $do = DeliveryOrder::create([
@@ -224,7 +225,7 @@ class DeliveryWorkflowTest extends TestCase
 
     // ─── #15 DO TABLE ATTRIBUTES ─────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function delivery_order_has_required_columns_for_listing(): void
     {
         $so = SaleOrder::factory()->create([
@@ -269,7 +270,7 @@ class DeliveryWorkflowTest extends TestCase
 
     // ─── #16 DO APPROVAL TOGGLE ───────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function do_approval_required_config_defaults_to_true(): void
     {
         $this->assertTrue(
@@ -278,7 +279,7 @@ class DeliveryWorkflowTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function do_approval_not_required_when_config_is_false(): void
     {
         config(['procurement.do_approval_required' => false]);
@@ -302,7 +303,7 @@ class DeliveryWorkflowTest extends TestCase
         $this->assertEquals('sent', $do->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function delivery_order_service_updates_status_correctly(): void
     {
         $do = DeliveryOrder::create([

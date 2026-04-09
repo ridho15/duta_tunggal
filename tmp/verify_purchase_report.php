@@ -10,7 +10,9 @@ $start = now()->startOfMonth()->format('Y-m-d');
 $end = now()->format('Y-m-d');
 
 $service = app(App\Services\Reports\PurchaseReportService::class);
-$user = App\Models\User::query()->whereRaw("JSON_CONTAINS(manage_type, '\"all\"')")->first() ?? App\Models\User::query()->first();
+$user = App\Models\User::query()
+    ->where('manage_type', 'like', '%all%')
+    ->first() ?? App\Models\User::query()->first();
 
 if (! $user) {
     fwrite(STDERR, "No user found\n");
@@ -87,7 +89,7 @@ $result = [
         'status_counts' => $servicePayload['summary']['status_counts'] === $directSummary['status_counts'],
     ],
     'sample_service_rows' => $serviceRows->take(3)->all(),
-    'sample_direct_rows' => $directRows->take(3)->map(fn ($order) => [
+    'sample_direct_rows' => $directOrders->take(3)->map(fn ($order) => [
         'po_number' => $order->po_number,
         'order_date' => $order->order_date?->format('Y-m-d'),
         'supplier_code' => $order->supplier->code ?? '-',

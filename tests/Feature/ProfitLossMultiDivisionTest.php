@@ -26,7 +26,7 @@ uses(RefreshDatabase::class);
 /**
  * Create a minimal Cabang (division/branch) for testing.
  */
-function makeCabang(string $kode, string $nama): Cabang
+function makeProfitLossCabang(string $kode, string $nama): Cabang
 {
     return Cabang::create([
         'kode'    => $kode,
@@ -75,8 +75,8 @@ describe('ProfitLossMultiDivisionService', function () {
         $this->service = new ProfitLossMultiDivisionService();
 
         // Divisions
-        $this->divA = makeCabang('ACC', 'Accounting');
-        $this->divB = makeCabang('DIR', 'Director');
+        $this->divA = makeProfitLossCabang('ACC', 'Accounting');
+        $this->divB = makeProfitLossCabang('DIR', 'Director');
 
         // Revenue COA
         $this->revParent = makeCoa('4100', 'PENJUALAN BARANG DAGANGAN', 'Revenue');
@@ -388,7 +388,7 @@ describe('ProfitLossMultiDivisionPage', function () {
 
     it('shows report table after generateReport', function () {
         // Seed some data so the report is non-trivial
-        $div = makeCabang('TST', 'Test Division');
+        $div = makeProfitLossCabang('TST', 'Test Division');
         $rev = makeCoa('4200', 'Revenue Test Parent', 'Revenue');
         $rc  = makeCoa('4200.01', 'Revenue Test Leaf', 'Revenue', $rev->id);
         makeJe($rc->id, $div->id, 0, 1_000_000);
@@ -401,8 +401,8 @@ describe('ProfitLossMultiDivisionPage', function () {
     });
 
     it('builds preview and export urls with selected filters', function () {
-        $divA = makeCabang('AA2', 'Alpha 2');
-        $divB = makeCabang('BB2', 'Beta 2');
+        $divA = makeProfitLossCabang('AA2', 'Alpha 2');
+        $divB = makeProfitLossCabang('BB2', 'Beta 2');
 
         $component = Livewire::test(ProfitLossMultiDivisionPage::class)
             ->set('startDate', '2025-04-01')
@@ -418,8 +418,8 @@ describe('ProfitLossMultiDivisionPage', function () {
     });
 
     it('accepts specific cabangIds filter', function () {
-        $divA = makeCabang('AA1', 'Alpha');
-        $divB = makeCabang('BB1', 'Beta');
+        $divA = makeProfitLossCabang('AA1', 'Alpha');
+        $divB = makeProfitLossCabang('BB1', 'Beta');
 
         $component = Livewire::test(ProfitLossMultiDivisionPage::class)
             ->set('cabangIds', [$divA->id]);

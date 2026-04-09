@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\TaxService;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -65,7 +66,7 @@ class InvoiceDppCalculationTest extends TestCase
     // DPP basic correctness tests (InvoiceResource formula)
     // -----------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function test_invoice_dpp_no_discount_no_tax(): void
     {
         // unit_price=500000, discount=0%, tax=0%, qty=3
@@ -74,7 +75,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(1_500_000.0, $dpp);
     }
 
-    /** @test */
+    #[Test]
     public function test_invoice_dpp_with_discount_percentage(): void
     {
         // unit_price=1,000,000, discount=10%, qty=2
@@ -84,7 +85,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(1_800_000.0, $dpp);
     }
 
-    /** @test */
+    #[Test]
     public function test_invoice_dpp_is_pre_tax_not_including_ppn(): void
     {
         // unit_price=1,000,000, discount=10%, tax(ppn)=11%, qty=2
@@ -100,7 +101,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(1_998_000.0, $total);
     }
 
-    /** @test */
+    #[Test]
     public function test_invoice_dpp_fixed_formula_differs_from_buggy_formula(): void
     {
         // This test documents that the bug produced wrong values.
@@ -119,7 +120,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertNotEquals($dppFixed, $dppBuggy);
     }
 
-    /** @test */
+    #[Test]
     public function test_invoice_dpp_zero_discount_still_works(): void
     {
         // unit_price=750,000, discount=0%, qty=4
@@ -128,7 +129,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(3_000_000.0, $dpp);
     }
 
-    /** @test */
+    #[Test]
     public function test_invoice_dpp_multiple_items_sum(): void
     {
         // Item 1: unit_price=1,000,000, discount=10%, qty=2 → DPP=1,800,000
@@ -147,7 +148,7 @@ class InvoiceDppCalculationTest extends TestCase
     // DPP basic correctness tests (PurchaseInvoiceResource formula)
     // -----------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function test_purchase_invoice_dpp_no_discount(): void
     {
         // unit_price=800,000, discount=0%, qty_accepted=5
@@ -156,7 +157,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(4_000_000.0, $dpp);
     }
 
-    /** @test */
+    #[Test]
     public function test_purchase_invoice_dpp_with_discount(): void
     {
         // unit_price=1,000,000, discount=10%, qty_accepted=2
@@ -165,7 +166,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(1_800_000.0, $dpp);
     }
 
-    /** @test */
+    #[Test]
     public function test_purchase_invoice_dpp_is_pre_tax(): void
     {
         // unit_price=1,000,000, discount=10%, tax=11%, qty_accepted=2
@@ -181,7 +182,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(1_998_000.0, $total);
     }
 
-    /** @test */
+    #[Test]
     public function test_purchase_invoice_dpp_fixed_differs_from_buggy(): void
     {
         // unit_price=1,000,000, discount=10%, tax=11%, qty_accepted=2
@@ -199,7 +200,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertGreaterThan($dppFixed, $dppBuggy);
     }
 
-    /** @test */
+    #[Test]
     public function test_purchase_invoice_dpp_multiple_items_sum(): void
     {
         // Item 1: unit_price=600,000, discount=0%,  qty_accepted=10 → DPP=6,000,000
@@ -218,7 +219,7 @@ class InvoiceDppCalculationTest extends TestCase
     // TaxService consistency: confirm DPP from TaxService matches our formula
     // -----------------------------------------------------------------------
 
-    /** @test */
+    #[Test]
     public function test_taxservice_eksklusif_dpp_matches_invoice_dpp_formula(): void
     {
         // For Eksklusif: TaxService::compute(amount) returns dpp = amount (the pre-tax base)
@@ -239,7 +240,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(1_998_000.0, $taxResult['total']); // 1,800,000 + 198,000
     }
 
-    /** @test */
+    #[Test]
     public function test_taxservice_inklusif_dpp_calculated_from_gross(): void
     {
         // For Inklusif: the gross price already includes PPN.
@@ -260,7 +261,7 @@ class InvoiceDppCalculationTest extends TestCase
         $this->assertEquals(2_220_000.0, $taxResult['total']);
     }
 
-    /** @test */
+    #[Test]
     public function test_taxservice_non_pajak_dpp_equals_gross(): void
     {
         $amount = 1_500_000.0;

@@ -119,9 +119,9 @@ class AssetDisposalResource extends Resource
                             ->label('Sale Price')
                             ->indonesianMoney()
                             ->rules([
-                                function () {
-                                    return function (string $attribute, $value, \Closure $fail) {
-                                        $disposalType = request()->input('disposal_type');
+                                function (Forms\Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $disposalType = $get('disposal_type');
                                         if ($disposalType === 'sale') {
                                             if (empty($value)) {
                                                 $fail('Harga jual wajib diisi untuk disposal tipe Sale.');

@@ -18,6 +18,7 @@ use App\Models\Warehouse;
 use App\Services\InvoiceService;
 use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -54,7 +55,7 @@ class AccountingTaxTest extends TestCase
 
     // ─── #22 PPN CALCULATION ─────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function ppn_calculation_on_invoice_uses_rate_not_absolute_amount(): void
     {
         // Invoice with subtotal=1,000,000 and tax=12 (meaning 12%, not Rp 12,000)
@@ -88,7 +89,7 @@ class AccountingTaxTest extends TestCase
             'tax field must be treated as percentage rate, not absolute amount');
     }
 
-    /** @test */
+    #[Test]
     public function ppn_calculation_for_eleven_percent_rate(): void
     {
         $subtotal = 2000000;
@@ -99,7 +100,7 @@ class AccountingTaxTest extends TestCase
             '11% PPN on Rp 2,000,000 must equal Rp 220,000');
     }
 
-    /** @test */
+    #[Test]
     public function ppn_included_in_total_amount(): void
     {
         $subtotal  = 1000000;
@@ -111,7 +112,7 @@ class AccountingTaxTest extends TestCase
             'Total must equal subtotal + tax amount for PPN Excluded invoice');
     }
 
-    /** @test */
+    #[Test]
     public function invoice_stores_tax_as_rate_not_as_absolute_amount(): void
     {
         $po = PurchaseOrder::factory()->create([
@@ -145,7 +146,7 @@ class AccountingTaxTest extends TestCase
             'Invoice tax field must store 12 (the rate) not 600000 (the absolute amount)');
     }
 
-    /** @test */
+    #[Test]
     public function journal_entries_for_purchase_invoice_include_ppn_masukan_line(): void
     {
         // Create COAs needed by LedgerPostingService
@@ -195,7 +196,7 @@ class AccountingTaxTest extends TestCase
 
     // ─── #23 AP SETTLEMENT DETAIL ─────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function account_payable_stores_supplier_invoice_total_paid_remaining(): void
     {
         $po = PurchaseOrder::factory()->create([
@@ -255,7 +256,7 @@ class AccountingTaxTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function account_payable_status_changes_to_lunas_when_paid_in_full(): void
     {
         $invoice = Invoice::create([
@@ -297,7 +298,7 @@ class AccountingTaxTest extends TestCase
 
     // ─── #24 NTPN NOT IN CUSTOMER PAYMENT FORM ───────────────────────────────
 
-    /** @test */
+    #[Test]
     public function customer_receipt_has_ntpn_field_in_database(): void
     {
         // NTPN field exists in the DB, but must be hidden from the Filament form
@@ -316,7 +317,7 @@ class AccountingTaxTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function ntpn_field_is_not_listed_in_required_customer_receipt_columns(): void
     {
         // Verify the Filament resource does NOT expose ntpn as a required or visible field
