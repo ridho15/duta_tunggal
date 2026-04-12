@@ -1,0 +1,2 @@
+target_sku,difference_reason,row_count,candidate_skus,candidate_names,candidate_category_ids,candidate_biaya_values,total_qty_available,total_qty_reserved,recommended_canonical_sku,recommended_category_id,recommended_biaya,approval_status,approved_canonical_sku,approved_category_id,approved_biaya,notes
+002008065067,"name,category,uom",2,"CAB-002008065067 || CAB-002008065067-DUP2-R13772","COPPER MALE UNION 2 1/2 X 2 5/8 || COPPER MALE UNION 2 1/2&quot; X 2 5/8&quot;","635 || 309","617083.00 || 617083.00",15.00,0.00,CAB-002008065067,635,617083.00,,,,,

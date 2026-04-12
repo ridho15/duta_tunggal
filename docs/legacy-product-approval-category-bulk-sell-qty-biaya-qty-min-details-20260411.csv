@@ -1,0 +1,13 @@
+target_sku,difference_reason,current_sku,product_name,product_category_id,uom_id,cost_price,sell_price,item_value,tipe_pajak,pajak,jumlah_kelipatan_gudang_besar,jumlah_jual_kategori_banyak,kode_merk,biaya,qty_available,qty_reserved,qty_min
+002013022019,"category,bulk_sell_qty,biaya,qty_min",CAB-002013022019,"TEE REDUCER COPPER 7/8 X 3/4",635,6,48750.00,58425.00,0.00,"Non Pajak",0.00,1,1,PS,49725.00,6.00,0.00,1.00
+002013022019,"category,bulk_sell_qty,biaya,qty_min",CAB-002013022019-DUP2-R18882,"TEE REDUCER COPPER 7/8 X 3/4",309,6,48750.00,58425.00,0.00,"Non Pajak",0.00,1,10000,PS,48750.00,16.00,0.00,0.00
+002017016009,"category,bulk_sell_qty,biaya,qty_min",CAB-002017016009,"REDUCER COPPER 5/8 X 3/8",635,6,15000.00,17595.00,0.00,"Non Pajak",0.00,1,1,PS,15300.00,76.00,93.00,1.00
+002017016009,"category,bulk_sell_qty,biaya,qty_min",CAB-002017016009-DUP2-R17430,"REDUCER COPPER 5/8 X 3/8",309,6,15000.00,17595.00,0.00,"Non Pajak",0.00,1,10000,PS,15000.00,109.00,0.00,0.00
+002017016013,"category,bulk_sell_qty,biaya,qty_min",CAB-002017016013,"REDUCER COPPER 5/8 X 1/2",635,6,15000.00,17595.00,0.00,"Non Pajak",0.00,1,1,PS,15300.00,0.00,0.00,1.00
+002017016013,"category,bulk_sell_qty,biaya,qty_min",CAB-002017016013-DUP2-R17429,"REDUCER COPPER 5/8 X 1/2",309,6,15000.00,17595.00,0.00,"Non Pajak",0.00,1,10000,PS,15000.00,0.00,0.00,0.00
+002017019009,"category,bulk_sell_qty,biaya,qty_min",CAB-002017019009,"REDUCER COPPER 3/4 X 3/8",635,6,17917.00,21490.00,0.00,"Non Pajak",0.00,1,1,PS,18275.00,0.00,0.00,1.00
+002017019009,"category,bulk_sell_qty,biaya,qty_min",CAB-002017019009-DUP2-R17427,"REDUCER COPPER 3/4 X 3/8",309,6,17917.00,21490.00,0.00,"Non Pajak",0.00,1,10000,PS,17917.00,154.00,0.00,0.00
+002017019013,"category,bulk_sell_qty,biaya,qty_min",CAB-002017019013,"REDUCER COPPER 3/4 X 1/2",635,6,13458.00,18535.00,0.00,"Non Pajak",0.00,1,1,PS,16150.00,5.00,25.00,1.00
+002017019013,"category,bulk_sell_qty,biaya,qty_min",CAB-002017019013-DUP2-R17426,"REDUCER COPPER 3/4 X 1/2",309,6,13458.00,18535.00,0.00,"Non Pajak",0.00,1,10000,PS,13458.00,51.00,0.00,0.00
+002017025022,"category,bulk_sell_qty,biaya,qty_min",CAB-002017025022,"REDUCER COPPER 1 X 7/8",635,6,11019.00,40695.00,0.00,"Non Pajak",0.00,1,1,STD,34850.00,7.00,7.00,1.00
+002017025022,"category,bulk_sell_qty,biaya,qty_min",CAB-002017025022-DUP2-R17424,"REDUCER COPPER 1 X 7/8",309,6,11019.00,40695.00,0.00,"Non Pajak",0.00,1,10000,STD,11019.00,79.00,0.00,0.00

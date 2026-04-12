@@ -143,7 +143,6 @@ class SaleOrderResource extends Resource
                         Select::make('quotation_id')
                             ->label('Quotation')
                             ->searchable()
-                            ->preload()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $items = [];
@@ -189,7 +188,6 @@ class SaleOrderResource extends Resource
                             ]),
                         Select::make('sale_order_id')
                             ->label('Sales Order')
-                            ->preload()
                             ->loadingMessage('Loading ...')
                             ->reactive()
                             ->searchable()
@@ -228,7 +226,6 @@ class SaleOrderResource extends Resource
                         Select::make('customer_id')
                             ->required()
                             ->label('Customer')
-                            ->preload()
                             ->searchable()
                             ->reactive()
                             ->helperText(function ($state) {
@@ -534,7 +531,6 @@ class SaleOrderResource extends Resource
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->searchable(['sku', 'name'])
-                                    ->preload()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::find($state);
@@ -1105,7 +1101,6 @@ class SaleOrderResource extends Resource
                 SelectFilter::make('customer')
                     ->label('Customer')
                     ->searchable()
-                    ->preload()
                     ->relationship('customer', 'name')
                     ->getOptionLabelFromRecordUsing(function (Customer $customer) {
                         return "({$customer->code}) {$customer->name}";
@@ -1402,7 +1397,6 @@ class SaleOrderResource extends Resource
                                         ]),
                                     Select::make('supplier_id')
                                         ->label('Supplier')
-                                        ->preload()
                                         ->reactive()
                                         ->searchable()
                                         ->validationMessages([

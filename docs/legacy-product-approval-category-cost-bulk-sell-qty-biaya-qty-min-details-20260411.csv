@@ -1,0 +1,9 @@
+target_sku,difference_reason,current_sku,product_name,product_category_id,uom_id,cost_price,sell_price,item_value,tipe_pajak,pajak,jumlah_kelipatan_gudang_besar,jumlah_jual_kategori_banyak,kode_merk,biaya,qty_available,qty_reserved,qty_min
+002013025019,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002013025019,"TEE REDUCER COPPER 1 x 3/4",413,6,97400.00,102244.00,0.00,"Non Pajak",0.00,1,1,PSF,82790.00,6.00,10.00,1.00
+002013025019,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002013025019-DUP2-R18881,"TEE REDUCER COPPER 1 x 3/4",100,6,81250.00,102244.00,0.00,"Non Pajak",0.00,1,10000,PSF,81250.00,94.00,0.00,0.00
+002017013009,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002017013009,"REDUCER COPPER 1/2 X 3/8",635,6,2077.00,13700.00,0.00,"Non Pajak",0.00,1,1,STD,11900.00,0.00,69.00,1.00
+002017013009,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002017013009-DUP2-R17425,"REDUCER COPPER 1/2 X 3/8",309,6,5000.00,13700.00,0.00,"Non Pajak",0.00,1,10000,STD,5000.00,0.00,0.00,0.00
+002017019016,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002017019016,"REDUCER COPPER 3/4 X 5/8",635,6,18600.00,18535.00,0.00,"Non Pajak",0.00,1,1,PS,15810.00,0.00,4.00,1.00
+002017019016,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002017019016-DUP2-R17428,"REDUCER COPPER 3/4 X 5/8",309,6,15833.00,18535.00,0.00,"Non Pajak",0.00,1,10000,PS,15833.00,0.00,0.00,0.00
+002017025019,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002017025019,"REDUCER COPPER 1 X 3/4",635,6,32100.00,32100.00,0.00,"Non Pajak",0.00,1,1,PS,27285.00,46.00,52.00,1.00
+002017025019,"category,cost,bulk_sell_qty,biaya,qty_min",CAB-002017025019-DUP2-R17423,"REDUCER COPPER 1 X 3/4",309,6,23021.00,32100.00,0.00,"Non Pajak",0.00,1,10000,PS,23021.00,7.00,0.00,0.00
