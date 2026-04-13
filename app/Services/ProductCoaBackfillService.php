@@ -40,6 +40,26 @@ class ProductCoaBackfillService
      */
     private array $inventoryDefaultCache = [];
 
+    /**
+     * @return array<int, string>
+     */
+    public function managedFields(): array
+    {
+        return [
+            'inventory_coa_id',
+            'sales_coa_id',
+            'sales_return_coa_id',
+            'sales_discount_coa_id',
+            'goods_delivery_coa_id',
+            'cogs_coa_id',
+            'purchase_return_coa_id',
+            'unbilled_purchase_coa_id',
+            'temporary_procurement_coa_id',
+            'manufacturing_labor_coa_id',
+            'manufacturing_overhead_coa_id',
+        ];
+    }
+
     public function resolveDefaultValues(Product $product): array
     {
         return [
@@ -63,6 +83,36 @@ class ProductCoaBackfillService
             $this->resolveDefaultValues($product),
             static fn ($value) => $value !== null
         );
+    }
+
+    /**
+     * Compare current product COA values against the create-form defaults.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function compareToDefaultValues(Product $product): array
+    {
+        $defaults = $this->resolveDefaultValues($product);
+        $rows = [];
+
+        foreach ($this->managedFields() as $field) {
+            $currentId = $product->{$field};
+            $expectedId = $defaults[$field] ?? null;
+
+            if ((string) $currentId === (string) $expectedId) {
+                continue;
+            }
+
+            $rows[] = [
+                'field' => $field,
+                'current_id' => $currentId ? (int) $currentId : null,
+                'expected_id' => $expectedId ? (int) $expectedId : null,
+                'current_code' => $currentId ? $this->resolveCodeById((int) $currentId) : null,
+                'expected_code' => $this->defaultCodeForField($product, $field),
+            ];
+        }
+
+        return $rows;
     }
 
     public function defaultCodeForField(Product $product, string $field): ?string
