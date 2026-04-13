@@ -816,7 +816,6 @@ class OrderRequestResource extends Resource
                             ->mapWithKeys(fn($s) => [$s->id => "({$s->code}) {$s->perusahaan}"]);
                     })
                     ->searchable()
-                    ->preload()
                     ->query(function (Builder $query, array $data): void {
                         if (!empty($data['value'])) {
                             $query->whereHas('orderRequestItem', function ($q) use ($data) {
@@ -830,8 +829,7 @@ class OrderRequestResource extends Resource
                     ->getOptionLabelFromRecordUsing(function ($record) {
                         return "({$record->kode}) {$record->name}";
                     })
-                    ->searchable()
-                    ->preload(),
+                    ->searchable(),
                 Filter::make('request_date')
                     ->form([
                         DatePicker::make('request_date_from')
@@ -967,7 +965,6 @@ class OrderRequestResource extends Resource
                                     Select::make('supplier_id')
                                         ->label('Supplier (untuk PO)')
                                         ->helperText('Supplier utama untuk Purchase Order. Setiap item memiliki supplier masing-masing (lihat di tabel item).')
-                                        ->preload()
                                         ->searchable()
                                         ->columnSpanFull()
                                         ->options(function () {
@@ -1291,7 +1288,6 @@ class OrderRequestResource extends Resource
                                 ->schema([
                                     Select::make('supplier_id')
                                         ->label('Supplier')
-                                        ->preload()
                                         ->searchable()
                                         ->columnSpanFull()
                                         ->options(function () {
