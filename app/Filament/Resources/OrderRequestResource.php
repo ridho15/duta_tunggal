@@ -102,6 +102,77 @@ class OrderRequestResource extends Resource
         return $product ? "({$product->sku}) {$product->name}" : null;
     }
 
+    public static function resolveProductOptions(?string $search = null, int $limit = 50): array
+    {
+        $query = Product::query()->orderBy('name');
+
+        if ($search !== null && $search !== '') {
+            $query->where(function ($productQuery) use ($search) {
+                $productQuery->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->limit($limit)
+            ->get()
+            ->mapWithKeys(function ($product) {
+                return [$product->id => "({$product->sku}) {$product->name}"];
+            })
+            ->all();
+    }
+
+    public static function resolveProductSupplierId(?int $productId): ?int
+    {
+        if (! $productId) {
+            return null;
+        }
+
+        $product = Product::with('suppliers')->find($productId);
+
+        if (! $product) {
+            return null;
+        }
+
+        if ($product->supplier_id) {
+            return (int) $product->supplier_id;
+        }
+
+        return $product->suppliers->first()?->id ? (int) $product->suppliers->first()->id : null;
+    }
+
+    public static function resolveSupplierOptions(?int $productId = null, ?string $search = null, int $limit = 50): array
+    {
+        $query = Supplier::query()->orderBy('perusahaan');
+
+        if ($search !== null && $search !== '') {
+            $query->where(function ($supplierQuery) use ($search) {
+                $supplierQuery->where('perusahaan', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        if ($productId) {
+            $query->whereHas('products', function ($productQuery) use ($productId) {
+                $productQuery->where('products.id', $productId);
+            });
+        }
+
+        return $query->limit($limit)
+            ->get()
+            ->mapWithKeys(function ($supplier) use ($productId) {
+                $priceLabel = '';
+
+                if ($productId) {
+                    $product = Product::find($productId);
+                    $price = $product?->suppliers()->where('suppliers.id', $supplier->id)->first()?->pivot?->supplier_price;
+                    $priceLabel = $price ? ' - Rp ' . number_format((float) $price, 0, ',', '.') : '';
+                }
+
+                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}{$priceLabel}"];
+            })
+            ->all();
+    }
+
     public static function resolveSupplierLabel(?int $supplierId): ?string
     {
         if (! $supplierId) {
@@ -138,6 +209,7 @@ class OrderRequestResource extends Resource
                         Select::make('cabang_id')
                             ->label('Cabang')
                             ->searchable()
+                            ->preload()
                             ->reactive()
                             ->afterStateUpdated(function ($state, callable $set) {
                                 // Reset warehouse when cabang changes
@@ -229,6 +301,7 @@ class OrderRequestResource extends Resource
                                 'PPN Included' => 'PPN Included (PPN sudah termasuk harga)',
                             ])
                             ->default('None')
+                            ->preload()
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (string $state, callable $get, callable $set) {
@@ -285,10 +358,28 @@ class OrderRequestResource extends Resource
                                     ->label('Product')
                                     ->reactive()
                                     ->searchable()
+                                    ->options(fn () => static::resolveProductOptions(limit: 50))
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         if ($state) {
                                             $product = Product::find($state);
                                             if ($product) {
+                                                $currentSupplierId = $get('supplier_id');
+                                                $resolvedSupplierId = static::resolveProductSupplierId((int) $state);
+
+                                                if ($currentSupplierId) {
+                                                    $supplierMatchesProduct = $product->suppliers()
+                                                        ->where('suppliers.id', $currentSupplierId)
+                                                        ->exists();
+
+                                                    if (! $supplierMatchesProduct) {
+                                                        $currentSupplierId = null;
+                                                    }
+                                                }
+
+                                                if (! $currentSupplierId && $resolvedSupplierId) {
+                                                    $currentSupplierId = $resolvedSupplierId;
+                                                }
+
                                                 // Set tax from product if available, otherwise keep current value
                                                 if (($get('../../tax_type') ?? 'PPN Excluded') === 'None') {
                                                     $set('tax', 0);
@@ -297,7 +388,7 @@ class OrderRequestResource extends Resource
                                                 }
 
                                                 // Use item-level supplier price if available
-                                                $itemSupplierId = $get('supplier_id');
+                                                $itemSupplierId = $currentSupplierId;
                                                 $unitPrice = (float) $product->cost_price;
                                                 if ($itemSupplierId) {
                                                     $supplierProduct = $product->suppliers()->where('suppliers.id', $itemSupplierId)->first();
@@ -308,8 +399,7 @@ class OrderRequestResource extends Resource
                                                             : (float) $product->cost_price;
                                                     }
                                                 }
-                                                // Reset item-level supplier when product changes
-                                                $set('supplier_id', null);
+                                                $set('supplier_id', $itemSupplierId);
                                                 // Store the master price as original_price; user can override unit_price
                                                 $set('original_price', number_format((float)$unitPrice, 0, ',', '.'));
                                                 $set('unit_price', number_format((float)$unitPrice, 0, ',', '.'));
@@ -328,12 +418,7 @@ class OrderRequestResource extends Resource
                                     })
                                     ->getOptionLabelUsing(fn ($value): ?string => static::resolveProductLabel(is_numeric($value) ? (int) $value : null))
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
-                                        return Product::where(function ($q) use ($search) {
-                                            $q->where('name', 'like', "%{$search}%")
-                                                ->orWhere('sku', 'like', "%{$search}%");
-                                        })->orderBy('name')->limit(50)->get()->mapWithKeys(function ($product) {
-                                            return [$product->id => "({$product->sku}) {$product->name}"];
-                                        });
+                                        return static::resolveProductOptions($search, 50);
                                     })
                                     ->helperText('Pilih produk yang akan dipesan')
                                     ->required()
@@ -354,40 +439,19 @@ class OrderRequestResource extends Resource
                                     ->label('Supplier')
                                     ->reactive()
                                     ->searchable()
+                                    ->preload()
                                     ->nullable()
+                                    ->options(function (callable $get) {
+                                        $productId = $get('product_id');
+
+                                        return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, null, 50);
+                                    })
                                     ->getOptionLabelUsing(fn ($value): ?string => static::resolveSupplierLabel(is_numeric($value) ? (int) $value : null))
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
                                         $productId = $get('product_id');
-                                        $query = \App\Models\Supplier::query()
-                                            ->where(function ($supplierQuery) use ($search) {
-                                                $supplierQuery->where('perusahaan', 'like', "%{$search}%")
-                                                    ->orWhere('code', 'like', "%{$search}%");
-                                            })
-                                            ->orderBy('perusahaan')
-                                            ->limit(50);
-
-                                        if ($productId) {
-                                            $query->whereHas('products', function ($productQuery) use ($productId) {
-                                                $productQuery->where('products.id', $productId);
-                                            });
-                                        }
-
-                                        return $query->get()->mapWithKeys(function ($supplier) use ($productId) {
-                                            $priceLabel = '';
-                                            if ($productId) {
-                                                $product = Product::find($productId);
-                                                $price = $product?->suppliers()->where('suppliers.id', $supplier->id)->first()?->pivot?->supplier_price;
-                                                $priceLabel = $price ? ' - Rp ' . number_format((float) $price, 0, ',', '.') : '';
-                                            }
-
-                                            return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}{$priceLabel}"];
-                                        });
+                                        return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, $search, 50);
                                     })
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        if ($state) {
-                                            $set('orderRequestItem', []);
-                                        }
-
                                         if ($state) {
                                             $productId = $get('product_id');
                                             if ($productId) {
@@ -743,6 +807,7 @@ class OrderRequestResource extends Resource
                         'rejected'        => 'Rejected',
                         'closed'          => 'Closed',
                     ])
+                    ->preload()
                     ->placeholder('All Statuses'),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier (per Item)')

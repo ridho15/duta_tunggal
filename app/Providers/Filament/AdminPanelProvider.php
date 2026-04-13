@@ -140,7 +140,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->assets([
                 // Custom CSS for sale orders
-                \Filament\Support\Assets\Css::make('custom-sale-order', asset('css/custom-sale-order.css')),
+                \Filament\Support\Assets\Css::make('custom-sale-order', secure_asset('css/custom-sale-order.css')),
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s');

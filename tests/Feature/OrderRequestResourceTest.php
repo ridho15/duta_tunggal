@@ -193,6 +193,57 @@ it('recalculates approval preview totals when override price changes', function 
         ->and($preview['tax_nominal'])->toBe('55.000');
 });
 
+it('limits product options to fifty entries', function () {
+    Product::factory()
+        ->count(60)
+        ->create(['cabang_id' => $this->cabang->id]);
+
+    $options = OrderRequestResource::resolveProductOptions(null, 50);
+
+    expect($options)->toHaveCount(50);
+});
+
+it('preloads the static tax type select', function () {
+    $file = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource.php'));
+
+    expect($file)->toContain("Select::make('tax_type')")
+        ->and($file)->toContain("->preload()");
+});
+
+it('resolves product supplier options and auto-selects supplier when product changes', function () {
+    $secondarySupplier = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
+    $primaryProduct = Product::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+    ]);
+    $secondaryProduct = Product::factory()->create([
+        'supplier_id' => $secondarySupplier->id,
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    $supplierOptions = OrderRequestResource::resolveSupplierOptions($primaryProduct->id);
+
+    expect($supplierOptions)->toHaveKey($this->supplier->id)
+        ->and($supplierOptions)->not->toHaveKey($secondarySupplier->id);
+
+    Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-SUPPLIER-'.uniqid(),
+            'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $this->warehouse->id,
+            'request_date' => now()->format('Y-m-d'),
+            'note' => 'Order request supplier auto select test',
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => $primaryProduct->id,
+            'quantity' => 1,
+        ]])
+        ->assertSet('data.orderRequestItem.0.supplier_id', $this->supplier->id)
+        ->set('data.orderRequestItem.0.product_id', $secondaryProduct->id)
+        ->assertSet('data.orderRequestItem.0.supplier_id', $secondarySupplier->id);
+});
+
 it('lists order requests on the index page', function () {
     $or1 = OrderRequest::factory()->create(['warehouse_id' => $this->warehouse->id, 'cabang_id' => $this->cabang->id]);
     $or2 = OrderRequest::factory()->create(['warehouse_id' => $this->warehouse->id, 'cabang_id' => $this->cabang->id]);
