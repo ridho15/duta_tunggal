@@ -1,0 +1,59 @@
+name: duta_tunggal
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: duta-tunggal-php83:latest
+    container_name: duta-tunggal-app-php83
+    env_file:
+      - .env.docker
+    ports:
+      - "18083:80"
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/up"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+    networks:
+      - duta_tunggal_net
+
+  mysql:
+    image: mysql:8.0
+    container_name: duta-tunggal-mysql-8
+    ports:
+      - "${MYSQL_PORT:-13306}:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --sql-mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-duta_tunggal}
+      MYSQL_USER: ${DB_USERNAME:-duta_tunggal}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+    volumes:
+      - duta_tunggal_mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+    networks:
+      - duta_tunggal_net
+
+networks:
+  duta_tunggal_net:
+    driver: bridge
+
+volumes:
+  duta_tunggal_mysql_data:

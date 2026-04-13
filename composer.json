@@ -12,6 +12,7 @@
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
         "blade-ui-kit/blade-heroicons": "^2.6",
+        "fakerphp/faker": "^1.24",
         "filament/filament": "^3.3",
         "filament/notifications": "^3.3",
         "laravel/framework": "^12.0",
@@ -26,7 +27,6 @@
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "*",
-        "fakerphp/faker": "^1.23",
         "laravel/dusk": "^8.3",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.18",

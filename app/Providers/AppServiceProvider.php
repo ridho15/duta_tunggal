@@ -88,7 +88,9 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $loader = AliasLoader::getInstance();
-        $loader->alias('Debugbar', Debugbar::class);
+        if (class_exists(Debugbar::class)) {
+            $loader->alias('Debugbar', Debugbar::class);
+        }
 
         if ($this->app->environment(['local', 'testing']) && class_exists(\Laravel\Dusk\DuskServiceProvider::class)) {
             $this->app->register(\Laravel\Dusk\DuskServiceProvider::class);

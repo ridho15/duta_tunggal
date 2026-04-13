@@ -91,6 +91,28 @@ class OrderRequestResource extends Resource
         ];
     }
 
+    public static function resolveProductLabel(?int $productId): ?string
+    {
+        if (! $productId) {
+            return null;
+        }
+
+        $product = Product::find($productId);
+
+        return $product ? "({$product->sku}) {$product->name}" : null;
+    }
+
+    public static function resolveSupplierLabel(?int $supplierId): ?string
+    {
+        if (! $supplierId) {
+            return null;
+        }
+
+        $supplier = Supplier::find($supplierId);
+
+        return $supplier ? "({$supplier->code}) {$supplier->perusahaan}" : null;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -258,29 +280,6 @@ class OrderRequestResource extends Resource
                                 'required' => 'Order request harus memiliki setidaknya satu item produk.',
                                 'min' => 'Order request harus memiliki setidaknya satu item produk.',
                             ])
-                            ->afterStateHydrated(function ($state, callable $set, callable $get) {
-                                // Recalculate subtotal for each row when form is loaded
-                                $taxType = $get('tax_type') ?? 'PPN Excluded';
-                                $new = [];
-                                foreach ($state as $i => $row) {
-                                    $qty  = (float) ($row['quantity'] ?? 0);
-                                    $unit = \App\Helpers\MoneyHelper::parse($row['unit_price'] ?? 0);
-                                    $disc = (float) ($row['discount'] ?? 0);
-                                    $tax  = (float) ($row['tax'] ?? 0);
-                                    $base      = $qty * $unit;
-                                    $afterDisc = $base - $base * ($disc / 100);
-                                    try {
-                                        $taxResult = \App\Services\TaxService::compute($afterDisc, $tax, $taxType);
-                                        $row['subtotal']    = $taxResult['total'];
-                                        $row['tax_nominal'] = number_format((float)$taxResult['ppn'], 0, ',', '.');
-                                    } catch (\Throwable $e) {
-                                        $row['subtotal']    = $afterDisc;
-                                        $row['tax_nominal'] = '0';
-                                    }
-                                    $new[$i] = $row;
-                                }
-                                $set('orderRequestItem', $new);
-                            })
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
@@ -327,11 +326,7 @@ class OrderRequestResource extends Resource
                                             }
                                         }
                                     })
-                                    ->options(function (callable $get) {
-                                        return Product::orderBy('name')->get()->mapWithKeys(function ($product) {
-                                            return [$product->id => "({$product->sku}) {$product->name}"];
-                                        });
-                                    })
+                                    ->getOptionLabelUsing(fn ($value): ?string => static::resolveProductLabel(is_numeric($value) ? (int) $value : null))
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
                                         return Product::where(function ($q) use ($search) {
                                             $q->where('name', 'like', "%{$search}%")
@@ -360,17 +355,31 @@ class OrderRequestResource extends Resource
                                     ->reactive()
                                     ->searchable()
                                     ->nullable()
-                                    ->options(function (callable $get) {
+                                    ->getOptionLabelUsing(fn ($value): ?string => static::resolveSupplierLabel(is_numeric($value) ? (int) $value : null))
+                                    ->getSearchResultsUsing(function (string $search, callable $get) {
                                         $productId = $get('product_id');
-                                        if (!$productId) {
-                                            return \App\Models\Supplier::orderBy('perusahaan')->get()
-                                                ->mapWithKeys(fn($s) => [$s->id => "({$s->code}) {$s->perusahaan}"]);
+                                        $query = \App\Models\Supplier::query()
+                                            ->where(function ($supplierQuery) use ($search) {
+                                                $supplierQuery->where('perusahaan', 'like', "%{$search}%")
+                                                    ->orWhere('code', 'like', "%{$search}%");
+                                            })
+                                            ->orderBy('perusahaan')
+                                            ->limit(50);
+
+                                        if ($productId) {
+                                            $query->whereHas('products', function ($productQuery) use ($productId) {
+                                                $productQuery->where('products.id', $productId);
+                                            });
                                         }
-                                        $product = Product::find($productId);
-                                        if (!$product) return [];
-                                        return $product->suppliers()->get()->mapWithKeys(function ($supplier) use ($product) {
-                                            $price = $product->suppliers()->where('suppliers.id', $supplier->id)->first()?->pivot?->supplier_price;
-                                            $priceLabel = $price ? ' - Rp ' . number_format((float)$price, 0, ',', '.') : '';
+
+                                        return $query->get()->mapWithKeys(function ($supplier) use ($productId) {
+                                            $priceLabel = '';
+                                            if ($productId) {
+                                                $product = Product::find($productId);
+                                                $price = $product?->suppliers()->where('suppliers.id', $supplier->id)->first()?->pivot?->supplier_price;
+                                                $priceLabel = $price ? ' - Rp ' . number_format((float) $price, 0, ',', '.') : '';
+                                            }
+
                                             return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}{$priceLabel}"];
                                         });
                                     })
