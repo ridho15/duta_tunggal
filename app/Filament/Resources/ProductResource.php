@@ -87,7 +87,7 @@ class ProductResource extends Resource
         'cogs' => '5100.10',
         'purchase_return' => '5120.10',
         'unbilled_purchase' => '2100.10',
-        'temporary_procurement' => '2100.10',
+        'temporary_procurement' => '1400.01',
         'manufacturing_labor' => '5230',
         'manufacturing_overhead' => '6000',
     ];

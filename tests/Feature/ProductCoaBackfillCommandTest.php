@@ -83,7 +83,7 @@ it('backfill command fills product coa fields using create-form defaults', funct
         ->and($standard->cogsCoa?->code)->toBe('5100.10')
         ->and($standard->purchaseReturnCoa?->code)->toBe('5120.10')
         ->and($standard->unbilledPurchaseCoa?->code)->toBe('2100.10')
-        ->and($standard->temporaryProcurementCoa?->code)->toBe('2100.10');
+        ->and($standard->temporaryProcurementCoa?->code)->toBe('1400.01');
 
     expect($manufacture->inventoryCoa?->code)->toBe('1140.02')
         ->and($rawMaterial->inventoryCoa?->code)->toBe('1-101');

@@ -20,7 +20,7 @@ class ProductCoaBackfillService
         'cogs_coa_id' => '5100.10',
         'purchase_return_coa_id' => '5120.10',
         'unbilled_purchase_coa_id' => '2100.10',
-        'temporary_procurement_coa_id' => '2100.10',
+        'temporary_procurement_coa_id' => '1400.01',
         'manufacturing_labor_coa_id' => '5230',
         'manufacturing_overhead_coa_id' => '6000',
     ];
