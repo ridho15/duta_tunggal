@@ -214,7 +214,7 @@ class Product extends Model
     {
         return $this->resolveCoaRelationOrDefault(
             'manufacturingLaborCoa',
-            ['5120', '5120.10', '6-201', '6-202']
+            ['5230', '6-201', '6-202']
         );
     }
 
@@ -222,7 +222,7 @@ class Product extends Model
     {
         return $this->resolveCoaRelationOrDefault(
             'manufacturingOverheadCoa',
-            ['5130', '6100.02', '6-301', '6-302']
+            ['6000', '6-301', '6-302']
         );
     }
 

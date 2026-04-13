@@ -85,7 +85,9 @@ class ProductSeeder extends Seeder
     private function resolveDefaultAccountIds(): array
     {
         $mapping = [
-            'inventory_coa_id' => '1140.10',
+            'inventory_coa_id' => Product::resolveDefaultInventoryCoaId(false, false)
+                ? ChartOfAccount::whereKey(Product::resolveDefaultInventoryCoaId(false, false))->value('code')
+                : '1140.01',
             'sales_coa_id' => '4100.10',
             'sales_return_coa_id' => '4120.10',
             'sales_discount_coa_id' => '4110.10',

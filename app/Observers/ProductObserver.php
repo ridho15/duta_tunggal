@@ -81,5 +81,19 @@ class ProductObserver
                 $product->temporary_procurement_coa_id = $temporaryProcurementCoa->id;
             }
         }
+
+        if (! $product->manufacturing_labor_coa_id) {
+            $manufacturingLaborCoa = $product->resolveManufacturingLaborCoaOrDefault();
+            if ($manufacturingLaborCoa) {
+                $product->manufacturing_labor_coa_id = $manufacturingLaborCoa->id;
+            }
+        }
+
+        if (! $product->manufacturing_overhead_coa_id) {
+            $manufacturingOverheadCoa = $product->resolveManufacturingOverheadCoaOrDefault();
+            if ($manufacturingOverheadCoa) {
+                $product->manufacturing_overhead_coa_id = $manufacturingOverheadCoa->id;
+            }
+        }
     }
 }

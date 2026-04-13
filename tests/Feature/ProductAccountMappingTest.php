@@ -48,3 +48,15 @@ it('sets manufactured product inventory COA to 1140.02 on create', function () {
 
     expect($product->inventoryCoa?->code)->toBe('1140.02');
 });
+
+it('resolves manufacturing coa defaults for manufactured products', function () {
+    $product = Product::factory()->create([
+        'is_manufacture' => true,
+        'is_raw_material' => false,
+        'manufacturing_labor_coa_id' => null,
+        'manufacturing_overhead_coa_id' => null,
+    ]);
+
+    expect($product->resolveManufacturingLaborCoaOrDefault()?->code)->toBe('5230')
+        ->and($product->resolveManufacturingOverheadCoaOrDefault()?->code)->toBe('6000');
+});
