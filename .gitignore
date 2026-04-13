@@ -8,6 +8,10 @@
 /storage/*.key
 /storage/pail
 /vendor
+/tmp/*.png
+/tmp/*.jpg
+/tmp/*.jpeg
+/tmp/*.webp
 .env
 .env.backup
 .env.production
