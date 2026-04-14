@@ -147,15 +147,17 @@ test('customer receipt resolves remaining amount from invoice total when account
 });
 
 test('customer receipt create flow moves draft receipt to paid and posts journal entries', function () {
-    $cashCoa = ChartOfAccount::factory()->create([
+    $cashCoa = ChartOfAccount::firstOrCreate([
         'code' => '1111.01',
+    ], [
         'name' => 'Kas Kecil',
         'type' => 'Asset',
         'is_active' => true,
     ]);
 
-    $accountsReceivableCoa = ChartOfAccount::factory()->create([
+    $accountsReceivableCoa = ChartOfAccount::firstOrCreate([
         'code' => '1120',
+    ], [
         'name' => 'Piutang Usaha',
         'type' => 'Asset',
         'is_active' => true,
@@ -236,8 +238,9 @@ test('customer receipt create flow moves draft receipt to paid and posts journal
 });
 
 test('customer receipt item creation does not double count account receivable after create marker', function () {
-    $cashCoa = ChartOfAccount::factory()->create([
+    $cashCoa = ChartOfAccount::firstOrCreate([
         'code' => '1111.01',
+    ], [
         'name' => 'Kas Operasional',
         'type' => 'Asset',
         'is_active' => true,

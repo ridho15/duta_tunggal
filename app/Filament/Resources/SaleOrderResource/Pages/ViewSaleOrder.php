@@ -35,18 +35,18 @@ class ViewSaleOrder extends ViewRecord
     {
         return [
             ActionGroup::make([
-                    EditAction::make()
-                        ->color('success')
-                        ->icon('heroicon-o-pencil-square')
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('update sales order') &&
-                                   in_array($record->status, ['draft', 'request_approve', 'approved']);
-                        }),
+                EditAction::make()
+                    ->color('success')
+                    ->icon('heroicon-o-pencil-square')
+                    ->visible(function ($record) {
+                        return Auth::user()->hasPermissionTo('update sales order') &&
+                            in_array($record->status, ['draft', 'request_approve', 'approved']);
+                    }),
                 DeleteAction::make()
                     ->icon('heroicon-o-trash')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('delete sales order') &&
-                               in_array($record->status, ['draft', 'request_approve']);
+                            in_array($record->status, ['draft', 'request_approve']);
                     }),
                 Action::make('request_approve')
                     ->label('Request Approve')
@@ -55,8 +55,8 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-arrow-uturn-up')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('request sales order')
-                               && $record->status == 'draft'
-                               && ! $record->hasInsufficientStock();
+                            && $record->status == 'draft'
+                            && ! $record->hasInsufficientStock();
                     })
                     ->action(function ($record) {
                         try {
@@ -85,7 +85,7 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-x-circle')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('request sales order') &&
-                               in_array($record->status, ['approved', 'confirmed', 'completed']);
+                            in_array($record->status, ['approved', 'confirmed', 'completed']);
                     })
                     ->action(function ($record) {
                         try {
@@ -110,8 +110,8 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-check-badge')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('response sales order')
-                               && ($record->status == 'request_approve')
-                               && ! $record->hasInsufficientStock();
+                            && ($record->status == 'request_approve')
+                            && ! $record->hasInsufficientStock();
                     })
                     ->action(function ($record) {
                         try {
@@ -203,8 +203,8 @@ class ViewSaleOrder extends ViewRecord
                     ->requiresConfirmation()
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('update sales order') &&
-                               in_array($record->status, ['approved', 'confirmed']) &&
-                               $record->deliveryOrder()->where('status', 'completed')->exists();
+                            in_array($record->status, ['approved', 'confirmed']) &&
+                            $record->deliveryOrder()->where('status', 'completed')->exists();
                     })
                     ->color('success')
                     ->action(function ($record) {
@@ -229,7 +229,7 @@ class ViewSaleOrder extends ViewRecord
                     ->color('warning')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('update deposit') &&
-                               in_array($record->status, ['approved', 'confirmed', 'completed']);
+                            in_array($record->status, ['approved', 'confirmed', 'completed']);
                     })
                     ->form(function () {
                         $record = $this->getRecord();
@@ -243,9 +243,9 @@ class ViewSaleOrder extends ViewRecord
                                     ->label('COA')
                                     ->preload()
                                     ->searchable()
-                                    ->options(function () {
-                                        return ChartOfAccount::get()->pluck('name', 'id');
-                                    })
+                                    ->options(ChartOfAccount::orderBy('code')->get()->mapWithKeys(function ($coa) {
+                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
+                                    }))
                                     ->required(),
                                 Textarea::make('note')
                                     ->label('Note')

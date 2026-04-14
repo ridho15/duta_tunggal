@@ -296,7 +296,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     ->schema([
                                         \Filament\Forms\Components\Select::make('warehouse_id')
                                             ->label('Gudang Tujuan')
-                                            ->options(\App\Models\Warehouse::where('status', 1)->get()->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"]))
+                                            ->options(\App\Models\Warehouse::where('status', 1)->orderBy('name')->limit(50)->get()->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"]))
                                             ->default($defaultWarehouseId)
                                             ->searchable()
                                             ->required()

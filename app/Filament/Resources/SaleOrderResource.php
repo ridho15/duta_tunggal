@@ -411,13 +411,14 @@ class SaleOrderResource extends Resource
 
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                        ->limit(50)
                                         ->get()
                                         ->mapWithKeys(function ($cabang) {
                                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                         });
                                 }
 
-                                return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                     return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                                 });
                             })
@@ -1409,7 +1410,11 @@ class SaleOrderResource extends Resource
                                             }
                                         })
                                         ->options(function () {
-                                            return Supplier::select(['id', 'perusahaan', 'code', DB::raw("CONCAT('(', code, ') ', perusahaan) as label")])->get()->pluck('label', 'id');
+                                            return Supplier::select(['id', 'perusahaan', 'code', DB::raw("CONCAT('(', code, ') ', perusahaan) as label")])
+                                                ->orderBy('perusahaan')
+                                                ->limit(50)
+                                                ->get()
+                                                ->pluck('label', 'id');
                                         })->required(),
                                     TextInput::make('po_number')
                                         ->label('PO Number')
@@ -1454,7 +1459,11 @@ class SaleOrderResource extends Resource
                                         ->searchable(['name', 'kode'])
                                         ->required()
                                         ->options(function () {
-                                            return Warehouse::select(['id', 'kode', 'name', DB::raw("CONCAT('(', kode, ') ', name) as label")])->get()->pluck('label', 'id');
+                                            return Warehouse::select(['id', 'kode', 'name', DB::raw("CONCAT('(', kode, ') ', name) as label")])
+                                                ->orderBy('name')
+                                                ->limit(50)
+                                                ->get()
+                                                ->pluck('label', 'id');
                                         })
                                         ->validationMessages([
                                             'required' => 'Gudang belum dipilih',

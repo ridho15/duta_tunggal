@@ -61,7 +61,7 @@ class InventoryCardReportServiceTest extends TestCase
         $warehouse = Warehouse::create([
             'kode' => 'WH-CARD',
             'name' => 'Warehouse Card',
-            'tipe' => 'Utama',
+            'tipe' => 'Kecil',
             'location' => 'Main Warehouse',
             'telepon' => '081100000001',
             'status' => 1,

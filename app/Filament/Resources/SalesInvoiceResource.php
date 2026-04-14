@@ -801,7 +801,7 @@ class SalesInvoiceResource extends Resource
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->options(function () {
-                                        return \App\Models\Product::all()->pluck('name', 'id');
+                                        return \App\Models\Product::query()->orderBy('name')->limit(50)->pluck('name', 'id');
                                     })
                                     ->searchable()
                                     ->required()

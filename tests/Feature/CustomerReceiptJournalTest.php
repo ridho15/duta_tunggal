@@ -47,28 +47,36 @@ class CustomerReceiptJournalTest extends TestCase
         $this->actingAs($this->user);
 
         // Create COAs
-        $this->cashCoa = ChartOfAccount::factory()->create([
+        $this->cashCoa = ChartOfAccount::firstOrCreate([
             'code' => '1111.01',
+        ], [
             'name' => 'Kas Kecil',
             'type' => 'asset',
+            'is_active' => true,
         ]);
 
-        $this->bankCoa = ChartOfAccount::factory()->create([
+        $this->bankCoa = ChartOfAccount::firstOrCreate([
             'code' => '1112.01',
+        ], [
             'name' => 'Bank BCA',
             'type' => 'asset',
+            'is_active' => true,
         ]);
 
-        $this->accountsReceivableCoa = ChartOfAccount::factory()->create([
+        $this->accountsReceivableCoa = ChartOfAccount::firstOrCreate([
             'code' => '1120',
+        ], [
             'name' => 'Piutang Usaha',
             'type' => 'asset',
+            'is_active' => true,
         ]);
 
-        $this->depositCoa = ChartOfAccount::factory()->create([
+        $this->depositCoa = ChartOfAccount::firstOrCreate([
             'code' => '1150.01',
+        ], [
             'name' => 'Hutang Titipan Konsumen',
             'type' => 'liability',
+            'is_active' => true,
         ]);
 
         // Debug: check COA ids

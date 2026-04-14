@@ -54,6 +54,66 @@ class Product extends Model
         'biaya' => 'decimal:2',
     ];
 
+    public static function productCoaFields(): array
+    {
+        return [
+            'inventory_coa_id',
+            'sales_coa_id',
+            'sales_return_coa_id',
+            'sales_discount_coa_id',
+            'goods_delivery_coa_id',
+            'cogs_coa_id',
+            'purchase_return_coa_id',
+            'unbilled_purchase_coa_id',
+            'temporary_procurement_coa_id',
+            'manufacturing_labor_coa_id',
+            'manufacturing_overhead_coa_id',
+        ];
+    }
+
+    public static function resolveDefaultProductCoaCodes(string $field, bool $isManufacture = false, bool $isRawMaterial = false): array
+    {
+        $productDefaults = config('coa.product', []);
+
+        if ($field === 'inventory_coa_id') {
+            if ($isRawMaterial) {
+                return $productDefaults['inventory_coa_id']['raw_material'] ?? [];
+            }
+
+            if ($isManufacture) {
+                return $productDefaults['inventory_coa_id']['manufacture'] ?? [];
+            }
+
+            return $productDefaults['inventory_coa_id']['standard'] ?? [];
+        }
+
+        return $productDefaults[$field] ?? [];
+    }
+
+    public static function resolveDefaultProductCoaId(string $field, bool $isManufacture = false, bool $isRawMaterial = false): ?int
+    {
+        foreach (self::resolveDefaultProductCoaCodes($field, $isManufacture, $isRawMaterial) as $code) {
+            $coaId = ChartOfAccount::where('code', $code)->value('id');
+
+            if ($coaId) {
+                return $coaId;
+            }
+        }
+
+        return null;
+    }
+
+    public static function resolveDefaultProductCoaMap(bool $isManufacture = false, bool $isRawMaterial = false): array
+    {
+        $defaults = [];
+
+        foreach (self::productCoaFields() as $field) {
+            $defaults[$field] = self::resolveDefaultProductCoaId($field, $isManufacture, $isRawMaterial);
+        }
+
+        return $defaults;
+    }
+
     // Scopes for active/inactive products
     public function scopeActive($query)
     {
@@ -164,66 +224,42 @@ class Product extends Model
 
     public function resolveInventoryCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'inventoryCoa',
-            [config('coa.inventory', '1140.01'), '1140.10', '1-101', '1140']
-        );
+        return $this->resolveCoaRelationOrDefault('inventoryCoa', self::resolveDefaultProductCoaCodes('inventory_coa_id', (bool) $this->is_manufacture, (bool) $this->is_raw_material));
     }
 
     public function resolveUnbilledPurchaseCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'unbilledPurchaseCoa',
-            [config('coa.unbilled_purchase', '2100.10'), '2100.10', '2190.10', '1180.01']
-        );
+        return $this->resolveCoaRelationOrDefault('unbilledPurchaseCoa', self::resolveDefaultProductCoaCodes('unbilled_purchase_coa_id'));
     }
 
     public function resolveTemporaryProcurementCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'temporaryProcurementCoa',
-            ['1400.01', '1180.01']
-        );
+        return $this->resolveCoaRelationOrDefault('temporaryProcurementCoa', self::resolveDefaultProductCoaCodes('temporary_procurement_coa_id'));
     }
 
     public function resolveCogsCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'cogsCoa',
-            [config('coa.cogs', '5100.10'), '5100.10', '5000']
-        );
+        return $this->resolveCoaRelationOrDefault('cogsCoa', self::resolveDefaultProductCoaCodes('cogs_coa_id'));
     }
 
     public function resolveGoodsDeliveryCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'goodsDeliveryCoa',
-            [config('coa.goods_delivery', '1140.20'), '1140.20', '1180.10']
-        );
+        return $this->resolveCoaRelationOrDefault('goodsDeliveryCoa', self::resolveDefaultProductCoaCodes('goods_delivery_coa_id'));
     }
 
     public function resolvePurchaseReturnCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'purchaseReturnCoa',
-            ['5120.10', '5120', '6100.02']
-        );
+        return $this->resolveCoaRelationOrDefault('purchaseReturnCoa', self::resolveDefaultProductCoaCodes('purchase_return_coa_id'));
     }
 
     public function resolveManufacturingLaborCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'manufacturingLaborCoa',
-            ['5230', '6-201', '6-202']
-        );
+        return $this->resolveCoaRelationOrDefault('manufacturingLaborCoa', self::resolveDefaultProductCoaCodes('manufacturing_labor_coa_id'));
     }
 
     public function resolveManufacturingOverheadCoaOrDefault(): ?ChartOfAccount
     {
-        return $this->resolveCoaRelationOrDefault(
-            'manufacturingOverheadCoa',
-            ['6000', '6-301', '6-302']
-        );
+        return $this->resolveCoaRelationOrDefault('manufacturingOverheadCoa', self::resolveDefaultProductCoaCodes('manufacturing_overhead_coa_id'));
     }
 
     protected function resolveCoaRelationOrDefault(string $relation, array $fallbackCodes): ?ChartOfAccount
@@ -282,21 +318,7 @@ class Product extends Model
 
     public static function resolveDefaultInventoryCoaId(bool $isManufacture = false, bool $isRawMaterial = false): ?int
     {
-        $codes = match (true) {
-            $isRawMaterial => ['1-101', '1140.10', '1140.01'],
-            $isManufacture => ['1140.02', '1140.01'],
-            default => ['1140.01', '1140.10'],
-        };
-
-        foreach ($codes as $code) {
-            $coaId = ChartOfAccount::where('code', $code)->value('id');
-
-            if ($coaId) {
-                return $coaId;
-            }
-        }
-
-        return null;
+        return self::resolveDefaultProductCoaId('inventory_coa_id', $isManufacture, $isRawMaterial);
     }
 
     protected static function booted()

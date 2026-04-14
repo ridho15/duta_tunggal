@@ -118,7 +118,7 @@ class VendorPaymentResource extends Resource
                                 Select::make('supplier_id')
                                     ->label('Vendor')
                                     ->options(function () {
-                                        return Supplier::all()->mapWithKeys(function ($supplier) {
+                                        return Supplier::orderBy('perusahaan')->limit(50)->get()->mapWithKeys(function ($supplier) {
                                             return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                         })->toArray();
                                     })

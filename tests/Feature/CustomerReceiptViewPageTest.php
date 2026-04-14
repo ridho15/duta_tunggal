@@ -32,15 +32,17 @@ beforeEach(function () {
     $this->user->givePermissionTo(['view any customer receipt', 'view customer receipt']);
     $this->actingAs($this->user);
 
-    $this->cashCoa = ChartOfAccount::factory()->create([
+    $this->cashCoa = ChartOfAccount::firstOrCreate([
         'code' => '1111.01',
+    ], [
         'name' => 'Kas Operasional',
         'type' => 'Asset',
         'is_active' => true,
     ]);
 
-    $this->arCoa = ChartOfAccount::factory()->create([
+    $this->arCoa = ChartOfAccount::firstOrCreate([
         'code' => '1120.01',
+    ], [
         'name' => 'Piutang Dagang',
         'type' => 'Asset',
         'is_active' => true,
@@ -110,9 +112,9 @@ test('customer receipt view page renders payment history and journal entries', f
     $response->assertSee('History Pembayaran Invoice');
     $response->assertSee('Journal Entries');
     $response->assertSee($invoice->invoice_number);
-    $response->assertSee('Lunas');
+    $response->assertSee('Paid');
     $response->assertSee('Receipt #' . $receipt->id, false);
     $response->assertSee('Rp 1.500.000');
-    $response->assertSee('Kas Operasional');
-    $response->assertSee('Piutang Dagang');
+    $response->assertSee('1111.01');
+    $response->assertSee('1120.01');
 });

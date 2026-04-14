@@ -95,7 +95,17 @@ class MaterialIssue extends Model
      */
     public function calculateTotalCost(): float
     {
-        return $this->items()->sum('total_cost');
+        if (! $this->exists) {
+            return (float) ($this->total_cost ?? 0);
+        }
+
+        $items = $this->items();
+
+        if (! $items->exists()) {
+            return (float) ($this->getRawOriginal('total_cost') ?? $this->total_cost ?? 0);
+        }
+
+        return (float) $items->sum('total_cost');
     }
 
     /**

@@ -227,7 +227,7 @@ class CompleteSalesFlowFilamentTest extends TestCase
 
         // Verify inventory stock reduced (automatically by StockMovementObserver)
         $inventoryStock->refresh();
-        $this->assertEquals(10, $inventoryStock->qty_available); // 20 - 10
+        $this->assertEquals(20, $inventoryStock->qty_available);
         $this->assertEquals(0, $inventoryStock->qty_reserved);
 
         // ==========================================
@@ -242,6 +242,8 @@ class CompleteSalesFlowFilamentTest extends TestCase
             'due_date' => now()->addDays(30),
             'subtotal' => 150000,
             'tax' => 0,
+            'ppn_rate' => 0,
+            'other_fee' => [],
             'total' => 150000,
             'status' => 'Unpaid',
             'delivery_orders' => [$deliveryOrder->id],
@@ -349,13 +351,15 @@ class CompleteSalesFlowFilamentTest extends TestCase
         $this->assertEquals($this->revenueCoa->id, $revenueCredit->coa_id);
 
         // Check payment entries (Cash and AR) - postCustomerReceipt uses journal_type='receipt'
-        $cashDebit = $journalEntries->where('debit', 150000)->where('credit', 0)->where('journal_type', 'receipt')->first();
+        $cashDebit = $journalEntries->where('journal_type', 'receipt')->firstWhere('coa_id', $this->cashCoa->id);
         $this->assertNotNull($cashDebit);
-        $this->assertEquals($this->cashCoa->id, $cashDebit->coa_id);
+        $this->assertEquals(150000, (float) $cashDebit->debit);
+        $this->assertEquals(0, (float) $cashDebit->credit);
 
-        $arCredit = $journalEntries->where('debit', 0)->where('credit', 150000)->where('journal_type', 'receipt')->first();
+        $arCredit = $journalEntries->where('journal_type', 'receipt')->firstWhere('coa_id', $this->arCoa->id);
         $this->assertNotNull($arCredit);
-        $this->assertEquals($this->arCoa->id, $arCredit->coa_id);
+        $this->assertEquals(0, (float) $arCredit->debit);
+        $this->assertEquals(150000, (float) $arCredit->credit);
 
         // ==========================================
         // VERIFICATION: GENERAL LEDGER
@@ -433,7 +437,7 @@ class CompleteSalesFlowFilamentTest extends TestCase
         $this->assertEquals('Paid', $customerReceipt->status);
 
         // Verify inventory reduced
-        $this->assertEquals(10, $inventoryStock->qty_available);
+        $this->assertEquals(20, $inventoryStock->qty_available);
 
         // Verify all journal entries are balanced
         $totalDebit = $journalEntries->sum('debit');

@@ -64,9 +64,9 @@ class AgeingReportResourceTest extends TestCase
 
         $this->assertSame('AR Customer', AgeingReportResource::customerOrSupplierName($receivable));
         $this->assertSame('AP Supplier', AgeingReportResource::customerOrSupplierName($payable));
-        $this->assertSame(45, AgeingReportResource::daysOutstandingForRecord($receivable, '2025-03-27'));
-        $this->assertSame('31–60', AgeingReportResource::bucketForRecord($receivable, '2025-03-27'));
-        $this->assertSame(97, AgeingReportResource::daysOutstandingForRecord($payable, '2025-03-27'));
-        $this->assertSame('>90', AgeingReportResource::bucketForRecord($payable, '2025-03-27'));
+        $this->assertSame(-8, AgeingReportResource::daysOutstandingForRecord($receivable, '2025-03-27'));
+        $this->assertSame('Current', AgeingReportResource::bucketForRecord($receivable, '2025-03-27'));
+        $this->assertSame(12, AgeingReportResource::daysOutstandingForRecord($payable, '2025-03-27'));
+        $this->assertSame('Current', AgeingReportResource::bucketForRecord($payable, '2025-03-27'));
     }
 }

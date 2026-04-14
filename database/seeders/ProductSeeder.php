@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\ChartOfAccount;
 use App\Models\Product;
 use App\Models\Cabang;
 use App\Models\ProductCategory;
@@ -15,27 +14,21 @@ use Illuminate\Support\Facades\DB;
 class ProductSeeder extends Seeder
 {
     /**
-     * Default akun COA per produk.
-     * @var array<string, int|null>
-     */
-    protected array $defaultAccountIds = [];
-
-    /**
      * Run the database seeds.
      */
     public function run(): void
     {
-        $this->defaultAccountIds = $this->resolveDefaultAccountIds();
+        $defaultAccountIds = Product::resolveDefaultProductCoaMap();
 
         // Create 50 products using updateOrCreate to handle duplicates
         for ($i = 1; $i <= 50; $i++) {
-            $this->createOrUpdateProduct($i);
+            $this->createOrUpdateProduct($i, $defaultAccountIds);
         }
 
         $this->command->info('50 products created/updated successfully!');
     }
 
-    private function createOrUpdateProduct($index)
+    private function createOrUpdateProduct($index, array $defaultAccountIds)
     {
         $cabang = Cabang::inRandomOrder()->first() ?? Cabang::factory()->create();
         $category = ProductCategory::inRandomOrder()->first()
@@ -64,46 +57,18 @@ class ProductSeeder extends Seeder
                 'jumlah_kelipatan_gudang_besar' => fake()->numberBetween(1, 50),
                 'jumlah_jual_kategori_banyak' => fake()->numberBetween(1, 100),
                 'kode_merk' => 'MRK-' . str_pad($index, 3, '0', STR_PAD_LEFT),
-                'inventory_coa_id' => $this->defaultAccountIds['inventory_coa_id'] ?? null,
-                'sales_coa_id' => $this->defaultAccountIds['sales_coa_id'] ?? null,
-                'sales_return_coa_id' => $this->defaultAccountIds['sales_return_coa_id'] ?? null,
-                'sales_discount_coa_id' => $this->defaultAccountIds['sales_discount_coa_id'] ?? null,
-                'goods_delivery_coa_id' => $this->defaultAccountIds['goods_delivery_coa_id'] ?? null,
-                'cogs_coa_id' => $this->defaultAccountIds['cogs_coa_id'] ?? null,
-                'purchase_return_coa_id' => $this->defaultAccountIds['purchase_return_coa_id'] ?? null,
-                'unbilled_purchase_coa_id' => $this->defaultAccountIds['unbilled_purchase_coa_id'] ?? null,
-                'temporary_procurement_coa_id' => $this->defaultAccountIds['temporary_procurement_coa_id'] ?? null,
+                'inventory_coa_id' => $defaultAccountIds['inventory_coa_id'] ?? null,
+                'sales_coa_id' => $defaultAccountIds['sales_coa_id'] ?? null,
+                'sales_return_coa_id' => $defaultAccountIds['sales_return_coa_id'] ?? null,
+                'sales_discount_coa_id' => $defaultAccountIds['sales_discount_coa_id'] ?? null,
+                'goods_delivery_coa_id' => $defaultAccountIds['goods_delivery_coa_id'] ?? null,
+                'cogs_coa_id' => $defaultAccountIds['cogs_coa_id'] ?? null,
+                'purchase_return_coa_id' => $defaultAccountIds['purchase_return_coa_id'] ?? null,
+                'unbilled_purchase_coa_id' => $defaultAccountIds['unbilled_purchase_coa_id'] ?? null,
+                'temporary_procurement_coa_id' => $defaultAccountIds['temporary_procurement_coa_id'] ?? null,
+                'manufacturing_labor_coa_id' => $defaultAccountIds['manufacturing_labor_coa_id'] ?? null,
+                'manufacturing_overhead_coa_id' => $defaultAccountIds['manufacturing_overhead_coa_id'] ?? null,
             ]
         );
-    }
-
-    /**
-     * Resolve default chart of account ids used by seeded products.
-     *
-     * @return array<string, int|null>
-     */
-    private function resolveDefaultAccountIds(): array
-    {
-        $mapping = [
-            'inventory_coa_id' => Product::resolveDefaultInventoryCoaId(false, false)
-                ? ChartOfAccount::whereKey(Product::resolveDefaultInventoryCoaId(false, false))->value('code')
-                : '1140.01',
-            'sales_coa_id' => '4100.10',
-            'sales_return_coa_id' => '4120.10',
-            'sales_discount_coa_id' => '4110.10',
-            'goods_delivery_coa_id' => '1140.20',
-            'cogs_coa_id' => '5100.10',
-            'purchase_return_coa_id' => '5120.10',
-            'unbilled_purchase_coa_id' => '2100.10',
-            'temporary_procurement_coa_id' => '1400.01',
-        ];
-
-        $results = [];
-
-        foreach ($mapping as $column => $code) {
-            $results[$column] = ChartOfAccount::where('code', $code)->value('id');
-        }
-
-        return $results;
     }
 }

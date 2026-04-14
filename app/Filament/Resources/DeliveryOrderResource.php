@@ -158,7 +158,7 @@ class DeliveryOrderResource extends Resource
                             ->label('Cabang')
                             ->searchable()
                             ->preload()
-                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                            ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
                             ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))

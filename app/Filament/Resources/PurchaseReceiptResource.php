@@ -100,7 +100,7 @@ class PurchaseReceiptResource extends Resource
                             ->required(),
                         Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                            ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
                             ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))

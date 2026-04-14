@@ -71,7 +71,7 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 Select::make('selected_supplier')
                                     ->label('Supplier')
-                                    ->options(Supplier::all()->mapWithKeys(function ($supplier) {
+                                    ->options(Supplier::orderBy('perusahaan')->limit(50)->get()->mapWithKeys(function ($supplier) {
                                         return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                     }))
                                     ->searchable()
@@ -93,7 +93,7 @@ class PurchaseInvoiceResource extends Resource
                                     
                                 Select::make('cabang_id')
                                     ->label('Cabang')
-                                    ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                    ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     }))
                                     ->searchable()
@@ -490,7 +490,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->schema([
                                         Select::make('product_id')
                                             ->label('Produk')
-                                            ->options(\App\Models\Product::all()->mapWithKeys(function ($product) {
+                                            ->options(\App\Models\Product::query()->orderBy('name')->limit(50)->get()->mapWithKeys(function ($product) {
                                                 return [$product->id => $product->name];
                                             }))
                                             ->searchable()

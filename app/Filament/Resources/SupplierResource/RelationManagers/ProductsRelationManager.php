@@ -61,7 +61,7 @@ class ProductsRelationManager extends RelationManager
                     ->form([
                         Forms\Components\Select::make('product_id')
                             ->label('Produk')
-                            ->options(Product::all()->mapWithKeys(function ($product) {
+                            ->options(Product::query()->orderBy('name')->limit(50)->get()->mapWithKeys(function ($product) {
                                 return [$product->id => "{$product->sku} - {$product->name}"];
                             }))
                             ->searchable()

@@ -99,7 +99,7 @@ class OtherSaleResource extends Resource
 
                         Forms\Components\Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(\App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                            ->options(\App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
                             ->searchable()
@@ -278,7 +278,7 @@ class OtherSaleResource extends Resource
                                 });
                         }
 
-                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                        return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                         });
                     })

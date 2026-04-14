@@ -13,6 +13,7 @@ use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\SaleOrder;
 use App\Models\UnitOfMeasure;
+use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -244,18 +245,21 @@ class CustomerReceiptJournalIntegrationTest extends TestCase
             'method' => 'Cash'
         ]);
 
+        app(LedgerPostingService::class)->postCustomerReceipt($receipt->fresh());
+
         // Get journal entries before deletion
         $journalEntryIds = $receipt->journalEntries->pluck('id');
 
         // Soft delete the receipt
         $receipt->delete();
 
-        // Check that journal entries still exist (not cascade deleted)
+        // Check that journal entries are soft-deleted with the receipt
         foreach ($journalEntryIds as $entryId) {
-            $entry = JournalEntry::find($entryId);
+            $entry = JournalEntry::withTrashed()->find($entryId);
             $this->assertNotNull($entry);
             $this->assertEquals(CustomerReceipt::class, $entry->source_type);
             $this->assertEquals($receipt->id, $entry->source_id);
+            $this->assertSoftDeleted('journal_entries', ['id' => $entryId]);
         }
     }
 }

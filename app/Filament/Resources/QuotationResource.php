@@ -314,10 +314,11 @@ class QuotationResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
+                                        ->limit(50)
                                         ->get()
                                         ->mapWithKeys(fn ($c) => [$c->id => "{$c->kode} - {$c->nama}"]);
                                 }
-                                return \App\Models\Cabang::all()->mapWithKeys(fn ($c) => [$c->id => "{$c->kode} - {$c->nama}"]);
+                                return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(fn ($c) => [$c->id => "{$c->kode} - {$c->nama}"]);
                             })
                             ->default(fn () => Auth::user()?->cabang_id)
                             ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))

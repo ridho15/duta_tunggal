@@ -8,14 +8,67 @@
 
 use App\Models\AccountReceivable;
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\Product;
 use App\Models\SaleOrder;
+use App\Models\SaleOrderItem;
 use App\Services\InvoiceService;
 use App\Services\TaxService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(Tests\TestCase::class, RefreshDatabase::class);
+
+beforeEach(function (): void {
+    ChartOfAccount::factory()->create([
+        'code' => '1120',
+        'name' => 'Piutang Dagang',
+        'type' => 'Asset',
+        'is_active' => true,
+    ]);
+
+    ChartOfAccount::factory()->create([
+        'code' => '4000',
+        'name' => 'Penjualan',
+        'type' => 'Revenue',
+        'is_active' => true,
+    ]);
+
+    ChartOfAccount::factory()->create([
+        'code' => '4111',
+        'name' => 'Penjualan Lainnya',
+        'type' => 'Revenue',
+        'is_active' => true,
+    ]);
+
+    ChartOfAccount::factory()->create([
+        'code' => '5100.10',
+        'name' => 'Harga Pokok Penjualan',
+        'type' => 'Expense',
+        'is_active' => true,
+    ]);
+
+    ChartOfAccount::factory()->create([
+        'code' => '1140.20',
+        'name' => 'Persediaan Barang Terkirim',
+        'type' => 'Asset',
+        'is_active' => true,
+    ]);
+});
+
+function seedInvoiceSalesProduct(): Product
+{
+    $cogsCoa = ChartOfAccount::where('code', '5100.10')->firstOrFail();
+    $goodsDeliveryCoa = ChartOfAccount::where('code', '1140.20')->firstOrFail();
+
+    return Product::factory()->create([
+        'name' => 'Produk Invoice Service',
+        'cost_price' => 50_000,
+        'cogs_coa_id' => $cogsCoa->id,
+        'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
+    ]);
+}
 
 // ---------------------------------------------------------------------------
 // TC-INV-001 & 002 – Invoice number generation (format + sequential)
@@ -54,10 +107,21 @@ test('TC-INV-002: generatePurchaseInvoiceNumber returns PINV-YYYYMMDD-0001 when 
 test('TC-INV-003: creating a SaleOrder invoice auto-creates one AccountReceivable', function () {
     $cabang   = Cabang::factory()->create();
     $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
+    $product  = seedInvoiceSalesProduct();
     $so       = SaleOrder::factory()->create([
         'customer_id' => $customer->id,
         'cabang_id'   => $cabang->id,
         'status'      => 'completed',
+    ]);
+
+    SaleOrderItem::factory()->create([
+        'sale_order_id' => $so->id,
+        'product_id' => $product->id,
+        'quantity' => 1,
+        'unit_price' => 100000,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Eksklusif',
     ]);
 
     $invoice = Invoice::create([
@@ -89,12 +153,23 @@ test('TC-INV-003: creating a SaleOrder invoice auto-creates one AccountReceivabl
 test('TC-INV-004: AR remaining equals invoice total immediately after invoice creation', function () {
     $cabang       = Cabang::factory()->create();
     $customer     = Customer::factory()->create(['cabang_id' => $cabang->id]);
+    $product      = seedInvoiceSalesProduct();
     $so           = SaleOrder::factory()->create([
         'customer_id' => $customer->id,
         'cabang_id'   => $cabang->id,
         'status'      => 'completed',
     ]);
     $invoiceTotal = 550000;
+
+    SaleOrderItem::factory()->create([
+        'sale_order_id' => $so->id,
+        'product_id' => $product->id,
+        'quantity' => 1,
+        'unit_price' => 550000,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Eksklusif',
+    ]);
 
     $invoice = Invoice::create([
         'invoice_number' => 'INV-' . now()->format('Ymd') . '-0001',
@@ -170,10 +245,21 @@ test('TC-INV-006b: dpp + ppn = total for inklusif 12% PPN', function () {
 test('TC-INV-007: invoice status becomes paid when AR remaining is set to zero', function () {
     $cabang   = Cabang::factory()->create();
     $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
+    $product  = seedInvoiceSalesProduct();
     $so       = SaleOrder::factory()->create([
         'customer_id' => $customer->id,
         'cabang_id'   => $cabang->id,
         'status'      => 'completed',
+    ]);
+
+    SaleOrderItem::factory()->create([
+        'sale_order_id' => $so->id,
+        'product_id' => $product->id,
+        'quantity' => 1,
+        'unit_price' => 100000,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Eksklusif',
     ]);
 
     $invoice = Invoice::create([

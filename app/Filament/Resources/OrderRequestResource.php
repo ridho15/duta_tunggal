@@ -219,11 +219,11 @@ class OrderRequestResource extends Resource
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
                                 if ($user && is_array($manageType) && in_array('all', $manageType)) {
-                                    return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                                    return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     });
                                 } else {
-                                    return \App\Models\Cabang::where('id', $user?->cabang_id)->get()->mapWithKeys(function ($cabang) {
+                                    return \App\Models\Cabang::where('id', $user?->cabang_id)->limit(50)->get()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     });
                                 }

@@ -20,14 +20,18 @@ class CustomerReceiptItemObserverTest extends TestCase
     {
         Config::set('coa.accounts_receivable', '1120.10');
 
-        $cashCoa = ChartOfAccount::factory()->create([
+        $cashCoa = ChartOfAccount::firstOrCreate([
             'code' => '1111.01',
+        ], [
+            'name' => 'Kas Kecil',
             'type' => 'Asset',
             'is_active' => true,
         ]);
 
-        $receivableCoa = ChartOfAccount::factory()->create([
+        $receivableCoa = ChartOfAccount::firstOrCreate([
             'code' => '1120.10',
+        ], [
+            'name' => 'Piutang Dagang',
             'type' => 'Asset',
             'is_active' => true,
         ]);
@@ -50,11 +54,11 @@ class CustomerReceiptItemObserverTest extends TestCase
             'payment_date' => now()->toDateString(),
         ]));
 
-        app(CustomerReceiptItemObserver::class)->created($item);
+        $receipt->update(['status' => 'paid']);
 
         $creditEntry = JournalEntry::query()
-            ->where('source_type', CustomerReceiptItem::class)
-            ->where('source_id', $item->id)
+            ->where('source_type', CustomerReceipt::class)
+            ->where('source_id', $receipt->id)
             ->where('credit', '>', 0)
             ->first();
 

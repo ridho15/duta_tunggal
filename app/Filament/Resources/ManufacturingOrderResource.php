@@ -302,7 +302,7 @@ class ManufacturingOrderResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Material harus dipilih'
                                     ])
-                                    ->options(Product::where('is_raw_material', true)->pluck('name', 'id'))
+                                    ->options(Product::where('is_raw_material', true)->orderBy('name')->limit(50)->pluck('name', 'id'))
                                     ->getOptionLabelFromRecordUsing(function ($value) {
                                         $product = Product::find($value);
                                         return $product ? "({$product->sku}) {$product->name}" : '';

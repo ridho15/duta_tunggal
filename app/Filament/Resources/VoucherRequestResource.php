@@ -98,7 +98,7 @@ class VoucherRequestResource extends Resource
 
                                 Select::make('cabang_id')
                                     ->label('Cabang')
-                                    ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                    ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     }))
                                     ->searchable()
@@ -375,7 +375,7 @@ class VoucherRequestResource extends Resource
                                 });
                         }
                         
-                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                        return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                         });
                     })

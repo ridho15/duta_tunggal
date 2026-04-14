@@ -68,30 +68,6 @@ class ProductResource extends Resource
      */
     protected static array $coaOptionsCache = [];
 
-    /**
-     * Cache untuk mapping kode COA ke ID
-     * @var array<string, int|null>
-     */
-    protected static array $coaIdCache = [];
-
-    /**
-     * Kode default akun produk berbasis best practice ERP
-     * @var array<string, string>
-     */
-    protected static array $defaultProductAccountCodes = [
-        'inventory' => '1140.01',
-        'sales' => '4100.10',
-        'sales_return' => '4120.10',
-        'sales_discount' => '4110.10',
-        'goods_delivery' => '1140.20',
-        'cogs' => '5100.10',
-        'purchase_return' => '5120.10',
-        'unbilled_purchase' => '2100.10',
-        'temporary_procurement' => '1400.01',
-        'manufacturing_labor' => '5230',
-        'manufacturing_overhead' => '6000',
-    ];
-
     protected static function formatCabangLabel(?Product $product): string
     {
         if (! $product?->cabang_id) {
@@ -126,17 +102,14 @@ class ProductResource extends Resource
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state) {
                                     $set('is_raw_material', false);
-                                    $productionInventoryCoa = ChartOfAccount::where('code', '1140.02')->first();
-                                    if ($productionInventoryCoa) {
-                                        $set('inventory_coa_id', $productionInventoryCoa->id);
-                                    }
+                                    $set('inventory_coa_id', self::resolveInventoryCoaId(true, false));
 
                                     if (! $get('manufacturing_labor_coa_id')) {
-                                        $set('manufacturing_labor_coa_id', self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_labor'] ?? null));
+                                        $set('manufacturing_labor_coa_id', Product::resolveDefaultProductCoaId('manufacturing_labor_coa_id'));
                                     }
 
                                     if (! $get('manufacturing_overhead_coa_id')) {
-                                        $set('manufacturing_overhead_coa_id', self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_overhead'] ?? null));
+                                        $set('manufacturing_overhead_coa_id', Product::resolveDefaultProductCoaId('manufacturing_overhead_coa_id'));
                                     }
                                 } else {
                                     $set('inventory_coa_id', self::resolveInventoryCoaId(false, (bool) $get('is_raw_material')));
@@ -187,7 +160,7 @@ class ProductResource extends Resource
                             ]),
                         Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                            ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
                             ->preload()
@@ -361,7 +334,7 @@ class ProductResource extends Resource
                             ->label('Penjualan')
                             ->helperText('Akun penjualan ketika produk dijual.')
                             ->options(fn() => self::getCoaOptions('Revenue'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('sales_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -369,7 +342,7 @@ class ProductResource extends Resource
                             ->label('Retur Penjualan')
                             ->helperText('Akun yang digunakan saat retur penjualan produk.')
                             ->options(fn() => self::getCoaOptions('Revenue'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales_return'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('sales_return_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -377,7 +350,7 @@ class ProductResource extends Resource
                             ->label('Diskon Penjualan')
                             ->helperText('Akun untuk diskon penjualan produk.')
                             ->options(fn() => self::getCoaOptions('Revenue'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['sales_discount'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('sales_discount_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -385,7 +358,7 @@ class ProductResource extends Resource
                             ->label('Barang Terkirim')
                             ->helperText('Akun penampung barang terkirim yang belum diterima pelanggan.')
                             ->options(fn() => self::getCoaOptions('Asset'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['goods_delivery'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('goods_delivery_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -393,7 +366,7 @@ class ProductResource extends Resource
                             ->label('Beban Pokok Penjualan')
                             ->helperText('Akun beban pokok untuk produk ini.')
                             ->options(fn() => self::getCoaOptions('Expense'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['cogs'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('cogs_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -401,7 +374,7 @@ class ProductResource extends Resource
                             ->label('Retur Pembelian')
                             ->helperText('Akun ketika terjadi retur pembelian produk.')
                             ->options(fn() => self::getCoaOptions('Expense'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['purchase_return'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('purchase_return_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -409,7 +382,7 @@ class ProductResource extends Resource
                             ->label('Pembelian Belum Tertagih')
                             ->helperText('Akun kewajiban ketika barang sudah diterima namun belum ditagih.')
                             ->options(fn() => self::getCoaOptions('Liability'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['unbilled_purchase'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('unbilled_purchase_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -417,7 +390,7 @@ class ProductResource extends Resource
                             ->label('Pos Sementara Pengadaan')
                             ->helperText('Akun posisi sementara untuk produk selama proses pengadaan. Akan di-zero ketika pengadaan selesai.')
                             ->options(fn() => self::getCoaOptions('Asset'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['temporary_procurement'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('temporary_procurement_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable(),
@@ -425,7 +398,7 @@ class ProductResource extends Resource
                             ->label('COA TKL Produksi')
                             ->helperText('Default akun kredit untuk biaya tenaga kerja langsung saat costing produksi otomatis dibuat.')
                             ->options(fn() => self::getCoaOptions('Expense'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_labor'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('manufacturing_labor_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable()
@@ -434,7 +407,7 @@ class ProductResource extends Resource
                             ->label('COA Overhead Produksi')
                             ->helperText('Default akun kredit untuk biaya overhead produksi saat costing otomatis dibuat.')
                             ->options(fn() => self::getCoaOptions('Expense'))
-                            ->default(fn() => self::getCoaIdByCode(self::$defaultProductAccountCodes['manufacturing_overhead'] ?? null))
+                            ->default(fn() => Product::resolveDefaultProductCoaId('manufacturing_overhead_coa_id'))
                             ->searchable()
                             ->preload()
                             ->nullable()
@@ -467,22 +440,6 @@ class ProductResource extends Resource
         }
 
         return self::$coaOptionsCache[$cacheKey];
-    }
-
-    /**
-     * Ambil ID COA berdasarkan kode dengan cache sederhana.
-     */
-    protected static function getCoaIdByCode(?string $code): ?int
-    {
-        if (! $code) {
-            return null;
-        }
-
-        if (! array_key_exists($code, self::$coaIdCache)) {
-            self::$coaIdCache[$code] = ChartOfAccount::where('code', $code)->value('id');
-        }
-
-        return self::$coaIdCache[$code];
     }
 
     /**
@@ -932,7 +889,7 @@ class ProductResource extends Resource
                                     ->schema([
                                         Select::make('cabang_id')
                                             ->label('Cabang')
-                                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                            ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                             }))
                                             ->preload()

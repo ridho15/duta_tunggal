@@ -40,7 +40,7 @@ class SalesReportServiceTest extends TestCase
         $cancelledOrder = SaleOrder::factory()->create([
             'customer_id' => $customer->id,
             'so_number' => 'SO-SERVICE-002',
-            'status' => 'cancelled',
+            'status' => 'canceled',
             'total_amount' => 250_000,
             'created_at' => '2026-04-04 11:00:00',
         ]);

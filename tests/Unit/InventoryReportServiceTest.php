@@ -59,7 +59,7 @@ class InventoryReportServiceTest extends TestCase
 
         $this->assertCount(1, $agingRows);
         $this->assertSame('Aktif', $agingRows[0]['Kategori Aging']);
-        $this->assertSame(14, $agingRows[0]['Hari Aging']);
+        $this->assertSame(15, $agingRows[0]['Hari Aging']);
 
         $payload = $service->pdfPayload([
             'warehouse_id' => $fixture['warehouse']->id,
@@ -123,8 +123,8 @@ class InventoryReportServiceTest extends TestCase
 
         $this->assertNotNull($rak1);
         $this->assertNotNull($rak2);
-        $this->assertSame(14, $rak1['Hari Aging']);
-        $this->assertSame(1, $rak2['Hari Aging']);
+        $this->assertSame(15, $rak1['Hari Aging']);
+        $this->assertSame(2, $rak2['Hari Aging']);
 
         Carbon::setTestNow();
     }

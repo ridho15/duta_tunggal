@@ -65,9 +65,11 @@ class CustomerReceiptVsVendorPaymentTest extends TestCase
             'symbol' => 'Rp',
         ]);
 
+        $cabangId = \App\Models\Cabang::query()->value('id') ?? \App\Models\Cabang::factory()->create()->id;
+
         $this->supplier = Supplier::factory()->create([
             'tempo_hutang' => 30,
-            'cabang_id' => 1,
+            'cabang_id' => $cabangId,
         ]);
 
         $this->customer = Customer::factory()->create();
