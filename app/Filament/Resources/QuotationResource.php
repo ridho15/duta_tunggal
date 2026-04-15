@@ -1329,17 +1329,13 @@ class QuotationResource extends Resource
 
                             $saleOrder->load('saleOrderItem.warehouseAllocations', 'saleOrderItem.product');
 
-                            if (! $saleOrder->hasInsufficientStock()) {
-                                $saleOrder->update([
-                                    'status' => 'approved',
-                                    'approve_by' => Auth::id(),
-                                    'approve_at' => now(),
-                                ]);
+                            $saleOrder->update([
+                                'status' => 'approved',
+                                'approve_by' => Auth::id(),
+                                'approve_at' => now(),
+                            ]);
 
-                                HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation dan disetujui karena stok bebas mencukupi. Proses selanjutnya: Tim Gudang/Logistik dapat melanjutkan ke Delivery Order.");
-                            } else {
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation, tetapi status tetap draft karena stok belum mencukupi. Silakan lengkapi stok terlebih dahulu sebelum request approve.");
-                            }
+                            HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation dan disetujui. Proses selanjutnya: Tim Gudang/Logistik dapat melanjutkan ke Delivery Order.");
 
                             // Redirect to edit page
                             return redirect()->route('filament.admin.resources.sale-orders.edit', $saleOrder);

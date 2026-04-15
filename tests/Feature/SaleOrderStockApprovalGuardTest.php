@@ -13,7 +13,6 @@ use App\Models\Warehouse;
 use App\Services\SalesOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -115,30 +114,28 @@ function createSaleOrderWithStock($customer, $category, $warehouse, $rak, int $c
     return $saleOrder->fresh(['saleOrderItem.warehouseAllocations', 'saleOrderItem.product']);
 }
 
-test('sales order request approval is blocked when stock is insufficient', function () {
+test('sales order request approval still works when stock is insufficient', function () {
     $saleOrder = createSaleOrderWithShortage($this->customer, $this->category, $this->warehouse, $this->rak, $this->user->id);
 
     expect($saleOrder->hasInsufficientStock())->toBeTrue();
 
-    expect(fn () => $this->salesOrderService->requestApprove($saleOrder))
-        ->toThrow(ValidationException::class);
+    expect($this->salesOrderService->requestApprove($saleOrder))->toBeTrue();
 
-    expect($saleOrder->fresh()->status)->toBe('draft')
-        ->and($saleOrder->fresh()->request_approve_by)->toBeNull();
+    expect($saleOrder->fresh()->status)->toBe('request_approve')
+        ->and($saleOrder->fresh()->request_approve_by)->not->toBeNull();
 });
 
-test('sales order approval is blocked when stock is insufficient', function () {
+test('sales order approval still works when stock is insufficient', function () {
     $saleOrder = createSaleOrderWithShortage($this->customer, $this->category, $this->warehouse, $this->rak, $this->user->id);
 
     $saleOrder->update(['status' => 'request_approve']);
 
     expect($saleOrder->fresh()->hasInsufficientStock())->toBeTrue();
 
-    expect(fn () => $this->salesOrderService->approve($saleOrder))
-        ->toThrow(ValidationException::class);
+    expect($this->salesOrderService->approve($saleOrder))->toBeTrue();
 
-    expect($saleOrder->fresh()->status)->toBe('request_approve')
-        ->and($saleOrder->fresh()->approve_by)->toBeNull();
+    expect($saleOrder->fresh()->status)->toBe('approved')
+        ->and($saleOrder->fresh()->approve_by)->not->toBeNull();
 });
 
 test('sales order can request approval and approve when stock is sufficient', function () {

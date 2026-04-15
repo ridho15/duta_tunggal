@@ -644,14 +644,6 @@ class SaleOrderResource extends Resource
                                                         $fail('Setiap alokasi wajib memiliki gudang dan qty > 0.');
                                                         return;
                                                     }
-
-                                                    $productId = $get('product_id');
-                                                    $availableStock = InventoryStock::freeQtyFor($productId, $allocationWarehouseId);
-
-                                                    if ((float) $availableStock < $allocationItemQty) {
-                                                        $fail('Stok bebas tidak mencukupi pada salah satu alokasi gudang.');
-                                                        return;
-                                                    }
                                                 }
                                             };
                                         }
@@ -1027,14 +1019,26 @@ class SaleOrderResource extends Resource
                     ->label('Status Stok')
                     ->badge()
                     ->state(function (SaleOrder $record): string {
+                        if ($record->status === 'completed') {
+                            return 'SELESAI';
+                        }
+
                         return $record->hasInsufficientStock() ? 'STOK KURANG' : 'STOK READY';
                     })
                     ->color(function (SaleOrder $record): string {
+                        if ($record->status === 'completed') {
+                            return 'gray';
+                        }
+
                         return $record->hasInsufficientStock() ? 'warning' : 'success';
                     })
                     ->size('sm')
                     ->weight('bold')
                     ->tooltip(function (SaleOrder $record): ?string {
+                        if ($record->status === 'completed') {
+                            return '✅ Sales order sudah selesai';
+                        }
+
                         if ($record->hasInsufficientStock()) {
                             $insufficientItems = $record->getInsufficientStockItems();
                             $tooltip = "⚠️ Item dengan stok kurang:\n";
@@ -1145,6 +1149,10 @@ class SaleOrderResource extends Resource
                 return $query->with(['customer', 'saleOrderItem.product']);
             })
             ->recordClasses(function (SaleOrder $record): string {
+                if ($record->status === 'completed') {
+                    return '';
+                }
+
                 return $record->hasInsufficientStock() ? 'insufficient-stock-row' : '';
             })
             ->actions([
@@ -1169,8 +1177,7 @@ class SaleOrderResource extends Resource
                         ->icon('heroicon-o-arrow-uturn-up')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('request sales order')
-                                && $record->status == 'draft'
-                                && ! $record->hasInsufficientStock();
+                                && $record->status == 'draft';
                         })
                         ->action(function ($record) {
                             try {
@@ -1217,8 +1224,7 @@ class SaleOrderResource extends Resource
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('response sales order')
-                                && $record->status == 'request_approve'
-                                && ! $record->hasInsufficientStock();
+                                && $record->status == 'request_approve';
                         })
                         ->action(function ($record) {
                             try {

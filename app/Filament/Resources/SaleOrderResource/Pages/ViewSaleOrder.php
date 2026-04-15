@@ -55,8 +55,7 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-arrow-uturn-up')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('request sales order')
-                            && $record->status == 'draft'
-                            && ! $record->hasInsufficientStock();
+                            && $record->status == 'draft';
                     })
                     ->action(function ($record) {
                         try {
@@ -110,8 +109,7 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-check-badge')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('response sales order')
-                            && ($record->status == 'request_approve')
-                            && ! $record->hasInsufficientStock();
+                            && ($record->status == 'request_approve');
                     })
                     ->action(function ($record) {
                         try {

@@ -46,6 +46,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Enums\ThemeMode;
 use Filament\Support\Colors\Color;
 
 class AdminPanelProvider extends PanelProvider
@@ -58,6 +59,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('/admin')
             ->login()
             ->profile()
+            ->defaultThemeMode(ThemeMode::Light)
             ->colors([
                 'primary' => Color::Blue,
             ])

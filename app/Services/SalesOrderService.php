@@ -144,8 +144,6 @@ class SalesOrderService
 
     public function requestApprove($saleOrder)
     {
-        $this->ensureStockAvailableForApproval($saleOrder);
-
         return $saleOrder->update([
             'status' => 'request_approve',
             'request_approve_by' => Auth::user()->id,
@@ -164,8 +162,6 @@ class SalesOrderService
 
     public function approve($saleOrder)
     {
-        $this->ensureStockAvailableForApproval($saleOrder);
-
         // Validate customer credit limit before approving
         $saleOrder->loadMissing('customer');
         if ($saleOrder->customer && $saleOrder->customer->tipe_pembayaran === 'Kredit') {
@@ -189,34 +185,6 @@ class SalesOrderService
             'status' => 'approved',
             'approve_by' => Auth::user()->id,
             'approve_at' => Carbon::now()
-        ]);
-    }
-
-    protected function ensureStockAvailableForApproval(SaleOrder $saleOrder): void
-    {
-        $saleOrder->loadMissing('saleOrderItem.warehouseAllocations', 'saleOrderItem.product');
-
-        if (! $saleOrder->hasInsufficientStock()) {
-            return;
-        }
-
-        $insufficientItems = collect($saleOrder->getInsufficientStockItems())
-            ->map(function (array $item) {
-                $product = $item['item']?->product;
-
-                return trim(sprintf(
-                    '%s (butuh %s, tersedia %s)',
-                    $product?->name ?? 'Produk',
-                    rtrim(rtrim((string) ($item['needed'] ?? 0), '0'), '.'),
-                    rtrim(rtrim((string) ($item['available'] ?? 0), '0'), '.')
-                ));
-            })
-            ->implode('; ');
-
-        throw ValidationException::withMessages([
-            'stock' => $insufficientItems
-                ? 'Stok tidak cukup untuk request/approve sales order: ' . $insufficientItems
-                : 'Stok tidak cukup untuk request/approve sales order.',
         ]);
     }
 
