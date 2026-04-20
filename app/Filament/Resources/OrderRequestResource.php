@@ -12,6 +12,7 @@ use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\OrderRequestService;
 use App\Support\ProcurementFailureNotifier;
+use App\Support\TaxDefaultResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Forms\Components\Checkbox;
@@ -305,8 +306,6 @@ class OrderRequestResource extends Resource
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (string $state, callable $get, callable $set) {
-                                $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
-
                                 if ($state === 'None') {
                                     $items = $get('orderRequestItem') ?? [];
                                     foreach ($items as $key => $item) {
@@ -316,7 +315,13 @@ class OrderRequestResource extends Resource
                                 } else {
                                     $items = $get('orderRequestItem') ?? [];
                                     foreach ($items as $key => $item) {
-                                        $set("orderRequestItem.{$key}.tax", $defaultTax);
+                                        $set(
+                                            "orderRequestItem.{$key}.tax",
+                                            TaxDefaultResolver::resolveForProductId(
+                                                is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null,
+                                                $state
+                                            )
+                                        );
                                     }
                                 }
 
@@ -326,7 +331,12 @@ class OrderRequestResource extends Resource
                                     $qty     = (float) ($item['quantity'] ?? 0);
                                     $price   = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
                                     $discPct = (float) ($item['discount'] ?? 0);
-                                    $taxPct  = $state === 'None' ? 0 : $defaultTax;
+                                    $taxPct  = $state === 'None'
+                                        ? 0
+                                        : TaxDefaultResolver::resolveForProductId(
+                                            is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null,
+                                            $state
+                                        );
                                     $base      = $qty * $price;
                                     $afterDisc = $base - $base * ($discPct / 100);
                                     try {
@@ -380,12 +390,9 @@ class OrderRequestResource extends Resource
                                                     $currentSupplierId = $resolvedSupplierId;
                                                 }
 
-                                                // Set tax from product if available, otherwise keep current value
-                                                if (($get('../../tax_type') ?? 'PPN Excluded') === 'None') {
-                                                    $set('tax', 0);
-                                                } elseif ($product->pajak && $product->pajak > 0) {
-                                                    $set('tax', $product->pajak);
-                                                }
+                                                $taxType = $get('../../tax_type') ?? 'PPN Excluded';
+                                                $taxRate = TaxDefaultResolver::resolveForProductId((int) $state, $taxType);
+                                                $set('tax', $taxType === 'None' ? 0 : $taxRate);
 
                                                 // Use item-level supplier price if available
                                                 $itemSupplierId = $currentSupplierId;
@@ -405,10 +412,9 @@ class OrderRequestResource extends Resource
                                                 $set('unit_price', number_format((float)$unitPrice, 0, ',', '.'));
                                                 $set('unit', $product->uom?->abbreviation ?? '-');
                                                 // Recalculate subtotal
-                                                $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
                                                 $quantity = (float) ($get('quantity') ?? 0);
                                                 $discPct  = (float) ($get('discount') ?? 0);
-                                                $taxPct   = (float) ($get('tax') ?? 0);
+                                                $taxPct   = $taxType === 'None' ? 0 : $taxRate;
                                                 $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
                                                 $set('total_cost', $preview['total_cost']);
                                                 $set('subtotal', $preview['subtotal']);
@@ -603,7 +609,12 @@ class OrderRequestResource extends Resource
                                 TextInput::make('tax')
                                     ->label('Tax (%)')
                                     ->numeric()
-                                    ->default(fn (callable $get) => ($get('../../tax_type') ?? 'PPN Excluded') === 'None' ? 0 : \App\Models\TaxSetting::activeRate('PPN'))
+                                    ->default(function (callable $get) {
+                                        return TaxDefaultResolver::resolveForProductId(
+                                            is_numeric($get('product_id')) ? (int) $get('product_id') : null,
+                                            $get('../../tax_type') ?? 'PPN Excluded'
+                                        );
+                                    })
                                     ->minValue(0)
                                     ->maxValue(100)
                                     ->reactive()

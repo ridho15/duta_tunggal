@@ -13,6 +13,7 @@ use App\Models\SaleOrder;
 use App\Services\CustomerService;
 use App\Services\QuotationService;
 use App\Services\SalesOrderService;
+use App\Support\TaxDefaultResolver;
 use App\Support\WarehouseStockOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -386,10 +387,12 @@ class QuotationResource extends Resource
                                             $set('unit_price', number_format($numericUnit, 0, ',', '.'));
                                             // F2: auto-fill unit/satuan from product UOM
                                             $set('unit', $product->uom?->abbreviation ?? '-');
+                                            $taxType = $get('tax_type') ?? 'None';
+                                            $taxRate = TaxDefaultResolver::resolveForProductId((int) $state, $taxType);
+                                            $set('tax', $taxType === 'None' ? 0 : $taxRate);
                                             $qty = (float)($get('quantity') ?? 0);
                                             $discPct = (float)($get('discount') ?? 0);
-                                            $taxPct = (float)($get('tax') ?? 0);
-                                            $taxType = $get('tax_type') ?? 'None';
+                                            $taxPct = $taxType === 'None' ? 0 : $taxRate;
                                             // total = unit_price * quantity (no discount)
                                             $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
                                             // subtotal = with discount + tax (formatted)
@@ -569,7 +572,10 @@ class QuotationResource extends Resource
                                     ->live()
                                     ->afterStateUpdated(function ($state, callable $get, callable $set, $livewire) {
                                         $state = static::normalizeTaxTypeValue($state);
-                                        $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
+                                        $defaultTax = TaxDefaultResolver::resolveForProductId(
+                                            is_numeric($get('product_id')) ? (int) $get('product_id') : null,
+                                            $state
+                                        );
 
                                         if ($state === 'None') {
                                             $set('tax', 0);
@@ -619,6 +625,20 @@ class QuotationResource extends Resource
                                         'required' => 'Tax tidak boleh kosong'
                                     ])
                                     ->maxValue(100)
+                                    ->default(function (callable $get, $record) {
+                                        if ($record) {
+                                            $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
+
+                                            if ($quotationItem) {
+                                                return $quotationItem->tax;
+                                            }
+                                        }
+
+                                        return TaxDefaultResolver::resolveForProductId(
+                                            is_numeric($get('product_id')) ? (int) $get('product_id') : null,
+                                            $get('tax_type') ?? 'None'
+                                        );
+                                    })
                                     ->afterStateUpdated(function ($set, $get, $state, $livewire) {
                                         $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
                                         $qty = (float)($get('quantity') ?? 0);
@@ -1193,26 +1213,6 @@ class QuotationResource extends Resource
                                             TextInput::make('tax')
                                                 ->label('Tax (%)')
                                                 ->numeric()
-                                                ->default(function ($get, $record) {
-                                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
-                                                    return $quotationItem ? $quotationItem->tax : 0;
-                                                })
-                                                ->minValue(0)
-                                                ->maxValue(100)
-                                                ->reactive()
-                                                ->afterStateUpdated(function ($state, $set, $get) {
-                                                    $quantity = $get('quantity') ?? 0;
-                                                    $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
-                                                    $discount = $get('discount') ?? 0;
-                                                    $tax = $state ?? 0;
-                                                    $taxType = $get('tax_type') ?? 'None';
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
-                                                    $set('subtotal', $subtotal);
-                                                    $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
-                                                }),
-                                            TextInput::make('tax_nominal')
-                                                ->label('Tax Amount')
-                                                ->indonesianMoney()
                                                 ->readOnly()
                                                 ->default(0),
                                             TextInput::make('subtotal')

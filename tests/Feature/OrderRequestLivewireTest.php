@@ -138,10 +138,20 @@ it('filters product options based on selected supplier', function () {
     $component->assertSet('data.orderRequestItem.0.product_id', $productB->id);
 });
 
-it('auto-fills tax from active setting when tax type is PPN Excluded or Included', function () {
+it('prefers product tax, then active setting, then zero for order request items', function () {
     TaxSetting::factory()->ppn()->create([
         'effective_date' => now()->subDay()->toDateString(),
         'status' => true,
+    ]);
+
+    $productWithTax = Product::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'pajak' => 7,
+    ]);
+
+    $productWithoutTax = Product::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'pajak' => null,
     ]);
 
     Livewire::actingAs($this->user)
@@ -150,7 +160,7 @@ it('auto-fills tax from active setting when tax type is PPN Excluded or Included
         ->set('data.warehouse_id', $this->warehouse->id)
         ->set('data.orderRequestItem', [
             [
-                'product_id' => $this->productA->id,
+                'product_id' => $productWithTax->id,
                 'quantity' => 1,
                 'unit_price' => 100000,
                 'discount' => 0,
@@ -158,11 +168,34 @@ it('auto-fills tax from active setting when tax type is PPN Excluded or Included
             ],
         ])
         ->set('data.tax_type', 'PPN Excluded')
-        ->assertSet('data.orderRequestItem.0.tax', 11)
+        ->assertSet('data.orderRequestItem.0.tax', 7)
         ->set('data.orderRequestItem.0.tax', 7)
         ->assertSet('data.orderRequestItem.0.tax', 7)
         ->set('data.tax_type', 'PPN Included')
+        ->assertSet('data.orderRequestItem.0.tax', 7)
+        ->set('data.orderRequestItem.0.product_id', $productWithoutTax->id)
+        ->set('data.tax_type', 'PPN Excluded')
         ->assertSet('data.orderRequestItem.0.tax', 11);
+
+    TaxSetting::query()->delete();
+
+    Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->set('data.supplier_id', $this->supplierA->id)
+        ->set('data.warehouse_id', $this->warehouse->id)
+        ->set('data.orderRequestItem', [
+            [
+                'product_id' => $productWithoutTax->id,
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+            ],
+        ])
+        ->set('data.tax_type', 'PPN Excluded')
+        ->assertSet('data.orderRequestItem.0.tax', 0)
+        ->set('data.tax_type', 'PPN Included')
+        ->assertSet('data.orderRequestItem.0.tax', 0);
 });
 
 

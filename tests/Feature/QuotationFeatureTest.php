@@ -690,7 +690,7 @@ test('quotation item tax_type persists through update', function () {
     expect($item->tax_type)->toBe('PPN Included');
 });
 
-test('quotation form auto-fills tax from active setting when tax type is PPN Excluded or Included', function () {
+test('quotation form prefers product tax, then active setting, then zero', function () {
     $user = User::factory()->create();
     $permissions = [
         'view any quotation',
@@ -708,9 +708,15 @@ test('quotation form auto-fills tax from active setting when tax type is PPN Exc
     $user->givePermissionTo($permissions);
 
     $customer = Customer::factory()->create();
-    $product = Product::factory()->create([
+    $productWithTax = Product::factory()->create([
         'cabang_id' => $this->cabang->id,
         'uom_id' => $this->uom->id,
+        'pajak' => 7,
+    ]);
+    $productWithoutTax = Product::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'uom_id' => $this->uom->id,
+        'pajak' => null,
     ]);
 
     TaxSetting::factory()->ppn()->create([
@@ -723,7 +729,7 @@ test('quotation form auto-fills tax from active setting when tax type is PPN Exc
         ->set('data.customer_id', $customer->id)
         ->set('data.date', now()->toDateString())
         ->set('data.quotationItem', [
-            [
+                'product_id' => $productWithTax->id,
                 'product_id' => $product->id,
                 'quantity' => 1,
                 'unit_price' => 100000,
@@ -732,11 +738,35 @@ test('quotation form auto-fills tax from active setting when tax type is PPN Exc
                 'tax_type' => 'None',
             ],
         ])
-            ->set('data.quotationItem.0.tax_type', 'PPN Excluded')
+            ->assertSet('data.quotationItem.0.tax', 7)
             ->assertSet('data.quotationItem.0.tax', 11)
         ->set('data.quotationItem.0.tax', 7)
         ->assertSet('data.quotationItem.0.tax', 7)
-            ->set('data.quotationItem.0.tax_type', 'PPN Included')
+        ->assertSet('data.quotationItem.0.tax', 7)
+        ->set('data.quotationItem.0.product_id', $productWithoutTax->id)
+            ->set('data.quotationItem.0.tax_type', 'PPN Excluded')
+        ->assertSet('data.quotationItem.0.tax', 11);
+
+    TaxSetting::query()->delete();
+
+    Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.quotationItem', [
+            [
+                'product_id' => $productWithoutTax->id,
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+                'tax_type' => 'None',
+            ],
+        ])
+        ->set('data.quotationItem.0.tax_type', 'PPN Excluded')
+        ->assertSet('data.quotationItem.0.tax', 0)
+        ->set('data.quotationItem.0.tax_type', 'PPN Included')
+        ->assertSet('data.quotationItem.0.tax', 0);
         ->assertSet('data.quotationItem.0.tax', 11);
 });
 
