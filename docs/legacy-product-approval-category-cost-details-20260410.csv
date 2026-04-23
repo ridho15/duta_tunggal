@@ -1,5 +1,0 @@
-target_sku,difference_reason,current_sku,product_name,product_category_id,uom_id,cost_price,sell_price,item_value,tipe_pajak,pajak,jumlah_kelipatan_gudang_besar,jumlah_jual_kategori_banyak,kode_merk,biaya,qty_available,qty_reserved,qty_min
-PTBB016100,"category,cost",CAB-PTBB016100,"PIPA TEMBAGA ASTM B280 5/8 x 1MM",514,9,455683.00,601398.00,0.00,Inklusif,11.00,1,1,ECOPIPE,455683.00,0.00,0.00,1.00
-PTBB016100,"category,cost",CAB-PTBB016100-DUP2-R12205,"PIPA TEMBAGA ASTM B280 5/8 x 1MM",822,9,458325.00,601398.00,0.00,Inklusif,11.00,1,1,ECOPIPE,455683.00,0.00,0.00,1.00
-PTBB019100,"category,cost",CAB-PTBB019100,"BRASSCO PIPA TEMBAGA ASTM B280 3/4 X 1mm",517,9,671000.00,680400.00,0.00,Inklusif,11.00,1,1,NONE,564000.00,0.00,0.00,1.00
-PTBB019100,"category,cost",CAB-PTBB019100-DUP2-R12224,"BRASSCO PIPA TEMBAGA ASTM B280 3/4 X 1mm",822,9,564000.00,680400.00,0.00,Inklusif,11.00,1,1,NONE,564000.00,0.00,0.00,1.00

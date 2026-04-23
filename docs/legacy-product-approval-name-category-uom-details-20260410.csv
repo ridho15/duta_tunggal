@@ -1,3 +1,0 @@
-target_sku,difference_reason,current_sku,product_name,product_category_id,uom_id,cost_price,sell_price,item_value,tipe_pajak,pajak,jumlah_kelipatan_gudang_besar,jumlah_jual_kategori_banyak,kode_merk,biaya,qty_available,qty_reserved,qty_min
-002008065067,"name,category,uom",CAB-002008065067,"COPPER MALE UNION 2 1/2 X 2 5/8",635,30,617083.00,740500.00,0.00,"Non Pajak",0.00,1,10000,,617083.00,0.00,0.00,1.00
-002008065067,"name,category,uom",CAB-002008065067-DUP2-R13772,"COPPER MALE UNION 2 1/2&quot; X 2 5/8&quot;",309,28,617083.00,740500.00,0.00,"Non Pajak",0.00,1,10000,,617083.00,15.00,0.00,1.00

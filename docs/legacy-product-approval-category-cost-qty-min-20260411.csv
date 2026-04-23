@@ -1,2 +1,0 @@
-target_sku,difference_reason,row_count,candidate_skus,candidate_names,candidate_category_ids,candidate_biaya_values,total_qty_available,total_qty_reserved,recommended_canonical_sku,recommended_category_id,recommended_biaya,approval_status,approved_canonical_sku,approved_category_id,approved_biaya,notes
-001005061333,"category,cost,qty_min",2,"CAB-001005061333 || CAB-001005061333-DUP2-R16898","PIPA SET 1/4 T0.61mm + 1/2 T0.61mm x 30m || PIPA SET 1/4 T0.61mm + 1/2 T0.61mm x 30m","640 || 7","1745520.00 || 1745520.00",0.00,0.00,CAB-001005061333,640,1745520.00,,,,,

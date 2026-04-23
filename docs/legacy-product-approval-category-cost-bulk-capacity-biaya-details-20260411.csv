@@ -1,3 +1,0 @@
-target_sku,difference_reason,current_sku,product_name,product_category_id,uom_id,cost_price,sell_price,item_value,tipe_pajak,pajak,jumlah_kelipatan_gudang_besar,jumlah_jual_kategori_banyak,kode_merk,biaya,qty_available,qty_reserved,qty_min
-PTRB213081,"category,cost,bulk_capacity,biaya",CAB-PTRB213081,"BRASSCO PIPA TBG ROL ASTM B280 1/2 X 0.81MM X 30M",640,30,1227365.00,2026500.00,0.00,Inklusif,11.00,6,1,,1393134.00,1.00,1.00,1.00
-PTRB213081,"category,cost,bulk_capacity,biaya",CAB-PTRB213081-DUP2-R12431,"BRASSCO PIPA TBG ROL ASTM B280 1/2 X 0.81MM X 30M",948,30,1372365.00,2026500.00,0.00,Inklusif,11.00,2,1,,1565111.00,240.00,0.00,1.00

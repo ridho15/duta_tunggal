@@ -1,3 +1,0 @@
-target_sku,difference_reason,row_count,candidate_skus,candidate_names,candidate_category_ids,candidate_biaya_values,total_qty_available,total_qty_reserved,recommended_canonical_sku,recommended_category_id,recommended_biaya,approval_status,approved_canonical_sku,approved_category_id,approved_biaya,notes
-PTBB016100,"category,cost",2,"CAB-PTBB016100 || CAB-PTBB016100-DUP2-R12205","PIPA TEMBAGA ASTM B280 5/8 x 1MM || PIPA TEMBAGA ASTM B280 5/8 x 1MM","514 || 822","455683.00 || 455683.00",0.00,0.00,CAB-PTBB016100,514,455683.00,,,,,
-PTBB019100,"category,cost",2,"CAB-PTBB019100 || CAB-PTBB019100-DUP2-R12224","BRASSCO PIPA TEMBAGA ASTM B280 3/4 X 1mm || BRASSCO PIPA TEMBAGA ASTM B280 3/4 X 1mm","517 || 822","564000.00 || 564000.00",0.00,0.00,CAB-PTBB019100,517,564000.00,,,,,

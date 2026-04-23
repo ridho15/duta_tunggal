@@ -1,5 +1,0 @@
-target_sku,difference_reason,current_sku,product_name,product_category_id,uom_id,cost_price,sell_price,item_value,tipe_pajak,pajak,jumlah_kelipatan_gudang_besar,jumlah_jual_kategori_banyak,kode_merk,biaya,qty_available,qty_reserved,qty_min
-002013028019,"category,bulk_sell_qty,qty_min",CAB-002013028019,"TEE REDUCER COPPER 1 1/8 X 3/4",635,6,97500.00,116850.00,0.00,"Non Pajak",0.00,1,1,PS,97500.00,0.00,0.00,1.00
-002013028019,"category,bulk_sell_qty,qty_min",CAB-002013028019-DUP2-R18880,"TEE REDUCER COPPER 1 1/8 X 3/4",309,6,97500.00,116850.00,0.00,"Non Pajak",0.00,1,10000,PS,97500.00,61.00,0.00,0.00
-002017022019,"category,bulk_sell_qty,qty_min",CAB-002017022019,"REDUCER COPPER 7/8 X 3/4",635,6,7347.00,30220.00,0.00,"Non Pajak",0.00,1,1,STD,7347.00,0.00,0.00,1.00
-002017022019,"category,bulk_sell_qty,qty_min",CAB-002017022019-DUP2-R17431,"REDUCER COPPER 7/8 X 3/4",309,6,7347.00,30220.00,0.00,"Non Pajak",0.00,1,10000,STD,7347.00,0.00,0.00,0.00
