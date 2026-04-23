@@ -64,7 +64,7 @@
     </div>
     <div class="hubv2-grid">
         @foreach($section['items'] as $item)
-        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card target="_blank" rel="noopener noreferrer">
+        <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
             <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
                 <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
             </div>

@@ -153,28 +153,33 @@ class OrderRequestResource extends Resource
         }
 
         if ($productId) {
-            $query->whereHas('products', function ($productQuery) use ($productId) {
-                $productQuery->where('products.id', $productId);
+            $product = Product::find($productId);
+            $query->where(function ($q) use ($productId, $product) {
+                $q->whereHas('productSuppliers', function ($productQuery) use ($productId) {
+                    $productQuery->where('products.id', $productId);
+                });
+
+                if ($product && $product->supplier_id) {
+                    $q->orWhere('id', $product->supplier_id);
+                }
             });
         }
-
         return $query->limit($limit)
             ->get()
             ->mapWithKeys(function ($supplier) use ($productId) {
                 $priceLabel = '';
-
                 if ($productId) {
                     $product = Product::find($productId);
                     $price = $product?->suppliers()->where('suppliers.id', $supplier->id)->first()?->pivot?->supplier_price;
                     $priceLabel = $price ? ' - Rp ' . number_format((float) $price, 0, ',', '.') : '';
                 }
 
-                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}{$priceLabel}"];
+                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan} {$priceLabel}"];
             })
             ->all();
     }
 
-    public static function resolveSupplierLabel(?int $supplierId): ?string
+    public static function resolveSupplierLabel(?int $supplierId, ?int $productId = null): ?string
     {
         if (! $supplierId) {
             return null;
@@ -182,7 +187,14 @@ class OrderRequestResource extends Resource
 
         $supplier = Supplier::find($supplierId);
 
-        return $supplier ? "({$supplier->code}) {$supplier->perusahaan}" : null;
+        $priceLabel = '';
+        if ($productId && $supplier) {
+            $product = Product::find($productId);
+            $price = $product?->suppliers()->where('suppliers.id', $supplierId)->first()?->pivot?->supplier_price;
+            $priceLabel = $price ? ' - Rp ' . number_format((float) $price, 0, ',', '.') : '';
+        }
+
+        return $supplier ? trim("({$supplier->code}) {$supplier->perusahaan} {$priceLabel}") : null;
     }
 
     public static function form(Form $form): Form
@@ -257,7 +269,7 @@ class OrderRequestResource extends Resource
                                         ->orderBy('name')
                                         ->get()
                                         ->mapWithKeys(function ($warehouse) {
-                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
                                 }
                                 return [];
@@ -368,7 +380,7 @@ class OrderRequestResource extends Resource
                                     ->label('Product')
                                     ->reactive()
                                     ->searchable()
-                                    ->options(fn () => static::resolveProductOptions(limit: 50))
+                                    ->options(fn() => static::resolveProductOptions(limit: 50))
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                         if ($state) {
                                             $product = Product::find($state);
@@ -422,7 +434,7 @@ class OrderRequestResource extends Resource
                                             }
                                         }
                                     })
-                                    ->getOptionLabelUsing(fn ($value): ?string => static::resolveProductLabel(is_numeric($value) ? (int) $value : null))
+                                    ->getOptionLabelUsing(fn($value): ?string => static::resolveProductLabel(is_numeric($value) ? (int) $value : null))
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
                                         return static::resolveProductOptions($search, 50);
                                     })
@@ -449,10 +461,12 @@ class OrderRequestResource extends Resource
                                     ->nullable()
                                     ->options(function (callable $get) {
                                         $productId = $get('product_id');
-
                                         return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, null, 50);
                                     })
-                                    ->getOptionLabelUsing(fn ($value): ?string => static::resolveSupplierLabel(is_numeric($value) ? (int) $value : null))
+                                    ->getOptionLabelUsing(function ($value, callable $get): ?string {
+                                        $productId = $get('product_id');
+                                        return static::resolveSupplierLabel(is_numeric($value) ? (int) $value : null, is_numeric($productId) ? (int) $productId : null);
+                                    })
                                     ->getSearchResultsUsing(function (string $search, callable $get) {
                                         $productId = $get('product_id');
                                         return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, $search, 50);
@@ -752,7 +766,7 @@ class OrderRequestResource extends Resource
                     ->label('Qty Diterima (Penerimaan Barang)')
                     ->state(function ($record) {
                         return (float) $record->orderRequestItem->sum(
-                            fn ($item) => (float) ($item->fulfilled_quantity ?? 0)
+                            fn($item) => (float) ($item->fulfilled_quantity ?? 0)
                         );
                     })
                     ->numeric(),
@@ -760,7 +774,7 @@ class OrderRequestResource extends Resource
                     ->label('Sisa Qty Belum Diterima')
                     ->state(function ($record) {
                         return (float) $record->orderRequestItem->sum(
-                            fn ($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
+                            fn($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
                         );
                     })
                     ->numeric(),
@@ -1054,8 +1068,8 @@ class OrderRequestResource extends Resource
                                                 ->readOnly(),
                                             TextInput::make('supplier_name')
                                                 ->label('Supplier')
-                                                ->readOnly()
-,                                            TextInput::make('uom')
+                                                ->readOnly(),
+                                            TextInput::make('uom')
                                                 ->label('Satuan')
                                                 ->readOnly(),
                                             TextInput::make('quantity')
@@ -1615,17 +1629,17 @@ class OrderRequestResource extends Resource
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('items_count')
                             ->label('Jumlah Item')
-                            ->getStateUsing(fn ($record) => $record->orderRequestItem->count()),
+                            ->getStateUsing(fn($record) => $record->orderRequestItem->count()),
                         \Filament\Infolists\Components\TextEntry::make('total_quantity')
                             ->label('Total Qty')
-                            ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum('quantity')),
+                            ->getStateUsing(fn($record) => (float) $record->orderRequestItem->sum('quantity')),
                         \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
                             ->label('Qty Diterima (Penerimaan Barang)')
-                            ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum('fulfilled_quantity')),
+                            ->getStateUsing(fn($record) => (float) $record->orderRequestItem->sum('fulfilled_quantity')),
                         \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
                             ->label('Sisa Qty Belum Diterima')
-                            ->getStateUsing(fn ($record) => (float) $record->orderRequestItem->sum(
-                                fn ($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
+                            ->getStateUsing(fn($record) => (float) $record->orderRequestItem->sum(
+                                fn($item) => max(0, (float) $item->quantity - (float) ($item->fulfilled_quantity ?? 0))
                             )),
                     ]),
                 \Filament\Infolists\Components\Section::make('Detail Item Order Request')
@@ -1646,10 +1660,10 @@ class OrderRequestResource extends Resource
                                     ->label('Qty'),
                                 \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
                                     ->label('Qty Diterima (Penerimaan Barang)')
-                                    ->getStateUsing(fn ($record) => (float) ($record->fulfilled_quantity ?? 0)),
+                                    ->getStateUsing(fn($record) => (float) ($record->fulfilled_quantity ?? 0)),
                                 \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
                                     ->label('Sisa Qty Belum Diterima')
-                                    ->getStateUsing(fn ($record) => max(0, (float) $record->quantity - (float) ($record->fulfilled_quantity ?? 0))),
+                                    ->getStateUsing(fn($record) => max(0, (float) $record->quantity - (float) ($record->fulfilled_quantity ?? 0))),
                                 \Filament\Infolists\Components\TextEntry::make('original_price')
                                     ->label('Harga Supplier')
                                     ->getStateUsing(function ($record) {
@@ -1662,7 +1676,7 @@ class OrderRequestResource extends Resource
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('tax')
                                     ->label('Pajak (%)')
-                                    ->getStateUsing(fn ($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'),
+                                    ->getStateUsing(fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'),
                                 \Filament\Infolists\Components\TextEntry::make('total_cost')
                                     ->label('Total (Harga x Qty)')
                                     ->getStateUsing(function ($record) {
