@@ -16,10 +16,12 @@
             ],
         ],
         [
-            'title' => 'Schedule & Voucher',
+            'title' => 'Schedule, Voucher & Hub',
             'items' => [
-                ['label' => 'Ageing Schedule',   'url' => \App\Filament\Resources\AgeingScheduleResource::getUrl(),  'icon' => 'clock',   'desc' => 'Analisis umur piutang & hutang'],
-                ['label' => 'Pengajuan Voucher', 'url' => \App\Filament\Resources\VoucherRequestResource::getUrl(), 'icon' => 'ticket',  'desc' => 'Ajukan voucher kas/biaya untuk approval'],
+                ['label' => 'Ageing Schedule',    'url' => \App\Filament\Resources\AgeingScheduleResource::getUrl(),  'icon' => 'clock',   'desc' => 'Analisis umur piutang & hutang'],
+                ['label' => 'Pengajuan Voucher',  'url' => \App\Filament\Resources\VoucherRequestResource::getUrl(), 'icon' => 'ticket',   'desc' => 'Ajukan voucher kas/biaya untuk approval'],
+                ['label' => 'Laporan Keuangan',   'url' => \App\Filament\Pages\FinanceReportHubPage::getUrl(),        'icon' => 'document-chart-bar', 'desc' => 'Hub laporan keuangan yang lebih detail'],
+                ['label' => 'Manajemen Aset',     'url' => \App\Filament\Pages\AssetManagementHubPage::getUrl(),      'icon' => 'building-office-2',  'desc' => 'Pintu masuk ke pengelolaan aset'],
             ],
         ],
     ];

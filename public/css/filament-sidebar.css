@@ -1,0 +1,267 @@
+/* ============================================================
+   Aneka Jaya ERP — Luxury Modern Professional Sidebar Styling
+   Enhanced design with gradients, shadows, and smooth animations
+   ============================================================ */
+
+/* ── Sidebar Container ────────────────────────────────────── */
+
+/* Luxury gradient background for sidebar */
+.fi-sidebar {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%) !important;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    border-right: 1px solid rgba(148, 163, 184, 0.1) !important;
+}
+
+/* Padding atas sidebar nav */
+.fi-sidebar-nav {
+    gap: 0.5rem !important;
+    padding-top: 1rem !important;
+    padding-bottom: 2rem !important;
+}
+
+/* Kurangi jarak antar grup/menu bawaan Filament yang terlalu renggang */
+.fi-sidebar-nav-groups {
+    gap: 0.5rem !important;
+}
+
+/* ── Sidebar Brand/Logo Area ──────────────────────────────── */
+
+.fi-sidebar-header {
+    padding: 1.5rem 1.25rem !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;
+    margin-bottom: 0.5rem !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.8) 100%) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+/* ── Navigation Groups (Dropdown Headers) ─────────────────── */
+
+/* Jarak antara satu grup dengan grup berikutnya */
+.fi-sidebar-group {
+    margin-bottom: 8px;
+}
+
+/* Luxury styling untuk header grup navigasi */
+.fi-sidebar-group-button {
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    color: #475569 !important;
+    margin-top: 8px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(241, 245, 249, 0.6) 100%) !important;
+    backdrop-filter: blur(8px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    border: 1px solid rgba(148, 163, 184, 0.08) !important;
+}
+
+.fi-sidebar-group-button:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.06) 100%) !important;
+    color: #1d4ed8 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.fi-sidebar-group-button.fi-active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.08) 100%) !important;
+    color: #1d4ed8 !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+/* ── Sidebar Navigation Items ─────────────────────────────── */
+
+/* Tambah jarak bawah pada setiap item navigasi */
+.fi-sidebar-item {
+    margin-bottom: 4px;
+}
+
+/* Luxury styling untuk item navigasi */
+.fi-sidebar-item-button {
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 250, 252, 0.7) 100%) !important;
+    backdrop-filter: blur(6px) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    border: 1px solid rgba(148, 163, 184, 0.06) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.fi-sidebar-item-button::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent) !important;
+    transition: left 0.5s !important;
+}
+
+.fi-sidebar-item-button:hover::before {
+    left: 100% !important;
+}
+
+.fi-sidebar-item-button:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.08) 100%) !important;
+    color: #1d4ed8 !important;
+    transform: translateX(4px) !important;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.fi-sidebar-item-button.fi-active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.12) 100%) !important;
+    color: #1d4ed8 !important;
+    font-weight: 600 !important;
+    transform: translateX(4px) !important;
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Item di dalam group (sub-item) */
+.fi-sidebar-group-items .fi-sidebar-item-button {
+    padding-left: 2.5rem !important;
+    font-size: 0.85rem !important;
+    margin-left: 8px !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(248, 250, 252, 0.5) 100%) !important;
+}
+
+.fi-sidebar-group-items .fi-sidebar-item-button:hover {
+    transform: translateX(8px) !important;
+}
+
+/* ── Ungrouped items (items without group) ────────────────── */
+
+/* Item langsung tanpa grup — beri jarak atas yang lebih */
+.fi-sidebar-nav > .fi-sidebar-item {
+    margin-bottom: 6px;
+}
+
+/* Tampilan yang lebih baik untuk flat items (hub pages) */
+.fi-sidebar-nav .fi-sidebar-item-button {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.06) 100%) !important;
+    border: 1px solid rgba(59, 130, 246, 0.1) !important;
+}
+
+.fi-sidebar-nav .fi-sidebar-item-button:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.1) 100%) !important;
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.fi-sidebar-nav .fi-sidebar-item-button.fi-active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(37, 99, 235, 0.15) 100%) !important;
+    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(59, 130, 246, 0.15) !important;
+}
+
+/* ── Separator antara ungrouped dan grouped sections ─────── */
+
+.fi-sidebar-nav > .fi-sidebar-groups {
+    padding-top: 1rem !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.15) !important;
+    margin-top: 1rem !important;
+    position: relative !important;
+}
+
+.fi-sidebar-nav > .fi-sidebar-groups::before {
+    content: 'Modul Utama' !important;
+    position: absolute !important;
+    top: -8px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    padding: 0 12px !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    border-radius: 20px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+    border: 1px solid rgba(148, 163, 184, 0.1) !important;
+}
+
+/* ── Icon dalam navigasi ──────────────────────────────────── */
+
+.fi-sidebar-item-button svg {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    opacity: 0.8 !important;
+    transition: all 0.3s ease !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)) !important;
+}
+
+.fi-sidebar-item-button.fi-active svg,
+.fi-sidebar-item-button:hover svg {
+    opacity: 1 !important;
+    transform: scale(1.05) !important;
+    filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.2)) !important;
+}
+
+/* ── Scrollbar Styling ───────────────────────────────────── */
+
+.fi-sidebar::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+.fi-sidebar::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.5) !important;
+    border-radius: 10px !important;
+}
+
+.fi-sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.3) 0%, rgba(100, 116, 139, 0.5) 100%) !important;
+    border-radius: 10px !important;
+    transition: all 0.3s ease !important;
+}
+
+.fi-sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.4) 0%, rgba(37, 99, 235, 0.6) 100%) !important;
+}
+
+/* ── Responsive Enhancements ─────────────────────────────── */
+
+@media (max-width: 1024px) {
+    .fi-sidebar-item-button {
+        padding: 10px 12px !important;
+        font-size: 0.8rem !important;
+    }
+
+    .fi-sidebar-group-button {
+        padding: 10px 12px !important;
+        font-size: 0.7rem !important;
+    }
+
+    .fi-sidebar-item-button svg {
+        width: 1.1rem !important;
+        height: 1.1rem !important;
+    }
+}
+
+/* ── Focus States for Accessibility ───────────────────────── */
+
+.fi-sidebar-item-button:focus-visible,
+.fi-sidebar-group-button:focus-visible {
+    outline: 2px solid rgba(59, 130, 246, 0.5) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* ── Icon dalam navigasi ──────────────────────────────────── */
+
+.fi-sidebar-item-button svg {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+    opacity: 0.85;
+}
+
+.fi-sidebar-item-button.fi-active svg,
+.fi-sidebar-item-button:hover svg {
+    opacity: 1;
+}

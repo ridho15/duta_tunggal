@@ -35,6 +35,11 @@ class InventoryReportPage extends Page implements HasTable
 
     protected static ?int $navigationSort = 3;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public ?string $start_date = null;
     public ?string $end_date = null;
     public ?int $warehouse_id = null;

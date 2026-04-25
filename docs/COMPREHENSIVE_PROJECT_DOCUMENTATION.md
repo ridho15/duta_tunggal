@@ -173,7 +173,7 @@ Production Plan → Bill of Material → Manufacturing Order → Quality Control
 
 #### Report Categories:
 - **Financial Reports** - Laporan keuangan
-- **Operational Reports** - Laporan operasional
+- **Dashboard Hub** - Pusat masuk ke dashboard, laporan penjualan, dan laporan pembelian
 - **Inventory Reports** - Laporan stok
 - **Sales Reports** - Laporan penjualan
 - **Purchase Reports** - Laporan pembelian

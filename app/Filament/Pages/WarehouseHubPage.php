@@ -17,4 +17,9 @@ class WarehouseHubPage extends Page
     protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'warehouse-hub';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }

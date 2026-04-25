@@ -97,36 +97,49 @@ test.describe('Hub Pages – v2 Design & Navigation', () => {
     await expect(hub.locator('.hubv2-sh')).toHaveCount(2);
   });
 
-  test('operational reports hub renders v2 hero and 2 nav cards', async ({ page }) => {
-    await assertHubV2(page, {
-      url: '/admin/operational-reports', id: '#operational-report-hub',
-      title: 'Laporan Operasional', minCards: 2,
-    });
-  });
 });
 
 test.describe('Sidebar Hub Grouping', () => {
-  test('dashboard finance is no longer shown inside the finance report group', async ({ page }) => {
+  test('report sub-hubs stay hidden from the sidebar', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForLoadState('networkidle');
 
     const sidebar = page.getByRole('complementary');
 
-    await expect(sidebar.getByRole('link', { name: /dashboard finance/i })).toBeVisible({ timeout: 10000 });
-    await expect(sidebar.getByRole('link', { name: /laporan keuangan/i })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /laporan keuangan/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /laporan operasional/i })).toHaveCount(0);
   });
 
-  test('accounting and warehouse hubs are visible in sidebar', async ({ page }) => {
+  test('hub pages are visible in sidebar for the top-level modules', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByRole('link', { name: /pusat akuntansi/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat gudang/i }).first()).toBeVisible({ timeout: 10000 });
+    const sidebar = page.getByRole('complementary');
+
+    await expect(page.getByRole('link', { name: /dashboard/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(sidebar.getByRole('link', { name: /retur pelanggan/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /laporan stok/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /pusat penjualan/i }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('link', { name: /pusat pembelian/i }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('link', { name: /pusat pengiriman/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat keuangan penjualan/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat keuangan pembelian/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat pembayaran/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /pusat akuntansi/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /pusat data master/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /pusat manajemen user/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /pusat manufaktur/i }).first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test('dashboard hub page renders quick links for finance and reports while operational report link stays hidden', async ({ page }) => {
+    await page.goto('/admin/dashboard-hub');
+    await page.waitForLoadState('networkidle');
+
+    const sidebar = page.getByRole('complementary');
+    const hub = page.locator('#dashboard-hub');
+
+    await expect(hub).toBeVisible({ timeout: 10000 });
+    await expect(hub.getByRole('link', { name: /finance dashboard/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /laporan penjualan/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /laporan pembelian/i })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /laporan operasional/i })).toHaveCount(0);
   });
 
   test('accounting hub page renders quick links while detailed accounting sidebar links stay hidden', async ({ page }) => {
@@ -143,18 +156,20 @@ test.describe('Sidebar Hub Grouping', () => {
     await expect(sidebar.getByRole('link', { name: /pengajuan voucher/i })).toHaveCount(0);
   });
 
-  test('warehouse hub page renders quick links while detailed warehouse sidebar links stay hidden', async ({ page }) => {
-    await page.goto('/admin/warehouse-hub');
+  test('inventory hub page renders quick links while detailed inventory sidebar links stay hidden', async ({ page }) => {
+    await page.goto('/admin/inventory-hub');
     await page.waitForLoadState('networkidle');
 
     const sidebar = page.getByRole('complementary');
-    const hub = page.locator('#warehouse-hub');
+    const hub = page.locator('#inventory-hub');
 
     await expect(hub).toBeVisible({ timeout: 10000 });
-    await expect(hub.getByRole('link', { name: /stock transfer/i })).toBeVisible();
-    await expect(hub.getByRole('link', { name: /inventory stock/i })).toBeVisible();
-    await expect(sidebar.getByRole('link', { name: /stock transfer/i })).toHaveCount(0);
-    await expect(sidebar.getByRole('link', { name: /stock opname/i })).toHaveCount(0);
+    await expect(hub.getByRole('link', { name: /gudang/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /kartu persediaan/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /laporan stok/i })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /gudang/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /kartu persediaan/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /laporan stok/i })).toHaveCount(0);
   });
 
   test('purchase hub page renders quick links while detailed purchase sidebar links stay hidden', async ({ page }) => {
@@ -227,19 +242,26 @@ test.describe('Sidebar Hub Grouping', () => {
     await expect(sidebar.getByRole('link', { name: /transfer kas & bank/i })).toHaveCount(0);
   });
 
-  test('sales and manufacturing resources remain accessible after child label cleanup', async ({ page }) => {
-    await page.goto('/admin/sale-orders');
+  test('sales and manufacturing hubs expose their child cards while the sidebar stays clean', async ({ page }) => {
+    await page.goto('/admin/sales-hub');
     await page.waitForLoadState('networkidle');
 
     const sidebar = page.getByRole('complementary');
+    const salesHub = page.locator('#sales-hub');
 
-    await expect(page).toHaveURL(/\/admin\/sale-orders/);
-    await expect(sidebar.getByRole('link', { name: /pesanan penjualan/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(salesHub).toBeVisible({ timeout: 10000 });
+    await expect(salesHub.getByRole('link', { name: /sale orders/i })).toBeVisible();
+    await expect(salesHub.getByRole('link', { name: /piutang usaha/i })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /pesanan penjualan/i })).toHaveCount(0);
 
-    await page.goto('/admin/manufacturing-orders');
+    await page.goto('/admin/manufacturing-hub');
     await page.waitForLoadState('networkidle');
 
-    await expect(page).toHaveURL(/\/admin\/manufacturing-orders/);
-    await expect(sidebar.getByRole('link', { name: /perintah produksi/i }).first()).toBeVisible({ timeout: 10000 });
+    const manufacturingHub = page.locator('#manufacturing-hub');
+
+    await expect(manufacturingHub).toBeVisible({ timeout: 10000 });
+    await expect(manufacturingHub.getByRole('link', { name: /manufacturing order/i })).toBeVisible();
+    await expect(manufacturingHub.getByRole('link', { name: /qc manufacture/i })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /manufacturing order/i })).toHaveCount(0);
   });
 });

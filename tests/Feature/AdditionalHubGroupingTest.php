@@ -51,14 +51,13 @@ test('manufacturing hub page is configured as the visible manufacturing entry', 
         ->and(ManufacturingHubPage::getUrl())->toContain('/admin/manufacturing-hub');
 });
 
-test('asset management hub page is configured as the visible asset entry', function () {
-    expect(hubStaticProperty(AssetManagementHubPage::class, 'navigationGroup'))->toBe('Asset Management')
-        ->and(hubStaticProperty(AssetManagementHubPage::class, 'navigationLabel'))->toBe('Pusat Manajemen Aset')
+test('asset management hub page is hidden and only exposed through the accounting hub', function () {
+    expect(AssetManagementHubPage::shouldRegisterNavigation())->toBeFalse()
         ->and(AssetManagementHubPage::getUrl())->toContain('/admin/asset-management-hub');
 });
 
 test('user roles management hub page is configured as the visible admin entry', function () {
-    expect(hubStaticProperty(UserRolesManagementHubPage::class, 'navigationGroup'))->toBe('User Roles Management')
+    expect(hubStaticProperty(UserRolesManagementHubPage::class, 'navigationGroup'))->toBe('Manajemen User dan Role')
         ->and(hubStaticProperty(UserRolesManagementHubPage::class, 'navigationLabel'))->toBe('Pusat Manajemen User & Role')
         ->and(UserRolesManagementHubPage::getUrl())->toContain('/admin/user-roles-management-hub');
 });

@@ -37,11 +37,16 @@ class MyDashboard extends Dashboard
 {
     use HasFiltersForm;
 
-    protected static ?string $navigationGroup = 'Finance';
-    protected static ?string $navigationLabel = 'Dashboard Finance';
+    protected static ?string $navigationGroup = 'Dashboard';
+    protected static ?string $navigationLabel = 'Finance Dashboard';
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
     protected static ?string $slug = 'finance-dashboard';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public function getWidgets(): array
     {

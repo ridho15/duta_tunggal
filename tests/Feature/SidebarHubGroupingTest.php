@@ -1,11 +1,14 @@
 <?php
 
 use App\Filament\Pages\AccountingHubPage;
+use App\Filament\Pages\DashboardHubPage;
 use App\Filament\Pages\ArApManagementPage;
 use App\Filament\Pages\DeliveryHubPage;
 use App\Filament\Pages\FinancePurchaseHubPage;
 use App\Filament\Pages\FinanceSalesHubPage;
 use App\Filament\Pages\MyDashboard;
+use App\Filament\Pages\InventoryHubPage;
+use App\Filament\Pages\InventoryReportPage;
 use App\Filament\Pages\PaymentHubPage;
 use App\Filament\Pages\PurchaseHubPage;
 use App\Filament\Pages\SalesHubPage;
@@ -19,6 +22,7 @@ use App\Filament\Resources\BankReconciliationResource;
 use App\Filament\Resources\BillOfMaterialResource;
 use App\Filament\Resources\CashBankTransactionResource;
 use App\Filament\Resources\CashBankTransferResource;
+use App\Filament\Resources\Reports\InventoryCardResource;
 use App\Filament\Resources\CustomerReturnResource;
 use App\Filament\Resources\CustomerReceiptResource;
 use App\Filament\Resources\DepositResource;
@@ -60,21 +64,32 @@ function sidebarStaticProperty(string $class, string $property): mixed
     return $prop->getValue();
 }
 
-test('finance dashboard is no longer grouped under finance reports', function () {
-    expect(sidebarStaticProperty(MyDashboard::class, 'navigationGroup'))->toBe('Finance')
-    ->and(sidebarStaticProperty(MyDashboard::class, 'navigationLabel'))->toBe('Dashboard Finance');
+test('dashboard hub page is configured as the visible dashboard menu entry', function () {
+    expect(sidebarStaticProperty(DashboardHubPage::class, 'navigationGroup'))->toBe('Dashboard')
+        ->and(sidebarStaticProperty(DashboardHubPage::class, 'navigationLabel'))->toBe('Dashboard')
+        ->and(DashboardHubPage::getUrl())->toContain('/admin/dashboard-hub');
+});
+
+test('finance dashboard page is hidden and only exposed through the dashboard hub', function () {
+    expect(MyDashboard::shouldRegisterNavigation())->toBeFalse();
 });
 
 test('accounting hub page is configured as the visible accounting menu entry', function () {
-    expect(sidebarStaticProperty(AccountingHubPage::class, 'navigationGroup'))->toBe('Akuntansi Keuangan')
+    expect(sidebarStaticProperty(AccountingHubPage::class, 'navigationGroup'))->toBe('Akuntansi')
         ->and(sidebarStaticProperty(AccountingHubPage::class, 'navigationLabel'))->toBe('Pusat Akuntansi')
         ->and(AccountingHubPage::getUrl())->toContain('/admin/accounting-hub');
 });
 
-test('warehouse hub page is configured as the visible warehouse menu entry', function () {
-    expect(sidebarStaticProperty(WarehouseHubPage::class, 'navigationGroup'))->toBe('Gudang')
-        ->and(sidebarStaticProperty(WarehouseHubPage::class, 'navigationLabel'))->toBe('Pusat Gudang')
-        ->and(WarehouseHubPage::getUrl())->toContain('/admin/warehouse-hub');
+test('inventory hub page is configured as the visible inventory menu entry', function () {
+    expect(sidebarStaticProperty(InventoryHubPage::class, 'navigationGroup'))->toBe('Inventory')
+        ->and(sidebarStaticProperty(InventoryHubPage::class, 'navigationLabel'))->toBe('Pusat Inventory')
+        ->and(InventoryHubPage::getUrl())->toContain('/admin/inventory-hub');
+});
+
+test('warehouse and inventory detail hubs are hidden and only exposed through the inventory hub', function () {
+    expect(WarehouseHubPage::shouldRegisterNavigation())->toBeFalse()
+        ->and(InventoryCardResource::shouldRegisterNavigation())->toBeFalse()
+        ->and(InventoryReportPage::shouldRegisterNavigation())->toBeFalse();
 });
 
 test('purchase hub page is configured as the visible purchase menu entry', function () {
@@ -95,15 +110,12 @@ test('sales hub page is configured as the visible sales menu entry', function ()
         ->and(SalesHubPage::getUrl())->toContain('/admin/sales-hub');
 });
 
-test('finance sales, purchase, and payment hubs are configured as the visible transaction menu entries', function () {
-    expect(sidebarStaticProperty(FinanceSalesHubPage::class, 'navigationGroup'))->toBe('Keuangan Penjualan')
-        ->and(sidebarStaticProperty(FinanceSalesHubPage::class, 'navigationLabel'))->toBe('Pusat Keuangan Penjualan')
+test('finance sales, purchase, and payment hubs are hidden and only exposed through their parent hubs', function () {
+    expect(FinanceSalesHubPage::shouldRegisterNavigation())->toBeFalse()
         ->and(FinanceSalesHubPage::getUrl())->toContain('/admin/finance-sales-hub')
-        ->and(sidebarStaticProperty(FinancePurchaseHubPage::class, 'navigationGroup'))->toBe('Keuangan Pembelian')
-        ->and(sidebarStaticProperty(FinancePurchaseHubPage::class, 'navigationLabel'))->toBe('Pusat Keuangan Pembelian')
+        ->and(FinancePurchaseHubPage::shouldRegisterNavigation())->toBeFalse()
         ->and(FinancePurchaseHubPage::getUrl())->toContain('/admin/finance-purchase-hub')
-        ->and(sidebarStaticProperty(PaymentHubPage::class, 'navigationGroup'))->toBe('Pembayaran Keuangan')
-        ->and(sidebarStaticProperty(PaymentHubPage::class, 'navigationLabel'))->toBe('Pusat Pembayaran')
+        ->and(PaymentHubPage::shouldRegisterNavigation())->toBeFalse()
         ->and(PaymentHubPage::getUrl())->toContain('/admin/payment-hub');
 });
 

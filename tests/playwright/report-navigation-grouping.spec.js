@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Report Navigation Grouping', () => {
-  test('finance and operational report hubs are visible in the sidebar', async ({ page }) => {
+  test('report sub-hubs stay hidden from the sidebar', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByRole('link', { name: /laporan keuangan/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /laporan operasional/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /laporan keuangan/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /laporan operasional/i })).toHaveCount(0);
   });
 
   test('legacy duplicate sidebar labels are no longer shown as top-level items', async ({ page }) => {

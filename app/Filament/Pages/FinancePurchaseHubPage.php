@@ -17,4 +17,9 @@ class FinancePurchaseHubPage extends Page
     protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'finance-purchase-hub';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }

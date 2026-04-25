@@ -30,6 +30,8 @@ class CustomerReturnResource extends Resource
 {
     protected static ?string $model = CustomerReturn::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-uturn-left';
 
     protected static ?string $navigationGroup = 'Retur Pelanggan';
@@ -41,6 +43,11 @@ class CustomerReturnResource extends Resource
     protected static ?string $pluralModelLabel = 'Retur Pelanggan';
 
     protected static ?int $navigationSort = 10;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     // ------------------------------------------------------------------
     // Authorization

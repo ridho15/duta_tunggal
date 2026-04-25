@@ -23,6 +23,11 @@ class InventoryCardResource extends Resource
 
     protected static ?string $navigationLabel = 'Kartu Persediaan (Stock Card)';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([]);

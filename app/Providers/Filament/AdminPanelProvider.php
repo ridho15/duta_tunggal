@@ -9,6 +9,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Filament\Pages\ArApManagementPage;
 use App\Filament\Pages\AlkGraficPage;
 use App\Filament\Pages\AccountingHubPage;
+use App\Filament\Pages\DashboardHubPage;
 use App\Filament\Pages\AssetManagementHubPage;
 use App\Filament\Pages\BalanceSheetPage;
 use App\Filament\Pages\BukuBesarPage;
@@ -20,10 +21,11 @@ use App\Filament\Pages\FinancePurchaseHubPage;
 use App\Filament\Pages\FinanceReportHubPage;
 use App\Filament\Pages\FinanceSalesHubPage;
 use App\Filament\Pages\IncomeStatementPage;
+use App\Filament\Pages\InventoryHubPage;
+use App\Filament\Pages\InventoryReportPage;
 use App\Filament\Pages\JournalConsolidationPage;
 use App\Filament\Pages\ManufacturingHubPage;
 use App\Filament\Pages\MasterDataHubPage;
-use App\Filament\Pages\OperationalReportHubPage;
 use App\Filament\Pages\PaymentHubPage;
 use App\Filament\Pages\SalesHubPage;
 use App\Filament\Pages\UserRolesManagementHubPage;
@@ -70,13 +72,24 @@ class AdminPanelProvider extends PanelProvider
             ])
             // ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages') // Commented out to avoid Livewire component conflicts
             ->pages([
-                MyDashboard::class,
-                AccountingHubPage::class,
-                ArApManagementPage::class,
+                DashboardHubPage::class,
+                SalesHubPage::class,
+                PurchaseHubPage::class,
                 DeliveryHubPage::class,
-                FinancePurchaseHubPage::class,
-                FinanceReportHubPage::class,
+                AccountingHubPage::class,
+                InventoryHubPage::class,
+                MasterDataHubPage::class,
+                UserRolesManagementHubPage::class,
+                ManufacturingHubPage::class,
+                MyDashboard::class,
                 FinanceSalesHubPage::class,
+                FinancePurchaseHubPage::class,
+                PaymentHubPage::class,
+                FinanceReportHubPage::class,
+                AssetManagementHubPage::class,
+                WarehouseHubPage::class,
+                InventoryReportPage::class,
+                ArApManagementPage::class,
                 BalanceSheetPage::class,
                 BukuBesarPage::class,
                 IncomeStatementPage::class,
@@ -87,18 +100,9 @@ class AdminPanelProvider extends PanelProvider
                 CostOfGoodsManufacturingPage::class,
                 AlkGraficPage::class,
                 JournalConsolidationPage::class,
-                OperationalReportHubPage::class,
-                PaymentHubPage::class,
-                SalesHubPage::class,
-                PurchaseHubPage::class,
-                MasterDataHubPage::class,
-                ManufacturingHubPage::class,
-                AssetManagementHubPage::class,
-                UserRolesManagementHubPage::class,
                 SalesReportPage::class,
                 PurchaseReportPage::class,
                 ViewAgeingReport::class,
-                WarehouseHubPage::class,
                 GroupedJournalEntries::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
@@ -120,22 +124,15 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->sidebarCollapsibleOnDesktop()
             ->navigationGroups([
+                \Filament\Navigation\NavigationGroup::make('Dashboard')->icon('heroicon-o-home'),
                 \Filament\Navigation\NavigationGroup::make('Penjualan')->icon('heroicon-o-shopping-cart'),
-                \Filament\Navigation\NavigationGroup::make('Retur Pelanggan')->icon('heroicon-o-arrow-uturn-left'),
-                \Filament\Navigation\NavigationGroup::make('Pengiriman')->icon('heroicon-o-truck'),
-                \Filament\Navigation\NavigationGroup::make('Keuangan Penjualan')->icon('heroicon-o-banknotes'),
                 \Filament\Navigation\NavigationGroup::make('Pembelian')->icon('heroicon-o-shopping-bag'),
-                \Filament\Navigation\NavigationGroup::make('Keuangan Pembelian')->icon('heroicon-o-credit-card'),
-                \Filament\Navigation\NavigationGroup::make('Pembayaran Keuangan')->icon('heroicon-o-currency-dollar'),
-                \Filament\Navigation\NavigationGroup::make('Akuntansi Keuangan')->icon('heroicon-o-calculator'),
-                \Filament\Navigation\NavigationGroup::make('Laporan Keuangan')->icon('heroicon-o-document-chart-bar'),
-                \Filament\Navigation\NavigationGroup::make('Finance')->icon('heroicon-o-building-library'),
-                \Filament\Navigation\NavigationGroup::make('Gudang')->icon('heroicon-o-archive-box'),
-                \Filament\Navigation\NavigationGroup::make('Persediaan')->icon('heroicon-o-clipboard-document-list'),
-                \Filament\Navigation\NavigationGroup::make('Manufaktur')->icon('heroicon-o-cog-6-tooth'),
-                \Filament\Navigation\NavigationGroup::make('Asset Management')->icon('heroicon-o-building-office'),
+                \Filament\Navigation\NavigationGroup::make('Pengiriman')->icon('heroicon-o-truck'),
+                \Filament\Navigation\NavigationGroup::make('Akuntansi')->icon('heroicon-o-calculator'),
+                \Filament\Navigation\NavigationGroup::make('Inventory')->icon('heroicon-o-archive-box'),
                 \Filament\Navigation\NavigationGroup::make('Master Data')->icon('heroicon-o-circle-stack'),
-                \Filament\Navigation\NavigationGroup::make('User Roles Management')->icon('heroicon-o-users'),
+                \Filament\Navigation\NavigationGroup::make('Manajemen User dan Role')->icon('heroicon-o-users'),
+                \Filament\Navigation\NavigationGroup::make('Manufaktur')->icon('heroicon-o-cog-6-tooth'),
             ])
             ->authMiddleware([
                 Authenticate::class,
@@ -143,6 +140,8 @@ class AdminPanelProvider extends PanelProvider
             ->assets([
                 // Custom CSS for sale orders
                 \Filament\Support\Assets\Css::make('custom-sale-order', secure_asset('css/custom-sale-order.css')),
+                // Custom CSS for filament sidebar
+                \Filament\Support\Assets\Css::make('filament-sidebar', secure_asset('css/filament-sidebar.css')),
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s');

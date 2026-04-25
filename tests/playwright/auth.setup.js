@@ -26,8 +26,8 @@ test('setup auth state', async ({ page }) => {
 
   await expect(page).toHaveTitle(/Masuk|Login|Duta Tunggal ERP/);
 
-  await page.locator('#data\\.email').fill('superadmin@gmail.com');
-  await page.locator('#data\\.password').fill('superadmin');
+  await page.locator('#data\\.email').fill('ralamzah@gmail.com');
+  await page.locator('#data\\.password').fill('ridho123');
   await page.locator('form').getByRole('button', { name: /masuk|login|sign in/i }).click();
 
   await page.waitForFunction(() => !window.location.pathname.endsWith('/login'), { timeout: 30_000 });

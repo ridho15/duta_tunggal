@@ -5,13 +5,26 @@
     $iconBg      = '#fff7ed';
     $heroFrom    = '#fff7ed';
     $heroTo      = '#fed7aa';
-    $items = [
-        ['label' => 'Permintaan Pembelian',      'url' => \App\Filament\Resources\OrderRequestResource::getUrl(),          'icon' => 'document-text',    'desc' => 'Ajukan permintaan bahan/barang ke supplier'],
-        ['label' => 'Pesanan Pembelian',          'url' => \App\Filament\Resources\PurchaseOrderResource::getUrl(),         'icon' => 'shopping-cart',    'desc' => 'Buat & kelola purchase order ke vendor'],
-        ['label' => 'Kontrol Kualitas Pembelian', 'url' => \App\Filament\Resources\QualityControlPurchaseResource::getUrl(),'icon' => 'beaker',           'desc' => 'Inspeksi kualitas barang yang diterima'],
-        ['label' => 'Penerimaan Pembelian',       'url' => \App\Filament\Resources\PurchaseReceiptResource::getUrl(),       'icon' => 'inbox-arrow-down', 'desc' => 'Konfirmasi penerimaan barang dari supplier'],
-        ['label' => 'Retur Pembelian',            'url' => \App\Filament\Resources\PurchaseReturnResource::getUrl(),        'icon' => 'arrow-uturn-left', 'desc' => 'Kembalikan barang tidak sesuai ke supplier'],
+    $sections = [
+        [
+            'title' => 'Transaksi Pembelian',
+            'items' => [
+                ['label' => 'Permintaan Pembelian',      'url' => \App\Filament\Resources\OrderRequestResource::getUrl(),          'icon' => 'document-text',    'desc' => 'Ajukan permintaan bahan/barang ke supplier'],
+                ['label' => 'Pesanan Pembelian',          'url' => \App\Filament\Resources\PurchaseOrderResource::getUrl(),         'icon' => 'shopping-cart',    'desc' => 'Buat & kelola purchase order ke vendor'],
+                ['label' => 'Kontrol Kualitas Pembelian', 'url' => \App\Filament\Resources\QualityControlPurchaseResource::getUrl(),'icon' => 'beaker',           'desc' => 'Inspeksi kualitas barang yang diterima'],
+                ['label' => 'Penerimaan Pembelian',       'url' => \App\Filament\Resources\PurchaseReceiptResource::getUrl(),       'icon' => 'inbox-arrow-down', 'desc' => 'Konfirmasi penerimaan barang dari supplier'],
+                ['label' => 'Retur Pembelian',            'url' => \App\Filament\Resources\PurchaseReturnResource::getUrl(),        'icon' => 'arrow-uturn-left', 'desc' => 'Kembalikan barang tidak sesuai ke supplier'],
+            ],
+        ],
+        [
+            'title' => 'Keuangan & Pembayaran',
+            'items' => [
+                ['label' => 'Keuangan Pembelian',         'url' => \App\Filament\Pages\FinancePurchaseHubPage::getUrl(),            'icon' => 'credit-card',      'desc' => 'Pintu masuk ke utang usaha dan invoice pembelian'],
+                ['label' => 'Pembayaran Keuangan',        'url' => \App\Filament\Pages\PaymentHubPage::getUrl(),                    'icon' => 'currency-dollar',  'desc' => 'Pusat permintaan pembayaran dan transaksi kas/bank'],
+            ],
+        ],
     ];
+    $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 
 @include('filament.pages.partials.hub-styles')
@@ -26,17 +39,23 @@
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Pembelian</div>
             <h1 class="hubv2-hero-title">Pusat Pembelian</h1>
-            <p class="hubv2-hero-subtitle">Kelola seluruh proses pembelian — dari permintaan hingga penerimaan &amp; retur barang.</p>
+            <p class="hubv2-hero-subtitle">Kelola transaksi pembelian dan pintu masuk ke keuangan serta pembayaran dari satu halaman.</p>
         </div>
         <div class="hubv2-hero-meta">
-            <span class="hubv2-hero-meta-num">{{ count($items) }}</span>
+            <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>
             <span class="hubv2-hero-meta-lbl">Modul</span>
         </div>
     </div>
 
-    {{-- Cards --}}
+    {{-- Sections --}}
+    @foreach($sections as $section)
+    <div class="hubv2-sh">
+        <span class="hubv2-sh-dot"></span>
+        <span class="hubv2-sh-name">{{ $section['title'] }}</span>
+        <span class="hubv2-sh-rule"></span>
+    </div>
     <div class="hubv2-grid">
-        @foreach($items as $item)
+        @foreach($section['items'] as $item)
         <a href="{{ $item['url'] }}" class="hubv2-card" data-hub-card>
             <div class="hubv2-ci" style="background:{{ $iconBg }};color:{{ $accentColor }};">
                 <x-dynamic-component :component="'heroicon-o-'.$item['icon']" class="w-5 h-5" />
@@ -51,6 +70,7 @@
         </a>
         @endforeach
     </div>
+    @endforeach
 
 </div>
 </x-filament-panels::page>

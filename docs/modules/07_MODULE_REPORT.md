@@ -191,7 +191,7 @@ Saldo WIP Awal Periode
 
 ---
 
-## 3. Laporan Operasional Penjualan & Pembelian
+## 3. Laporan Penjualan & Pembelian
 
 ### 3.1 Sales Report
 

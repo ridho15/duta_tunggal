@@ -8,10 +8,7 @@ use App\Filament\Pages\FinancialStatementPage;
 use App\Filament\Pages\FinanceReportHubPage;
 use App\Filament\Pages\IncomeStatementPage;
 use App\Filament\Pages\JournalConsolidationPage;
-use App\Filament\Pages\OperationalReportHubPage;
 use App\Filament\Pages\ProfitLossMultiDivisionPage;
-use App\Filament\Pages\PurchaseReportPage;
-use App\Filament\Pages\SalesReportPage;
 use App\Filament\Pages\TrialBalancePage;
 use App\Filament\Pages\ViewAgeingReport;
 use App\Filament\Resources\Reports\AgeingReportResource;
@@ -34,12 +31,6 @@ test('finance report hub page is configured as the parent menu', function () {
     expect(staticPropertyValue(FinanceReportHubPage::class, 'navigationGroup'))->toBe('Laporan Keuangan')
         ->and(staticPropertyValue(FinanceReportHubPage::class, 'navigationLabel'))->toBe('Laporan Keuangan')
         ->and(FinanceReportHubPage::getUrl())->toContain('/admin/finance-reports');
-});
-
-test('operational report hub page is configured as the parent menu', function () {
-    expect(staticPropertyValue(OperationalReportHubPage::class, 'navigationGroup'))->toBe('Reports')
-        ->and(staticPropertyValue(OperationalReportHubPage::class, 'navigationLabel'))->toBe('Laporan Operasional')
-        ->and(OperationalReportHubPage::getUrl())->toContain('/admin/operational-reports');
 });
 
 test('finance report navigation items are nested under the finance hub', function () {
@@ -88,12 +79,6 @@ test('detailed finance reports are hidden from sidebar and only exposed through 
         StockMutationReportResource::class,
     ] as $resourceClass) {
         expect(staticPropertyValue($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
-    }
-});
-
-test('operational report navigation items are nested under the operational hub', function () {
-    foreach ([SalesReportPage::class, PurchaseReportPage::class] as $child) {
-        expect(staticPropertyValue($child, 'navigationParentItem'))->toBe('Laporan Operasional');
     }
 });
 

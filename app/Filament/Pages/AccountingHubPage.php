@@ -10,7 +10,7 @@ class AccountingHubPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-calculator';
 
-    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
+    protected static ?string $navigationGroup = 'Akuntansi';
 
     protected static ?string $navigationLabel = 'Pusat Akuntansi';
 

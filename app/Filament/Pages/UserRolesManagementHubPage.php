@@ -10,7 +10,7 @@ class UserRolesManagementHubPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'User Roles Management';
+    protected static ?string $navigationGroup = 'Manajemen User dan Role';
 
     protected static ?string $navigationLabel = 'Pusat Manajemen User & Role';
 

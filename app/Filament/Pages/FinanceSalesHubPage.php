@@ -17,4 +17,9 @@ class FinanceSalesHubPage extends Page
     protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'finance-sales-hub';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }

@@ -220,7 +220,7 @@ Output yang harus terlihat:
 - User memiliki role yang benar.
 - Permission tidak berlebihan dan tidak menghambat pekerjaan.
 
-## Laporan Keuangan dan Operasional
+## Laporan Keuangan, Penjualan, dan Pembelian
 
 Tujuan departemen ini adalah memberi ringkasan manajemen dan analisa data bisnis.
 
@@ -229,7 +229,7 @@ Role yang biasanya memakai alur ini adalah Owner, Super Admin, Finance Manager, 
 Langkah kerja:
 
 1. Buka Laporan Keuangan untuk neraca, laba rugi, trial balance, buku besar, cash flow, HPP, ageing, dan analisis lanjutan.
-2. Buka Laporan Operasional untuk rekap penjualan dan pembelian.
+2. Buka Dashboard untuk masuk ke Laporan Penjualan dan Laporan Pembelian.
 3. Gunakan filter periode, cabang, atau parameter lain sebelum mengekspor.
 
 Output yang harus terlihat:

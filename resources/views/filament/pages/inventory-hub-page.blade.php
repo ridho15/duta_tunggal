@@ -1,24 +1,17 @@
 <x-filament-panels::page>
 @php
-    $accentColor = '#dc2626';
-    $accentLight = '#fca5a5';
-    $iconBg      = '#fef2f2';
-    $heroFrom    = '#fee2e2';
-    $heroTo      = '#fecaca';
+    $accentColor = '#059669';
+    $accentLight = '#6ee7b7';
+    $iconBg      = '#ecfdf5';
+    $heroFrom    = '#ecfdf5';
+    $heroTo      = '#a7f3d0';
     $sections = [
         [
-            'title' => 'Transaksi Penjualan',
+            'title' => 'Menu Inventory',
             'items' => [
-                ['label' => 'Quotations',      'url' => \App\Filament\Resources\QuotationResource::getUrl(),        'icon' => 'document-text',        'desc' => 'Kelola penawaran harga untuk pelanggan'],
-                ['label' => 'Sale Orders',     'url' => \App\Filament\Resources\SaleOrderResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Buat dan pantau pesanan penjualan'],
-                ['label' => 'Retur Pelanggan', 'url' => \App\Filament\Resources\CustomerReturnResource::getUrl(),   'icon' => 'arrow-uturn-left',     'desc' => 'Tangani retur barang dari pelanggan'],
-            ],
-        ],
-        [
-            'title' => 'Keuangan Penjualan',
-            'items' => [
-                ['label' => 'Piutang Usaha',     'url' => \App\Filament\Pages\FinanceSalesHubPage::getUrl(),       'icon' => 'banknotes',            'desc' => 'Pintu masuk ke piutang, invoice, dan transaksi penjualan lain'],
-                ['label' => 'Sales Report',      'url' => \App\Filament\Pages\SalesReportPage::getUrl(),            'icon' => 'chart-bar-square',     'desc' => 'Pantau ringkasan dan performa penjualan'],
+                ['label' => 'Gudang',           'url' => \App\Filament\Pages\WarehouseHubPage::getUrl(),                 'icon' => 'archive-box',              'desc' => 'Pusat transaksi dan pengaturan gudang'],
+                ['label' => 'Kartu Persediaan', 'url' => \App\Filament\Resources\Reports\InventoryCardResource::getUrl(),'icon' => 'clipboard-document-list', 'desc' => 'Lihat kartu persediaan / stock card'],
+                ['label' => 'Laporan Stok',     'url' => \App\Filament\Pages\InventoryReportPage::getUrl(),             'icon' => 'chart-bar-square',        'desc' => 'Laporan stok, mutasi, dan aging inventory'],
             ],
         ],
     ];
@@ -27,17 +20,15 @@
 
 @include('filament.pages.partials.hub-styles')
 
-<div id="sales-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
-
-    {{-- Hero --}}
+<div id="inventory-hub" style="--hub-c1:{{ $accentColor }};--hub-border:{{ $accentLight }};">
     <div class="hubv2-hero" style="background:linear-gradient(135deg,{{ $heroFrom }},{{ $heroTo }});">
         <div class="hubv2-hero-icon" style="color:{{ $accentColor }};">
-            <x-heroicon-o-shopping-cart class="w-9 h-9" />
+            <x-heroicon-o-archive-box class="w-9 h-9" />
         </div>
         <div class="hubv2-hero-body">
-            <div class="hubv2-hero-badge">Modul ERP &middot; Penjualan</div>
-            <h1 class="hubv2-hero-title">Pusat Penjualan</h1>
-            <p class="hubv2-hero-subtitle">Kelola penawaran, pesanan, retur, dan pintu masuk ke keuangan penjualan dari satu halaman.</p>
+            <div class="hubv2-hero-badge">Modul ERP &middot; Inventory</div>
+            <h1 class="hubv2-hero-title">Pusat Inventory</h1>
+            <p class="hubv2-hero-subtitle">Pintu masuk untuk gudang, kartu persediaan, dan laporan stok.</p>
         </div>
         <div class="hubv2-hero-meta">
             <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>
@@ -45,7 +36,6 @@
         </div>
     </div>
 
-    {{-- Sections --}}
     @foreach($sections as $section)
     <div class="hubv2-sh">
         <span class="hubv2-sh-dot"></span>
@@ -69,6 +59,5 @@
         @endforeach
     </div>
     @endforeach
-
 </div>
 </x-filament-panels::page>

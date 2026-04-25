@@ -30,9 +30,12 @@ class PurchaseReportPage extends Page implements HasTable
 
     protected static ?string $navigationLabel = 'Laporan Pembelian';
 
-    protected static ?string $navigationParentItem = 'Laporan Operasional';
-
     protected static ?int $navigationSort = 2;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public ?string $start_date = null;
     public ?string $end_date = null;

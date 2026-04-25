@@ -17,4 +17,9 @@ class AssetManagementHubPage extends Page
     protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'asset-management-hub';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }
