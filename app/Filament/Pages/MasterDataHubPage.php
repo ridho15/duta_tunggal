@@ -12,7 +12,7 @@ class MasterDataHubPage extends Page
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?string $navigationLabel = 'Pusat Data Master';
+    protected static ?string $navigationLabel = 'Data Master';
 
     protected static ?int $navigationSort = 1;
 

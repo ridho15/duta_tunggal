@@ -24,41 +24,44 @@ async function assertHubV2(page, { url, id, title, minCards }) {
   for (let i = 0; i < count; i++) {
     const href = await cards.nth(i).getAttribute('href');
     expect(href).toBeTruthy();
+    expect(href).not.toMatch(/\/admin\/.+-hub$/);
   }
 }
 
 test.describe('Hub Pages – v2 Design & Navigation', () => {
   // ── Design regression ────────────────────────────────────────────────────
 
-  test('purchase hub renders v2 hero and 5 nav cards', async ({ page }) => {
+  test('purchase hub renders v2 hero and flattened direct-menu cards', async ({ page }) => {
     await assertHubV2(page, {
       url: '/admin/purchase-hub', id: '#purchase-hub',
-      title: 'Pusat Pembelian', minCards: 5,
+      title: 'Pembelian', minCards: 13,
     });
     const hub = page.locator('#purchase-hub');
     await expect(hub.getByRole('link', { name: /permintaan pembelian/i })).toBeVisible();
     await expect(hub.getByRole('link', { name: /pesanan pembelian/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /utang usaha/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /invoice pembelian/i })).toBeVisible();
     await expect(hub.locator('.hubv2-cd').first()).not.toBeEmpty();
   });
 
   test('finance purchase hub renders v2 hero and 2 nav cards', async ({ page }) => {
     await assertHubV2(page, {
       url: '/admin/finance-purchase-hub', id: '#finance-purchase-hub',
-      title: 'Pusat Keuangan Pembelian', minCards: 2,
+      title: 'Keuangan Pembelian', minCards: 2,
     });
   });
 
   test('finance sales hub renders v2 hero and 3 nav cards', async ({ page }) => {
     await assertHubV2(page, {
       url: '/admin/finance-sales-hub', id: '#finance-sales-hub',
-      title: 'Pusat Keuangan Penjualan', minCards: 3,
+      title: 'Keuangan Penjualan', minCards: 3,
     });
   });
 
   test('warehouse hub renders v2 hero, section headers, and 7 nav cards', async ({ page }) => {
     await assertHubV2(page, {
       url: '/admin/warehouse-hub', id: '#warehouse-hub',
-      title: 'Pusat Gudang', minCards: 7,
+      title: 'Gudang', minCards: 7,
     });
     const hub = page.locator('#warehouse-hub');
     await expect(hub.locator('.hubv2-sh-name').first()).toBeVisible();
@@ -68,23 +71,23 @@ test.describe('Hub Pages – v2 Design & Navigation', () => {
   test('delivery hub renders v2 hero and 3 nav cards', async ({ page }) => {
     await assertHubV2(page, {
       url: '/admin/delivery-hub', id: '#delivery-hub',
-      title: 'Pusat Pengiriman', minCards: 3,
+      title: 'Pengiriman', minCards: 3,
     });
   });
 
   test('accounting hub renders v2 hero, section headers, and 6 nav cards', async ({ page }) => {
     await assertHubV2(page, {
       url: '/admin/accounting-hub', id: '#accounting-hub',
-      title: 'Pusat Akuntansi', minCards: 6,
+      title: 'Akuntansi', minCards: 6,
     });
     const hub = page.locator('#accounting-hub');
-    await expect(hub.locator('.hubv2-sh')).toHaveCount(2);
+    await expect(hub.locator('.hubv2-sh')).toHaveCount(4);
   });
 
   test('payment hub renders v2 hero and 6 nav cards', async ({ page }) => {
     await assertHubV2(page, {
       url: '/admin/payment-hub', id: '#payment-hub',
-      title: 'Pusat Pembayaran', minCards: 6,
+      title: 'Pembayaran', minCards: 6,
     });
   });
 
@@ -119,13 +122,13 @@ test.describe('Sidebar Hub Grouping', () => {
     await expect(page.getByRole('link', { name: /dashboard/i }).first()).toBeVisible({ timeout: 10000 });
     await expect(sidebar.getByRole('link', { name: /retur pelanggan/i })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: /laporan stok/i })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /pusat penjualan/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat pembelian/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat pengiriman/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat akuntansi/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat data master/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat manajemen user/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /pusat manufaktur/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /^penjualan$/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /^pembelian$/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /^pengiriman$/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /^akuntansi$/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /^data master$/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /^manajemen user & role$/i }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: /^manufaktur$/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('dashboard hub page renders quick links for finance and reports while operational report link stays hidden', async ({ page }) => {
@@ -156,7 +159,7 @@ test.describe('Sidebar Hub Grouping', () => {
     await expect(sidebar.getByRole('link', { name: /pengajuan voucher/i })).toHaveCount(0);
   });
 
-  test('inventory hub page renders quick links while detailed inventory sidebar links stay hidden', async ({ page }) => {
+  test('inventory hub page renders direct inventory links without nested warehouse hub links', async ({ page }) => {
     await page.goto('/admin/inventory-hub');
     await page.waitForLoadState('networkidle');
 
@@ -164,10 +167,11 @@ test.describe('Sidebar Hub Grouping', () => {
     const hub = page.locator('#inventory-hub');
 
     await expect(hub).toBeVisible({ timeout: 10000 });
-    await expect(hub.getByRole('link', { name: /gudang/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /stock transfer/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /stock adjustment/i })).toBeVisible();
     await expect(hub.getByRole('link', { name: /kartu persediaan/i })).toBeVisible();
     await expect(hub.getByRole('link', { name: /laporan stok/i })).toBeVisible();
-    await expect(sidebar.getByRole('link', { name: /gudang/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /stock transfer/i })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: /kartu persediaan/i })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: /laporan stok/i })).toHaveCount(0);
   });
@@ -182,8 +186,12 @@ test.describe('Sidebar Hub Grouping', () => {
     await expect(hub).toBeVisible({ timeout: 10000 });
     await expect(hub.getByRole('link', { name: /permintaan pembelian/i })).toBeVisible();
     await expect(hub.getByRole('link', { name: /pesanan pembelian/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /utang usaha/i })).toBeVisible();
+    await expect(hub.getByRole('link', { name: /invoice pembelian/i })).toBeVisible();
     await expect(sidebar.getByRole('link', { name: /pesanan pembelian/i })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: /kontrol kualitas pembelian/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /utang usaha|account payable/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /invoice pembelian/i })).toHaveCount(0);
   });
 
   test('delivery hub page renders quick links while detailed delivery sidebar links stay hidden', async ({ page }) => {
@@ -252,7 +260,11 @@ test.describe('Sidebar Hub Grouping', () => {
     await expect(salesHub).toBeVisible({ timeout: 10000 });
     await expect(salesHub.getByRole('link', { name: /sale orders/i })).toBeVisible();
     await expect(salesHub.getByRole('link', { name: /piutang usaha/i })).toBeVisible();
+    await expect(salesHub.getByRole('link', { name: /invoice penjualan/i })).toBeVisible();
+    await expect(salesHub.getByRole('link', { name: /penjualan lainnya/i })).toBeVisible();
     await expect(sidebar.getByRole('link', { name: /pesanan penjualan/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /invoice penjualan/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: /penjualan lainnya/i })).toHaveCount(0);
 
     await page.goto('/admin/manufacturing-hub');
     await page.waitForLoadState('networkidle');

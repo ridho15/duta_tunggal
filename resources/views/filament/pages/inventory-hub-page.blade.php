@@ -7,11 +7,22 @@
     $heroTo      = '#a7f3d0';
     $sections = [
         [
-            'title' => 'Menu Inventory',
+            'title' => 'Transaksi Gudang',
             'items' => [
-                ['label' => 'Gudang',           'url' => \App\Filament\Pages\WarehouseHubPage::getUrl(),                 'icon' => 'archive-box',              'desc' => 'Pusat transaksi dan pengaturan gudang'],
-                ['label' => 'Kartu Persediaan', 'url' => \App\Filament\Resources\Reports\InventoryCardResource::getUrl(),'icon' => 'clipboard-document-list', 'desc' => 'Lihat kartu persediaan / stock card'],
-                ['label' => 'Laporan Stok',     'url' => \App\Filament\Pages\InventoryReportPage::getUrl(),             'icon' => 'chart-bar-square',        'desc' => 'Laporan stok, mutasi, dan aging inventory'],
+                ['label' => 'Stock Transfer',    'url' => \App\Filament\Resources\StockTransferResource::getUrl(),         'icon' => 'arrows-right-left',        'desc' => 'Pindahkan stok antar gudang/lokasi'],
+                ['label' => 'Stock Adjustment',  'url' => \App\Filament\Resources\StockAdjustmentResource::getUrl(),       'icon' => 'adjustments-horizontal',   'desc' => 'Koreksi selisih stok secara manual'],
+                ['label' => 'Stock Opname',      'url' => \App\Filament\Resources\StockOpnameResource::getUrl(),           'icon' => 'clipboard-document-check', 'desc' => 'Hitung fisik persediaan gudang'],
+                ['label' => 'Return Product',    'url' => \App\Filament\Resources\ReturnProductResource::getUrl(),         'icon' => 'arrow-uturn-left',         'desc' => 'Proses pengembalian produk dari pelanggan'],
+            ],
+        ],
+        [
+            'title' => 'Monitoring Inventory',
+            'items' => [
+                ['label' => 'Inventory Stock',   'url' => \App\Filament\Resources\InventoryStockResource::getUrl(),        'icon' => 'archive-box',              'desc' => 'Monitor posisi stok real-time'],
+                ['label' => 'Stock Movement',    'url' => \App\Filament\Resources\StockMovementResource::getUrl(),         'icon' => 'arrow-trending-up',        'desc' => 'Riwayat mutasi masuk/keluar stok'],
+                ['label' => 'Konfirmasi Gudang', 'url' => \App\Filament\Resources\WarehouseConfirmationResource::getUrl(), 'icon' => 'check-badge',              'desc' => 'Persetujuan penerimaan/pengeluaran gudang'],
+                ['label' => 'Kartu Persediaan',  'url' => \App\Filament\Resources\Reports\InventoryCardResource::getUrl(),'icon' => 'clipboard-document-list',   'desc' => 'Lihat kartu persediaan / stock card'],
+                ['label' => 'Laporan Stok',      'url' => \App\Filament\Pages\InventoryReportPage::getUrl(),              'icon' => 'chart-bar-square',         'desc' => 'Laporan stok, mutasi, dan aging inventory'],
             ],
         ],
     ];
@@ -27,8 +38,8 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Inventory</div>
-            <h1 class="hubv2-hero-title">Pusat Inventory</h1>
-            <p class="hubv2-hero-subtitle">Pintu masuk untuk gudang, kartu persediaan, dan laporan stok.</p>
+            <h1 class="hubv2-hero-title">Inventory</h1>
+            <p class="hubv2-hero-subtitle">Kelola transaksi gudang, kontrol stok, dan monitoring inventory dari satu halaman.</p>
         </div>
         <div class="hubv2-hero-meta">
             <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>

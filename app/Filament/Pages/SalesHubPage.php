@@ -12,7 +12,7 @@ class SalesHubPage extends Page
 
     protected static ?string $navigationGroup = 'Penjualan';
 
-    protected static ?string $navigationLabel = 'Pusat Penjualan';
+    protected static ?string $navigationLabel = 'Penjualan';
 
     protected static ?int $navigationSort = 1;
 

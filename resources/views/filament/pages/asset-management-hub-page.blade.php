@@ -27,7 +27,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Asset Management</div>
-            <h1 class="hubv2-hero-title">Pusat Manajemen Aset</h1>
+            <h1 class="hubv2-hero-title">Manajemen Aset</h1>
             <p class="hubv2-hero-subtitle">Kelola aset tetap, mutasi aset, dan disposal dari satu halaman pusat.</p>
         </div>
         <div class="hubv2-hero-meta">

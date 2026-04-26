@@ -12,7 +12,7 @@ class ManufacturingHubPage extends Page
 
     protected static ?string $navigationGroup = 'Manufaktur';
 
-    protected static ?string $navigationLabel = 'Pusat Manufaktur';
+    protected static ?string $navigationLabel = 'Manufaktur';
 
     protected static ?int $navigationSort = 1;
 

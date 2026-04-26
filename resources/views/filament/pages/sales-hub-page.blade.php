@@ -17,7 +17,9 @@
         [
             'title' => 'Keuangan Penjualan',
             'items' => [
-                ['label' => 'Piutang Usaha',     'url' => \App\Filament\Pages\FinanceSalesHubPage::getUrl(),       'icon' => 'banknotes',            'desc' => 'Pintu masuk ke piutang, invoice, dan transaksi penjualan lain'],
+                ['label' => 'Piutang Usaha',     'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',            'desc' => 'Kelola hak tagih dari pelanggan'],
+                ['label' => 'Invoice Penjualan', 'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text',        'desc' => 'Tagihan penjualan kepada pelanggan'],
+                ['label' => 'Penjualan Lainnya', 'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Transaksi penjualan non-standar'],
                 ['label' => 'Sales Report',      'url' => \App\Filament\Pages\SalesReportPage::getUrl(),            'icon' => 'chart-bar-square',     'desc' => 'Pantau ringkasan dan performa penjualan'],
             ],
         ],
@@ -36,7 +38,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Penjualan</div>
-            <h1 class="hubv2-hero-title">Pusat Penjualan</h1>
+            <h1 class="hubv2-hero-title">Penjualan</h1>
             <p class="hubv2-hero-subtitle">Kelola penawaran, pesanan, retur, dan pintu masuk ke keuangan penjualan dari satu halaman.</p>
         </div>
         <div class="hubv2-hero-meta">

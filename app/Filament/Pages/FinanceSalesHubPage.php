@@ -12,7 +12,7 @@ class FinanceSalesHubPage extends Page
 
     protected static ?string $navigationGroup = 'Keuangan Penjualan';
 
-    protected static ?string $navigationLabel = 'Pusat Keuangan Penjualan';
+    protected static ?string $navigationLabel = 'Keuangan Penjualan';
 
     protected static ?int $navigationSort = 1;
 

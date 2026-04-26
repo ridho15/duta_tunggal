@@ -26,7 +26,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Pembayaran</div>
-            <h1 class="hubv2-hero-title">Pusat Pembayaran</h1>
+            <h1 class="hubv2-hero-title">Pembayaran</h1>
             <p class="hubv2-hero-subtitle">Kelola pembayaran, penerimaan pelanggan, dan seluruh transaksi kas &amp; bank.</p>
         </div>
         <div class="hubv2-hero-meta">

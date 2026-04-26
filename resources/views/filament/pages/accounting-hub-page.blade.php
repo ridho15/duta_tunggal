@@ -16,12 +16,36 @@
             ],
         ],
         [
-            'title' => 'Schedule, Voucher & Hub',
+            'title' => 'Schedule & Voucher',
             'items' => [
                 ['label' => 'Ageing Schedule',    'url' => \App\Filament\Resources\AgeingScheduleResource::getUrl(),  'icon' => 'clock',   'desc' => 'Analisis umur piutang & hutang'],
                 ['label' => 'Pengajuan Voucher',  'url' => \App\Filament\Resources\VoucherRequestResource::getUrl(), 'icon' => 'ticket',   'desc' => 'Ajukan voucher kas/biaya untuk approval'],
-                ['label' => 'Laporan Keuangan',   'url' => \App\Filament\Pages\FinanceReportHubPage::getUrl(),        'icon' => 'document-chart-bar', 'desc' => 'Hub laporan keuangan yang lebih detail'],
-                ['label' => 'Manajemen Aset',     'url' => \App\Filament\Pages\AssetManagementHubPage::getUrl(),      'icon' => 'building-office-2',  'desc' => 'Pintu masuk ke pengelolaan aset'],
+            ],
+        ],
+        [
+            'title' => 'Laporan Keuangan',
+            'items' => [
+                ['label' => 'Neraca (Balance Sheet)',       'url' => \App\Filament\Resources\Reports\BalanceSheetResource::getUrl(),  'icon' => 'chart-bar',             'desc' => 'Posisi aset, liabilitas & ekuitas'],
+                ['label' => 'Laporan Laba Rugi (P&L)',      'url' => \App\Filament\Resources\Reports\ProfitAndLossResource::getUrl(), 'icon' => 'arrow-trending-up',     'desc' => 'Kinerja pendapatan & beban operasional'],
+                ['label' => 'Neraca Saldo (Trial Balance)', 'url' => \App\Filament\Pages\TrialBalancePage::getUrl(),                  'icon' => 'table-cells',           'desc' => 'Saldo debet/kredit per akun'],
+                ['label' => 'Buku Besar',                   'url' => \App\Filament\Pages\BukuBesarPage::getUrl(),                     'icon' => 'book-open',             'desc' => 'Rincian mutasi per akun COA'],
+                ['label' => 'Laporan Arus Kas',             'url' => \App\Filament\Resources\Reports\CashFlowResource::getUrl(),     'icon' => 'banknotes',             'desc' => 'Aliran dana masuk & keluar perusahaan'],
+                ['label' => 'HPP / Cost of Goods Sold',     'url' => \App\Filament\Resources\Reports\HppResource::getUrl(),          'icon' => 'calculator',            'desc' => 'Hitung biaya pokok penjualan'],
+                ['label' => 'Cost of Goods Manufacturing',  'url' => \App\Filament\Pages\CostOfGoodsManufacturingPage::getUrl(),      'icon' => 'cog-6-tooth',           'desc' => 'Biaya produksi barang selesai'],
+                ['label' => 'Aging Report (AR/AP)',         'url' => \App\Filament\Resources\Reports\AgeingReportResource::getUrl(), 'icon' => 'clock',                 'desc' => 'Analisis umur piutang & hutang'],
+                ['label' => 'Profit per Divisi',            'url' => \App\Filament\Pages\ProfitLossMultiDivisionPage::getUrl(),       'icon' => 'chart-pie',             'desc' => 'Laba rugi per unit bisnis/divisi'],
+                ['label' => 'Drill Down Financial Report',  'url' => \App\Filament\Pages\DrillDownFinancialReportPage::getUrl(),      'icon' => 'magnifying-glass-circle','desc' => 'Analisis mendalam per pos keuangan'],
+                ['label' => 'Financial Statement',          'url' => \App\Filament\Pages\FinancialStatementPage::getUrl(),            'icon' => 'document-chart-bar',    'desc' => 'Laporan keuangan gabungan lengkap'],
+                ['label' => 'ALK Grafik',                   'url' => \App\Filament\Pages\AlkGraficPage::getUrl(),                     'icon' => 'presentation-chart-line','desc' => 'Visualisasi analisis laporan keuangan'],
+                ['label' => 'Journal Consolidation',        'url' => \App\Filament\Pages\JournalConsolidationPage::getUrl(),          'icon' => 'server-stack',          'desc' => 'Konsolidasi jurnal lintas divisi'],
+            ],
+        ],
+        [
+            'title' => 'Manajemen Aset',
+            'items' => [
+                ['label' => 'Aset Tetap',    'url' => \App\Filament\Resources\AssetResource::getUrl(),         'icon' => 'building-office-2',  'desc' => 'Master aset dan nilai buku'],
+                ['label' => 'Transfer Aset', 'url' => \App\Filament\Resources\AssetTransferResource::getUrl(), 'icon' => 'arrow-right-circle', 'desc' => 'Perpindahan aset antar cabang'],
+                ['label' => 'Disposal Aset', 'url' => \App\Filament\Resources\AssetDisposalResource::getUrl(), 'icon' => 'archive-box-x-mark', 'desc' => 'Penghapusan aset tetap'],
             ],
         ],
     ];
@@ -39,8 +63,8 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Akuntansi Keuangan</div>
-            <h1 class="hubv2-hero-title">Pusat Akuntansi</h1>
-            <p class="hubv2-hero-subtitle">Kelola jurnal, rekonsiliasi bank, AR/AP, ageing, dan pengajuan voucher dari satu halaman.</p>
+            <h1 class="hubv2-hero-title">Akuntansi</h1>
+            <p class="hubv2-hero-subtitle">Kelola jurnal, rekonsiliasi, laporan keuangan, dan manajemen aset langsung dari satu halaman.</p>
         </div>
         <div class="hubv2-hero-meta">
             <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>

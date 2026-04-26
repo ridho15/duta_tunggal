@@ -12,7 +12,7 @@ class WarehouseHubPage extends Page
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?string $navigationLabel = 'Pusat Gudang';
+    protected static ?string $navigationLabel = 'Gudang';
 
     protected static ?int $navigationSort = 1;
 

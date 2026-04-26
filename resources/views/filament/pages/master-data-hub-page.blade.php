@@ -47,7 +47,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Data Master</div>
-            <h1 class="hubv2-hero-title">Pusat Data Master</h1>
+            <h1 class="hubv2-hero-title">Data Master</h1>
             <p class="hubv2-hero-subtitle">Kelola data dasar produk, gudang, cabang, pelanggan, supplier, akun, mata uang, dan pendukung operasional dari satu halaman.</p>
         </div>
         <div class="hubv2-hero-meta">

@@ -12,7 +12,7 @@ class PaymentHubPage extends Page
 
     protected static ?string $navigationGroup = 'Pembayaran Keuangan';
 
-    protected static ?string $navigationLabel = 'Pusat Pembayaran';
+    protected static ?string $navigationLabel = 'Pembayaran';
 
     protected static ?int $navigationSort = 1;
 

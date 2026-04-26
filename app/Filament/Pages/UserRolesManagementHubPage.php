@@ -12,7 +12,7 @@ class UserRolesManagementHubPage extends Page
 
     protected static ?string $navigationGroup = 'Manajemen User dan Role';
 
-    protected static ?string $navigationLabel = 'Pusat Manajemen User & Role';
+    protected static ?string $navigationLabel = 'Manajemen User & Role';
 
     protected static ?int $navigationSort = 1;
 

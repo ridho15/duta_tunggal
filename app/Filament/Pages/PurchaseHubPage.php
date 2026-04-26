@@ -12,7 +12,7 @@ class PurchaseHubPage extends Page
 
     protected static ?string $navigationGroup = 'Pembelian';
 
-    protected static ?string $navigationLabel = 'Pusat Pembelian';
+    protected static ?string $navigationLabel = 'Pembelian';
 
     protected static ?int $navigationSort = 1;
 

@@ -35,7 +35,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Manufaktur</div>
-            <h1 class="hubv2-hero-title">Pusat Manufaktur</h1>
+            <h1 class="hubv2-hero-title">Manufaktur</h1>
             <p class="hubv2-hero-subtitle">Kelola perencanaan, pengeluaran material, produksi, dan kontrol kualitas dari satu hub yang terpusat.</p>
         </div>
         <div class="hubv2-hero-meta">

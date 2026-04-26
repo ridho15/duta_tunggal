@@ -14,7 +14,7 @@ test.describe.serial('Legacy master-data import UI verification', () => {
   test('master data hub and imported rows are visible in Filament', async ({ page }) => {
     await assertPageHealthy(page, '/admin/master-data-hub');
     await expect(page.locator('#master-data-hub')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.hubv2-hero-title')).toContainText('Pusat Data Master');
+    await expect(page.locator('.hubv2-hero-title')).toContainText('Data Master');
     await expect(page.getByRole('link', { name: /produk/i }).first()).toBeVisible();
     await expect(page.getByRole('link', { name: /kategori produk/i }).first()).toBeVisible();
 

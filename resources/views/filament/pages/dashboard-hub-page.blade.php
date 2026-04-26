@@ -22,7 +22,7 @@
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Dashboard</div>
             <h1 class="hubv2-hero-title">Dashboard</h1>
-            <p class="hubv2-hero-subtitle">Pusat masuk untuk dashboard keuangan, laporan penjualan, dan laporan pembelian.</p>
+            <p class="hubv2-hero-subtitle">Pintu masuk untuk dashboard keuangan, laporan penjualan, dan laporan pembelian.</p>
         </div>
         <div class="hubv2-hero-meta">
             <span class="hubv2-hero-meta-num">{{ count($items) }}</span>

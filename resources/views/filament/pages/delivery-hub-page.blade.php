@@ -23,7 +23,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Pengiriman</div>
-            <h1 class="hubv2-hero-title">Pusat Pengiriman</h1>
+            <h1 class="hubv2-hero-title">Pengiriman</h1>
             <p class="hubv2-hero-subtitle">Kelola perintah pengiriman, jadwal, dan surat jalan dari satu halaman terpadu.</p>
         </div>
         <div class="hubv2-hero-meta">

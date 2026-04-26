@@ -38,7 +38,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Gudang</div>
-            <h1 class="hubv2-hero-title">Pusat Gudang</h1>
+            <h1 class="hubv2-hero-title">Gudang</h1>
             <p class="hubv2-hero-subtitle">Kelola transaksi gudang, kontrol stok, dan konfirmasi penerimaan/pengeluaran barang.</p>
         </div>
         <div class="hubv2-hero-meta">

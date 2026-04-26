@@ -22,7 +22,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Keuangan Pembelian</div>
-            <h1 class="hubv2-hero-title">Pusat Keuangan Pembelian</h1>
+            <h1 class="hubv2-hero-title">Keuangan Pembelian</h1>
             <p class="hubv2-hero-subtitle">Kelola utang usaha dan invoice pembelian dari satu halaman terpadu.</p>
         </div>
         <div class="hubv2-hero-meta">

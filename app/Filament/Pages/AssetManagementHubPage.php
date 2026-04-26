@@ -12,7 +12,7 @@ class AssetManagementHubPage extends Page
 
     protected static ?string $navigationGroup = 'Asset Management';
 
-    protected static ?string $navigationLabel = 'Pusat Manajemen Aset';
+    protected static ?string $navigationLabel = 'Manajemen Aset';
 
     protected static ?int $navigationSort = 1;
 

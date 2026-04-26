@@ -12,7 +12,7 @@ class FinancePurchaseHubPage extends Page
 
     protected static ?string $navigationGroup = 'Keuangan Pembelian';
 
-    protected static ?string $navigationLabel = 'Pusat Keuangan Pembelian';
+    protected static ?string $navigationLabel = 'Keuangan Pembelian';
 
     protected static ?int $navigationSort = 1;
 

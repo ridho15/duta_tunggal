@@ -41,13 +41,13 @@ function hubStaticProperty(string $class, string $property): mixed
 
 test('master data hub page is configured as the visible master data entry', function () {
     expect(hubStaticProperty(MasterDataHubPage::class, 'navigationGroup'))->toBe('Master Data')
-        ->and(hubStaticProperty(MasterDataHubPage::class, 'navigationLabel'))->toBe('Pusat Data Master')
+    ->and(hubStaticProperty(MasterDataHubPage::class, 'navigationLabel'))->toBe('Data Master')
         ->and(MasterDataHubPage::getUrl())->toContain('/admin/master-data-hub');
 });
 
 test('manufacturing hub page is configured as the visible manufacturing entry', function () {
     expect(hubStaticProperty(ManufacturingHubPage::class, 'navigationGroup'))->toBe('Manufaktur')
-        ->and(hubStaticProperty(ManufacturingHubPage::class, 'navigationLabel'))->toBe('Pusat Manufaktur')
+    ->and(hubStaticProperty(ManufacturingHubPage::class, 'navigationLabel'))->toBe('Manufaktur')
         ->and(ManufacturingHubPage::getUrl())->toContain('/admin/manufacturing-hub');
 });
 
@@ -58,7 +58,7 @@ test('asset management hub page is hidden and only exposed through the accountin
 
 test('user roles management hub page is configured as the visible admin entry', function () {
     expect(hubStaticProperty(UserRolesManagementHubPage::class, 'navigationGroup'))->toBe('Manajemen User dan Role')
-        ->and(hubStaticProperty(UserRolesManagementHubPage::class, 'navigationLabel'))->toBe('Pusat Manajemen User & Role')
+    ->and(hubStaticProperty(UserRolesManagementHubPage::class, 'navigationLabel'))->toBe('Manajemen User & Role')
         ->and(UserRolesManagementHubPage::getUrl())->toContain('/admin/user-roles-management-hub');
 });
 

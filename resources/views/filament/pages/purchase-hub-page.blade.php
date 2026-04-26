@@ -17,10 +17,21 @@
             ],
         ],
         [
-            'title' => 'Keuangan & Pembayaran',
+            'title' => 'Keuangan Pembelian',
             'items' => [
-                ['label' => 'Keuangan Pembelian',         'url' => \App\Filament\Pages\FinancePurchaseHubPage::getUrl(),            'icon' => 'credit-card',      'desc' => 'Pintu masuk ke utang usaha dan invoice pembelian'],
-                ['label' => 'Pembayaran Keuangan',        'url' => \App\Filament\Pages\PaymentHubPage::getUrl(),                    'icon' => 'currency-dollar',  'desc' => 'Pusat permintaan pembayaran dan transaksi kas/bank'],
+                ['label' => 'Utang Usaha',                'url' => \App\Filament\Resources\AccountPayableResource::getUrl(),        'icon' => 'credit-card',      'desc' => 'Kelola kewajiban pembayaran ke supplier'],
+                ['label' => 'Invoice Pembelian',          'url' => \App\Filament\Resources\PurchaseInvoiceResource::getUrl(),       'icon' => 'document-text',    'desc' => 'Tagihan pembelian dari vendor/supplier'],
+            ],
+        ],
+        [
+            'title' => 'Pembayaran & Kas Bank',
+            'items' => [
+                ['label' => 'Permintaan Pembayaran',      'url' => \App\Filament\Resources\PaymentRequestResource::getUrl(),        'icon' => 'document-text',    'desc' => 'Ajukan permintaan dana ke keuangan'],
+                ['label' => 'Penerimaan Pelanggan',       'url' => \App\Filament\Resources\CustomerReceiptResource::getUrl(),       'icon' => 'inbox-arrow-down', 'desc' => 'Catat pembayaran masuk dari pelanggan'],
+                ['label' => 'Pembayaran Vendor',          'url' => \App\Filament\Resources\VendorPaymentResource::getUrl(),         'icon' => 'arrow-up-circle',  'desc' => 'Proses pelunasan ke vendor/supplier'],
+                ['label' => 'Transaksi Kas & Bank',       'url' => \App\Filament\Resources\CashBankTransactionResource::getUrl(),   'icon' => 'banknotes',        'desc' => 'Catat penerimaan & pengeluaran kas/bank'],
+                ['label' => 'Deposit',                    'url' => \App\Filament\Resources\DepositResource::getUrl(),               'icon' => 'circle-stack',     'desc' => 'Kelola deposit & uang muka'],
+                ['label' => 'Transfer Kas & Bank',        'url' => \App\Filament\Resources\CashBankTransferResource::getUrl(),      'icon' => 'arrows-right-left','desc' => 'Transfer antar akun kas & bank'],
             ],
         ],
     ];
@@ -38,7 +49,7 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Pembelian</div>
-            <h1 class="hubv2-hero-title">Pusat Pembelian</h1>
+            <h1 class="hubv2-hero-title">Pembelian</h1>
             <p class="hubv2-hero-subtitle">Kelola transaksi pembelian dan pintu masuk ke keuangan serta pembayaran dari satu halaman.</p>
         </div>
         <div class="hubv2-hero-meta">

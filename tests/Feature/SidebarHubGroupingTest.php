@@ -76,13 +76,13 @@ test('finance dashboard page is hidden and only exposed through the dashboard hu
 
 test('accounting hub page is configured as the visible accounting menu entry', function () {
     expect(sidebarStaticProperty(AccountingHubPage::class, 'navigationGroup'))->toBe('Akuntansi')
-        ->and(sidebarStaticProperty(AccountingHubPage::class, 'navigationLabel'))->toBe('Pusat Akuntansi')
+    ->and(sidebarStaticProperty(AccountingHubPage::class, 'navigationLabel'))->toBe('Akuntansi')
         ->and(AccountingHubPage::getUrl())->toContain('/admin/accounting-hub');
 });
 
 test('inventory hub page is configured as the visible inventory menu entry', function () {
     expect(sidebarStaticProperty(InventoryHubPage::class, 'navigationGroup'))->toBe('Inventory')
-        ->and(sidebarStaticProperty(InventoryHubPage::class, 'navigationLabel'))->toBe('Pusat Inventory')
+    ->and(sidebarStaticProperty(InventoryHubPage::class, 'navigationLabel'))->toBe('Inventory')
         ->and(InventoryHubPage::getUrl())->toContain('/admin/inventory-hub');
 });
 
@@ -94,19 +94,19 @@ test('warehouse and inventory detail hubs are hidden and only exposed through th
 
 test('purchase hub page is configured as the visible purchase menu entry', function () {
     expect(sidebarStaticProperty(PurchaseHubPage::class, 'navigationGroup'))->toBe('Pembelian')
-        ->and(sidebarStaticProperty(PurchaseHubPage::class, 'navigationLabel'))->toBe('Pusat Pembelian')
+    ->and(sidebarStaticProperty(PurchaseHubPage::class, 'navigationLabel'))->toBe('Pembelian')
         ->and(PurchaseHubPage::getUrl())->toContain('/admin/purchase-hub');
 });
 
 test('delivery hub page is configured as the visible delivery menu entry', function () {
     expect(sidebarStaticProperty(DeliveryHubPage::class, 'navigationGroup'))->toBe('Pengiriman')
-        ->and(sidebarStaticProperty(DeliveryHubPage::class, 'navigationLabel'))->toBe('Pusat Pengiriman')
+    ->and(sidebarStaticProperty(DeliveryHubPage::class, 'navigationLabel'))->toBe('Pengiriman')
         ->and(DeliveryHubPage::getUrl())->toContain('/admin/delivery-hub');
 });
 
 test('sales hub page is configured as the visible sales menu entry', function () {
     expect(sidebarStaticProperty(SalesHubPage::class, 'navigationGroup'))->toBe('Penjualan')
-        ->and(sidebarStaticProperty(SalesHubPage::class, 'navigationLabel'))->toBe('Pusat Penjualan')
+    ->and(sidebarStaticProperty(SalesHubPage::class, 'navigationLabel'))->toBe('Penjualan')
         ->and(SalesHubPage::getUrl())->toContain('/admin/sales-hub');
 });
 

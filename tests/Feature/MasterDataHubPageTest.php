@@ -11,6 +11,6 @@ test('master data hub page renders without component errors', function () {
     $response = $this->actingAs($user)->get('/admin/master-data-hub');
 
     $response->assertOk();
-    $response->assertSeeText('Pusat Data Master');
+    $response->assertSeeText('Data Master');
     $response->assertSeeText('Satuan');
 });

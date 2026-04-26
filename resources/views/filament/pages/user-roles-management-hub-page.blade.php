@@ -27,8 +27,8 @@
         </div>
         <div class="hubv2-hero-body">
             <div class="hubv2-hero-badge">Modul ERP &middot; Admin Akses</div>
-            <h1 class="hubv2-hero-title">Pusat Manajemen User & Role</h1>
-            <p class="hubv2-hero-subtitle">Kelola pengguna, role, dan permission dari satu halaman pusat agar akses sistem lebih mudah dipelihara.</p>
+            <h1 class="hubv2-hero-title">Manajemen User & Role</h1>
+            <p class="hubv2-hero-subtitle">Kelola pengguna, role, dan permission dari satu halaman agar akses sistem lebih mudah dipelihara.</p>
         </div>
         <div class="hubv2-hero-meta">
             <span class="hubv2-hero-meta-num">{{ $totalItems }}</span>

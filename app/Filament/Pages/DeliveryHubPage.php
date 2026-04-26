@@ -12,7 +12,7 @@ class DeliveryHubPage extends Page
 
     protected static ?string $navigationGroup = 'Pengiriman';
 
-    protected static ?string $navigationLabel = 'Pusat Pengiriman';
+    protected static ?string $navigationLabel = 'Pengiriman';
 
     protected static ?int $navigationSort = 1;
 

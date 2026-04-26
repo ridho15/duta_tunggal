@@ -12,7 +12,7 @@ class AccountingHubPage extends Page
 
     protected static ?string $navigationGroup = 'Akuntansi';
 
-    protected static ?string $navigationLabel = 'Pusat Akuntansi';
+    protected static ?string $navigationLabel = 'Akuntansi';
 
     protected static ?int $navigationSort = 1;
 

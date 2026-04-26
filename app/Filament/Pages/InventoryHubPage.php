@@ -12,7 +12,7 @@ class InventoryHubPage extends Page
 
     protected static ?string $navigationGroup = 'Inventory';
 
-    protected static ?string $navigationLabel = 'Pusat Inventory';
+    protected static ?string $navigationLabel = 'Inventory';
 
     protected static ?int $navigationSort = 1;
 
