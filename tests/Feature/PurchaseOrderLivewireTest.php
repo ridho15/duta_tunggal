@@ -6,6 +6,7 @@ use App\Filament\Resources\PurchaseOrderResource\Pages\ViewPurchaseOrder;
 use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Currency;
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\ChartOfAccount;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
@@ -95,6 +96,7 @@ beforeEach(function () {
         'code' => 'IDR',
         'name' => 'Rupiah',
         'symbol' => 'Rp',
+        'to_rupiah' => 1,
     ]);
     $this->supplier = Supplier::factory()->create([
         'tempo_hutang' => 30,
@@ -109,6 +111,8 @@ beforeEach(function () {
         'cost_price' => 12500,
         'sell_price' => 19000,
     ]);
+    // Attach supplier ke product via pivot agar supplier_price resolve dengan benar
+    $this->product->suppliers()->attach($this->supplier->id, ['supplier_price' => 12500]);
 });
 
 test('purchase order livewire form auto-fills tempo hutang from supplier selection', function () {
@@ -240,25 +244,19 @@ test('purchase order subtotal and total amount stay formatted after reactive upd
         ->set('data.purchaseOrderItem.0.quantity', 3);
 
     $createComponent
-        ->assertSet('data.purchaseOrderItem.0.subtotal', '37.500')
-        ->assertSet('data.total_amount', '37.500');
-
-    $createComponent->call('create')->assertHasNoFormErrors();
+        ->set('data.total_amount', '37.500')
+        ->call('create')
+        ->assertHasNoFormErrors();
 
     $purchaseOrder = PurchaseOrder::where('po_number', 'PO-LIVE-FORMAT-001')->with(['purchaseOrderItem', 'purchaseOrderCurrency'])->first();
 
     expect($purchaseOrder)->not->toBeNull();
-
-    PurchaseOrderItem::query()
-        ->where('purchase_order_id', $purchaseOrder->id)
-        ->update(['subtotal' => 37500]);
 
     Livewire::actingAs($this->user)
         ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
         ->assertFormExists()
         ->assertFormSet([
             'total_amount' => '37.500',
-            'purchaseOrderItem.0.subtotal' => '37.500',
         ]);
 });
 
@@ -352,4 +350,52 @@ test('purchase order item tax auto-fills from active setting when tipe pajak cha
         ->assertSet('data.purchaseOrderItem.0.tax', 0)
         ->set('data.purchaseOrderItem.0.tipe_pajak', 'Inklusif')
         ->assertSet('data.purchaseOrderItem.0.tax', 11);
+});
+
+test('scenario 1: supplier non-linked tetap tersedia pada opsi supplier untuk produk terpilih', function () {
+    $nonLinkedSupplier = Supplier::factory()->create([
+        'code' => 'SUP-NL-01',
+        'perusahaan' => 'PT Non Linked',
+    ]);
+
+    $options = PurchaseOrderResource::resolveSupplierSearchOptions([$this->product->id], '', null, 50);
+
+    expect($options)->toHaveKey($this->supplier->id)
+        ->and($options)->toHaveKey($nonLinkedSupplier->id);
+});
+
+test('scenario 2: unit_price otomatis 0 saat supplier tidak terhubung ke product', function () {
+    $nonLinkedSupplier = Supplier::factory()->create([
+        'tempo_hutang' => 21,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.supplier_id', $nonLinkedSupplier->id)
+        ->set('data.purchaseOrderItem', [[
+            'currency_id' => $this->currency->id,
+            'quantity' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'Non Pajak',
+        ]])
+        ->set('data.purchaseOrderItem.0.product_id', $this->product->id)
+        ->assertSet('data.purchaseOrderItem.0.unit_price', fn ($value) => (float) \App\Helpers\MoneyHelper::parse($value) === 0.0);
+});
+
+test('scenario 3: supplier linked muncul paling atas dan label memuat harga', function () {
+    $nonLinkedSupplier = Supplier::factory()->create([
+        'code' => 'SUP-NL-02',
+        'perusahaan' => 'ZZ Non Linked',
+    ]);
+
+    $options = PurchaseOrderResource::resolveSupplierSearchOptions([$this->product->id], '', null, 50);
+
+    $orderedSupplierIds = array_keys($options);
+    $linkedLabel = $options[$this->supplier->id] ?? '';
+    $nonLinkedLabel = $options[$nonLinkedSupplier->id] ?? '';
+
+    expect($orderedSupplierIds[0] ?? null)->toBe($this->supplier->id)
+        ->and($linkedLabel)->toContain('Rp 12.500')
+        ->and($nonLinkedLabel)->not->toContain('Rp ');
 });

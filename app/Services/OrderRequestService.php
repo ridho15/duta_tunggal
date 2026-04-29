@@ -6,11 +6,17 @@ use App\Models\Currency;
 use App\Models\OrderRequestItem;
 use App\Models\Supplier;
 use App\Services\PurchaseOrderService;
+use App\Services\ProductSupplierSyncService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class OrderRequestService
 {
+    public function __construct(
+        private readonly ProductSupplierSyncService $productSupplierSyncService
+    ) {
+    }
+
     /**
      * Build the list of OrderRequestItems to convert to PO items.
      * When $data['selected_items'] is present, use only items with include=true
@@ -141,6 +147,13 @@ class OrderRequestService
                     'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
                     'currency_id'       => $currency->id,
                 ]);
+
+                $itemSupplierId = (int) ($orderRequestItem->supplier_id ?: $supplier->id);
+                $this->productSupplierSyncService->syncSupplierProductPrice(
+                    (int) $orderRequestItem->product_id,
+                    $itemSupplierId,
+                    $row['unit_price']
+                );
                 // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
             }
 
@@ -191,6 +204,13 @@ class OrderRequestService
                 'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
                 'currency_id'       => $currency->id,
             ]);
+
+            $itemSupplierId = (int) ($orderRequestItem->supplier_id ?: $supplier->id);
+            $this->productSupplierSyncService->syncSupplierProductPrice(
+                (int) $orderRequestItem->product_id,
+                $itemSupplierId,
+                $row['unit_price']
+            );
             // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
         }
 

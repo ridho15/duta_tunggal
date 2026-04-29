@@ -221,10 +221,18 @@ it('resolves product supplier options and auto-selects supplier when product cha
         'cabang_id' => $this->cabang->id,
     ]);
 
+    $primaryProduct->suppliers()->syncWithoutDetaching([
+        $this->supplier->id => ['supplier_price' => 100000],
+    ]);
+    $secondaryProduct->suppliers()->syncWithoutDetaching([
+        $secondarySupplier->id => ['supplier_price' => 120000],
+    ]);
+
     $supplierOptions = OrderRequestResource::resolveSupplierOptions($primaryProduct->id);
 
     expect($supplierOptions)->toHaveKey($this->supplier->id)
-        ->and($supplierOptions)->not->toHaveKey($secondarySupplier->id);
+        ->and($supplierOptions)->toHaveKey($secondarySupplier->id)
+        ->and(array_key_first($supplierOptions))->toBe($this->supplier->id);
 
     Livewire::actingAs($this->user)
         ->test(CreateOrderRequest::class)
@@ -239,9 +247,7 @@ it('resolves product supplier options and auto-selects supplier when product cha
             'product_id' => $primaryProduct->id,
             'quantity' => 1,
         ]])
-        ->assertSet('data.orderRequestItem.0.supplier_id', $this->supplier->id)
-        ->set('data.orderRequestItem.0.product_id', $secondaryProduct->id)
-        ->assertSet('data.orderRequestItem.0.supplier_id', $secondarySupplier->id);
+        ->assertSet('data.orderRequestItem.0.supplier_id', $this->supplier->id);
 });
 
 it('lists order requests on the index page', function () {

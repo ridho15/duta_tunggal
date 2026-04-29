@@ -44,6 +44,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class OrderRequestResource extends Resource
@@ -143,7 +144,33 @@ class OrderRequestResource extends Resource
 
     public static function resolveSupplierOptions(?int $productId = null, ?string $search = null, int $limit = 50): array
     {
-        $query = Supplier::query()->orderBy('perusahaan');
+        $query = Supplier::query();
+
+        $product = null;
+        $linkedSupplierIds = [];
+        $linkedPriceMap = [];
+
+        if ($productId) {
+            $product = Product::find($productId);
+
+            $linkedRows = DB::table('product_supplier')
+                ->where('product_id', $productId)
+                ->get(['supplier_id', 'supplier_price']);
+
+            foreach ($linkedRows as $row) {
+                $supplierId = (int) $row->supplier_id;
+                $linkedSupplierIds[] = $supplierId;
+                $linkedPriceMap[$supplierId] = $row->supplier_price !== null
+                    ? (float) $row->supplier_price
+                    : null;
+            }
+
+            if ($product?->supplier_id) {
+                $linkedSupplierIds[] = (int) $product->supplier_id;
+            }
+
+            $linkedSupplierIds = array_values(array_unique(array_map('intval', $linkedSupplierIds)));
+        }
 
         if ($search !== null && $search !== '') {
             $query->where(function ($supplierQuery) use ($search) {
@@ -152,25 +179,19 @@ class OrderRequestResource extends Resource
             });
         }
 
-        if ($productId) {
-            $product = Product::find($productId);
-            $query->where(function ($q) use ($productId, $product) {
-                $q->whereHas('productSuppliers', function ($productQuery) use ($productId) {
-                    $productQuery->where('products.id', $productId);
-                });
-
-                if ($product && $product->supplier_id) {
-                    $q->orWhere('id', $product->supplier_id);
-                }
-            });
+        if (! empty($linkedSupplierIds)) {
+            $placeholders = implode(',', array_fill(0, count($linkedSupplierIds), '?'));
+            $query->orderByRaw("CASE WHEN id IN ({$placeholders}) THEN 0 ELSE 1 END", $linkedSupplierIds);
         }
+
+        $query->orderBy('perusahaan');
+
         return $query->limit($limit)
             ->get()
-            ->mapWithKeys(function ($supplier) use ($productId) {
+            ->mapWithKeys(function ($supplier) use ($productId, $linkedPriceMap) {
                 $priceLabel = '';
                 if ($productId) {
-                    $product = Product::find($productId);
-                    $price = $product?->suppliers()->where('suppliers.id', $supplier->id)->first()?->pivot?->supplier_price;
+                    $price = $linkedPriceMap[(int) $supplier->id] ?? null;
                     $priceLabel = $price ? ' - Rp ' . number_format((float) $price, 0, ',', '.') : '';
                 }
 

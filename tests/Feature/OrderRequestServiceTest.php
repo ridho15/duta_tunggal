@@ -14,6 +14,7 @@ use App\Models\Warehouse;
 use App\Services\OrderRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -350,4 +351,117 @@ test('second PO can be created for remaining unfulfilled quantity after first PO
 
     expect(PurchaseOrder::count())->toBe(2);
     expect((float) $po2->purchaseOrderItem->first()->quantity)->toBe(4.0);
+});
+
+test('order request approve creates product_supplier for non-linked supplier with OR item price', function () {
+    $this->itemA->update([
+        'supplier_id' => $this->supplier->id,
+        'unit_price' => 32100,
+    ]);
+
+    DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->delete();
+
+    $payload = [
+        'po_number' => 'PO-SYNC-OR-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'quantity' => 5,
+                'unit_price' => 32100,
+                'include' => true,
+            ],
+        ],
+    ];
+
+    $this->service->approve($this->orderRequest->fresh(['orderRequestItem.product']), $payload);
+
+    $pivot = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->first();
+
+    expect($pivot)->not->toBeNull()
+        ->and((float) $pivot->supplier_price)->toBe(32100.0)
+        ->and(
+            DB::table('product_supplier')
+                ->where('product_id', $this->productA->id)
+                ->where('supplier_id', $this->supplier->id)
+                ->count()
+        )->toBe(1);
+});
+
+test('updating order request item price updates product_supplier price without duplicates', function () {
+    DB::table('product_supplier')->insert([
+        'product_id' => $this->productA->id,
+        'supplier_id' => $this->supplier->id,
+        'supplier_price' => 12000,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->itemA->update([
+        'supplier_id' => $this->supplier->id,
+        'unit_price' => 14500,
+    ]);
+
+    $pivot = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->first();
+
+    expect($pivot)->not->toBeNull()
+        ->and((float) $pivot->supplier_price)->toBe(14500.0)
+        ->and(
+            DB::table('product_supplier')
+                ->where('product_id', $this->productA->id)
+                ->where('supplier_id', $this->supplier->id)
+                ->count()
+        )->toBe(1);
+});
+
+test('updating purchase order item price updates product_supplier price without duplicates', function () {
+    $this->itemA->update([
+        'supplier_id' => $this->supplier->id,
+        'unit_price' => 15000,
+    ]);
+
+    $this->orderRequest->update(['status' => 'approved']);
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(['orderRequestItem.product']), [
+        'po_number' => 'PO-SYNC-PO-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'quantity' => 5,
+                'unit_price' => 15000,
+                'include' => true,
+            ],
+        ],
+    ]);
+
+    $poItem = $po->purchaseOrderItem->firstWhere('product_id', $this->productA->id);
+    expect($poItem)->not->toBeNull();
+
+    $poItem->update(['unit_price' => 17800]);
+
+    $pivot = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->first();
+
+    expect($pivot)->not->toBeNull()
+        ->and((float) $pivot->supplier_price)->toBe(17800.0)
+        ->and(
+            DB::table('product_supplier')
+                ->where('product_id', $this->productA->id)
+                ->where('supplier_id', $this->supplier->id)
+                ->count()
+        )->toBe(1);
 });

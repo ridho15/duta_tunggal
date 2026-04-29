@@ -188,6 +188,102 @@ class PurchaseOrderResource extends Resource
         return count(static::getAvailableOrderRequestSupplierIds($orderRequest)) > 0;
     }
 
+    /**
+     * Build supplier_id => supplier_price map for the given product IDs.
+     * For multi-product context, the first encountered linked price is used.
+     *
+     * @param array<int, int|string|null> $productIds
+     * @return array<int, float>
+     */
+    public static function resolveLinkedSupplierPriceMap(array $productIds): array
+    {
+        $normalizedProductIds = collect($productIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($normalizedProductIds)) {
+            return [];
+        }
+
+        $rows = DB::table('product_supplier')
+            ->whereIn('product_id', $normalizedProductIds)
+            ->get(['supplier_id', 'supplier_price']);
+
+        $linkedPrices = [];
+        foreach ($rows as $row) {
+            if (! isset($linkedPrices[$row->supplier_id])) {
+                $linkedPrices[$row->supplier_id] = (float) $row->supplier_price;
+            }
+        }
+
+        return $linkedPrices;
+    }
+
+    /**
+     * Resolve searchable supplier options with linked suppliers ranked first.
+     * If exactly one product is in context, linked supplier prices are shown in labels.
+     *
+     * @param array<int, int|string|null> $productIds
+     * @param array<int, int>|null $allowedSupplierIds
+     * @return array<int, string>
+     */
+    public static function resolveSupplierSearchOptions(
+        array $productIds,
+        string $search = '',
+        ?array $allowedSupplierIds = null,
+        int $limit = 50
+    ): array {
+        $normalizedProductIds = collect($productIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $linkedPrices = self::resolveLinkedSupplierPriceMap($normalizedProductIds);
+
+        $query = Supplier::query();
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('perusahaan', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        if (is_array($allowedSupplierIds)) {
+            if (empty($allowedSupplierIds)) {
+                return [];
+            }
+            $query->whereIn('id', array_values(array_unique(array_map('intval', $allowedSupplierIds))));
+        }
+
+        if (! empty($linkedPrices)) {
+            $linkedIds = array_map('intval', array_keys($linkedPrices));
+            $placeholders = implode(',', array_fill(0, count($linkedIds), '?'));
+            $query->orderByRaw("CASE WHEN id IN ({$placeholders}) THEN 0 ELSE 1 END", $linkedIds);
+        }
+
+        $showPrice = count($normalizedProductIds) === 1;
+
+        return $query
+            ->orderBy('perusahaan')
+            ->limit($limit)
+            ->get()
+            ->mapWithKeys(function (Supplier $supplier) use ($linkedPrices, $showPrice) {
+                $label = "({$supplier->code}) {$supplier->perusahaan}";
+                if ($showPrice && isset($linkedPrices[$supplier->id]) && $linkedPrices[$supplier->id] > 0) {
+                    $label .= ' — Rp ' . number_format($linkedPrices[$supplier->id], 0, ',', '.');
+                }
+
+                return [$supplier->id => $label];
+            })
+            ->all();
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -329,6 +425,34 @@ class PurchaseOrderResource extends Resource
                                             }
                                         }
                                     }
+
+                                    // Rank suppliers linked to products in current cart first, then limit 50
+                                    $productIds = collect($get('purchaseOrderItem') ?? [])
+                                        ->pluck('product_id')
+                                        ->filter()
+                                        ->map(fn ($id) => (int) $id)
+                                        ->unique()
+                                        ->values()
+                                        ->all();
+
+                                    if (! empty($productIds)) {
+                                        $linkedSupplierIds = DB::table('product_supplier')
+                                            ->whereIn('product_id', $productIds)
+                                            ->pluck('supplier_id')
+                                            ->unique()
+                                            ->values()
+                                            ->all();
+
+                                        if (! empty($linkedSupplierIds)) {
+                                            $placeholders = implode(',', array_fill(0, count($linkedSupplierIds), '?'));
+                                            $query->orderByRaw(
+                                                "CASE WHEN id IN ({$placeholders}) THEN 0 ELSE 1 END",
+                                                $linkedSupplierIds
+                                            );
+                                        }
+                                    }
+
+                                    $query->orderBy('perusahaan')->limit(50);
                                 }
                             )
                             ->validationMessages([
@@ -358,7 +482,35 @@ class PurchaseOrderResource extends Resource
 
                                 return count($availableSupplierIds) === 0 && $currentSupplierId === 0;
                             })
-                            ->searchable(['code', 'perusahaan'])
+                            ->searchable()
+                            ->getSearchResultsUsing(function (string $search, Get $get) {
+                                $productIds = collect($get('purchaseOrderItem') ?? [])
+                                    ->pluck('product_id')
+                                    ->filter()
+                                    ->map(fn ($id) => (int) $id)
+                                    ->unique()
+                                    ->values()
+                                    ->all();
+
+                                $referType    = $get('refer_model_type');
+                                $referModelId = $get('refer_model_id');
+
+                                $allowedSupplierIds = null;
+
+                                if ($referType === 'App\\Models\\OrderRequest' && $referModelId) {
+                                    $or = OrderRequest::with('orderRequestItem')->find($referModelId);
+                                    if ($or && $or->orderRequestItem->isNotEmpty()) {
+                                        $allowedSupplierIds = self::getAvailableOrderRequestSupplierIds($or);
+                                        $currentSupplierId = (int) ($get('supplier_id') ?? 0);
+                                        if ($currentSupplierId > 0) {
+                                            $allowedSupplierIds[] = $currentSupplierId;
+                                            $allowedSupplierIds = array_values(array_unique(array_map('intval', $allowedSupplierIds)));
+                                        }
+                                    }
+                                }
+
+                                return self::resolveSupplierSearchOptions($productIds, $search, $allowedSupplierIds, 50);
+                            })
                             ->getOptionLabelFromRecordUsing(function (Supplier $supplier) {
                                 return "({$supplier->code}) {$supplier->perusahaan}";
                             })
@@ -641,39 +793,28 @@ class PurchaseOrderResource extends Resource
                                     ->dehydrated(true),
                                 Select::make('product_id')
                                     ->label('Product')
-                                    ->options(function (Get $get) {
-                                        $supplierId = $get('../../supplier_id');
-                                        $query = Product::orderBy('name');
-                                        if ($supplierId) {
-                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
-                                                $q->where('suppliers.id', $supplierId);
+                                     ->options(function (Get $get) {
+                                        return Product::orderBy('name')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(function ($product) {
+                                                return [$product->id => "({$product->sku}) {$product->name}"];
                                             });
-                                        }
-                                        return $query->get()->mapWithKeys(function ($product) {
-                                            return [$product->id => "({$product->sku}) {$product->name}"];
-                                        });
                                     })
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (string $search, Get $get) {
-                                        $supplierId = $get('../../supplier_id');
-                                        $query = Product::where(function ($q) use ($search) {
+                                    ->getSearchResultsUsing(function (string $search) {
+                                        return Product::where(function ($q) use ($search) {
                                             $q->where('name', 'like', "%{$search}%")
                                                 ->orWhere('sku', 'like', "%{$search}%");
-                                        })->orderBy('name')->limit(50);
-                                        if ($supplierId) {
-                                            $query->whereHas('suppliers', function ($q) use ($supplierId) {
-                                                $q->where('suppliers.id', $supplierId);
+                                        })
+                                            ->orderBy('name')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(function ($product) {
+                                                return [$product->id => "({$product->sku}) {$product->name}"];
                                             });
-                                        }
-                                        return $query->get()->mapWithKeys(function ($product) {
-                                            return [$product->id => "({$product->sku}) {$product->name}"];
-                                        });
                                     })
-                                    ->helperText(
-                                        fn(Get $get) => $get('../../supplier_id')
-                                            ? 'Menampilkan produk dari supplier yang dipilih'
-                                            : 'Pilih supplier untuk memfilter produk'
-                                    )
+                                    ->helperText('Menampilkan semua produk. Harga otomatis terisi dari harga supplier jika terhubung, atau Rp 0 jika tidak terhubung.')
                                     ->reactive()
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         $product = Product::find($state);
@@ -687,9 +828,9 @@ class PurchaseOrderResource extends Resource
                                                 default => 'Inklusif',
                                             };
                                             $newTax = $newTipePajak === 'Non Pajak' ? 0 : (float)($product->pajak ?? 0);
-                                            // Use supplier price from product_supplier pivot; fallback to cost_price
+                                            // Use supplier price from product_supplier pivot; Rp 0 if supplier not linked
                                             $supplierId = $get('../../supplier_id');
-                                            $newUnitPrice = (float) $product->cost_price;
+                                            $newUnitPrice = 0.0;
                                             if ($supplierId) {
                                                 $supplierProduct = $product->suppliers()->where('suppliers.id', $supplierId)->first();
                                                 if ($supplierProduct) {

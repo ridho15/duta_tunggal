@@ -142,7 +142,10 @@ test('buildOrderRequestItems skips items where remaining quantity is zero or neg
 });
 
 test('buildOrderRequestItems falls back to cost_price when unit_price is zero', function () {
-    $this->itemA->update(['unit_price' => 0]);
+    $this->itemA->update([
+        'supplier_id' => null,
+        'unit_price' => 0,
+    ]);
     $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
 
     $items = PurchaseOrderResource::buildOrderRequestItems(
