@@ -6,7 +6,6 @@ use App\Models\OrderRequest;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseOrder;
 use App\Models\OrderRequestItem;
-use App\Services\ProductSupplierSyncService;
 
 class PurchaseOrderItemObserver
 {
@@ -60,14 +59,6 @@ class PurchaseOrderItemObserver
     public function saved(PurchaseOrderItem $purchaseOrderItem): void
     {
         $purchaseOrder = $purchaseOrderItem->purchaseOrder;
-
-        if ($purchaseOrder && $purchaseOrderItem->product_id && $purchaseOrder->supplier_id) {
-            app(ProductSupplierSyncService::class)->syncSupplierProductPrice(
-                (int) $purchaseOrderItem->product_id,
-                (int) $purchaseOrder->supplier_id,
-                (float) ($purchaseOrderItem->unit_price ?? 0)
-            );
-        }
 
         // When a PO item is saved, sync the parent PO's journal entries
         if ($purchaseOrder) {

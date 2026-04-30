@@ -395,7 +395,202 @@ test('order request approve creates product_supplier for non-linked supplier wit
         )->toBe(1);
 });
 
-test('updating order request item price updates product_supplier price without duplicates', function () {
+// ─── DIAGNOSTIC TESTS FOR PIVOT SYNC ──────────────────────────────────────────
+
+test('DIAGNOSTIC: product_supplier NOT updated on item save (removed saved hook)', function () {
+    DB::table('product_supplier')->insert([
+        'product_id' => $this->productA->id,
+        'supplier_id' => $this->supplier->id,
+        'supplier_price' => 10000,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // This was the old behavior - pivot was synced on item save
+    // But we removed the saved hook, so it should NOT update pivot
+    $originalUpdatedAt = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->value('updated_at');
+
+    sleep(1);  // Wait a bit so updated_at would differ
+
+    $this->itemA->update([
+        'supplier_id' => $this->supplier->id,
+        'unit_price' => 25000,  // Different price
+    ]);
+
+    $newUpdatedAt = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->value('updated_at');
+
+    $pivot = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->first();
+
+    // Pivot should NOT be updated from item save (old saved hook removed)
+    // This test confirms the removed behavior
+    expect((float) $pivot->supplier_price)->toBe(10000.0)
+        ->and($originalUpdatedAt)->toBe($newUpdatedAt); // NOT updated (timestamps should be same)
+});
+
+test('DIAGNOSTIC: product_supplier created/updated ONLY at approve(), not at save()', function () {
+    // Setup: Product has NO pivot for this supplier initially
+    DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->delete();
+
+    // Create OR item WITHOUT supplier_id
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $this->orderRequest->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 2,
+        'unit_price' => 21500,
+        'original_price' => 21500,
+        'supplier_id' => null,  // ← KEY: no supplier set
+    ]);
+
+    // Save the item - should NOT create pivot (saved hook removed)
+    $item->save();
+
+    $pivotAfterSave = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->first();
+
+    expect($pivotAfterSave)->toBeNull();  // Pivot NOT created on save
+
+    // Now approve the OR with this supplier
+    $payload = [
+        'po_number' => 'PO-DIAGNOSTIC-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $item->id,
+                'quantity' => 2,
+                'unit_price' => 21500,
+                'include' => true,
+            ],
+        ],
+    ];
+
+    $this->service->approve($this->orderRequest->fresh(['orderRequestItem.product']), $payload);
+
+    // After approve, pivot SHOULD be created with the OR item's price
+    $pivotAfterApprove = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->first();
+
+    expect($pivotAfterApprove)->not->toBeNull()
+        ->and((float) $pivotAfterApprove->supplier_price)->toBe(21500.0);
+});
+
+test('DIAGNOSTIC: product_supplier with unlinked supplier (price=0) creates pivot at approve', function () {
+    // Setup: Create a second supplier not linked to productA
+    $unlinkedSupplier = Supplier::factory()->create(['tempo_hutang' => 30]);
+
+    DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $unlinkedSupplier->id)
+        ->delete();
+
+    // Create OR item with unlinked supplier
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $this->orderRequest->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 1,
+        'unit_price' => 0,  // Price is 0 because supplier not linked
+        'original_price' => 0,
+        'supplier_id' => $unlinkedSupplier->id,
+    ]);
+
+    // Approve with that unlinked supplier
+    $payload = [
+        'po_number' => 'PO-UNLINKED-001',
+        'supplier_id' => $unlinkedSupplier->id,
+        'order_date' => now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $item->id,
+                'quantity' => 1,
+                'unit_price' => 0,
+                'include' => true,
+            ],
+        ],
+    ];
+
+    $this->service->approve($this->orderRequest->fresh(['orderRequestItem.product']), $payload);
+
+    // Pivot should be created with price = 0
+    $pivot = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $unlinkedSupplier->id)
+        ->first();
+
+    expect($pivot)->not->toBeNull()
+        ->and((float) $pivot->supplier_price)->toBe(0.0);
+});
+
+test('DIAGNOSTIC: OR item supplier_id is used if set, else fallback to payload supplier_id', function () {
+    // Setup: Two suppliers
+    $supplier2 = Supplier::factory()->create(['tempo_hutang' => 15]);
+
+    DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->whereIn('supplier_id', [$this->supplier->id, $supplier2->id])
+        ->delete();
+
+    // Create a NEW order request to avoid existing itemA and itemB interference
+    $newOr = OrderRequest::factory()->create([
+        'warehouse_id' => $this->warehouse->id,
+        'created_by' => $this->user->id,
+        'status' => 'draft',
+        'request_date' => now()->toDateString(),
+    ]);
+
+    // Create ONE item with supplier2
+    $itemWithSupplier = OrderRequestItem::factory()->create([
+        'order_request_id' => $newOr->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 3,
+        'unit_price' => 18800,
+        'original_price' => 18800,
+        'supplier_id' => $supplier2->id,  // ← Explicit supplier on item
+    ]);
+
+    // Approve with DIFFERENT supplier ($this->supplier in payload)
+    $payload = [
+        'po_number' => 'PO-PRIORITY-001',
+        'supplier_id' => $this->supplier->id,  // Different from item
+        'order_date' => now()->toDateTimeString(),
+    ];
+
+    $this->service->approve($newOr->fresh(['orderRequestItem.product']), $payload);
+
+    // When item HAS supplier_id, that supplier should be used for pivot
+    $pivotForItemSupplier = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $supplier2->id)
+        ->first();
+
+    expect($pivotForItemSupplier)->not->toBeNull()
+        ->and((float) $pivotForItemSupplier->supplier_price)->toBe(18800.0);
+
+    // Payload supplier should NOT get a pivot for this item (item has explicit supplier)
+    $pivotForPayloadSupplier = DB::table('product_supplier')
+        ->where('product_id', $this->productA->id)
+        ->where('supplier_id', $this->supplier->id)
+        ->first();
+
+    expect($pivotForPayloadSupplier)->toBeNull();  // ← Item's supplier takes precedence
+});
+
+test('DIAGNOSTIC: creating purchase order does not update product_supplier pivot', function () {
     DB::table('product_supplier')->insert([
         'product_id' => $this->productA->id,
         'supplier_id' => $this->supplier->id,
@@ -406,7 +601,21 @@ test('updating order request item price updates product_supplier price without d
 
     $this->itemA->update([
         'supplier_id' => $this->supplier->id,
-        'unit_price' => 14500,
+        'unit_price' => 16500,
+    ]);
+
+    $this->service->createPurchaseOrder($this->orderRequest->fresh(['orderRequestItem.product']), [
+        'po_number' => 'PO-NO-PIVOT-SYNC-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'quantity' => 5,
+                'unit_price' => 16500,
+                'include' => true,
+            ],
+        ],
     ]);
 
     $pivot = DB::table('product_supplier')
@@ -415,7 +624,7 @@ test('updating order request item price updates product_supplier price without d
         ->first();
 
     expect($pivot)->not->toBeNull()
-        ->and((float) $pivot->supplier_price)->toBe(14500.0)
+        ->and((float) $pivot->supplier_price)->toBe(12000.0)
         ->and(
             DB::table('product_supplier')
                 ->where('product_id', $this->productA->id)
@@ -424,16 +633,17 @@ test('updating order request item price updates product_supplier price without d
         )->toBe(1);
 });
 
-test('updating purchase order item price updates product_supplier price without duplicates', function () {
-    $this->itemA->update([
+test('DIAGNOSTIC: updating purchase order item does not update product_supplier pivot', function () {
+    DB::table('product_supplier')->insert([
+        'product_id' => $this->productA->id,
         'supplier_id' => $this->supplier->id,
-        'unit_price' => 15000,
+        'supplier_price' => 12000,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
-    $this->orderRequest->update(['status' => 'approved']);
-
     $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(['orderRequestItem.product']), [
-        'po_number' => 'PO-SYNC-PO-001',
+        'po_number' => 'PO-NO-PIVOT-SYNC-002',
         'supplier_id' => $this->supplier->id,
         'order_date' => now()->toDateTimeString(),
         'selected_items' => [
@@ -457,7 +667,7 @@ test('updating purchase order item price updates product_supplier price without 
         ->first();
 
     expect($pivot)->not->toBeNull()
-        ->and((float) $pivot->supplier_price)->toBe(17800.0)
+        ->and((float) $pivot->supplier_price)->toBe(12000.0)
         ->and(
             DB::table('product_supplier')
                 ->where('product_id', $this->productA->id)

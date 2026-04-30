@@ -133,6 +133,8 @@ class OrderRequestService
 
             $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
 
+            $itemsForPivotSync = [];
+
             foreach ($resolvedItems as $row) {
                 /** @var OrderRequestItem $orderRequestItem */
                 $orderRequestItem = $row['order_request_item'];
@@ -148,20 +150,41 @@ class OrderRequestService
                     'currency_id'       => $currency->id,
                 ]);
 
-                $itemSupplierId = (int) ($orderRequestItem->supplier_id ?: $supplier->id);
-                $this->productSupplierSyncService->syncSupplierProductPrice(
-                    (int) $orderRequestItem->product_id,
-                    $itemSupplierId,
-                    $row['unit_price']
-                );
+                $itemsForPivotSync[] = [
+                    'product_id' => (int) $orderRequestItem->product_id,
+                    'supplier_id' => (int) ($orderRequestItem->supplier_id ?: $supplier->id),
+                    'unit_price' => $row['unit_price'],
+                ];
                 // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
+            }
+
+            // Ensure OR is approved first, then sync supplier-product pivot.
+            $orderRequest->update(['status' => 'approved']);
+            foreach ($itemsForPivotSync as $syncRow) {
+                $this->productSupplierSyncService->syncSupplierProductPrice(
+                    $syncRow['product_id'],
+                    $syncRow['supplier_id'],
+                    $syncRow['unit_price']
+                );
             }
 
             // Auto-approve PO when created from Order Request approval flow.
             app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
-        }
+        } else {
+            foreach($orderRequest->orderRequestItem as $item) {
+                $productId = $item->product_id;
+                $supplierId = $item->supplier_id;
 
-        $orderRequest->update(['status' => 'approved']);
+                if ($productId && $supplierId) {
+                    $this->productSupplierSyncService->syncSupplierProductPrice(
+                        $productId,
+                        $supplierId,
+                        $item->unit_price
+                    );
+                }
+            }
+            $orderRequest->update(['status' => 'approved']);
+        }
 
         return $orderRequest->fresh(['purchaseOrder.purchaseOrderItem']);
     }
@@ -204,13 +227,6 @@ class OrderRequestService
                 'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
                 'currency_id'       => $currency->id,
             ]);
-
-            $itemSupplierId = (int) ($orderRequestItem->supplier_id ?: $supplier->id);
-            $this->productSupplierSyncService->syncSupplierProductPrice(
-                (int) $orderRequestItem->product_id,
-                $itemSupplierId,
-                $row['unit_price']
-            );
             // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
         }
 

@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Helpers\MoneyHelper;
-use App\Services\ProductSupplierSyncService;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -74,18 +73,8 @@ class OrderRequestItem extends Model
             }
         });
 
-        static::saved(function (OrderRequestItem $item) {
-            if (! $item->product_id || ! $item->supplier_id) {
-                return;
-            }
-
-            $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
-            app(ProductSupplierSyncService::class)->syncSupplierProductPrice(
-                (int) $item->product_id,
-                (int) $item->supplier_id,
-                $unitPrice
-            );
-        });
+        // Do not sync product_supplier on OR item save.
+        // Pivot synchronization is intentionally handled during OR approval / PO creation flow.
     }
 
     /**
