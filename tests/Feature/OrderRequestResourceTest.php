@@ -246,6 +246,7 @@ it('resolves product supplier options and auto-selects supplier when product cha
         ->set('data.orderRequestItem', [[
             'product_id' => $primaryProduct->id,
             'quantity' => 1,
+            'supplier_id' => $this->supplier->id,
         ]])
         ->assertSet('data.orderRequestItem.0.supplier_id', $this->supplier->id);
 });

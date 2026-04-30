@@ -499,13 +499,16 @@ class OrderRequestResource extends Resource
                                                 $product = Product::find($productId);
                                                 if ($product) {
                                                     $supplierProduct = $product->suppliers()->where('suppliers.id', $state)->first();
-                                                    $unitPrice = \App\Helpers\MoneyHelper::parse($get('unit_price') ?? $product->cost_price);
+                                                    // If supplier is linked and has a supplier_price, use it.
+                                                    // Otherwise, set price to 0.0 to reflect "unlinked supplier" behaviour.
                                                     if ($supplierProduct && $supplierProduct->pivot->supplier_price !== null) {
                                                         $unitPrice = (float) $supplierProduct->pivot->supplier_price;
+                                                    } else {
+                                                        $unitPrice = 0.0;
                                                     }
 
-                                                    $set('original_price', number_format($unitPrice, 0, ',', '.'));
-                                                    $set('unit_price', number_format($unitPrice, 0, ',', '.'));
+                                                    $set('original_price', number_format((float)$unitPrice, 0, ',', '.'));
+                                                    $set('unit_price', number_format((float)$unitPrice, 0, ',', '.'));
                                                     // Recalculate subtotal
                                                     $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
                                                     $quantity = (float) ($get('quantity') ?? 0);
