@@ -25,6 +25,8 @@ class OrderRequestItemFactory extends Factory
             'quantity' => random_int(1, 20),
             'unit_price' => $unitPrice,
             'original_price' => $unitPrice,
+            'tax' => 0,
+            'tipe_pajak' => 'Eklusif',
             'note' => $this->faker->sentence()
         ];
     }

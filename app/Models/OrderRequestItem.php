@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Helpers\MoneyHelper;
+use App\Support\TaxDefaultResolver;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class OrderRequestItem extends Model
         'original_price',
         'discount',
         'tax',
+        'tipe_pajak',
         'subtotal',
         'note'
     ];
@@ -54,13 +56,13 @@ class OrderRequestItem extends Model
             $quantity = (float) ($item->quantity ?? 0);
             $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
             $discount = (float) ($item->discount ?? 0);
-            $tax = (float) ($item->tax ?? 0);
-            $taxType = $item->orderRequest?->tax_type ?? 'PPN Excluded';
-
-            if ($taxType === 'None') {
-                $tax = 0;
-                $item->tax = 0;
-            }
+            $itemTaxType = static::normalizeItemTaxType($item->tipe_pajak ?? null);
+            $taxType = static::taxServiceTypeFromItemTaxType($itemTaxType);
+            $item->tipe_pajak = $itemTaxType;
+            $tax = $taxType === 'None'
+                ? 0.0
+                : TaxDefaultResolver::resolveForProductId((int) ($item->product_id ?? 0), $taxType);
+            $item->tax = $tax;
 
             $base = $quantity * $unitPrice;
             $afterDisc = $base - ($base * ($discount / 100));
@@ -75,6 +77,26 @@ class OrderRequestItem extends Model
 
         // Do not sync product_supplier on OR item save.
         // Pivot synchronization is intentionally handled during OR approval / PO creation flow.
+    }
+
+    public static function normalizeItemTaxType(?string $value): string
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        return match ($normalized) {
+            'non pajak', 'none', 'non-pajak', 'nonpajak' => 'Non Pajak',
+            'inklusif', 'included', 'ppn included' => 'Inklusif',
+            default => 'Eklusif',
+        };
+    }
+
+    public static function taxServiceTypeFromItemTaxType(?string $itemTaxType): string
+    {
+        return match (static::normalizeItemTaxType($itemTaxType)) {
+            'Non Pajak' => 'None',
+            'Inklusif' => 'PPN Included',
+            default => 'PPN Excluded',
+        };
     }
 
     /**

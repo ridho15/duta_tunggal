@@ -65,6 +65,7 @@ beforeEach(function () {
         'original_price'   => (float) $this->productA->cost_price,
         'discount'         => 10, // percent
         'tax'              => 5,  // percent
+        'tipe_pajak'       => 'Eklusif',
         'note'             => 'Untuk batch produksi 01',
     ]);
 
@@ -74,6 +75,8 @@ beforeEach(function () {
         'quantity'         => 3,
         'unit_price'       => (float) $this->productB->cost_price,
         'original_price'   => (float) $this->productB->cost_price,
+        'tax'              => 0,
+        'tipe_pajak'       => 'Non Pajak',
         'note'             => 'Safety stock',
     ]);
 });
@@ -118,12 +121,14 @@ test('order request approval generates purchase order and items', function () {
 
     $poItemA = $purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productA->id);
     $poItemB = $purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productB->id);
+    $itemA = $this->itemA->fresh();
+    $itemB = $this->itemB->fresh();
 
     expect($poItemA)->not->toBeNull()
         ->and((float) $poItemA->quantity)->toBe(5.0)
         ->and((float) $poItemA->unit_price)->toBe((float) $this->productA->cost_price)
         ->and((float) $poItemA->discount)->toBe(10.0)
-        ->and((float) $poItemA->tax)->toBe(5.0)
+        ->and((float) $poItemA->tax)->toBe((float) ($itemA->tax ?? 0))
         ->and($poItemA->tipe_pajak)->toBe('Eklusif') // tax_type defaults to 'PPN Excluded' → Eklusif
         ->and($poItemA->currency_id)->toBe($this->currency->id)
         ->and($poItemA->refer_item_model_type)->toBe(OrderRequestItem::class)
@@ -133,7 +138,7 @@ test('order request approval generates purchase order and items', function () {
         ->and((float) $poItemB->quantity)->toBe(3.0)
         ->and((float) $poItemB->unit_price)->toBe((float) $this->productB->cost_price)
         ->and((float) $poItemB->discount)->toBe(0.0)
-        ->and((float) $poItemB->tax)->toBe(0.0)
+        ->and((float) $poItemB->tax)->toBe((float) ($itemB->tax ?? 0))
         ->and($poItemB->tipe_pajak)->toBe('Non Pajak') // tax = 0 → Non Pajak
         ->and($poItemB->currency_id)->toBe($this->currency->id)
         ->and($poItemB->refer_item_model_type)->toBe(OrderRequestItem::class)
@@ -200,9 +205,9 @@ test('createPurchaseOrder uses unit_price override not original_price', function
 
 // ─── Feature 2: tax_type → tipe_pajak mapping ────────────────────────────────
 
-test('PPN Included tax_type maps to Inklusif on purchase order item', function () {
-    $this->orderRequest->update(['tax_type' => 'PPN Included', 'status' => 'approved']);
-    $this->itemA->update(['tax' => 11, 'unit_price' => 10000]);
+test('item tax type Inklusif maps to Inklusif on purchase order item', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+    $this->itemA->update(['tipe_pajak' => 'Inklusif', 'tax' => 11, 'unit_price' => 10000]);
 
     $payload = [
         'po_number'   => 'PO-INKLUSIF-001',
@@ -220,9 +225,9 @@ test('PPN Included tax_type maps to Inklusif on purchase order item', function (
     expect($poItem->tipe_pajak)->toBe('Inklusif');
 });
 
-test('PPN Excluded tax_type maps to Eksklusif on purchase order item', function () {
-    $this->orderRequest->update(['tax_type' => 'PPN Excluded', 'status' => 'approved']);
-    $this->itemA->update(['tax' => 11, 'unit_price' => 10000]);
+test('item tax type Eklusif maps to Eklusif on purchase order item', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+    $this->itemA->update(['tipe_pajak' => 'Eklusif', 'tax' => 11, 'unit_price' => 10000]);
 
     $payload = [
         'po_number'   => 'PO-EKSKLUSIF-001',
@@ -240,9 +245,9 @@ test('PPN Excluded tax_type maps to Eksklusif on purchase order item', function 
     expect($poItem->tipe_pajak)->toBe('Eklusif');
 });
 
-test('item with zero tax always gets Non Pajak regardless of tax_type', function () {
-    $this->orderRequest->update(['tax_type' => 'PPN Included', 'status' => 'approved']);
-    $this->itemB->update(['tax' => 0, 'unit_price' => 5000]);
+test('item tax type Non Pajak always maps to Non Pajak', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+    $this->itemB->update(['tipe_pajak' => 'Non Pajak', 'tax' => 0, 'unit_price' => 5000]);
 
     $payload = [
         'po_number'   => 'PO-NONPAJAK-001',

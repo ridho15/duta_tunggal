@@ -79,12 +79,24 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 $set('refer_item_model_type', $referItem ? \App\Models\OrderRequestItem::class : null);
                                 $set('refer_item_model_id', $referItem?->id);
 
+                                $tipePajak = $get('tipe_pajak') ?? 'Inklusif';
+                                $taxType = match ($tipePajak) {
+                                    'Non Pajak' => 'None',
+                                    'Inklusif' => 'PPN Included',
+                                    default => 'PPN Excluded',
+                                };
+                                $resolvedTax = \App\Support\TaxDefaultResolver::resolveForProductId(
+                                    $state ? (int) $state : null,
+                                    $taxType
+                                );
+                                $set('tax', $resolvedTax);
+
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
                                     'unit_price' => $get('unit_price'),
-                                    'tax' => $get('tax'),
+                                    'tax' => $resolvedTax,
                                     'discount' => $get('discount'),
-                                    'tipe_pajak' => $get('tipe_pajak') ?? null,
+                                    'tipe_pajak' => $tipePajak,
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
@@ -146,6 +158,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                         TextInput::make('tax')
                             ->label('Tax')
                             ->reactive()
+                            ->disabled()
+                            ->dehydrated(true)
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -156,7 +170,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 $set('subtotal', $subtotal);
                             })
                             ->indonesianMoney()
-                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN')),
+                            ->default(fn () => \App\Support\TaxDefaultResolver::resolveFallbackRate()),
                         TextInput::make('subtotal')
                             ->label('Sub Total')
                             ->reactive()
@@ -174,18 +188,21 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ])
                             ->default('Inklusif')
                             ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
-
-                                if ($state === 'Non Pajak') {
-                                    $set('tax', 0);
-                                } else {
-                                    $set('tax', $defaultTax);
-                                }
+                                $taxType = match ($state) {
+                                    'Non Pajak' => 'None',
+                                    'Inklusif' => 'PPN Included',
+                                    default => 'PPN Excluded',
+                                };
+                                $resolvedTax = \App\Support\TaxDefaultResolver::resolveForProductId(
+                                    $get('product_id') ? (int) $get('product_id') : null,
+                                    $taxType
+                                );
+                                $set('tax', $resolvedTax);
 
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
                                     'unit_price' => $get('unit_price'),
-                                    'tax' => $state === 'Non Pajak' ? 0 : $defaultTax,
+                                    'tax' => $resolvedTax,
                                     'discount' => $get('discount'),
                                     'tipe_pajak' => $state,
                                 ]);

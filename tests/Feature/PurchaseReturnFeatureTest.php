@@ -89,7 +89,7 @@ if (! function_exists('createPurchaseReturnRecordForNotificationTest')) {
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
         ]);
 
         $purchaseReceipt = PurchaseReceipt::create([
@@ -170,7 +170,7 @@ test('can create purchase return with auto generated number', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -237,7 +237,7 @@ test('can submit purchase return for approval', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -322,7 +322,7 @@ test('cannot submit non-draft purchase return', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -387,7 +387,7 @@ test('can approve pending purchase return', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -456,7 +456,7 @@ test('can reject pending purchase return', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -524,7 +524,7 @@ test('stock adjustment on approval', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -591,7 +591,7 @@ test('journal entry creation on approval', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt

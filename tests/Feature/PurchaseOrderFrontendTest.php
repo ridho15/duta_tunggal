@@ -194,8 +194,8 @@ test('purchase order with non_ppn option disables tax fields', function () {
     $response = $this->get(PurchaseOrderResource::getUrl('create'));
 
     $response->assertOk();
-    // The form should render with ppn_option field
-    $response->assertSee('Opsi PPN');
+    // The form should render with ppn_option field (now labeled Tipe Pajak)
+    $response->assertSee('Tipe Pajak (Global)');
 });
 
 test('purchase order status presentation handles paid state', function () {

@@ -493,7 +493,7 @@ class PaymentLedgerPostingTest extends TestCase
         $purchaseOrder = \App\Models\PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
             'is_import' => true,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
             'status' => 'approved',
         ]);
 
@@ -551,7 +551,7 @@ class PaymentLedgerPostingTest extends TestCase
         $purchaseOrder = \App\Models\PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
             'is_import' => true,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
             'status' => 'approved',
         ]);
 

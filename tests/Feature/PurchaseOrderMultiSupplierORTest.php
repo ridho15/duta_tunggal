@@ -176,8 +176,9 @@ test('buildOrderRequestItems sets correct refer_item_model_type and refer_item_m
     );
 });
 
-test('buildOrderRequestItems maps tax_type PPN Included to Inklusif', function () {
-    $this->orderRequest->update(['tax_type' => 'PPN Included']);
+test('buildOrderRequestItems maps item tipe_pajak Inklusif correctly', function () {
+    $this->itemA->update(['tipe_pajak' => 'Inklusif', 'tax' => 11]);
+    $this->itemB->update(['tipe_pajak' => 'Inklusif', 'tax' => 11]);
     $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
 
     $items = PurchaseOrderResource::buildOrderRequestItems(
@@ -191,8 +192,9 @@ test('buildOrderRequestItems maps tax_type PPN Included to Inklusif', function (
     }
 });
 
-test('buildOrderRequestItems maps tax_type None to Non Pajak', function () {
-    $this->orderRequest->update(['tax_type' => 'None']);
+test('buildOrderRequestItems maps item tipe_pajak Non Pajak correctly', function () {
+    $this->itemA->update(['tipe_pajak' => 'Non Pajak', 'tax' => 0]);
+    $this->itemB->update(['tipe_pajak' => 'Non Pajak', 'tax' => 0]);
     $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
 
     $items = PurchaseOrderResource::buildOrderRequestItems(

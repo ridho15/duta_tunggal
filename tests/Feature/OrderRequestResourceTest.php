@@ -71,6 +71,7 @@ it('creates an order request through the Filament create page', function () {
         'quantity' => 2,
         'original_price' => $this->product->cost_price,
         'unit_price' => $this->product->cost_price,
+        'tipe_pajak' => 'Eklusif',
         // supply nonzero percentages to ensure calculation logic is exercised
         'discount' => 10, // 10%
         'tax' => 5,       // 5%
@@ -138,6 +139,7 @@ it('stores formatted unit_price as numeric value in database', function () {
             'quantity' => 1,
             'original_price' => '1.250.000',
             'unit_price' => '1.250.000',
+            'tipe_pajak' => 'Eklusif',
             'discount' => 0,
             'tax' => 0,
             'subtotal' => '1.250.000',
@@ -154,7 +156,7 @@ it('stores formatted unit_price as numeric value in database', function () {
     expect((float) $item->original_price)->toBe(1250000.0);
 });
 
-it('forces item tax to zero when order request tax type is non tax', function () {
+it('forces item tax to zero when item tax type is non tax', function () {
     $component = Livewire::actingAs($this->user)
         ->test(CreateOrderRequest::class)
         ->fillForm([
@@ -162,7 +164,6 @@ it('forces item tax to zero when order request tax type is non tax', function ()
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
             'request_date' => now()->format('Y-m-d'),
-            'tax_type' => 'None',
             'note' => 'Order request non pajak test',
         ])
         ->set('data.orderRequestItem', [[
@@ -170,6 +171,7 @@ it('forces item tax to zero when order request tax type is non tax', function ()
             'quantity' => 1,
             'original_price' => '1.000.000',
             'unit_price' => '1.000.000',
+            'tipe_pajak' => 'Non Pajak',
             'discount' => 0,
             'tax' => 11,
             'subtotal' => '1.000.000',
@@ -181,7 +183,8 @@ it('forces item tax to zero when order request tax type is non tax', function ()
     $or = OrderRequest::latest('id')->first();
     $item = $or->orderRequestItem()->latest('id')->first();
 
-    expect($or->tax_type)->toBe('None')
+    expect($or->tax_type)->toBe('PPN Excluded')
+        ->and($item->tipe_pajak)->toBe('Non Pajak')
         ->and((float) $item->tax)->toBe(0.0);
 });
 
@@ -203,11 +206,11 @@ it('limits product options to fifty entries', function () {
     expect($options)->toHaveCount(50);
 });
 
-it('preloads the static tax type select', function () {
+it('uses header tax type select and item-level tax type radio', function () {
     $file = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource.php'));
 
     expect($file)->toContain("Select::make('tax_type')")
-        ->and($file)->toContain("->preload()");
+        ->and($file)->toContain("Radio::make('tipe_pajak')");
 });
 
 it('resolves product supplier options and auto-selects supplier when product changes', function () {
@@ -298,8 +301,16 @@ it('views order request details on the Filament view page', function () {
         'unit_price' => 100000,
         'discount' => 0,
         'tax' => 11,
+        'tipe_pajak' => 'Eklusif',
         'subtotal' => 333000,
     ]);
+
+    $item = $or->orderRequestItem()->latest('id')->first();
+    $base = (float) $item->quantity * (float) $item->unit_price;
+    $taxRes = \App\Services\TaxService::compute($base, (float) $item->tax, OrderRequestResource::taxServiceTypeFromItemTaxType($item->tipe_pajak));
+    $expectedRate = number_format((float) $item->tax, 0, ',', '.') . '%';
+    $expectedTax = 'Rp ' . number_format((float) ($taxRes['ppn'] ?? 0), 0, ',', '.');
+    $expectedSubtotal = 'Rp ' . number_format((float) ($taxRes['total'] ?? 0), 0, ',', '.');
 
     Livewire::actingAs($this->user)
         ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
@@ -307,10 +318,10 @@ it('views order request details on the Filament view page', function () {
         ->assertSee($or->request_number)
         ->assertSee($this->warehouse->name)
         ->assertSee('PPN Excluded')
-        ->assertSee('11%')
+        ->assertSee($expectedRate)
         ->assertSee('Rp 300.000')
-        ->assertSee('Rp 33.000')
-        ->assertSee('Rp 333.000')
+        ->assertSee($expectedTax)
+        ->assertSee($expectedSubtotal)
         ->assertSee('Qty Diterima (Penerimaan Barang)')
         ->assertSee('Sisa Qty Belum Diterima');
 });
@@ -328,6 +339,7 @@ it('edits an order request through the Filament edit page', function () {
                 'product_id' => $this->product->id,
                 'quantity' => 1,
                 'unit_price' => 1000,
+                'tipe_pajak' => 'Eklusif',
                 'discount' => 15, // percent
                 'tax' => 2,       // percent
                 'subtotal' => round(((1 * 1000) * (1 - 0.15)) * (1 + 0.02), 2),

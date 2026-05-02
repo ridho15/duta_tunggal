@@ -360,7 +360,11 @@ class PurchaseOrderResource extends Resource
                                             if ($orderRequest) {
                                                 $set('warehouse_id', $orderRequest->warehouse_id);
                                                 $set('cabang_id', $orderRequest->cabang_id ?? null);
-                                                $ppnOption = ($orderRequest->tax_type === 'None') ? 'non_ppn' : 'standard';
+                                                $ppnOption = match ($orderRequest->tax_type ?? 'PPN Excluded') {
+                                                    'None'         => 'non_ppn',
+                                                    'PPN Included' => 'inklusif',
+                                                    default        => 'eklusif',
+                                                };
                                                 $set('ppn_option', $ppnOption);
 
                                                 $availableSupplierIds = self::getAvailableOrderRequestSupplierIds($orderRequest);
@@ -685,69 +689,52 @@ class PurchaseOrderResource extends Resource
                             ->helperText('Aktifkan untuk menandai pembelian impor sehingga pajak impor dicatat saat pembayaran')
                             ->reactive(),
                         Radio::make('ppn_option')
-                            ->label('Opsi PPN')
+                            ->label('Tipe Pajak (Global)')
                             ->inline()
                             ->reactive()
-                            ->default('standard')
+                            ->default('eklusif')
                             ->options([
-                                'standard' => 'Pakai PPN (Default)',
-                                'non_ppn' => 'Non PPN',
+                                'non_ppn'  => 'Non Pajak',
+                                'inklusif' => 'Inklusif (PPN sudah termasuk harga)',
+                                'eklusif'  => 'Eklusif (PPN di luar harga)',
                             ])
+                            ->helperText('Pilihan ini akan otomatis set tipe pajak ke semua item. Per-item masih bisa diubah manual.')
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                if (! in_array($state, ['standard', 'non_ppn'])) {
+                                if (! in_array($state, ['non_ppn', 'inklusif', 'eklusif'])) {
                                     return;
                                 }
 
-                                if ($state === 'non_ppn') {
-                                    $items = collect($get('purchaseOrderItem') ?? [])->map(function ($item) {
-                                        $item['tax'] = 0;
-                                        $item['tipe_pajak'] = 'Non Pajak';
-                                        $item['subtotal'] = self::formatMoneyState(HelperController::hitungSubtotal(
-                                            (float) ($item['quantity'] ?? 0),
-                                            \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                            (float) ($item['discount'] ?? 0),
-                                            0,
-                                            'Non Pajak'
-                                        ));
-                                        return $item;
-                                    })->all();
+                                $tipePajak = match ($state) {
+                                    'non_ppn'  => 'Non Pajak',
+                                    'inklusif' => 'Inklusif',
+                                    default    => 'Eklusif',
+                                };
+                                $taxServiceType = match ($state) {
+                                    'non_ppn'  => 'None',
+                                    'inklusif' => 'PPN Included',
+                                    default    => 'PPN Excluded',
+                                };
 
-                                    $set('purchaseOrderItem', $items);
-                                }
+                                $items = collect($get('purchaseOrderItem') ?? [])->map(function ($item) use ($tipePajak, $taxServiceType) {
+                                    $tax = 0;
+                                    if ($taxServiceType !== 'None') {
+                                        $productId = ! empty($item['product_id']) ? (int) $item['product_id'] : null;
+                                        $tax = \App\Support\TaxDefaultResolver::resolveForProductId($productId, $taxServiceType);
+                                    }
+                                    $item['tipe_pajak'] = $tipePajak;
+                                    $item['tax'] = $tax;
+                                    $item['subtotal'] = self::formatMoneyState(HelperController::hitungSubtotal(
+                                        (float) ($item['quantity'] ?? 0),
+                                        \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                        (float) ($item['discount'] ?? 0),
+                                        $tax,
+                                        $tipePajak
+                                    ));
+                                    return $item;
+                                })->all();
 
-                                if ($state === 'standard') {
-                                    $items = collect($get('purchaseOrderItem') ?? [])->map(function ($item) {
-                                        $tipePajak = 'Inklusif';
-                                        $tax = 0;
-
-                                        if (! empty($item['product_id'])) {
-                                            $product = \App\Models\Product::find($item['product_id']);
-                                            if ($product) {
-                                                $raw = strtolower(trim((string) ($product->tipe_pajak ?? 'inklusif')));
-                                                $tipePajak = match ($raw) {
-                                                    'eklusif', 'eksklusif', 'exclusive', 'ppn excluded' => 'Eklusif',
-                                                    'non pajak', 'non-pajak', 'nonpajak', 'none' => 'Non Pajak',
-                                                    default => 'Inklusif',
-                                                };
-                                                $tax = $tipePajak === 'Non Pajak' ? 0 : (float) ($product->pajak ?? 0);
-                                            }
-                                        }
-
-                                        $item['tipe_pajak'] = $tipePajak;
-                                        $item['tax'] = $tax;
-                                        $item['subtotal'] = self::formatMoneyState(HelperController::hitungSubtotal(
-                                            (float) ($item['quantity'] ?? 0),
-                                            \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                            (float) ($item['discount'] ?? 0),
-                                            $tax,
-                                            $tipePajak
-                                        ));
-                                        return $item;
-                                    })->all();
-                                    $set('purchaseOrderItem', $items);
-                                }
-                            })
-                            ->helperText('Pilih Non PPN bila pemasok tidak mengenakan PPN untuk pesanan ini'),
+                                $set('purchaseOrderItem', $items);
+                            }),
                         TextInput::make('tempo_hutang')
                             ->label('Tempo Hutang (Hari)')
                             ->numeric()
@@ -827,7 +814,12 @@ class PurchaseOrderResource extends Resource
                                                 'non pajak', 'non-pajak', 'nonpajak' => 'Non Pajak',
                                                 default => 'Inklusif',
                                             };
-                                            $newTax = $newTipePajak === 'Non Pajak' ? 0 : (float)($product->pajak ?? 0);
+                                            $taxType = match ($newTipePajak) {
+                                                'Non Pajak' => 'None',
+                                                'Inklusif' => 'PPN Included',
+                                                default => 'PPN Excluded',
+                                            };
+                                            $newTax = \App\Support\TaxDefaultResolver::resolveForProductId((int) $product->id, $taxType);
                                             // Use supplier price from product_supplier pivot; Rp 0 if supplier not linked
                                             $supplierId = $get('../../supplier_id');
                                             $newUnitPrice = 0.0;
@@ -1013,10 +1005,7 @@ class PurchaseOrderResource extends Resource
                                     ->numeric()
                                     ->maxValue(100)
                                     ->required()
-                                    ->disabled(
-                                        fn(Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn'
-                                            || $get('tipe_pajak') === 'Non Pajak'
-                                    )
+                                    ->disabled()
                                     ->helperText(fn(Get $get) => match ($get('tipe_pajak')) {
                                         'Inklusif'  => 'Pajak sudah termasuk dalam harga satuan',
                                         'Eklusif' => 'Pajak akan ditambahkan ke harga satuan',
@@ -1578,12 +1567,21 @@ class PurchaseOrderResource extends Resource
                     ->boolean()
                     ->tooltip(fn($state) => $state ? 'Pembelian import (pajak dicatat saat pembayaran)' : 'Pembelian lokal'),
                 TextColumn::make('ppn_option')
-                    ->label('Opsi PPN')
+                    ->label('Tipe Pajak')
                     ->formatStateUsing(function ($state) {
-                        return $state === 'non_ppn' ? 'Non PPN' : 'PPN';
+                        return match ($state) {
+                            'non_ppn'  => 'Non Pajak',
+                            'inklusif' => 'Inklusif',
+                            'eklusif'  => 'Eklusif',
+                            default    => 'PPN',
+                        };
                     })
                     ->badge()
-                    ->color(fn($state) => $state === 'non_ppn' ? 'warning' : 'success')
+                    ->color(fn($state) => match($state) {
+                        'non_ppn'  => 'warning',
+                        'inklusif' => 'info',
+                        default    => 'success',
+                    })
                     ->toggleable(),
                 TextColumn::make('warehouse')
                     ->label('Gudang')
@@ -1796,12 +1794,13 @@ class PurchaseOrderResource extends Resource
                     ])
                     ->placeholder('Semua PO'),
                 SelectFilter::make('ppn_option')
-                    ->label('Opsi PPN')
+                    ->label('Tipe Pajak')
                     ->options([
-                        'standard' => 'PPN',
-                        'non_ppn' => 'Non PPN',
+                        'non_ppn'  => 'Non Pajak',
+                        'inklusif' => 'Inklusif',
+                        'eklusif'  => 'Eklusif',
                     ])
-                    ->placeholder('Semua Opsi PPN'),
+                    ->placeholder('Semua Tipe Pajak'),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
                     ->relationship('supplier', 'perusahaan')
@@ -2105,11 +2104,7 @@ class PurchaseOrderResource extends Resource
 
             $discount  = $orderRequestItem->discount ?? 0;
             $tax       = $orderRequestItem->tax ?? 0;
-            $tipePajak = match ($orderRequest->tax_type ?? 'PPN Excluded') {
-                'PPN Included' => 'Inklusif',
-                'None'         => 'Non Pajak',
-                default        => 'Eklusif',
-            };
+            $tipePajak = $orderRequestItem->tipe_pajak ?: ((float) $tax > 0 ? 'Eklusif' : 'Non Pajak');
             $subtotal = HelperController::hitungSubtotal($remainingQuantity, $unitPrice, $discount, $tax, $tipePajak);
 
             $items[] = [

@@ -20,6 +20,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -91,6 +92,37 @@ class OrderRequestResource extends Resource
             'subtotal' => number_format($subtotal, 0, ',', '.'),
             'tax_nominal' => number_format($taxNominal, 0, ',', '.'),
         ];
+    }
+
+    public static function normalizeItemTaxType(?string $itemTaxType): string
+    {
+        $normalized = strtolower(trim((string) $itemTaxType));
+
+        return match ($normalized) {
+            'non pajak', 'none', 'non-pajak', 'nonpajak' => 'Non Pajak',
+            'inklusif', 'included', 'ppn included' => 'Inklusif',
+            default => 'Eklusif',
+        };
+    }
+
+    public static function taxServiceTypeFromItemTaxType(?string $itemTaxType): string
+    {
+        return match (self::normalizeItemTaxType($itemTaxType)) {
+            'Non Pajak' => 'None',
+            'Inklusif' => 'PPN Included',
+            default => 'PPN Excluded',
+        };
+    }
+
+    public static function resolveItemTaxRate(?int $productId, ?string $itemTaxType): float
+    {
+        $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+
+        if ($taxType === 'None') {
+            return 0.0;
+        }
+
+        return TaxDefaultResolver::resolveForProductId($productId, $taxType);
     }
 
     public static function resolveProductLabel(?int $productId): ?string
@@ -328,63 +360,37 @@ class OrderRequestResource extends Resource
                             ->label('Note')
                             ->nullable(),
                         Select::make('tax_type')
-                            ->label('Tipe PPN')
+                            ->label('Tipe Pajak (Global)')
                             ->options([
-                                'None' => 'Non Pajak',
-                                'PPN Excluded' => 'PPN Excluded (PPN di luar harga)',
-                                'PPN Included' => 'PPN Included (PPN sudah termasuk harga)',
+                                'None'         => 'Non Pajak',
+                                'PPN Included' => 'Inklusif (PPN sudah termasuk harga)',
+                                'PPN Excluded' => 'Eklusif (PPN di luar harga)',
                             ])
-                            ->default('None')
-                            ->preload()
+                            ->default('PPN Excluded')
                             ->required()
                             ->live()
+                            ->helperText('Pilihan ini akan otomatis set tipe pajak ke semua item. Per-item masih bisa diubah manual.')
                             ->afterStateUpdated(function (string $state, callable $get, callable $set) {
-                                if ($state === 'None') {
-                                    $items = $get('orderRequestItem') ?? [];
-                                    foreach ($items as $key => $item) {
-                                        $set("orderRequestItem.{$key}.tax", 0);
-                                        $set("orderRequestItem.{$key}.tax_nominal", '0');
-                                    }
-                                } else {
-                                    $items = $get('orderRequestItem') ?? [];
-                                    foreach ($items as $key => $item) {
-                                        $set(
-                                            "orderRequestItem.{$key}.tax",
-                                            TaxDefaultResolver::resolveForProductId(
-                                                is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null,
-                                                $state
-                                            )
-                                        );
-                                    }
-                                }
-
-                                // Recalculate subtotals for all items when tax type changes
+                                $itemTaxType = match ($state) {
+                                    'None'         => 'Non Pajak',
+                                    'PPN Included' => 'Inklusif',
+                                    default        => 'Eklusif',
+                                };
                                 $items = $get('orderRequestItem') ?? [];
                                 foreach ($items as $key => $item) {
-                                    $qty     = (float) ($item['quantity'] ?? 0);
-                                    $price   = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
-                                    $discPct = (float) ($item['discount'] ?? 0);
-                                    $taxPct  = $state === 'None'
-                                        ? 0
-                                        : TaxDefaultResolver::resolveForProductId(
-                                            is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null,
-                                            $state
-                                        );
-                                    $base      = $qty * $price;
-                                    $afterDisc = $base - $base * ($discPct / 100);
-                                    try {
-                                        $taxResult = \App\Services\TaxService::compute($afterDisc, $taxPct, $state);
-                                        $set("orderRequestItem.{$key}.subtotal",    number_format((float)$taxResult['total'], 0, ',', '.'));
-                                        $set("orderRequestItem.{$key}.tax_nominal", number_format((float)$taxResult['ppn'],   0, ',', '.'));
-                                    } catch (\Throwable $e) {
-                                        $set("orderRequestItem.{$key}.subtotal",    number_format((float)$afterDisc, 0, ',', '.'));
-                                        $set("orderRequestItem.{$key}.tax_nominal", '0');
-                                    }
+                                    $productId = is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null;
+                                    $taxPct = self::resolveItemTaxRate($productId, $itemTaxType);
+                                    $set("orderRequestItem.{$key}.tipe_pajak", $itemTaxType);
+                                    $set("orderRequestItem.{$key}.tax", $taxPct);
+                                    $qty      = (float) ($item['quantity'] ?? 0);
+                                    $price    = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
+                                    $discPct  = (float) ($item['discount'] ?? 0);
+                                    $preview  = self::calculateApprovalItemPreview($qty, $price, $discPct, $taxPct, $state);
+                                    $set("orderRequestItem.{$key}.subtotal", $preview['subtotal']);
+                                    $set("orderRequestItem.{$key}.tax_nominal", $preview['tax_nominal']);
                                 }
                             })
-                            ->validationMessages([
-                                'required' => 'Tipe PPN wajib dipilih.',
-                            ]),
+                            ->dehydrated(true),
                         Repeater::make('orderRequestItem')
                             ->relationship()
                             ->columnSpanFull()
@@ -423,9 +429,10 @@ class OrderRequestResource extends Resource
                                                     $currentSupplierId = $resolvedSupplierId;
                                                 }
 
-                                                $taxType = $get('../../tax_type') ?? 'PPN Excluded';
-                                                $taxRate = TaxDefaultResolver::resolveForProductId((int) $state, $taxType);
-                                                $set('tax', $taxType === 'None' ? 0 : $taxRate);
+                                                $itemTaxType = $get('tipe_pajak') ?? 'Eklusif';
+                                                $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                                $taxRate = self::resolveItemTaxRate((int) $state, $itemTaxType);
+                                                $set('tax', $taxRate);
 
                                                 // Use item-level supplier price if available
                                                 $itemSupplierId = $currentSupplierId;
@@ -447,7 +454,7 @@ class OrderRequestResource extends Resource
                                                 // Recalculate subtotal
                                                 $quantity = (float) ($get('quantity') ?? 0);
                                                 $discPct  = (float) ($get('discount') ?? 0);
-                                                $taxPct   = $taxType === 'None' ? 0 : $taxRate;
+                                                $taxPct   = $taxRate;
                                                 $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
                                                 $set('total_cost', $preview['total_cost']);
                                                 $set('subtotal', $preview['subtotal']);
@@ -510,7 +517,8 @@ class OrderRequestResource extends Resource
                                                     $set('original_price', number_format((float)$unitPrice, 0, ',', '.'));
                                                     $set('unit_price', number_format((float)$unitPrice, 0, ',', '.'));
                                                     // Recalculate subtotal
-                                                    $taxType  = $get('../../tax_type') ?? 'PPN Excluded';
+                                                    $itemTaxType = $get('tipe_pajak') ?? 'Eklusif';
+                                                    $taxType  = self::taxServiceTypeFromItemTaxType($itemTaxType);
                                                     $quantity = (float) ($get('quantity') ?? 0);
                                                     $discPct  = (float) ($get('discount') ?? 0);
                                                     $taxPct   = (float) ($get('tax') ?? 0);
@@ -549,7 +557,8 @@ class OrderRequestResource extends Resource
                                     ->default(0)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        $itemTaxType = $get('tipe_pajak') ?? 'Eklusif';
+                                        $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
                                         $quantity  = (float) ($state ?? 0);
                                         $unitPrice = \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
                                         $discPct   = (float) ($get('discount') ?? 0);
@@ -589,7 +598,8 @@ class OrderRequestResource extends Resource
                                     ->reactive()
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        $itemTaxType = $get('tipe_pajak') ?? 'Eklusif';
+                                        $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
                                         $quantity  = (float) ($get('quantity') ?? 0);
                                         $unitPrice = \App\Helpers\MoneyHelper::parse($state ?? 0);
                                         $discPct   = (float) ($get('discount') ?? 0);
@@ -621,7 +631,8 @@ class OrderRequestResource extends Resource
                                     ->maxValue(100)
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
+                                        $itemTaxType = $get('tipe_pajak') ?? 'Eklusif';
+                                        $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
                                         $quantity  = (float) ($get('quantity') ?? 0);
                                         $unitPrice = \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
                                         $discPct   = (float) ($state ?? 0);
@@ -644,41 +655,47 @@ class OrderRequestResource extends Resource
                                         'min' => 'Discount tidak boleh negatif.',
                                         'max' => 'Discount maksimal 100%.',
                                     ]),
+                                Radio::make('tipe_pajak')
+                                    ->label('Tipe Pajak')
+                                    ->inline()
+                                    ->required()
+                                    ->default('Eklusif')
+                                    ->options([
+                                        'Non Pajak' => 'Non Pajak',
+                                        'Inklusif' => 'Inklusif',
+                                        'Eklusif' => 'Eklusif',
+                                    ])
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        $itemTaxType = self::normalizeItemTaxType($state);
+                                        $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                        $productId = is_numeric($get('product_id')) ? (int) $get('product_id') : null;
+                                        $taxPct = self::resolveItemTaxRate($productId, $itemTaxType);
+
+                                        $set('tipe_pajak', $itemTaxType);
+                                        $set('tax', $taxPct);
+
+                                        $quantity  = (float) ($get('quantity') ?? 0);
+                                        $unitPrice = \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
+                                        $discPct   = (float) ($get('discount') ?? 0);
+                                        $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                        $set('total_cost', $preview['total_cost']);
+                                        $set('subtotal', $preview['subtotal']);
+                                        $set('tax_nominal', $preview['tax_nominal']);
+                                    }),
                                 TextInput::make('tax')
                                     ->label('Tax (%)')
                                     ->numeric()
                                     ->default(function (callable $get) {
-                                        return TaxDefaultResolver::resolveForProductId(
+                                        return self::resolveItemTaxRate(
                                             is_numeric($get('product_id')) ? (int) $get('product_id') : null,
-                                            $get('../../tax_type') ?? 'PPN Excluded'
+                                            $get('tipe_pajak')
                                         );
                                     })
                                     ->minValue(0)
                                     ->maxValue(100)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $taxType   = $get('../../tax_type') ?? 'PPN Excluded';
-                                        if ($taxType === 'None') {
-                                            $state = 0;
-                                            $set('tax', 0);
-                                        }
-                                        $quantity  = (float) ($get('quantity') ?? 0);
-                                        $unitPrice = \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
-                                        $discPct   = (float) ($get('discount') ?? 0);
-                                        $taxPct    = (float) ($state ?? 0);
-                                        $base      = $quantity * $unitPrice;
-                                        $afterDisc = $base - $base * ($discPct / 100);
-                                        $subtotal  = $taxType === 'PPN Included'
-                                            ? $afterDisc
-                                            : $afterDisc + $afterDisc * ($taxPct / 100);
-                                        $set('subtotal', number_format((float)$subtotal, 0, ',', '.'));
-                                        try {
-                                            $taxRes = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
-                                            $set('tax_nominal', number_format((float)$taxRes['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) {
-                                            $set('tax_nominal', '0');
-                                        }
-                                    })
+                                    ->disabled()
+                                    ->dehydrated(true)
                                     ->validationMessages([
                                         'numeric' => 'Tax harus berupa angka.',
                                         'min' => 'Tax tidak boleh negatif.',
@@ -703,7 +720,27 @@ class OrderRequestResource extends Resource
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated(false)
-                                    ->default(0),
+                                    ->default(0)
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if (! $record) {
+                                            return;
+                                        }
+                                        $taxPct    = (float) ($record->tax ?? 0);
+                                        $qty       = (float) ($record->quantity ?? 0);
+                                        $unitPrice = \App\Helpers\MoneyHelper::parse($record->unit_price ?? 0);
+                                        $discPct   = (float) ($record->discount ?? 0);
+                                        $taxType   = \App\Models\OrderRequestItem::taxServiceTypeFromItemTaxType(
+                                            $record->tipe_pajak ?? null
+                                        );
+                                        $base      = $qty * $unitPrice;
+                                        $afterDisc = $base - $base * ($discPct / 100);
+                                        try {
+                                            $result = \App\Services\TaxService::compute($afterDisc, $taxPct, $taxType);
+                                            $component->state(number_format((float) $result['ppn'], 0, ',', '.'));
+                                        } catch (\Throwable $e) {
+                                            $component->state('0');
+                                        }
+                                    }),
                                 TextInput::make('subtotal')
                                     ->label('Subtotal')
                                     ->default(0)
@@ -961,7 +998,7 @@ class OrderRequestResource extends Resource
                                     $taxRes = \App\Services\TaxService::compute(
                                         max(0, $remainingQty) * $supplierPrice,
                                         $taxPct,
-                                        $item->orderRequest->tax_type ?? 'None'
+                                        self::taxServiceTypeFromItemTaxType($item->tipe_pajak ?? null)
                                     );
                                     $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
                                     $subtotal = number_format($taxRes['total'], 0, ',', '.');
@@ -1265,7 +1302,7 @@ class OrderRequestResource extends Resource
                                     $taxRes = \App\Services\TaxService::compute(
                                         max(0, $remainingQty) * $supplierPrice,
                                         $taxPct,
-                                        $item->orderRequest->tax_type ?? 'None'
+                                        self::taxServiceTypeFromItemTaxType($item->tipe_pajak ?? null)
                                     );
                                     $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
                                     $subtotal = number_format($taxRes['total'], 0, ',', '.');
@@ -1711,7 +1748,7 @@ class OrderRequestResource extends Resource
                                 \Filament\Infolists\Components\TextEntry::make('tax_nominal')
                                     ->label('Nominal Pajak')
                                     ->getStateUsing(function ($record) {
-                                        $taxType = $record->orderRequest->tax_type ?? 'PPN Excluded';
+                                        $taxType = self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null);
                                         $base = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
 
                                         try {
@@ -1752,13 +1789,24 @@ class OrderRequestResource extends Resource
 
         // Recalculate subtotals server-side (same as mutateFormDataBeforeSave)
         if (isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
-            $taxType = $data['tax_type'] ?? 'PPN Excluded';
+            $headerTaxType  = $data['tax_type'] ?? 'PPN Excluded';
+            $headerItemType = match ($headerTaxType) {
+                'None'         => 'Non Pajak',
+                'PPN Included' => 'Inklusif',
+                default        => 'Eklusif',
+            };
 
             foreach ($data['orderRequestItem'] as &$item) {
                 $qty   = (float) ($item['quantity'] ?? 0);
                 $price = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
                 $disc  = (float) ($item['discount'] ?? 0);
-                $tax   = (float) ($item['tax'] ?? 0);
+                $itemTaxType = self::normalizeItemTaxType($item['tipe_pajak'] ?? $headerItemType);
+                $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                $productId = is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null;
+                $tax = self::resolveItemTaxRate($productId, $itemTaxType);
+
+                $item['tipe_pajak'] = $itemTaxType;
+                $item['tax'] = $tax;
 
                 $base      = $qty * $price;
                 $afterDisc = $base - $base * ($disc / 100);
@@ -1780,13 +1828,24 @@ class OrderRequestResource extends Resource
     {
         // Recalculate subtotals server-side and ignore any client-provided values
         if (isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
-            $taxType = $data['tax_type'] ?? 'PPN Excluded';
+            $headerTaxType  = $data['tax_type'] ?? 'PPN Excluded';
+            $headerItemType = match ($headerTaxType) {
+                'None'         => 'Non Pajak',
+                'PPN Included' => 'Inklusif',
+                default        => 'Eklusif',
+            };
 
             foreach ($data['orderRequestItem'] as &$item) {
                 $qty   = (float) ($item['quantity'] ?? 0);
                 $price = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
                 $disc  = (float) ($item['discount'] ?? 0);
-                $tax   = (float) ($item['tax'] ?? 0);
+                $itemTaxType = self::normalizeItemTaxType($item['tipe_pajak'] ?? $headerItemType);
+                $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                $productId = is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null;
+                $tax = self::resolveItemTaxRate($productId, $itemTaxType);
+
+                $item['tipe_pajak'] = $itemTaxType;
+                $item['tax'] = $tax;
 
                 $base      = $qty * $price;
                 $afterDisc = $base - $base * ($disc / 100);

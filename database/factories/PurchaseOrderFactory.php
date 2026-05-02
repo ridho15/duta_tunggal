@@ -40,7 +40,7 @@ class PurchaseOrderFactory extends Factory
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
             'cabang_id' => function () {
                 return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
             },

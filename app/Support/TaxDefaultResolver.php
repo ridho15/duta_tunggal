@@ -13,27 +13,47 @@ class TaxDefaultResolver
             return 0.0;
         }
 
-        if ($productId) {
-            return static::resolveForProduct(Product::find($productId));
+        $settingRate = static::resolveSettingRate();
+        if ($settingRate !== null) {
+            return $settingRate;
         }
 
-        return static::resolveFallbackRate();
+        if ($productId) {
+            return static::resolveProductRate(Product::find($productId));
+        }
+
+        return 0.0;
     }
 
     public static function resolveForProduct(?Product $product): float
+    {
+        $settingRate = static::resolveSettingRate();
+        if ($settingRate !== null) {
+            return $settingRate;
+        }
+
+        return static::resolveProductRate($product);
+    }
+
+    public static function resolveFallbackRate(): float
+    {
+        return static::resolveSettingRate() ?? 0.0;
+    }
+
+    protected static function resolveSettingRate(): ?float
+    {
+        $activeRate = (float) TaxSetting::activeRate('PPN');
+
+        return $activeRate > 0 ? $activeRate : null;
+    }
+
+    protected static function resolveProductRate(?Product $product): float
     {
         if ($product && $product->pajak !== null && $product->pajak !== '') {
             return (float) $product->pajak;
         }
 
-        return static::resolveFallbackRate();
-    }
-
-    public static function resolveFallbackRate(): float
-    {
-        $activeRate = (float) TaxSetting::activeRate('PPN');
-
-        return $activeRate > 0 ? $activeRate : 0.0;
+        return 0.0;
     }
 
     protected static function isNonTaxType(?string $taxType): bool

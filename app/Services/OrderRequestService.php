@@ -146,7 +146,7 @@ class OrderRequestService
                     'unit_price'        => $row['unit_price'],
                     'discount'          => $row['discount'],
                     'tax'               => $row['tax'],
-                    'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
+                    'tipe_pajak'        => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
                     'currency_id'       => $currency->id,
                 ]);
 
@@ -224,7 +224,7 @@ class OrderRequestService
                 'unit_price'        => $row['unit_price'],
                 'discount'          => $row['discount'],
                 'tax'               => $row['tax'],
-                'tipe_pajak'        => $this->resolveTipePajak($orderRequest->tax_type, $row['tax']),
+                'tipe_pajak'        => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
                 'currency_id'       => $currency->id,
             ]);
             // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
@@ -239,12 +239,18 @@ class OrderRequestService
      *  - tax_type = 'PPN Included' → 'Inklusif'
      *  - tax_type = 'PPN Excluded' (default) → 'Eksklusif'
      */
-    private function resolveTipePajak(?string $taxType, float $tax): string
+    private function resolveTipePajak(?string $itemTaxType, float $tax): string
     {
         if ((float) $tax <= 0) {
             return 'Non Pajak';
         }
-        return $taxType === 'PPN Included' ? 'Inklusif' : 'Eklusif';
+
+        $normalized = strtolower(trim((string) $itemTaxType));
+        if (in_array($normalized, ['inklusif', 'ppn included', 'included'], true)) {
+            return 'Inklusif';
+        }
+
+        return 'Eklusif';
     }
 
     public function reject($orderRequest)

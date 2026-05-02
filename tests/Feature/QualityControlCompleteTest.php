@@ -84,7 +84,7 @@ class QualityControlCompleteTest extends TestCase
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
         ]);
 
         $receipt = PurchaseReceipt::create([
@@ -209,7 +209,7 @@ class QualityControlCompleteTest extends TestCase
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
         ]);
 
         $receipt = PurchaseReceipt::create([
