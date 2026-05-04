@@ -312,14 +312,6 @@ class OrderRequestResource extends Resource
                             ->validationMessages([
                                 'required' => 'Cabang wajib dipilih.',
                             ]),
-                        Placeholder::make('cabang_kode')
-                            ->label('Kode Cabang')
-                            ->content(function (Get $get) {
-                                $cabangId = $get('cabang_id');
-                                if (! $cabangId) return '-';
-                                $c = \App\Models\Cabang::find($cabangId);
-                                return $c ? ($c->kode ?? '-') : '-';
-                            }),
                         Select::make('warehouse_id')
                             ->label('Gudang')
                             ->options(function (callable $get) {
@@ -359,14 +351,6 @@ class OrderRequestResource extends Resource
                             ->validationMessages([
                                 'required' => 'Gudang wajib dipilih.',
                             ]),
-                        Placeholder::make('warehouse_kode')
-                            ->label('Kode Gudang')
-                            ->content(function (Get $get) {
-                                $warehouseId = $get('warehouse_id');
-                                if (! $warehouseId) return '-';
-                                $w = \App\Models\Warehouse::find($warehouseId);
-                                return $w ? ($w->kode ?? '-') : '-';
-                            }),
                         DatePicker::make('request_date')
                             ->required()
                             ->validationMessages([
@@ -571,15 +555,6 @@ class OrderRequestResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Cabang item wajib dipilih.',
                                     ]),
-                                    Placeholder::make('cabang_kode_item')
-                                        ->label('Kode Cabang')
-                                        ->content(function (callable $get) {
-                                            $cabangId = $get('cabang_id');
-                                            if (! $cabangId) return '-';
-                                            $c = \App\Models\Cabang::find($cabangId);
-                                            return $c ? ($c->kode ?? '-') : '-';
-                                        })
-                                        ->columnSpan(1),
                                 Placeholder::make('supplier_recommendation')
                                     ->label('Rekomendasi Supplier')
                                     ->content(function (callable $get) {
