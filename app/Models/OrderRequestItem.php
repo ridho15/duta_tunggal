@@ -16,6 +16,7 @@ class OrderRequestItem extends Model
     protected $fillable = [
         'order_request_id',
         'supplier_id',
+        'cabang_id',
         'product_id',
         'quantity',
         'fulfilled_quantity',
@@ -36,6 +37,11 @@ class OrderRequestItem extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     public function product()

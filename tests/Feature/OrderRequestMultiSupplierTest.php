@@ -189,28 +189,47 @@ test('two separate createPurchaseOrder calls produce two single-supplier POs', f
 // SCENARIO 4 — Approve with multi_supplier=true via service builds correct POs
 //   Simulates what the Filament action does: group by item_supplier_id → call service per group
 // ─────────────────────────────────────────────
-test('multi-supplier approve creates one PO per supplier', function () {
+test('multi-supplier approve creates one PO per supplier and cabang combination', function () {
+    $branchB = Cabang::factory()->create();
+
+    $this->itemA2->update(['cabang_id' => $branchB->id]);
+
     // Build the selected_items the way the Filament action builds it
     $items = $this->orderRequest->orderRequestItem->map(fn($item) => [
         'item_id'          => $item->id,
         'item_supplier_id' => $item->supplier_id,
+        'item_cabang_id'   => $item->cabang_id,
         'product_id'       => $item->product_id,
         'quantity'         => $item->quantity,
         'unit_price'       => $item->unit_price,
         'include'          => true,
     ])->values()->toArray();
 
-    $uniqueSupplierIds = collect($items)->pluck('item_supplier_id')->filter()->unique();
-    expect($uniqueSupplierIds)->toHaveCount(2); // confirm multi-supplier
+    $uniqueGroups = collect($items)
+        ->map(fn ($item) => implode('|', [
+            (string) ($item['item_supplier_id'] ?? ''),
+            (string) ($item['item_cabang_id'] ?? ''),
+        ]))
+        ->unique();
+
+    expect($uniqueGroups)->toHaveCount(3);
 
     // Simulate the groupBy + createPurchaseOrder loop from the action handler
-    $groups = collect($items)->groupBy('item_supplier_id');
+    $groups = collect($items)->groupBy(fn ($item) => implode('|', [
+        (string) ($item['item_supplier_id'] ?? ''),
+        (string) ($item['item_cabang_id'] ?? ''),
+    ]));
     $created = 0;
-    foreach ($groups as $supplierId => $groupItems) {
-        if (empty($supplierId)) continue;
-        $poNumber = 'PO-AUTO-' . $supplierId;
+    foreach ($groups as $groupKey => $groupItems) {
+        $firstItem = $groupItems->first();
+        $supplierId = $firstItem['item_supplier_id'] ?? null;
+        $cabangId = $firstItem['item_cabang_id'] ?? null;
+        if (empty($supplierId) || empty($cabangId)) continue;
+
+        $poNumber = 'PO-AUTO-' . str_replace('|', '-', $groupKey);
         $this->service->createPurchaseOrder($this->orderRequest, [
             'supplier_id'    => $supplierId,
+            'cabang_id'      => $cabangId,
             'po_number'      => $poNumber,
             'order_date'     => Carbon::today()->toDateString(),
             'selected_items' => $groupItems->values()->toArray(),
@@ -220,22 +239,58 @@ test('multi-supplier approve creates one PO per supplier', function () {
     }
     $this->orderRequest->update(['status' => 'approved']);
 
-    expect($created)->toBe(2);
-    expect(PurchaseOrder::count())->toBe(2);
+    expect($created)->toBe(3);
+    expect(PurchaseOrder::count())->toBe(3);
     expect($this->orderRequest->fresh()->status)->toBe('approved');
 
-    // Each PO must belong to exactly one supplier
+    // Each PO must belong to exactly one supplier + cabang combination
     $allPOs = PurchaseOrder::with('purchaseOrderItem')->get();
     foreach ($allPOs as $po) {
         $poSupplierIds = $po->purchaseOrderItem->map(function ($poi) {
             $orItem = OrderRequestItem::find($poi->refer_item_model_id);
-            return $orItem?->supplier_id;
+            return implode('|', [
+                (string) ($orItem?->supplier_id ?? ''),
+                (string) ($orItem?->cabang_id ?? ''),
+            ]);
         })->filter()->unique();
 
-        // All items in a PO come from the same supplier
+        // All items in a PO come from the same supplier + cabang
         expect($poSupplierIds)->toHaveCount(1);
-        expect($poSupplierIds->first())->toBe($po->supplier_id);
+        $poKey = implode('|', [
+            (string) $po->supplier_id,
+            (string) $po->cabang_id,
+        ]);
+        expect($poSupplierIds->first())->toBe($poKey);
     }
+});
+
+test('createPurchaseOrder splits same supplier across different cabang into separate POs', function () {
+    $branchB = Cabang::factory()->create();
+
+    $this->itemA1->update(['cabang_id' => $this->cabang->id]);
+    $this->itemA2->update(['cabang_id' => $branchB->id]);
+
+    $this->orderRequest->update(['status' => 'approved']);
+
+    $groups = collect([
+        ['item_id' => $this->itemA1->id, 'item_supplier_id' => $this->supplierA->id, 'item_cabang_id' => $this->cabang->id, 'quantity' => 10, 'unit_price' => 10000, 'include' => true],
+        ['item_id' => $this->itemA2->id, 'item_supplier_id' => $this->supplierA->id, 'item_cabang_id' => $branchB->id, 'quantity' => 5, 'unit_price' => 20000, 'include' => true],
+    ])->groupBy(fn ($item) => implode('|', [(string) $item['item_supplier_id'], (string) $item['item_cabang_id']]));
+
+    foreach ($groups as $groupItems) {
+        $firstItem = $groupItems->first();
+        $this->service->createPurchaseOrder($this->orderRequest, [
+            'supplier_id'    => $firstItem['item_supplier_id'],
+            'cabang_id'      => $firstItem['item_cabang_id'],
+            'po_number'      => 'PO-SPLIT-' . $firstItem['item_cabang_id'],
+            'order_date'     => Carbon::today()->toDateString(),
+            'selected_items' => $groupItems->values()->toArray(),
+        ]);
+    }
+
+    expect(PurchaseOrder::count())->toBe(2);
+    expect(PurchaseOrder::pluck('cabang_id')->unique())->toHaveCount(2);
+    expect(PurchaseOrder::pluck('supplier_id')->unique())->toHaveCount(1);
 });
 
 // ─────────────────────────────────────────────

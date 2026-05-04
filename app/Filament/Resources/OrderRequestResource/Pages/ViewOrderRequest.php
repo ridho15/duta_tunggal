@@ -32,6 +32,47 @@ class ViewOrderRequest extends ViewRecord
 {
     protected static string $resource = OrderRequestResource::class;
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // Ensure header kode fields are present for the view page
+        $cabangId = $this->record->cabang_id ?? null;
+        $warehouseId = $this->record->warehouse_id ?? null;
+
+        $data['cabang_kode'] = '-';
+        $data['warehouse_kode'] = '-';
+
+        if ($cabangId) {
+            $c = \App\Models\Cabang::find($cabangId);
+            $data['cabang_kode'] = $c ? ($c->kode ?? '-') : '-';
+        }
+
+        if ($warehouseId) {
+            $w = \App\Models\Warehouse::find($warehouseId);
+            $data['warehouse_kode'] = $w ? ($w->kode ?? '-') : '-';
+        }
+
+        // Populate cabang_kode_item for each orderRequestItem so repeater placeholder shows it
+        $items = $data['orderRequestItem'] ?? [];
+        $populated = [];
+        foreach ($this->record->orderRequestItem as $idx => $item) {
+            $entry = $items[$idx] ?? [];
+            $cabangIdItem = $item->cabang_id ?: $this->record->cabang_id;
+            $entry['cabang_kode_item'] = '-';
+            if ($cabangIdItem) {
+                $c = \App\Models\Cabang::find($cabangIdItem);
+                $entry['cabang_kode_item'] = $c ? ($c->kode ?? '-') : '-';
+            }
+            $populated[] = array_merge($entry, [
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+            ]);
+        }
+
+        $data['orderRequestItem'] = $populated;
+
+        return $data;
+    }
+
     protected function getActions(): array
     {
         return [
@@ -81,6 +122,7 @@ class ViewOrderRequest extends ViewRecord
                         $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
                         $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
+                        $cabangId = $item->cabang_id ?: $record->cabang_id;
 
                         $taxPct = (float)($item->tax ?? 0);
                         $preview = OrderRequestResource::calculateApprovalItemPreview(
@@ -94,13 +136,21 @@ class ViewOrderRequest extends ViewRecord
                         $supplierName = $item->supplier_id
                             ? ("({$item->supplier->code}) {$item->supplier->perusahaan}")
                             : '-';
+                        $cabangName = $cabangId
+                            ? (function () use ($cabangId) {
+                                $c = \App\Models\Cabang::find($cabangId);
+                                return $c ? "({$c->kode}) {$c->nama}" : '-';
+                            })()
+                            : '-';
                         $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
 
                         return [
                             'item_id'          => $item->id,
                             'item_supplier_id' => $item->supplier_id,
+                            'item_cabang_id'   => $cabangId,
                             'product_name'     => "({$item->product->sku}) {$item->product->name}",
                             'supplier_name'    => $supplierName,
+                            'cabang_name'      => $cabangName,
                             'uom'              => $uom,
                             'quantity'         => max(0, $remainingQty),
                             'original_price'   => $originalPrice,
@@ -114,14 +164,22 @@ class ViewOrderRequest extends ViewRecord
                         ];
                     })->values()->toArray();
 
-                    $uniqueSuppliers = collect($items)->pluck('item_supplier_id')->filter()->unique();
-                    $isMultiSupplier = $uniqueSuppliers->count() > 1;
+                    $groups = collect($items)
+                        ->map(fn ($item) => implode('|', [
+                            (string) ($item['item_supplier_id'] ?? ''),
+                            (string) ($item['item_cabang_id'] ?? ''),
+                        ]))
+                        ->filter(fn ($key) => trim($key, '|') !== '')
+                        ->unique();
+                    $isMultiSupplier = $groups->count() > 1;
 
                     // Pre-fill supplier from the first item that has a supplier
                     $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+                    $firstCabangId = $items[0]['item_cabang_id'] ?? null;
 
                     return [
-                        'supplier_id'           => $firstSupplierId,
+                        'supplier_id'           => $isMultiSupplier ? null : $firstSupplierId,
+                        'cabang_id'             => $isMultiSupplier ? null : $firstCabangId,
                         'create_purchase_order' => true,
                         'multi_supplier'        => $isMultiSupplier,
                         'tax_type'              => $record->tax_type ?? 'None',
@@ -133,6 +191,7 @@ class ViewOrderRequest extends ViewRecord
                         ->icon('heroicon-o-cog-6-tooth')
                         ->schema([
                             Hidden::make('tax_type'),
+                            Hidden::make('cabang_id'),
                             Toggle::make('create_purchase_order')
                                 ->label('Buat Purchase Order secara otomatis?')
                                 ->helperText('Aktifkan untuk langsung membuat PO setelah approval.')
@@ -141,7 +200,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->columnSpanFull(),
                             Placeholder::make('multi_supplier_notice')
                                 ->label('')
-                                ->content('Item dalam OR ini memiliki beberapa supplier berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
+                                ->content('Item dalam OR ini memiliki beberapa kombinasi supplier dan cabang berbeda. Sistem akan membuat satu PO per kombinasi secara otomatis.')
                                 ->visible(fn(Get $get) => $get('create_purchase_order') && $get('multi_supplier'))
                                 ->columnSpanFull(),
                             Hidden::make('multi_supplier'),
@@ -334,10 +393,18 @@ class ViewOrderRequest extends ViewRecord
                                     return;
                                 }
 
-                                $groups = $includedItems->groupBy('item_supplier_id');
+                                $groups = $includedItems->groupBy(function ($item) {
+                                    return implode('|', [
+                                        (string) ($item['item_supplier_id'] ?? ''),
+                                        (string) ($item['item_cabang_id'] ?? ''),
+                                    ]);
+                                });
                                 $created = 0;
-                                foreach ($groups as $supplierId => $groupItems) {
-                                    if (empty($supplierId)) {
+                                foreach ($groups as $groupItems) {
+                                    $firstItem = $groupItems->first();
+                                    $supplierId = $firstItem['item_supplier_id'] ?? null;
+                                    $cabangId = $firstItem['item_cabang_id'] ?? null;
+                                    if (empty($supplierId) || empty($cabangId)) {
                                         continue;
                                     }
                                     $poNumber = HelperController::generatePoNumber();
@@ -347,6 +414,7 @@ class ViewOrderRequest extends ViewRecord
 
                                     $poData = array_merge($data, [
                                         'supplier_id'    => $supplierId,
+                                        'cabang_id'      => $cabangId,
                                         'po_number'      => $poNumber,
                                         'selected_items' => $groupItems->values()->toArray(),
                                         'multi_supplier' => false,
@@ -394,6 +462,7 @@ class ViewOrderRequest extends ViewRecord
                         $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
                         $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
+                        $cabangId = $item->cabang_id ?: $record->cabang_id;
 
                         $taxPct = (float)($item->tax ?? 0);
                         $base = $totalCost;
@@ -407,13 +476,21 @@ class ViewOrderRequest extends ViewRecord
                         $supplierName = $item->supplier_id
                             ? ("({$item->supplier->code}) {$item->supplier->perusahaan}")
                             : '-';
+                        $cabangName = $cabangId
+                            ? (function () use ($cabangId) {
+                                $c = \App\Models\Cabang::find($cabangId);
+                                return $c ? "({$c->kode}) {$c->nama}" : '-';
+                            })()
+                            : '-';
                         $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
 
                         return [
                             'item_id'          => $item->id,
                             'item_supplier_id' => $item->supplier_id,
+                            'item_cabang_id'   => $cabangId,
                             'product_name'     => "({$item->product->sku}) {$item->product->name}",
                             'supplier_name'    => $supplierName,
+                            'cabang_name'      => $cabangName,
                             'uom'              => $uom,
                             'quantity'         => max(0, $remainingQty),
                             'original_price'   => $originalPrice,
@@ -426,14 +503,22 @@ class ViewOrderRequest extends ViewRecord
                         ];
                     })->values()->toArray();
 
-                    $uniqueSuppliers = collect($items)->pluck('item_supplier_id')->filter()->unique();
-                    $isMultiSupplier = $uniqueSuppliers->count() > 1;
+                    $groups = collect($items)
+                        ->map(fn ($item) => implode('|', [
+                            (string) ($item['item_supplier_id'] ?? ''),
+                            (string) ($item['item_cabang_id'] ?? ''),
+                        ]))
+                        ->filter(fn ($key) => trim($key, '|') !== '')
+                        ->unique();
+                    $isMultiSupplier = $groups->count() > 1;
 
                     // Pre-fill supplier from the first item that has one
                     $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+                    $firstCabangId = $items[0]['item_cabang_id'] ?? null;
 
                     return [
-                        'supplier_id'    => $firstSupplierId,
+                        'supplier_id'    => $isMultiSupplier ? null : $firstSupplierId,
+                        'cabang_id'      => $isMultiSupplier ? null : $firstCabangId,
                         'multi_supplier' => $isMultiSupplier,
                         'selected_items' => $items,
                     ];
@@ -445,10 +530,11 @@ class ViewOrderRequest extends ViewRecord
                         ->schema([
                             Placeholder::make('multi_supplier_notice')
                                 ->label('')
-                                ->content('Item dalam OR ini memiliki beberapa supplier berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
+                                ->content('Item dalam OR ini memiliki beberapa kombinasi supplier dan cabang berbeda. Sistem akan membuat satu PO per kombinasi secara otomatis.')
                                 ->visible(fn(Get $get) => $get('multi_supplier'))
                                 ->columnSpanFull(),
                             Hidden::make('multi_supplier'),
+                            Hidden::make('cabang_id'),
                             Select::make('supplier_id')
                                 ->label('Supplier')
                                 ->visible(fn(Get $get) => !$get('multi_supplier'))
@@ -515,6 +601,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->schema([
                                     Hidden::make('item_id'),
                                     Hidden::make('item_supplier_id'),
+                                    Hidden::make('item_cabang_id'),
                                     Hidden::make('max_quantity'),
                                     TextInput::make('product_name')
                                         ->label('Nama Produk')
@@ -522,6 +609,10 @@ class ViewOrderRequest extends ViewRecord
                                         ->columnSpan(3),
                                     TextInput::make('supplier_name')
                                         ->label('Supplier')
+                                        ->readOnly()
+                                        ->columnSpan(2),
+                                    TextInput::make('cabang_name')
+                                        ->label('Cabang')
                                         ->readOnly()
                                         ->columnSpan(2),
                                     TextInput::make('uom')
@@ -603,10 +694,18 @@ class ViewOrderRequest extends ViewRecord
                             return;
                         }
 
-                        $groups = $includedItems->groupBy('item_supplier_id');
+                        $groups = $includedItems->groupBy(function ($item) {
+                            return implode('|', [
+                                (string) ($item['item_supplier_id'] ?? ''),
+                                (string) ($item['item_cabang_id'] ?? ''),
+                            ]);
+                        });
                         $created = 0;
-                        foreach ($groups as $supplierId => $groupItems) {
-                            if (empty($supplierId)) {
+                        foreach ($groups as $groupItems) {
+                            $firstItem = $groupItems->first();
+                            $supplierId = $firstItem['item_supplier_id'] ?? null;
+                            $cabangId = $firstItem['item_cabang_id'] ?? null;
+                            if (empty($supplierId) || empty($cabangId)) {
                                 continue;
                             }
                             $poNumber = HelperController::generatePoNumber();
@@ -616,6 +715,7 @@ class ViewOrderRequest extends ViewRecord
 
                             $poData = array_merge($data, [
                                 'supplier_id'    => $supplierId,
+                                'cabang_id'      => $cabangId,
                                 'po_number'      => $poNumber,
                                 'selected_items' => $groupItems->values()->toArray(),
                                 'multi_supplier' => false,

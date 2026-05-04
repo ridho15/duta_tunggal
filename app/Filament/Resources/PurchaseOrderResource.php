@@ -141,7 +141,8 @@ class PurchaseOrderResource extends Resource
     public static function resolveOrderRequestItemReference(
         ?int $orderRequestId,
         ?int $productId,
-        ?int $supplierId = null
+        ?int $supplierId = null,
+        ?int $cabangId = null
     ): ?OrderRequestItem {
         if (! $orderRequestId || ! $productId) {
             return null;
@@ -156,7 +157,84 @@ class PurchaseOrderResource extends Resource
             $query->orderByRaw('CASE WHEN supplier_id = ? THEN 0 WHEN supplier_id IS NULL THEN 1 ELSE 2 END', [$supplierId]);
         }
 
+        if ($cabangId) {
+            $query->orderByRaw('CASE WHEN cabang_id = ? THEN 0 WHEN cabang_id IS NULL THEN 1 ELSE 2 END', [$cabangId]);
+        }
+
         return $query->orderBy('id')->first();
+    }
+
+    public static function resolveOrderRequestItemCabangId(OrderRequestItem $orderRequestItem, ?OrderRequest $orderRequest = null): ?int
+    {
+        if (! empty($orderRequestItem->cabang_id)) {
+            return (int) $orderRequestItem->cabang_id;
+        }
+
+        if ($orderRequest && ! empty($orderRequest->cabang_id)) {
+            return (int) $orderRequest->cabang_id;
+        }
+
+        return null;
+    }
+
+    public static function getAvailableOrderRequestItemGroups(OrderRequest $orderRequest): array
+    {
+        $existingGroupKeys = PurchaseOrder::query()
+            ->where('refer_model_type', OrderRequest::class)
+            ->where('refer_model_id', $orderRequest->id)
+            ->get(['supplier_id', 'cabang_id'])
+            ->map(function (PurchaseOrder $purchaseOrder) {
+                return implode('|', [
+                    (string) ($purchaseOrder->supplier_id ?? ''),
+                    (string) ($purchaseOrder->cabang_id ?? ''),
+                ]);
+            })
+            ->all();
+
+        return $orderRequest->orderRequestItem
+            ->map(function (OrderRequestItem $orderRequestItem) use ($orderRequest, $existingGroupKeys) {
+                $remainingQuantity = max(0, (float) $orderRequestItem->quantity - (float) ($orderRequestItem->fulfilled_quantity ?? 0));
+                if ($remainingQuantity <= 0) {
+                    return null;
+                }
+
+                $supplierId = $orderRequestItem->supplier_id ? (int) $orderRequestItem->supplier_id : null;
+                $cabangId = static::resolveOrderRequestItemCabangId($orderRequestItem, $orderRequest);
+                if (! $supplierId || ! $cabangId) {
+                    return null;
+                }
+
+                $groupKey = implode('|', [$supplierId, $cabangId]);
+
+                if (in_array($groupKey, $existingGroupKeys, true)) {
+                    return null;
+                }
+
+                return [
+                    'group_key'   => $groupKey,
+                    'supplier_id'  => $supplierId,
+                    'cabang_id'   => $cabangId,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    public static function getAvailableOrderRequestCabangIds(OrderRequest $orderRequest, ?int $supplierId = null): array
+    {
+        $groups = static::getAvailableOrderRequestItemGroups($orderRequest);
+
+        return collect($groups)
+            ->filter(function ($g) use ($supplierId) {
+                if ($supplierId === null) return true;
+                return isset($g['supplier_id']) && (int) $g['supplier_id'] === (int) $supplierId;
+            })
+            ->pluck('cabang_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public static function getOrderRequestOptions(?int $currentOrderRequestId = null): array
@@ -185,7 +263,7 @@ class PurchaseOrderResource extends Resource
 
     public static function hasAvailableOrderRequestSupplier(OrderRequest $orderRequest): bool
     {
-        return count(static::getAvailableOrderRequestSupplierIds($orderRequest)) > 0;
+        return count(static::getAvailableOrderRequestItemGroups($orderRequest)) > 0;
     }
 
     /**
@@ -359,7 +437,6 @@ class PurchaseOrderResource extends Resource
                                             $orderRequest = OrderRequest::with(['orderRequestItem.product.uom', 'orderRequestItem.product.suppliers'])->find($state);
                                             if ($orderRequest) {
                                                 $set('warehouse_id', $orderRequest->warehouse_id);
-                                                $set('cabang_id', $orderRequest->cabang_id ?? null);
                                                 $ppnOption = match ($orderRequest->tax_type ?? 'PPN Excluded') {
                                                     'None'         => 'non_ppn',
                                                     'PPN Included' => 'inklusif',
@@ -367,18 +444,20 @@ class PurchaseOrderResource extends Resource
                                                 };
                                                 $set('ppn_option', $ppnOption);
 
-                                                $availableSupplierIds = self::getAvailableOrderRequestSupplierIds($orderRequest);
+                                                $availableGroups = self::getAvailableOrderRequestItemGroups($orderRequest);
 
-                                                if (count($availableSupplierIds) > 1) {
-                                                    // Multisupplier OR: clear supplier field so user must choose one.
+                                                if (count($availableGroups) > 1) {
+                                                    // Multi-group OR: clear supplier field so user must choose one.
                                                     // Items will be populated automatically via supplier_id->afterStateUpdated.
                                                     $set('supplier_id', null);
                                                     // $items stays [] — will be set by the final $set('purchaseOrderItem', $items) below
                                                 } else {
-                                                    // Single supplier: auto-select and populate all items immediately
-                                                    $autoSupplierId = $availableSupplierIds[0] ?? null;
+                                                    // Single group: auto-select and populate all items immediately
+                                                    $autoSupplierId = $availableGroups[0]['supplier_id'] ?? null;
+                                                    $autoCabangId = $availableGroups[0]['cabang_id'] ?? null;
                                                     if ($autoSupplierId) {
                                                         $set('supplier_id', $autoSupplierId);
+                                                        $set('cabang_id', $autoCabangId);
                                                         $autoSupplier = Supplier::find($autoSupplierId);
                                                         if ($autoSupplier) {
                                                             $set('tempo_hutang', $autoSupplier->tempo_hutang);
@@ -390,6 +469,7 @@ class PurchaseOrderResource extends Resource
                                                     $items = self::buildOrderRequestItems(
                                                         $orderRequest,
                                                         $autoSupplierId ? (int) $autoSupplierId : null,
+                                                        $autoCabangId ? (int) $autoCabangId : null,
                                                         $defaultCurrencyId
                                                     );
                                                 }
@@ -553,7 +633,12 @@ class PurchaseOrderResource extends Resource
                                         ->find($get('refer_model_id'));
                                     if ($orderRequest) {
                                         $defaultCurrencyId = Currency::query()->first()?->id;
-                                        $items = self::buildOrderRequestItems($orderRequest, (int) $state, $defaultCurrencyId);
+                                        $items = self::buildOrderRequestItems(
+                                            $orderRequest,
+                                            (int) $state,
+                                            is_numeric($get('cabang_id')) ? (int) $get('cabang_id') : null,
+                                            $defaultCurrencyId
+                                        );
                                         $set('purchaseOrderItem', $items);
                                     }
                                 }
@@ -595,9 +680,34 @@ class PurchaseOrderResource extends Resource
                             ->required(),
                         Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(function () {
+                            ->options(function (Get $get) {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
+
+                                // When referencing an Order Request, restrict cabang options
+                                // to those present in the Order Request's available item groups.
+                                $referType = $get('refer_model_type');
+                                $referModelId = $get('refer_model_id');
+                                $supplierId = $get('supplier_id');
+
+                                if ($referType === 'App\\Models\\OrderRequest' && $referModelId) {
+                                    $or = OrderRequest::with('orderRequestItem')->find($referModelId);
+                                    if ($or) {
+                                        $cabangIds = self::getAvailableOrderRequestCabangIds($or, is_numeric($supplierId) ? (int) $supplierId : null);
+                                        $current = is_numeric($get('cabang_id')) ? (int) $get('cabang_id') : null;
+                                        if ($current && !in_array($current, $cabangIds, true)) {
+                                            $cabangIds[] = $current;
+                                        }
+
+                                        if (! empty($cabangIds)) {
+                                            return \App\Models\Cabang::whereIn('id', $cabangIds)
+                                                ->get()
+                                                ->mapWithKeys(function ($cabang) {
+                                                    return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                                });
+                                        }
+                                    }
+                                }
 
                                 if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
@@ -2072,8 +2182,14 @@ class PurchaseOrderResource extends Resource
     public static function buildOrderRequestItems(
         OrderRequest $orderRequest,
         ?int $filterSupplierId = null,
+        ?int $filterCabangId = null,
         ?int $defaultCurrencyId = null
     ): array {
+        if (func_num_args() === 3 && $defaultCurrencyId === null) {
+            $defaultCurrencyId = $filterCabangId;
+            $filterCabangId = null;
+        }
+
         $defaultCurrencyId ??= Currency::query()->first()?->id;
         $items = [];
 
@@ -2083,6 +2199,11 @@ class PurchaseOrderResource extends Resource
                 && $orderRequestItem->supplier_id !== null
                 && (int) $orderRequestItem->supplier_id !== $filterSupplierId
             ) {
+                continue;
+            }
+
+            $resolvedCabangId = static::resolveOrderRequestItemCabangId($orderRequestItem, $orderRequest);
+            if ($filterCabangId !== null && $resolvedCabangId !== null && (int) $resolvedCabangId !== $filterCabangId) {
                 continue;
             }
 
@@ -2119,6 +2240,7 @@ class PurchaseOrderResource extends Resource
                 'refer_item_model_type' => \App\Models\OrderRequestItem::class,
                 'refer_item_model_id'   => $orderRequestItem->id,
                 'unit'                  => $orderRequestItem->product->uom?->abbreviation ?? '-',
+                'cabang_id'             => $resolvedCabangId,
             ];
         }
 
@@ -2130,7 +2252,7 @@ class PurchaseOrderResource extends Resource
      */
     public static function getAvailableOrderRequestSupplierIds(OrderRequest $orderRequest): array
     {
-        $orSupplierIds = $orderRequest->orderRequestItem
+        $orSupplierIds = collect(static::getAvailableOrderRequestItemGroups($orderRequest))
             ->pluck('supplier_id')
             ->filter()
             ->map(fn ($supplierId) => (int) $supplierId)

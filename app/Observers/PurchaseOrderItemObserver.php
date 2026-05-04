@@ -27,6 +27,18 @@ class PurchaseOrderItemObserver
 
         $matchedItem = $orderRequest->orderRequestItem()
             ->where('product_id', $purchaseOrderItem->product_id)
+            ->when($purchaseOrder->supplier_id, function ($query) use ($purchaseOrder) {
+                $query->where(function ($supplierQuery) use ($purchaseOrder) {
+                    $supplierQuery->where('supplier_id', $purchaseOrder->supplier_id)
+                        ->orWhereNull('supplier_id');
+                });
+            })
+            ->when($purchaseOrder->cabang_id, function ($query) use ($purchaseOrder) {
+                $query->where(function ($branchQuery) use ($purchaseOrder) {
+                    $branchQuery->where('cabang_id', $purchaseOrder->cabang_id)
+                        ->orWhereNull('cabang_id');
+                });
+            })
             ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)')
             ->orderBy('id')
             ->first();

@@ -312,6 +312,14 @@ class OrderRequestResource extends Resource
                             ->validationMessages([
                                 'required' => 'Cabang wajib dipilih.',
                             ]),
+                        Placeholder::make('cabang_kode')
+                            ->label('Kode Cabang')
+                            ->content(function (Get $get) {
+                                $cabangId = $get('cabang_id');
+                                if (! $cabangId) return '-';
+                                $c = \App\Models\Cabang::find($cabangId);
+                                return $c ? ($c->kode ?? '-') : '-';
+                            }),
                         Select::make('warehouse_id')
                             ->label('Gudang')
                             ->options(function (callable $get) {
@@ -351,6 +359,14 @@ class OrderRequestResource extends Resource
                             ->validationMessages([
                                 'required' => 'Gudang wajib dipilih.',
                             ]),
+                        Placeholder::make('warehouse_kode')
+                            ->label('Kode Gudang')
+                            ->content(function (Get $get) {
+                                $warehouseId = $get('warehouse_id');
+                                if (! $warehouseId) return '-';
+                                $w = \App\Models\Warehouse::find($warehouseId);
+                                return $w ? ($w->kode ?? '-') : '-';
+                            }),
                         DatePicker::make('request_date')
                             ->required()
                             ->validationMessages([
@@ -531,6 +547,39 @@ class OrderRequestResource extends Resource
                                         }
                                     })
                                     ->helperText('Pilih supplier untuk item ini (opsional, akan memperbarui harga)'),
+                                Select::make('cabang_id')
+                                    ->label('Cabang Item')
+                                    ->options(function () {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+
+                                        if ($user && is_array($manageType) && in_array('all', $manageType)) {
+                                            return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
+                                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                            });
+                                        }
+
+                                        return \App\Models\Cabang::where('id', $user?->cabang_id)->limit(50)->get()->mapWithKeys(function ($cabang) {
+                                            return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                        });
+                                    })
+                                    ->default(fn (Get $get) => $get('../../cabang_id'))
+                                    ->searchable()
+                                    ->preload()
+                                    ->required()
+                                    ->helperText('Cabang per item dipakai untuk memecah Purchase Order bila supplier sama tetapi cabang berbeda.')
+                                    ->validationMessages([
+                                        'required' => 'Cabang item wajib dipilih.',
+                                    ]),
+                                    Placeholder::make('cabang_kode_item')
+                                        ->label('Kode Cabang')
+                                        ->content(function (callable $get) {
+                                            $cabangId = $get('cabang_id');
+                                            if (! $cabangId) return '-';
+                                            $c = \App\Models\Cabang::find($cabangId);
+                                            return $c ? ($c->kode ?? '-') : '-';
+                                        })
+                                        ->columnSpan(1),
                                 Placeholder::make('supplier_recommendation')
                                     ->label('Rekomendasi Supplier')
                                     ->content(function (callable $get) {
@@ -983,6 +1032,7 @@ class OrderRequestResource extends Resource
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
                                 // Use item-level supplier only
                                 $supplierId = $item->supplier_id;
+                                $cabangId = $item->cabang_id ?: $record->cabang_id;
                                 // Priority: item->unit_price (user override) > catalog supplier_price > cost_price
                                 $itemUnitPrice = (float)($item->unit_price ?? 0);
                                 if ($itemUnitPrice > 0) {
@@ -1013,13 +1063,21 @@ class OrderRequestResource extends Resource
                                         return $s ? "({$s->code}) {$s->perusahaan}" : '-';
                                     })()
                                     : '-';
+                                $cabangName = $cabangId
+                                    ? (function () use ($cabangId) {
+                                        $c = \App\Models\Cabang::find($cabangId);
+                                        return $c ? "({$c->kode}) {$c->nama}" : '-';
+                                    })()
+                                    : '-';
                                 $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
 
                                 return [
                                     'item_id'          => $item->id,
                                     'item_supplier_id' => $supplierId,
+                                    'item_cabang_id'   => $cabangId,
                                     'product_name'     => "({$item->product->sku}) {$item->product->name}",
                                     'supplier_name'    => $supplierName,
+                                    'cabang_name'      => $cabangName,
                                     'uom'              => $uom,
                                     'quantity'         => max(0, $remainingQty),
                                     'unit_price'       => $supplierPrice,
@@ -1031,12 +1089,23 @@ class OrderRequestResource extends Resource
                                 ];
                             })->values()->toArray();
 
+                            $groups = collect($items)
+                                ->map(fn ($item) => implode('|', [
+                                    (string) ($item['item_supplier_id'] ?? ''),
+                                    (string) ($item['item_cabang_id'] ?? ''),
+                                ]))
+                                ->filter(fn ($key) => trim($key, '|') !== '')
+                                ->unique();
+
                             // Pre-fill supplier from first item that has one
                             $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+                            $firstCabangId = $items[0]['item_cabang_id'] ?? null;
 
                             return [
-                                'supplier_id'           => $firstSupplierId,
+                                'supplier_id'           => $groups->count() === 1 ? ($firstSupplierId ?? null) : null,
+                                'cabang_id'             => $groups->count() === 1 ? $firstCabangId : null,
                                 'create_purchase_order' => true,
+                                'multi_supplier'        => $groups->count() > 1,
                                 'tax_type'              => $record->tax_type ?? 'None',
                                 'selected_items'        => $items,
                             ];
@@ -1048,6 +1117,7 @@ class OrderRequestResource extends Resource
                                 ->visible(fn(Get $get) => $get('create_purchase_order'))
                                 ->schema([
                                     Hidden::make('tax_type'),
+                                    Hidden::make('cabang_id'),
                                     Select::make('supplier_id')
                                         ->label('Supplier (untuk PO)')
                                         ->helperText('Supplier utama untuk Purchase Order. Setiap item memiliki supplier masing-masing (lihat di tabel item).')
@@ -1124,11 +1194,15 @@ class OrderRequestResource extends Resource
                                             Hidden::make('item_id'),
                                             Hidden::make('max_quantity'),
                                             Hidden::make('item_supplier_id'),
+                                            Hidden::make('item_cabang_id'),
                                             TextInput::make('product_name')
                                                 ->label('Nama Produk')
                                                 ->readOnly(),
                                             TextInput::make('supplier_name')
                                                 ->label('Supplier')
+                                                ->readOnly(),
+                                            TextInput::make('cabang_name')
+                                                ->label('Cabang')
                                                 ->readOnly(),
                                             TextInput::make('uom')
                                                 ->label('Satuan')
@@ -1230,17 +1304,31 @@ class OrderRequestResource extends Resource
                             try {
                                 $orderRequestService = app(OrderRequestService::class);
 
-                                if (! empty($data['multi_supplier'])) {
-                                    // Multi-supplier mode: group included items by supplier and create one PO each
+                                $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                                $groups = $includedItems->groupBy(function ($item) {
+                                    return implode('|', [
+                                        (string) ($item['item_supplier_id'] ?? ''),
+                                        (string) ($item['item_cabang_id'] ?? ''),
+                                    ]);
+                                });
+
+                                if (! empty($data['multi_supplier']) || $groups->count() > 1) {
+                                    // Multi-group mode: group included items by supplier + cabang and create one PO each
                                     $includedItems = collect($data['selected_items'])->filter(fn($i) => $i['include'] ?? false);
                                     if ($includedItems->isEmpty()) {
                                         HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
                                         return;
                                     }
-                                    $groups = $includedItems->groupBy('item_supplier_id');
                                     $created = 0;
-                                    foreach ($groups as $supplierId => $groupItems) {
-                                        if (empty($supplierId)) continue;
+                                    foreach ($groups as $groupItems) {
+                                        $firstItem = $groupItems->first();
+                                        $supplierId = $firstItem['item_supplier_id'] ?? null;
+                                        $cabangId = $firstItem['item_cabang_id'] ?? null;
+
+                                        if (empty($supplierId) || empty($cabangId)) {
+                                            continue;
+                                        }
+
                                         $poNumber = HelperController::generatePoNumber();
                                         // Make sure it's unique
                                         while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
@@ -1248,6 +1336,7 @@ class OrderRequestResource extends Resource
                                         }
                                         $poData = array_merge($data, [
                                             'supplier_id'    => $supplierId,
+                                            'cabang_id'      => $cabangId,
                                             'po_number'      => $poNumber,
                                             'selected_items' => $groupItems->values()->toArray(),
                                             'multi_supplier' => false,
@@ -1287,6 +1376,7 @@ class OrderRequestResource extends Resource
                                 $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
                                 // Use item-level supplier only (no OR-level fallback)
                                 $supplierId = $item->supplier_id;
+                                $cabangId = $item->cabang_id ?: $record->cabang_id;
                                 // Priority: item->unit_price (user override) > catalog supplier_price > cost_price
                                 $itemUnitPrice = (float)($item->unit_price ?? 0);
                                 if ($itemUnitPrice > 0) {
@@ -1317,13 +1407,21 @@ class OrderRequestResource extends Resource
                                         return $s ? "({$s->code}) {$s->perusahaan}" : '-';
                                     })()
                                     : '-';
+                                $cabangName = $cabangId
+                                    ? (function () use ($cabangId) {
+                                        $c = \App\Models\Cabang::find($cabangId);
+                                        return $c ? "({$c->kode}) {$c->nama}" : '-';
+                                    })()
+                                    : '-';
                                 $uom = $item->product->uom->abbreviation ?? $item->product->uom->name ?? '-';
 
                                 return [
                                     'item_id'          => $item->id,
                                     'item_supplier_id' => $supplierId,
+                                    'item_cabang_id'   => $cabangId,
                                     'product_name'     => "({$item->product->sku}) {$item->product->name}",
                                     'supplier_name'    => $supplierName,
+                                    'cabang_name'      => $cabangName,
                                     'uom'              => $uom,
                                     'quantity'         => max(0, $remainingQty),
                                     'original_price'   => number_format((float)($item->original_price ?? $supplierPrice), 0, ',', '.'),
@@ -1337,12 +1435,21 @@ class OrderRequestResource extends Resource
                                 ];
                             })->values()->toArray();
 
+                            $groups = collect($items)
+                                ->map(fn ($item) => implode('|', [
+                                    (string) ($item['item_supplier_id'] ?? ''),
+                                    (string) ($item['item_cabang_id'] ?? ''),
+                                ]))
+                                ->filter(fn ($key) => trim($key, '|') !== '')
+                                ->unique();
+
                             // Detect multi-supplier: items have different item_supplier_id values
-                            $uniqueSuppliers = collect($items)->pluck('item_supplier_id')->filter()->unique();
-                            $isMultiSupplier = $uniqueSuppliers->count() > 1;
+                            $isMultiSupplier = $groups->count() > 1;
+                            $firstCabangId = $items[0]['item_cabang_id'] ?? null;
 
                             return [
-                                'supplier_id'           => $isMultiSupplier ? null : $uniqueSuppliers->first(),
+                                'supplier_id'           => $isMultiSupplier ? null : ($items[0]['item_supplier_id'] ?? null),
+                                'cabang_id'             => $isMultiSupplier ? null : $firstCabangId,
                                 'create_purchase_order' => true,
                                 'multi_supplier'        => $isMultiSupplier,
                                 'tax_type'              => $record->tax_type ?? 'PPN Excluded',
@@ -1354,6 +1461,7 @@ class OrderRequestResource extends Resource
                                 ->icon('heroicon-o-cog-6-tooth')
                                 ->schema([
                                     Hidden::make('tax_type'),
+                                    Hidden::make('cabang_id'),
                                     \Filament\Forms\Components\Toggle::make('create_purchase_order')
                                         ->label('Buat Purchase Order secara otomatis?')
                                         ->helperText('Aktifkan untuk langsung membuat PO setelah approval.')
@@ -1362,7 +1470,7 @@ class OrderRequestResource extends Resource
                                         ->columnSpanFull(),
                                     \Filament\Forms\Components\Placeholder::make('multi_supplier_notice')
                                         ->label('')
-                                        ->content('Item dalam OR ini memiliki beberapa supplier berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
+                                        ->content('Item dalam OR ini memiliki beberapa kombinasi supplier dan cabang berbeda. Sistem akan membuat satu PO per kombinasi secara otomatis.')
                                         ->visible(fn(Get $get) => $get('create_purchase_order') && $get('multi_supplier'))
                                         ->columnSpanFull(),
                                     Hidden::make('multi_supplier'),
@@ -1449,11 +1557,15 @@ class OrderRequestResource extends Resource
                                             Hidden::make('item_id'),
                                             Hidden::make('max_quantity'),
                                             Hidden::make('item_supplier_id'),
+                                            Hidden::make('item_cabang_id'),
                                             TextInput::make('product_name')
                                                 ->label('Nama Produk')
                                                 ->readOnly(),
                                             TextInput::make('supplier_name')
                                                 ->label('Supplier')
+                                                ->readOnly(),
+                                            TextInput::make('cabang_name')
+                                                ->label('Cabang')
                                                 ->readOnly(),
                                             TextInput::make('uom')
                                                 ->label('Satuan')
@@ -1571,23 +1683,38 @@ class OrderRequestResource extends Resource
                             $orderRequestService = app(OrderRequestService::class);
 
                             if ($data['create_purchase_order']) {
-                                if (!empty($data['multi_supplier'])) {
-                                    // Multi-supplier: group items by item_supplier_id and create one PO each
+                                $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                                $groups = $includedItems->groupBy(function ($item) {
+                                    return implode('|', [
+                                        (string) ($item['item_supplier_id'] ?? ''),
+                                        (string) ($item['item_cabang_id'] ?? ''),
+                                    ]);
+                                });
+
+                                if (!empty($data['multi_supplier']) || $groups->count() > 1) {
+                                    // Multi-group: group items by supplier + cabang and create one PO each
                                     $includedItems = collect($data['selected_items'])->filter(fn($i) => $i['include'] ?? false);
                                     if ($includedItems->isEmpty()) {
                                         HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
                                         return;
                                     }
-                                    $groups = $includedItems->groupBy('item_supplier_id');
                                     $created = 0;
-                                    foreach ($groups as $supplierId => $groupItems) {
-                                        if (empty($supplierId)) continue;
+                                    foreach ($groups as $groupItems) {
+                                        $firstItem = $groupItems->first();
+                                        $supplierId = $firstItem['item_supplier_id'] ?? null;
+                                        $cabangId = $firstItem['item_cabang_id'] ?? null;
+
+                                        if (empty($supplierId) || empty($cabangId)) {
+                                            continue;
+                                        }
+
                                         $poNumber = HelperController::generatePoNumber();
                                         while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
                                             $poNumber = HelperController::generatePoNumber();
                                         }
                                         $poData = array_merge($data, [
                                             'supplier_id'    => $supplierId,
+                                            'cabang_id'      => $cabangId,
                                             'po_number'      => $poNumber,
                                             'selected_items' => $groupItems->values()->toArray(),
                                             'multi_supplier' => false,
@@ -1677,8 +1804,14 @@ class OrderRequestResource extends Resource
                         \Filament\Infolists\Components\TextEntry::make('warehouse.name')
                             ->label('Gudang')
                             ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('warehouse.kode')
+                            ->label('Kode Gudang')
+                            ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('cabang.nama')
                             ->label('Cabang')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('cabang.kode')
+                            ->label('Kode Cabang')
                             ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('request_date')
                             ->label('Request Date')
@@ -1714,9 +1847,33 @@ class OrderRequestResource extends Resource
                                 \Filament\Infolists\Components\TextEntry::make('product.name')
                                     ->label('Produk')
                                     ->columnSpan(2),
-                                \Filament\Infolists\Components\TextEntry::make('supplier.perusahaan')
+                                \Filament\Infolists\Components\TextEntry::make('supplier_display')
                                     ->label('Supplier')
-                                    ->placeholder('-'),
+                                    ->getStateUsing(function ($record) {
+                                        if (! $record->supplier_id) {
+                                            return '-';
+                                        }
+
+                                        $code = $record->supplier?->code ?? '-';
+                                        $name = $record->supplier?->perusahaan ?? '-';
+
+                                        return "({$code}) {$name}";
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('cabang.nama')
+                                    ->label('Cabang Item')
+                                    ->getStateUsing(function ($record) {
+                                        $code = $record->cabang?->kode ?? $record->orderRequest?->cabang?->kode;
+                                        $name = $record->cabang?->nama ?? $record->orderRequest?->cabang?->nama;
+
+                                        if (! $name) {
+                                            return '-';
+                                        }
+
+                                        return $code ? "({$code}) {$name}" : $name;
+                                    }),
+                                \Filament\Infolists\Components\TextEntry::make('cabang.kode')
+                                    ->label('Kode Cabang')
+                                    ->getStateUsing(fn($record) => $record->cabang?->kode ?? $record->orderRequest?->cabang?->kode ?? '-'),
                                 \Filament\Infolists\Components\TextEntry::make('quantity')
                                     ->label('Qty'),
                                 \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
@@ -1797,6 +1954,10 @@ class OrderRequestResource extends Resource
             };
 
             foreach ($data['orderRequestItem'] as &$item) {
+                if (empty($item['cabang_id'])) {
+                    $item['cabang_id'] = $data['cabang_id'] ?? null;
+                }
+
                 $qty   = (float) ($item['quantity'] ?? 0);
                 $price = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
                 $disc  = (float) ($item['discount'] ?? 0);
@@ -1836,6 +1997,10 @@ class OrderRequestResource extends Resource
             };
 
             foreach ($data['orderRequestItem'] as &$item) {
+                if (empty($item['cabang_id'])) {
+                    $item['cabang_id'] = $data['cabang_id'] ?? null;
+                }
+
                 $qty   = (float) ($item['quantity'] ?? 0);
                 $price = \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
                 $disc  = (float) ($item['discount'] ?? 0);

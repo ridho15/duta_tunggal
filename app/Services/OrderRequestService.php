@@ -121,7 +121,7 @@ class OrderRequestService
             $purchaseOrder = $orderRequest->purchaseOrders()->create([
                 'po_number'    => $data['po_number'],
                 'supplier_id'  => $supplier->id,
-                'cabang_id'    => $orderRequest->cabang_id,
+                'cabang_id'    => $data['cabang_id'] ?? $orderRequest->cabang_id,
                 'order_date'   => $data['order_date'],
                 'expected_date'=> $data['expected_date'] ?? null,
                 'note'         => $data['note'] ?? null,
@@ -206,7 +206,7 @@ class OrderRequestService
             'note'         => $data['note'] ?? null,
             'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
             'warehouse_id' => $orderRequest->warehouse_id,
-            'cabang_id'    => $orderRequest->cabang_id,
+            'cabang_id'    => $data['cabang_id'] ?? $orderRequest->cabang_id,
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
             'created_by'   => Auth::id() ?? $orderRequest->created_by,
         ]);
