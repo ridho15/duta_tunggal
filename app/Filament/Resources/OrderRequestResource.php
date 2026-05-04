@@ -547,7 +547,7 @@ class OrderRequestResource extends Resource
                                             return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                         });
                                     })
-                                    ->default(fn (Get $get) => $get('../../cabang_id'))
+                                    ->default(fn(Get $get) => $get('../../cabang_id'))
                                     ->searchable()
                                     ->preload()
                                     ->required()
@@ -1065,11 +1065,11 @@ class OrderRequestResource extends Resource
                             })->values()->toArray();
 
                             $groups = collect($items)
-                                ->map(fn ($item) => implode('|', [
+                                ->map(fn($item) => implode('|', [
                                     (string) ($item['item_supplier_id'] ?? ''),
                                     (string) ($item['item_cabang_id'] ?? ''),
                                 ]))
-                                ->filter(fn ($key) => trim($key, '|') !== '')
+                                ->filter(fn($key) => trim($key, '|') !== '')
                                 ->unique();
 
                             // Pre-fill supplier from first item that has one
@@ -1411,11 +1411,11 @@ class OrderRequestResource extends Resource
                             })->values()->toArray();
 
                             $groups = collect($items)
-                                ->map(fn ($item) => implode('|', [
+                                ->map(fn($item) => implode('|', [
                                     (string) ($item['item_supplier_id'] ?? ''),
                                     (string) ($item['item_cabang_id'] ?? ''),
                                 ]))
-                                ->filter(fn ($key) => trim($key, '|') !== '')
+                                ->filter(fn($key) => trim($key, '|') !== '')
                                 ->unique();
 
                             // Detect multi-supplier: items have different item_supplier_id values
@@ -1846,9 +1846,6 @@ class OrderRequestResource extends Resource
 
                                         return $code ? "({$code}) {$name}" : $name;
                                     }),
-                                \Filament\Infolists\Components\TextEntry::make('cabang.kode')
-                                    ->label('Kode Cabang')
-                                    ->getStateUsing(fn($record) => $record->cabang?->kode ?? $record->orderRequest?->cabang?->kode ?? '-'),
                                 \Filament\Infolists\Components\TextEntry::make('quantity')
                                     ->label('Qty'),
                                 \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
