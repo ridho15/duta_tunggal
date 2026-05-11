@@ -367,7 +367,6 @@ class OrderRequestResource extends Resource
                                 'PPN Excluded' => 'Eklusif (PPN di luar harga)',
                             ])
                             ->default('PPN Excluded')
-                            ->required()
                             ->live()
                             ->helperText('Pilihan ini akan otomatis set tipe pajak ke semua item. Per-item masih bisa diubah manual.')
                             ->afterStateUpdated(function (string $state, callable $get, callable $set) {
