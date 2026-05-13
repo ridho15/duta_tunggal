@@ -1421,7 +1421,7 @@ class PurchaseOrderResource extends Resource
                             ->label("Total Amount")
                             ->required()
                             ->reactive()
-                            ->readOnly()
+                            ->hidden()
                             ->indonesianMoney()
                             ->helperText('Total dihitung dari item dan biaya; tampil untuk referensi saja')
                             ->afterStateHydrated(function ($component, $record) {
