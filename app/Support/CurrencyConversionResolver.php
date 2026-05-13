@@ -33,9 +33,31 @@ class CurrencyConversionResolver
         return round($amount * static::resolveRate($currencyId), 2);
     }
 
+    public static function convertBetweenCurrencies(float $amount, ?int $fromCurrencyId, ?int $toCurrencyId): float
+    {
+        $fromRate = static::resolveRate($fromCurrencyId);
+        $toRate = static::resolveRate($toCurrencyId);
+
+        if ($toRate <= 0) {
+            return $amount;
+        }
+
+        return round(($amount * $fromRate) / $toRate, 2);
+    }
+
     public static function convertFromIdr(float $amount, ?int $currencyId): float
     {
         return round($amount / static::resolveRate($currencyId), 2);
+    }
+
+    public static function formatAmount(?int $currencyId, float $amount, int $decimals = 0): string
+    {
+        return static::resolveSymbol($currencyId) . ' ' . number_format($amount, $decimals, ',', '.');
+    }
+
+    public static function formatAmountFromIdr(float $amount, ?int $currencyId, int $decimals = 0): string
+    {
+        return static::formatAmount($currencyId, static::convertFromIdr($amount, $currencyId), $decimals);
     }
 
     public static function resolveSymbol(?int $currencyId): string

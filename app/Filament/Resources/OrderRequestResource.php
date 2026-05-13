@@ -12,6 +12,7 @@ use App\Models\Supplier;
 use App\Models\Currency;
 use App\Models\Warehouse;
 use App\Services\OrderRequestService;
+use App\Support\CurrencyConversionResolver;
 use App\Support\ProcurementFailureNotifier;
 use App\Support\TaxDefaultResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -166,24 +167,22 @@ class OrderRequestResource extends Resource
 
     public static function resolveCurrencySymbol(?int $currencyId): string
     {
-        return self::resolveCurrency($currencyId)?->symbol ?: 'Rp';
+        return CurrencyConversionResolver::resolveSymbol($currencyId);
     }
 
     public static function resolveCurrencyRateToRupiah(?int $currencyId): float
     {
-        $rate = (float) (self::resolveCurrency($currencyId)?->to_rupiah ?? 1);
-
-        return $rate > 0 ? $rate : 1.0;
+        return CurrencyConversionResolver::resolveRate($currencyId);
     }
 
     public static function convertIdrToCurrency(float $amountInIdr, ?int $currencyId): float
     {
-        return $amountInIdr / self::resolveCurrencyRateToRupiah($currencyId);
+        return CurrencyConversionResolver::convertFromIdr($amountInIdr, $currencyId);
     }
 
     public static function formatMoneyByCurrency(?int $currencyId, float $amount): string
     {
-        return self::resolveCurrencySymbol($currencyId) . ' ' . number_format($amount, 0, ',', '.');
+        return CurrencyConversionResolver::formatAmount($currencyId, $amount);
     }
 
     public static function resolveProductLabel(?int $productId): ?string
@@ -876,7 +875,6 @@ class OrderRequestResource extends Resource
                                             ? (int) $get('currency_id')
                                             : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
                                     ))
-                                    ->indonesianMoney()
                                     ->disabled()
                                     ->validationMessages([
                                         'numeric' => 'Subtotal harus berupa angka.',
