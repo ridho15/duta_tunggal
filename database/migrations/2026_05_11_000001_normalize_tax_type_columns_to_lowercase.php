@@ -26,6 +26,20 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Convert data back to original format before changing type
+        DB::statement("UPDATE purchase_order_items SET tipe_pajak = CASE
+            WHEN LOWER(TRIM(tipe_pajak)) IN ('none', 'non pajak', 'non-pajak', 'nonpajak') THEN 'Non Pajak'
+            WHEN LOWER(TRIM(tipe_pajak)) IN ('inklusif', 'ppn included', 'included', 'ppn-included') THEN 'Inklusif'
+            ELSE 'Eklusif'
+        END");
+
+        DB::statement("UPDATE order_request_items SET tipe_pajak = CASE
+            WHEN LOWER(TRIM(tipe_pajak)) IN ('none', 'non pajak', 'non-pajak', 'nonpajak') THEN 'Non Pajak'
+            WHEN LOWER(TRIM(tipe_pajak)) IN ('inklusif', 'ppn included', 'included', 'ppn-included') THEN 'Inklusif'
+            ELSE 'Eklusif'
+        END");
+
+        // Now alter table type back to ENUM
         DB::statement("ALTER TABLE purchase_order_items MODIFY tipe_pajak ENUM('Non Pajak', 'Inklusif', 'Eklusif') NOT NULL DEFAULT 'Eklusif'");
         DB::statement("ALTER TABLE order_request_items MODIFY tipe_pajak ENUM('Non Pajak', 'Inklusif', 'Eklusif') NOT NULL DEFAULT 'Eklusif'");
     }

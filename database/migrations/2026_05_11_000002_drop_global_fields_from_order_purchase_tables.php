@@ -14,28 +14,40 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Disable foreign key checks to allow column drops
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        // Drop foreign key constraints first using raw SQL with error handling
+        try {
+            DB::statement('ALTER TABLE `purchase_orders` DROP FOREIGN KEY `purchase_orders_cabang_id_foreign`');
+        } catch (\Exception $e) {
+            // Foreign key might not exist, continue
+        }
 
         try {
             // Drop global tax_type from order_requests table
             if (Schema::hasColumn('order_requests', 'tax_type')) {
-                DB::statement('ALTER TABLE `order_requests` DROP COLUMN `tax_type`');
+                Schema::table('order_requests', function (Blueprint $table) {
+                    $table->dropColumn('tax_type');
+                });
             }
 
             // Drop global fields from purchase_orders table
             if (Schema::hasColumn('purchase_orders', 'ppn_option')) {
-                DB::statement('ALTER TABLE `purchase_orders` DROP COLUMN `ppn_option`');
+                Schema::table('purchase_orders', function (Blueprint $table) {
+                    $table->dropColumn('ppn_option');
+                });
             }
             if (Schema::hasColumn('purchase_orders', 'cabang_id')) {
-                DB::statement('ALTER TABLE `purchase_orders` DROP COLUMN `cabang_id`');
+                Schema::table('purchase_orders', function (Blueprint $table) {
+                    $table->dropColumn('cabang_id');
+                });
             }
             if (Schema::hasColumn('purchase_orders', 'warehouse_id')) {
-                DB::statement('ALTER TABLE `purchase_orders` DROP COLUMN `warehouse_id`');
+                Schema::table('purchase_orders', function (Blueprint $table) {
+                    $table->dropColumn('warehouse_id');
+                });
             }
-        } finally {
-            // Re-enable foreign key checks
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Migration error: ' . $e->getMessage());
+            throw $e;
         }
     }
 

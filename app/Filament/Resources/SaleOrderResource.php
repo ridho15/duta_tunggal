@@ -575,6 +575,7 @@ class SaleOrderResource extends Resource
                             ->required()
                             ->disabled()
                             ->reactive()
+                            ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
                             ->default(0)
                             ->indonesianMoney()
                             ->validationMessages([
@@ -794,6 +795,7 @@ class SaleOrderResource extends Resource
                                     ->default(0),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
+                                    ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
                                     ->indonesianMoney()
                                     ->validationMessages([
                                         'required' => 'Unit Price harus diisi',
@@ -817,7 +819,7 @@ class SaleOrderResource extends Resource
                                     }),
                                 TextInput::make('total')
                                     ->label('Total (Harga × Qty)')
-                                    ->prefix('Rp')
+                                    ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
