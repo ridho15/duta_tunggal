@@ -621,6 +621,7 @@ class QuotationResource extends Resource
                                     ->numeric()
                                     ->reactive()
                                     ->required()
+                                    ->readOnly()
                                     ->validationMessages([
                                         'required' => 'Tax tidak boleh kosong'
                                     ])
