@@ -37,6 +37,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Get;
 use Filament\Forms\Form;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
@@ -130,6 +131,18 @@ class SaleOrderResource extends Resource
     protected static function resolveExchangeRate(?int $currencyId): float
     {
         return CurrencyConversionResolver::resolveRate($currencyId);
+    }
+
+    protected static function convertCurrencyAmount(float $amount, ?int $fromCurrencyId, ?int $toCurrencyId): float
+    {
+        $fromRate = static::resolveExchangeRate($fromCurrencyId);
+        $toRate = static::resolveExchangeRate($toCurrencyId);
+
+        if ($toRate <= 0) {
+            return $amount;
+        }
+
+        return round(($amount * $fromRate) / $toRate, 2);
     }
 
     public static function normalizeFormDataForPersist(array $data): array
@@ -560,11 +573,45 @@ class SaleOrderResource extends Resource
                             ->searchable()
                             ->preload()
                             ->reactive()
+                            ->live()
                             ->afterStateHydrated(function ($component, $state) {
                                 $component->state($state ?: static::resolveDefaultCurrencyId());
                             })
-                            ->afterStateUpdated(function ($set, $state) {
-                                $set('exchange_rate', static::resolveExchangeRate(is_numeric($state) ? (int) $state : null));
+                            ->afterStateUpdated(function ($set, $get, $state, $old) {
+                                $newCurrencyId = is_numeric($state) ? (int) $state : static::resolveDefaultCurrencyId();
+                                $oldCurrencyId = is_numeric($old) ? (int) $old : static::resolveDefaultCurrencyId();
+
+                                $set('exchange_rate', static::resolveExchangeRate($newCurrencyId));
+
+                                if ($newCurrencyId === $oldCurrencyId) {
+                                    return;
+                                }
+
+                                $items = $get('saleOrderItem') ?? [];
+                                $convertedItems = [];
+                                $totalAmount = 0.0;
+
+                                foreach ($items as $item) {
+                                    $quantity = (float) ($item['quantity'] ?? 0);
+                                    $discount = (float) ($item['discount'] ?? 0);
+                                    $taxRate = (float) ($item['tax'] ?? 0);
+                                    $taxType = static::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+                                    $currentUnitPrice = (float) HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
+                                    $convertedUnitPrice = static::convertCurrencyAmount($currentUnitPrice, $oldCurrencyId, $newCurrencyId);
+                                    $convertedTotal = $quantity * $convertedUnitPrice;
+
+                                    $item['unit_price'] = number_format($convertedUnitPrice, 0, ',', '.');
+                                    $item['total'] = number_format($convertedTotal, 0, ',', '.');
+                                    $item['subtotal'] = static::formatMoneyState(HelperController::hitungSubtotal($quantity, $convertedUnitPrice, $discount, $taxRate, $taxType));
+                                    $item['tax_nominal'] = number_format(HelperController::hitungTaxNominal($quantity, $convertedUnitPrice, $discount, $taxRate, $taxType), 0, ',', '.');
+
+                                    $convertedSubtotal = HelperController::hitungSubtotal($quantity, $convertedUnitPrice, $discount, $taxRate, $taxType);
+                                    $convertedItems[] = $item;
+                                    $totalAmount += $convertedSubtotal;
+                                }
+
+                                $set('saleOrderItem', $convertedItems);
+                                $set('total_amount', static::formatMoneyState($totalAmount));
                             })
                             ->helperText('Mata uang transaksi. Nilai invoice dan laporan akan dikonversi ke Rupiah menggunakan kurs master.'),
                         Hidden::make('exchange_rate')
@@ -575,9 +622,10 @@ class SaleOrderResource extends Resource
                             ->required()
                             ->disabled()
                             ->reactive()
-                            ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                            ->live()
                             ->default(0)
                             ->indonesianMoney()
+                            ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
                             ->validationMessages([
                                 'required' => 'Total amount wajib diisi',
                                 'numeric' => 'Total amount harus berupa angka'
@@ -795,8 +843,9 @@ class SaleOrderResource extends Resource
                                     ->default(0),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
-                                    ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                                    ->live()
                                     ->indonesianMoney()
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : static::resolveDefaultCurrencyId()))
                                     ->validationMessages([
                                         'required' => 'Unit Price harus diisi',
                                         'numeric' => 'Unit Price tidak valid !'
@@ -819,7 +868,8 @@ class SaleOrderResource extends Resource
                                     }),
                                 TextInput::make('total')
                                     ->label('Total (Harga × Qty)')
-                                    ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                                    ->live()
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : static::resolveDefaultCurrencyId()))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
@@ -915,7 +965,8 @@ class SaleOrderResource extends Resource
                                     ->suffix('%'),
                                 TextInput::make('tax_nominal')
                                     ->label('Nominal Pajak')
-                                    ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                                    ->live()
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : static::resolveDefaultCurrencyId()))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
@@ -1680,7 +1731,7 @@ class SaleOrderResource extends Resource
                             ->formatStateUsing(fn($state) => $state ? $state . ' Hari' : '-'),
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
-                            ->rupiah(),
+                            ->getStateUsing(fn ($record) => static::formatCurrencyAmount($record?->currency_id, $record?->total_amount)),
                         \Filament\Infolists\Components\TextEntry::make('tipe_pengiriman')
                             ->label('Tipe Pengiriman')
                             ->placeholder('-'),
@@ -1709,7 +1760,7 @@ class SaleOrderResource extends Resource
                                     ->getStateUsing(function ($record) {
                                         $price = (float) ($record->unit_price ?? 0);
                                         $qty = (float) ($record->quantity ?? 0);
-                                        return 'Rp ' . number_format($price * $qty, 0, ',', '.');
+                                        return static::formatCurrencyAmount($record?->currency?->id, $price * $qty);
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('discount')
                                     ->label('Diskon (%)')
@@ -1729,7 +1780,7 @@ class SaleOrderResource extends Resource
                                         $tax = (float) ($record->tax ?? 0);
                                         $tipePajak = $record->tipe_pajak ?? null;
                                         $taxNominal = \App\Http\Controllers\HelperController::hitungTaxNominal($qty, $unitPrice, $discount, $tax, $tipePajak);
-                                        return 'Rp ' . number_format($taxNominal, 0, ',', '.');
+                                        return static::formatCurrencyAmount($record?->currency?->id, $taxNominal);
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('subtotal_display')
                                     ->label('Sub Total')
@@ -1742,7 +1793,7 @@ class SaleOrderResource extends Resource
                                             $record->tax,
                                             $record->tipe_pajak ?? null
                                         );
-                                        return 'Rp ' . number_format($subtotal, 0, ',', '.');
+                                        return static::formatCurrencyAmount($record?->currency?->id, $subtotal);
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('stock_tersedia')
                                     ->label('Stok Bebas (Semua Gudang)')

@@ -24,6 +24,7 @@ use App\Services\QualityControlService;
 use App\Services\PurchaseReceiptService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Helpers\MoneyHelper;
+use App\Support\CurrencyConversionResolver;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -902,18 +903,12 @@ class PurchaseOrderResource extends Resource
                                         $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null))));
                                     })
                                     ->prefix(function ($get) {
-                                        $currency = Currency::find($get('currency_id'));
-                                        if ($currency) {
-                                            return $currency->symbol;
-                                        }
-
-                                        return null;
+                                        return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
                                     }),
                                 TextInput::make('total')
                                     ->label('Total (Harga × Qty)')
                                     ->prefix(function ($get) {
-                                        $currency = Currency::find($get('currency_id'));
-                                        return $currency ? $currency->symbol : null;
+                                        return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
                                     })
                                     ->readOnly()
                                     ->dehydrated(false)
@@ -977,12 +972,7 @@ class PurchaseOrderResource extends Resource
                                     ->label('Sub Total (termasuk pajak)')
                                     ->reactive()
                                     ->prefix(function ($get) {
-                                        $currency = Currency::find($get('currency_id'));
-                                        if ($currency) {
-                                            return $currency->symbol;
-                                        }
-
-                                        return null;
+                                        return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
                                     })
                                     ->default(0)
                                     ->readOnly()
