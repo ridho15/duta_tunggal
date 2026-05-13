@@ -158,7 +158,7 @@ class AssetResource extends Resource
                             ->afterStateUpdated(function (Get $get, Set $set, $state) {
                                 if ($state) {
                                     // Auto-fill purchase_order_id and purchase_order_item_id based on selected product
-                                    $product = \App\Models\Product::find($state);
+                                    $product = \App\Models\Product::withoutGlobalScope('product_cabang')->find($state);
                                     if ($product) {
                                         // Find the latest purchase order item for this product
                                         $latestPOItem = \App\Models\PurchaseOrderItem::where('product_id', $state)

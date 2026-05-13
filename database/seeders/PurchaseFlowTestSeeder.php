@@ -68,17 +68,19 @@ class PurchaseFlowTestSeeder extends Seeder
             PurchaseReceiptItem::where('product_id', $product->id)->delete();
             PurchaseReceipt::where('purchase_order_id', '>', 0)->delete(); // Will be recreated
             PurchaseOrder::where('supplier_id', $supplier->id)->delete(); // Will be recreated
-            OrderRequest::where('supplier_id', $supplier->id)->delete(); // Will be recreated
+            // OrderRequest header no longer stores supplier/warehouse; remove any prior requests for this run
+            OrderRequest::whereIn('id', function ($q) use ($supplier) {
+                $q->select('order_request_id')->from('order_request_items')->where('supplier_id', $supplier->id);
+            })->delete();
             // 1. Create Order Request
             $this->command->info('Step 1: Creating Order Request...');
             $orderRequest = OrderRequest::create([
                 'request_number' => 'OR-' . now()->format('Ymd') . '-0001',
-                'warehouse_id' => $warehouse->id,
-                'supplier_id' => $supplier->id,
                 'request_date' => now(),
                 'status' => 'draft',
                 'note' => 'Test Order Request for Purchase Flow',
-                'created_by' => $user->id
+                'created_by' => $user->id,
+                'currency_id' => $currency->id,
             ]);
 
             // Create Order Request Item
@@ -86,7 +88,10 @@ class PurchaseFlowTestSeeder extends Seeder
                 'order_request_id' => $orderRequest->id,
                 'product_id' => $product->id,
                 'quantity' => 10,
-                'note' => 'Test item'
+                'note' => 'Test item',
+                'cabang_id' => $warehouse->cabang_id,
+                'supplier_id' => $supplier->id,
+                'currency_id' => $currency->id,
             ]);
 
             // 2. Approve Order Request (creates Purchase Order)

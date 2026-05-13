@@ -380,7 +380,7 @@ class QuotationResource extends Resource
                                     ->required()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state, $livewire) {
-                                        $product = Product::find($state);
+                                        $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                         if ($product) {
                                             // Format unit_price as Indonesian money for proper display
                                             $numericUnit = (float)$product->sell_price;

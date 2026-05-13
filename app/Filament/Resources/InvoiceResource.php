@@ -10,6 +10,7 @@ use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
 use App\Models\TaxSetting;
 use App\Services\InvoiceService;
+use App\Support\CurrencyConversionResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -150,6 +151,20 @@ class InvoiceResource extends Resource
                                         } elseif ($get('from_model_type') == 'App\Models\SaleOrder') {
                                             $saleOrder = SaleOrder::find($state);
                                             if ($saleOrder) {
+                                                $currencyId = (int) ($saleOrder->currency_id ?? 0);
+                                                $exchangeRate = (float) ($saleOrder->exchange_rate ?? 0);
+
+                                                if ($exchangeRate <= 0) {
+                                                    $exchangeRate = CurrencyConversionResolver::resolveRate($currencyId ?: null);
+                                                }
+
+                                                $firstItem = $saleOrder->saleOrderItem->first();
+                                                if ($firstItem) {
+                                                    $set('ppn_rate', (float) ($firstItem->tax ?? 0));
+                                                    $set('tax', (float) ($firstItem->tax ?? 0));
+                                                    $set('tipe_pajak', \App\Services\TaxService::normalizeType($firstItem->tipe_pajak ?? null));
+                                                }
+
                                                 foreach ($saleOrder->saleOrderItem as $item) {
                                                     $discountAmount = $item->unit_price * ($item->discount / 100);
                                                     $price = $item->unit_price - $discountAmount;
@@ -157,10 +172,10 @@ class InvoiceResource extends Resource
                                                     array_push($items, [
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->quantity,
-                                                        'price' => $price,
-                                                        'total' => $subtotal
+                                                        'price' => CurrencyConversionResolver::convertToIdr((float) $price, $currencyId ?: null),
+                                                        'total' => CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null)
                                                     ]);
-                                                    $total += $subtotal;
+                                                    $total += CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null);
                                                 }
                                             }
                                         }

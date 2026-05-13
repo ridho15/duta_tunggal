@@ -11,18 +11,20 @@ return new class extends Migration
     {
         Schema::table('order_request_items', function (Blueprint $table) {
             if (! Schema::hasColumn('order_request_items', 'tipe_pajak')) {
-                $table->string('tipe_pajak', 20)->default('Eklusif')->after('tax');
+                $table->string('tipe_pajak', 20)->default('eklusif')->after('tax');
             }
         });
 
-        if (Schema::hasTable('order_request_items') && Schema::hasTable('order_requests')) {
+        // Only update if order_requests still has tax_type column
+        // (will be removed in Phase 1 migration, so this may be skipped)
+        if (Schema::hasTable('order_request_items') && Schema::hasTable('order_requests') && Schema::hasColumn('order_requests', 'tax_type')) {
             DB::statement(
                 "UPDATE order_request_items ori
                  INNER JOIN order_requests orh ON orh.id = ori.order_request_id
                  SET ori.tipe_pajak = CASE
-                    WHEN COALESCE(ori.tax, 0) <= 0 OR COALESCE(orh.tax_type, 'PPN Excluded') = 'None' THEN 'Non Pajak'
-                    WHEN COALESCE(orh.tax_type, 'PPN Excluded') = 'PPN Included' THEN 'Inklusif'
-                    ELSE 'Eklusif'
+                    WHEN COALESCE(ori.tax, 0) <= 0 OR COALESCE(orh.tax_type, 'PPN Excluded') = 'None' THEN 'none'
+                    WHEN COALESCE(orh.tax_type, 'PPN Excluded') = 'PPN Included' THEN 'inklusif'
+                    ELSE 'eklusif'
                  END"
             );
         }

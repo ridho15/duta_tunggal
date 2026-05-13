@@ -205,6 +205,13 @@ class EditPurchaseOrder extends EditRecord
         $total = 0;
 
         if ($record) {
+            if (! empty($data['purchaseOrderItem']) && is_array($data['purchaseOrderItem'])) {
+                foreach ($data['purchaseOrderItem'] as &$item) {
+                    $item['tipe_pajak'] = \App\Filament\Resources\PurchaseOrderResource::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+                }
+                unset($item);
+            }
+
             foreach ($record->purchaseOrderItem as $item) {
                 $total += HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);
             }

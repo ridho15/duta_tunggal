@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             
             // Master Data
-            // CurrencySeeder::class, // REMOVED: Handled by FinanceSeeder
+            CurrencySeeder::class,
             UnitOfMeasureSeeder::class,
             CabangSeeder::class, // ✅ TAMBAHKAN: Data cabang untuk multi-cabang
             ChartOfAccountSeeder::class, // ✅ TAMBAHKAN: COA lengkap

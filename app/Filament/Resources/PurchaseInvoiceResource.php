@@ -1248,7 +1248,10 @@ class PurchaseInvoiceResource extends Resource
             return [];
         }
 
-        return \App\Models\OrderRequest::where('cabang_id', $cabangId)
+        return \App\Models\OrderRequest::where(function ($query) use ($cabangId) {
+                $query->whereHas('orderRequestItem', fn ($itemQuery) => $itemQuery->where('cabang_id', $cabangId))
+                    ->orWhereHas('purchaseOrders', fn ($purchaseOrderQuery) => $purchaseOrderQuery->where('cabang_id', $cabangId));
+            })
             ->where(function ($q) use ($supplierId) {
                 $q->whereHas('orderRequestItem', fn($iq) => $iq->where('supplier_id', $supplierId))
                   ->orWhereHas('purchaseOrders', fn($pq) => $pq->where('supplier_id', $supplierId));

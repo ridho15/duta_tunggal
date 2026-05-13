@@ -30,31 +30,20 @@ test('Order Request view shows header and item cabang/warehouse codes', async ({
 
   // Detail item should also expose branch code information
   await expect(page.getByText('Detail Item Order Request', { exact: true })).toBeVisible();
-  const kodeCabangCount = await detailSection.locator('text=Kode Cabang').count();
-  expect(kodeCabangCount).toBeGreaterThan(1);
+  const cabangItemLabelCount = await detailSection.getByText('Cabang Item', { exact: true }).count();
+  expect(cabangItemLabelCount).toBeGreaterThan(0);
 
-  // Lock requirement: first detail item Supplier and Cabang Item are rendered as "(KODE) Nama"
-  const firstItem = detailSection.locator('.fi-in-repeatable-item').first();
+  // Lock requirement: Supplier and Cabang Item values are rendered as "(KODE) Nama"
+  const items = detailSection.locator('.fi-in-repeatable-item');
+  const itemCount = await items.count();
+  expect(itemCount).toBeGreaterThan(0);
 
-  const supplierValue = (
-    await firstItem
-      .locator('.fi-in-entry-wrp')
-      .filter({ has: firstItem.getByText('Supplier', { exact: true }) })
-      .locator('dd .text-sm.leading-6')
-      .first()
-      .innerText()
-  ).trim();
-  expect(supplierValue).toMatch(/^\([^)]+\)\s+.+$/);
-
-  const cabangItemValue = (
-    await firstItem
-      .locator('.fi-in-entry-wrp')
-      .filter({ has: firstItem.getByText('Cabang Item', { exact: true }) })
-      .locator('dd .text-sm.leading-6')
-      .first()
-      .innerText()
-  ).trim();
-  expect(cabangItemValue).toMatch(/^\([^)]+\)\s+.+$/);
+  for (let i = 0; i < itemCount; i += 1) {
+    const item = items.nth(i);
+    const itemText = await item.innerText();
+    expect(itemText).toMatch(/Supplier\s*\n\([^)]+\)\s+.+/);
+    expect(itemText).toMatch(/Cabang Item\s*\n\([^)]+\)\s+.+/);
+  }
 
   // As final assurance, ensure at least one product name is visible on the page
   const productRow = page.locator('text=Produk').first();

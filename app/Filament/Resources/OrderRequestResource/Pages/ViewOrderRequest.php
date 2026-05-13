@@ -23,6 +23,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Get;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
@@ -34,29 +35,12 @@ class ViewOrderRequest extends ViewRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        // Ensure header kode fields are present for the view page
-        $cabangId = $this->record->cabang_id ?? null;
-        $warehouseId = $this->record->warehouse_id ?? null;
-
-        $data['cabang_kode'] = '-';
-        $data['warehouse_kode'] = '-';
-
-        if ($cabangId) {
-            $c = \App\Models\Cabang::find($cabangId);
-            $data['cabang_kode'] = $c ? ($c->kode ?? '-') : '-';
-        }
-
-        if ($warehouseId) {
-            $w = \App\Models\Warehouse::find($warehouseId);
-            $data['warehouse_kode'] = $w ? ($w->kode ?? '-') : '-';
-        }
-
         // Populate cabang_kode_item for each orderRequestItem so repeater placeholder shows it
         $items = $data['orderRequestItem'] ?? [];
         $populated = [];
         foreach ($this->record->orderRequestItem as $idx => $item) {
             $entry = $items[$idx] ?? [];
-            $cabangIdItem = $item->cabang_id ?: $this->record->cabang_id;
+            $cabangIdItem = $item->cabang_id;
             $entry['cabang_kode_item'] = '-';
             if ($cabangIdItem) {
                 $c = \App\Models\Cabang::find($cabangIdItem);
@@ -65,6 +49,8 @@ class ViewOrderRequest extends ViewRecord
             $populated[] = array_merge($entry, [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
+                'tipe_pajak' => OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null),
+                'currency_id' => $item->currency_id ?? $this->record->currency_id ?? null,
             ]);
         }
 
@@ -116,13 +102,12 @@ class ViewOrderRequest extends ViewRecord
                 ->modalDescription('Tinjau dan setujui Order Request ini. Pilih item yang akan dibuatkan Purchase Order.')
                 ->modalSubmitActionLabel('Approve')
                 ->fillForm(function ($record) {
-                    $taxType = $record->tax_type ?? 'None';
-                    $items = $record->orderRequestItem->map(function ($item) use ($taxType) {
+                    $items = $record->orderRequestItem->map(function ($item) use ($record) {
                         $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
                         $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
                         $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
-                        $cabangId = $item->cabang_id ?: $record->cabang_id;
+                        $cabangId = $item->cabang_id;
 
                         $taxPct = (float)($item->tax ?? 0);
                         $preview = OrderRequestResource::calculateApprovalItemPreview(
@@ -130,7 +115,9 @@ class ViewOrderRequest extends ViewRecord
                             (float) $unitPrice,
                             0,
                             $taxPct,
-                            $taxType
+                            OrderRequestResource::taxServiceTypeFromItemTaxType(
+                                OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null)
+                            )
                         );
 
                         $supplierName = $item->supplier_id
@@ -148,6 +135,7 @@ class ViewOrderRequest extends ViewRecord
                             'item_id'          => $item->id,
                             'item_supplier_id' => $item->supplier_id,
                             'item_cabang_id'   => $cabangId,
+                            'currency_id'      => $item->currency_id ?? $record->currency_id,
                             'product_name'     => "({$item->product->sku}) {$item->product->name}",
                             'supplier_name'    => $supplierName,
                             'cabang_name'      => $cabangName,
@@ -165,24 +153,21 @@ class ViewOrderRequest extends ViewRecord
                     })->values()->toArray();
 
                     $groups = collect($items)
-                        ->map(fn ($item) => implode('|', [
+                        ->map(fn($item) => implode('|', [
                             (string) ($item['item_supplier_id'] ?? ''),
                             (string) ($item['item_cabang_id'] ?? ''),
                         ]))
-                        ->filter(fn ($key) => trim($key, '|') !== '')
+                        ->filter(fn($key) => trim($key, '|') !== '')
                         ->unique();
                     $isMultiSupplier = $groups->count() > 1;
 
                     // Pre-fill supplier from the first item that has a supplier
                     $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
-                    $firstCabangId = $items[0]['item_cabang_id'] ?? null;
 
                     return [
                         'supplier_id'           => $isMultiSupplier ? null : $firstSupplierId,
-                        'cabang_id'             => $isMultiSupplier ? null : $firstCabangId,
                         'create_purchase_order' => true,
                         'multi_supplier'        => $isMultiSupplier,
-                        'tax_type'              => $record->tax_type ?? 'None',
                         'selected_items'        => $items,
                     ];
                 })
@@ -190,8 +175,6 @@ class ViewOrderRequest extends ViewRecord
                     Section::make('Opsi Persetujuan')
                         ->icon('heroicon-o-cog-6-tooth')
                         ->schema([
-                            Hidden::make('tax_type'),
-                            Hidden::make('cabang_id'),
                             Toggle::make('create_purchase_order')
                                 ->label('Buat Purchase Order secara otomatis?')
                                 ->helperText('Aktifkan untuk langsung membuat PO setelah approval.')
@@ -279,6 +262,7 @@ class ViewOrderRequest extends ViewRecord
                                     Hidden::make('item_id'),
                                     Hidden::make('item_supplier_id'),
                                     Hidden::make('max_quantity'),
+                                    Hidden::make('currency_id'),
                                     TextInput::make('product_name')
                                         ->label('Nama Produk')
                                         ->readOnly(),
@@ -333,13 +317,15 @@ class ViewOrderRequest extends ViewRecord
                                         ->dehydrated(false)
                                         ->default(0),
                                     TextInput::make('original_price')
-                                        ->label('Harga Asli (Rp)')
+                                        ->label('Harga Asli')
                                         ->minValue(0)
-                                        ->indonesianMoney(),
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : ''),
                                     TextInput::make('unit_price')
-                                        ->label('Harga Override (Rp)')
+                                        ->label('Harga Override')
                                         ->minValue(0)
-                                        ->indonesianMoney()
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
                                         ->reactive()
                                         ->live()
                                         ->afterStateUpdated(function ($state, callable $set, callable $get) {
@@ -362,16 +348,19 @@ class ViewOrderRequest extends ViewRecord
                                         ->suffix('%')
                                         ->columnSpan(1),
                                     TextInput::make('tax_nominal')
-                                        ->label('Nominal Pajak (Rp)')
-                                        ->indonesianMoney()
+                                        ->label('Nominal Pajak')
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     TextInput::make('total_cost')
                                         ->label('Total (Harga × Qty)')
-                                        ->indonesianMoney()
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     TextInput::make('subtotal')
-                                        ->label('Subtotal (Rp)')
-                                        ->indonesianMoney()
+                                        ->label('Subtotal')
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     Checkbox::make('include')
                                         ->label('Sertakan')
@@ -414,7 +403,6 @@ class ViewOrderRequest extends ViewRecord
 
                                     $poData = array_merge($data, [
                                         'supplier_id'    => $supplierId,
-                                        'cabang_id'      => $cabangId,
                                         'po_number'      => $poNumber,
                                         'selected_items' => $groupItems->values()->toArray(),
                                         'multi_supplier' => false,
@@ -456,16 +444,17 @@ class ViewOrderRequest extends ViewRecord
                 ->modalHeading('Buat Purchase Order')
                 ->modalDescription('Pilih item yang akan dimasukkan ke Purchase Order baru. Harga Override dapat diubah.')
                 ->fillForm(function ($record) {
-                    $taxType = $record->tax_type ?? 'None';
-                    $items = $record->orderRequestItem->map(function ($item) use ($taxType) {
+                    $items = $record->orderRequestItem->map(function ($item) use($record) {
                         $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
                         $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
                         $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
-                        $cabangId = $item->cabang_id ?: $record->cabang_id;
+                        $cabangId = $item->cabang_id;
 
                         $taxPct = (float)($item->tax ?? 0);
                         $base = $totalCost;
+                        $tipePajak = OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null);
+                        $taxType = OrderRequestResource::taxServiceTypeFromItemTaxType($tipePajak);
                         try {
                             $taxRes = \App\Services\TaxService::compute($base, $taxPct, $taxType);
                             $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
@@ -488,6 +477,7 @@ class ViewOrderRequest extends ViewRecord
                             'item_id'          => $item->id,
                             'item_supplier_id' => $item->supplier_id,
                             'item_cabang_id'   => $cabangId,
+                            'currency_id'      => $item->currency_id ?? $record->currency_id,
                             'product_name'     => "({$item->product->sku}) {$item->product->name}",
                             'supplier_name'    => $supplierName,
                             'cabang_name'      => $cabangName,
@@ -500,25 +490,24 @@ class ViewOrderRequest extends ViewRecord
                             'total_cost'       => $totalCost,
                             'max_quantity'     => max(0, $remainingQty),
                             'include'          => $remainingQty > 0,
+                            'tipe_pajak'       => $tipePajak,
                         ];
                     })->values()->toArray();
 
                     $groups = collect($items)
-                        ->map(fn ($item) => implode('|', [
+                        ->map(fn($item) => implode('|', [
                             (string) ($item['item_supplier_id'] ?? ''),
                             (string) ($item['item_cabang_id'] ?? ''),
                         ]))
-                        ->filter(fn ($key) => trim($key, '|') !== '')
+                        ->filter(fn($key) => trim($key, '|') !== '')
                         ->unique();
                     $isMultiSupplier = $groups->count() > 1;
 
                     // Pre-fill supplier from the first item that has one
                     $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
-                    $firstCabangId = $items[0]['item_cabang_id'] ?? null;
 
                     return [
                         'supplier_id'    => $isMultiSupplier ? null : $firstSupplierId,
-                        'cabang_id'      => $isMultiSupplier ? null : $firstCabangId,
                         'multi_supplier' => $isMultiSupplier,
                         'selected_items' => $items,
                     ];
@@ -534,7 +523,6 @@ class ViewOrderRequest extends ViewRecord
                                 ->visible(fn(Get $get) => $get('multi_supplier'))
                                 ->columnSpanFull(),
                             Hidden::make('multi_supplier'),
-                            Hidden::make('cabang_id'),
                             Select::make('supplier_id')
                                 ->label('Supplier')
                                 ->visible(fn(Get $get) => !$get('multi_supplier'))
@@ -594,7 +582,7 @@ class ViewOrderRequest extends ViewRecord
                         ->schema([
                             Repeater::make('selected_items')
                                 ->label('')
-                                ->columns(12)
+                                ->columns(4)
                                 ->addable(false)
                                 ->deletable(false)
                                 ->reorderable(false)
@@ -603,29 +591,25 @@ class ViewOrderRequest extends ViewRecord
                                     Hidden::make('item_supplier_id'),
                                     Hidden::make('item_cabang_id'),
                                     Hidden::make('max_quantity'),
+                                    Hidden::make('currency_id'),
                                     TextInput::make('product_name')
                                         ->label('Nama Produk')
-                                        ->readOnly()
-                                        ->columnSpan(3),
+                                        ->readOnly(),
                                     TextInput::make('supplier_name')
                                         ->label('Supplier')
-                                        ->readOnly()
-                                        ->columnSpan(2),
+                                        ->readOnly(),
                                     TextInput::make('cabang_name')
                                         ->label('Cabang')
-                                        ->readOnly()
-                                        ->columnSpan(2),
+                                        ->readOnly(),
                                     TextInput::make('uom')
                                         ->label('Satuan')
-                                        ->readOnly()
-                                        ->columnSpan(1),
+                                        ->readOnly(),
                                     TextInput::make('quantity')
                                         ->label('Qty')
                                         ->numeric()
                                         ->minValue(0)
                                         ->required()
                                         ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
-                                        ->columnSpan(1)
                                         ->rules([
                                             fn($get) => function ($attribute, $value, $fail) use ($get) {
                                                 $max = $get('max_quantity');
@@ -651,24 +635,50 @@ class ViewOrderRequest extends ViewRecord
                                         ->default(0),
                                     TextInput::make('original_price')
                                         ->label('Harga Asli')
-                                        ->indonesianMoney()
-                                        ->readOnly()
-                                        ->columnSpan(2),
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->readOnly(),
                                     TextInput::make('unit_price')
                                         ->label('Harga Override')
                                         ->minValue(0)
-                                        ->indonesianMoney()
-                                        ->columnSpan(2),
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : ''),
+                                    Radio::make('tipe_pajak')
+                                        ->label('Tipe Pajak')
+                                        ->options([
+                                            'None' => 'Tanpa Pajak',
+                                            'Eklusif' => 'Eklusif',
+                                            'Inklusif' => 'Inklusif',
+                                        ])
+                                        ->default('None')
+                                        ->reactive()
+                                        ->live()
+                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                            $quantity = (float) ($get('quantity') ?? 0);
+                                            $unitPrice = MoneyHelper::parse($get('unit_price') ?? 0);
+                                            $taxPct = (float) ($get('tax') ?? 0);
+
+                                            $preview = OrderRequestResource::calculateApprovalItemPreview(
+                                                $quantity,
+                                                $unitPrice,
+                                                0,
+                                                $taxPct,
+                                                $state
+                                            );
+
+                                            $set('total_cost', $preview['total_cost']);
+                                            $set('subtotal', $preview['subtotal']);
+                                            $set('tax_nominal', $preview['tax_nominal']);
+                                        }),
                                     TextInput::make('tax')
                                         ->label('Pajak (%)')
                                         ->readOnly()
-                                        ->suffix('%')
-                                        ->columnSpan(1),
+                                        ->suffix('%'),
                                     TextInput::make('tax_nominal')
-                                        ->label('Nominal Pajak (Rp)')
-                                        ->indonesianMoney()
-                                        ->readOnly()
-                                        ->columnSpan(2),
+                                        ->label('Nominal Pajak')
+                                        ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->readOnly(),
                                     Checkbox::make('include')
                                         ->label('Sertakan')
                                         ->default(true)
@@ -715,7 +725,6 @@ class ViewOrderRequest extends ViewRecord
 
                             $poData = array_merge($data, [
                                 'supplier_id'    => $supplierId,
-                                'cabang_id'      => $cabangId,
                                 'po_number'      => $poNumber,
                                 'selected_items' => $groupItems->values()->toArray(),
                                 'multi_supplier' => false,

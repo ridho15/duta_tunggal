@@ -11,9 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('order_requests', function (Blueprint $table) {
-            $table->string('tax_type', 20)->default('None')->change();
-        });
+        // Skip if column doesn't exist (will be removed in later migration)
+        if (Schema::hasColumn('order_requests', 'tax_type')) {
+            Schema::table('order_requests', function (Blueprint $table) {
+                $table->string('tax_type', 20)->default('None')->change();
+            });
+        }
     }
 
     /**

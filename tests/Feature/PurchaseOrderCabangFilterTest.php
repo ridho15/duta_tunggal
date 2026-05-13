@@ -22,7 +22,7 @@ it('returns cabang ids filtered by supplier from order request', function () {
     Warehouse::factory()->create(['cabang_id' => $c1->id]);
     // Ensure products exist for order request items
     Product::factory()->count(3)->create();
-    $or = OrderRequest::factory()->create(['status' => 'approved', 'cabang_id' => $c1->id]);
+    $or = OrderRequest::factory()->create(['status' => 'approved']);
 
     // Create OR items across suppliers and cabangs
     OrderRequestItem::factory()->create([

@@ -19,18 +19,23 @@ return new class extends Migration
         });
 
         // 2. Extend order_requests.status enum to include all workflow statuses
-        \Illuminate\Support\Facades\DB::statement(
-            "ALTER TABLE `order_requests` MODIFY COLUMN `status`
-             ENUM('draft','request_approve','approved','partial','complete','closed','rejected')
-             NOT NULL DEFAULT 'draft'"
-        );
+        if (Schema::hasColumn('order_requests', 'status')) {
+            \Illuminate\Support\Facades\DB::statement(
+                "ALTER TABLE `order_requests` MODIFY COLUMN `status`
+                 ENUM('draft','request_approve','approved','partial','complete','closed','rejected')
+                 NOT NULL DEFAULT 'draft'"
+            );
+        }
 
         // 3. Extend order_requests.tax_type enum to include 'None'
-        \Illuminate\Support\Facades\DB::statement(
-            "ALTER TABLE `order_requests` MODIFY COLUMN `tax_type`
-             ENUM('None','PPN Included','PPN Excluded')
-             NOT NULL DEFAULT 'PPN Excluded'"
-        );
+        // (Skip if column doesn't exist - will be removed in later migration)
+        if (Schema::hasColumn('order_requests', 'tax_type')) {
+            \Illuminate\Support\Facades\DB::statement(
+                "ALTER TABLE `order_requests` MODIFY COLUMN `tax_type`
+                 ENUM('None','PPN Included','PPN Excluded')
+                 NOT NULL DEFAULT 'PPN Excluded'"
+            );
+        }
     }
 
     /**
@@ -44,16 +49,20 @@ return new class extends Migration
             }
         });
 
-        \Illuminate\Support\Facades\DB::statement(
-            "ALTER TABLE `order_requests` MODIFY COLUMN `status`
-             ENUM('draft','approved','rejected','closed')
-             NOT NULL DEFAULT 'draft'"
-        );
+        if (Schema::hasColumn('order_requests', 'status')) {
+            \Illuminate\Support\Facades\DB::statement(
+                "ALTER TABLE `order_requests` MODIFY COLUMN `status`
+                 ENUM('draft','approved','rejected','closed')
+                 NOT NULL DEFAULT 'draft'"
+            );
+        }
 
-        \Illuminate\Support\Facades\DB::statement(
-            "ALTER TABLE `order_requests` MODIFY COLUMN `tax_type`
-             ENUM('PPN Included','PPN Excluded')
-             NOT NULL DEFAULT 'PPN Excluded'"
-        );
+        if (Schema::hasColumn('order_requests', 'tax_type')) {
+            \Illuminate\Support\Facades\DB::statement(
+                "ALTER TABLE `order_requests` MODIFY COLUMN `tax_type`
+                 ENUM('PPN Included','PPN Excluded')
+                 NOT NULL DEFAULT 'PPN Excluded'"
+            );
+        }
     }
 };

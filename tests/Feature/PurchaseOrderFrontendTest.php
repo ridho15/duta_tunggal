@@ -156,7 +156,6 @@ test('purchase order can be created with non_ppn option', function () {
         'supplier_id' => $supplier->id,
         'warehouse_id' => $warehouse->id,
         'currency_id' => $currency->id,
-        'ppn_option' => 'non_ppn',
         'is_import' => false,
         'items' => [
             [
@@ -179,23 +178,19 @@ test('purchase order can be created with non_ppn option', function () {
         'currency_id' => $currency->id,
         'order_date' => now(),
         'tempo_hutang' => 30,
-        'ppn_option' => 'non_ppn',
         'is_import' => false,
         'status' => 'draft',
         'created_by' => $this->user->id,
     ]);
 
-    expect($purchaseOrder->ppn_option)->toBe('non_ppn');
+    expect($purchaseOrder)->not->toBeNull();
 });
 
-test('purchase order with non_ppn option disables tax fields', function () {
-    // This test verifies that when ppn_option is 'non_ppn', tax fields are disabled
-    // Since this is a frontend test, we check the form rendering
+test('purchase order create form no longer shows a global tax field', function () {
     $response = $this->get(PurchaseOrderResource::getUrl('create'));
 
     $response->assertOk();
-    // The form should render with ppn_option field (now labeled Tipe Pajak)
-    $response->assertSee('Tipe Pajak (Global)');
+    $response->assertDontSee('Tipe Pajak (Global)');
 });
 
 test('purchase order status presentation handles paid state', function () {

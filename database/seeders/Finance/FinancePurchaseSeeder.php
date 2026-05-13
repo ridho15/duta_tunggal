@@ -94,7 +94,6 @@ class FinancePurchaseSeeder extends Seeder
                     'expected_date' => $purchase['expected_date'],
                     'status' => $purchase['status'],
                     'total_amount' => 0,
-                    'warehouse_id' => $warehouse->id,
                     'tempo_hutang' => $tempoHutang,
                 ]
             );

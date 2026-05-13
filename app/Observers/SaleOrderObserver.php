@@ -10,6 +10,7 @@ use App\Models\StockReservation;
 use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
 use App\Services\SalesInvoiceTaxResolver;
+use App\Support\CurrencyConversionResolver;
 use Illuminate\Support\Facades\Log;
 
 class SaleOrderObserver
@@ -101,6 +102,12 @@ class SaleOrderObserver
         $tax = 0;
         $invoiceItems = [];
         $invoiceTaxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
+        $currencyId = (int) ($saleOrder->currency_id ?? 0);
+        $exchangeRate = (float) ($saleOrder->exchange_rate ?? 0);
+
+        if ($exchangeRate <= 0) {
+            $exchangeRate = CurrencyConversionResolver::resolveRate($currencyId ?: null);
+        }
 
         foreach ($saleOrder->saleOrderItem as $item) {
             // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
@@ -129,16 +136,21 @@ class SaleOrderObserver
                 $lineTax = 0;
                 $subtotalBeforeTax = $baseAmount;
             }
+
+            $subtotalBeforeTaxIdr = CurrencyConversionResolver::convertToIdr((float) $subtotalBeforeTax, $currencyId ?: null);
+            $lineTaxIdr = CurrencyConversionResolver::convertToIdr((float) $lineTax, $currencyId ?: null);
+            $lineTotalIdr = CurrencyConversionResolver::convertToIdr((float) $lineSubtotal, $currencyId ?: null);
             
-            $subtotal += $subtotalBeforeTax;
-            $tax += $lineTax;
+            $subtotal += $subtotalBeforeTaxIdr;
+            $tax += $lineTaxIdr;
 
             Log::info('SaleOrderObserver: Calculated values', [
                 'item_id' => $item->id,
                 'base_amount' => $baseAmount,
                 'tax_result' => $taxResult ?? 'error',
-                'subtotal_before_tax' => $subtotalBeforeTax,
-                'line_subtotal' => $lineSubtotal,
+                'subtotal_before_tax' => $subtotalBeforeTaxIdr,
+                'line_subtotal' => $lineTotalIdr,
+                'exchange_rate' => $exchangeRate,
             ]);
 
             // Get sales COA from product
@@ -147,12 +159,12 @@ class SaleOrderObserver
             $invoiceItems[] = [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
-                'price' => $item->unit_price,
+                'price' => CurrencyConversionResolver::convertToIdr((float) $item->unit_price, $currencyId ?: null),
                 'discount' => $item->discount,
                 'tax_rate' => $item->tax,
-                'tax_amount' => $lineTax,
-                'subtotal' => $subtotalBeforeTax,
-                'total' => $lineSubtotal,
+                'tax_amount' => $lineTaxIdr,
+                'subtotal' => $subtotalBeforeTaxIdr,
+                'total' => $lineTotalIdr,
                 'coa_id' => $salesCoaId, // Add sales COA ID from product
             ];
         }

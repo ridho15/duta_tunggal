@@ -35,6 +35,8 @@ class EditSaleOrder extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data = SaleOrderResource::normalizeFormDataForPersist($data);
+
         // Validate credit limit and overdue credits before saving sale order
         if (isset($data['customer_id']) && isset($data['total_amount'])) {
             $customer = Customer::find($data['customer_id']);

@@ -54,7 +54,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->relationship('product', 'name')
                             ->reactive()
                             ->afterStateUpdated(function (Set $set, Get $get, $state, $livewire) {
-                                $product = Product::find($state);
+                                $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                 // Use supplier price from product_supplier pivot; fallback to cost_price
                                 $unitPrice = (float) ($product->cost_price ?? 0);
                                 $supplierId = $livewire->ownerRecord->supplier_id ?? null;
@@ -79,10 +79,10 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 $set('refer_item_model_type', $referItem ? \App\Models\OrderRequestItem::class : null);
                                 $set('refer_item_model_id', $referItem?->id);
 
-                                $tipePajak = $get('tipe_pajak') ?? 'Inklusif';
+                                $tipePajak = \App\Filament\Resources\PurchaseOrderResource::normalizeTaxTypeValue($get('tipe_pajak') ?? null);
                                 $taxType = match ($tipePajak) {
-                                    'Non Pajak' => 'None',
-                                    'Inklusif' => 'PPN Included',
+                                    'none' => 'None',
+                                    'inklusif' => 'PPN Included',
                                     default => 'PPN Excluded',
                                 };
                                 $resolvedTax = \App\Support\TaxDefaultResolver::resolveForProductId(
@@ -131,6 +131,21 @@ class PurchaseOrderItemRelationManager extends RelationManager
                         TextInput::make('unit_price')
                             ->label('Unit Price')
                             ->reactive()
+                            ->mask(\Filament\Support\RawJs::make(<<<'JS'
+            $money($input, ',', '.', 2)
+        JS))
+                            ->formatStateUsing(function ($state) {
+                                if ($state === null || $state === '') {
+                                    return '';
+                                }
+                                return number_format(\App\Helpers\MoneyHelper::parse($state), 2, ',', '.');
+                            })
+                            ->dehydrateStateUsing(function ($state) {
+                                if ($state === null || $state === '') {
+                                    return null;
+                                }
+                                return \App\Helpers\MoneyHelper::parse($state);
+                            })
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -139,8 +154,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     'discount' => $get('discount')
                                 ]);
                                 $set('subtotal', $subtotal);
-                            })
-                            ->indonesianMoney(),
+                            }),
                         TextInput::make('discount')
                             ->label('Discount')
                             ->reactive()
@@ -182,15 +196,16 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->inline()
                             ->required()
                             ->options([
-                                'Non Pajak' => 'Non Pajak',
-                                'Inklusif' => 'Inklusif',
-                                'Eklusif' => 'Eklusif'
+                                'none' => 'Non Pajak',
+                                'inklusif' => 'Inklusif',
+                                'eklusif' => 'Eklusif'
                             ])
-                            ->default('Inklusif')
+                            ->default('inklusif')
                             ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                $taxType = match ($state) {
-                                    'Non Pajak' => 'None',
-                                    'Inklusif' => 'PPN Included',
+                                $normalizedState = \App\Filament\Resources\PurchaseOrderResource::normalizeTaxTypeValue($state);
+                                $taxType = match ($normalizedState) {
+                                    'none' => 'None',
+                                    'inklusif' => 'PPN Included',
                                     default => 'PPN Excluded',
                                 };
                                 $resolvedTax = \App\Support\TaxDefaultResolver::resolveForProductId(
@@ -204,7 +219,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     'unit_price' => $get('unit_price'),
                                     'tax' => $resolvedTax,
                                     'discount' => $get('discount'),
-                                    'tipe_pajak' => $state,
+                                    'tipe_pajak' => $normalizedState,
                                 ]);
                                 $set('subtotal', $subtotal);
                             })

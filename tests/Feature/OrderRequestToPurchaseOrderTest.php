@@ -61,8 +61,6 @@ beforeEach(function () {
     $this->productB = Product::factory()->create(['cost_price' => 20000, 'sell_price' => 30000]);
 
     $this->orderRequest = OrderRequest::factory()->create([
-        'warehouse_id' => $this->warehouse->id,
-        'cabang_id'    => $this->cabang->id,
         'created_by'   => $this->user->id,
         'status'       => 'draft',
         'request_date' => Carbon::today()->toDateString(),
@@ -421,8 +419,6 @@ test('manually created PO items linked to an OrderRequest backfill refer_item_mo
         'po_number' => 'PO-TEST-MANUAL-001',
         'order_date' => Carbon::today()->toDateString(),
         'status' => 'draft',
-        'warehouse_id' => $this->warehouse->id,
-        'cabang_id' => $this->cabang->id,
         'tempo_hutang' => $this->supplier->tempo_hutang,
         'created_by' => $this->user->id,
     ]);

@@ -11,10 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('order_requests', function (Blueprint $table) {
-            // supplier_id moved to order_request_items (per-item supplier)
-            $table->dropColumn('supplier_id');
-        });
+        if (Schema::hasColumn('order_requests', 'supplier_id')) {
+            Schema::table('order_requests', function (Blueprint $table) {
+                // supplier_id moved to order_request_items (per-item supplier)
+                $table->dropColumn('supplier_id');
+            });
+        }
     }
 
     /**

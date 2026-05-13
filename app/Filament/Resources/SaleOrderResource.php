@@ -7,6 +7,7 @@ use App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder;
 use App\Filament\Resources\SaleOrderResource\RelationManagers\SaleOrderItemRelationManager;
 use App\Http\Controllers\HelperController;
 use App\Models\ChartOfAccount;
+use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\InventoryStock;
 use App\Models\Product;
@@ -20,6 +21,7 @@ use App\Services\CustomerService;
 use App\Services\PurchaseOrderService;
 use App\Services\SalesOrderService;
 use App\Services\CreditValidationService;
+use App\Support\CurrencyConversionResolver;
 use App\Support\WarehouseStockOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -27,6 +29,7 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -77,23 +80,100 @@ class SaleOrderResource extends Resource
 
     protected static function normalizeTaxTypeValue(?string $taxType): string
     {
-        $normalized = \App\Services\TaxService::normalizeType($taxType);
+        $normalized = strtolower(trim((string) $taxType));
 
         return match ($normalized) {
-            'Eksklusif' => 'PPN Excluded',
-            'Inklusif' => 'PPN Included',
-            'Non Pajak' => 'None',
-            default => 'None',
+            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
+            'inklusif', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            'eksklusif', 'eklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
+            default => 'eklusif',
         };
     }
 
     protected static function taxTypeOptions(): array
     {
         return [
-            'None' => 'Non Pajak',
-            'PPN Excluded' => 'PPN Excluded',
-            'PPN Included' => 'PPN Included',
+            'none' => 'Non Pajak',
+            'eklusif' => 'Eksklusif (PPN ditambahkan)',
+            'inklusif' => 'Inklusif (PPN termasuk)',
         ];
+    }
+
+    protected static function resolveCurrencyOptions(): array
+    {
+        return Currency::query()
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(function (Currency $currency) {
+                $label = trim((string) $currency->name);
+
+                if ($currency->code) {
+                    $label .= ' (' . $currency->code . ')';
+                }
+
+                return [$currency->id => $label];
+            })
+            ->all();
+    }
+
+    protected static function resolveDefaultCurrencyId(): ?int
+    {
+        return CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
+            ?? Currency::query()->orderBy('id')->value('id');
+    }
+
+    protected static function resolveCurrencySymbol(?int $currencyId): string
+    {
+        return CurrencyConversionResolver::resolveSymbol($currencyId);
+    }
+
+    protected static function resolveExchangeRate(?int $currencyId): float
+    {
+        return CurrencyConversionResolver::resolveRate($currencyId);
+    }
+
+    public static function normalizeFormDataForPersist(array $data): array
+    {
+        $currencyId = is_numeric($data['currency_id'] ?? null)
+            ? (int) $data['currency_id']
+            : static::resolveDefaultCurrencyId();
+
+        $data['currency_id'] = $currencyId;
+        $data['exchange_rate'] = static::resolveExchangeRate($currencyId);
+
+        $items = [];
+        foreach (($data['saleOrderItem'] ?? []) as $item) {
+            $taxType = static::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+            $unitPrice = (float) HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
+            $quantity = (float) ($item['quantity'] ?? 0);
+            $discount = (float) ($item['discount'] ?? 0);
+            $taxRate = $taxType === 'none' ? 0.0 : (float) \App\Models\TaxSetting::activeRate('PPN');
+
+            $item['tipe_pajak'] = $taxType;
+            $item['tax'] = $taxRate;
+            $item['subtotal'] = static::formatMoneyState(HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $taxRate, $taxType));
+            $item['tax_nominal'] = number_format(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $taxRate, $taxType), 0, ',', '.');
+            $items[] = $item;
+        }
+
+        if (! empty($items)) {
+            $data['saleOrderItem'] = $items;
+            $total = 0.0;
+
+            foreach ($items as $item) {
+                $total += HelperController::hitungSubtotal(
+                    (float) ($item['quantity'] ?? 0),
+                    (float) HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                    (float) ($item['discount'] ?? 0),
+                    (float) ($item['tax'] ?? 0),
+                    $item['tipe_pajak'] ?? 'eklusif'
+                );
+            }
+
+            $data['total_amount'] = static::formatMoneyState($total);
+        }
+
+        return $data;
     }
 
     protected static function formatMoneyState(mixed $amount): string
@@ -170,6 +250,10 @@ class SaleOrderResource extends Resource
                                     $set('total_amount', static::formatMoneyState($quotation->total_amount ?? 0));
                                     $set('customer_id', $quotation->customer_id);
                                     $set('cabang_id', $quotation->cabang_id);
+                                    if (! empty($quotation->currency_id)) {
+                                        $set('currency_id', $quotation->currency_id);
+                                        $set('exchange_rate', static::resolveExchangeRate((int) $quotation->currency_id));
+                                    }
                                     $set('shipped_to', $quotation->customer->address);
                                     // Warisi tempo pembayaran dari quotation yang sudah disetujui
                                     if ($quotation->tempo_pembayaran) {
@@ -199,21 +283,26 @@ class SaleOrderResource extends Resource
                                 $saleOrder = SaleOrder::find($state);
                                 if ($saleOrder) {
                                     foreach ($saleOrder->saleOrderItem as $item) {
+                                        $tipePajak = static::normalizeTaxTypeValue($item->tipe_pajak ?? null);
                                         array_push($items, [
                                             'product_id' => $item->product_id,
                                             'unit_price' => number_format((float) $item->unit_price, 0, ',', '.'),
                                             'quantity' => $item->quantity,
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
-                                            'tipe_pajak' => $item->tipe_pajak ?? 'None',
-                                            'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? 'None')),
-                                            'tax_nominal' => number_format(HelperController::hitungTaxNominal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? 'None'), 0, ',', '.'),
+                                            'tipe_pajak' => $tipePajak,
+                                            'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak)),
+                                            'tax_nominal' => number_format(HelperController::hitungTaxNominal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak), 0, ',', '.'),
                                             'notes' => $item->notes,
                                         ]);
                                     }
                                     $set('total_amount', static::formatMoneyState($saleOrder->total_amount ?? 0));
                                     $set('customer_id', $saleOrder->customer_id);
                                     $set('cabang_id', $saleOrder->cabang_id);
+                                    if (! empty($saleOrder->currency_id)) {
+                                        $set('currency_id', $saleOrder->currency_id);
+                                        $set('exchange_rate', static::resolveExchangeRate((int) $saleOrder->currency_id));
+                                    }
                                     $set('shipped_to', $saleOrder->customer->address);
                                 }
                                 $set('saleOrderItem', $items);
@@ -464,6 +553,23 @@ class SaleOrderResource extends Resource
                             ->validationMessages([
                                 'max' => 'Alamat pengiriman maksimal 255 karakter'
                             ]),
+                        Select::make('currency_id')
+                            ->label('Currency')
+                            ->options(static::resolveCurrencyOptions())
+                            ->default(static::resolveDefaultCurrencyId())
+                            ->searchable()
+                            ->preload()
+                            ->reactive()
+                            ->afterStateHydrated(function ($component, $state) {
+                                $component->state($state ?: static::resolveDefaultCurrencyId());
+                            })
+                            ->afterStateUpdated(function ($set, $state) {
+                                $set('exchange_rate', static::resolveExchangeRate(is_numeric($state) ? (int) $state : null));
+                            })
+                            ->helperText('Mata uang transaksi. Nilai invoice dan laporan akan dikonversi ke Rupiah menggunakan kurs master.'),
+                        Hidden::make('exchange_rate')
+                            ->default(fn ($get) => static::resolveExchangeRate(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                            ->dehydrated(true),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
                             ->required()
@@ -534,7 +640,7 @@ class SaleOrderResource extends Resource
                                     ->searchable(['sku', 'name'])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $product = Product::find($state);
+                                        $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                         if ($product) {
                                             $set('unit_price', number_format((float)$product->sell_price, 0, ',', '.'));
                                             $set('unit', $product->uom?->abbreviation ?? '-');
@@ -749,7 +855,7 @@ class SaleOrderResource extends Resource
                                 \Filament\Forms\Components\Select::make('tipe_pajak')
                                     ->label('Tipe Pajak')
                                     ->options(static::taxTypeOptions())
-                                    ->default('None')
+                                    ->default('eklusif')
                                     ->reactive()
                                     ->afterStateHydrated(function ($component, $state) {
                                         $component->state(static::normalizeTaxTypeValue($state));
@@ -758,7 +864,7 @@ class SaleOrderResource extends Resource
                                         $normalizedState = static::normalizeTaxTypeValue($state);
                                         $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
 
-                                        if ($normalizedState === 'None') {
+                                        if ($normalizedState === 'none') {
                                             $set('tax', 0);
                                         } else {
                                             $set('tax', $defaultTax);
@@ -779,12 +885,10 @@ class SaleOrderResource extends Resource
                                     ->label('Tax')
                                     ->numeric()
                                     ->reactive()
-                                    ->disabled(fn() => Auth::user()?->hasRole('Sales'))
-                                    ->readOnly(fn() => Auth::user()?->hasRole('Sales'))
+                                    ->disabled()
+                                    ->readOnly()
                                     ->dehydrated(true)
-                                    ->helperText(fn() => Auth::user()?->hasRole('Sales')
-                                        ? 'Dihitung otomatis oleh sistem (tidak dapat diubah oleh Sales)'
-                                        : 'Nilai PPN dalam persen')
+                                    ->helperText('Dihitung otomatis dari setting global PPN dan tidak dapat diedit manual.')
                                     ->validationMessages([
                                         'numeric' => 'Tax harus berupa angka',
                                         'min' => 'Tax minimal 0%',
@@ -805,11 +909,11 @@ class SaleOrderResource extends Resource
                                             Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
                                         }
                                     })
-                                    ->default(fn(callable $get) => ($get('tipe_pajak') ?? 'None') === 'None' ? 0 : \App\Models\TaxSetting::activeRate('PPN'))
+                                    ->default(fn(callable $get) => static::normalizeTaxTypeValue($get('tipe_pajak') ?? null) === 'none' ? 0 : \App\Models\TaxSetting::activeRate('PPN'))
                                     ->suffix('%'),
                                 TextInput::make('tax_nominal')
-                                    ->label('Nominal Pajak (Rp)')
-                                    ->prefix('Rp')
+                                    ->label('Nominal Pajak')
+                                    ->prefix(fn (callable $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)

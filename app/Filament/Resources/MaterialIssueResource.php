@@ -257,7 +257,7 @@ class MaterialIssueResource extends Resource
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $state) {
-                                        $product = Product::find($state);
+                                        $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                         if ($product) {
                                             $set('uom_id', $product->uom_id);
                                             $set('cost_per_unit', $product->cost_price);

@@ -38,7 +38,7 @@ class QuotationItemRelationManager extends RelationManager
                             ->searchable()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $product = Product::find($state);
+                                $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                 $set('unit_price', $product->sell_price);
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                             })

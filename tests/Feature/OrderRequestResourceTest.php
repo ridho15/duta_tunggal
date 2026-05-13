@@ -45,7 +45,12 @@ beforeEach(function () {
     $this->user->givePermissionTo($needed);
 
     UnitOfMeasure::factory()->create();
-    Currency::factory()->create();
+    $this->defaultCurrency = Currency::factory()->create([
+        'name' => 'Indonesian Rupiah',
+        'symbol' => 'Rp',
+        'code' => 'IDR',
+        'to_rupiah' => 1,
+    ]);
 
     $this->cabang = \App\Models\Cabang::factory()->create();
     // assign user's cabang so the disabled cabang select has a default
@@ -60,18 +65,17 @@ beforeEach(function () {
 it('creates an order request through the Filament create page', function () {
     $headerPayload = [
         'request_number' => 'OR-TEST-'.uniqid(),
-        'cabang_id' => $this->cabang->id,
-        'warehouse_id' => $this->warehouse->id,
         'request_date' => now()->format('Y-m-d'),
         'note' => 'Order request dari test',
     ];
 
     $itemsPayload = [[
         'product_id' => $this->product->id,
+        'cabang_id' => $this->cabang->id,
         'quantity' => 2,
         'original_price' => $this->product->cost_price,
         'unit_price' => $this->product->cost_price,
-        'tipe_pajak' => 'Eklusif',
+        'tipe_pajak' => 'eklusif',
         // supply nonzero percentages to ensure calculation logic is exercised
         'discount' => 10, // 10%
         'tax' => 5,       // 5%
@@ -95,7 +99,6 @@ it('creates an order request through the Filament create page', function () {
     $item = $or->orderRequestItem()->latest('id')->first();
 
     expect($or)->not->toBeNull();
-    expect($or->warehouse_id)->toBe($this->warehouse->id);
     expect($or->orderRequestItem()->count())->toBe(1);
     expect($or->created_by)->toBe($this->user->id);
     expect((float) $item->subtotal)->toBeGreaterThan(0.0);
@@ -129,17 +132,16 @@ it('stores formatted unit_price as numeric value in database', function () {
         ->test(CreateOrderRequest::class)
         ->fillForm([
             'request_number' => 'OR-TEST-FMT-'.uniqid(),
-            'cabang_id' => $this->cabang->id,
-            'warehouse_id' => $this->warehouse->id,
             'request_date' => now()->format('Y-m-d'),
             'note' => 'Order request format nominal test',
         ])
         ->set('data.orderRequestItem', [[
             'product_id' => $this->product->id,
+            'cabang_id' => $this->cabang->id,
             'quantity' => 1,
             'original_price' => '1.250.000',
             'unit_price' => '1.250.000',
-            'tipe_pajak' => 'Eklusif',
+            'tipe_pajak' => 'eklusif',
             'discount' => 0,
             'tax' => 0,
             'subtotal' => '1.250.000',
@@ -156,22 +158,53 @@ it('stores formatted unit_price as numeric value in database', function () {
     expect((float) $item->original_price)->toBe(1250000.0);
 });
 
+it('stores decimal unit_price and original_price without changing 15.09', function () {
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-DECIMAL-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'note' => 'Order request decimal price test',
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => $this->product->id,
+            'cabang_id' => $this->cabang->id,
+            'quantity' => 1,
+            'original_price' => '15.09',
+            'unit_price' => '15.09',
+            'tipe_pajak' => 'none',
+            'discount' => 0,
+            'tax' => 0,
+            'subtotal' => '15.09',
+        ]])
+        ->call('create');
+
+    $component->assertHasNoFormErrors();
+
+    $or = OrderRequest::latest('id')->first();
+    $item = $or->orderRequestItem()->latest('id')->first();
+
+    expect((float) $item->unit_price)->toBe(15.09)
+        ->and((float) $item->original_price)->toBe(15.09)
+        ->and((float) $item->subtotal)->toBe(15.09)
+        ->and($item->tipe_pajak)->toBe('none');
+});
+
 it('forces item tax to zero when item tax type is non tax', function () {
     $component = Livewire::actingAs($this->user)
         ->test(CreateOrderRequest::class)
         ->fillForm([
             'request_number' => 'OR-TEST-NON-PAJAK-'.uniqid(),
-            'cabang_id' => $this->cabang->id,
-            'warehouse_id' => $this->warehouse->id,
             'request_date' => now()->format('Y-m-d'),
             'note' => 'Order request non pajak test',
         ])
         ->set('data.orderRequestItem', [[
             'product_id' => $this->product->id,
+            'cabang_id' => $this->cabang->id,
             'quantity' => 1,
             'original_price' => '1.000.000',
             'unit_price' => '1.000.000',
-            'tipe_pajak' => 'Non Pajak',
+            'tipe_pajak' => 'none',
             'discount' => 0,
             'tax' => 11,
             'subtotal' => '1.000.000',
@@ -183,17 +216,16 @@ it('forces item tax to zero when item tax type is non tax', function () {
     $or = OrderRequest::latest('id')->first();
     $item = $or->orderRequestItem()->latest('id')->first();
 
-    expect($or->tax_type)->toBe('PPN Excluded')
-        ->and($item->tipe_pajak)->toBe('Non Pajak')
+    expect($item->tipe_pajak)->toBe('none')
         ->and((float) $item->tax)->toBe(0.0);
 });
 
 it('recalculates approval preview totals when override price changes', function () {
     $preview = OrderRequestResource::calculateApprovalItemPreview(4, 125000, 0, 11, 'PPN Excluded');
 
-    expect($preview['total_cost'])->toBe('500.000')
-        ->and($preview['subtotal'])->toBe('555.000')
-        ->and($preview['tax_nominal'])->toBe('55.000');
+    expect($preview['total_cost'])->toBe(500000.0)
+        ->and($preview['subtotal'])->toBe(555000.0)
+        ->and($preview['tax_nominal'])->toBe(55000.0);
 });
 
 it('limits product options to fifty entries', function () {
@@ -206,10 +238,10 @@ it('limits product options to fifty entries', function () {
     expect($options)->toHaveCount(50);
 });
 
-it('uses header tax type select and item-level tax type radio', function () {
+it('does not expose a global tax type select and keeps item-level tax radio', function () {
     $file = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource.php'));
 
-    expect($file)->toContain("Select::make('tax_type')")
+    expect($file)->not->toContain("Select::make('tax_type')")
         ->and($file)->toContain("Radio::make('tipe_pajak')");
 });
 
@@ -241,8 +273,6 @@ it('resolves product supplier options and auto-selects supplier when product cha
         ->test(CreateOrderRequest::class)
         ->fillForm([
             'request_number' => 'OR-TEST-SUPPLIER-'.uniqid(),
-            'cabang_id' => $this->cabang->id,
-            'warehouse_id' => $this->warehouse->id,
             'request_date' => now()->format('Y-m-d'),
             'note' => 'Order request supplier auto select test',
         ])
@@ -254,9 +284,162 @@ it('resolves product supplier options and auto-selects supplier when product cha
         ->assertSet('data.orderRequestItem.0.supplier_id', $this->supplier->id);
 });
 
+it('auto-selects item cabang when product changes', function () {
+    $otherCabang = \App\Models\Cabang::factory()->create();
+    $branchProduct = Product::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $otherCabang->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-CABANG-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'note' => 'Order request cabang auto select test',
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => null,
+            'cabang_id' => null,
+            'quantity' => 1,
+        ]])
+        ->set('data.orderRequestItem.0.product_id', $branchProduct->id)
+        ->assertSet('data.orderRequestItem.0.cabang_id', $otherCabang->id);
+});
+
+it('formats supplier label using selected currency conversion', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 15000,
+    ]);
+
+    $product = Product::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    $product->suppliers()->syncWithoutDetaching([
+        $this->supplier->id => ['supplier_price' => 30000],
+    ]);
+
+    $label = OrderRequestResource::resolveSupplierLabel($this->supplier->id, $product->id, $usd->id);
+
+    expect($label)->toContain('$ 2');
+});
+
+it('converts item original and override price when item currency changes in create form', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 15000,
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-CURRENCY-SWITCH-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'note' => 'Order request currency switch test',
+            'currency_id' => $this->defaultCurrency->id,
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => $this->product->id,
+            'cabang_id' => $this->cabang->id,
+            'currency_id' => $this->defaultCurrency->id,
+            'quantity' => 1,
+            'original_price' => '109.859',
+            'unit_price' => '109.859',
+            'tipe_pajak' => 'eklusif',
+            'discount' => 0,
+            'tax' => 0,
+            'subtotal' => '109.859',
+        ]]);
+
+    $component->set('data.orderRequestItem.0.currency_id', $usd->id);
+
+    $rawOriginal = $component->get('data.orderRequestItem.0.original_price');
+    $rawUnit = $component->get('data.orderRequestItem.0.unit_price');
+
+    $convertedOriginal = is_numeric($rawOriginal)
+        ? (float) $rawOriginal
+        : \App\Helpers\MoneyHelper::parse($rawOriginal);
+    $convertedUnit = is_numeric($rawUnit)
+        ? (float) $rawUnit
+        : \App\Helpers\MoneyHelper::parse($rawUnit);
+
+    $expectedConverted = 109859 / 15000;
+
+    expect($convertedOriginal)->toBeGreaterThan(0)
+        ->and($convertedOriginal)->toBeLessThan(109859)
+        ->and(abs($convertedOriginal - $expectedConverted))->toBeLessThan(1.0);
+
+    expect($convertedUnit)->toBeGreaterThan(0)
+        ->and($convertedUnit)->toBeLessThan(109859)
+        ->and(abs($convertedUnit - $expectedConverted))->toBeLessThan(1.0);
+});
+
+it('recalculates total subtotal and tax nominal when item currency changes', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 15000,
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-CURRENCY-TOTALS-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'note' => 'Order request currency totals test',
+            'currency_id' => $this->defaultCurrency->id,
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => $this->product->id,
+            'cabang_id' => $this->cabang->id,
+            'currency_id' => $this->defaultCurrency->id,
+            'quantity' => 2,
+            'original_price' => '150.000',
+            'unit_price' => '150.000',
+            'tipe_pajak' => 'eklusif',
+            'discount' => 10,
+            'tax' => 11,
+            'total' => '300.000',
+            'subtotal' => '299.700',
+            'tax_nominal' => '29.700',
+        ]]);
+
+    $oldTotal = (float) \App\Helpers\MoneyHelper::parse($component->get('data.orderRequestItem.0.total'));
+    $oldSubtotal = (float) \App\Helpers\MoneyHelper::parse($component->get('data.orderRequestItem.0.subtotal'));
+    $oldTaxNominal = (float) \App\Helpers\MoneyHelper::parse($component->get('data.orderRequestItem.0.tax_nominal'));
+
+    $component->set('data.orderRequestItem.0.currency_id', $usd->id);
+
+    $newTotal = (float) \App\Helpers\MoneyHelper::parse($component->get('data.orderRequestItem.0.total'));
+    $newSubtotal = (float) \App\Helpers\MoneyHelper::parse($component->get('data.orderRequestItem.0.subtotal'));
+    $newTaxNominal = (float) \App\Helpers\MoneyHelper::parse($component->get('data.orderRequestItem.0.tax_nominal'));
+
+    expect($newTotal)->toBeLessThan($oldTotal)
+        ->and($newSubtotal)->toBeLessThan($oldSubtotal)
+        ->and($newTaxNominal)->toBeLessThan($oldTaxNominal);
+
+    $expectedUnitPriceUsd = 150000 / 15000; // 10
+    $expectedBase = 2 * $expectedUnitPriceUsd; // 20
+    $expectedAfterDiscount = $expectedBase - ($expectedBase * 0.10); // 18
+    $expectedTaxNominal = $expectedAfterDiscount * 0.11; // 1.98
+    $expectedSubtotal = $expectedAfterDiscount + $expectedTaxNominal; // 19.98
+
+    expect(abs($newTotal - $expectedBase))->toBeLessThan(1.0)
+        ->and(abs($newTaxNominal - $expectedTaxNominal))->toBeLessThan(1.0)
+        ->and(abs($newSubtotal - $expectedSubtotal))->toBeLessThan(1.0);
+});
+
 it('lists order requests on the index page', function () {
-    $or1 = OrderRequest::factory()->create(['warehouse_id' => $this->warehouse->id, 'cabang_id' => $this->cabang->id]);
-    $or2 = OrderRequest::factory()->create(['warehouse_id' => $this->warehouse->id, 'cabang_id' => $this->cabang->id]);
+    $or1 = OrderRequest::factory()->create();
+    $or2 = OrderRequest::factory()->create();
 
     Livewire::actingAs($this->user)
         ->test(ListOrderRequests::class)
@@ -265,7 +448,7 @@ it('lists order requests on the index page', function () {
 });
 
 it('shows fulfilled quantity summary on the index page', function () {
-    $or = OrderRequest::factory()->create(['warehouse_id' => $this->warehouse->id, 'cabang_id' => $this->cabang->id]);
+    $or = OrderRequest::factory()->create();
 
     OrderRequestItem::factory()->create([
         'order_request_id' => $or->id,
@@ -280,16 +463,20 @@ it('shows fulfilled quantity summary on the index page', function () {
 
     Livewire::actingAs($this->user)
         ->test(ListOrderRequests::class)
-        ->assertSee('Qty Diterima (Penerimaan Barang)')
         ->assertSee('4');
 });
 
 it('views order request details on the Filament view page', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 15000,
+    ]);
+
     $or = OrderRequest::factory()->create([
-        'warehouse_id' => $this->warehouse->id,
         'note' => 'Note View Test',
-        'cabang_id' => $this->cabang->id,
-        'tax_type' => 'PPN Excluded',
+        'currency_id' => $usd->id,
     ]);
 
     OrderRequestItem::factory()->create([
@@ -301,33 +488,61 @@ it('views order request details on the Filament view page', function () {
         'unit_price' => 100000,
         'discount' => 0,
         'tax' => 11,
-        'tipe_pajak' => 'Eklusif',
+        'tipe_pajak' => 'eklusif',
         'subtotal' => 333000,
+        'currency_id' => $usd->id,
     ]);
 
     $item = $or->orderRequestItem()->latest('id')->first();
     $base = (float) $item->quantity * (float) $item->unit_price;
     $taxRes = \App\Services\TaxService::compute($base, (float) $item->tax, OrderRequestResource::taxServiceTypeFromItemTaxType($item->tipe_pajak));
     $expectedRate = number_format((float) $item->tax, 0, ',', '.') . '%';
-    $expectedTax = 'Rp ' . number_format((float) ($taxRes['ppn'] ?? 0), 0, ',', '.');
-    $expectedSubtotal = 'Rp ' . number_format((float) ($taxRes['total'] ?? 0), 0, ',', '.');
+    $symbol = $item->currency?->symbol ?? '$';
+    $expectedTotal = $symbol . ' 300.000';
+    $expectedTax = $symbol . ' ' . number_format((float) ($taxRes['ppn'] ?? 0), 0, ',', '.');
+    $expectedSubtotal = $symbol . ' ' . number_format((float) ($taxRes['total'] ?? 0), 0, ',', '.');
 
     Livewire::actingAs($this->user)
         ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
         ->assertSee('Informasi Order Request')
         ->assertSee($or->request_number)
-        ->assertSee($this->warehouse->name)
-        ->assertSee('PPN Excluded')
+        ->assertSee('eklusif')
         ->assertSee($expectedRate)
-        ->assertSee('Rp 300.000')
+        ->assertSee($expectedTotal)
         ->assertSee($expectedTax)
         ->assertSee($expectedSubtotal)
         ->assertSee('Qty Diterima (Penerimaan Barang)')
         ->assertSee('Sisa Qty Belum Diterima');
 });
 
+it('shows decimal unit price on the Filament view page', function () {
+    $or = OrderRequest::factory()->create([
+        'note' => 'Decimal view test',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'original_price' => 15.09,
+        'unit_price' => 15.09,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'eklusif',
+        'subtotal' => 15.09,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->assertSee('15,09')
+            ;
+});
+
 it('edits an order request through the Filament edit page', function () {
-    $or = OrderRequest::factory()->create(['warehouse_id' => $this->warehouse->id, 'note' => 'Old Note', 'cabang_id' => $this->cabang->id]);
+    $or = OrderRequest::factory()->create(['note' => 'Old Note']);
     // ensure it has at least one item so save validation passes
     \App\Models\OrderRequestItem::factory()->create(['order_request_id' => $or->id, 'product_id' => $this->product->id, 'quantity' => 1, 'unit_price' => 1000, 'discount' => 0, 'tax' => 0, 'subtotal' => 1000]);
 
@@ -337,9 +552,10 @@ it('edits an order request through the Filament edit page', function () {
             'note' => 'New Note via Edit',
             'orderRequestItem' => [[
                 'product_id' => $this->product->id,
+                'cabang_id' => $this->cabang->id,
                 'quantity' => 1,
                 'unit_price' => 1000,
-                'tipe_pajak' => 'Eklusif',
+                'tipe_pajak' => 'eklusif',
                 'discount' => 15, // percent
                 'tax' => 2,       // percent
                 'subtotal' => round(((1 * 1000) * (1 - 0.15)) * (1 + 0.02), 2),
@@ -353,7 +569,7 @@ it('edits an order request through the Filament edit page', function () {
 });
 
 it('deletes (soft deletes) an order request and its items', function () {
-    $or = OrderRequest::factory()->create(['warehouse_id' => $this->warehouse->id, 'cabang_id' => $this->cabang->id]);
+    $or = OrderRequest::factory()->create();
     $item = OrderRequestItem::factory()->create(['order_request_id' => $or->id, 'product_id' => $this->product->id, 'discount' => 0, 'tax' => 0, 'subtotal' => 0]);
 
     // Simulate deletion (DeleteAction calls model delete internally). Some Filament actions are not directly callable

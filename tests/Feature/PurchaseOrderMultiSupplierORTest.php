@@ -176,9 +176,9 @@ test('buildOrderRequestItems sets correct refer_item_model_type and refer_item_m
     );
 });
 
-test('buildOrderRequestItems maps item tipe_pajak Inklusif correctly', function () {
-    $this->itemA->update(['tipe_pajak' => 'Inklusif', 'tax' => 11]);
-    $this->itemB->update(['tipe_pajak' => 'Inklusif', 'tax' => 11]);
+test('buildOrderRequestItems maps item tipe_pajak inklusif correctly', function () {
+    $this->itemA->update(['tipe_pajak' => 'inklusif', 'tax' => 11]);
+    $this->itemB->update(['tipe_pajak' => 'inklusif', 'tax' => 11]);
     $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
 
     $items = PurchaseOrderResource::buildOrderRequestItems(
@@ -188,13 +188,13 @@ test('buildOrderRequestItems maps item tipe_pajak Inklusif correctly', function 
     );
 
     foreach ($items as $item) {
-        expect($item['tipe_pajak'])->toBe('Inklusif');
+        expect($item['tipe_pajak'])->toBe('inklusif');
     }
 });
 
-test('buildOrderRequestItems maps item tipe_pajak Non Pajak correctly', function () {
-    $this->itemA->update(['tipe_pajak' => 'Non Pajak', 'tax' => 0]);
-    $this->itemB->update(['tipe_pajak' => 'Non Pajak', 'tax' => 0]);
+test('buildOrderRequestItems maps item tipe_pajak none correctly', function () {
+    $this->itemA->update(['tipe_pajak' => 'none', 'tax' => 0]);
+    $this->itemB->update(['tipe_pajak' => 'none', 'tax' => 0]);
     $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
 
     $items = PurchaseOrderResource::buildOrderRequestItems(
@@ -204,7 +204,7 @@ test('buildOrderRequestItems maps item tipe_pajak Non Pajak correctly', function
     );
 
     foreach ($items as $item) {
-        expect($item['tipe_pajak'])->toBe('Non Pajak');
+        expect($item['tipe_pajak'])->toBe('none');
     }
 });
 

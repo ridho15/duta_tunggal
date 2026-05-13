@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,7 +25,6 @@ class PurchaseOrder extends Model
         'approved_by',
         'approval_signature',
         'approval_signed_at',
-        'warehouse_id',
         'tempo_hutang', // hari
         'note',
         'close_requested_by',
@@ -39,9 +37,7 @@ class PurchaseOrder extends Model
         'created_by',
         'refer_model_type',
         'refer_model_id',
-        'is_import',
-        'ppn_option',
-        'cabang_id'
+        'is_import'
     ];
 
     protected function casts(): array
@@ -131,8 +127,6 @@ class PurchaseOrder extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope(new CabangScope());
-
         static::deleting(function ($purchaseOrder) {
             if ($purchaseOrder->isForceDeleting()) {
                 $purchaseOrder->purchaseOrderItem()->forceDelete();

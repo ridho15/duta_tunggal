@@ -33,7 +33,7 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Set $set) {
                         if ($state) {
-                            $product = Product::find($state);
+                            $product = Product::withoutGlobalScope('product_cabang')->find($state);
                             // Get current stock from inventory_stocks
                             $warehouseId = $this->getOwnerRecord()->warehouse_id;
                             $inventoryStock = \App\Models\InventoryStock::where('product_id', $state)

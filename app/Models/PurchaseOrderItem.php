@@ -31,6 +31,10 @@ class PurchaseOrderItem extends Model
 
     protected static function booted()
     {
+        static::saving(function (PurchaseOrderItem $purchaseOrderItem) {
+            $purchaseOrderItem->tipe_pajak = OrderRequestItem::normalizeItemTaxType($purchaseOrderItem->tipe_pajak ?? null);
+        });
+
         static::creating(function (PurchaseOrderItem $purchaseOrderItem) {
             if (! empty($purchaseOrderItem->refer_item_model_type) && ! empty($purchaseOrderItem->refer_item_model_id)) {
                 return;
@@ -52,12 +56,6 @@ class PurchaseOrderItem extends Model
                     $query->where(function ($supplierQuery) use ($purchaseOrder) {
                         $supplierQuery->where('supplier_id', $purchaseOrder->supplier_id)
                             ->orWhereNull('supplier_id');
-                    });
-                })
-                ->when($purchaseOrder->cabang_id, function ($query) use ($purchaseOrder) {
-                    $query->where(function ($branchQuery) use ($purchaseOrder) {
-                        $branchQuery->where('cabang_id', $purchaseOrder->cabang_id)
-                            ->orWhereNull('cabang_id');
                     });
                 })
                 ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)')

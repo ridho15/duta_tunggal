@@ -136,19 +136,9 @@ class QualityControlPurchaseResource extends Resource
                                                 $set('uom', $item->product->uom->name ?? '');
                                                 $set('product_id', $item->product_id ?? null);
 
-                                                // Auto-fill warehouse from PurchaseOrder, with fallback to OrderRequest
+                                                // Auto-fill warehouse from PurchaseOrder, which is the canonical source.
                                                 $purchaseOrder = $item->purchaseOrder;
                                                 $warehouseId = $purchaseOrder->warehouse_id ?? null;
-                                                // If PO refers to an OrderRequest, prefer its warehouse
-                                                if (
-                                                    $purchaseOrder->refer_model_type === 'App\Models\OrderRequest'
-                                                    && $purchaseOrder->refer_model_id
-                                                ) {
-                                                    $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);
-                                                    if ($orderRequest && $orderRequest->warehouse_id) {
-                                                        $warehouseId = $orderRequest->warehouse_id;
-                                                    }
-                                                }
                                                 $set('warehouse_id', $warehouseId);
                                                 $set('cabang_id', $purchaseOrder->cabang_id ?? null);
 

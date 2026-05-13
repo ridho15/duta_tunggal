@@ -112,21 +112,20 @@ class OrderRequestService
 
         if ($createPurchaseOrder) {
             $supplier = Supplier::findOrFail($data['supplier_id']);
-            $currency = Currency::query()->first();
 
-            if (! $currency) {
+            $defaultCurrency = Currency::query()->first();
+
+            if (! $defaultCurrency) {
                 throw new \RuntimeException('Data mata uang wajib tersedia sebelum order request dapat disetujui.');
             }
 
             $purchaseOrder = $orderRequest->purchaseOrders()->create([
                 'po_number'    => $data['po_number'],
                 'supplier_id'  => $supplier->id,
-                'cabang_id'    => $data['cabang_id'] ?? $orderRequest->cabang_id,
                 'order_date'   => $data['order_date'],
                 'expected_date'=> $data['expected_date'] ?? null,
                 'note'         => $data['note'] ?? null,
                 'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
-                'warehouse_id' => $orderRequest->warehouse_id,
                 'tempo_hutang' => $supplier->tempo_hutang ?? 0,
                 'created_by'   => Auth::id() ?? $orderRequest->created_by,
             ]);
@@ -139,6 +138,8 @@ class OrderRequestService
                 /** @var OrderRequestItem $orderRequestItem */
                 $orderRequestItem = $row['order_request_item'];
 
+                $itemCurrencyId = $orderRequestItem->currency_id ?? $orderRequest->currency_id ?? $defaultCurrency->id;
+
                 $orderRequestItem->purchaseOrderItem()->create([
                     'purchase_order_id' => $purchaseOrder->id,
                     'product_id'        => $orderRequestItem->product_id,
@@ -147,7 +148,7 @@ class OrderRequestService
                     'discount'          => $row['discount'],
                     'tax'               => $row['tax'],
                     'tipe_pajak'        => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
-                    'currency_id'       => $currency->id,
+                    'currency_id'       => $itemCurrencyId,
                 ]);
 
                 $itemsForPivotSync[] = [
@@ -156,6 +157,17 @@ class OrderRequestService
                     'unit_price' => $row['unit_price'],
                 ];
                 // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
+            }
+
+            // Create PurchaseOrderCurrency entries for any currencies used by items
+            $usedCurrencyIds = $purchaseOrder->purchaseOrderItem()->pluck('currency_id')->filter()->unique()->values()->all();
+            foreach ($usedCurrencyIds as $cid) {
+                $currency = Currency::find($cid);
+                $nominal = $currency ? ($currency->to_rupiah ?? 1) : 1;
+                $purchaseOrder->purchaseOrderCurrency()->create([
+                    'currency_id' => $cid,
+                    'nominal' => $nominal,
+                ]);
             }
 
             // Ensure OR is approved first, then sync supplier-product pivot.
@@ -191,10 +203,11 @@ class OrderRequestService
 
     public function createPurchaseOrder($orderRequest, $data)
     {
-        $supplier = Supplier::findOrFail($data['supplier_id']);
-        $currency = Currency::query()->first();
 
-        if (! $currency) {
+        $supplier = Supplier::findOrFail($data['supplier_id']);
+        $defaultCurrency = Currency::query()->first();
+
+        if (! $defaultCurrency) {
             throw new \RuntimeException('Data mata uang wajib tersedia sebelum purchase order dibuat.');
         }
 
@@ -205,8 +218,6 @@ class OrderRequestService
             'expected_date'=> $data['expected_date'] ?? null,
             'note'         => $data['note'] ?? null,
             'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
-            'warehouse_id' => $orderRequest->warehouse_id,
-            'cabang_id'    => $data['cabang_id'] ?? $orderRequest->cabang_id,
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
             'created_by'   => Auth::id() ?? $orderRequest->created_by,
         ]);
@@ -217,6 +228,8 @@ class OrderRequestService
             /** @var OrderRequestItem $orderRequestItem */
             $orderRequestItem = $row['order_request_item'];
 
+            $itemCurrencyId = $orderRequestItem->currency_id ?? $orderRequest->currency_id ?? $defaultCurrency->id;
+
             $orderRequestItem->purchaseOrderItem()->create([
                 'purchase_order_id' => $purchaseOrder->id,
                 'product_id'        => $orderRequestItem->product_id,
@@ -225,9 +238,20 @@ class OrderRequestService
                 'discount'          => $row['discount'],
                 'tax'               => $row['tax'],
                 'tipe_pajak'        => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
-                'currency_id'       => $currency->id,
+                'currency_id'       => $itemCurrencyId,
             ]);
             // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
+        }
+
+        // Ensure PurchaseOrderCurrency entries are created for item currencies
+        $usedCurrencyIds = collect($purchaseOrder->purchaseOrderItem)->pluck('currency_id')->filter()->unique()->values()->all();
+        foreach ($usedCurrencyIds as $cid) {
+            $currency = Currency::find($cid);
+            $nominal = $currency ? ($currency->to_rupiah ?? 1) : 1;
+            $purchaseOrder->purchaseOrderCurrency()->create([
+                'currency_id' => $cid,
+                'nominal' => $nominal,
+            ]);
         }
 
         return $purchaseOrder->fresh(['purchaseOrderItem']);
@@ -235,22 +259,22 @@ class OrderRequestService
 
     /**
      * Derive the PurchaseOrderItem tipe_pajak from the Order Request tax_type and item tax rate.
-     *  - tax = 0 → 'Non Pajak'
-     *  - tax_type = 'PPN Included' → 'Inklusif'
-     *  - tax_type = 'PPN Excluded' (default) → 'Eksklusif'
+     *  - tax = 0 → 'none'
+     *  - tax_type = 'inklusif' → 'inklusif'
+     *  - tax_type = 'eklusif' (default) → 'eklusif'
      */
     private function resolveTipePajak(?string $itemTaxType, float $tax): string
     {
         if ((float) $tax <= 0) {
-            return 'Non Pajak';
+            return 'none';
         }
 
         $normalized = strtolower(trim((string) $itemTaxType));
         if (in_array($normalized, ['inklusif', 'ppn included', 'included'], true)) {
-            return 'Inklusif';
+            return 'inklusif';
         }
 
-        return 'Eklusif';
+        return 'eklusif';
     }
 
     public function reject($orderRequest)

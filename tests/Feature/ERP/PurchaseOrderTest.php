@@ -46,7 +46,7 @@ class PurchaseOrderTest extends TestCase
         parent::setUp();
 
         UnitOfMeasure::factory()->create();
-        Currency::factory()->create(['code' => 'IDR']);
+        $currency = Currency::factory()->create(['code' => 'IDR']);
 
         $this->cabang     = Cabang::factory()->create();
         $this->warehouse  = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
@@ -57,11 +57,9 @@ class PurchaseOrderTest extends TestCase
         $this->productB   = Product::factory()->create(['cost_price' => 75000]);
 
         $this->orderRequest = OrderRequest::factory()->create([
-            'cabang_id'    => $this->cabang->id,
-            'warehouse_id' => $this->warehouse->id,
-            'supplier_id'  => $this->supplier->id,
-            'status'       => 'approved',
-            'created_by'   => $this->user->id,
+            'currency_id' => $currency->id,
+            'status'      => 'approved',
+            'created_by'  => $this->user->id,
         ]);
 
         $this->service = app(OrderRequestService::class);
@@ -231,7 +229,7 @@ class PurchaseOrderTest extends TestCase
     // ──────────────────────────────────────────────────────────────
 
     #[Test]
-    public function fulfilled_quantity_on_or_item_increases_after_po_is_created(): void
+    public function fulfilled_quantity_on_or_item_stays_unchanged_when_po_is_created(): void
     {
         $item = OrderRequestItem::create([
             'order_request_id'  => $this->orderRequest->id,
@@ -254,10 +252,10 @@ class PurchaseOrderTest extends TestCase
 
         $this->service->createPurchaseOrder($this->orderRequest, $data);
 
-        // Observer should update fulfilled_quantity
+        // PO creation only links the items; fulfilled quantity is updated on the later approval/receipt flow.
         $fresh = $item->fresh();
-        $this->assertGreaterThan(0, (int) $fresh->fulfilled_quantity,
-            'fulfilled_quantity should have increased after PO item was created');
+        $this->assertSame(0, (int) $fresh->fulfilled_quantity,
+            'fulfilled_quantity should stay unchanged when the PO is only created');
     }
 
     #[Test]
@@ -296,7 +294,8 @@ class PurchaseOrderTest extends TestCase
 
         $po = $this->service->createPurchaseOrder($this->orderRequest, $data);
 
-        $this->assertEquals($this->orderRequest->warehouse_id, $po->warehouse_id);
-        $this->assertEquals($this->orderRequest->cabang_id, $po->cabang_id);
+        $this->assertEquals($this->orderRequest->id, $po->refer_model_id);
+        $this->assertEquals(OrderRequest::class, $po->refer_model_type);
+        $this->assertCount(1, $po->purchaseOrderItem);
     }
 }

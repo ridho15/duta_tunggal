@@ -15,12 +15,6 @@ class CreateOrderRequest extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Set cabang_id if not provided
-        if (empty($data['cabang_id'])) {
-            $user = Auth::user();
-            $data['cabang_id'] = $user?->cabang_id;
-        }
-
         $data['created_by'] = Auth::user()->id;
 
         return OrderRequestResource::mutateFormDataBeforeCreate($data);

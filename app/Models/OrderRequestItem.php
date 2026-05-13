@@ -26,7 +26,8 @@ class OrderRequestItem extends Model
         'tax',
         'tipe_pajak',
         'subtotal',
-        'note'
+        'note',
+        'currency_id'  // ← ADD THIS
     ];
 
     public function orderRequest()
@@ -47,6 +48,11 @@ class OrderRequestItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function purchaseOrderItem()
@@ -90,17 +96,18 @@ class OrderRequestItem extends Model
         $normalized = strtolower(trim((string) $value));
 
         return match ($normalized) {
-            'non pajak', 'none', 'non-pajak', 'nonpajak' => 'Non Pajak',
-            'inklusif', 'included', 'ppn included' => 'Inklusif',
-            default => 'Eklusif',
+            'non pajak', 'none', 'non-pajak', 'nonpajak' => 'none',
+            'inklusif', 'included', 'ppn included' => 'inklusif',
+            'eksklusif', 'eklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
+            default => 'eklusif',
         };
     }
 
     public static function taxServiceTypeFromItemTaxType(?string $itemTaxType): string
     {
         return match (static::normalizeItemTaxType($itemTaxType)) {
-            'Non Pajak' => 'None',
-            'Inklusif' => 'PPN Included',
+            'none' => 'None',
+            'inklusif' => 'PPN Included',
             default => 'PPN Excluded',
         };
     }

@@ -97,7 +97,6 @@ class PaymentRequestVendorPaymentFlowTest extends TestCase
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
             'po_number' => 'PO-TEST-PR-0001',
-            'warehouse_id' => $warehouse->id,
             'created_by' => $this->user->id,
             'approved_by' => $this->approver->id,
             'status' => 'approved',

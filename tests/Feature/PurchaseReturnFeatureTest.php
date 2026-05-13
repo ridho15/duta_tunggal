@@ -70,14 +70,12 @@ if (! function_exists('createPurchaseReturnRecordForNotificationTest')) {
             'received_by' => $user->id,
             'expected_date' => now()->addDays(rand(3, 14)),
             'total_amount' => rand(50000, 2000000),
-            'cabang_id' => Cabang::first()->id,
             'currency_id' => 1,
             'created_by' => $user->id,
             'is_asset' => rand(0, 1),
             'close_reason' => null,
             'date_approved' => now(),
             'approved_by' => $user->id,
-            'warehouse_id' => 1,
             'tempo_hutang' => rand(0, 60),
             'note' => null,
             'close_requested_by' => $user->id,
@@ -89,7 +87,6 @@ if (! function_exists('createPurchaseReturnRecordForNotificationTest')) {
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'eklusif',
         ]);
 
         $purchaseReceipt = PurchaseReceipt::create([

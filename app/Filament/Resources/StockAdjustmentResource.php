@@ -165,7 +165,7 @@ class StockAdjustmentResource extends Resource
                                         self::syncAdjustmentItemStockState($set, $get, $get('../../warehouse_id'), $state, $get('rak_id'));
 
                                         if (is_numeric($state)) {
-                                            $product = Product::find((int) $state);
+                                            $product = Product::withoutGlobalScope('product_cabang')->find((int) $state);
                                             if ($product) {
                                                 $set('unit_cost', $product->cost_price ?? 0);
                                             }

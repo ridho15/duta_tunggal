@@ -97,7 +97,6 @@ class AssetPurchaseWorkflowTest extends TestCase
         // Step 1: Create Purchase Order
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
-            'cabang_id' => $this->cabang->id,
             'order_date' => now(),
             'status' => 'approved'
         ]);
@@ -334,7 +333,6 @@ class AssetPurchaseWorkflowTest extends TestCase
         // Step 2: Create Purchase Order with is_asset = true
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
-            'cabang_id' => $this->cabang->id,
             'order_date' => now(),
             'status' => 'approved', // Approval happens at OR; PO created approved
             'is_asset' => true // Mark as asset purchase
@@ -477,7 +475,6 @@ class AssetPurchaseWorkflowTest extends TestCase
         // Create Purchase Order with is_asset = true
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
-            'cabang_id' => $this->cabang->id,
             'order_date' => now(),
             'status' => 'approved',
             'is_asset' => true

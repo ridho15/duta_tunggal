@@ -66,9 +66,7 @@ class QualityControlCompleteTest extends TestCase
             'order_date' => now(),
             'status' => 'completed',
             'total_amount' => 100000,
-            'cabang_id' => $cabangId,
             'created_by' => $this->user->id,
-            'warehouse_id' => $warehouse->id,
             'approved_by' => $this->user->id,
             'date_approved' => now(),
             'completed_by' => $this->user->id,
@@ -84,7 +82,6 @@ class QualityControlCompleteTest extends TestCase
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'eklusif',
         ]);
 
         $receipt = PurchaseReceipt::create([
@@ -209,7 +206,6 @@ class QualityControlCompleteTest extends TestCase
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'eklusif',
         ]);
 
         $receipt = PurchaseReceipt::create([

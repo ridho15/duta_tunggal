@@ -25,6 +25,7 @@ class SaleOrder extends Model
         'completed_at' => 'datetime',
         'reject_at' => 'datetime',
         'warehouse_confirmed_at' => 'datetime',
+        'exchange_rate' => 'decimal:8',
     ];
     protected $fillable = [
         'customer_id',
@@ -49,6 +50,8 @@ class SaleOrder extends Model
         'reason_close',
         'tipe_pengiriman', // Ambil Sendiri, Kirim Langsung
         'tempo_pembayaran',
+        'currency_id',
+        'exchange_rate',
         'created_by',
         'warehouse_confirmed_at',
         'cabang_id'
@@ -63,6 +66,11 @@ class SaleOrder extends Model
     public function quotation()
     {
         return $this->belongsTo(Quotation::class, 'quotation_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function saleOrderItem()

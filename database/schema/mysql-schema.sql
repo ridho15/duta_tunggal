@@ -1198,21 +1198,15 @@ DROP TABLE IF EXISTS `order_requests`;
 CREATE TABLE `order_requests` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `request_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `warehouse_id` int NOT NULL,
-  `supplier_id` int DEFAULT NULL,
-  `cabang_id` bigint unsigned DEFAULT NULL,
   `request_date` date NOT NULL,
   `status` enum('draft','approved','rejected','closed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `tax_type` enum('PPN Included','PPN Excluded') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PPN Excluded',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `created_by` int NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `order_requests_cabang_id_foreign` (`cabang_id`),
-  KEY `order_requests_created_at_index` (`created_at`),
-  CONSTRAINT `order_requests_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`)
+  KEY `order_requests_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `other_sales`;
@@ -1579,7 +1573,6 @@ CREATE TABLE `purchase_orders` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `is_asset` tinyint(1) NOT NULL DEFAULT '0',
   `is_import` tinyint(1) NOT NULL DEFAULT '0',
-  `ppn_option` enum('standard','non_ppn') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'standard',
   `close_reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `date_approved` datetime DEFAULT NULL,
   `approved_by` int DEFAULT NULL,
@@ -1595,14 +1588,10 @@ CREATE TABLE `purchase_orders` (
   `created_by` int DEFAULT NULL,
   `refer_model_type` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `refer_model_id` bigint unsigned DEFAULT NULL,
-  `warehouse_id` int NOT NULL,
   `tempo_hutang` int NOT NULL,
-  `cabang_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `purchase_orders_refer_model_type_refer_model_id_index` (`refer_model_type`,`refer_model_id`),
-  KEY `purchase_orders_cabang_id_foreign` (`cabang_id`),
-  KEY `purchase_orders_created_at_index` (`created_at`),
-  CONSTRAINT `purchase_orders_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL
+  KEY `purchase_orders_created_at_index` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `purchase_receipt_biayas`;

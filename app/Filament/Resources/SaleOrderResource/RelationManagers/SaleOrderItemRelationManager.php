@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SaleOrderResource\RelationManagers;
 
 use App\Http\Controllers\HelperController;
 use App\Models\Product;
+use App\Models\TaxSetting;
 use Filament\Forms;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -25,6 +26,18 @@ class SaleOrderItemRelationManager extends RelationManager
 {
     protected static string $relationship = 'saleOrderItem';
 
+    protected static function normalizeTaxTypeValue(?string $taxType): string
+    {
+        $normalized = strtolower(trim((string) $taxType));
+
+        return match ($normalized) {
+            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
+            'inklusif', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            'eksklusif', 'eklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
+            default => 'eklusif',
+        };
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -37,7 +50,7 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->preload()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $product = Product::find($state);
+                                $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                 $set('unit_price', $product->sell_price);
                                 $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
                             })
@@ -103,16 +116,32 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->default(0)
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null));
+                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null)));
                             })
                             ->indonesianMoney(),
+                        Select::make('tipe_pajak')
+                            ->label('Tipe Pajak')
+                            ->options([
+                                'none' => 'Non Pajak',
+                                'inklusif' => 'Inklusif',
+                                'eklusif' => 'Eklusif',
+                            ])
+                            ->default('eklusif')
+                            ->reactive()
+                            ->afterStateHydrated(function ($component, $state) {
+                                $component->state(self::normalizeTaxTypeValue($state));
+                            })
+                            ->afterStateUpdated(function ($set, $get, $state) {
+                                $normalized = self::normalizeTaxTypeValue($state);
+                                $set('tax', $normalized === 'none' ? 0 : TaxSetting::activeRate('PPN'));
+                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax'), $normalized));
+                            }),
                         TextInput::make('tax')
                             ->label('Tax')
                             ->reactive()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                $set('subtotal',  HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
-                            })
-                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
+                            ->disabled()
+                            ->readOnly()
+                            ->default(fn () => TaxSetting::activeRate('PPN'))
                             ->indonesianMoney(),
                         TextInput::make('subtotal')
                             ->label('Sub Total')

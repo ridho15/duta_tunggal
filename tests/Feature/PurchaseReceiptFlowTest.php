@@ -84,7 +84,6 @@ class PurchaseReceiptFlowTest extends TestCase
             'order_date' => now(),
             'expected_date' => now()->addDays(7),
             'status' => 'approved',
-            'warehouse_id' => $this->warehouse->id,
             'created_by' => $this->user->id,
         ]);
 
@@ -216,7 +215,6 @@ class PurchaseReceiptFlowTest extends TestCase
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
             'status' => 'approved',
-            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $poItem = PurchaseOrderItem::factory()->create([
@@ -298,7 +296,6 @@ class PurchaseReceiptFlowTest extends TestCase
         $purchaseOrder = PurchaseOrder::factory()->create([
             'supplier_id' => $this->supplier->id,
             'status' => 'approved',
-            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $poItem = PurchaseOrderItem::factory()->create([
@@ -349,7 +346,6 @@ class PurchaseReceiptFlowTest extends TestCase
             'order_date' => now(),
             'expected_date' => now()->addDays(7),
             'status' => 'approved',
-            'warehouse_id' => $this->warehouse->id,
             'created_by' => $this->user->id,
         ]);
 
@@ -405,7 +401,6 @@ class PurchaseReceiptFlowTest extends TestCase
             'order_date' => now(),
             'expected_date' => now()->addDays(7),
             'status' => 'approved',
-            'warehouse_id' => $this->warehouse->id,
             'created_by' => $this->user->id,
         ]);
 
@@ -494,7 +489,6 @@ class PurchaseReceiptFlowTest extends TestCase
             'order_date' => now(),
             'expected_date' => now()->addDays(7),
             'status' => 'approved',
-            'warehouse_id' => $this->warehouse->id,
             'created_by' => $this->user->id,
         ]);
 

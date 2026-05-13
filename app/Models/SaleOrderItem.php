@@ -25,6 +25,18 @@ class SaleOrderItem extends Model
         'rak_id',
     ];
 
+    protected static function normalizeItemTaxType(?string $itemTaxType): string
+    {
+        $normalized = strtolower(trim((string) $itemTaxType));
+
+        return match ($normalized) {
+            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
+            'inklusif', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            'eksklusif', 'eklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
+            default => 'eklusif',
+        };
+    }
+
 
     public function saleOrder()
     {
@@ -64,5 +76,14 @@ class SaleOrderItem extends Model
     public function getRemainingQuantityAttribute()
     {
         return $this->quantity - $this->delivered_quantity;
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (SaleOrderItem $item): void {
+            $itemTaxType = static::normalizeItemTaxType($item->tipe_pajak ?? null);
+            $item->tipe_pajak = $itemTaxType;
+            $item->tax = $itemTaxType === 'none' ? 0 : TaxSetting::activeRate('PPN');
+        });
     }
 }

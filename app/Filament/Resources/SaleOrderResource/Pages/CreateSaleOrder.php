@@ -40,6 +40,8 @@ class CreateSaleOrder extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data = SaleOrderResource::normalizeFormDataForPersist($data);
+
         // Set created_by to current user
         $data['created_by'] = Auth::id();
 

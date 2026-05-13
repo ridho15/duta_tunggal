@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,23 +13,29 @@ class OrderRequest extends Model
     protected $table = 'order_requests';
     protected $fillable = [
         'request_number',
-        'warehouse_id',
-        'cabang_id',
         'request_date',
         'status', // draft, approved, rejected, closed
         'note',
-        'tax_type', // PPN Included, PPN Excluded
-        'created_by'
+        'created_by',
+        'currency_id',
+        // header-level cabang/warehouse intentionally removed; per-item cabang retained on OrderRequestItem
     ];
 
     public function warehouse()
     {
-        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+        // legacy accessor removed
+        return null;
     }
 
     public function cabang()
     {
-        return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();
+        // legacy accessor removed
+        return null;
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(\App\Models\Currency::class, 'currency_id')->withDefault();
     }
 
     public function orderRequestItem()
@@ -89,8 +94,6 @@ class OrderRequest extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope(new CabangScope());
-
         static::deleting(function ($orderRequest) {
             if ($orderRequest->isForceDeleting()) {
                 $orderRequest->orderRequestItem()->forceDelete();

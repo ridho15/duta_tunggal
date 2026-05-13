@@ -50,7 +50,6 @@ beforeEach(function () {
     ]);
 
     $this->orderRequest = OrderRequest::factory()->create([
-        'warehouse_id' => $this->warehouse->id,
         'created_by' => $this->user->id,
         'status' => 'draft',
         'request_date' => Carbon::now()->toDateString(),
@@ -113,7 +112,6 @@ test('order request approval generates purchase order and items', function () {
         ->and($purchaseOrder->refer_model_type)->toBe(OrderRequest::class)
         ->and($purchaseOrder->refer_model_id)->toBe($fresh->id)
         ->and($purchaseOrder->status)->toBe('approved')
-        ->and($purchaseOrder->warehouse_id)->toBe($this->warehouse->id)
         ->and($purchaseOrder->tempo_hutang)->toBe(30)
         ->and($purchaseOrder->created_by)->toBe($this->user->id);
 
@@ -129,7 +127,7 @@ test('order request approval generates purchase order and items', function () {
         ->and((float) $poItemA->unit_price)->toBe((float) $this->productA->cost_price)
         ->and((float) $poItemA->discount)->toBe(10.0)
         ->and((float) $poItemA->tax)->toBe((float) ($itemA->tax ?? 0))
-        ->and($poItemA->tipe_pajak)->toBe('Eklusif') // tax_type defaults to 'PPN Excluded' → Eklusif
+        ->and($poItemA->tipe_pajak)->toBe('eklusif') // tax_type defaults to lowercase eklusif
         ->and($poItemA->currency_id)->toBe($this->currency->id)
         ->and($poItemA->refer_item_model_type)->toBe(OrderRequestItem::class)
         ->and($poItemA->refer_item_model_id)->toBe($this->itemA->id);
@@ -139,7 +137,7 @@ test('order request approval generates purchase order and items', function () {
         ->and((float) $poItemB->unit_price)->toBe((float) $this->productB->cost_price)
         ->and((float) $poItemB->discount)->toBe(0.0)
         ->and((float) $poItemB->tax)->toBe((float) ($itemB->tax ?? 0))
-        ->and($poItemB->tipe_pajak)->toBe('Non Pajak') // tax = 0 → Non Pajak
+        ->and($poItemB->tipe_pajak)->toBe('none') // tax = 0 → none
         ->and($poItemB->currency_id)->toBe($this->currency->id)
         ->and($poItemB->refer_item_model_type)->toBe(OrderRequestItem::class)
         ->and($poItemB->refer_item_model_id)->toBe($this->itemB->id);
@@ -222,7 +220,7 @@ test('item tax type Inklusif maps to Inklusif on purchase order item', function 
     $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(), $payload);
     $poItem = $po->purchaseOrderItem->first();
 
-    expect($poItem->tipe_pajak)->toBe('Inklusif');
+    expect($poItem->tipe_pajak)->toBe('inklusif');
 });
 
 test('item tax type Eklusif maps to Eklusif on purchase order item', function () {
@@ -242,7 +240,7 @@ test('item tax type Eklusif maps to Eklusif on purchase order item', function ()
     $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(), $payload);
     $poItem = $po->purchaseOrderItem->first();
 
-    expect($poItem->tipe_pajak)->toBe('Eklusif');
+    expect($poItem->tipe_pajak)->toBe('eklusif');
 });
 
 test('item tax type Non Pajak always maps to Non Pajak', function () {
@@ -262,7 +260,7 @@ test('item tax type Non Pajak always maps to Non Pajak', function () {
     $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(), $payload);
     $poItem = $po->purchaseOrderItem->first();
 
-    expect($poItem->tipe_pajak)->toBe('Non Pajak');
+    expect($poItem->tipe_pajak)->toBe('none');
 });
 
 // ─── Feature 3: One Order Request → Multiple Purchase Orders ─────────────────
@@ -552,7 +550,6 @@ test('DIAGNOSTIC: OR item supplier_id is used if set, else fallback to payload s
 
     // Create a NEW order request to avoid existing itemA and itemB interference
     $newOr = OrderRequest::factory()->create([
-        'warehouse_id' => $this->warehouse->id,
         'created_by' => $this->user->id,
         'status' => 'draft',
         'request_date' => now()->toDateString(),
