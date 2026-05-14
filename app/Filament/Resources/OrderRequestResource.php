@@ -542,17 +542,23 @@ class OrderRequestResource extends Resource
                                             return;
                                         }
 
-                                        $oldRateToIdr = self::resolveCurrencyRateToRupiah($oldCurrencyId);
-                                        $newRateToIdr = self::resolveCurrencyRateToRupiah($newCurrencyId);
-
                                         $currentOriginalPrice = (float) \App\Helpers\MoneyHelper::parse($get('original_price') ?? 0);
                                         $currentUnitPrice = (float) \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
 
-                                        $convertedOriginalPrice = ($currentOriginalPrice * $oldRateToIdr) / $newRateToIdr;
-                                        $convertedUnitPrice = ($currentUnitPrice * $oldRateToIdr) / $newRateToIdr;
+                                        // Use CurrencyConversionResolver with bcmath precision for high-accuracy conversion
+                                        $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertBetweenCurrencies(
+                                            $currentOriginalPrice,
+                                            $oldCurrencyId,
+                                            $newCurrencyId
+                                        );
+                                        $convertedUnitPrice = \App\Support\CurrencyConversionResolver::convertBetweenCurrencies(
+                                            $currentUnitPrice,
+                                            $oldCurrencyId,
+                                            $newCurrencyId
+                                        );
 
-                                        $set('original_price', round($convertedOriginalPrice, 2));
-                                        $set('unit_price', round($convertedUnitPrice, 2));
+                                        $set('original_price', $convertedOriginalPrice);
+                                        $set('unit_price', $convertedUnitPrice);
 
                                         $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
                                         $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);

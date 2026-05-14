@@ -69,7 +69,10 @@ class PurchaseReceiptService
         foreach ($receipt->purchaseReceiptItem as $item) {
             $qtyAccepted = max(0, $item->qty_accepted ?? 0);
             $poItem = $item->purchaseOrderItem;
-            $unitPrice = $poItem?->unit_price ?? 0;
+            $rawUnitPrice = (float) ($poItem->unit_price ?? $item->product->cost_price ?? 0);
+            $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+            $unitPrice = 
+                \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
             $debugItems[] = [
                 'item_id' => $item->id,
                 'qtyAccepted' => $qtyAccepted,
@@ -194,7 +197,9 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         $poItem = $item->purchaseOrderItem;
-        $unitPrice = $poItem?->unit_price ?? 0;
+        $rawUnitPrice = (float) ($poItem->unit_price ?? $item->product->cost_price ?? 0);
+        $unitCurrencyId = (int) ($poItem->currency_id ?? $item->purchaseReceipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+        $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
         $amount = round($qtyAccepted * $unitPrice, 2);
 
         $qc = $this->resolveCompletedQcForReceiptItem($item);
@@ -898,20 +903,37 @@ class PurchaseReceiptService
         $invoiceService = app(\App\Services\InvoiceService::class);
         $subtotal = 0;
         $invoiceItems = [];
+        
+        Log::info('createAutomaticInvoiceFromReceipt: starting', [
+            'receipt_id' => $receipt->id,
+            'item_count' => $receipt->purchaseReceiptItem->count(),
+            'items' => $receipt->purchaseReceiptItem->map(fn($i) => [
+                'id' => $i->id,
+                'qty_accepted' => (float) $i->qty_accepted,
+                'po_item_id' => $i->purchaseOrderItem?->id,
+            ])->toArray(),
+        ]);
 
         foreach ($receipt->purchaseReceiptItem as $receiptItem) {
-            if ($receiptItem->qty_accepted > 0) {
+            if ((float) $receiptItem->qty_accepted > 0) {
                 $poItem = $receiptItem->purchaseOrderItem;
-                $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+                
+                // Normalize unit price to IDR using currency conversion
+                $rawUnitPrice = (float) ($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+                $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+                $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
+                
                 $total = round($unitPrice * $receiptItem->qty_accepted, 2);
 
                 // Debug per-item calculation
                 Log::info('createAutomaticInvoiceFromReceipt: item calc', [
                     'receipt_item_id' => $receiptItem->id,
                     'po_item_id' => $poItem?->id,
+                    'raw_unit_price' => $rawUnitPrice,
+                    'unit_currency_id' => $unitCurrencyId,
+                    'converted_unit_price' => $unitPrice,
                     'tipe_pajak' => $poItem?->tipe_pajak,
                     'tax_rate' => $poItem?->tax,
-                    'unit_price' => $unitPrice,
                     'qty' => $receiptItem->qty_accepted,
                     'line_gross' => $total,
                 ]);
@@ -966,14 +988,19 @@ class PurchaseReceiptService
         $taxableLineCount = 0;
 
         foreach ($receipt->purchaseReceiptItem as $receiptItem) {
-            if ($receiptItem->qty_accepted <= 0) {
+            if ((float) $receiptItem->qty_accepted <= 0) {
                 continue;
             }
 
             $acceptedLineCount++;
 
             $poItem = $receiptItem->purchaseOrderItem;
-            $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+            
+            // Normalize unit price to IDR using currency conversion
+            $rawUnitPrice = (float) ($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+            $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+            $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
+            
             $qty = $receiptItem->qty_accepted;
             $lineGross = round($unitPrice * $qty, 2);
             $rate = (float)($poItem->tax ?? 0);
