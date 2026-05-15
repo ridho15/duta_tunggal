@@ -175,9 +175,9 @@ class OrderRequestResource extends Resource
         return CurrencyConversionResolver::resolveRate($currencyId);
     }
 
-    public static function convertIdrToCurrency(float $amountInIdr, ?int $currencyId): float
+    public static function convertIdrToCurrency(float $amountInIdr, ?int $currencyId, bool $round = true): float
     {
-        return CurrencyConversionResolver::convertFromIdr($amountInIdr, $currencyId);
+        return CurrencyConversionResolver::convertFromIdr($amountInIdr, $currencyId, $round);
     }
 
     public static function formatMoneyByCurrency(?int $currencyId, float $amount): string
@@ -284,8 +284,8 @@ class OrderRequestResource extends Resource
                 $priceLabel = '';
                 if ($productId) {
                     $price = $linkedPriceMap[(int) $supplier->id] ?? null;
-                    if ($price !== null) {
-                        $converted = self::convertIdrToCurrency((float) $price, $currencyId);
+                        if ($price !== null) {
+                        $converted = self::convertIdrToCurrency((float) $price, $currencyId, false);
                         $priceLabel = ' - ' . self::formatMoneyByCurrency($currencyId, $converted);
                     }
                 }
@@ -308,7 +308,7 @@ class OrderRequestResource extends Resource
             $product = Product::withoutGlobalScope('product_cabang')->find($productId);
             $price = $product?->suppliers()->where('suppliers.id', $supplierId)->first()?->pivot?->supplier_price;
             if ($price !== null) {
-                $converted = self::convertIdrToCurrency((float) $price, $currencyId);
+                $converted = self::convertIdrToCurrency((float) $price, $currencyId, false);
                 $priceLabel = ' - ' . self::formatMoneyByCurrency($currencyId, $converted);
             }
         }
@@ -411,14 +411,14 @@ class OrderRequestResource extends Resource
 
                                                 // Use item-level supplier price if available
                                                 $itemSupplierId = $currentSupplierId;
-                                                $unitPrice = self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId);
+                                                $unitPrice = self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId, false);
                                                 if ($itemSupplierId) {
                                                     $supplierProduct = $product->suppliers()->where('suppliers.id', $itemSupplierId)->first();
                                                     if ($supplierProduct) {
                                                         $supplierPrice = $supplierProduct->pivot->supplier_price;
                                                         $unitPrice = $supplierPrice !== null
-                                                            ? self::convertIdrToCurrency((float) $supplierPrice, $itemCurrencyId)
-                                                            : self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId);
+                                                            ? self::convertIdrToCurrency((float) $supplierPrice, $itemCurrencyId, false)
+                                                            : self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId, false);
                                                     }
                                                 }
                                                 $set('supplier_id', $itemSupplierId);
@@ -503,9 +503,9 @@ class OrderRequestResource extends Resource
                                                         : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
                                                     $supplierProduct = $product->suppliers()->where('suppliers.id', $state)->first();
                                                     if ($supplierProduct && $supplierProduct->pivot->supplier_price !== null) {
-                                                        $unitPrice = self::convertIdrToCurrency((float) $supplierProduct->pivot->supplier_price, $itemCurrencyId);
+                                                        $unitPrice = self::convertIdrToCurrency((float) $supplierProduct->pivot->supplier_price, $itemCurrencyId, false);
                                                     } else {
-                                                        $unitPrice = self::convertIdrToCurrency((float) ($product->cost_price ?? 0), $itemCurrencyId);
+                                                        $unitPrice = self::convertIdrToCurrency((float) ($product->cost_price ?? 0), $itemCurrencyId, false);
                                                     }
 
                                                     $set('original_price', $unitPrice);
@@ -549,12 +549,14 @@ class OrderRequestResource extends Resource
                                         $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertBetweenCurrencies(
                                             $currentOriginalPrice,
                                             $oldCurrencyId,
-                                            $newCurrencyId
+                                            $newCurrencyId,
+                                            false
                                         );
                                         $convertedUnitPrice = \App\Support\CurrencyConversionResolver::convertBetweenCurrencies(
                                             $currentUnitPrice,
                                             $oldCurrencyId,
-                                            $newCurrencyId
+                                            $newCurrencyId,
+                                            false
                                         );
 
                                         $set('original_price', $convertedOriginalPrice);
@@ -648,7 +650,7 @@ class OrderRequestResource extends Resource
                                             ? (int) $get('currency_id')
                                             : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
 
-                                        $converted = self::convertIdrToCurrency($price, $itemCurrencyId);
+                                        $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
 
                                         return "{$recommended->perusahaan} (" . self::formatMoneyByCurrency($itemCurrencyId, $converted) . ')';
                                     }),

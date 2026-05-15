@@ -135,14 +135,9 @@ class SaleOrderResource extends Resource
 
     protected static function convertCurrencyAmount(float $amount, ?int $fromCurrencyId, ?int $toCurrencyId): float
     {
-        $fromRate = static::resolveExchangeRate($fromCurrencyId);
-        $toRate = static::resolveExchangeRate($toCurrencyId);
-
-        if ($toRate <= 0) {
-            return $amount;
-        }
-
-        return round(($amount * $fromRate) / $toRate, 2);
+        // Use centralized resolver with high-precision intermediate calculation,
+        // but return a non-rounded intermediate value for UI (rounded where needed on persist).
+        return (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($amount, $fromCurrencyId, $toCurrencyId, false);
     }
 
     public static function normalizeFormDataForPersist(array $data): array

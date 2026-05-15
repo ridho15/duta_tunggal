@@ -36,10 +36,14 @@ class CurrencyConversionResolver
      * @param int|null $currencyId Currency ID to convert from
      * @return float Amount in IDR, rounded to 2 decimals
      */
-    public static function convertToIdr(float $amount, ?int $currencyId): float
+    public static function convertToIdr(float $amount, ?int $currencyId, bool $round = true)
     {
         $rate = static::resolveRate($currencyId);
         $product = bcmul((string) $amount, (string) $rate, 10);
+        if (! $round) {
+            return rtrim(rtrim($product, '0'), '.');
+        }
+
         return (float) round((float) $product, 2);
     }
 
@@ -59,7 +63,7 @@ class CurrencyConversionResolver
      * @param int|null $toCurrencyId Target currency ID
      * @return float Converted amount, rounded to 2 decimals
      */
-    public static function convertBetweenCurrencies(float $amount, ?int $fromCurrencyId, ?int $toCurrencyId): float
+    public static function convertBetweenCurrencies(float $amount, ?int $fromCurrencyId, ?int $toCurrencyId, bool $round = true)
     {
         $fromRate = static::resolveRate($fromCurrencyId);
         $toRate = static::resolveRate($toCurrencyId);
@@ -71,7 +75,11 @@ class CurrencyConversionResolver
         // Use bcmath for 10-decimal precision during intermediate calculation
         $product = bcmul((string) $amount, (string) $fromRate, 10);
         $quotient = bcdiv($product, (string) $toRate, 10);
-        
+
+        if (! $round) {
+            return rtrim(rtrim($quotient, '0'), '.');
+        }
+
         return (float) round((float) $quotient, 2);
     }
 
@@ -83,10 +91,14 @@ class CurrencyConversionResolver
      * @param int|null $currencyId Target currency ID
      * @return float Amount in target currency, rounded to 2 decimals
      */
-    public static function convertFromIdr(float $amount, ?int $currencyId): float
+    public static function convertFromIdr(float $amount, ?int $currencyId, bool $round = true)
     {
         $rate = static::resolveRate($currencyId);
         $quotient = bcdiv((string) $amount, (string) $rate, 10);
+        if (! $round) {
+            return rtrim(rtrim($quotient, '0'), '.');
+        }
+
         return (float) round((float) $quotient, 2);
     }
 

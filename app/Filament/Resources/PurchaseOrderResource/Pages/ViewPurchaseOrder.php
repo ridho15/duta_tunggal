@@ -260,7 +260,7 @@ class ViewPurchaseOrder extends ViewRecord
             }
 
             foreach ($record->purchaseOrderBiaya as $biaya) {
-                $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
+                    $biayaAmount = $biaya->total * CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null));
                 $total += $biayaAmount;
             }
         }

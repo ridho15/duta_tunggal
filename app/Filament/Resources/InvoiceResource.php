@@ -139,7 +139,7 @@ class InvoiceResource extends Resource
 
                                                 foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
                                                     if ($biaya->masuk_invoice == 1) {
-                                                        $otherFee += ($biaya->total * $biaya->currency->to_rupiah);
+                                                        $otherFee += ($biaya->total * \App\Support\CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null)));
                                                     }
                                                 }
 
@@ -172,10 +172,10 @@ class InvoiceResource extends Resource
                                                     array_push($items, [
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->quantity,
-                                                        'price' => CurrencyConversionResolver::convertToIdr((float) $price, $currencyId ?: null),
-                                                        'total' => CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null)
+                                                        'price' => (float) CurrencyConversionResolver::convertToIdr((float) $price, $currencyId ?: null, false),
+                                                        'total' => (float) CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null, false)
                                                     ]);
-                                                    $total += CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null);
+                                                    $total += (float) CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null, false);
                                                 }
                                             }
                                         }

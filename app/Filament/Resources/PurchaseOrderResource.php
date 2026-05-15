@@ -1336,11 +1336,11 @@ class PurchaseOrderResource extends Resource
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         // Auto-fill nominal from Currency.to_rupiah master rate
                                         if ($state) {
-                                            $currency = Currency::find($state);
-                                            if ($currency && (float)$currency->to_rupiah > 0) {
+                                            $rate = CurrencyConversionResolver::resolveRate(is_numeric($state) ? (int) $state : null);
+                                            if ($rate > 0) {
                                                 // Cast to float to prevent indonesianMoney dehydrate from treating
                                                 // decimal strings like "1.00" as "100" (stripping the decimal dot)
-                                                $set('nominal', (float)$currency->to_rupiah);
+                                                $set('nominal', $rate);
                                             }
                                         }
                                     })
@@ -1436,7 +1436,7 @@ class PurchaseOrderResource extends Resource
                                     $poCurrency = $poCurrencies->get($item->currency_id);
                                     $itemNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
                                         ? (float)$poCurrency->nominal
-                                        : ($item->currency->to_rupiah ?? 1);
+                                        : CurrencyConversionResolver::resolveRate((int) ($item->currency_id ?? null));
                                     $total += $itemSubtotal * $itemNominal;
                                 }
 
@@ -1444,7 +1444,7 @@ class PurchaseOrderResource extends Resource
                                     $poCurrency = $poCurrencies->get($biaya->currency_id);
                                     $biayaNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
                                         ? (float)$poCurrency->nominal
-                                        : ($biaya->currency->to_rupiah ?? 1);
+                                            : CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null));
                                     $total += (float) $biaya->total * $biayaNominal;
                                 }
                                 $component->state(self::formatMoneyState($total));
@@ -1972,7 +1972,7 @@ class PurchaseOrderResource extends Resource
                                     $otherFee = 0;
                                     foreach ($record->purchaseOrderBiaya as $biaya) {
                                         if ($biaya->masuk_invoice == 1) {
-                                            $otherFee += ($biaya->total * $biaya->currency->to_rupiah);
+                                                $otherFee += ($biaya->total * CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null)));
                                         }
                                     }
 

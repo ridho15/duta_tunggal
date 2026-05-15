@@ -6,6 +6,7 @@ use App\Filament\Resources\PurchaseOrderResource;
 use App\Http\Controllers\HelperController;
 use App\Services\PurchaseOrderService;
 use App\Support\ProcurementFailureNotifier;
+use App\Support\CurrencyConversionResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Actions;
@@ -217,7 +218,7 @@ class EditPurchaseOrder extends EditRecord
             }
 
             foreach ($record->purchaseOrderBiaya as $biaya) {
-                $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
+                $biayaAmount = $biaya->total * CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null));
                 $total += $biayaAmount;
             }
         }
