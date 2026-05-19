@@ -85,7 +85,7 @@ class SaleOrderObserver
         ]);
 
         // Load relationships
-        $saleOrder->loadMissing('saleOrderItem.product', 'deliveryOrder', 'customer');
+        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.currency', 'deliveryOrder', 'customer');
 
         // Cek apakah sudah ada invoice untuk sale order ini
         $existingInvoice = Invoice::where('from_model_type', SaleOrder::class)
@@ -102,14 +102,10 @@ class SaleOrderObserver
         $tax = 0;
         $invoiceItems = [];
         $invoiceTaxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
-        $currencyId = (int) ($saleOrder->currency_id ?? 0);
-        $exchangeRate = (float) ($saleOrder->exchange_rate ?? 0);
-
-        if ($exchangeRate <= 0) {
-            $exchangeRate = CurrencyConversionResolver::resolveRate($currencyId ?: null);
-        }
-
         foreach ($saleOrder->saleOrderItem as $item) {
+            $itemCurrencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null;
+            $itemExchangeRate = CurrencyConversionResolver::resolveRate($itemCurrencyId);
+
             // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
             // which also defaults to 'Exclusive' (normalises to 'Eksklusif').
             // Keeping both paths consistent prevents SO total_amount diverging from invoice total.
@@ -137,9 +133,9 @@ class SaleOrderObserver
                 $subtotalBeforeTax = $baseAmount;
             }
 
-            $subtotalBeforeTaxIdr = CurrencyConversionResolver::convertToIdr((float) $subtotalBeforeTax, $currencyId ?: null);
-            $lineTaxIdr = CurrencyConversionResolver::convertToIdr((float) $lineTax, $currencyId ?: null);
-            $lineTotalIdr = CurrencyConversionResolver::convertToIdr((float) $lineSubtotal, $currencyId ?: null);
+            $subtotalBeforeTaxIdr = CurrencyConversionResolver::convertToIdr((float) $subtotalBeforeTax, $itemCurrencyId);
+            $lineTaxIdr = CurrencyConversionResolver::convertToIdr((float) $lineTax, $itemCurrencyId);
+            $lineTotalIdr = CurrencyConversionResolver::convertToIdr((float) $lineSubtotal, $itemCurrencyId);
             
             $subtotal += $subtotalBeforeTaxIdr;
             $tax += $lineTaxIdr;
@@ -150,7 +146,8 @@ class SaleOrderObserver
                 'tax_result' => $taxResult ?? 'error',
                 'subtotal_before_tax' => $subtotalBeforeTaxIdr,
                 'line_subtotal' => $lineTotalIdr,
-                'exchange_rate' => $exchangeRate,
+                'currency_id' => $itemCurrencyId,
+                'exchange_rate' => $itemExchangeRate,
             ]);
 
             // Get sales COA from product
@@ -159,7 +156,7 @@ class SaleOrderObserver
             $invoiceItems[] = [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
-                'price' => CurrencyConversionResolver::convertToIdr((float) $item->unit_price, $currencyId ?: null),
+                'price' => CurrencyConversionResolver::convertToIdr((float) $item->unit_price, $itemCurrencyId),
                 'discount' => $item->discount,
                 'tax_rate' => $item->tax,
                 'tax_amount' => $lineTaxIdr,

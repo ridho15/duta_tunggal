@@ -97,7 +97,7 @@ class PaymentRequestResource extends Resource
                                     ->label('Total Pembayaran (Rp)')
                                     ->disabled()
                                     ->dehydrated(true)
-                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::parse($state))
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
                                     ->indonesianMoney(),
                             ]),
 

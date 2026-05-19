@@ -66,7 +66,7 @@ class OrderRequestItem extends Model
             $item->loadMissing('orderRequest');
 
             $quantity = (float) ($item->quantity ?? 0);
-            $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
+            $unitPrice = MoneyHelper::safeParse($item->unit_price ?? 0);
             $discount = (float) ($item->discount ?? 0);
             $itemTaxType = static::normalizeItemTaxType($item->tipe_pajak ?? null);
             $taxType = static::taxServiceTypeFromItemTaxType($itemTaxType);
@@ -79,12 +79,11 @@ class OrderRequestItem extends Model
             $base = $quantity * $unitPrice;
             $afterDisc = $base - ($base * ($discount / 100));
 
-            try {
-                $taxResult = \App\Services\TaxService::compute($afterDisc, $tax, $taxType);
-                $item->subtotal = $taxResult['total'];
-            } catch (\Throwable $e) {
-                $item->subtotal = $afterDisc;
-            }
+            $taxNominal = round($afterDisc * ($tax / 100), 2);
+            $item->subtotal = match ($itemTaxType) {
+                'none', 'inklusif' => round($afterDisc, 2),
+                default => round($afterDisc + $taxNominal, 2),
+            };
         });
 
         // Do not sync product_supplier on OR item save.

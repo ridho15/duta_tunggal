@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockAdjustmentResource\RelationManagers;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Product;
 use App\Models\Rak;
 use App\Filament\Resources\StockAdjustmentResource;
@@ -97,7 +98,7 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = \App\Helpers\MoneyHelper::parse($state ?? 0);
+                        $unitCost = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
                         $differenceValue = $differenceQty * $unitCost;
                         $set('difference_value', $differenceValue);
                     }),
@@ -107,7 +108,7 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                     ->prefix('Rp')
                     ->disabled()
                     ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : ''),
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : ''),
 
                 Textarea::make('notes')
                     ->label('Catatan')

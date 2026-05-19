@@ -65,8 +65,8 @@ class EditMaterialIssue extends EditRecord
                     }
                 }
 
-                $costPerUnit = (float) \App\Helpers\MoneyHelper::parse($item['cost_per_unit'] ?? 0);
-                $itemTotalCost = (float) \App\Helpers\MoneyHelper::parse($item['total_cost'] ?? ($quantity * $costPerUnit));
+                $costPerUnit = (float) \App\Helpers\MoneyHelper::safeParse($item['cost_per_unit'] ?? 0);
+                $itemTotalCost = (float) \App\Helpers\MoneyHelper::safeParse($item['total_cost'] ?? ($quantity * $costPerUnit));
 
                 $data['items'][$index]['quantity'] = $quantity;
                 $data['items'][$index]['cost_per_unit'] = $costPerUnit;

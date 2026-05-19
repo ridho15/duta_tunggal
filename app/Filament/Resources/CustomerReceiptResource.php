@@ -136,7 +136,7 @@ class CustomerReceiptResource extends Resource
         $accountReceivable = $invoice->accountReceivable;
 
         if ($accountReceivable?->getKey()) {
-            return max(0, (float) MoneyHelper::parse($accountReceivable->remaining ?? 0));
+            return max(0, (float) MoneyHelper::safeParse($accountReceivable->remaining ?? 0));
         }
 
         $paidTotal = (float) CustomerReceiptItem::query()
@@ -144,7 +144,7 @@ class CustomerReceiptResource extends Resource
             ->selectRaw('COALESCE(SUM(amount), 0) as paid_total')
             ->value('paid_total');
 
-        return max(0, (float) MoneyHelper::parse($invoice->total ?? 0) - $paidTotal);
+        return max(0, (float) MoneyHelper::safeParse($invoice->total ?? 0) - $paidTotal);
     }
 
     public static function form(Form $form): Form
@@ -422,6 +422,7 @@ class CustomerReceiptResource extends Resource
                                     ->required()
                                     ->indonesianMoney()
                                     ->reactive()
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
                                     ->disabled(false) // Allow JavaScript to update this field
                                     ->extraAttributes([
                                         'class' => 'auto-calculated-field',
@@ -436,7 +437,6 @@ class CustomerReceiptResource extends Resource
 
                                 Select::make('coa_id')
                                     ->label('COA')
-                                    ->native(false)
                                     ->preload()
                                     ->searchable(['code', 'name'])
                                     ->reactive()
@@ -551,7 +551,7 @@ class CustomerReceiptResource extends Resource
                         if ($allPaid) {
                             return 'Fully Paid';
                         } else {
-                            return 'Rp ' . number_format($totalRemaining, 0, ',', '.') . ' remaining';
+                            return MoneyHelper::rupiah($totalRemaining) . ' remaining';
                         }
                     })
                     ->badge()
@@ -826,7 +826,7 @@ class CustomerReceiptResource extends Resource
 
     private static function formatMoneyState($value): string
     {
-        return number_format((float) MoneyHelper::parse($value ?? 0), 0, ',', '.');
+        return number_format((float) MoneyHelper::safeParse($value ?? 0), 2, ',', '.');
     }
 
     public static function infolist(Infolist $infolist): Infolist
@@ -925,19 +925,19 @@ class CustomerReceiptResource extends Resource
                                     $html .= '<div class="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4 mb-4">';
                                     $html .= '<div class="min-w-0">';
                                     $html .= '<span class="text-gray-600">Total Invoice:</span>';
-                                    $html .= '<div class="mt-1 font-semibold text-lg">Rp ' . number_format($data['invoice_total'], 0, ',', '.') . '</div>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg">' . MoneyHelper::rupiah($data['invoice_total']) . '</div>';
                                     $html .= '</div>';
                                     $html .= '<div class="min-w-0">';
                                     $html .= '<span class="text-gray-600">Pembayaran Ini:</span>';
-                                    $html .= '<div class="mt-1 font-semibold text-lg text-blue-600">Rp ' . number_format($data['this_payment'], 0, ',', '.') . '</div>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg text-blue-600">' . MoneyHelper::rupiah($data['this_payment']) . '</div>';
                                     $html .= '</div>';
                                     $html .= '<div class="min-w-0">';
                                     $html .= '<span class="text-gray-600">Total Sudah Dibayar:</span>';
-                                    $html .= '<div class="mt-1 font-semibold text-lg text-green-600">Rp ' . number_format($data['total_paid'], 0, ',', '.') . '</div>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg text-green-600">' . MoneyHelper::rupiah($data['total_paid']) . '</div>';
                                     $html .= '</div>';
                                     $html .= '<div class="min-w-0">';
                                     $html .= '<span class="text-gray-600">Sisa Pembayaran:</span>';
-                                    $html .= '<div class="mt-1 font-semibold text-lg text-red-600">Rp ' . number_format($data['remaining'], 0, ',', '.') . '</div>';
+                                    $html .= '<div class="mt-1 font-semibold text-lg text-red-600">' . MoneyHelper::rupiah($data['remaining']) . '</div>';
                                     $html .= '</div>';
                                     $html .= '</div>';
 
@@ -996,7 +996,7 @@ class CustomerReceiptResource extends Resource
                                             $html .= '<div class="text-sm">Metode: ' . e((string) $payment->method) . '</div>';
                                             $html .= '</div>';
                                             $html .= '<div class="text-left sm:text-right ' . $textColor . '">';
-                                            $html .= '<div class="text-base font-semibold sm:text-lg">Rp ' . number_format((float) $payment->amount, 0, ',', '.') . '</div>';
+                                            $html .= '<div class="text-base font-semibold sm:text-lg">' . MoneyHelper::rupiah($payment->amount) . '</div>';
                                             $html .= '</div>';
                                             $html .= '</div>';
                                         }
@@ -1004,7 +1004,7 @@ class CustomerReceiptResource extends Resource
                                         $html .= '<div class="mt-4 border-t border-gray-200 pt-4">';
                                         $html .= '<div class="flex flex-col gap-1 font-semibold text-gray-900 sm:flex-row sm:items-center sm:justify-between">';
                                         $html .= '<span>Total Pembayaran (' . $history['payments']->count() . ' transaksi):</span>';
-                                        $html .= '<span class="text-lg">Rp ' . number_format($history['total_payments'], 0, ',', '.') . '</span>';
+                                        $html .= '<span class="text-lg">' . MoneyHelper::rupiah($history['total_payments']) . '</span>';
                                         $html .= '</div>';
                                         $html .= '</div>';
 
@@ -1060,15 +1060,15 @@ class CustomerReceiptResource extends Resource
                                     $html .= '<td class="border border-gray-200 px-4 py-3 whitespace-nowrap">' . ($entry->date ? \Carbon\Carbon::parse($entry->date)->format('d M Y') : '-') . '</td>';
                                     $html .= '<td class="border border-gray-200 px-4 py-3 font-medium">' . $accountCode . ' — ' . $accountName . '</td>';
                                     $html .= '<td class="border border-gray-200 px-4 py-3 text-gray-600">' . e($entry->description ?? '') . '</td>';
-                                    $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . ($debit > 0 ? 'Rp ' . number_format($debit, 0, ',', '.') : '-') . '</td>';
-                                    $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . ($credit > 0 ? 'Rp ' . number_format($credit, 0, ',', '.') : '-') . '</td>';
+                                    $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . ($debit > 0 ? MoneyHelper::rupiah($debit) : '-') . '</td>';
+                                    $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . ($credit > 0 ? MoneyHelper::rupiah($credit) : '-') . '</td>';
                                     $html .= '</tr>';
                                 }
 
                                 $html .= '<tr class="bg-gray-50 font-semibold">';
                                 $html .= '<td colspan="3" class="border border-gray-200 px-4 py-3 text-right">Total</td>';
-                                $html .= '<td class="border border-gray-200 px-4 py-3 text-right">Rp ' . number_format($totalDebit, 0, ',', '.') . '</td>';
-                                $html .= '<td class="border border-gray-200 px-4 py-3 text-right">Rp ' . number_format($totalCredit, 0, ',', '.') . '</td>';
+                                $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . MoneyHelper::rupiah($totalDebit) . '</td>';
+                                $html .= '<td class="border border-gray-200 px-4 py-3 text-right">' . MoneyHelper::rupiah($totalCredit) . '</td>';
                                 $html .= '</tr>';
 
                                 $html .= '</tbody></table></div>';

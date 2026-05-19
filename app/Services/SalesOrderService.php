@@ -8,6 +8,7 @@ use App\Models\Currency;
 use App\Models\InventoryStock;
 use App\Models\SaleOrder;
 use App\Models\StockReservation;
+use App\Support\CurrencyConversionResolver;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -21,13 +22,14 @@ class SalesOrderService
         $total_amount = 0;
         foreach ($salesOrder->saleOrderItem as $item) {
             $taxType = \App\Services\TaxService::normalizeType($item->tipe_pajak ?? 'PPN Excluded');
-            $total_amount += HelperController::hitungSubtotal(
+            $subtotal = HelperController::hitungSubtotal(
                 $item->quantity,
                 $item->unit_price,
                 $item->discount,
                 $item->tax,
                 $taxType
             );
+            $total_amount += CurrencyConversionResolver::convertToIdr((float) $subtotal, is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null);
         }
 
         return $salesOrder->update([

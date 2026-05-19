@@ -97,7 +97,7 @@ test('production list shows a view action and the view page shows material requi
         ['name' => 'Biaya Tenaga Kerja Langsung - Direct Labor 2', 'type' => 'Expense', 'is_active' => true]
     );
 
-    $finishedProduct = Product::factory()->create([
+    $finishedProduct = Product::factory()->forCabang($cabang)->create([
         'name' => 'Finished Product View Production',
         'sku' => 'FG-PROD-VIEW',
         'cabang_id' => $cabang->id,
@@ -107,7 +107,7 @@ test('production list shows a view action and the view page shows material requi
         'is_manufacture' => true,
     ]);
 
-    $rawMaterialOne = Product::factory()->create([
+    $rawMaterialOne = Product::factory()->forCabang($cabang)->create([
         'name' => 'Raw Material A View Production',
         'sku' => 'RM-PROD-A',
         'cabang_id' => $cabang->id,
@@ -117,7 +117,7 @@ test('production list shows a view action and the view page shows material requi
         'is_manufacture' => false,
     ]);
 
-    $rawMaterialTwo = Product::factory()->create([
+    $rawMaterialTwo = Product::factory()->forCabang($cabang)->create([
         'name' => 'Raw Material B View Production',
         'sku' => 'RM-PROD-B',
         'cabang_id' => $cabang->id,
@@ -267,7 +267,7 @@ test('production edit page stays editable and shows bom requirements info', func
         ['name' => 'Biaya Tenaga Kerja Langsung - Direct Labor 2', 'type' => 'Expense', 'is_active' => true]
     );
 
-    $finishedProduct = Product::factory()->create([
+    $finishedProduct = Product::factory()->forCabang($cabang)->create([
         'name' => 'Finished Product Edit Production',
         'sku' => 'FG-PROD-EDIT',
         'cabang_id' => $cabang->id,
@@ -277,7 +277,7 @@ test('production edit page stays editable and shows bom requirements info', func
         'is_manufacture' => true,
     ]);
 
-    $rawMaterial = Product::factory()->create([
+    $rawMaterial = Product::factory()->forCabang($cabang)->create([
         'name' => 'Raw Material Edit Production',
         'sku' => 'RM-PROD-EDIT',
         'cabang_id' => $cabang->id,
@@ -395,7 +395,7 @@ test('production view page exposes finish action and marks draft production as f
         ['name' => 'Biaya Tenaga Kerja Langsung - Direct Labor 2', 'type' => 'Expense', 'is_active' => true]
     );
 
-    $finishedProduct = Product::factory()->create([
+    $finishedProduct = Product::factory()->forCabang($cabang)->create([
         'name' => 'Finished Product Finish Production',
         'sku' => 'FG-PROD-FINISH',
         'cabang_id' => $cabang->id,
@@ -405,7 +405,7 @@ test('production view page exposes finish action and marks draft production as f
         'is_manufacture' => true,
     ]);
 
-    $rawMaterial = Product::factory()->create([
+    $rawMaterial = Product::factory()->forCabang($cabang)->create([
         'name' => 'Raw Material Finish Production',
         'sku' => 'RM-PROD-FINISH',
         'cabang_id' => $cabang->id,

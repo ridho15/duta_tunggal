@@ -6,6 +6,7 @@ $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 DB::transaction(function () {
     $now = now();
@@ -48,7 +49,7 @@ DB::transaction(function () {
     $tax = 11;
     $subtotal = $qty * $unitPrice * 1.11;
 
-    $saleOrderId = DB::table('sale_orders')->insertGetId([
+    $soRow = [
         'customer_id' => $customer->id,
         'quotation_id' => null,
         'so_number' => $soNumber,
@@ -60,12 +61,15 @@ DB::transaction(function () {
         'created_by' => $user->id,
         'shipped_to' => $customer->address ?? 'Alamat fixture G2',
         'tipe_pengiriman' => 'Kirim Langsung',
-        'cabang_id' => $cabangId,
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
+    if (Schema::hasColumn('sale_orders', 'cabang_id')) {
+        $soRow['cabang_id'] = $cabangId;
+    }
+    $saleOrderId = DB::table('sale_orders')->insertGetId($soRow);
 
-    DB::table('sale_order_items')->insert([
+    $soItemRow = [
         'sale_order_id' => $saleOrderId,
         'product_id' => $product->id,
         'quantity' => $qty,
@@ -74,12 +78,15 @@ DB::transaction(function () {
         'discount' => $discount,
         'tax' => $tax,
         'tipe_pajak' => 'Exclusive',
-        'warehouse_id' => $warehouse->id,
         'rak_id' => null,
         'created_at' => $now,
         'updated_at' => $now,
         'deleted_at' => null,
-    ]);
+    ];
+    if (Schema::hasColumn('sale_order_items', 'warehouse_id')) {
+        $soItemRow['warehouse_id'] = $warehouse->id;
+    }
+    DB::table('sale_order_items')->insert($soItemRow);
 
     echo "✅ G2 SaleOrder fixture ready\n";
     echo "   SO Number: {$soNumber}\n";

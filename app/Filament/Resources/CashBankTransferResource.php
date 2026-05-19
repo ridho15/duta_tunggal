@@ -171,7 +171,7 @@ class CashBankTransferResource extends Resource
                                                     "- Nomor: {$record->number}\n" .
                                                     "- Dari: " . ($record->fromCoa ? $record->fromCoa->code . ' - ' . $record->fromCoa->name : 'N/A') . "\n" .
                                                     "- Ke: " . ($record->toCoa ? $record->toCoa->code . ' - ' . $record->toCoa->name : 'N/A') . "\n" .
-                                                    "- Jumlah: Rp " . number_format($record->amount, 0, ',', '.') . "\n\n" .
+                                                    "- Jumlah: " . \App\Helpers\MoneyHelper::rupiah($record->amount) . "\n\n" .
                                                     "Pastikan transfer ini belum diposting jurnal.")
                                    ->modalSubmitActionLabel('Ya, Hapus Transfer');
                         })

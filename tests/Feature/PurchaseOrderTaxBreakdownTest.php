@@ -274,6 +274,6 @@ class PurchaseOrderTaxBreakdownTest extends TestCase
 
     public function test_rupiah_formats_zero(): void
     {
-        $this->assertEquals('Rp 0', MoneyHelper::rupiah(0));
+        $this->assertEquals('Rp 0,00', MoneyHelper::rupiah(0));
     }
 }

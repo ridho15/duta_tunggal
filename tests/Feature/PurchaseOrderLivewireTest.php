@@ -106,7 +106,7 @@ beforeEach(function () {
         'cabang_id' => $this->cabang->id,
         'status' => 1,
     ]);
-    $this->product = Product::factory()->create([
+    $this->product = Product::factory()->forCabang($this->cabang)->create([
         'supplier_id' => $this->supplier->id,
         'cost_price' => 12500,
         'sell_price' => 19000,
@@ -136,7 +136,6 @@ test('purchase order edit and view pages show supplier code and name', function 
         'status' => 'draft',
         'expected_date' => Carbon::now()->addDays(3)->toDateString(),
         'total_amount' => 0,
-        'warehouse_id' => $this->warehouse->id,
         'tempo_hutang' => $supplier->tempo_hutang,
         'note' => 'PO supplier label test',
         'created_by' => $this->user->id,
@@ -160,9 +159,9 @@ test('purchase order can be created through livewire create page', function () {
         ->test(CreatePurchaseOrder::class)
         ->set('data.po_number', 'PO-LIVE-001')
         ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
         ->set('data.order_date', $orderDate)
         ->set('data.expected_date', $expectedDate)
-        ->set('data.warehouse_id', $this->warehouse->id)
         ->set('data.status', 'draft')
         ->set('data.is_asset', false)
         ->set('data.note', 'Pengujian Livewire Form')
@@ -194,7 +193,6 @@ test('purchase order can be created through livewire create page', function () {
 
     expect($created)->not->toBeNull()
         ->and($created->supplier_id)->toBe($this->supplier->id)
-        ->and($created->warehouse_id)->toBe($this->warehouse->id)
         ->and((int) $created->tempo_hutang)->toBe($this->supplier->tempo_hutang)
         ->and((float) $created->total_amount)->toBe(25000.0)
         ->and($created->created_by)->toBe($this->user->id)
@@ -217,9 +215,9 @@ test('purchase order subtotal and total amount stay formatted after reactive upd
         ->test(CreatePurchaseOrder::class)
         ->set('data.po_number', 'PO-LIVE-FORMAT-001')
         ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
         ->set('data.order_date', $orderDate)
         ->set('data.expected_date', $expectedDate)
-        ->set('data.warehouse_id', $this->warehouse->id)
         ->set('data.status', 'draft')
         ->set('data.is_asset', false)
         ->set('data.purchaseOrderItem', [
@@ -252,12 +250,22 @@ test('purchase order subtotal and total amount stay formatted after reactive upd
 
     expect($purchaseOrder)->not->toBeNull();
 
-    Livewire::actingAs($this->user)
+    $editComponent = Livewire::actingAs($this->user)
         ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
         ->assertFormExists()
         ->assertFormSet([
-            'total_amount' => '37.500',
+            'total_amount' => '37.500,00',
         ]);
+
+    expect(collect($editComponent->get('data.purchaseOrderItem'))->pluck('subtotal')->filter()->first())
+        ->toBe('37.500,00');
+
+    $viewComponent = Livewire::actingAs($this->user)
+        ->test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertFormExists();
+
+    expect(collect($viewComponent->get('data.purchaseOrderItem'))->pluck('subtotal')->filter()->first())
+        ->toBe('37.500,00');
 });
 
 test('purchase order total amount includes formatted other fee values correctly', function () {
@@ -273,9 +281,9 @@ test('purchase order total amount includes formatted other fee values correctly'
         ->test(CreatePurchaseOrder::class)
         ->set('data.po_number', 'PO-LIVE-FEE-001')
         ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
         ->set('data.order_date', $orderDate)
         ->set('data.expected_date', $expectedDate)
-        ->set('data.warehouse_id', $this->warehouse->id)
         ->set('data.status', 'draft')
         ->set('data.is_asset', false)
         ->set('data.purchaseOrderItem', [
@@ -307,7 +315,7 @@ test('purchase order total amount includes formatted other fee values correctly'
         ->set('data.purchaseOrderBiaya.0.total', '100.000');
 
     $component
-        ->assertSet('data.total_amount', '125.000')
+        ->assertSet('data.total_amount', '125.000,00')
         ->call('create')
         ->assertHasNoFormErrors();
 

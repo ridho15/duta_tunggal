@@ -34,6 +34,8 @@ class SuratJalanTest extends TestCase
     protected Warehouse $warehouse;
     protected Customer $customer;
     protected Product $product;
+    protected $driver;
+    protected $vehicle;
 
     protected function setUp(): void
     {
@@ -44,6 +46,8 @@ class SuratJalanTest extends TestCase
         $this->customer  = Customer::factory()->create();
         $this->product   = Product::factory()->create();
         $this->user      = User::factory()->create(['cabang_id' => $this->cabang->id]);
+        $this->driver    = \App\Models\Driver::factory()->create();
+        $this->vehicle   = \App\Models\Vehicle::factory()->create();
         $this->actingAs($this->user);
     }
 

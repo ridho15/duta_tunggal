@@ -643,7 +643,7 @@ class ViewBalanceSheet extends Page
                 ->title('Neraca Tidak Seimbang')
                 ->warning()
                 ->persistent()
-                ->body('Selisih neraca saat ini Rp ' . number_format(abs((float) $data['difference']), 0, ',', '.') . '. Periksa jurnal sumber karena laporan menampilkan angka ledger aktual.')
+                ->body('Selisih neraca saat ini ' . \App\Helpers\MoneyHelper::rupiah(abs((float) $data['difference'])) . '. Periksa jurnal sumber karena laporan menampilkan angka ledger aktual.')
                 ->send();
         }
 

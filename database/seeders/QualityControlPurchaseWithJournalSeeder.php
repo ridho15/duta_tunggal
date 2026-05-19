@@ -67,7 +67,7 @@ class QualityControlPurchaseWithJournalSeeder extends Seeder
 
         $product = Product::where('name', 'Test Product QC')->first();
         if (!$product) {
-            $product = Product::factory()->create([
+            $product = Product::factory()->forCabang($cabang)->create([
                 'name' => 'Test Product QC',
                 'sku' => 'TEST-QC-001',
                 'description' => 'Product for Quality Control Testing',

@@ -495,11 +495,14 @@ class QualityControlWorkflowTest extends TestCase
             'source_id'   => $qc->id,
         ]);
 
+        // The posting path for PO-based QC goes through PurchaseReceiptService which
+        // will skip posting when COA is missing and emit a warning. Assert a warning
+        // was logged indicating missing COA configuration.
         \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')->withArgs(
             function ($message, $context) use ($qc) {
-                return str_contains($message, 'QC journal posting skipped due to missing COA')
-                    && isset($context['qc_number'])
-                    && $context['qc_number'] === $qc->qc_number;
+                return str_contains($message, 'PurchaseReceiptService skipped flow')
+                    && isset($context['message'])
+                    && str_contains($context['message'], 'Missing required COA configuration');
             }
         );
     }

@@ -7,39 +7,39 @@ namespace App\Helpers;
  *
  * Centralized Rupiah (IDR) money formatter for Duta Tunggal ERP.
  *
- * Standard format: Rp 1.000.000
+ * Standard format: Rp 1.000.000,00
  * Rules:
  *  - Prefix    : "Rp " (with trailing space)
  *  - Thousands : "." (dot)
- *  - Decimal   : "," (comma) — not shown by default
- *  - Negative  : "-Rp 1.000"
- *  - Null/empty: "Rp 0"
+ *  - Decimal   : "," (comma)
+ *  - Negative  : "-Rp 1.000,00"
+ *  - Null/empty: "Rp 0,00"
  */
 class MoneyHelper
 {
     /**
-     * Format a numeric value as Indonesian Rupiah (no decimals).
+     * Format a numeric value as Indonesian Rupiah with two decimals.
      *
      * Examples:
-     *   rupiah(1000000)      → "Rp 1.000.000"
-     *   rupiah("20.000.000") → "Rp 20.000.000"  (formatted string also handled)
-     *   rupiah(0)            → "Rp 0"
-     *   rupiah(null)         → "Rp 0"
-     *   rupiah(-5000)        → "-Rp 5.000"
+     *   rupiah(1000000)      → "Rp 1.000.000,00"
+     *   rupiah("20.000.000") → "Rp 20.000.000,00"  (formatted string also handled)
+     *   rupiah(0)            → "Rp 0,00"
+     *   rupiah(null)         → "Rp 0,00"
+     *   rupiah(-5000)        → "-Rp 5.000,00"
      */
     public static function rupiah(mixed $value): string
     {
         if ($value === null || $value === '') {
-            return 'Rp 0';
+            return 'Rp 0,00';
         }
 
         $numeric = self::parse($value);
 
         if ($numeric < 0) {
-            return '-Rp ' . number_format(abs($numeric), 0, ',', '.');
+            return '-Rp ' . number_format(abs($numeric), 2, ',', '.');
         }
 
-        return 'Rp ' . number_format($numeric, 0, ',', '.');
+        return 'Rp ' . number_format($numeric, 2, ',', '.');
     }
 
     /**
@@ -50,7 +50,7 @@ class MoneyHelper
     public static function rupiahDecimal(mixed $value, int $decimals = 2): string
     {
         if ($value === null || $value === '') {
-            return 'Rp 0';
+            return 'Rp 0,00';
         }
 
         $numeric = self::parse($value);
@@ -130,21 +130,75 @@ class MoneyHelper
                 $decimal = '0';
             }
         } else {
-            // Only dots — ambiguous between decimal and thousands
-            if (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
+            // Only dots — ambiguous between decimal and thousands.
+            // Treat a single dot with exactly 3 trailing digits as thousands
+            // (e.g. "27.500" => 27500), but preserve true decimals with 1-2
+            // trailing digits or longer raw float strings like "4.2510666666".
+            $dotCount = substr_count($cleaned, '.');
+            if ($dotCount === 1) {
+                $parts = explode('.', $cleaned);
+                $fraction = $parts[1] ?? '';
+                if (preg_match('/^\d{3}$/', $fraction)) {
+                    $integer = str_replace('.', '', $cleaned);
+                    $decimal = '0';
+                } elseif (strlen($fraction) > 3) {
+                    $integer = $parts[0];
+                    $decimal = $fraction;
+                } elseif (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
+                    // Ends with .X or .XX  → decimal separator
+                    $decimal = $matches[1];
+                    $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
+                    $integer = str_replace('.', '', $integer);
+                } else {
+                    // Single dot but fractional length <=2 — assume thousands
+                    $integer = str_replace('.', '', $cleaned);
+                    $decimal = '0';
+                }
+            } elseif (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
                 // Ends with .X or .XX  → decimal separator
-                // Handles raw DB values like "20000000.00" or "1500.5"
                 $decimal = $matches[1];
                 $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
                 $integer = str_replace('.', '', $integer); // clear any remaining thousand dots
             } else {
-                // Ends with .XXX or more → Indonesian thousands separator
-                // e.g. "1.000", "20.000.000", "1.500.000"
+                // Multiple dots or other patterns → Indonesian thousands separator
                 $integer = str_replace('.', '', $cleaned);
                 $decimal = '0';
             }
         }
 
         return (float) ($integer . '.' . $decimal);
+    }
+
+    /**
+     * Safely parse a currency state coming from UI.
+     * Native ints/floats and numeric strings without separators are returned as
+     * numeric values, while formatted money strings are parsed with Indonesian
+     * separator rules. This prevents "92.551" from being saved as 92.55.
+     */
+    public static function safeParse(mixed $value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+
+            if ($trimmed === '' || $trimmed === '-') {
+                return 0.0;
+            }
+
+            if (! preg_match('/[.,]/', $trimmed) && is_numeric($trimmed)) {
+                return (float) $trimmed;
+            }
+
+            return self::parse($trimmed);
+        }
+
+        return self::parse($value);
     }
 }

@@ -80,14 +80,7 @@ class VoucherRequestResource extends Resource
                                     ->required()
                                     ->indonesianMoney()
                                     ->minValue(0)
-                                    ->step(0.01)
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(function ($state, Forms\Set $set) {
-                                        // Format saat blur
-                                        if ($state) {
-                                            $set('amount', number_format((float) $state, 2, '.', ''));
-                                        }
-                                    }),
+                                    ->dehydrateStateUsing(fn ($state) => \App\Helpers\MoneyHelper::safeParse($state)),
 
                                 Forms\Components\TextInput::make('related_party')
                                     ->label('Pihak Terkait')

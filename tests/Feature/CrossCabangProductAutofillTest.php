@@ -21,7 +21,7 @@ beforeEach(function () {
     $this->uom = UnitOfMeasure::factory()->create(['abbreviation' => 'Pcs']);
 
     // Create product in cabangB (different from user's cabang)
-    $this->crossCabangProduct = Product::factory()->create([
+    $this->crossCabangProduct = Product::factory()->forCabang($this->cabangB)->create([
         'sku' => 'CROSS-001',
         'sell_price' => 50000,
         'cost_price' => 35000,
@@ -32,7 +32,7 @@ beforeEach(function () {
     ]);
 
     // Create product in same cabang for comparison
-    $this->sameCanangProduct = Product::factory()->create([
+    $this->sameCanangProduct = Product::factory()->forCabang($this->cabangA)->create([
         'sku' => 'SAME-001',
         'sell_price' => 40000,
         'uom_id' => $this->uom->id,
@@ -87,8 +87,8 @@ it('p1 patch: purchase order can reference cross-cabang product', function () {
 
     if ($product) {
         expect($product->sku)->toBe('CROSS-001');
-        expect($product->cost_price)->toBe(35000);
-        expect($product->tipe_pajak)->toBe('inklusif');
+        expect((float) $product->cost_price)->toBe(35000.0);
+        expect($product->tipe_pajak)->toBe('Inklusif');
     }
 });
 
@@ -98,6 +98,6 @@ it('p2 patch: sale order can reference cross-cabang product', function () {
 
     if ($product) {
         expect($product->sku)->toBe('CROSS-001');
-        expect($product->sell_price)->toBe(50000);
+        expect((float) $product->sell_price)->toBe(50000.0);
     }
 });

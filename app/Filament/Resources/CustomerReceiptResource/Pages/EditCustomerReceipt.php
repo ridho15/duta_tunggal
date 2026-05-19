@@ -43,7 +43,7 @@ class EditCustomerReceipt extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['total_payment'] = MoneyHelper::parse($data['total_payment'] ?? 0);
+        $data['total_payment'] = MoneyHelper::safeParse($data['total_payment'] ?? 0);
         $data['payment_method'] = $data['payment_method'] ?? 'Cash';
 
         // Handle JSON strings from form (hidden fields send JSON strings)

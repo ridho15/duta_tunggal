@@ -59,7 +59,7 @@ beforeEach(function () {
 
     $this->warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
     $this->supplier = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
-    $this->product = Product::factory()->create(['supplier_id' => $this->supplier->id, 'cabang_id' => $this->cabang->id]);
+    $this->product = Product::factory()->forCabang($this->cabang)->create(['supplier_id' => $this->supplier->id]);
 });
 
 it('creates an order request through the Filament create page', function () {
@@ -158,6 +158,49 @@ it('stores formatted unit_price as numeric value in database', function () {
     expect((float) $item->original_price)->toBe(1250000.0);
 });
 
+it('accepts live formatted decimal unit price and recalculates preview totals', function () {
+    $this->product->forceFill([
+        'pajak' => 10,
+        'tipe_pajak' => 'Eksklusif',
+    ])->save();
+
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-LIVE-MONEY-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'note' => 'Order request live money test',
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => $this->product->id,
+            'cabang_id' => $this->cabang->id,
+            'quantity' => 2,
+            'original_price' => '1.234,56',
+            'unit_price' => '1.234,56',
+            'tipe_pajak' => 'eklusif',
+            'discount' => 0,
+            'tax' => 10,
+            'total' => '2.469,12',
+            'tax_nominal' => '246,91',
+            'subtotal' => '2.716,03',
+        ]]);
+
+    $component
+        ->set('data.orderRequestItem.0.unit_price', '1.234,56')
+        ->assertSet('data.orderRequestItem.0.total', '2.469,12')
+        ->assertSet('data.orderRequestItem.0.tax_nominal', '246,91')
+        ->assertSet('data.orderRequestItem.0.subtotal', '2.716,03')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $or = OrderRequest::latest('id')->first();
+    $item = $or->orderRequestItem()->latest('id')->first();
+
+    expect((float) $item->unit_price)->toBe(1234.56)
+        ->and((float) $item->original_price)->toBe(1234.56)
+        ->and((float) $item->subtotal)->toBe(2716.03);
+});
+
 it('stores decimal unit_price and original_price without changing 15.09', function () {
     $component = Livewire::actingAs($this->user)
         ->test(CreateOrderRequest::class)
@@ -247,11 +290,11 @@ it('does not expose a global tax type select and keeps item-level tax radio', fu
 
 it('resolves product supplier options and auto-selects supplier when product changes', function () {
     $secondarySupplier = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
-    $primaryProduct = Product::factory()->create([
+    $primaryProduct = Product::factory()->forCabang($this->cabang)->create([
         'supplier_id' => $this->supplier->id,
         'cabang_id' => $this->cabang->id,
     ]);
-    $secondaryProduct = Product::factory()->create([
+    $secondaryProduct = Product::factory()->forCabang($this->cabang)->create([
         'supplier_id' => $secondarySupplier->id,
         'cabang_id' => $this->cabang->id,
     ]);
@@ -284,9 +327,172 @@ it('resolves product supplier options and auto-selects supplier when product cha
         ->assertSet('data.orderRequestItem.0.supplier_id', $this->supplier->id);
 });
 
+it('formats original and override prices after product and supplier are selected', function () {
+    $secondarySupplier = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
+    $product = Product::factory()->forCabang($this->cabang)->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'cost_price' => 75000,
+    ]);
+
+    $product->suppliers()->syncWithoutDetaching([
+        $this->supplier->id => ['supplier_price' => 100000],
+        $secondarySupplier->id => ['supplier_price' => 125000],
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-PRICE-FMT-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'currency_id' => $this->defaultCurrency->id,
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => null,
+            'currency_id' => $this->defaultCurrency->id,
+            'quantity' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'eklusif',
+        ]])
+        ->set('data.orderRequestItem.0.product_id', $product->id)
+        ->assertSet('data.orderRequestItem.0.original_price', '100.000,00')
+        ->assertSet('data.orderRequestItem.0.unit_price', '100.000,00');
+
+    $component
+        ->set('data.orderRequestItem.0.supplier_id', $secondarySupplier->id)
+        ->assertSet('data.orderRequestItem.0.original_price', '125.000,00')
+        ->assertSet('data.orderRequestItem.0.unit_price', '125.000,00');
+});
+
+it('preserves granular plastic supplier price when switching IDR to USD and back', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 15000,
+    ]);
+
+    $supplier = Supplier::factory()->create([
+        'perusahaan' => 'UD Hassanah Saptono',
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    $product = Product::factory()->create([
+        'name' => 'Bahan Baku Plastik Granul',
+        'supplier_id' => $supplier->id,
+        'cabang_id' => null,
+        'pajak' => 11,
+    ]);
+
+    $product->suppliers()->syncWithoutDetaching([
+        $supplier->id => ['supplier_price' => 704000],
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-GRANUL-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'currency_id' => $this->defaultCurrency->id,
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => null,
+            'currency_id' => $this->defaultCurrency->id,
+            'quantity' => 10,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'eklusif',
+        ]])
+        ->set('data.orderRequestItem.0.product_id', $product->id)
+        ->assertSet('data.orderRequestItem.0.supplier_id', $supplier->id)
+        ->assertSet('data.orderRequestItem.0.cabang_id', $this->cabang->id)
+        ->assertSet('data.orderRequestItem.0.original_price', '704.000,00')
+        ->assertSet('data.orderRequestItem.0.unit_price', '704.000,00');
+
+    expect(OrderRequestResource::resolveSupplierLabel($supplier->id, $product->id, $usd->id))
+        ->toContain('$ 46,93')
+        ->not->toContain('Rp 704.000');
+
+    $component
+        ->set('data.orderRequestItem.0.currency_id', $usd->id)
+        ->assertSet('data.orderRequestItem.0.cabang_id', $this->cabang->id)
+        ->assertSet('data.orderRequestItem.0.original_price', '46,93')
+        ->assertSet('data.orderRequestItem.0.unit_price', '46,93')
+        ->assertSet('data.orderRequestItem.0.total', '469,33')
+        ->assertSet('data.orderRequestItem.0.tax_nominal', '51,63')
+        ->assertSet('data.orderRequestItem.0.subtotal', '520,96')
+        ->set('data.orderRequestItem.0.currency_id', $this->defaultCurrency->id)
+        ->assertSet('data.orderRequestItem.0.original_price', '703.950,00')
+        ->assertSet('data.orderRequestItem.0.unit_price', '703.950,00')
+        ->assertSet('data.orderRequestItem.0.total', '7.039.500,00')
+        ->assertSet('data.orderRequestItem.0.tax_nominal', '774.345,00')
+        ->assertSet('data.orderRequestItem.0.subtotal', '7.813.845,00');
+});
+
+it('persists and shows granular plastic USD values without rounding to whole dollars', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 15000,
+    ]);
+
+    $supplier = Supplier::factory()->create([
+        'perusahaan' => 'UD Hassanah Saptono',
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    $product = Product::factory()->create([
+        'name' => 'Bahan Baku Plastik Granul',
+        'supplier_id' => $supplier->id,
+        'cabang_id' => null,
+        'pajak' => 11,
+    ]);
+
+    $product->suppliers()->syncWithoutDetaching([
+        $supplier->id => ['supplier_price' => 704000],
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-GRANUL-SAVE-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+            'currency_id' => $this->defaultCurrency->id,
+        ])
+        ->set('data.orderRequestItem', [[
+            'product_id' => null,
+            'currency_id' => $this->defaultCurrency->id,
+            'quantity' => 10,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'eklusif',
+        ]])
+        ->set('data.orderRequestItem.0.product_id', $product->id)
+        ->set('data.orderRequestItem.0.currency_id', $usd->id)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $orderRequest = OrderRequest::latest('id')->first();
+    $item = $orderRequest->orderRequestItem()->latest('id')->first();
+
+    expect(abs((float) $item->original_price - 46.93))->toBeLessThan(0.0000001)
+        ->and(abs((float) $item->unit_price - 46.93))->toBeLessThan(0.0000001)
+        ->and(abs((float) $item->subtotal - 520.92))->toBeLessThan(0.0000001)
+        ->and($item->cabang_id)->toBe($this->cabang->id);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $orderRequest->getKey()])
+        ->assertSee('$ 46,93')
+        ->assertSee('$ 469,30')
+        ->assertSee('$ 51,62')
+        ->assertSee('$ 520,92');
+});
+
 it('auto-selects item cabang when product changes', function () {
     $otherCabang = \App\Models\Cabang::factory()->create();
-    $branchProduct = Product::factory()->create([
+    $branchProduct = Product::factory()->forCabang($otherCabang)->create([
         'supplier_id' => $this->supplier->id,
         'cabang_id' => $otherCabang->id,
     ]);
@@ -315,7 +521,7 @@ it('formats supplier label using selected currency conversion', function () {
         'to_rupiah' => 15000,
     ]);
 
-    $product = Product::factory()->create([
+    $product = Product::factory()->forCabang($this->cabang)->create([
         'supplier_id' => $this->supplier->id,
         'cabang_id' => $this->cabang->id,
     ]);

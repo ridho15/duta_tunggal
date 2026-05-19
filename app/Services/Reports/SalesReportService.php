@@ -2,6 +2,7 @@
 
 namespace App\Services\Reports;
 
+use App\Helpers\MoneyHelper;
 use App\Models\SaleOrder;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -120,7 +121,7 @@ class SalesReportService
                 'PPN Amount' => '',
                 'Item Subtotal' => '',
                 'Subtotal' => '',
-                'Total SO' => 'Rp ' . number_format($order->total_amount ?? 0, 0, ',', '.'),
+                'Total SO' => MoneyHelper::rupiah($order->total_amount ?? 0),
                 'Status' => $order->status,
             ]);
 
@@ -145,13 +146,13 @@ class SalesReportService
                     'Email' => '',
                     'Produk' => $item->product->name ?? '-',
                     'Qty' => $item->quantity ?? 0,
-                    'Harga Satuan' => 'Rp ' . number_format($item->unit_price ?? 0, 0, ',', '.'),
+                    'Harga Satuan' => MoneyHelper::rupiah($item->unit_price ?? 0),
                     'Discount (%)' => number_format($discountPct, 2),
                     'Tax Rate (%)' => number_format($taxRate, 2),
                     'Tipe Pajak' => $item->tipe_pajak ?? '-',
-                    'DPP' => 'Rp ' . number_format($taxResult['dpp'] ?? 0, 0, ',', '.'),
-                    'PPN Amount' => 'Rp ' . number_format($taxResult['ppn'] ?? 0, 0, ',', '.'),
-                    'Item Subtotal' => 'Rp ' . number_format($taxResult['total'] ?? 0, 0, ',', '.'),
+                    'DPP' => MoneyHelper::rupiah($taxResult['dpp'] ?? 0),
+                    'PPN Amount' => MoneyHelper::rupiah($taxResult['ppn'] ?? 0),
+                    'Item Subtotal' => MoneyHelper::rupiah($taxResult['total'] ?? 0),
                     'Subtotal' => '',
                     'Total SO' => '',
                     'Status' => '',
@@ -195,11 +196,11 @@ class SalesReportService
             'Discount (%)' => '',
             'Tax Rate (%)' => '',
             'Tipe Pajak' => '',
-            'DPP' => 'Total DPP: Rp ' . number_format($summary['total_dpp'], 0, ',', '.'),
+            'DPP' => 'Total DPP: ' . MoneyHelper::rupiah($summary['total_dpp']),
             'PPN Amount' => '',
             'Item Subtotal' => '',
             'Subtotal' => '',
-            'Total SO' => 'Total: Rp ' . number_format($summary['total_amount'], 0, ',', '.'),
+            'Total SO' => 'Total: ' . MoneyHelper::rupiah($summary['total_amount']),
             'Status' => '',
         ]);
 
@@ -256,7 +257,7 @@ class SalesReportService
             'No. Telp' => '',
             'Email' => '',
             'Produk' => 'Total Qty: ' . $summary['total_quantity'],
-            'Qty' => 'Avg Transaction: Rp ' . number_format($summary['average_amount'], 0, ',', '.'),
+            'Qty' => 'Avg Transaction: ' . MoneyHelper::rupiah($summary['average_amount']),
             'Harga Satuan' => 'Unique Products: ' . $summary['unique_products'],
             'Discount (%)' => '',
             'Tax Rate (%)' => '',

@@ -25,7 +25,8 @@ class CreatePurchaseInvoice extends CreateRecord
             ]);
         }
 
-        // Remove temporary fields
+        // Preserve selected_order_request for later fallback, then remove temp fields
+        $selectedOrderRequest = $data['selected_order_request'] ?? null;
         unset($data['selected_supplier']);
         unset($data['selected_order_request']); // Task 14: remove OR filter field
         
@@ -37,8 +38,54 @@ class CreatePurchaseInvoice extends CreateRecord
             $firstPoId = collect($data['purchase_order_ids'])->filter()->first();
             if ($firstPoId) {
                 $purchaseOrder = PurchaseOrder::find($firstPoId);
-                if ($purchaseOrder && !empty($purchaseOrder->cabang_id)) {
-                    $data['cabang_id'] = $purchaseOrder->cabang_id;
+                if ($purchaseOrder) {
+                    if (!empty($purchaseOrder->cabang_id)) {
+                        $data['cabang_id'] = $purchaseOrder->cabang_id;
+                    } else {
+                        // Try to inherit cabang from the referenced model (OrderRequest/SaleOrder)
+                        try {
+                            $referType = $purchaseOrder->refer_model_type ?? null;
+                            $referId = $purchaseOrder->refer_model_id ?? null;
+                            if (!empty($referType) && $referId) {
+                                $referModel = $referType::find($referId);
+                                if ($referModel && !empty($referModel->cabang_id)) {
+                                    $data['cabang_id'] = $referModel->cabang_id;
+                                }
+                            }
+                        } catch (\Throwable $e) {
+                            // ignore resolution errors
+                        }
+                    }
+                }
+                
+            }
+            // If selected_order_request exists, prefer its cabang as the source of truth
+            if (!empty($selectedOrderRequest)) {
+                $orderRequest = \App\Models\OrderRequest::find($selectedOrderRequest);
+                \Illuminate\Support\Facades\Log::debug('CreatePurchaseInvoice: selectedOrderRequest lookup', [
+                    'selectedOrderRequest' => $selectedOrderRequest,
+                    'found' => $orderRequest ? true : false,
+                    'orderRequestCabang' => $orderRequest->cabang_id ?? null,
+                ]);
+                if ($orderRequest) {
+                    if (!empty($orderRequest->cabang_id)) {
+                        $data['cabang_id'] = $orderRequest->cabang_id;
+                    } else {
+                        // Fallback: use order request creator's cabang or the warehouse's cabang
+                        try {
+                            $creator = \App\Models\User::find($orderRequest->created_by ?? null);
+                            if ($creator && !empty($creator->cabang_id)) {
+                                $data['cabang_id'] = $creator->cabang_id;
+                            } elseif (!empty($orderRequest->warehouse_id)) {
+                                $warehouse = \App\Models\Warehouse::find($orderRequest->warehouse_id);
+                                if ($warehouse && !empty($warehouse->cabang_id)) {
+                                    $data['cabang_id'] = $warehouse->cabang_id;
+                                }
+                            }
+                        } catch (\Throwable $e) {
+                            // ignore any lookup errors
+                        }
+                    }
                 }
             }
         }
@@ -55,7 +102,7 @@ class CreatePurchaseInvoice extends CreateRecord
         $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
         $data['expense_coa_id'] = $data['expense_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
 
-        $subtotal = (float) \App\Helpers\MoneyHelper::parse($data['subtotal'] ?? 0);
+        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($data['subtotal'] ?? 0);
         $data['subtotal'] = $subtotal;
         $ppnRate = (float) ($data['ppn_rate'] ?? 0);
         $ppnAmount = round($subtotal * $ppnRate / 100, 2);
@@ -72,7 +119,7 @@ class CreatePurchaseInvoice extends CreateRecord
         }
 
         $data['other_fee'] = collect($otherFees)->map(function ($fee) {
-            $amount = (float) \App\Helpers\MoneyHelper::parse($fee['total'] ?? $fee['amount'] ?? 0);
+            $amount = (float) \App\Helpers\MoneyHelper::safeParse($fee['total'] ?? $fee['amount'] ?? 0);
 
             if ($amount <= 0) {
                 return null;
@@ -87,9 +134,9 @@ class CreatePurchaseInvoice extends CreateRecord
         unset($data['other_fees'], $data['receiptBiayaItems']);
 
         // Always parse total in case it comes in as an Indonesian-formatted string (e.g. '17.000.000')
-        $parsedTotal = (float) \App\Helpers\MoneyHelper::parse($data['total'] ?? 0);
+        $parsedTotal = (float) \App\Helpers\MoneyHelper::safeParse($data['total'] ?? 0);
         if ($parsedTotal === 0.0) {
-            $otherFeeTotal = (float) collect($data['other_fee'] ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+            $otherFeeTotal = (float) collect($data['other_fee'] ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
             $parsedTotal = $subtotal + $otherFeeTotal + $ppnAmount;
         }
         $data['total'] = $parsedTotal;
@@ -102,8 +149,8 @@ class CreatePurchaseInvoice extends CreateRecord
         try {
             if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
                 foreach ($this->data['invoiceItem'] as $item) {
-                    $item['price']    = (float) \App\Helpers\MoneyHelper::parse($item['price'] ?? 0);
-                    $item['total']    = (float) \App\Helpers\MoneyHelper::parse($item['total'] ?? 0);
+                    $item['price']    = (float) \App\Helpers\MoneyHelper::safeParse($item['price'] ?? 0);
+                    $item['total']    = (float) \App\Helpers\MoneyHelper::safeParse($item['total'] ?? 0);
                     $item['quantity'] = (float) ($item['quantity'] ?? 0);
                     $this->record->invoiceItem()->create($item);
                 }

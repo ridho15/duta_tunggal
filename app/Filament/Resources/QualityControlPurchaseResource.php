@@ -860,7 +860,7 @@ class QualityControlPurchaseResource extends Resource
                         TextEntry::make('fromModel.purchaseOrder.po_number')->label('PO Number'),
                         TextEntry::make('fromModel.purchaseOrder.supplier.perusahaan')->label('Supplier'),
                         TextEntry::make('fromModel.quantity')->label('Ordered Quantity'),
-                        TextEntry::make('fromModel.unit_price')->label('Unit Price')->formatStateUsing(fn ($state) => "Rp " . number_format($state, 0, ',', '.'))
+                        TextEntry::make('fromModel.unit_price')->label('Unit Price')->formatStateUsing(fn ($state) => \App\Helpers\MoneyHelper::rupiah($state))
                     ])->columns(2),
                 InfolistSection::make('Quality Control Results')
                     ->schema([

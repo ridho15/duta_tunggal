@@ -102,12 +102,12 @@ class CurrencyConversionResolver
         return (float) round((float) $quotient, 2);
     }
 
-    public static function formatAmount(?int $currencyId, float $amount, int $decimals = 0): string
+    public static function formatAmount(?int $currencyId, float $amount, int $decimals = 2): string
     {
         return static::resolveSymbol($currencyId) . ' ' . number_format($amount, $decimals, ',', '.');
     }
 
-    public static function formatAmountFromIdr(float $amount, ?int $currencyId, int $decimals = 0): string
+    public static function formatAmountFromIdr(float $amount, ?int $currencyId, int $decimals = 2): string
     {
         return static::formatAmount($currencyId, static::convertFromIdr($amount, $currencyId), $decimals);
     }

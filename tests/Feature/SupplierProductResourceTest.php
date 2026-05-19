@@ -96,7 +96,7 @@ beforeEach(function () {
         'cabang_id'   => $this->cabang->id,
     ]);
 
-    $this->product = Product::factory()->create([
+    $this->product = Product::factory()->forCabang($this->cabang)->create([
         'sku'                 => 'SKU-EXISTING-001',
         'name'                => 'Produk Existing',
         'cabang_id'           => $this->cabang->id,
@@ -190,7 +190,7 @@ describe('Product Model Relationships', function () {
     });
 
     it('casts is_active, is_manufacture, is_raw_material as boolean', function () {
-        $product = Product::factory()->create([
+        $product = Product::factory()->forCabang($this->cabang)->create([
             'cabang_id'           => $this->cabang->id,
             'is_active'           => true,
             'is_manufacture'      => false,

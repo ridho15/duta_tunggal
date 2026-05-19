@@ -118,7 +118,7 @@ class CreateMaterialIssue extends CreateRecord
                 $warehouseId = $item['warehouse_id'] ?? null;
 
                 // Normalize quantity (handle formatted strings like "1.000,00")
-                $quantity = (float) \App\Helpers\MoneyHelper::parse($item['quantity'] ?? 0);
+                $quantity = (float) \App\Helpers\MoneyHelper::safeParse($item['quantity'] ?? 0);
 
                 if (!$productId || !$warehouseId) {
                     throw ValidationException::withMessages([
@@ -138,9 +138,9 @@ class CreateMaterialIssue extends CreateRecord
                 }
 
                 // Normalize cost_per_unit and total_cost (handle formatted strings)
-                $costPerUnit = (float) \App\Helpers\MoneyHelper::parse($item['cost_per_unit'] ?? 0);
+                $costPerUnit = (float) \App\Helpers\MoneyHelper::safeParse($item['cost_per_unit'] ?? 0);
 
-                $itemTotalCost = (float) \App\Helpers\MoneyHelper::parse($item['total_cost'] ?? ($quantity * $costPerUnit));
+                $itemTotalCost = (float) \App\Helpers\MoneyHelper::safeParse($item['total_cost'] ?? ($quantity * $costPerUnit));
 
                 // Ensure the item values stored are numeric (so DB receives correct types)
                 $data['items'][$index]['quantity'] = $quantity;
@@ -177,7 +177,7 @@ class CreateMaterialIssue extends CreateRecord
                 $item['warehouse_id'] ?? $warehouseId
             );
             $effectiveQty = (float) $stockMetrics['effective'];
-            $requiredQty = (float) \App\Helpers\MoneyHelper::parse($item['quantity'] ?? 0);
+            $requiredQty = (float) \App\Helpers\MoneyHelper::safeParse($item['quantity'] ?? 0);
 
             $product = \App\Models\Product::find($item['product_id']);
 

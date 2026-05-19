@@ -114,7 +114,6 @@ class PurchaseOrderObserverTest extends TestCase
             'order_date' => now()->format('Y-m-d'),
             'status' => 'draft',
             'is_asset' => true,
-            'cabang_id' => $this->cabang->id,
             'created_by' => $this->user->id,
         ]);
 

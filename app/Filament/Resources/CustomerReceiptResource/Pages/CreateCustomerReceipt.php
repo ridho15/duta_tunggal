@@ -54,7 +54,7 @@ class CreateCustomerReceipt extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['total_payment'] = MoneyHelper::parse($data['total_payment'] ?? 0);
+        $data['total_payment'] = MoneyHelper::safeParse($data['total_payment'] ?? 0);
         $data['payment_method'] = $data['payment_method'] ?? 'Cash';
 
         // Extract data from Livewire component data if not in form data
@@ -355,7 +355,7 @@ class CreateCustomerReceipt extends CreateRecord
         Notification::make()
             ->success()
             ->title('Customer Receipt created successfully')
-            ->body("Payment of Rp " . number_format($finalTotal, 0, ',', '.') . " processed for {$itemsCreated} invoice(s). {$arUpdated} Account Receivable record(s) updated.")
+            ->body("Payment of " . \App\Helpers\MoneyHelper::rupiah($finalTotal) . " processed for {$itemsCreated} invoice(s). {$arUpdated} Account Receivable record(s) updated.")
             ->send();
     }
 

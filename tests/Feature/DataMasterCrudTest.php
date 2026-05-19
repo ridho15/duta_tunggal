@@ -855,7 +855,10 @@ describe('Rak (Shelf) CRUD', function () {
     beforeEach(function () {
         $this->cabang = Cabang::factory()->create();
         $this->user = setupDataMasterUser($this->cabang->id);
-        $this->warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        $this->warehouse = Warehouse::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 1,
+        ]);
     });
 
     it('can render list page', function () {

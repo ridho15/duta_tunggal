@@ -5,6 +5,7 @@ namespace App\Filament\Resources\SaleOrderResource\RelationManagers;
 use App\Http\Controllers\HelperController;
 use App\Models\Product;
 use App\Models\TaxSetting;
+use App\Support\CurrencyConversionResolver;
 use Filament\Forms;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -104,7 +105,7 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->reactive()
                             ->afterStateHydrated(function ($component, $record) {
                                 if ($record) {
-                                    $component->state(number_format((float) $record->unit_price, 0, ',', '.'));
+                                    $component->state(number_format((float) $record->unit_price, 2, ',', '.'));
                                 }
                             })
                             ->afterStateUpdated(function ($set, $get, $state) {
@@ -219,7 +220,7 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->sortable(false),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->rupiah()
+                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::resolveSymbol($record->currency_id ?? $record->saleOrder?->currency_id) . ' ' . number_format((float) $state, 2, ',', '.'))
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
@@ -233,7 +234,7 @@ class SaleOrderItemRelationManager extends RelationManager
                     ->label('Sub Total')
                     ->formatStateUsing(function ($record) {
                         $hasil = HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, $record->tipe_pajak ?? null);
-                        return \App\Helpers\MoneyHelper::rupiah($hasil);
+                        return CurrencyConversionResolver::resolveSymbol($record->currency_id ?? $record->saleOrder?->currency_id) . ' ' . number_format((float) $hasil, 2, ',', '.');
                     })
                     ->sortable(),
             ])

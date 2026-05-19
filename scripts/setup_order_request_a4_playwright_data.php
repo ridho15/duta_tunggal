@@ -16,6 +16,7 @@ $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\PurchaseOrder;
@@ -60,16 +61,21 @@ DB::transaction(function () use ($now) {
     }
 
     $createOr = function (string $requestNumber, string $status) use ($warehouseId, $cabangId, $userId, $now) {
-        return DB::table('order_requests')->insertGetId([
+        $row = [
             'request_number' => $requestNumber,
-            'warehouse_id' => $warehouseId,
-            'cabang_id' => $cabangId,
             'request_date' => now()->toDateString(),
             'status' => $status,
             'created_by' => $userId,
             'created_at' => $now,
             'updated_at' => $now,
-        ]);
+        ];
+        if (Schema::hasColumn('order_requests', 'warehouse_id')) {
+            $row['warehouse_id'] = $warehouseId;
+        }
+        if (Schema::hasColumn('order_requests', 'cabang_id')) {
+            $row['cabang_id'] = $cabangId;
+        }
+        return DB::table('order_requests')->insertGetId($row);
     };
 
     // Static status fixtures
@@ -99,14 +105,19 @@ DB::transaction(function () use ($now) {
     $fixtureSuffix = $now->format('YmdHisv') . '-' . bin2hex(random_bytes(3));
 
     // Transition fixture 1: approved -> partial after approvePo
-    $orPartial = OrderRequest::create([
+    $orPartialData = [
         'request_number' => 'OR-TEST-A4-PARTIAL',
-        'warehouse_id' => $warehouseId,
-        'cabang_id' => $cabangId,
         'request_date' => now()->toDateString(),
         'status' => 'approved',
         'created_by' => $userId,
-    ]);
+    ];
+    if (Schema::hasColumn('order_requests', 'warehouse_id')) {
+        $orPartialData['warehouse_id'] = $warehouseId;
+    }
+    if (Schema::hasColumn('order_requests', 'cabang_id')) {
+        $orPartialData['cabang_id'] = $cabangId;
+    }
+    $orPartial = OrderRequest::create($orPartialData);
 
     $orPartialItemA = OrderRequestItem::create([
         'order_request_id' => $orPartial->id,
@@ -134,18 +145,23 @@ DB::transaction(function () use ($now) {
         'subtotal' => 1200000,
     ]);
 
-    $poPartial = PurchaseOrder::create([
+    $poPartialData = [
         'supplier_id' => $supplierId,
         'po_number' => 'PO-TEST-A4-PARTIAL-' . $fixtureSuffix,
         'order_date' => now()->toDateString(),
         'status' => 'draft',
-        'warehouse_id' => $warehouseId,
         'tempo_hutang' => 30,
         'created_by' => $userId,
         'refer_model_type' => OrderRequest::class,
         'refer_model_id' => $orPartial->id,
-        'cabang_id' => $cabangId,
-    ]);
+    ];
+    if (Schema::hasColumn('purchase_orders', 'warehouse_id')) {
+        $poPartialData['warehouse_id'] = $warehouseId;
+    }
+    if (Schema::hasColumn('purchase_orders', 'cabang_id')) {
+        $poPartialData['cabang_id'] = $cabangId;
+    }
+    $poPartial = PurchaseOrder::create($poPartialData);
 
     PurchaseOrderItem::create([
         'purchase_order_id' => $poPartial->id,
@@ -163,14 +179,19 @@ DB::transaction(function () use ($now) {
     $service->approvePo($poPartial, $userId);
 
     // Transition fixture 2: approved -> complete after approvePo
-    $orComplete = OrderRequest::create([
+    $orCompleteData = [
         'request_number' => 'OR-TEST-A4-COMPLETE',
-        'warehouse_id' => $warehouseId,
-        'cabang_id' => $cabangId,
         'request_date' => now()->toDateString(),
         'status' => 'approved',
         'created_by' => $userId,
-    ]);
+    ];
+    if (Schema::hasColumn('order_requests', 'warehouse_id')) {
+        $orCompleteData['warehouse_id'] = $warehouseId;
+    }
+    if (Schema::hasColumn('order_requests', 'cabang_id')) {
+        $orCompleteData['cabang_id'] = $cabangId;
+    }
+    $orComplete = OrderRequest::create($orCompleteData);
 
     $orCompleteItemA = OrderRequestItem::create([
         'order_request_id' => $orComplete->id,
@@ -198,18 +219,23 @@ DB::transaction(function () use ($now) {
         'subtotal' => 720000,
     ]);
 
-    $poComplete = PurchaseOrder::create([
+    $poCompleteData = [
         'supplier_id' => $supplierId,
         'po_number' => 'PO-TEST-A4-COMPLETE-' . $fixtureSuffix,
         'order_date' => now()->toDateString(),
         'status' => 'draft',
-        'warehouse_id' => $warehouseId,
         'tempo_hutang' => 30,
         'created_by' => $userId,
         'refer_model_type' => OrderRequest::class,
         'refer_model_id' => $orComplete->id,
-        'cabang_id' => $cabangId,
-    ]);
+    ];
+    if (Schema::hasColumn('purchase_orders', 'warehouse_id')) {
+        $poCompleteData['warehouse_id'] = $warehouseId;
+    }
+    if (Schema::hasColumn('purchase_orders', 'cabang_id')) {
+        $poCompleteData['cabang_id'] = $cabangId;
+    }
+    $poComplete = PurchaseOrder::create($poCompleteData);
 
     PurchaseOrderItem::create([
         'purchase_order_id' => $poComplete->id,

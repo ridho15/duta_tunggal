@@ -198,7 +198,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
         $total = $records->where('aging_bucket_computed', $bucket)->sum('remaining');
 
-        return 'Rp ' . number_format($total, 0, ',', '.');
+        return \App\Helpers\MoneyHelper::rupiah($total);
     }
 
     public function calculateExpectedCashFlow($type, $days): float

@@ -404,7 +404,7 @@ class HppReportServiceTest extends TestCase
         Carbon::setTestNow('2025-02-01 00:00:00');
 
         $branch = Cabang::factory()->create(['nama' => 'Test Branch']);
-        $product = Product::factory()->create(['cabang_id' => $branch->id, 'name' => 'Test Product']);
+        $product = Product::factory()->forCabang($branch)->create(['name' => 'Test Product']);
 
         // Create standard costs
         $standardCost = ProductStandardCost::create([

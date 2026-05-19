@@ -67,7 +67,7 @@ class SuppliersRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('pivot.supplier_price')
                     ->label('Harga Beli')
-                    ->formatStateUsing(fn ($state) => $state ? 'Rp ' . number_format((float)$state, 0, ',', '.') : '-')
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? \App\Helpers\MoneyHelper::rupiah($state) : '-')
                     ->sortable(),
                 TextColumn::make('phone')
                     ->label('Telepon')

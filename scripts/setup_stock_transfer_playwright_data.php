@@ -16,6 +16,7 @@ use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
 use App\Models\Warehouse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 DB::transaction(function () {
     $cabang = Cabang::query()->first() ?? Cabang::factory()->create([
@@ -30,158 +31,156 @@ DB::transaction(function () {
     $product = Product::query()->where('sku', 'PW-ST-001')->first();
 
     if (! $product) {
-        $product = Product::factory()->create([
+        $product = Product::factory()->forCabang($cabang)->create([
             'sku' => 'PW-ST-001',
             'name' => 'Playwright Stock Transfer Product',
             'product_category_id' => $category->id,
-            'cabang_id' => $cabang->id,
             'cost_price' => 10000,
             'sell_price' => 15000,
         ]);
     }
 
-    $fromWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(
-        ['kode' => 'GDG-PW-ST-001'],
-        [
-            'name' => 'Gudang Asal Playwright Transfer',
-            'cabang_id' => $cabang->id,
-            'location' => 'Playwright Source',
-            'status' => 1,
-        ]
-    );
+    $fromWarehouseData = [
+        'name' => 'Gudang Asal Playwright Transfer',
+        'location' => 'Playwright Source',
+        'status' => 1,
+    ];
+    if (Schema::hasColumn('warehouses', 'cabang_id')) {
+        $fromWarehouseData['cabang_id'] = $cabang->id;
+    }
+    $fromWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(['kode' => 'GDG-PW-ST-001'], $fromWarehouseData);
 
-    $toWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(
-        ['kode' => 'GDG-PW-ST-002'],
-        [
-            'name' => 'Gudang Tujuan Playwright Transfer',
-            'cabang_id' => $cabang->id,
-            'location' => 'Playwright Destination',
-            'status' => 1,
-        ]
-    );
+    $toWarehouseData = [
+        'name' => 'Gudang Tujuan Playwright Transfer',
+        'location' => 'Playwright Destination',
+        'status' => 1,
+    ];
+    if (Schema::hasColumn('warehouses', 'cabang_id')) {
+        $toWarehouseData['cabang_id'] = $cabang->id;
+    }
+    $toWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(['kode' => 'GDG-PW-ST-002'], $toWarehouseData);
 
-    $failedFromWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(
-        ['kode' => 'GDG-PW-ST-003'],
-        [
-            'name' => 'Gudang Asal Playwright Transfer Gagal',
-            'cabang_id' => $cabang->id,
-            'location' => 'Playwright Failed Source',
-            'status' => 1,
-        ]
-    );
+    $failedFromWarehouseData = [
+        'name' => 'Gudang Asal Playwright Transfer Gagal',
+        'location' => 'Playwright Failed Source',
+        'status' => 1,
+    ];
+    if (Schema::hasColumn('warehouses', 'cabang_id')) {
+        $failedFromWarehouseData['cabang_id'] = $cabang->id;
+    }
+    $failedFromWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(['kode' => 'GDG-PW-ST-003'], $failedFromWarehouseData);
 
-    $failedToWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(
-        ['kode' => 'GDG-PW-ST-004'],
-        [
-            'name' => 'Gudang Tujuan Playwright Transfer Gagal',
-            'cabang_id' => $cabang->id,
-            'location' => 'Playwright Failed Destination',
-            'status' => 1,
-        ]
-    );
+    $failedToWarehouseData = [
+        'name' => 'Gudang Tujuan Playwright Transfer Gagal',
+        'location' => 'Playwright Failed Destination',
+        'status' => 1,
+    ];
+    if (Schema::hasColumn('warehouses', 'cabang_id')) {
+        $failedToWarehouseData['cabang_id'] = $cabang->id;
+    }
+    $failedToWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(['kode' => 'GDG-PW-ST-004'], $failedToWarehouseData);
 
-    $fromRak = Rak::query()->firstOrCreate(
-        ['code' => 'RAK-PW-ST-001'],
-        [
-            'name' => 'Rak Asal PW',
-            'warehouse_id' => $fromWarehouse->id,
-        ]
-    );
+    $fromRakData = ['name' => 'Rak Asal PW'];
+    if (Schema::hasColumn('raks', 'warehouse_id')) {
+        $fromRakData['warehouse_id'] = $fromWarehouse->id;
+    }
+    $fromRak = Rak::query()->firstOrCreate(['code' => 'RAK-PW-ST-001'], $fromRakData);
 
-    $toRak = Rak::query()->firstOrCreate(
-        ['code' => 'RAK-PW-ST-002'],
-        [
-            'name' => 'Rak Tujuan PW',
-            'warehouse_id' => $toWarehouse->id,
-        ]
-    );
+    $toRakData = ['name' => 'Rak Tujuan PW'];
+    if (Schema::hasColumn('raks', 'warehouse_id')) {
+        $toRakData['warehouse_id'] = $toWarehouse->id;
+    }
+    $toRak = Rak::query()->firstOrCreate(['code' => 'RAK-PW-ST-002'], $toRakData);
 
-    $failedFromRak = Rak::query()->firstOrCreate(
-        ['code' => 'RAK-PW-ST-003'],
-        [
-            'name' => 'Rak Asal PW Gagal',
-            'warehouse_id' => $failedFromWarehouse->id,
-        ]
-    );
+    $failedFromRakData = ['name' => 'Rak Asal PW Gagal'];
+    if (Schema::hasColumn('raks', 'warehouse_id')) {
+        $failedFromRakData['warehouse_id'] = $failedFromWarehouse->id;
+    }
+    $failedFromRak = Rak::query()->firstOrCreate(['code' => 'RAK-PW-ST-003'], $failedFromRakData);
 
-    $failedToRak = Rak::query()->firstOrCreate(
-        ['code' => 'RAK-PW-ST-004'],
-        [
-            'name' => 'Rak Tujuan PW Gagal',
-            'warehouse_id' => $failedToWarehouse->id,
-        ]
-    );
+    $failedToRakData = ['name' => 'Rak Tujuan PW Gagal'];
+    if (Schema::hasColumn('raks', 'warehouse_id')) {
+        $failedToRakData['warehouse_id'] = $failedToWarehouse->id;
+    }
+    $failedToRak = Rak::query()->firstOrCreate(['code' => 'RAK-PW-ST-004'], $failedToRakData);
 
-    InventoryStock::updateOrCreate(
-        [
-            'product_id' => $product->id,
-            'warehouse_id' => $fromWarehouse->id,
-            'rak_id' => $fromRak->id,
-        ],
-        [
-            'qty_available' => 20,
-            'qty_reserved' => 0,
-            'qty_min' => 0,
-        ]
-    );
+    $stockKeyA = [
+        'product_id' => $product->id,
+        'rak_id' => $fromRak->id,
+    ];
+    if (Schema::hasColumn('inventory_stocks', 'warehouse_id')) {
+        $stockKeyA['warehouse_id'] = $fromWarehouse->id;
+    }
+    InventoryStock::updateOrCreate($stockKeyA, [
+        'qty_available' => 20,
+        'qty_reserved' => 0,
+        'qty_min' => 0,
+    ]);
 
-    InventoryStock::updateOrCreate(
-        [
-            'product_id' => $product->id,
-            'warehouse_id' => $toWarehouse->id,
-            'rak_id' => $toRak->id,
-        ],
-        [
-            'qty_available' => 0,
-            'qty_reserved' => 0,
-            'qty_min' => 0,
-        ]
-    );
+    $stockKeyB = [
+        'product_id' => $product->id,
+        'rak_id' => $toRak->id,
+    ];
+    if (Schema::hasColumn('inventory_stocks', 'warehouse_id')) {
+        $stockKeyB['warehouse_id'] = $toWarehouse->id;
+    }
+    InventoryStock::updateOrCreate($stockKeyB, [
+        'qty_available' => 0,
+        'qty_reserved' => 0,
+        'qty_min' => 0,
+    ]);
 
-    InventoryStock::updateOrCreate(
-        [
-            'product_id' => $product->id,
-            'warehouse_id' => $failedFromWarehouse->id,
-            'rak_id' => $failedFromRak->id,
-        ],
-        [
-            'qty_available' => 3,
-            'qty_reserved' => 0,
-            'qty_min' => 0,
-        ]
-    );
+    $stockKeyC = [
+        'product_id' => $product->id,
+        'rak_id' => $failedFromRak->id,
+    ];
+    if (Schema::hasColumn('inventory_stocks', 'warehouse_id')) {
+        $stockKeyC['warehouse_id'] = $failedFromWarehouse->id;
+    }
+    InventoryStock::updateOrCreate($stockKeyC, [
+        'qty_available' => 3,
+        'qty_reserved' => 0,
+        'qty_min' => 0,
+    ]);
 
-    InventoryStock::updateOrCreate(
-        [
-            'product_id' => $product->id,
-            'warehouse_id' => $failedToWarehouse->id,
-            'rak_id' => $failedToRak->id,
-        ],
-        [
-            'qty_available' => 0,
-            'qty_reserved' => 0,
-            'qty_min' => 0,
-        ]
-    );
+    $stockKeyD = [
+        'product_id' => $product->id,
+        'rak_id' => $failedToRak->id,
+    ];
+    if (Schema::hasColumn('inventory_stocks', 'warehouse_id')) {
+        $stockKeyD['warehouse_id'] = $failedToWarehouse->id;
+    }
+    InventoryStock::updateOrCreate($stockKeyD, [
+        'qty_available' => 0,
+        'qty_reserved' => 0,
+        'qty_min' => 0,
+    ]);
 
-    $successTransfer = StockTransfer::withTrashed()->firstOrCreate(
-        ['transfer_number' => 'ST-PW-APPROVE-001'],
-        [
-            'from_warehouse_id' => $fromWarehouse->id,
-            'to_warehouse_id' => $toWarehouse->id,
-            'transfer_date' => now(),
-            'status' => 'Request',
-        ]
-    );
+    $stData = [
+        'transfer_date' => now(),
+        'status' => 'Request',
+    ];
+    if (Schema::hasColumn('stock_transfers', 'from_warehouse_id')) {
+        $stData['from_warehouse_id'] = $fromWarehouse->id;
+    }
+    if (Schema::hasColumn('stock_transfers', 'to_warehouse_id')) {
+        $stData['to_warehouse_id'] = $toWarehouse->id;
+    }
+    $successTransfer = StockTransfer::withTrashed()->firstOrCreate(['transfer_number' => 'ST-PW-APPROVE-001'], $stData);
     if ($successTransfer->trashed()) {
         $successTransfer->restore();
     }
-    $successTransfer->update([
-        'from_warehouse_id' => $fromWarehouse->id,
-        'to_warehouse_id' => $toWarehouse->id,
+    $updateSt1 = [
         'transfer_date' => now(),
         'status' => 'Request',
-    ]);
+    ];
+    if (Schema::hasColumn('stock_transfers', 'from_warehouse_id')) {
+        $updateSt1['from_warehouse_id'] = $fromWarehouse->id;
+    }
+    if (Schema::hasColumn('stock_transfers', 'to_warehouse_id')) {
+        $updateSt1['to_warehouse_id'] = $toWarehouse->id;
+    }
+    $successTransfer->update($updateSt1);
 
     StockMovement::query()
         ->where('from_model_type', StockTransfer::class)
@@ -189,34 +188,46 @@ DB::transaction(function () {
         ->forceDelete();
     StockTransferItem::withTrashed()->where('stock_transfer_id', $successTransfer->id)->forceDelete();
 
-    StockTransferItem::create([
+    $sti = [
         'stock_transfer_id' => $successTransfer->id,
         'product_id' => $product->id,
         'quantity' => 7,
-        'from_warehouse_id' => $fromWarehouse->id,
         'from_rak_id' => $fromRak->id,
-        'to_warehouse_id' => $toWarehouse->id,
         'to_rak_id' => $toRak->id,
-    ]);
+    ];
+    if (Schema::hasColumn('stock_transfer_items', 'from_warehouse_id')) {
+        $sti['from_warehouse_id'] = $fromWarehouse->id;
+    }
+    if (Schema::hasColumn('stock_transfer_items', 'to_warehouse_id')) {
+        $sti['to_warehouse_id'] = $toWarehouse->id;
+    }
+    StockTransferItem::create($sti);
 
-    $failedTransfer = StockTransfer::withTrashed()->firstOrCreate(
-        ['transfer_number' => 'ST-PW-FAIL-001'],
-        [
-            'from_warehouse_id' => $failedFromWarehouse->id,
-            'to_warehouse_id' => $failedToWarehouse->id,
-            'transfer_date' => now(),
-            'status' => 'Request',
-        ]
-    );
+    $ftData = [
+        'transfer_date' => now(),
+        'status' => 'Request',
+    ];
+    if (Schema::hasColumn('stock_transfers', 'from_warehouse_id')) {
+        $ftData['from_warehouse_id'] = $failedFromWarehouse->id;
+    }
+    if (Schema::hasColumn('stock_transfers', 'to_warehouse_id')) {
+        $ftData['to_warehouse_id'] = $failedToWarehouse->id;
+    }
+    $failedTransfer = StockTransfer::withTrashed()->firstOrCreate(['transfer_number' => 'ST-PW-FAIL-001'], $ftData);
     if ($failedTransfer->trashed()) {
         $failedTransfer->restore();
     }
-    $failedTransfer->update([
-        'from_warehouse_id' => $failedFromWarehouse->id,
-        'to_warehouse_id' => $failedToWarehouse->id,
+    $updateFt = [
         'transfer_date' => now(),
         'status' => 'Request',
-    ]);
+    ];
+    if (Schema::hasColumn('stock_transfers', 'from_warehouse_id')) {
+        $updateFt['from_warehouse_id'] = $failedFromWarehouse->id;
+    }
+    if (Schema::hasColumn('stock_transfers', 'to_warehouse_id')) {
+        $updateFt['to_warehouse_id'] = $failedToWarehouse->id;
+    }
+    $failedTransfer->update($updateFt);
 
     StockMovement::query()
         ->where('from_model_type', StockTransfer::class)

@@ -57,7 +57,7 @@ class OrderRequestService
                     }
 
                     // Use form-provided price if given; otherwise fall back to OR item price → supplier pivot → cost_price
-                    $formPrice = isset($row['unit_price']) && $row['unit_price'] !== '' ? \App\Helpers\MoneyHelper::parse($row['unit_price']) : null;
+                    $formPrice = isset($row['unit_price']) && $row['unit_price'] !== '' ? \App\Helpers\MoneyHelper::safeParse($row['unit_price']) : null;
                     if ($formPrice !== null && $formPrice >= 0) {
                         $unitPrice = $formPrice;
                     } elseif (($orderRequestItem->unit_price ?? 0) > 0) {
@@ -138,7 +138,7 @@ class OrderRequestService
                 /** @var OrderRequestItem $orderRequestItem */
                 $orderRequestItem = $row['order_request_item'];
 
-                $itemCurrencyId = $orderRequestItem->currency_id ?? $orderRequest->currency_id ?? $defaultCurrency->id;
+                $itemCurrencyId = $orderRequestItem->currency_id ?? $defaultCurrency->id;
 
                 $orderRequestItem->purchaseOrderItem()->create([
                     'purchase_order_id' => $purchaseOrder->id,
@@ -228,7 +228,7 @@ class OrderRequestService
             /** @var OrderRequestItem $orderRequestItem */
             $orderRequestItem = $row['order_request_item'];
 
-            $itemCurrencyId = $orderRequestItem->currency_id ?? $orderRequest->currency_id ?? $defaultCurrency->id;
+            $itemCurrencyId = $orderRequestItem->currency_id ?? $defaultCurrency->id;
 
             $orderRequestItem->purchaseOrderItem()->create([
                 'purchase_order_id' => $purchaseOrder->id,
@@ -287,4 +287,3 @@ class OrderRequestService
         $orderRequest->update(['status' => 'pending']);
     }
 }
-

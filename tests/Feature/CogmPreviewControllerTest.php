@@ -327,8 +327,8 @@ class CogmPreviewControllerTest extends TestCase
             'ending_balance' => 0,
         ]);
 
-        $productA = Product::factory()->create(['name' => 'Produk A', 'cabang_id' => $branch->id, 'uom_id' => $uom->id]);
-        $productB = Product::factory()->create(['name' => 'Produk B', 'cabang_id' => $branch->id, 'uom_id' => $uom->id]);
+        $productA = Product::factory()->forCabang($branch)->create(['name' => 'Produk A', 'uom_id' => $uom->id]);
+        $productB = Product::factory()->forCabang($branch)->create(['name' => 'Produk B', 'uom_id' => $uom->id]);
 
         $bomA = BillOfMaterial::factory()->create([
             'product_id' => $productA->id,

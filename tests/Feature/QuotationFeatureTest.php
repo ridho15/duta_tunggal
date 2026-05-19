@@ -690,7 +690,7 @@ test('quotation item tax_type persists through update', function () {
     expect($item->tax_type)->toBe('PPN Included');
 });
 
-test('quotation form prefers product tax, then active setting, then zero', function () {
+test('quotation form prefers active setting, then product tax, then zero', function () {
     $user = User::factory()->create();
     $permissions = [
         'view any quotation',
@@ -724,22 +724,19 @@ test('quotation form prefers product tax, then active setting, then zero', funct
         'status' => true,
     ]);
 
-    Livewire::actingAs($user)
+        Livewire::actingAs($user)
         ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
         ->set('data.customer_id', $customer->id)
         ->set('data.date', now()->toDateString())
-        ->set('data.quotationItem', [
-                'product_id' => $productWithTax->id,
-                'product_id' => $product->id,
+        ->set('data.quotationItem', [[
                 'quantity' => 1,
                 'unit_price' => 100000,
                 'discount' => 0,
                 'tax' => 0,
-                'tax_type' => 'None',
-            ],
-        ])
-            ->assertSet('data.quotationItem.0.tax', 7)
-            ->assertSet('data.quotationItem.0.tax', 11)
+                'tax_type' => 'PPN Excluded',
+            ]])
+        ->set('data.quotationItem.0.product_id', $productWithTax->id)
+        ->assertSet('data.quotationItem.0.tax', 11)
         ->set('data.quotationItem.0.tax', 7)
         ->assertSet('data.quotationItem.0.tax', 7)
         ->assertSet('data.quotationItem.0.tax', 7)
@@ -748,6 +745,22 @@ test('quotation form prefers product tax, then active setting, then zero', funct
         ->assertSet('data.quotationItem.0.tax', 11);
 
     TaxSetting::query()->delete();
+
+    Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.quotationItem', [
+            [
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+                'tax_type' => 'PPN Excluded',
+            ],
+        ])
+        ->set('data.quotationItem.0.product_id', $productWithTax->id)
+        ->assertSet('data.quotationItem.0.tax', 7);
 
     Livewire::actingAs($user)
         ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
@@ -767,8 +780,7 @@ test('quotation form prefers product tax, then active setting, then zero', funct
         ->assertSet('data.quotationItem.0.tax', 0)
         ->set('data.quotationItem.0.tax_type', 'PPN Included')
         ->assertSet('data.quotationItem.0.tax', 0);
-        ->assertSet('data.quotationItem.0.tax', 11);
-});
+    });
 
     test('quotation total amount stays formatted as rupiah on live updates and persists numerically', function () {
         $user = User::factory()->create();

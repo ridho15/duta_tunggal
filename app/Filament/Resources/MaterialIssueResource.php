@@ -295,7 +295,7 @@ class MaterialIssueResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get) {
                                         $qty = (float) $get('quantity');
-                                        $cost = HelperController::parseIndonesianMoney($get('cost_per_unit') ?? '0');
+                                        $cost = \App\Helpers\MoneyHelper::safeParse($get('cost_per_unit') ?? '0');
                                         $set('total_cost', $qty * $cost);
                                     }),
                                 Forms\Components\TextInput::make('cost_per_unit')
@@ -312,7 +312,7 @@ class MaterialIssueResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get) {
                                         $qty = (float) $get('quantity');
-                                        $cost = HelperController::parseIndonesianMoney($get('cost_per_unit') ?? '0');
+                                        $cost = \App\Helpers\MoneyHelper::safeParse($get('cost_per_unit') ?? '0');
                                         $set('total_cost', $qty * $cost);
                                     }),
                                 Forms\Components\TextInput::make('total_cost')
@@ -465,7 +465,7 @@ class MaterialIssueResource extends Resource
                                 $items = $get('items') ?? [];
                                 $total = 0;
                                 foreach ($items as $item) {
-                                    $total += HelperController::parseIndonesianMoney($item['total_cost'] ?? '0');
+                                    $total += \App\Helpers\MoneyHelper::safeParse($item['total_cost'] ?? '0');
                                 }
                                 return 'Rp ' . number_format($total, 2, ',', '.');
                             }),
@@ -501,7 +501,7 @@ class MaterialIssueResource extends Resource
                                 $totalMaterial = 0;
                                 $items = $get('items') ?? [];
                                 foreach ($items as $item) {
-                                    $totalMaterial += HelperController::parseIndonesianMoney($item['total_cost'] ?? '0');
+                                    $totalMaterial += \App\Helpers\MoneyHelper::safeParse($item['total_cost'] ?? '0');
                                 }
                                 $labor = 0;
                                 $overhead = 0;

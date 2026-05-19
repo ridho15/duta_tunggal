@@ -134,7 +134,7 @@ class ViewPaymentRequest extends ViewRecord
                             $ids = $record->selected_invoices ?? [];
                             if (empty($ids)) return 'Tidak ada invoice dipilih';
                             $invoices = Invoice::whereIn('id', $ids)->get();
-                            return $invoices->map(fn ($i) => "{$i->invoice_number} - Rp " . number_format($i->total, 0, ',', '.'))->join(', ');
+                            return $invoices->map(fn ($i) => "{$i->invoice_number} - " . \App\Helpers\MoneyHelper::rupiah($i->total))->join(', ');
                         })
                         ->columnSpanFull(),
                 ]),

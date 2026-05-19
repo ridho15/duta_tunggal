@@ -275,7 +275,7 @@ class InvoiceResource extends Resource
                             ->columnSpanFull(),
                         // Legacy `tax` column kept for historical data — hidden, synced from ppn_rate.
                         \Filament\Forms\Components\Hidden::make('tax')
-                            ->dehydrateStateUsing(fn ($state, $get) => (float) $get('ppn_rate')),
+                            ->dehydrateStateUsing(fn ($state, $get) => \App\Helpers\MoneyHelper::safeParse($get('ppn_rate'))),
                         TextInput::make('ppn_rate')
                             ->label('PPN Rate (%)')
                             ->validationMessages([
@@ -348,9 +348,9 @@ class InvoiceResource extends Resource
     {
         $otherFee   = static::sumOtherFee($get);
         // Always parse through MoneyHelper so Indonesian-formatted strings like "20.000.000" are read correctly.
-        $subtotal   = (float) \App\Helpers\MoneyHelper::parse($get('subtotal'));
+        $subtotal   = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal'));
         // ppn_rate is a numeric percentage (e.g. 12) — no money parsing needed.
-        $ppnRate    = (float) $get('ppn_rate');
+        $ppnRate    = (float) \App\Helpers\MoneyHelper::safeParse($get('ppn_rate'));
         // ppn_option: 'non_ppn' | 'standard' (Eksklusif) | 'inclusive' (Inklusif)
         $ppnOption  = $get('ppn_option') ?? 'standard';
 
@@ -377,14 +377,14 @@ class InvoiceResource extends Resource
             $sum = 0.0;
             foreach ($fees as $fee) {
                 if (is_array($fee)) {
-                    $sum += (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0);
+                    $sum += (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0);
                 } else {
-                    $sum += (float) \App\Helpers\MoneyHelper::parse($fee);
+                    $sum += (float) \App\Helpers\MoneyHelper::safeParse($fee);
                 }
             }
             return $sum;
         }
-        return (float) \App\Helpers\MoneyHelper::parse($fees);
+        return (float) \App\Helpers\MoneyHelper::safeParse($fees);
     }
 
     public static function table(Table $table): Table

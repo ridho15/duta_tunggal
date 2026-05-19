@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\PaymentStatus;
 use App\Filament\Resources\AccountPayableResource\Pages;
+use App\Helpers\MoneyHelper;
 use App\Models\AccountPayable;
 use App\Models\Invoice;
 use App\Models\Supplier;
@@ -97,11 +98,11 @@ class AccountPayableResource extends Resource
                             ->readonly()
                             ->reactive()
                             ->dehydrateStateUsing(function ($state) {
-                                return (float) \App\Helpers\MoneyHelper::parse($state);
+                                return (float) \App\Helpers\MoneyHelper::safeParse($state);
                             })
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                $total = (float) \App\Helpers\MoneyHelper::parse($state);
-                                $paid = (float) \App\Helpers\MoneyHelper::parse($get('paid'));
+                                $total = (float) \App\Helpers\MoneyHelper::safeParse($state);
+                                $paid = (float) \App\Helpers\MoneyHelper::safeParse($get('paid'));
                                 $set('remaining', $total - $paid);
                             })
                             ->helperText('Total akan terisi otomatis berdasarkan invoice yang dipilih'),
@@ -114,9 +115,10 @@ class AccountPayableResource extends Resource
                             ])
                             ->default(0.00)
                             ->reactive()
+                            ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                $total = (float) \App\Helpers\MoneyHelper::parse($get('total'));
-                                $paid = (float) \App\Helpers\MoneyHelper::parse($state);
+                                $total = (float) \App\Helpers\MoneyHelper::safeParse($get('total'));
+                                $paid = (float) \App\Helpers\MoneyHelper::safeParse($state);
                                 $set('remaining', $total - $paid);
                             }),
                         TextInput::make('remaining')
@@ -127,6 +129,7 @@ class AccountPayableResource extends Resource
                                 'numeric' => 'Sisa pembayaran harus berupa angka'
                             ])
                             ->reactive()
+                            ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
                             ->helperText('Sisa pembayaran akan terisi otomatis berdasarkan total invoice'),
                         Radio::make('status')
                             ->label('Status Pembayaran')
@@ -352,10 +355,12 @@ class AccountPayableResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
-                                    ->indonesianMoney(),
+                                    ->indonesianMoney()
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state)),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
-                                    ->indonesianMoney(),
+                                    ->indonesianMoney()
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state)),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -368,10 +373,10 @@ class AccountPayableResource extends Resource
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
                         if ($data['amount_from'] ?? null) {
-                            $indicators['amount_from'] = 'Amount from: Rp ' . number_format($data['amount_from']);
+                            $indicators['amount_from'] = 'Amount from: ' . MoneyHelper::rupiah($data['amount_from']);
                         }
                         if ($data['amount_to'] ?? null) {
-                            $indicators['amount_to'] = 'Amount to: Rp ' . number_format($data['amount_to']);
+                            $indicators['amount_to'] = 'Amount to: ' . MoneyHelper::rupiah($data['amount_to']);
                         }
                         return $indicators;
                     }),

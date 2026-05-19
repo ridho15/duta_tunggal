@@ -104,8 +104,8 @@ class ViewOrderRequest extends ViewRecord
                 ->fillForm(function ($record) {
                     $items = $record->orderRequestItem->map(function ($item) use ($record) {
                         $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
-                        $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
-                        $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
+                        $unitPrice = MoneyHelper::safeParse($item->unit_price ?? 0);
+                        $originalPrice = MoneyHelper::safeParse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
                         $cabangId = $item->cabang_id;
 
@@ -283,7 +283,7 @@ class ViewOrderRequest extends ViewRecord
                                             $taxType = $get('../../tax_type') ?? 'None';
                                             $preview = OrderRequestResource::calculateApprovalItemPreview(
                                                 (float) ($state ?? 0),
-                                                (float) MoneyHelper::parse($get('unit_price') ?? 0),
+                                                (float) MoneyHelper::safeParse($get('unit_price') ?? 0),
                                                 0,
                                                 (float) ($get('tax') ?? 0),
                                                 $taxType
@@ -306,33 +306,23 @@ class ViewOrderRequest extends ViewRecord
                                             'required' => 'Qty wajib diisi.',
                                             'min' => 'Qty minimal 0.',
                                         ]),
-                                    TextInput::make('fulfilled_quantity')
-                                        ->label('Qty Diterima (Penerimaan Barang)')
-                                        ->readOnly()
-                                        ->dehydrated(false)
-                                        ->default(0),
-                                    TextInput::make('remaining_quantity')
-                                        ->label('Sisa Qty Belum Diterima')
-                                        ->readOnly()
-                                        ->dehydrated(false)
-                                        ->default(0),
                                     TextInput::make('original_price')
                                         ->label('Harga Asli')
                                         ->minValue(0)
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : ''),
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : ''),
                                     TextInput::make('unit_price')
                                         ->label('Harga Override')
                                         ->minValue(0)
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : '')
                                         ->reactive()
                                         ->live()
                                         ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                             $taxType = $get('../../tax_type') ?? 'None';
                                             $preview = OrderRequestResource::calculateApprovalItemPreview(
                                                 (float) ($get('quantity') ?? 0),
-                                                (float) MoneyHelper::parse($state ?? 0),
+                                                (float) MoneyHelper::safeParse($state ?? 0),
                                                 0,
                                                 (float) ($get('tax') ?? 0),
                                                 $taxType
@@ -350,17 +340,17 @@ class ViewOrderRequest extends ViewRecord
                                     TextInput::make('tax_nominal')
                                         ->label('Nominal Pajak')
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     TextInput::make('total_cost')
                                         ->label('Total (Harga × Qty)')
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     TextInput::make('subtotal')
                                         ->label('Subtotal')
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     Checkbox::make('include')
                                         ->label('Sertakan')
@@ -446,21 +436,21 @@ class ViewOrderRequest extends ViewRecord
                 ->fillForm(function ($record) {
                     $items = $record->orderRequestItem->map(function ($item) use($record) {
                         $remainingQty = $item->quantity - ($item->fulfilled_quantity ?? 0);
-                        $unitPrice = MoneyHelper::parse($item->unit_price ?? 0);
-                        $originalPrice = MoneyHelper::parse($item->original_price ?? $item->unit_price ?? 0);
+                        $unitPrice = MoneyHelper::safeParse($item->unit_price ?? 0);
+                        $originalPrice = MoneyHelper::safeParse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
                         $cabangId = $item->cabang_id;
 
                         $taxPct = (float)($item->tax ?? 0);
-                        $base = $totalCost;
                         $tipePajak = OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null);
                         $taxType = OrderRequestResource::taxServiceTypeFromItemTaxType($tipePajak);
-                        try {
-                            $taxRes = \App\Services\TaxService::compute($base, $taxPct, $taxType);
-                            $taxNom = number_format($taxRes['ppn'], 0, ',', '.');
-                        } catch (\Throwable $e) {
-                            $taxNom = '0';
-                        }
+                        $preview = OrderRequestResource::calculateApprovalItemPreview(
+                            (float) max(0, $remainingQty),
+                            (float) $unitPrice,
+                            0,
+                            $taxPct,
+                            $taxType
+                        );
 
                         $supplierName = $item->supplier_id
                             ? ("({$item->supplier->code}) {$item->supplier->perusahaan}")
@@ -486,8 +476,8 @@ class ViewOrderRequest extends ViewRecord
                             'original_price'   => $originalPrice,
                             'unit_price'       => $unitPrice,
                             'tax'              => $taxPct,
-                            'tax_nominal'      => $taxNom,
-                            'total_cost'       => $totalCost,
+                            'tax_nominal'      => $preview['tax_nominal'],
+                            'total_cost'       => $preview['total_cost'],
                             'max_quantity'     => max(0, $remainingQty),
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => $tipePajak,
@@ -636,13 +626,13 @@ class ViewOrderRequest extends ViewRecord
                                     TextInput::make('original_price')
                                         ->label('Harga Asli')
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     TextInput::make('unit_price')
                                         ->label('Harga Override')
                                         ->minValue(0)
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : ''),
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : ''),
                                     Radio::make('tipe_pajak')
                                         ->label('Tipe Pajak')
                                         ->options([
@@ -655,7 +645,7 @@ class ViewOrderRequest extends ViewRecord
                                         ->live()
                                         ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                             $quantity = (float) ($get('quantity') ?? 0);
-                                            $unitPrice = MoneyHelper::parse($get('unit_price') ?? 0);
+                                            $unitPrice = MoneyHelper::safeParse($get('unit_price') ?? 0);
                                             $taxPct = (float) ($get('tax') ?? 0);
 
                                             $preview = OrderRequestResource::calculateApprovalItemPreview(
@@ -677,7 +667,7 @@ class ViewOrderRequest extends ViewRecord
                                     TextInput::make('tax_nominal')
                                         ->label('Nominal Pajak')
                                         ->prefix(fn(Get $get) => OrderRequestResource::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
-                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::parse($state), 2, ',', '.') : '')
+                                        ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(MoneyHelper::safeParse($state), 2, ',', '.') : '')
                                         ->readOnly(),
                                     Checkbox::make('include')
                                         ->label('Sertakan')

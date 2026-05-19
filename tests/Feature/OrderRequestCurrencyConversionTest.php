@@ -107,7 +107,7 @@ test('formatMoneyByCurrency formats USD with dollar symbol', function () {
     $formatted = OrderRequestResource::formatMoneyByCurrency($this->currencyUsd->id, 10.5);
     
     expect($formatted)->toContain('$');
-    expect($formatted)->toContain('11'); // number_format rounds 10.5 to 11
+    expect($formatted)->toContain('10,50');
 });
 
 test('formatMoneyByCurrency formats IDR with Rp symbol', function () {

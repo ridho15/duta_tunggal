@@ -206,19 +206,48 @@ class EditPurchaseOrder extends EditRecord
         $total = 0;
 
         if ($record) {
+            $record->loadMissing('purchaseOrderCurrency');
+            $poCurrencies = $record->purchaseOrderCurrency->keyBy('currency_id');
+
             if (! empty($data['purchaseOrderItem']) && is_array($data['purchaseOrderItem'])) {
                 foreach ($data['purchaseOrderItem'] as &$item) {
                     $item['tipe_pajak'] = \App\Filament\Resources\PurchaseOrderResource::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+                    $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+                    $preview = \App\Filament\Resources\PurchaseOrderResource::calculateCurrencyPreview(
+                        (float) ($item['quantity'] ?? 0),
+                        (float) ($item['unit_price'] ?? 0),
+                        (float) ($item['discount'] ?? 0),
+                        (float) ($item['tax'] ?? 0),
+                        $item['tipe_pajak'],
+                        $currencyId
+                    );
+                    $item['subtotal'] = \App\Filament\Resources\PurchaseOrderResource::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
                 }
                 unset($item);
             }
 
             foreach ($record->purchaseOrderItem as $item) {
-                $total += HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);
+                $subtotal = HelperController::hitungSubtotal(
+                    (float) $item->quantity,
+                    (float) $item->unit_price,
+                    (float) $item->discount,
+                    (float) $item->tax,
+                    $item->tipe_pajak
+                );
+                $poCurrency = $poCurrencies->get($item->currency_id);
+                $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
+                    ? (float) $poCurrency->nominal
+                    : CurrencyConversionResolver::resolveRate(is_numeric($item->currency_id) ? (int) $item->currency_id : null);
+
+                $total += $subtotal * $rate;
             }
 
             foreach ($record->purchaseOrderBiaya as $biaya) {
-                $biayaAmount = $biaya->total * CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null));
+                $poCurrency = $poCurrencies->get($biaya->currency_id);
+                $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
+                    ? (float) $poCurrency->nominal
+                    : CurrencyConversionResolver::resolveRate(is_numeric($biaya->currency_id) ? (int) $biaya->currency_id : null);
+                $biayaAmount = (float) $biaya->total * $rate;
                 $total += $biayaAmount;
             }
         }
@@ -230,6 +259,6 @@ class EditPurchaseOrder extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return $data;
+        return PurchaseOrderResource::syncPurchaseOrderCurrencyData($data);
     }
 }

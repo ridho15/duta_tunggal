@@ -68,10 +68,9 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
     );
 
     $rawCost = 20.0;
-    $rawMaterial = Product::factory()->create([
+    $rawMaterial = Product::factory()->forCabang($branch)->create([
         'name' => 'Raw Material A',
         'sku' => 'RM-001',
-        'cabang_id' => $branch->id,
         'product_category_id' => $category->id,
         'uom_id' => $uom->id,
         'is_raw_material' => true,
@@ -80,10 +79,9 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
         'inventory_coa_id' => $rawCoa->id,
     ]);
 
-    $finishedGood = Product::factory()->create([
+    $finishedGood = Product::factory()->forCabang($branch)->create([
         'name' => 'Finished Product',
         'sku' => 'FG-001',
-        'cabang_id' => $branch->id,
         'product_category_id' => $category->id,
         'uom_id' => $uom->id,
         'is_raw_material' => false,
@@ -319,22 +317,23 @@ test('calculate material requirements from BOM', function () {
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create();
 
-    $finishedProduct = Product::factory()->create([
+    $finishedProduct = Product::factory()->forCabang($branch)->create([
         'is_raw_material' => false,
         'uom_id' => $uom->id,
     ]);
 
-    $rawMaterial1 = Product::factory()->create([
+    $rawMaterial1 = Product::factory()->forCabang($branch)->create([
         'is_raw_material' => true,
         'uom_id' => $uom->id,
     ]);
 
-    $rawMaterial2 = Product::factory()->create([
+    $rawMaterial2 = Product::factory()->forCabang($branch)->create([
         'is_raw_material' => true,
         'uom_id' => $uom->id,
     ]);
 
     $bom = BillOfMaterial::factory()->create([
+        'cabang_id' => $branch->id,
         'product_id' => $finishedProduct->id,
         'quantity' => 1,
         'code' => 'BOM-TEST-001',

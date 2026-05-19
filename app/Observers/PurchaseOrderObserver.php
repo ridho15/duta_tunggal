@@ -180,6 +180,8 @@ class PurchaseOrderObserver
                     ?? \App\Models\ChartOfAccount::where('type', 'Expense')->first();
             }
 
+            $resolvedCabangId = $this->resolveCabangId($purchaseOrder, $item);
+
             // Create one asset record per unit purchased
             $units = max(1, (int)$item->quantity);
             for ($i = 0; $i < $units; $i++) {
@@ -199,7 +201,7 @@ class PurchaseOrderObserver
                     'depreciation_expense_coa_id' => $depreciationExpenseCoa?->id ?? $assetCoa?->id,
                     'status' => 'active',
                     'notes' => 'Generated from PO ' . $purchaseOrder->po_number,
-                    'cabang_id' => $purchaseOrder->cabang_id,
+                    'cabang_id' => $resolvedCabangId,
                 ]);
 
                 // Calculate depreciation for the created unit
@@ -227,7 +229,7 @@ class PurchaseOrderObserver
             $totalAssetCost = $purchaseOrder->total_amount;
 
             // Get branch and department info
-            $branchId = $purchaseOrder->cabang_id;
+            $branchId = $this->resolveCabangId($purchaseOrder);
             $departmentId = null; // Could be added later if needed
             $projectId = null; // Could be added later if needed
 
@@ -385,5 +387,40 @@ class PurchaseOrderObserver
     public function syncJournalEntriesPublic(PurchaseOrder $purchaseOrder): void
     {
         $this->syncJournalEntries($purchaseOrder);
+    }
+
+    /**
+     * Resolve the best available cabang_id for asset and journal creation.
+     *
+     * Purchase orders may no longer persist cabang_id in the database, so we
+     * fall back to the item/product branch context when needed.
+     */
+    protected function resolveCabangId(PurchaseOrder $purchaseOrder, $purchaseOrderItem = null): ?int
+    {
+        if (! empty($purchaseOrder->cabang_id)) {
+            return (int) $purchaseOrder->cabang_id;
+        }
+
+        if ($purchaseOrderItem) {
+            if (! empty($purchaseOrderItem->cabang_id)) {
+                return (int) $purchaseOrderItem->cabang_id;
+            }
+
+            if (! empty($purchaseOrderItem->product?->cabang_id)) {
+                return (int) $purchaseOrderItem->product->cabang_id;
+            }
+        }
+
+        foreach ($purchaseOrder->purchaseOrderItem as $item) {
+            if (! empty($item->cabang_id)) {
+                return (int) $item->cabang_id;
+            }
+
+            if (! empty($item->product?->cabang_id)) {
+                return (int) $item->product->cabang_id;
+            }
+        }
+
+        return null;
     }
 }

@@ -17,6 +17,7 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 DB::transaction(function () {
     $cabang = Cabang::query()->first() ?? Cabang::factory()->create([
@@ -32,83 +33,81 @@ DB::transaction(function () {
     $user = User::query()->first() ?? User::factory()->create();
 
     if (! $product) {
-        $product = Product::factory()->create([
+        $product = Product::factory()->forCabang($cabang)->create([
             'sku' => 'PW-SA-001',
             'name' => 'Playwright Stock Adjustment Product',
             'product_category_id' => $category->id,
-            'cabang_id' => $cabang->id,
             'cost_price' => 10000,
             'sell_price' => 15000,
         ]);
     }
 
-    $successWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(
-        ['kode' => 'GDG-PW-SA-001'],
-        [
-            'name' => 'Gudang Playwright Adjustment Sukses',
-            'cabang_id' => $cabang->id,
-            'location' => 'Playwright Adjustment Success',
-            'status' => 1,
-        ]
-    );
+    $successWarehouseData = [
+        'name' => 'Gudang Playwright Adjustment Sukses',
+        'location' => 'Playwright Adjustment Success',
+        'status' => 1,
+    ];
+    if (Schema::hasColumn('warehouses', 'cabang_id')) {
+        $successWarehouseData['cabang_id'] = $cabang->id;
+    }
+    $successWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(['kode' => 'GDG-PW-SA-001'], $successWarehouseData);
 
-    $failedWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(
-        ['kode' => 'GDG-PW-SA-002'],
-        [
-            'name' => 'Gudang Playwright Adjustment Gagal',
-            'cabang_id' => $cabang->id,
-            'location' => 'Playwright Adjustment Fail',
-            'status' => 1,
-        ]
-    );
+    $failedWarehouseData = [
+        'name' => 'Gudang Playwright Adjustment Gagal',
+        'location' => 'Playwright Adjustment Fail',
+        'status' => 1,
+    ];
+    if (Schema::hasColumn('warehouses', 'cabang_id')) {
+        $failedWarehouseData['cabang_id'] = $cabang->id;
+    }
+    $failedWarehouse = Warehouse::withoutGlobalScopes()->firstOrCreate(['kode' => 'GDG-PW-SA-002'], $failedWarehouseData);
 
-    $successRak = Rak::query()->firstOrCreate(
-        ['code' => 'RAK-PW-SA-001'],
-        [
-            'name' => 'Rak PW Adjustment Sukses',
-            'warehouse_id' => $successWarehouse->id,
-        ]
-    );
+    $successRakData = [
+        'name' => 'Rak PW Adjustment Sukses',
+    ];
+    if (Schema::hasColumn('raks', 'warehouse_id')) {
+        $successRakData['warehouse_id'] = $successWarehouse->id;
+    }
+    $successRak = Rak::query()->firstOrCreate(['code' => 'RAK-PW-SA-001'], $successRakData);
 
-    $failedRak = Rak::query()->firstOrCreate(
-        ['code' => 'RAK-PW-SA-002'],
-        [
-            'name' => 'Rak PW Adjustment Gagal',
-            'warehouse_id' => $failedWarehouse->id,
-        ]
-    );
+    $failedRakData = [
+        'name' => 'Rak PW Adjustment Gagal',
+    ];
+    if (Schema::hasColumn('raks', 'warehouse_id')) {
+        $failedRakData['warehouse_id'] = $failedWarehouse->id;
+    }
+    $failedRak = Rak::query()->firstOrCreate(['code' => 'RAK-PW-SA-002'], $failedRakData);
 
-    InventoryStock::updateOrCreate(
-        [
-            'product_id' => $product->id,
-            'warehouse_id' => $successWarehouse->id,
-            'rak_id' => $successRak->id,
-        ],
-        [
-            'qty_available' => 10,
-            'qty_reserved' => 0,
-            'qty_min' => 0,
-        ]
-    );
+    $stockKey1 = [
+        'product_id' => $product->id,
+        'rak_id' => $successRak->id,
+    ];
+    if (Schema::hasColumn('inventory_stocks', 'warehouse_id')) {
+        $stockKey1['warehouse_id'] = $successWarehouse->id;
+    }
+    InventoryStock::updateOrCreate($stockKey1, [
+        'qty_available' => 10,
+        'qty_reserved' => 0,
+        'qty_min' => 0,
+    ]);
 
-    InventoryStock::updateOrCreate(
-        [
-            'product_id' => $product->id,
-            'warehouse_id' => $failedWarehouse->id,
-            'rak_id' => $failedRak->id,
-        ],
-        [
-            'qty_available' => 3,
-            'qty_reserved' => 0,
-            'qty_min' => 0,
-        ]
-    );
+    $stockKey2 = [
+        'product_id' => $product->id,
+        'rak_id' => $failedRak->id,
+    ];
+    if (Schema::hasColumn('inventory_stocks', 'warehouse_id')) {
+        $stockKey2['warehouse_id'] = $failedWarehouse->id;
+    }
+    InventoryStock::updateOrCreate($stockKey2, [
+        'qty_available' => 3,
+        'qty_reserved' => 0,
+        'qty_min' => 0,
+    ]);
 
     $successAdjustment = StockAdjustment::withTrashed()->firstOrCreate(
         ['adjustment_number' => 'ADJ-PW-APPROVE-001'],
         [
             'adjustment_date' => now()->toDateString(),
-            'warehouse_id' => $successWarehouse->id,
             'adjustment_type' => 'increase',
             'reason' => 'Playwright approval success fixture',
             'status' => 'draft',
@@ -118,9 +117,8 @@ DB::transaction(function () {
     if ($successAdjustment->trashed()) {
         $successAdjustment->restore();
     }
-    $successAdjustment->update([
+    $updateData1 = [
         'adjustment_date' => now()->toDateString(),
-        'warehouse_id' => $successWarehouse->id,
         'adjustment_type' => 'increase',
         'reason' => 'Playwright approval success fixture',
         'notes' => 'Playwright stock adjustment approval success case',
@@ -128,7 +126,11 @@ DB::transaction(function () {
         'created_by' => $user->id,
         'approved_by' => null,
         'approved_at' => null,
-    ]);
+    ];
+    if (Schema::hasColumn('stock_adjustments', 'warehouse_id')) {
+        $updateData1['warehouse_id'] = $successWarehouse->id;
+    }
+    $successAdjustment->update($updateData1);
 
     StockMovement::query()
         ->where('from_model_type', StockAdjustment::class)
@@ -153,7 +155,6 @@ DB::transaction(function () {
         ['adjustment_number' => 'ADJ-PW-FAIL-001'],
         [
             'adjustment_date' => now()->toDateString(),
-            'warehouse_id' => $failedWarehouse->id,
             'adjustment_type' => 'decrease',
             'reason' => 'Playwright approval failure fixture',
             'status' => 'draft',
@@ -163,9 +164,8 @@ DB::transaction(function () {
     if ($failedAdjustment->trashed()) {
         $failedAdjustment->restore();
     }
-    $failedAdjustment->update([
+    $updateData2 = [
         'adjustment_date' => now()->toDateString(),
-        'warehouse_id' => $failedWarehouse->id,
         'adjustment_type' => 'decrease',
         'reason' => 'Playwright approval failure fixture',
         'notes' => 'Playwright stock adjustment approval failure case',
@@ -173,7 +173,11 @@ DB::transaction(function () {
         'created_by' => $user->id,
         'approved_by' => null,
         'approved_at' => null,
-    ]);
+    ];
+    if (Schema::hasColumn('stock_adjustments', 'warehouse_id')) {
+        $updateData2['warehouse_id'] = $failedWarehouse->id;
+    }
+    $failedAdjustment->update($updateData2);
 
     StockMovement::query()
         ->where('from_model_type', StockAdjustment::class)

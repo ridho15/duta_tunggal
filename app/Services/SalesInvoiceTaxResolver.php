@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\SaleOrder;
+use App\Models\TaxSetting;
 
 class SalesInvoiceTaxResolver
 {
@@ -31,7 +32,16 @@ class SalesInvoiceTaxResolver
         } elseif ($resolvedTaxRate > 0) {
             $resolvedTaxType = 'Eksklusif';
         } else {
+            // If items indicate an exclusive tax type but rate is missing/zero,
+            // fall back to active tax setting rate for PPN.
             $resolvedTaxType = 'None';
+            if ($firstTaxType !== null) {
+                $normalized = strtolower(trim((string) $firstTaxType));
+                if (in_array($normalized, ['eksklusif', 'ekslusif', 'eklusif', 'exclusive'], true)) {
+                    $resolvedTaxRate = (float) TaxSetting::activeRate('PPN');
+                    $resolvedTaxType = SalesInvoiceResource::normalizeInvoiceTaxTypeValue((string) $firstTaxType);
+                }
+            }
         }
 
         return [
