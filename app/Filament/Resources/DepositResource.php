@@ -131,8 +131,8 @@ class DepositResource extends Resource
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 try {
                                     $usedAmount   = $get('used_amount') ?? 0;
-                                    $parsedAmount = MoneyHelper::parse($state);
-                                    $parsedUsed   = MoneyHelper::parse($usedAmount);
+                                    $parsedAmount = MoneyHelper::safeParse($state);
+                                    $parsedUsed   = MoneyHelper::safeParse($usedAmount);
                                     $set('remaining_amount', $parsedAmount - $parsedUsed);
                                 } catch (\Exception $e) {
                                     \Illuminate\Support\Facades\Log::error('Deposit amount calculation error: ' . $e->getMessage(), [
@@ -250,7 +250,7 @@ class DepositResource extends Resource
                 Hidden::make('used_amount')->default(0),
                 Hidden::make('remaining_amount')
                     ->default(function ($get) {
-                        return \App\Helpers\MoneyHelper::parse($get('amount') ?? 0);
+                        return \App\Helpers\MoneyHelper::safeParse($get('amount') ?? 0);
                     }),
                 Hidden::make('status')->default(true),
             ]);
@@ -489,11 +489,11 @@ class DepositResource extends Resource
                         return $query
                             ->when(
                                 $data['amount_from'],
-                                fn(Builder $query, $amount): Builder => $query->where('amount', '>=', \App\Helpers\MoneyHelper::parse($amount)),
+                                fn(Builder $query, $amount): Builder => $query->where('amount', '>=', \App\Helpers\MoneyHelper::safeParse($amount)),
                             )
                             ->when(
                                 $data['amount_to'],
-                                fn(Builder $query, $amount): Builder => $query->where('amount', '<=', \App\Helpers\MoneyHelper::parse($amount)),
+                                fn(Builder $query, $amount): Builder => $query->where('amount', '<=', \App\Helpers\MoneyHelper::safeParse($amount)),
                             );
                     }),
 
@@ -543,7 +543,7 @@ class DepositResource extends Resource
                                             ->required()
                                             ->rules([function () {
                                                 return function ($attribute, $value, $fail) {
-                                                    $parsed = \App\Helpers\MoneyHelper::parse($value);
+                                                    $parsed = \App\Helpers\MoneyHelper::safeParse($value);
                                                     if ($parsed < 1) {
                                                         $fail('Total penambahan saldo minimal Rp 1.');
                                                     }
@@ -560,7 +560,7 @@ class DepositResource extends Resource
                             ];
                         })
                         ->action(function (array $data, $record) {
-                            $amount = \App\Helpers\MoneyHelper::parse($data['amount'] ?? 0);
+                            $amount = \App\Helpers\MoneyHelper::safeParse($data['amount'] ?? 0);
 
                             $record->amount += $amount;
                             $record->remaining_amount += $amount;
@@ -596,7 +596,7 @@ class DepositResource extends Resource
                                             ->required()
                                             ->rules([function () {
                                                 return function ($attribute, $value, $fail) {
-                                                    $parsed = \App\Helpers\MoneyHelper::parse($value);
+                                                    $parsed = \App\Helpers\MoneyHelper::safeParse($value);
                                                     if ($parsed < 1) {
                                                         $fail('Total pengurangan saldo minimal Rp 1.');
                                                     }
@@ -616,14 +616,14 @@ class DepositResource extends Resource
                             ];
                         })
                         ->action(function (array $data, $record) {
-                            $amount = \App\Helpers\MoneyHelper::parse($data['amount'] ?? 0);
+                            $amount = \App\Helpers\MoneyHelper::safeParse($data['amount'] ?? 0);
 
                             // Validate that reduction amount doesn't exceed remaining balance
                             if ($amount > $record->remaining_amount) {
                                 HelperController::sendNotification(
                                     isSuccess: false,
                                     title: 'Error',
-                                    message: 'Jumlah pengurangan tidak boleh melebihi sisa saldo deposit (Rp ' . number_format($record->remaining_amount, 0, ',', '.') . ')'
+                                    message: 'Jumlah pengurangan tidak boleh melebihi sisa saldo deposit (' . MoneyHelper::rupiah($record->remaining_amount) . ')'
                                 );
                                 return;
                             }

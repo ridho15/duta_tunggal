@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Helpers\MoneyHelper;
 use App\Models\User;
 use App\Models\Cabang;
 use App\Models\Product;
@@ -45,8 +46,7 @@ class MultiSupplierTest extends TestCase
     #[Test]
     public function product_can_have_multiple_suppliers()
     {
-        $product = Product::factory()->create([
-            'cabang_id' => $this->cabang->id,
+        $product = Product::factory()->forCabang($this->cabang)->create([
             'supplier_id' => $this->supplier1->id,
         ]);
 
@@ -67,8 +67,8 @@ class MultiSupplierTest extends TestCase
     #[Test]
     public function supplier_can_have_multiple_products()
     {
-        $product1 = Product::factory()->create(['cabang_id' => $this->cabang->id]);
-        $product2 = Product::factory()->create(['cabang_id' => $this->cabang->id]);
+        $product1 = Product::factory()->forCabang($this->cabang)->create();
+        $product2 = Product::factory()->forCabang($this->cabang)->create();
 
         $this->supplier1->productSuppliers()->attach($product1->id, [
             'supplier_price' => 10000,
@@ -88,9 +88,7 @@ class MultiSupplierTest extends TestCase
     #[Test]
     public function product_supplier_pivot_stores_additional_data()
     {
-        $product = Product::factory()->create([
-            'cabang_id' => $this->cabang->id,
-        ]);
+        $product = Product::factory()->forCabang($this->cabang)->create();
 
         $product->suppliers()->attach($this->supplier1->id, [
             'supplier_price' => 12500,
@@ -101,5 +99,20 @@ class MultiSupplierTest extends TestCase
         $this->assertEquals(12500, $pivot->supplier_price);
 
         echo "✓ Test passed: Product-Supplier pivot stores supplier price\n";
+    }
+
+    #[Test]
+    public function product_supplier_price_keeps_two_decimal_money_format()
+    {
+        $product = Product::factory()->forCabang($this->cabang)->create();
+
+        $product->suppliers()->attach($this->supplier1->id, [
+            'supplier_price' => MoneyHelper::safeParse('92.550,52'),
+        ]);
+
+        $pivot = $product->suppliers()->first()->pivot;
+
+        $this->assertSame(92550.52, (float) $pivot->supplier_price);
+        $this->assertSame('Rp 92.550,52', MoneyHelper::rupiah($pivot->supplier_price));
     }
 }

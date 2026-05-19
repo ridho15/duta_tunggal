@@ -6,6 +6,7 @@ use App\Filament\Resources\PurchaseOrderResource;
 use App\Http\Controllers\HelperController;
 use App\Models\Asset;
 use App\Models\ChartOfAccount;
+use App\Support\CurrencyConversionResolver;
 use App\Support\ProcurementFailureNotifier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -255,12 +256,48 @@ class ViewPurchaseOrder extends ViewRecord
         $total = 0;
 
         if ($record) {
+            if (! empty($data['purchaseOrderItem']) && is_array($data['purchaseOrderItem'])) {
+                foreach ($data['purchaseOrderItem'] as &$item) {
+                    $item['tipe_pajak'] = \App\Filament\Resources\PurchaseOrderResource::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+                    $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+                    $preview = \App\Filament\Resources\PurchaseOrderResource::calculateCurrencyPreview(
+                        (float) ($item['quantity'] ?? 0),
+                        (float) ($item['unit_price'] ?? 0),
+                        (float) ($item['discount'] ?? 0),
+                        (float) ($item['tax'] ?? 0),
+                        $item['tipe_pajak'],
+                        $currencyId
+                    );
+                    $item['subtotal'] = \App\Filament\Resources\PurchaseOrderResource::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
+                }
+                unset($item);
+            }
+
+            $record->loadMissing('purchaseOrderCurrency');
+            $poCurrencies = $record->purchaseOrderCurrency->keyBy('currency_id');
+
             foreach ($record->purchaseOrderItem as $item) {
-                $total += HelperController::hitungSubtotal((int)$item->quantity, (int)$item->unit_price, (int)$item->discount, (int)$item->tax, $item->tipe_pajak);
+                $subtotal = HelperController::hitungSubtotal(
+                    (float) $item->quantity,
+                    (float) $item->unit_price,
+                    (float) $item->discount,
+                    (float) $item->tax,
+                    $item->tipe_pajak
+                );
+                $poCurrency = $poCurrencies->get($item->currency_id);
+                $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
+                    ? (float) $poCurrency->nominal
+                    : CurrencyConversionResolver::resolveRate(is_numeric($item->currency_id) ? (int) $item->currency_id : null);
+
+                $total += $subtotal * $rate;
             }
 
             foreach ($record->purchaseOrderBiaya as $biaya) {
-                $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
+                $poCurrency = $poCurrencies->get($biaya->currency_id);
+                $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
+                    ? (float) $poCurrency->nominal
+                    : CurrencyConversionResolver::resolveRate(is_numeric($biaya->currency_id) ? (int) $biaya->currency_id : null);
+                $biayaAmount = (float) $biaya->total * $rate;
                 $total += $biayaAmount;
             }
         }

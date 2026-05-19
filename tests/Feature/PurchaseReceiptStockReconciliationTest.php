@@ -31,7 +31,7 @@ function buildPostedPurchaseReceiptFixture(): array
     $supplier = Supplier::factory()->create();
     $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
     $currency = Currency::factory()->create(['code' => 'IDR', 'to_rupiah' => 1]);
-    $product = Product::factory()->create(['cabang_id' => $cabang->id]);
+    $product = Product::factory()->forCabang($cabang)->create();
 
     $inventoryCoa = ChartOfAccount::firstOrCreate(['code' => '1140.01'], ['name' => 'Persediaan Bahan Baku', 'type' => 'Asset', 'is_active' => true]);
     $temporaryProcurementCoa = ChartOfAccount::firstOrCreate(['code' => '1400.01'], ['name' => 'Pos Sementara Produksi', 'type' => 'Asset', 'is_active' => true]);
@@ -45,10 +45,8 @@ function buildPostedPurchaseReceiptFixture(): array
 
     $purchaseOrder = PurchaseOrder::factory()->create([
         'supplier_id' => $supplier->id,
-        'warehouse_id' => $warehouse->id,
         'status' => 'approved',
         'created_by' => $user->id,
-        'cabang_id' => $cabang->id,
     ]);
 
     $poItem = PurchaseOrderItem::factory()->create([

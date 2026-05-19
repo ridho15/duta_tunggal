@@ -23,7 +23,7 @@ class CreatePurchaseOrder extends CreateRecord
     {
         $data['created_by'] = Auth::id();
         $data['status']     = 'draft'; // PO dimulai dari draft, perlu disetujui manual
-        return $data;
+        return PurchaseOrderResource::syncPurchaseOrderCurrencyData($data);
     }
 
     protected function afterCreate()

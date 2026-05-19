@@ -71,7 +71,7 @@ class VendorPaymentResource extends Resource
                                             ->with('supplier')
                                             ->get()
                                             ->mapWithKeys(function ($pr) {
-                                                return [$pr->id => "{$pr->request_number} - {$pr->supplier->perusahaan} (Rp " . number_format($pr->total_amount, 0, ',', '.') . ")"];
+                                                return [$pr->id => "{$pr->request_number} - {$pr->supplier->perusahaan} (" . MoneyHelper::rupiah($pr->total_amount) . ")"];
                                             });
                                     })
                                     ->searchable()
@@ -189,7 +189,7 @@ class VendorPaymentResource extends Resource
 
                                                 $invDate = $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : '-';
                                                 $dueDate = $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-';
-                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.') . " - Due: {$dueDate}" . $statusText;
+                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: " . MoneyHelper::rupiah($invoice->total) . " - Sisa: " . MoneyHelper::rupiah($remaining) . " - Due: {$dueDate}" . $statusText;
                                             }
 
                                             $set('has_invoices', !empty($options));
@@ -408,15 +408,15 @@ class VendorPaymentResource extends Resource
                                             ->reactive()
                                             ->required()
                                             ->helperText(fn ($get) => $get('remaining_amount')
-                                                ? 'Maks: Rp ' . number_format(\App\Helpers\MoneyHelper::parse($get('remaining_amount') ?? 0), 0, ',', '.')
+                                                ? 'Maks: ' . MoneyHelper::rupiah($get('remaining_amount') ?? 0)
                                                 : null
                                             )
                                             ->rules([function (Get $get) {
                                                 return function ($attribute, $value, $fail) use ($get) {
-                                                    $remaining = \App\Helpers\MoneyHelper::parse($get('remaining_amount') ?? 0);
-                                                    $paid = \App\Helpers\MoneyHelper::parse($value ?? 0);
+                                                    $remaining = \App\Helpers\MoneyHelper::safeParse($get('remaining_amount') ?? 0);
+                                                    $paid = \App\Helpers\MoneyHelper::safeParse($value ?? 0);
                                                     if ($paid > $remaining + 0.01) { // 0.01 tolerance for float rounding
-                                                        $fail('Jumlah pembayaran tidak boleh melebihi sisa hutang (Rp ' . number_format($remaining, 0, ',', '.') . ').');
+                                                        $fail('Jumlah pembayaran tidak boleh melebihi sisa hutang (' . MoneyHelper::rupiah($remaining) . ').');
                                                     }
                                                 };
                                             }])
@@ -441,9 +441,9 @@ class VendorPaymentResource extends Resource
                                                     foreach ($paymentDetails as $detail) {
                                                         $amount = 0;
                                                         if (is_array($detail) && isset($detail['payment_amount'])) {
-                                                            $amount = \App\Helpers\MoneyHelper::parse($detail['payment_amount'] ?? 0);
+                                                            $amount = \App\Helpers\MoneyHelper::safeParse($detail['payment_amount'] ?? 0);
                                                         } elseif (is_object($detail) && isset($detail->payment_amount)) {
-                                                            $amount = \App\Helpers\MoneyHelper::parse($detail->payment_amount ?? 0);
+                                                            $amount = \App\Helpers\MoneyHelper::safeParse($detail->payment_amount ?? 0);
                                                         }
                                                         $totalPayment += $amount;
                                                     }
@@ -544,7 +544,7 @@ class VendorPaymentResource extends Resource
                                 Placeholder::make('calculating_total')
                                     ->label('Total Pembayaran')
                                     ->content('Menghitung total pembayaran...')
-                                    ->visible(fn($get) => !empty($get('selected_invoices')) && MoneyHelper::parse($get('total_payment') ?? 0) === 0.0)
+                                    ->visible(fn($get) => !empty($get('selected_invoices')) && MoneyHelper::safeParse($get('total_payment') ?? 0) === 0.0)
                                     ->columnSpan(1),
 
                                 TextInput::make('total_payment')
@@ -554,7 +554,7 @@ class VendorPaymentResource extends Resource
                                     ->reactive()
                                     ->readOnly() // Make it read-only since it's calculated automatically
                                     ->default(0)
-                                    ->visible(fn($get) => MoneyHelper::parse($get('total_payment') ?? 0) > 0)
+                                    ->visible(fn($get) => MoneyHelper::safeParse($get('total_payment') ?? 0) > 0)
                                     ->extraAttributes([
                                         'class' => 'auto-calculated-field',
                                         'data-field' => 'total_payment'
@@ -671,7 +671,7 @@ class VendorPaymentResource extends Resource
 
     private static function formatMoneyState($value): string
     {
-        return number_format((float) MoneyHelper::parse($value ?? 0), 0, ',', '.');
+        return number_format((float) MoneyHelper::safeParse($value ?? 0), 2, ',', '.');
     }
 
     public static function calculateSelectedInvoiceTotal($invoices): float
@@ -684,11 +684,11 @@ class VendorPaymentResource extends Resource
         $accountPayable = $invoice->accountPayable;
 
         if ($invoice->relationLoaded('accountPayable') && $accountPayable?->getKey()) {
-            return max(0, (float) MoneyHelper::parse($accountPayable->remaining ?? 0));
+            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining ?? 0));
         }
 
         if ($accountPayable?->getKey()) {
-            return max(0, (float) MoneyHelper::parse($accountPayable->remaining ?? 0));
+            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining ?? 0));
         }
 
         $paidTotal = (float) VendorPaymentDetail::query()
@@ -696,7 +696,7 @@ class VendorPaymentResource extends Resource
             ->selectRaw('COALESCE(SUM(amount + COALESCE(adjustment_amount, 0)), 0) as paid_total')
             ->value('paid_total');
 
-        return max(0, (float) MoneyHelper::parse($invoice->total ?? 0) - $paidTotal);
+        return max(0, (float) MoneyHelper::safeParse($invoice->total ?? 0) - $paidTotal);
     }
 
     private static function buildInvoicePaymentSnapshot($invoices)
@@ -715,10 +715,10 @@ class VendorPaymentResource extends Resource
             ->pluck('paid_total', 'invoice_id');
 
         return $invoiceCollection->map(function ($invoice) use ($fallbackPaidTotals) {
-            $totalAmount = (float) MoneyHelper::parse($invoice->total ?? 0);
+            $totalAmount = (float) MoneyHelper::safeParse($invoice->total ?? 0);
             $accountPayable = $invoice->accountPayable;
             $remainingAmount = $accountPayable?->getKey()
-                ? max(0, (float) MoneyHelper::parse($accountPayable->remaining ?? 0))
+                ? max(0, (float) MoneyHelper::safeParse($accountPayable->remaining ?? 0))
                 : max(0, $totalAmount - (float) ($fallbackPaidTotals[$invoice->id] ?? 0));
 
             return [

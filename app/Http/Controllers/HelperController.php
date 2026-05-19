@@ -903,25 +903,12 @@ class HelperController extends Controller
                     $integer = implode('', $parts);
                     $integer = str_replace(',', '', $integer);
                 }
-            } else {
-                // Comma comes after dot - likely Indonesian format (dots as thousand sep, comma as decimal)
-                // Example: 125.000.000,50
-                $parts = explode(',', $cleaned);
-                if (count($parts) === 2) {
-                    $integer = str_replace('.', '', $parts[0]);
-                    $decimal = $parts[1];
-                } else {
-                    // Multiple commas - take last part as decimal
-                    $decimal = array_pop($parts);
-                    $integer = implode('', $parts);
-                    $integer = str_replace('.', '', $integer);
                 }
-            }
-        } elseif ($hasComma) {
             // Only commas - could be Western thousand separators or Indonesian decimal
             $parts = explode(',', $cleaned);
-            if (count($parts) === 2 && strlen($parts[1]) <= 2) {
-                // Likely Western format: 125,000,000 (no decimal) or 125,000,000.50 (handled above)
+            if (count($parts) === 2 && preg_match('/^\d+$/', $parts[1])) {
+                // Indonesian decimal separator, including high precision
+                // values used for non-IDR currency input states.
                 $integer = str_replace(',', '', $parts[0]);
                 $decimal = $parts[1];
             } else {
@@ -931,13 +918,32 @@ class HelperController extends Controller
             }
         } elseif ($hasDot) {
             // Only dots - could be Indonesian thousand separators or decimal
-            if (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
-                // Ends with .digits (1-3 digits) - likely decimal part
+            $dotCount = substr_count($cleaned, '.');
+            if ($dotCount === 1) {
+                $parts = explode('.', $cleaned);
+                $fraction = $parts[1] ?? '';
+                // If fraction has 3 or more digits, it's very likely a thousands separator
+                // e.g. '27.500' -> 27500. Treat as thousands.
+                if (strlen($fraction) > 2) {
+                    $integer = str_replace('.', '', $cleaned);
+                    $decimal = '0';
+                } elseif (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
+                    // Ends with .X or .XX  → decimal separator
+                    $decimal = $matches[1];
+                    $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
+                    $integer = str_replace('.', '', $integer);
+                } else {
+                    // Fallback: treat single dot as thousands separator
+                    $integer = str_replace('.', '', $cleaned);
+                    $decimal = '0';
+                }
+            } elseif (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
+                // Ends with .X or .XX  → decimal separator
                 $decimal = $matches[1];
-                $integer = preg_replace('/\.\d{1,3}$/', '', $cleaned);
-                $integer = str_replace('.', '', $integer);
+                $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
+                $integer = str_replace('.', '', $integer); // clear any remaining thousand dots
             } else {
-                // All dots are thousand separators
+                // Multiple dots or other patterns → Indonesian thousands separator
                 $integer = str_replace('.', '', $cleaned);
                 $decimal = '0';
             }
@@ -955,8 +961,9 @@ class HelperController extends Controller
 
     public static function hitungSubtotal($quantity, $unit_price, $discount, $tax, $taxType = null)
     {
-        // Normalize unit price if passed as formatted string (contains dot thousand separators)
-        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
+        // Normalize only human-formatted money strings. Raw DB decimals like
+        // "10000.0000000000" must stay numeric after high-precision migrations.
+        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price) && ! preg_match('/^\d+\.\d{3,}$/', trim($unit_price))) {
             $parsed = self::parseIndonesianMoney($unit_price);
             $unit_price = $parsed;
         }
@@ -975,37 +982,23 @@ class HelperController extends Controller
         $discountAmount = $subtotal * ($discount / 100);
         $afterDiscount = $subtotal - $discountAmount;
 
-        // Use centralized tax service
-        $rate = $tax; // expecting percent, e.g., 12 for 12%
-        try {
-            // Lazy import to avoid circular deps in some contexts
-            $service = \App\Services\TaxService::class;
-            $result = $service::compute($afterDiscount, $rate, $taxType);
-            $final = round($result['total'], 2);
-            return $final;
-        } catch (\Throwable $e) {
-            // Log the error so it is not silently swallowed (guarded for unit-test contexts without app bootstrap)
-            if (function_exists('app') && app()->bound('log')) {
-                \Illuminate\Support\Facades\Log::error('hitungSubtotal: TaxService exception, falling back to exclusive', [
-                    'quantity'   => $quantity,
-                    'unit_price' => $unit_price,
-                    'discount'   => $discount,
-                    'tax'        => $tax,
-                    'taxType'    => $taxType,
-                    'error'      => $e->getMessage(),
-                ]);
-            }
-            // Fallback: previous behavior (exclusive)
-            $tax_amount = $afterDiscount * $rate / 100.0;
-            $total = $afterDiscount + $tax_amount;
-            $final = round($total, 2);
-            return $final;
-        }
+        $normalizedTaxType = strtolower(trim((string) $taxType));
+        $normalizedTaxType = match ($normalizedTaxType) {
+            'inklusif', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
+            default => 'eksklusif',
+        };
+
+        $taxAmount = round($afterDiscount * ($tax / 100.0), 2);
+
+        return in_array($normalizedTaxType, ['inklusif', 'none'], true)
+            ? round($afterDiscount, 2)
+            : round($afterDiscount + $taxAmount, 2);
     }
 
     public static function hitungTaxNominal($quantity, $unit_price, $discount, $tax, $taxType = null)
     {
-        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
+        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price) && ! preg_match('/^\d+\.\d{3,}$/', trim($unit_price))) {
             $unit_price = self::parseIndonesianMoney($unit_price);
         }
 
@@ -1017,24 +1010,12 @@ class HelperController extends Controller
 
         $baseAmount = $quantity * $unit_price * (1 - ($discount / 100));
 
-        try {
-            $service = \App\Services\TaxService::class;
-            $result = $service::compute($baseAmount, $tax, $taxType);
-            return round((float) ($result['ppn'] ?? 0), 2);
-        } catch (\Throwable $e) {
-            if (function_exists('app') && app()->bound('log')) {
-                \Illuminate\Support\Facades\Log::error('hitungTaxNominal: TaxService exception, falling back to exclusive', [
-                    'quantity'   => $quantity,
-                    'unit_price' => $unit_price,
-                    'discount'   => $discount,
-                    'tax'        => $tax,
-                    'taxType'    => $taxType,
-                    'error'      => $e->getMessage(),
-                ]);
-            }
-
-            return round($baseAmount * ($tax / 100.0), 2);
+        $normalizedTaxType = strtolower(trim((string) $taxType));
+        if (in_array($normalizedTaxType, ['none', 'non pajak', 'non-pajak', 'nonpajak'], true)) {
+            return 0.0;
         }
+
+        return round($baseAmount * ($tax / 100.0), 2);
     }
 
     public static function sendNotification($isSuccess = false, $title = "", $message = "")

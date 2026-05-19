@@ -156,7 +156,7 @@ class Invoice extends Model
             return null;
         }
 
-        return (float) MoneyHelper::parse($value);
+        return (float) MoneyHelper::safeParse($value);
     }
 
     public function setSubtotalAttribute(mixed $value): void

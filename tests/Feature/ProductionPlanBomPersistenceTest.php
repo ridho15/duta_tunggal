@@ -74,7 +74,7 @@ test('production plan keeps the selected bom on create', function () {
         'status' => true,
     ]);
 
-    $finishedProduct = Product::factory()->create([
+    $finishedProduct = Product::factory()->forCabang($cabang)->create([
         'name' => 'Finished Product BOM Persist',
         'sku' => 'FG-PP-BOM-001',
         'cabang_id' => $cabang->id,
@@ -176,7 +176,7 @@ test('production plan edit keeps cabang product uom and warehouse synchronized w
         'status' => true,
     ]);
 
-    $finishedProductA = Product::factory()->create([
+    $finishedProductA = Product::factory()->forCabang($cabangA)->create([
         'name' => 'Finished Product Edit A',
         'sku' => 'FG-PP-EDIT-A',
         'cabang_id' => $cabangA->id,
@@ -185,7 +185,7 @@ test('production plan edit keeps cabang product uom and warehouse synchronized w
         'is_manufacture' => true,
     ]);
 
-    $finishedProductB = Product::factory()->create([
+    $finishedProductB = Product::factory()->forCabang($cabangB)->create([
         'name' => 'Finished Product Edit B',
         'sku' => 'FG-PP-EDIT-B',
         'cabang_id' => $cabangB->id,

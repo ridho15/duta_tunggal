@@ -35,8 +35,8 @@ class AddDepositAction
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $usedAmount = $get('used_amount') ?? 0;
-                                $parsed     = \App\Helpers\MoneyHelper::parse($state);
-                                $parsedUsed = \App\Helpers\MoneyHelper::parse($usedAmount);
+                                $parsed     = \App\Helpers\MoneyHelper::safeParse($state);
+                                $parsedUsed = \App\Helpers\MoneyHelper::safeParse($usedAmount);
                                 $set('remaining_amount', $parsed - $parsedUsed);
                             }),
 
@@ -47,8 +47,8 @@ class AddDepositAction
                             ->reactive()
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $totalAmount = $get('amount') ?? 0;
-                                $parsedTotal = \App\Helpers\MoneyHelper::parse($totalAmount);
-                                $parsedUsed  = \App\Helpers\MoneyHelper::parse($state);
+                                $parsedTotal = \App\Helpers\MoneyHelper::safeParse($totalAmount);
+                                $parsedUsed  = \App\Helpers\MoneyHelper::safeParse($state);
                                 $set('remaining_amount', $parsedTotal - $parsedUsed);
                             }),
                     ]),

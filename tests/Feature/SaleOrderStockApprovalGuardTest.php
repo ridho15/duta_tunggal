@@ -30,8 +30,7 @@ beforeEach(function () {
 
 function createSaleOrderWithShortage($customer, $category, $warehouse, $rak, int $createdByUserId): SaleOrder
 {
-    $product = Product::factory()->create([
-        'cabang_id' => $customer->cabang_id,
+    $product = Product::factory()->forCabang($customer->cabang_id)->create([
         'product_category_id' => $category->id,
         'uom_id' => 1,
         'is_active' => true,
@@ -73,8 +72,7 @@ function createSaleOrderWithShortage($customer, $category, $warehouse, $rak, int
 
 function createSaleOrderWithStock($customer, $category, $warehouse, $rak, int $createdByUserId): SaleOrder
 {
-    $product = Product::factory()->create([
-        'cabang_id' => $customer->cabang_id,
+    $product = Product::factory()->forCabang($customer->cabang_id)->create([
         'product_category_id' => $category->id,
         'uom_id' => 1,
         'is_active' => true,

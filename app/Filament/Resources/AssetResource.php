@@ -56,14 +56,12 @@ class AssetResource extends Resource
                             ->maxLength(50)
                             ->default(fn() => \App\Models\Asset::generateAssetCode())
                             ->validationMessages([
-                                'required' => 'Kode asset wajib diisi',
                                 'unique' => 'Kode asset sudah digunakan',
                                 'max' => 'Kode asset maksimal 50 karakter'
                             ]),
 
                         Forms\Components\TextInput::make('name')
                             ->label('Nama Barang')
-                            ->required()
                             ->maxLength(255)
                             ->columnSpanFull()
                             ->validationMessages([
@@ -81,7 +79,7 @@ class AssetResource extends Resource
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
                                         ->get()
                                         ->mapWithKeys(function ($cabang) {
-                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"]; 
                                         });
                                 }
 
@@ -102,7 +100,6 @@ class AssetResource extends Resource
                         Forms\Components\DatePicker::make('purchase_date')
                             ->label('Tanggal Beli')
                             ->required()
-                            ->default(now())
                             ->native(false)
                             ->validationMessages([
                                 'required' => 'Tanggal beli wajib diisi'
@@ -380,8 +377,8 @@ class AssetResource extends Resource
                         Forms\Components\Placeholder::make('depreciable_amount')
                             ->label('Nilai yang Dapat Disusutkan')
                             ->content(function (Get $get) {
-                                $purchaseCost = (float) MoneyHelper::parse($get('purchase_cost') ?? 0);
-                                $salvageValue = (float) MoneyHelper::parse($get('salvage_value') ?? 0);
+                                $purchaseCost = (float) MoneyHelper::safeParse($get('purchase_cost') ?? 0);
+                                $salvageValue = (float) MoneyHelper::safeParse($get('salvage_value') ?? 0);
                                 $depreciable = $purchaseCost - $salvageValue;
                                 return MoneyHelper::rupiah($depreciable);
                             }),
@@ -404,14 +401,14 @@ class AssetResource extends Resource
                         Forms\Components\Placeholder::make('annual_depreciation_display')
                             ->label('Penyusutan Per Tahun')
                             ->content(function (Get $get) {
-                                $annual = (float) MoneyHelper::parse($get('annual_depreciation') ?? 0);
+                                $annual = (float) MoneyHelper::safeParse($get('annual_depreciation') ?? 0);
                                 return MoneyHelper::rupiah($annual);
                             }),
 
                         Forms\Components\Placeholder::make('monthly_depreciation_display')
                             ->label('Penyusutan Per Bulan')
                             ->content(function (Get $get) {
-                                $monthly = (float) MoneyHelper::parse($get('monthly_depreciation') ?? 0);
+                                $monthly = (float) MoneyHelper::safeParse($get('monthly_depreciation') ?? 0);
                                 return MoneyHelper::rupiah($monthly);
                             }),
 
@@ -446,8 +443,8 @@ class AssetResource extends Resource
 
     protected static function calculateDepreciation(Get $get, Set $set): void
     {
-        $purchaseCost = (float) MoneyHelper::parse($get('purchase_cost') ?? 0);
-        $salvageValue = (float) MoneyHelper::parse($get('salvage_value') ?? 0);
+        $purchaseCost = (float) MoneyHelper::safeParse($get('purchase_cost') ?? 0);
+        $salvageValue = (float) MoneyHelper::safeParse($get('salvage_value') ?? 0);
         $usefulLife = (float) $get('useful_life_years') ?? 1;
         $depreciationMethod = $get('depreciation_method') ?? 'straight_line';
 
@@ -505,7 +502,7 @@ class AssetResource extends Resource
             isset($data['product_id']) && isset($data['depreciation_method']) &&
             isset($data['purchase_cost']) && isset($data['useful_life_years'])
         ) {
-            $purchaseCost = (float) MoneyHelper::parse($data['purchase_cost'] ?? 0);
+            $purchaseCost = (float) MoneyHelper::safeParse($data['purchase_cost'] ?? 0);
             if ($purchaseCost > 0) {
                 $data['salvage_value'] = number_format($purchaseCost * 0.05, 2, '.', '');
             }
@@ -548,7 +545,7 @@ class AssetResource extends Resource
     {
         $productId = $get('product_id');
         $depreciationMethod = $get('depreciation_method');
-        $purchaseCost = (float) MoneyHelper::parse($get('purchase_cost') ?? 0);
+        $purchaseCost = (float) MoneyHelper::safeParse($get('purchase_cost') ?? 0);
         $usefulLifeYears = (float) $get('useful_life_years') ?? 0;
 
         // Only calculate salvage value if all required fields are filled

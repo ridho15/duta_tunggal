@@ -97,7 +97,7 @@ beforeEach(function () {
         'cabang_id' => $this->cabang->id,
         'status' => 1,
     ]);
-    $this->product = Product::factory()->create([
+    $this->product = Product::factory()->forCabang($this->cabang)->create([
         'supplier_id' => $this->supplier->id,
         'cost_price' => 8500,
         'sell_price' => 13000,
@@ -150,7 +150,7 @@ test('purchase order can be created with non_ppn option', function () {
         'name' => 'Rupiah',
         'symbol' => 'Rp',
     ]);
-    $product = Product::factory()->create();
+    $product = Product::factory()->forCabang($warehouse->cabang_id)->create();
 
     $data = [
         'supplier_id' => $supplier->id,

@@ -216,7 +216,7 @@ class ManufacturingOrderResource extends Resource
                                             'Satuan %s%s | Cost Price %s',
                                             $uomName,
                                             $uomAbbreviation ? " ({$uomAbbreviation})" : '',
-                                            'Rp ' . number_format((float) $product->cost_price, 0, ',', '.')
+                                            \App\Helpers\MoneyHelper::rupiah($product->cost_price)
                                         );
                                     }),
                                 Placeholder::make('bom_summary')

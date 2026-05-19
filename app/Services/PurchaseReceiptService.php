@@ -12,7 +12,7 @@ use App\Models\StockMovement;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Models\Currency;
+use App\Support\JournalCurrencyAmountResolver;
 
 class PurchaseReceiptService
 {
@@ -33,6 +33,16 @@ class PurchaseReceiptService
             'status' => 'skipped',
             'message' => $message,
         ];
+    }
+
+    /**
+     * Resolve the receipt item's unit cost in IDR for ledger and stock valuation.
+     *
+     * @return array{raw_unit_price: float, currency_id: ?int, currency_code: ?string, exchange_rate: float, unit_price_idr: float}
+     */
+    protected function resolveReceiptItemUnitCostInIdr(PurchaseReceiptItem $item): array
+    {
+        return JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($item);
     }
 
     public function generateReceiptNumber()
@@ -58,7 +68,7 @@ class PurchaseReceiptService
         // For now, this method just validates the receipt structure
         // Individual item posting happens when items are sent to QC
 
-        $receipt->loadMissing([
+        $receipt->load([
             'purchaseReceiptItem.purchaseOrderItem',
             'purchaseReceiptItem.product',
             'purchaseReceiptBiaya.coa',
@@ -68,16 +78,18 @@ class PurchaseReceiptService
         $debugItems = [];
         foreach ($receipt->purchaseReceiptItem as $item) {
             $qtyAccepted = max(0, $item->qty_accepted ?? 0);
-            $poItem = $item->purchaseOrderItem;
-            $unitPrice = $poItem?->unit_price ?? 0;
+            $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
             $debugItems[] = [
                 'item_id' => $item->id,
                 'qtyAccepted' => $qtyAccepted,
-                'po_item_id' => $poItem?->id ?? null,
-                'unitPrice' => $unitPrice,
+                'po_item_id' => $item->purchaseOrderItem?->id ?? null,
+                'unitPrice' => $unitCost['unit_price_idr'],
+                'rawUnitPrice' => $unitCost['raw_unit_price'],
+                'currencyId' => $unitCost['currency_id'],
+                'exchangeRate' => $unitCost['exchange_rate'],
             ];
 
-            if ($qtyAccepted > 0 && $unitPrice > 0) {
+            if ($qtyAccepted > 0 && $unitCost['unit_price_idr'] > 0) {
                 $validItems++;
             }
         }
@@ -194,7 +206,8 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         $poItem = $item->purchaseOrderItem;
-        $unitPrice = $poItem?->unit_price ?? 0;
+        $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
+        $unitPrice = $unitCost['unit_price_idr'];
         $amount = round($qtyAccepted * $unitPrice, 2);
 
         $qc = $this->resolveCompletedQcForReceiptItem($item);
@@ -222,15 +235,16 @@ class PurchaseReceiptService
                 'qty_accepted' => $qtyAccepted,
             ]);
         }
-        $unitPrice = $poItem?->unit_price ?? 0;
         if ($unitPrice <= 0) {
             return $this->skipWithWarning('Invalid unit price', [
                 'item_id' => $item->id,
-                'unit_price' => $unitPrice,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitPrice,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
             ]);
         }
 
-        $amount = round($qtyAccepted * $unitPrice, 2);
         if ($amount <= 0) {
             return $this->skipWithWarning('Invalid amount', [
                 'item_id' => $item->id,
@@ -258,6 +272,9 @@ class PurchaseReceiptService
 
         $receiptRef = $item->purchaseReceipt?->receipt_number ?? ('PRI-' . $item->id);
         $entries = [];
+        $amountOriginalCurrency = $unitCost['exchange_rate'] > 0
+            ? round($amount / $unitCost['exchange_rate'], 4)
+            : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
         if (! $journalAlreadyPosted) {
             // Debit inventory account
@@ -274,6 +291,9 @@ class PurchaseReceiptService
                 'project_id' => $projectId,
                 'source_type' => PurchaseReceiptItem::class,
                 'source_id' => $item->id,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+                'amount_original_currency' => $amountOriginalCurrency,
             ]);
 
             // Credit unbilled purchase position (goods receipt / GRNI)
@@ -290,6 +310,9 @@ class PurchaseReceiptService
                 'project_id' => $projectId,
                 'source_type' => PurchaseReceiptItem::class,
                 'source_id' => $item->id,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+                'amount_original_currency' => $amountOriginalCurrency,
             ]);
 
             Log::info('postItemInventoryAfterQC: created journal entries', ['item_id' => $item->id, 'entries_count' => count($entries)]);
@@ -307,7 +330,11 @@ class PurchaseReceiptService
                 'purchase_receipt_id' => $item->purchase_receipt_id,
                 'purchase_receipt_item_id' => $item->id,
                 'unit_cost' => $unitPrice,
-                'currency' => optional($item->purchaseReceipt->currency)->code,
+                'unit_cost_idr' => $unitPrice,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'currency_id' => $unitCost['currency_id'],
+                'currency' => $unitCost['currency_code'],
+                'exchange_rate' => $unitCost['exchange_rate'],
                 'purchase_order_item_id' => $poItem?->id,
                 'receipt_number' => $item->purchaseReceipt->receipt_number,
             ];
@@ -513,11 +540,15 @@ class PurchaseReceiptService
         }
 
         $poItem = $item->purchaseOrderItem;
-        $unitPrice = $poItem?->unit_price ?? 0;
+        $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
+        $unitPrice = $unitCost['unit_price_idr'];
         if ($unitPrice <= 0) {
             return $this->skipWithWarning('Invalid unit price', [
                 'item_id' => $item->id,
-                'unit_price' => $unitPrice,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitPrice,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
             ]);
         }
 
@@ -549,6 +580,9 @@ class PurchaseReceiptService
         $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
 
         $entries = [];
+        $amountOriginalCurrency = $unitCost['exchange_rate'] > 0
+            ? round($amount / $unitCost['exchange_rate'], 4)
+            : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
         // Debit return/expense account
         $entries[] = JournalEntry::create([
@@ -564,6 +598,9 @@ class PurchaseReceiptService
             'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         // Credit temporary procurement position (close temporary procurement)
@@ -580,6 +617,9 @@ class PurchaseReceiptService
             'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         if (! $this->validateJournalBalance($entries)) {
@@ -717,12 +757,15 @@ class PurchaseReceiptService
             ]);
         }
 
-        $poItem = $item->purchaseOrderItem;
-        $unitPrice = $poItem?->unit_price ?? 0;
+        $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
+        $unitPrice = $unitCost['unit_price_idr'];
         if ($unitPrice <= 0) {
             return $this->skipWithWarning('Invalid unit price', [
                 'item_id' => $item->id,
-                'unit_price' => $unitPrice,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitPrice,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
             ]);
         }
 
@@ -763,6 +806,9 @@ class PurchaseReceiptService
         $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
         $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
         $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
+        $amountOriginalCurrency = $unitCost['exchange_rate'] > 0
+            ? round($amount / $unitCost['exchange_rate'], 4)
+            : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
         // Debit temporary procurement position
         $debitEntry = JournalEntry::create([
@@ -779,6 +825,9 @@ class PurchaseReceiptService
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
             'transaction_id' => $transactionId,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         // Credit unbilled purchase liability
@@ -796,6 +845,9 @@ class PurchaseReceiptService
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
             'transaction_id' => $transactionId,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         return ['status' => 'posted', 'entries' => [$debitEntry, $creditEntry]];
@@ -898,20 +950,37 @@ class PurchaseReceiptService
         $invoiceService = app(\App\Services\InvoiceService::class);
         $subtotal = 0;
         $invoiceItems = [];
+        
+        Log::info('createAutomaticInvoiceFromReceipt: starting', [
+            'receipt_id' => $receipt->id,
+            'item_count' => $receipt->purchaseReceiptItem->count(),
+            'items' => $receipt->purchaseReceiptItem->map(fn($i) => [
+                'id' => $i->id,
+                'qty_accepted' => (float) $i->qty_accepted,
+                'po_item_id' => $i->purchaseOrderItem?->id,
+            ])->toArray(),
+        ]);
 
         foreach ($receipt->purchaseReceiptItem as $receiptItem) {
-            if ($receiptItem->qty_accepted > 0) {
+            if ((float) $receiptItem->qty_accepted > 0) {
                 $poItem = $receiptItem->purchaseOrderItem;
-                $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+                
+                // Normalize unit price to IDR using currency conversion
+                $rawUnitPrice = (float) ($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+                $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+                $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
+                
                 $total = round($unitPrice * $receiptItem->qty_accepted, 2);
 
                 // Debug per-item calculation
                 Log::info('createAutomaticInvoiceFromReceipt: item calc', [
                     'receipt_item_id' => $receiptItem->id,
                     'po_item_id' => $poItem?->id,
+                    'raw_unit_price' => $rawUnitPrice,
+                    'unit_currency_id' => $unitCurrencyId,
+                    'converted_unit_price' => $unitPrice,
                     'tipe_pajak' => $poItem?->tipe_pajak,
                     'tax_rate' => $poItem?->tax,
-                    'unit_price' => $unitPrice,
                     'qty' => $receiptItem->qty_accepted,
                     'line_gross' => $total,
                 ]);
@@ -966,14 +1035,19 @@ class PurchaseReceiptService
         $taxableLineCount = 0;
 
         foreach ($receipt->purchaseReceiptItem as $receiptItem) {
-            if ($receiptItem->qty_accepted <= 0) {
+            if ((float) $receiptItem->qty_accepted <= 0) {
                 continue;
             }
 
             $acceptedLineCount++;
 
             $poItem = $receiptItem->purchaseOrderItem;
-            $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+            
+            // Normalize unit price to IDR using currency conversion
+            $rawUnitPrice = (float) ($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+            $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+            $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
+            
             $qty = $receiptItem->qty_accepted;
             $lineGross = round($unitPrice * $qty, 2);
             $rate = (float)($poItem->tax ?? 0);

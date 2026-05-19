@@ -5,6 +5,7 @@ $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 $now = now();
 $fixture = [
@@ -53,33 +54,44 @@ DB::transaction(function () use ($now, $fixture) {
         DB::table('delivery_orders')->where('id', $existingDo->id)->delete();
     }
 
-    $doId = DB::table('delivery_orders')->insertGetId([
+    $doRow = [
         'delivery_date' => $now,
         'driver_id' => null,
         'vehicle_id' => null,
-        'warehouse_id' => $warehouseId,
         'status' => 'approved',
         'notes' => 'Fixture for surat-jalan-select playwright test',
         'additional_cost' => 0,
         'additional_cost_description' => null,
         'created_by' => $user->id,
         'do_number' => $fixture['do_number'],
-        'cabang_id' => $user->cabang_id,
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
 
-    $sjId = DB::table('surat_jalans')->insertGetId([
+    if (Schema::hasColumn('delivery_orders', 'warehouse_id')) {
+        $doRow['warehouse_id'] = $warehouseId;
+    }
+    if (Schema::hasColumn('delivery_orders', 'cabang_id')) {
+        $doRow['cabang_id'] = $user->cabang_id;
+    }
+
+    $doId = DB::table('delivery_orders')->insertGetId($doRow);
+
+    $sjRow = [
         'sj_number' => $fixture['sj_number'],
         'issued_at' => $now,
         'signed_by' => null,
         'status' => 1,
         'created_by' => $user->id,
         'document_path' => null,
-        'cabang_id' => $user->cabang_id,
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
+    if (Schema::hasColumn('surat_jalans', 'cabang_id')) {
+        $sjRow['cabang_id'] = $user->cabang_id;
+    }
+
+    $sjId = DB::table('surat_jalans')->insertGetId($sjRow);
 
     DB::table('surat_jalan_delivery_orders')->insert([
         'surat_jalan_id' => $sjId,

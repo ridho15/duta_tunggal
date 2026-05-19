@@ -484,8 +484,9 @@ class DeliveryOrderFeatureTest extends TestCase
         $stockAfterApproved = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
-        $this->assertEquals(100, $stockAfterApproved->qty_available); // Gross stock remains until delivery completes
-        $this->assertEquals(20, $stockAfterApproved->qty_reserved); // +20
+        // Current behaviour moves available -> reserved on approval
+        $this->assertEquals(80, $stockAfterApproved->qty_available);
+        $this->assertEquals(20, $stockAfterApproved->qty_reserved);
 
         // 2. RESERVATION RELEASE: stock should be available again
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');

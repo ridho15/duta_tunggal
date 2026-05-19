@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockOpnameResource\RelationManagers;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Product;
 use App\Models\Rak;
 use Filament\Forms;
@@ -102,7 +103,7 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = \App\Helpers\MoneyHelper::parse($state ?? 0);
+                        $unitCost = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
                         $differenceValue = $differenceQty * $unitCost;
                         $set('difference_value', $differenceValue);
 
@@ -118,7 +119,7 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->default(0)
                     ->disabled()
                     ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : '')
                     ->helperText('Harga rata-rata berdasarkan riwayat pembelian'),
 
                 TextInput::make('difference_value')
@@ -126,14 +127,14 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->prefix('Rp')
                     ->disabled()
                     ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : ''),
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : ''),
 
                 TextInput::make('total_value')
                     ->label('Total Nilai')
                     ->prefix('Rp')
                     ->disabled()
                     ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) $state, 0, ',', '.') : '')
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : '')
                     ->helperText('Total nilai berdasarkan qty fisik × harga satuan'),
 
                 Textarea::make('notes')

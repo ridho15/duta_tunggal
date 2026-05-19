@@ -975,7 +975,7 @@ class QuotationResource extends Resource
                             $discountText = $discountItems->count() > 0
                                 ? "<strong>Discount:</strong> {$discountItems->count()} item memiliki discount"
                                 : '<strong>Discount:</strong> Tidak ada discount';
-                            $totalText = 'Rp ' . number_format($record->total_amount, 0, ',', '.');
+                            $totalText = \App\Helpers\MoneyHelper::rupiah($record->total_amount);
                             return new \Illuminate\Support\HtmlString(
                                 "<div class='text-sm space-y-1'><p>{$discountText}</p><p>{$tempoText}</p><p><strong>Total Penawaran:</strong> {$totalText}</p><p class='mt-2 text-success-600'>Dengan menyetujui, term discount dan tempo pembayaran ini akan resmi berlaku untuk Sales Order yang dibuat dari quotation ini.</p></div>"
                             );
@@ -1042,7 +1042,7 @@ class QuotationResource extends Resource
                                         ->content(fn($record) => $record->customer->name ?? '-'),
                                     Placeholder::make('total_amount')
                                         ->label('Total Amount')
-                                        ->content(fn($record) => 'Rp ' . number_format($record->total_amount, 0, ',', '.')),
+                                        ->content(fn($record) => \App\Helpers\MoneyHelper::rupiah($record->total_amount)),
                                     Placeholder::make('item_count')
                                         ->label('Jumlah Item')
                                         ->content(fn($record) => $record->quotationItem->count() . ' item(s)'),

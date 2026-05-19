@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SalesInvoiceResource\Pages;
+use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\Invoice;
 use App\Models\SaleOrder;
@@ -274,7 +275,7 @@ class SalesInvoiceResource extends Resource
                                         foreach ($deliveryOrders as $do) {
                                             $isInvoiced = in_array($do->id, $invoicedDOIds);
                                             $total = $do->total ?? 0;
-                                            $label = "{$do->do_number} - Rp. " . number_format($total, 0, ',', '.');
+                                            $label = "{$do->do_number} - " . MoneyHelper::rupiah($total);
 
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
@@ -562,7 +563,7 @@ class SalesInvoiceResource extends Resource
                                             ->reactive()
                                             ->afterStateUpdated(function ($set, $get) {
                                                 $quantity = (float) ($get('invoice_quantity') ?? 0);
-                                                $price = (float) \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
+                                                $price = (float) \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $set('total_price', $quantity * $price);
                                             })
                                             ->columnSpan(1),
@@ -583,7 +584,7 @@ class SalesInvoiceResource extends Resource
                                             ->reactive()
                                             ->afterStateUpdated(function ($set, $get) {
                                                 $quantity = (float) ($get('invoice_quantity') ?? 0);
-                                                $price = (float) \App\Helpers\MoneyHelper::parse($get('unit_price') ?? 0);
+                                                $price = (float) \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $set('total_price', $quantity * $price);
                                             })
                                             ->columnSpan(1),
@@ -617,7 +618,7 @@ class SalesInvoiceResource extends Resource
 
                                         foreach ($deliveryOrderItems as $item) {
                                             $quantity = (float) ($item['invoice_quantity'] ?? 0);
-                                            $price = (float) \App\Helpers\MoneyHelper::parse($item['unit_price'] ?? 0);
+                                            $price = (float) \App\Helpers\MoneyHelper::safeParse($item['unit_price'] ?? 0);
                                             $total = $quantity * $price;
 
                                             $invoiceItems[] = [
@@ -639,7 +640,7 @@ class SalesInvoiceResource extends Resource
                                         $tax = 0;
                                         $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
                                         $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                         $set('other_fee', $otherFeeTotal);
@@ -673,10 +674,10 @@ class SalesInvoiceResource extends Resource
                                     ->columns(2)
                                     ->defaultItems(0)
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $totalOtherFee = (float) collect($state ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                        $totalOtherFee = (float) collect($state ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
                                         $set('other_fee', $totalOtherFee);
 
-                                        $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
                                         $tax = 0;
                                         $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
@@ -720,9 +721,9 @@ class SalesInvoiceResource extends Resource
                                         // If None, set ppn_rate to 0
                                         if ($state === 'None') {
                                             $set('ppn_rate', 0);
-                                            $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
+                                            $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
                                             $otherFees = $get('other_fees') ?? [];
-                                            $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                            $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
                                             $set('total', $subtotal + $otherFeeTotal);
                                         } else {
                                             // Reapply active rate when PPN is enabled, but keep the field editable
@@ -742,9 +743,9 @@ class SalesInvoiceResource extends Resource
                                     ->visible(fn ($get) => $get('tipe_pajak') !== 'None')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $state = $state ?? 11; // Ensure it's not null, default to 11
-                                        $subtotal = (float) \App\Helpers\MoneyHelper::parse($get('subtotal') ?? 0);
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
                                         $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::parse($fee['amount'] ?? 0));
+                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
                                         $tax = 0;
                                         $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $state / 100);
                                         $set('total', $finalTotal);

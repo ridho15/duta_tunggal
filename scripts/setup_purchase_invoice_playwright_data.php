@@ -16,6 +16,7 @@ $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 $now = now();
 
@@ -84,12 +85,9 @@ DB::transaction(function () use ($now, $fixture) {
         DB::table('order_requests')->updateOrInsert(
             ['request_number' => $fixture['order_request_number']],
             [
-                'warehouse_id' => $warehouseId,
-                'cabang_id' => $cabangId,
                 'request_date' => now()->toDateString(),
                 'status' => 'approved',
                 'note' => 'Fixture order request for purchase invoice browser tests',
-                'tax_type' => 'PPN Excluded',
                 'created_by' => $userId,
                 'updated_at' => $now,
                 'created_at' => $now,
@@ -149,24 +147,26 @@ DB::transaction(function () use ($now, $fixture) {
     }
 
     // Create completed PO
-    DB::table('purchase_orders')->updateOrInsert(
-        ['po_number' => $fixture['po_number']],
-        [
-            'supplier_id' => $supplierId,
-            'order_date' => now()->toDateString(),
-            'status' => 'completed',
-            'expected_date' => now()->addDays(7)->toDateString(),
-            'total_amount' => 1000000,
-            'warehouse_id' => $warehouseId,
-            'tempo_hutang' => 30,
-            'created_by' => $userId,
-            'refer_model_type' => 'App\\Models\\OrderRequest',
-            'refer_model_id' => $orderRequestId,
-            'cabang_id' => $cabangId,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]
-    );
+    $poData = [
+        'supplier_id' => $supplierId,
+        'order_date' => now()->toDateString(),
+        'status' => 'completed',
+        'expected_date' => now()->addDays(7)->toDateString(),
+        'total_amount' => 1000000,
+        'tempo_hutang' => 30,
+        'created_by' => $userId,
+        'refer_model_type' => 'App\\Models\\OrderRequest',
+        'refer_model_id' => $orderRequestId,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ];
+    if (Schema::hasColumn('purchase_orders', 'warehouse_id')) {
+        $poData['warehouse_id'] = $warehouseId;
+    }
+    if (Schema::hasColumn('purchase_orders', 'cabang_id')) {
+        $poData['cabang_id'] = $cabangId;
+    }
+    DB::table('purchase_orders')->updateOrInsert(['po_number' => $fixture['po_number']], $poData);
     $poId = (int) DB::table('purchase_orders')->where('po_number', $fixture['po_number'])->value('id');
 
     $poItemId = DB::table('purchase_order_items')->insertGetId([
@@ -183,59 +183,71 @@ DB::transaction(function () use ($now, $fixture) {
     ]);
 
     // Receipt #1 (locked - already invoiced)
-    $receiptLockedId = DB::table('purchase_receipts')->insertGetId([
+    $receiptLockedRow = [
         'receipt_number' => $fixture['receipt_locked'],
         'purchase_order_id' => $poId,
         'receipt_date' => now()->toDateString(),
         'received_by' => $userId,
         'currency_id' => $currencyId,
         'status' => 'completed',
-        'cabang_id' => $cabangId,
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
+    if (Schema::hasColumn('purchase_receipts', 'cabang_id')) {
+        $receiptLockedRow['cabang_id'] = $cabangId;
+    }
+    $receiptLockedId = DB::table('purchase_receipts')->insertGetId($receiptLockedRow);
 
-    DB::table('purchase_receipt_items')->insert([
+    $pri1 = [
         'purchase_receipt_id' => $receiptLockedId,
         'purchase_order_item_id' => $poItemId,
         'product_id' => $productId,
         'qty_received' => 4,
         'qty_accepted' => 4,
         'qty_rejected' => 0,
-        'warehouse_id' => $warehouseId,
         'status' => 'completed',
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
+    if (Schema::hasColumn('purchase_receipt_items', 'warehouse_id')) {
+        $pri1['warehouse_id'] = $warehouseId;
+    }
+    DB::table('purchase_receipt_items')->insert($pri1);
 
     // Receipt #2 (open - selectable)
-    $receiptOpenId = DB::table('purchase_receipts')->insertGetId([
+    $receiptOpenRow = [
         'receipt_number' => $fixture['receipt_open'],
         'purchase_order_id' => $poId,
         'receipt_date' => now()->toDateString(),
         'received_by' => $userId,
         'currency_id' => $currencyId,
         'status' => 'completed',
-        'cabang_id' => $cabangId,
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
+    if (Schema::hasColumn('purchase_receipts', 'cabang_id')) {
+        $receiptOpenRow['cabang_id'] = $cabangId;
+    }
+    $receiptOpenId = DB::table('purchase_receipts')->insertGetId($receiptOpenRow);
 
-    DB::table('purchase_receipt_items')->insert([
+    $pri2 = [
         'purchase_receipt_id' => $receiptOpenId,
         'purchase_order_item_id' => $poItemId,
         'product_id' => $productId,
         'qty_received' => 6,
         'qty_accepted' => 6,
         'qty_rejected' => 0,
-        'warehouse_id' => $warehouseId,
         'status' => 'completed',
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
+    if (Schema::hasColumn('purchase_receipt_items', 'warehouse_id')) {
+        $pri2['warehouse_id'] = $warehouseId;
+    }
+    DB::table('purchase_receipt_items')->insert($pri2);
 
     // Existing invoice that locks receipt #1
-    $invoiceId = DB::table('invoices')->insertGetId([
+    $invoiceRow = [
         'invoice_number' => $fixture['invoice_number'],
         'from_model_type' => 'App\\Models\\PurchaseOrder',
         'from_model_id' => $poId,
@@ -252,10 +264,13 @@ DB::transaction(function () use ($now, $fixture) {
         'supplier_phone' => '081100000001',
         'purchase_receipts' => json_encode([$receiptLockedId]),
         'purchase_order_ids' => json_encode([$poId]),
-        'cabang_id' => $cabangId,
         'created_at' => $now,
         'updated_at' => $now,
-    ]);
+    ];
+    if (Schema::hasColumn('invoices', 'cabang_id')) {
+        $invoiceRow['cabang_id'] = $cabangId;
+    }
+    $invoiceId = DB::table('invoices')->insertGetId($invoiceRow);
 
     DB::table('invoice_items')->insert([
         'invoice_id' => $invoiceId,

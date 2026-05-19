@@ -7,9 +7,11 @@ use App\Models\Currency;
 use App\Models\CustomerReceipt;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderCurrency;
 use App\Models\SaleOrder;
+use App\Models\SaleOrderItem;
 use App\Models\VendorPayment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -132,39 +134,85 @@ class CurrencyFiveDollarVerificationTest extends TestCase
 
         $customer = \App\Models\Customer::factory()->create();
 
-        $so = SaleOrder::factory()->create([
-            'customer_id' => $customer->id,
-            'currency_id' => $this->usd->id,
-            'total_amount' => $expectedIdr,
-            'status' => 'approved',
-        ]);
-
-        // Required by InvoiceObserver for sales invoice posting path.
-        ChartOfAccount::create([
+        $arCoa = ChartOfAccount::create([
             'code' => '1120',
             'name' => 'Piutang Dagang Test',
             'type' => 'Asset',
             'is_active' => true,
         ]);
-        ChartOfAccount::create([
+        $revenueCoa = ChartOfAccount::create([
             'code' => '4000',
             'name' => 'Penjualan Test',
             'type' => 'Revenue',
             'is_active' => true,
         ]);
-
-        $invoice = Invoice::create([
-            'from_model_type' => SaleOrder::class,
-            'from_model_id' => $so->id,
-            'invoice_number' => 'INV-USD-5-SO',
-            'invoice_date' => now(),
-            'due_date' => now()->addDays(30),
-            'subtotal' => $expectedIdr,
-            'total' => $expectedIdr,
-            'status' => 'sent',
+        $bankCoa = ChartOfAccount::create([
+            'code' => '1112.01',
+            'name' => 'Kas/Bank Test',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+        $cogsCoa = ChartOfAccount::create([
+            'code' => '5100.10',
+            'name' => 'HPP Test',
+            'type' => 'Expense',
+            'is_active' => true,
+        ]);
+        $goodsDeliveryCoa = ChartOfAccount::create([
+            'code' => '1140.20',
+            'name' => 'Release Barang Test',
+            'type' => 'Asset',
+            'is_active' => true,
         ]);
 
+        $product = Product::factory()->create([
+            'cost_price' => 20000,
+            'sell_price' => $expectedIdr,
+            'sales_coa_id' => $revenueCoa->id,
+            'cogs_coa_id' => $cogsCoa->id,
+            'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
+        ]);
+
+        $so = SaleOrder::factory()->create([
+            'customer_id' => $customer->id,
+            'currency_id' => $this->usd->id,
+            'exchange_rate' => 16000,
+            'total_amount' => $expectedIdr,
+            'status' => 'approved',
+            'tipe_pengiriman' => 'Kirim Langsung',
+        ]);
+
+        SaleOrderItem::create([
+            'sale_order_id' => $so->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => $usdAmount,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'none',
+            'warehouse_id' => \App\Models\Warehouse::factory()->create()->id,
+            'rak_id' => \App\Models\Rak::factory()->create(['warehouse_id' => \App\Models\Warehouse::first()->id])->id,
+        ]);
+
+        $so->update(['status' => 'completed']);
+
+        $invoice = Invoice::where('from_model_type', SaleOrder::class)
+            ->where('from_model_id', $so->id)
+            ->firstOrFail();
+
         $this->assertEquals($expectedIdr, (float) $invoice->total);
+
+        $invoiceEntries = JournalEntry::where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->get();
+
+        $this->assertTrue($invoiceEntries->isNotEmpty(), 'Sales invoice should create journal entries');
+
+        $arEntry = $invoiceEntries->firstWhere('coa_id', $arCoa->id);
+        $this->assertNotNull($arEntry, 'Sales invoice should create an Accounts Receivable entry');
+        $this->assertEquals($expectedIdr, (float) $arEntry->debit);
+        $this->assertEquals($this->idr->id, $arEntry->currency_id);
+        $this->assertEquals($expectedIdr, (float) $arEntry->amount_original_currency);
 
         $receipt = CustomerReceipt::create([
             'invoice_id' => $invoice->id,
@@ -172,54 +220,23 @@ class CurrencyFiveDollarVerificationTest extends TestCase
             'selected_invoices' => [$invoice->id],
             'payment_date' => now(),
             'total_payment' => $expectedIdr,
-            'status' => 'draft',
+            'payment_method' => 'Cash',
+            'coa_id' => $bankCoa->id,
+            'status' => 'paid',
         ]);
 
         $this->assertEquals($expectedIdr, (float) $receipt->total_payment);
 
-        $coaInvoice = ChartOfAccount::create([
-            'code' => '9999.13',
-            'name' => 'Test SO Invoice',
-            'type' => 'Revenue',
-            'is_active' => true,
-        ]);
+        $receiptEntries = JournalEntry::where('source_type', CustomerReceipt::class)
+            ->where('source_id', $receipt->id)
+            ->get();
 
-        $coaReceipt = ChartOfAccount::create([
-            'code' => '9999.14',
-            'name' => 'Test SO Payment',
-            'type' => 'Asset',
-            'is_active' => true,
-        ]);
+        $this->assertTrue($receiptEntries->isNotEmpty(), 'Customer receipt should create journal entries');
 
-        $invoiceEntry = JournalEntry::create([
-            'coa_id' => $coaInvoice->id,
-            'date' => now(),
-            'reference' => 'JE-INV-USD-5-SO',
-            'description' => 'Verify SO invoice conversion',
-            'debit' => $expectedIdr,
-            'credit' => 0,
-            'journal_type' => 'sales',
-            'source_type' => Invoice::class,
-            'source_id' => $invoice->id,
-        ]);
-
-        $receiptEntry = JournalEntry::create([
-            'coa_id' => $coaReceipt->id,
-            'date' => now(),
-            'reference' => 'JE-REC-USD-5-SO',
-            'description' => 'Verify SO payment conversion',
-            'debit' => $expectedIdr,
-            'credit' => 0,
-            'journal_type' => 'receipt',
-            'source_type' => CustomerReceipt::class,
-            'source_id' => $receipt->id,
-        ]);
-
-        // Current hook resolves explicit PO currency paths; SO/CustomerReceipt falls back to IDR.
-        $this->assertEquals($this->idr->id, $invoiceEntry->currency_id);
-        $this->assertEquals($expectedIdr, (float) $invoiceEntry->amount_original_currency);
-
-        $this->assertEquals($this->idr->id, $receiptEntry->currency_id);
-        $this->assertEquals($expectedIdr, (float) $receiptEntry->amount_original_currency);
+        $cashEntry = $receiptEntries->firstWhere('coa_id', $bankCoa->id);
+        $this->assertNotNull($cashEntry, 'Customer receipt should create a cash/bank entry');
+        $this->assertEquals($expectedIdr, (float) $cashEntry->debit);
+        $this->assertEquals($this->idr->id, $cashEntry->currency_id);
+        $this->assertEquals($expectedIdr, (float) $cashEntry->amount_original_currency);
     }
 }

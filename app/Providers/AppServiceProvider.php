@@ -142,7 +142,7 @@ class AppServiceProvider extends ServiceProvider
         // Usage: TextInput::make('amount')->indonesianMoney()
         //
         // Behaviour:
-        //  - JS mask: real-time thousand-dot formatting while user types
+        //  - JS mask: real-time Indonesian money formatting while user types
         //  - formatStateUsing: loads DB numeric value as formatted string
         //  - dehydrateStateUsing: parses user input back to float for DB storage
         // ---------------------------------------------------------------
@@ -151,25 +151,43 @@ class AppServiceProvider extends ServiceProvider
 
             return $this
                 ->prefix('Rp')
-                ->placeholder('500.000')
+                ->placeholder('500.000,00')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, ',', '.', 0)
+            $money($input, ',', '.', 2)
         JS))
+                ->extraInputAttributes([
+                    'x-on:blur' => <<<'JS'
+                        let value = ($event.target.value || '').trim()
+
+                        if (value !== '') {
+                            if (value.includes(',')) {
+                                let parts = value.split(',')
+                                let integer = parts.shift()
+                                let decimal = (parts.join('') || '').replace(/\D/g, '').slice(0, 2).padEnd(2, '0')
+                                $event.target.value = `${integer},${decimal}`
+                            } else {
+                                $event.target.value = `${value},00`
+                            }
+
+                            $dispatch('input', $event.target.value)
+                        }
+                    JS,
+                ])
                 ->formatStateUsing(function ($state) {
                     if ($state === null || $state === '') {
                         return '';
                     }
 
-                    return number_format(\App\Helpers\MoneyHelper::parse($state), 0, ',', '.');
+                    return number_format(\App\Helpers\MoneyHelper::safeParse($state), 2, ',', '.');
                 })
                 ->rules([function () {
                     return function ($attribute, $value, $fail) {
                         if ($value === null || $value === '') {
                             return;
                         }
-                        $parsed = \App\Helpers\MoneyHelper::parse($value);
+                        $parsed = \App\Helpers\MoneyHelper::safeParse($value);
                         if (! is_numeric($parsed)) {
-                            $fail('Nilai nominal tidak valid. Contoh format: 1.000.000');
+                            $fail('Nilai nominal tidak valid. Contoh format: 1.000.000,00');
                         }
                     };
                 }])
@@ -178,7 +196,7 @@ class AppServiceProvider extends ServiceProvider
                         return null;
                     }
 
-                    return \App\Helpers\MoneyHelper::parse($state);
+                    return \App\Helpers\MoneyHelper::safeParse($state);
                 });
         });
     }

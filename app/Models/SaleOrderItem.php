@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Models\TaxSetting;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -21,6 +22,7 @@ class SaleOrderItem extends Model
         'discount',
         'tax',
         'tipe_pajak',
+        'currency_id',
         'warehouse_id',
         'rak_id',
     ];
@@ -46,6 +48,11 @@ class SaleOrderItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function purchaseOrderItem()
@@ -83,7 +90,14 @@ class SaleOrderItem extends Model
         static::saving(function (SaleOrderItem $item): void {
             $itemTaxType = static::normalizeItemTaxType($item->tipe_pajak ?? null);
             $item->tipe_pajak = $itemTaxType;
-            $item->tax = $itemTaxType === 'none' ? 0 : TaxSetting::activeRate('PPN');
+
+            // Respect explicit tax passed in when present; otherwise fallback
+            // to configuration or 'none' handling.
+            if (isset($item->tax) && $item->tax !== null && $item->tax !== '') {
+                $item->tax = (float) $item->tax;
+            } else {
+                $item->tax = $itemTaxType === 'none' ? 0 : TaxSetting::activeRate('PPN');
+            }
         });
     }
 }

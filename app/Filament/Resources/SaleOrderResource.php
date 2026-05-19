@@ -135,21 +135,146 @@ class SaleOrderResource extends Resource
 
     protected static function convertCurrencyAmount(float $amount, ?int $fromCurrencyId, ?int $toCurrencyId): float
     {
-        $fromRate = static::resolveExchangeRate($fromCurrencyId);
-        $toRate = static::resolveExchangeRate($toCurrencyId);
-
-        if ($toRate <= 0) {
-            return $amount;
+        // Use centralized resolver with high-precision intermediate calculation,
+        // but return a non-rounded intermediate value for UI (rounded where needed on persist).
+        return (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($amount, $fromCurrencyId, $toCurrencyId, false);
+    }
+    
+    public static function parseCurrencyState(mixed $value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
         }
 
-        return round(($amount * $fromRate) / $toRate, 2);
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        $cleaned = trim((string) $value);
+        $cleaned = preg_replace('/[^0-9,\.\-]/u', '', $cleaned) ?? '';
+
+        if ($cleaned === '' || $cleaned === '-') {
+            return 0.0;
+        }
+
+        if (! str_contains($cleaned, ',') && ! str_contains($cleaned, '.')) {
+            return (float) $cleaned;
+        }
+
+        if (str_contains($cleaned, ',') && str_contains($cleaned, '.')) {
+            $lastCommaPos = strrpos($cleaned, ',');
+            $lastDotPos = strrpos($cleaned, '.');
+
+            if ($lastDotPos !== false && $lastCommaPos !== false && $lastDotPos > $lastCommaPos) {
+                return (float) str_replace(',', '', $cleaned);
+            }
+
+            return (float) str_replace(',', '.', str_replace('.', '', $cleaned));
+        }
+
+        if (str_contains($cleaned, ',')) {
+            $parts = explode(',', $cleaned);
+            $lastPart = end($parts) ?: '';
+
+            if (count($parts) === 2 && preg_match('/^\d+$/', $lastPart)) {
+                return (float) (str_replace('.', '', $parts[0]) . '.' . $lastPart);
+            }
+
+            return (float) str_replace(',', '', $cleaned);
+        }
+
+        if (substr_count($cleaned, '.') === 1) {
+            if (preg_match('/^\d+\.\d{1,2}$/', $cleaned)) {
+                return (float) $cleaned;
+            }
+
+            if (preg_match('/^\d+\.\d{3}$/', $cleaned)) {
+                return (float) str_replace('.', '', $cleaned);
+            }
+
+            return (float) $cleaned;
+        }
+
+        return (float) str_replace('.', '', $cleaned);
+    }
+
+    protected static function normalizeCurrencyDisplayValue(float $amount, ?int $currencyId): float
+    {
+        $currencyCode = Currency::find($currencyId)?->code;
+
+        return $currencyCode === 'IDR' ? round($amount, 2) : $amount;
+    }
+
+    protected static function currencyInputDecimals(?int $currencyId): int
+    {
+        return static::isIdrCurrency($currencyId) ? 2 : 10;
+    }
+
+    protected static function currencyPreviewDecimals(?int $currencyId): int
+    {
+        return 2;
+    }
+
+    protected static function isIdrCurrency(?int $currencyId): bool
+    {
+        if ($currencyId === null) {
+            $currencyId = static::resolveDefaultCurrencyId();
+        }
+
+        return Currency::find($currencyId)?->code === 'IDR';
+    }
+
+    protected static function formatCurrencyInputState(mixed $amount, ?int $currencyId): string
+    {
+        if ($amount === null || $amount === '') {
+            return '';
+        }
+
+        $decimals = static::currencyInputDecimals($currencyId);
+        $formatted = number_format(static::parseCurrencyState($amount), $decimals, ',', '.');
+
+        if ($decimals <= 2) {
+            return $formatted;
+        }
+
+        [$whole, $fraction] = explode(',', $formatted, 2);
+        $fraction = rtrim($fraction, '0');
+        $fraction = strlen($fraction) < 2 ? str_pad($fraction, 2, '0') : $fraction;
+
+        return "{$whole},{$fraction}";
+    }
+
+    protected static function formatCurrencyPreviewState(mixed $amount, ?int $currencyId): string
+    {
+        if ($amount === null || $amount === '') {
+            return '';
+        }
+
+        return number_format(static::parseCurrencyState($amount), static::currencyPreviewDecimals($currencyId), ',', '.');
+    }
+
+    protected static function formatCurrencyAmount(?int $currencyId, mixed $amount): string
+    {
+        return static::resolveCurrencySymbol($currencyId) . ' ' . static::formatCurrencyPreviewState($amount, $currencyId);
+    }
+
+    protected static function calculateCurrencyPreview(float $quantity, float $unitPrice, float $discount, float $tax, ?string $taxType, ?int $currencyId): array
+    {
+        $normalizedTaxType = static::normalizeTaxTypeValue($taxType);
+        $base = $quantity * $unitPrice;
+        $afterDiscount = $base - ($base * ($discount / 100));
+        $taxNominal = round($afterDiscount * ($tax / 100), 2);
+
+        return [
+            'total' => $base,
+            'tax_nominal' => $normalizedTaxType === 'none' ? 0.0 : $taxNominal,
+            'subtotal' => $normalizedTaxType === 'inklusif' ? $afterDiscount : $afterDiscount + $taxNominal,
+        ];
     }
 
     public static function normalizeFormDataForPersist(array $data): array
     {
-        $currencyId = is_numeric($data['currency_id'] ?? null)
-            ? (int) $data['currency_id']
-            : static::resolveDefaultCurrencyId();
+        $currencyId = static::resolveDefaultCurrencyId();
 
         $data['currency_id'] = $currencyId;
         $data['exchange_rate'] = static::resolveExchangeRate($currencyId);
@@ -157,45 +282,63 @@ class SaleOrderResource extends Resource
         $items = [];
         foreach (($data['saleOrderItem'] ?? []) as $item) {
             $taxType = static::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
-            $unitPrice = (float) HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
+            $unitPrice = (float) static::parseCurrencyState($item['unit_price'] ?? 0);
+            $itemCurrencyId = static::resolveItemCurrencyId($item['currency_id'] ?? null);
             $quantity = (float) ($item['quantity'] ?? 0);
             $discount = (float) ($item['discount'] ?? 0);
             $taxRate = $taxType === 'none' ? 0.0 : (float) \App\Models\TaxSetting::activeRate('PPN');
+            $preview = static::calculateCurrencyPreview($quantity, $unitPrice, $discount, $taxRate, $taxType, $itemCurrencyId);
 
             $item['tipe_pajak'] = $taxType;
             $item['tax'] = $taxRate;
-            $item['subtotal'] = static::formatMoneyState(HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $taxRate, $taxType));
-            $item['tax_nominal'] = number_format(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $taxRate, $taxType), 0, ',', '.');
+            $item['currency_id'] = $itemCurrencyId;
+            $item['unit_price'] = $unitPrice;
+            $item['subtotal'] = static::formatCurrencyPreviewState($preview['subtotal'], $itemCurrencyId);
+            $item['tax_nominal'] = static::formatCurrencyPreviewState($preview['tax_nominal'], $itemCurrencyId);
             $items[] = $item;
         }
 
         if (! empty($items)) {
             $data['saleOrderItem'] = $items;
-            $total = 0.0;
-
-            foreach ($items as $item) {
-                $total += HelperController::hitungSubtotal(
-                    (float) ($item['quantity'] ?? 0),
-                    (float) HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                    (float) ($item['discount'] ?? 0),
-                    (float) ($item['tax'] ?? 0),
-                    $item['tipe_pajak'] ?? 'eklusif'
-                );
-            }
-
-            $data['total_amount'] = static::formatMoneyState($total);
+            $data['total_amount'] = round(static::calculateSaleOrderTotalIdr($items), 2);
         }
 
         return $data;
     }
 
-    protected static function formatMoneyState(mixed $amount): string
+    protected static function resolveItemCurrencyId(mixed $currencyId = null): int
+    {
+        return is_numeric($currencyId) ? (int) $currencyId : static::resolveDefaultCurrencyId();
+    }
+
+    protected static function calculateSaleOrderTotalIdr(array $items): float
+    {
+        $total = 0.0;
+
+        foreach ($items as $item) {
+            $currencyId = static::resolveItemCurrencyId($item['currency_id'] ?? null);
+            $preview = static::calculateCurrencyPreview(
+                (float) ($item['quantity'] ?? 0),
+                static::parseCurrencyState($item['unit_price'] ?? 0),
+                (float) ($item['discount'] ?? 0),
+                (float) ($item['tax'] ?? 0),
+                $item['tipe_pajak'] ?? null,
+                $currencyId
+            );
+
+            $total += CurrencyConversionResolver::convertToIdr((float) $preview['subtotal'], $currencyId);
+        }
+
+        return $total;
+    }
+
+    protected static function formatMoneyState(mixed $amount, ?int $currencyId = null): string
     {
         if ($amount === null || $amount === '') {
             return '';
         }
 
-        return number_format((float) HelperController::parseIndonesianMoney($amount), 0, ',', '.');
+        return static::formatCurrencyPreviewState($amount, $currencyId ?? static::resolveDefaultCurrencyId());
     }
 
     protected static function getWarehouseAllocationOptions(?int $productId, ?int $selectedWarehouseId = null): array
@@ -243,30 +386,30 @@ class SaleOrderResource extends Resource
                                 if ($quotation) {
                                     foreach ($quotation->quotationItem as $item) {
                                         $tipePajak = static::normalizeTaxTypeValue($item->tax_type);
-                                        $unitPrice = (float) HelperController::parseIndonesianMoney($item->unit_price);
+                                        $unitPrice = (float) static::parseCurrencyState($item->unit_price);
+                                        $itemCurrencyId = $quotation->currency_id ?? static::resolveDefaultCurrencyId();
                                         array_push($items, [
                                             'product_id' => $item->product_id,
                                             'quantity' => $item->quantity,
-                                            'unit_price' => number_format($unitPrice, 0, ',', '.'),
+                                            'currency_id' => $itemCurrencyId,
+                                            'unit_price' => static::formatCurrencyInputState($unitPrice, $itemCurrencyId),
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
                                             'tipe_pajak' => $tipePajak,
                                             'notes' => $item->notes,
                                             'warehouse_id' => null,
-                                            'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak)),
-                                            'tax_nominal' => number_format(HelperController::hitungTaxNominal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak), 0, ',', '.'),
+                                            'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
+                                            'tax_nominal' => static::formatMoneyState(HelperController::hitungTaxNominal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
                                             'rak_id' => null,
                                             'unit' => $item->product->uom?->abbreviation ?? '-',
-                                            'total' => number_format($item->quantity * $unitPrice, 0, ',', '.'),
+                                            'total' => static::formatMoneyState($item->quantity * $unitPrice, $itemCurrencyId),
                                         ]);
                                     }
-                                    $set('total_amount', static::formatMoneyState($quotation->total_amount ?? 0));
+                                    $set('total_amount', static::formatMoneyState($quotation->total_amount ?? 0, static::resolveDefaultCurrencyId()));
                                     $set('customer_id', $quotation->customer_id);
                                     $set('cabang_id', $quotation->cabang_id);
-                                    if (! empty($quotation->currency_id)) {
-                                        $set('currency_id', $quotation->currency_id);
-                                        $set('exchange_rate', static::resolveExchangeRate((int) $quotation->currency_id));
-                                    }
+                                    $set('currency_id', static::resolveDefaultCurrencyId());
+                                    $set('exchange_rate', static::resolveExchangeRate(static::resolveDefaultCurrencyId()));
                                     $set('shipped_to', $quotation->customer->address);
                                     // Warisi tempo pembayaran dari quotation yang sudah disetujui
                                     if ($quotation->tempo_pembayaran) {
@@ -297,25 +440,25 @@ class SaleOrderResource extends Resource
                                 if ($saleOrder) {
                                     foreach ($saleOrder->saleOrderItem as $item) {
                                         $tipePajak = static::normalizeTaxTypeValue($item->tipe_pajak ?? null);
+                                        $itemCurrencyId = $item->currency_id ?? $saleOrder->currency_id ?? static::resolveDefaultCurrencyId();
                                         array_push($items, [
                                             'product_id' => $item->product_id,
-                                            'unit_price' => number_format((float) $item->unit_price, 0, ',', '.'),
+                                            'currency_id' => $itemCurrencyId,
+                                            'unit_price' => static::formatCurrencyInputState((float) $item->unit_price, $itemCurrencyId),
                                             'quantity' => $item->quantity,
                                             'discount' => $item->discount,
                                             'tax' => $item->tax,
                                             'tipe_pajak' => $tipePajak,
-                                            'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak)),
-                                            'tax_nominal' => number_format(HelperController::hitungTaxNominal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak), 0, ',', '.'),
+                                            'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
+                                            'tax_nominal' => static::formatMoneyState(HelperController::hitungTaxNominal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
                                             'notes' => $item->notes,
                                         ]);
                                     }
-                                    $set('total_amount', static::formatMoneyState($saleOrder->total_amount ?? 0));
+                                    $set('total_amount', static::formatMoneyState($saleOrder->total_amount ?? 0, static::resolveDefaultCurrencyId()));
                                     $set('customer_id', $saleOrder->customer_id);
                                     $set('cabang_id', $saleOrder->cabang_id);
-                                    if (! empty($saleOrder->currency_id)) {
-                                        $set('currency_id', $saleOrder->currency_id);
-                                        $set('exchange_rate', static::resolveExchangeRate((int) $saleOrder->currency_id));
-                                    }
+                                    $set('currency_id', static::resolveDefaultCurrencyId());
+                                    $set('exchange_rate', static::resolveExchangeRate(static::resolveDefaultCurrencyId()));
                                     $set('shipped_to', $saleOrder->customer->address);
                                 }
                                 $set('saleOrderItem', $items);
@@ -341,17 +484,17 @@ class SaleOrderResource extends Resource
 
                                 // Deposit info
                                 if ($customer->deposit->remaining_amount) {
-                                    $helper[] = "Saldo: Rp." . number_format($customer->deposit->remaining_amount, 0, ',', '.');
+                                    $helper[] = "Saldo: Rp." . number_format($customer->deposit->remaining_amount, 2, ',', '.');
                                 }
 
                                 // Credit info for credit customers
                                 if ($customer->tipe_pembayaran === 'Kredit') {
-                                    $helper[] = "Kredit Limit: Rp." . number_format($creditSummary['credit_limit'], 0, ',', '.');
-                                    $helper[] = "Terpakai: Rp." . number_format($creditSummary['current_usage'], 0, ',', '.') . " ({$creditSummary['usage_percentage']}%)";
-                                    $helper[] = "Tersedia: Rp." . number_format($creditSummary['available_credit'], 0, ',', '.');
+                                    $helper[] = "Kredit Limit: Rp." . number_format($creditSummary['credit_limit'], 2, ',', '.');
+                                    $helper[] = "Terpakai: Rp." . number_format($creditSummary['current_usage'], 2, ',', '.') . " ({$creditSummary['usage_percentage']}%)";
+                                    $helper[] = "Tersedia: Rp." . number_format($creditSummary['available_credit'], 2, ',', '.');
 
                                     if ($creditSummary['overdue_count'] > 0) {
-                                        $helper[] = "⚠️ {$creditSummary['overdue_count']} tagihan jatuh tempo (Rp." . number_format($creditSummary['overdue_total'], 0, ',', '.') . ")";
+                                        $helper[] = "⚠️ {$creditSummary['overdue_count']} tagihan jatuh tempo (Rp." . number_format($creditSummary['overdue_total'], 2, ',', '.') . ")";
                                     }
                                 }
 
@@ -566,56 +709,11 @@ class SaleOrderResource extends Resource
                             ->validationMessages([
                                 'max' => 'Alamat pengiriman maksimal 255 karakter'
                             ]),
-                        Select::make('currency_id')
-                            ->label('Currency')
-                            ->options(static::resolveCurrencyOptions())
+                        Hidden::make('currency_id')
                             ->default(static::resolveDefaultCurrencyId())
-                            ->searchable()
-                            ->preload()
-                            ->reactive()
-                            ->live()
-                            ->afterStateHydrated(function ($component, $state) {
-                                $component->state($state ?: static::resolveDefaultCurrencyId());
-                            })
-                            ->afterStateUpdated(function ($set, $get, $state, $old) {
-                                $newCurrencyId = is_numeric($state) ? (int) $state : static::resolveDefaultCurrencyId();
-                                $oldCurrencyId = is_numeric($old) ? (int) $old : static::resolveDefaultCurrencyId();
-
-                                $set('exchange_rate', static::resolveExchangeRate($newCurrencyId));
-
-                                if ($newCurrencyId === $oldCurrencyId) {
-                                    return;
-                                }
-
-                                $items = $get('saleOrderItem') ?? [];
-                                $convertedItems = [];
-                                $totalAmount = 0.0;
-
-                                foreach ($items as $item) {
-                                    $quantity = (float) ($item['quantity'] ?? 0);
-                                    $discount = (float) ($item['discount'] ?? 0);
-                                    $taxRate = (float) ($item['tax'] ?? 0);
-                                    $taxType = static::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
-                                    $currentUnitPrice = (float) HelperController::parseIndonesianMoney($item['unit_price'] ?? 0);
-                                    $convertedUnitPrice = static::convertCurrencyAmount($currentUnitPrice, $oldCurrencyId, $newCurrencyId);
-                                    $convertedTotal = $quantity * $convertedUnitPrice;
-
-                                    $item['unit_price'] = number_format($convertedUnitPrice, 0, ',', '.');
-                                    $item['total'] = number_format($convertedTotal, 0, ',', '.');
-                                    $item['subtotal'] = static::formatMoneyState(HelperController::hitungSubtotal($quantity, $convertedUnitPrice, $discount, $taxRate, $taxType));
-                                    $item['tax_nominal'] = number_format(HelperController::hitungTaxNominal($quantity, $convertedUnitPrice, $discount, $taxRate, $taxType), 0, ',', '.');
-
-                                    $convertedSubtotal = HelperController::hitungSubtotal($quantity, $convertedUnitPrice, $discount, $taxRate, $taxType);
-                                    $convertedItems[] = $item;
-                                    $totalAmount += $convertedSubtotal;
-                                }
-
-                                $set('saleOrderItem', $convertedItems);
-                                $set('total_amount', static::formatMoneyState($totalAmount));
-                            })
-                            ->helperText('Mata uang transaksi. Nilai invoice dan laporan akan dikonversi ke Rupiah menggunakan kurs master.'),
+                            ->dehydrated(true),
                         Hidden::make('exchange_rate')
-                            ->default(fn ($get) => static::resolveExchangeRate(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
+                            ->default(fn () => static::resolveExchangeRate(static::resolveDefaultCurrencyId()))
                             ->dehydrated(true),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
@@ -624,8 +722,16 @@ class SaleOrderResource extends Resource
                             ->reactive()
                             ->live()
                             ->default(0)
-                            ->indonesianMoney()
-                            ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                            ->prefix(fn () => static::resolveCurrencySymbol(static::resolveDefaultCurrencyId()))
+                            ->formatStateUsing(function ($state, Get $get) {
+                                if ($state === null || $state === '') {
+                                    return '';
+                                }
+
+                                $currencyId = static::resolveDefaultCurrencyId();
+
+                                return static::formatCurrencyPreviewState($state, $currencyId);
+                            })
                             ->validationMessages([
                                 'required' => 'Total amount wajib diisi',
                                 'numeric' => 'Total amount harus berupa angka'
@@ -638,7 +744,11 @@ class SaleOrderResource extends Resource
                                 if (!$customer || $customer->tipe_pembayaran !== 'Kredit') return null;
 
                                 $creditService = app(CreditValidationService::class);
-                                $validation = $creditService->canCustomerMakePurchase($customer, (float) HelperController::parseIndonesianMoney($state));
+                                $totalForCredit = CurrencyConversionResolver::convertToIdr(
+                                    (float) static::parseCurrencyState($state),
+                                    static::resolveDefaultCurrencyId()
+                                );
+                                $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
 
                                 if (!$validation['can_purchase']) {
                                     return '⚠️ Peringatan: ' . implode(' | ', $validation['messages']);
@@ -691,18 +801,19 @@ class SaleOrderResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                         if ($product) {
-                                            $set('unit_price', number_format((float)$product->sell_price, 0, ',', '.'));
+                                            $currencyId = static::resolveItemCurrencyId($get('currency_id'));
+                                            $unitPrice = static::normalizeCurrencyDisplayValue(
+                                                CurrencyConversionResolver::convertFromIdr((float) $product->sell_price, $currencyId, false),
+                                                $currencyId
+                                            );
+
+                                            $set('unit_price', static::formatCurrencyInputState($unitPrice, $currencyId));
+                                            $set('currency_id', $currencyId);
                                             $set('unit', $product->uom?->abbreviation ?? '-');
-                                            $set('subtotal', static::formatMoneyState(HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null)));
-                                            $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
-                                            try {
-                                                $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
-                                                $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                            } catch (\Throwable $e) {
-                                                $set('tax_nominal', '0');
-                                                \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
-                                                Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
-                                            }
+                                            $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), $unitPrice, (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
+                                            $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                            $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                            $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         }
                                     })
                                     ->validationMessages([
@@ -758,6 +869,46 @@ class SaleOrderResource extends Resource
                                             $component->state($record->product->uom?->abbreviation ?? '-');
                                         }
                                     }),
+                                Select::make('currency_id')
+                                    ->label('Currency')
+                                    ->options(static::resolveCurrencyOptions())
+                                    ->default(static::resolveDefaultCurrencyId())
+                                    ->searchable()
+                                    ->preload()
+                                    ->reactive()
+                                    ->required()
+                                    ->afterStateHydrated(function ($component, $state, $record) {
+                                        $component->state($state ?: ($record?->currency_id ?? $record?->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId()));
+                                    })
+                                    ->afterStateUpdated(function ($set, $get, $state, $old) {
+                                        $newCurrencyId = static::resolveItemCurrencyId($state);
+                                        $oldCurrencyId = static::resolveItemCurrencyId($old);
+
+                                        if ($newCurrencyId === $oldCurrencyId) {
+                                            return;
+                                        }
+
+                                        $convertedUnitPrice = static::normalizeCurrencyDisplayValue(
+                                            static::convertCurrencyAmount(static::parseCurrencyState($get('unit_price') ?? 0), $oldCurrencyId, $newCurrencyId),
+                                            $newCurrencyId
+                                        );
+                                        $preview = static::calculateCurrencyPreview(
+                                            (float) ($get('quantity') ?? 0),
+                                            $convertedUnitPrice,
+                                            (float) ($get('discount') ?? 0),
+                                            (float) ($get('tax') ?? 0),
+                                            $get('tipe_pajak') ?? null,
+                                            $newCurrencyId
+                                        );
+
+                                        $set('unit_price', static::formatCurrencyInputState($convertedUnitPrice, $newCurrencyId));
+                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $newCurrencyId));
+                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $newCurrencyId));
+                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $newCurrencyId));
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Currency item wajib dipilih',
+                                    ]),
 
 
                                 TextInput::make('quantity')
@@ -804,19 +955,13 @@ class SaleOrderResource extends Resource
                                         }
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                         $qty = (float)($state ?? 0);
-                                        $price = (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
-                                        $set('total', number_format($qty * $price, 0, ',', '.'));
-                                        $set('subtotal', static::formatMoneyState(HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null)));
-                                        $_base = $qty * $price * (1 - (float)($get('discount') ?? 0) / 100);
-                                        try {
-                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
-                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) {
-                                            $set('tax_nominal', '0');
-                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
-                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
-                                        }
+                                        $price = (float)static::parseCurrencyState($get('unit_price') ?? 0);
+                                        $preview = static::calculateCurrencyPreview($qty, $price, (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
+                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     })
                                     ->helperText(function ($get) {
                                         $productId = $get('product_id');
@@ -844,39 +989,46 @@ class SaleOrderResource extends Resource
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->live()
-                                    ->indonesianMoney()
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : static::resolveDefaultCurrencyId()))
+                                    ->mask(\Filament\Support\RawJs::make(<<<'JS'
+            $money($input, ',', '.', 10)
+        JS))
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->formatStateUsing(function ($state, Get $get) {
+                                        if ($state === null || $state === '') {
+                                            return '';
+                                        }
+
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
+
+                                        return static::formatCurrencyInputState($state, $currencyId);
+                                    })
+                                    ->dehydrateStateUsing(fn ($state) => static::parseCurrencyState($state ?? 0))
                                     ->validationMessages([
                                         'required' => 'Unit Price harus diisi',
                                         'numeric' => 'Unit Price tidak valid !'
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                         $qty = (float)($get('quantity') ?? 0);
-                                        $price = (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
-                                        $set('total', number_format($qty * $price, 0, ',', '.'));
-                                        $set('subtotal', static::formatMoneyState(HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null)));
-                                        $_base = $qty * $price * (1 - (float)($get('discount') ?? 0) / 100);
-                                        try {
-                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
-                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) {
-                                            $set('tax_nominal', '0');
-                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
-                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
-                                        }
+                                        $price = (float)static::parseCurrencyState($get('unit_price') ?? 0);
+                                        $preview = static::calculateCurrencyPreview($qty, $price, (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
+                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     }),
                                 TextInput::make('total')
                                     ->label('Total (Harga × Qty)')
                                     ->live()
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : static::resolveDefaultCurrencyId()))
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
+                                            $currencyId = $record->currency_id ?? $record->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId();
                                             $total = (float)$record->quantity * (float)$record->unit_price;
-                                            $component->state(number_format($total, 0, ',', '.'));
+                                            $component->state(static::formatCurrencyPreviewState($total, $currencyId));
                                         }
                                     }),
                                 TextInput::make('discount')
@@ -892,16 +1044,11 @@ class SaleOrderResource extends Resource
                                     ->minValue(0)
                                     ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('subtotal', static::formatMoneyState(HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null)));
-                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($state ?? 0) / 100);
-                                        try {
-                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $get('tipe_pajak') ?? 'None');
-                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) {
-                                            $set('tax_nominal', '0');
-                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
-                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
-                                        }
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
+                                        $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), static::parseCurrencyState($get('unit_price') ?? 0), (float) ($state ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
+                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     })
                                     ->suffix('%'),
                                 \Filament\Forms\Components\Select::make('tipe_pajak')
@@ -922,16 +1069,11 @@ class SaleOrderResource extends Resource
                                             $set('tax', $defaultTax);
                                         }
 
-                                        $set('subtotal', static::formatMoneyState(HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $normalizedState)));
-                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
-                                        try {
-                                            $_r = \App\Services\TaxService::compute($_base, (float)($get('tax') ?? 0), $normalizedState);
-                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) {
-                                            $set('tax_nominal', '0');
-                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
-                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
-                                        }
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
+                                        $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), static::parseCurrencyState($get('unit_price') ?? 0), (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $normalizedState, $currencyId);
+                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     }),
                                 TextInput::make('tax')
                                     ->label('Tax')
@@ -950,36 +1092,26 @@ class SaleOrderResource extends Resource
                                     ->maxValue(100)
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $taxType = static::normalizeTaxTypeValue($get('tipe_pajak'));
-                                        $set('subtotal', static::formatMoneyState(HelperController::hitungSubtotal($get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), $get('discount'), $get('tax'), $get('tipe_pajak') ?? null)));
-                                        $_base = (float)($get('quantity') ?? 0) * (float)HelperController::parseIndonesianMoney($get('unit_price') ?? 0) * (1 - (float)($get('discount') ?? 0) / 100);
-                                        try {
-                                            $_r = \App\Services\TaxService::compute($_base, (float)($state ?? 0), $taxType);
-                                            $set('tax_nominal', number_format((float)$_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) {
-                                            $set('tax_nominal', '0');
-                                            \Illuminate\Support\Facades\Log::warning('TaxService gagal menghitung pajak: ' . $e->getMessage());
-                                            Notification::make()->title('Perhitungan Pajak Gagal')->body('Nilai pajak direset ke 0. Silakan periksa konfigurasi tipe pajak atau hubungi administrator.')->warning()->send();
-                                        }
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
+                                        $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), static::parseCurrencyState($get('unit_price') ?? 0), (float) ($get('discount') ?? 0), (float) ($state ?? 0), $taxType, $currencyId);
+                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     })
                                     ->default(fn(callable $get) => static::normalizeTaxTypeValue($get('tipe_pajak') ?? null) === 'none' ? 0 : \App\Models\TaxSetting::activeRate('PPN'))
                                     ->suffix('%'),
                                 TextInput::make('tax_nominal')
                                     ->label('Nominal Pajak')
                                     ->live()
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : static::resolveDefaultCurrencyId()))
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
-                                            $base = (float)$record->quantity * (float)$record->unit_price * (1 - (float)$record->discount / 100);
-                                            try {
-                                                $r = \App\Services\TaxService::compute($base, (float)$record->tax, static::normalizeTaxTypeValue($record->tipe_pajak));
-                                                $component->state(number_format($r['ppn'], 0, ',', '.'));
-                                            } catch (\Throwable $e) {
-                                                $component->state('0');
-                                                \Illuminate\Support\Facades\Log::warning('TaxService gagal saat mengisi formulir: ' . $e->getMessage());
-                                            }
+                                            $currencyId = $record->currency_id ?? $record->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId();
+                                            $preview = static::calculateCurrencyPreview((float) $record->quantity, (float) $record->unit_price, (float) $record->discount, (float) $record->tax, $record->tipe_pajak, $currencyId);
+                                            $component->state(static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         }
                                     }),
                                 TextInput::make('subtotal')
@@ -987,33 +1119,49 @@ class SaleOrderResource extends Resource
                                     ->reactive()
                                     ->readOnly()
                                     ->default(0)
-                                    ->indonesianMoney()
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->formatStateUsing(function ($state, Get $get) {
+                                        if ($state === null || $state === '') {
+                                            return '';
+                                        }
+
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
+
+                                        return static::formatCurrencyPreviewState($state, $currencyId);
+                                    })
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
-                                            $component->state(static::formatMoneyState(HelperController::hitungSubtotal($record->quantity, $record->unit_price, $record->discount, $record->tax, static::normalizeTaxTypeValue($record->tipe_pajak))));
+                                            $currencyId = $record->currency_id ?? $record->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId();
+                                            $preview = static::calculateCurrencyPreview((float) $record->quantity, (float) $record->unit_price, (float) $record->discount, (float) $record->tax, $record->tipe_pajak, $currencyId);
+                                            $component->state(static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                         }
                                     })
                                     ->afterStateUpdated(function ($component, $state, $livewire, $get) {
                                         $qty   = $get('quantity') ?? 0;
-                                        $price = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                        $price = static::parseCurrencyState($get('unit_price') ?? 0);
                                         $disc  = $get('discount') ?? 0;
                                         $tax   = $get('tax') ?? 0;
                                         $type  = static::normalizeTaxTypeValue($get('tipe_pajak'));
 
-                                        $component->state(static::formatMoneyState(HelperController::hitungSubtotal($qty, $price, $disc, $tax, $type)));
+                                        $currencyId = static::resolveItemCurrencyId($get('currency_id'));
+                                        $preview = static::calculateCurrencyPreview((float) $qty, (float) $price, (float) $disc, (float) $tax, $type, $currencyId);
+                                        $component->state(static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
 
                                         // hitung ulang total order
                                         $total = 0;
                                         foreach ($livewire->data['saleOrderItem'] ?? [] as $item) {
-                                            $total += HelperController::hitungSubtotal(
+                                            $itemCurrencyId = static::resolveItemCurrencyId($item['currency_id'] ?? null);
+                                            $preview = static::calculateCurrencyPreview(
                                                 $item['quantity'] ?? 0,
-                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                                static::parseCurrencyState($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
-                                                static::normalizeTaxTypeValue($item['tipe_pajak'] ?? null)
+                                                static::normalizeTaxTypeValue($item['tipe_pajak'] ?? null),
+                                                $itemCurrencyId
                                             );
+                                            $total += CurrencyConversionResolver::convertToIdr((float) $preview['subtotal'], $itemCurrencyId);
                                         }
-                                        $livewire->data['total_amount'] = static::formatMoneyState($total);
+                                        $livewire->data['total_amount'] = static::formatCurrencyPreviewState($total, static::resolveDefaultCurrencyId());
 
                                         // Check credit validation
                                         $customerId = $livewire->data['customer_id'] ?? null;
@@ -1021,7 +1169,11 @@ class SaleOrderResource extends Resource
                                             $customer = Customer::find($customerId);
                                             if ($customer) {
                                                 $creditService = app(CreditValidationService::class);
-                                                $validation = $creditService->canCustomerMakePurchase($customer, (float)$total);
+                                                $totalForCredit = CurrencyConversionResolver::convertToIdr(
+                                                    (float) $total,
+                                                    static::resolveDefaultCurrencyId()
+                                                );
+                                                $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
 
                                                 if (!$validation['can_purchase']) {
                                                     Notification::make()
@@ -1075,20 +1227,8 @@ class SaleOrderResource extends Resource
                                     ->reactive(),
                             ])
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                // Calculate total amount whenever repeater items change
-                                $totalAmount = 0;
-                                if (is_array($state)) {
-                                    foreach ($state as $item) {
-                                        $totalAmount += HelperController::hitungSubtotal(
-                                            $item['quantity'] ?? 0,
-                                            HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                            $item['discount'] ?? 0,
-                                            $item['tax'] ?? 0,
-                                            $item['tipe_pajak'] ?? null
-                                        );
-                                    }
-                                }
-                                $set('total_amount', static::formatMoneyState($totalAmount));
+                                $totalAmount = is_array($state) ? static::calculateSaleOrderTotalIdr($state) : 0.0;
+                                $set('total_amount', static::formatMoneyState($totalAmount, static::resolveDefaultCurrencyId()));
                             })
                     ])
             ]);
@@ -1159,7 +1299,9 @@ class SaleOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->numeric()
-                    ->rupiah()
+                    ->formatStateUsing(function ($state) {
+                        return static::formatMoneyState($state, static::resolveDefaultCurrencyId());
+                    })
                     ->sortable(),
                 TextColumn::make('item_units')
                     ->label('Satuan')
@@ -1731,7 +1873,7 @@ class SaleOrderResource extends Resource
                             ->formatStateUsing(fn($state) => $state ? $state . ' Hari' : '-'),
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
-                            ->getStateUsing(fn ($record) => static::formatCurrencyAmount($record?->currency_id, $record?->total_amount)),
+                            ->getStateUsing(fn ($record) => static::formatCurrencyAmount(static::resolveDefaultCurrencyId(), $record?->total_amount)),
                         \Filament\Infolists\Components\TextEntry::make('tipe_pengiriman')
                             ->label('Tipe Pengiriman')
                             ->placeholder('-'),
@@ -1754,13 +1896,13 @@ class SaleOrderResource extends Resource
                                     ->label('Qty'),
                                 \Filament\Infolists\Components\TextEntry::make('unit_price')
                                     ->label('Harga Satuan')
-                                    ->formatStateUsing(fn($state) => 'Rp ' . number_format((float) $state, 0, ',', '.')),
+                                    ->getStateUsing(fn($record) => static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, (float) ($record->unit_price ?? 0))),
                                 \Filament\Infolists\Components\TextEntry::make('line_total')
                                     ->label('Harga Satuan x Qty')
                                     ->getStateUsing(function ($record) {
                                         $price = (float) ($record->unit_price ?? 0);
                                         $qty = (float) ($record->quantity ?? 0);
-                                        return static::formatCurrencyAmount($record?->currency?->id, $price * $qty);
+                                        return static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, $price * $qty);
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('discount')
                                     ->label('Diskon (%)')
@@ -1779,21 +1921,23 @@ class SaleOrderResource extends Resource
                                         $discount = (float) ($record->discount ?? 0);
                                         $tax = (float) ($record->tax ?? 0);
                                         $tipePajak = $record->tipe_pajak ?? null;
-                                        $taxNominal = \App\Http\Controllers\HelperController::hitungTaxNominal($qty, $unitPrice, $discount, $tax, $tipePajak);
-                                        return static::formatCurrencyAmount($record?->currency?->id, $taxNominal);
+                                        $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
+                                        $preview = static::calculateCurrencyPreview($qty, $unitPrice, $discount, $tax, $tipePajak, $currencyId);
+                                        return static::formatCurrencyAmount($currencyId, $preview['tax_nominal']);
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('subtotal_display')
                                     ->label('Sub Total')
                                     ->columnSpan(2)
                                     ->getStateUsing(function ($record) {
-                                        $subtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
-                                            $record->quantity,
+                                        $preview = static::calculateCurrencyPreview(
+                                            (float) $record->quantity,
                                             (float) $record->unit_price,
-                                            $record->discount,
-                                            $record->tax,
-                                            $record->tipe_pajak ?? null
+                                            (float) $record->discount,
+                                            (float) $record->tax,
+                                            $record->tipe_pajak ?? null,
+                                            $record?->currency_id ?? $record?->saleOrder?->currency_id
                                         );
-                                        return static::formatCurrencyAmount($record?->currency?->id, $subtotal);
+                                        return static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, $preview['subtotal']);
                                     }),
                                 \Filament\Infolists\Components\TextEntry::make('stock_tersedia')
                                     ->label('Stok Bebas (Semua Gudang)')

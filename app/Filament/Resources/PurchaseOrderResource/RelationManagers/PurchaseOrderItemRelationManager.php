@@ -138,13 +138,13 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 if ($state === null || $state === '') {
                                     return '';
                                 }
-                                return number_format(\App\Helpers\MoneyHelper::parse($state), 2, ',', '.');
+                                return number_format(\App\Helpers\MoneyHelper::safeParse($state), 2, ',', '.');
                             })
                             ->dehydrateStateUsing(function ($state) {
                                 if ($state === null || $state === '') {
                                     return null;
                                 }
-                                return \App\Helpers\MoneyHelper::parse($state);
+                                return \App\Helpers\MoneyHelper::safeParse($state);
                             })
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
@@ -256,7 +256,9 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->rupiah()
+                        ->formatStateUsing(function ($state, $record) {
+                        return \App\Filament\Resources\PurchaseOrderResource::formatCurrencyPreviewState($state, $record->currency_id ?? null);
+                    })
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')

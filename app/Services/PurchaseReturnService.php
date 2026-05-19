@@ -12,6 +12,7 @@ use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
 use App\Models\QualityControl;
 use App\Models\PurchaseOrderItem;
+use App\Support\JournalCurrencyAmountResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -253,7 +254,12 @@ class PurchaseReturnService
     {
         try {
             DB::transaction(function () use ($purchaseReturn) {
-                $purchaseReturn->load('purchaseReturnItem.product.inventoryCoa', 'purchaseReturnItem.product.purchaseReturnCoa');
+                $purchaseReturn->load([
+                    'purchaseReturnItem.product.inventoryCoa',
+                    'purchaseReturnItem.product.purchaseReturnCoa',
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
+                ]);
 
                 // Prevent duplicate posting
                 if (JournalEntry::where('source_type', PurchaseReturn::class)
@@ -262,9 +268,12 @@ class PurchaseReturnService
                     return;
                 }
 
-                $totalReturnAmount = $purchaseReturn->purchaseReturnItem->sum(function ($item) {
-                    return $item->qty_returned * $item->unit_price;
-                });
+                $resolvedLines = $purchaseReturn->purchaseReturnItem
+                    ->map(fn ($item) => $this->resolveReturnItemJournalAmount($item))
+                    ->filter(fn (array $line) => $line['amount_idr'] > 0)
+                    ->values();
+
+                $totalReturnAmount = round((float) $resolvedLines->sum('amount_idr'), 2);
 
                 if ($totalReturnAmount <= 0) {
                     return;
@@ -294,8 +303,9 @@ class PurchaseReturnService
 
                 $inventoryCredits = [];
 
-                foreach ($purchaseReturn->purchaseReturnItem as $item) {
-                    $lineAmount = (float) $item->qty_returned * (float) $item->unit_price;
+                foreach ($resolvedLines as $line) {
+                    $item = $line['item'];
+                    $lineAmount = $line['amount_idr'];
 
                     if ($lineAmount <= 0) {
                         continue;
@@ -341,7 +351,7 @@ class PurchaseReturnService
                     'date' => $date,
                     'reference' => $reference,
                     'description' => $description . ' - Reduce accounts payable',
-                    'debit' => $totalReturnAmount,
+                    'debit' => round($totalReturnAmount, 2),
                     'credit' => 0,
                     'journal_type' => 'purchase_return',
                     'source_type' => PurchaseReturn::class,
@@ -356,7 +366,7 @@ class PurchaseReturnService
                         'reference' => $reference,
                         'description' => $description . ' - Reduce inventory value',
                         'debit' => 0,
-                        'credit' => $inventoryCredit['amount'],
+                        'credit' => round($inventoryCredit['amount'], 2),
                         'journal_type' => 'purchase_return',
                         'source_type' => PurchaseReturn::class,
                         'source_id' => $purchaseReturn->id,
@@ -398,13 +408,74 @@ class PurchaseReturnService
     }
 
     /**
+     * Resolve purchase return line amount to IDR. Legacy lines without receipt/PO
+     * currency context are treated as already IDR.
+     *
+     * @return array{item: PurchaseReturnItem, amount_idr: float, raw_unit_price: float, unit_price_idr: float, currency_id: ?int, currency_code: ?string, exchange_rate: float, amount_original_currency: float}
+     */
+    private function resolveReturnItemJournalAmount(PurchaseReturnItem $item): array
+    {
+        $qty = max(0, (float) ($item->qty_returned ?? 0));
+        $fallbackRawUnitPrice = (float) ($item->unit_price ?? 0);
+
+        if ($item->purchaseReceiptItem?->exists) {
+            $unitCost = JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($item->purchaseReceiptItem);
+            $amountIdr = round($qty * $unitCost['unit_price_idr'], 2);
+
+            return [
+                'item' => $item,
+                'amount_idr' => $amountIdr,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitCost['unit_price_idr'],
+                'currency_id' => $unitCost['currency_id'],
+                'currency_code' => $unitCost['currency_code'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+                'amount_original_currency' => $unitCost['exchange_rate'] > 0
+                    ? round($amountIdr / $unitCost['exchange_rate'], 4)
+                    : round($qty * $unitCost['raw_unit_price'], 4),
+            ];
+        }
+
+        $resolved = JournalCurrencyAmountResolver::resolve(round($qty * $fallbackRawUnitPrice, 4), null, 1);
+
+        return [
+            'item' => $item,
+            'amount_idr' => $resolved['amount_idr'],
+            'raw_unit_price' => $fallbackRawUnitPrice,
+            'unit_price_idr' => $fallbackRawUnitPrice,
+            'currency_id' => $resolved['currency_id'],
+            'currency_code' => $resolved['currency_code'],
+            'exchange_rate' => $resolved['exchange_rate'],
+            'amount_original_currency' => $resolved['amount_original_currency'],
+        ];
+    }
+
+    private function calculateReturnTotalIdr(PurchaseReturn $purchaseReturn): float
+    {
+        $purchaseReturn->loadMissing([
+            'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
+            'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
+        ]);
+
+        return round((float) $purchaseReturn->purchaseReturnItem
+            ->sum(fn (PurchaseReturnItem $item) => $this->resolveReturnItemJournalAmount($item)['amount_idr']), 2);
+    }
+
+    /**
      * Adjust stock for purchase return
      */
     public function adjustStock(PurchaseReturn $purchaseReturn): bool
     {
         try {
             DB::transaction(function () use ($purchaseReturn) {
+                $purchaseReturn->loadMissing([
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
+                ]);
+
                 foreach ($purchaseReturn->purchaseReturnItem as $item) {
+                    $resolvedLine = $this->resolveReturnItemJournalAmount($item);
+
                     // Lock the inventory stock row to prevent concurrent returns
                     // from both reading the same qty and each decrementing incorrectly.
                     $inventoryStock = InventoryStock::where('product_id', $item->product_id)
@@ -423,7 +494,7 @@ class PurchaseReturnService
                         'warehouse_id' => $purchaseReturn->purchaseReceipt->warehouse_id ?? 1,
                         'rak_id' => $item->rak_id,
                         'quantity' => $item->qty_returned,
-                        'value' => $item->qty_returned * $item->unit_price,
+                        'value' => $resolvedLine['amount_idr'],
                         'type' => 'purchase_return',
                         'date' => $purchaseReturn->return_date ?? now(),
                         'notes' => 'Stock outbound from purchase return: ' . $purchaseReturn->nota_retur,
@@ -432,6 +503,12 @@ class PurchaseReturnService
                             'purchase_return_id' => $purchaseReturn->id,
                             'nota_retur' => $purchaseReturn->nota_retur,
                             'unit_price' => $item->unit_price,
+                            'raw_unit_price' => $resolvedLine['raw_unit_price'],
+                            'unit_price_idr' => $resolvedLine['unit_price_idr'],
+                            'currency_id' => $resolvedLine['currency_id'],
+                            'currency_code' => $resolvedLine['currency_code'],
+                            'exchange_rate' => $resolvedLine['exchange_rate'],
+                            'amount_original_currency' => $resolvedLine['amount_original_currency'],
                             'reason' => $item->reason,
                         ],
                         'from_model_type' => PurchaseReturn::class,
@@ -460,7 +537,7 @@ class PurchaseReturnService
             $purchaseReturn->update([
                 'credit_note_number' => $data['credit_note_number'] ?? null,
                 'credit_note_date' => $data['credit_note_date'] ?? now(),
-                'credit_note_amount' => $data['credit_note_amount'] ?? $purchaseReturn->purchaseReturnItem->sum(fn($item) => $item->qty_returned * $item->unit_price),
+                'credit_note_amount' => $data['credit_note_amount'] ?? $this->calculateReturnTotalIdr($purchaseReturn),
             ]);
 
             // Update account payable

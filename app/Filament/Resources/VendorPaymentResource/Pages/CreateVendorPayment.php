@@ -49,13 +49,13 @@ class CreateVendorPayment extends CreateRecord
             }
 
             // Calculate total payment amount
-            $totalPaymentAmount = MoneyHelper::parse($data['total_payment'] ?? 0);
+            $totalPaymentAmount = MoneyHelper::safeParse($data['total_payment'] ?? 0);
 
             $totalAvailableDeposit = $availableDeposits->sum('remaining_amount');
             if ($totalAvailableDeposit < $totalPaymentAmount) {
                 Notification::make()
                     ->title('Saldo Deposit Tidak Mencukupi')
-                    ->body("Saldo deposit supplier tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($totalPaymentAmount, 0, ',', '.'))
+                    ->body("Saldo deposit supplier tidak mencukupi. Saldo tersedia: " . \App\Helpers\MoneyHelper::rupiah($totalAvailableDeposit) . ", dibutuhkan: " . \App\Helpers\MoneyHelper::rupiah($totalPaymentAmount))
                     ->danger()
                     ->persistent()
                     ->send();
@@ -69,7 +69,7 @@ class CreateVendorPayment extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Determine payment status based on total payment vs total invoice amounts
-        $totalPayment = MoneyHelper::parse($data['total_payment'] ?? 0);
+        $totalPayment = MoneyHelper::safeParse($data['total_payment'] ?? 0);
         $data['total_payment'] = $totalPayment;
 
         if ($totalPayment > 0) {
@@ -129,7 +129,7 @@ class CreateVendorPayment extends CreateRecord
 
             $paidSoFar = (float) VendorPayment::where('payment_request_id', $paymentRequestId)
                 ->sum('total_payment');
-            $requestTotal = MoneyHelper::parse($pr->total_amount ?? 0);
+            $requestTotal = MoneyHelper::safeParse($pr->total_amount ?? 0);
 
             if ($paidSoFar >= ($requestTotal - 0.01)) {
                 $newStatus = PaymentRequest::STATUS_PAID;

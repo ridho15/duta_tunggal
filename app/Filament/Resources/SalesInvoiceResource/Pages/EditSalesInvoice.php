@@ -104,17 +104,17 @@ class EditSalesInvoice extends EditRecord
 
             foreach ($this->data['invoiceItem'] as $item) {
                 $quantity = (float) ($item['quantity'] ?? 0);
-                $price    = (float) MoneyHelper::parse($item['price'] ?? 0);
+                $price    = (float) MoneyHelper::safeParse($item['price'] ?? 0);
 
                 // Ensure all NOT NULL columns are provided even when the
                 // Repeater only captured the 4 visible fields.
                 $itemData = array_merge($item, [
                     'price'      => $price,
-                    'subtotal'   => (float) MoneyHelper::parse($item['subtotal'] ?? ($quantity * $price)),
-                    'discount'   => (float) MoneyHelper::parse($item['discount'] ?? 0),
-                    'tax_rate'   => (float) MoneyHelper::parse($item['tax_rate'] ?? 0),
-                    'tax_amount' => (float) MoneyHelper::parse($item['tax_amount'] ?? 0),
-                    'total'      => (float) MoneyHelper::parse($item['total'] ?? ($quantity * $price)),
+                    'subtotal'   => (float) MoneyHelper::safeParse($item['subtotal'] ?? ($quantity * $price)),
+                    'discount'   => (float) MoneyHelper::safeParse($item['discount'] ?? 0),
+                    'tax_rate'   => (float) MoneyHelper::safeParse($item['tax_rate'] ?? 0),
+                    'tax_amount' => (float) MoneyHelper::safeParse($item['tax_amount'] ?? 0),
+                    'total'      => (float) MoneyHelper::safeParse($item['total'] ?? ($quantity * $price)),
                 ]);
 
                 $this->record->invoiceItem()->create($itemData);

@@ -344,7 +344,7 @@ class BalanceSheetPage extends Page
             ->title('Neraca Tidak Seimbang')
             ->warning()
             ->persistent()
-            ->body('Selisih neraca saat ini Rp ' . number_format(abs((float) $data['difference']), 0, ',', '.') . '. Periksa jurnal sumber karena laporan tidak lagi memaksa balance lewat laba ditahan.')
+            ->body('Selisih neraca saat ini ' . \App\Helpers\MoneyHelper::rupiah(abs((float) $data['difference'])) . '. Periksa jurnal sumber karena laporan tidak lagi memaksa balance lewat laba ditahan.')
             ->send();
     }
 }

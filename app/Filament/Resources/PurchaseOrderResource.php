@@ -23,7 +23,6 @@ use App\Services\PurchaseOrderService;
 use App\Services\QualityControlService;
 use App\Services\PurchaseReceiptService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use App\Helpers\MoneyHelper;
 use App\Support\CurrencyConversionResolver;
 use Carbon\Carbon;
 use Filament\Forms;
@@ -85,9 +84,159 @@ class PurchaseOrderResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    protected static function formatMoneyState(mixed $value): string
+    protected static function formatMoneyState(mixed $value, ?int $currencyId = null): string
     {
-        return number_format((float) \App\Helpers\MoneyHelper::parse($value), 0, ',', '.');
+        return self::formatCurrencyPreviewState($value, $currencyId);
+    }
+
+    public static function syncPurchaseOrderCurrencyData(array $data): array
+    {
+        $existingRates = collect($data['purchaseOrderCurrency'] ?? [])
+            ->filter(fn ($row) => is_numeric($row['currency_id'] ?? null))
+            ->mapWithKeys(fn ($row) => [(int) $row['currency_id'] => $row['nominal'] ?? null]);
+
+        $currencyIds = collect($data['purchaseOrderItem'] ?? [])
+            ->pluck('currency_id')
+            ->merge(collect($data['purchaseOrderBiaya'] ?? [])->pluck('currency_id'))
+            ->filter(fn ($currencyId) => is_numeric($currencyId))
+            ->map(fn ($currencyId) => (int) $currencyId)
+            ->unique()
+            ->values();
+
+        $data['purchaseOrderCurrency'] = $currencyIds
+            ->map(function (int $currencyId) use ($existingRates) {
+                $nominal = $existingRates->get($currencyId);
+
+                return [
+                    'currency_id' => $currencyId,
+                    'nominal' => is_numeric($nominal) && (float) $nominal > 0
+                        ? (float) $nominal
+                        : CurrencyConversionResolver::resolveRate($currencyId),
+                ];
+            })
+            ->all();
+
+        return $data;
+    }
+
+    protected static function parseCurrencyState(mixed $value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        $cleaned = trim((string) $value);
+        $cleaned = preg_replace('/[^0-9,\.\-]/u', '', $cleaned) ?? '';
+
+        if ($cleaned === '' || $cleaned === '-') {
+            return 0.0;
+        }
+
+        if (! str_contains($cleaned, ',') && ! str_contains($cleaned, '.')) {
+            return (float) $cleaned;
+        }
+
+        if (str_contains($cleaned, ',') && str_contains($cleaned, '.')) {
+            $lastCommaPos = strrpos($cleaned, ',');
+            $lastDotPos = strrpos($cleaned, '.');
+
+            if ($lastDotPos !== false && $lastCommaPos !== false && $lastDotPos > $lastCommaPos) {
+                return (float) str_replace(',', '', $cleaned);
+            }
+
+            return (float) str_replace(',', '.', str_replace('.', '', $cleaned));
+        }
+
+        if (str_contains($cleaned, ',')) {
+            $parts = explode(',', $cleaned);
+            $lastPart = end($parts) ?: '';
+
+            if (count($parts) === 2 && preg_match('/^\d+$/', $lastPart)) {
+                return (float) (str_replace('.', '', $parts[0]) . '.' . $lastPart);
+            }
+
+            return (float) str_replace(',', '', $cleaned);
+        }
+
+        if (substr_count($cleaned, '.') === 1) {
+            if (preg_match('/^\d+\.\d{1,2}$/', $cleaned)) {
+                return (float) $cleaned;
+            }
+
+            if (preg_match('/^\d+\.\d{3}$/', $cleaned)) {
+                return (float) str_replace('.', '', $cleaned);
+            }
+
+            return (float) $cleaned;
+        }
+
+        return (float) str_replace('.', '', $cleaned);
+    }
+
+    protected static function currencyInputDecimals(?int $currencyId): int
+    {
+        return self::isIdrCurrency($currencyId) ? 2 : 10;
+    }
+
+    protected static function currencyPreviewDecimals(?int $currencyId): int
+    {
+        return 2;
+    }
+
+    protected static function isIdrCurrency(?int $currencyId): bool
+    {
+        if ($currencyId === null) {
+            return true;
+        }
+
+        return Currency::find($currencyId)?->code === 'IDR';
+    }
+
+    protected static function formatCurrencyInputState(mixed $amount, ?int $currencyId): string
+    {
+        if ($amount === null || $amount === '') {
+            return '';
+        }
+
+        $decimals = self::currencyInputDecimals($currencyId);
+        $formatted = number_format(self::parseCurrencyState($amount), $decimals, ',', '.');
+
+        if ($decimals <= 2) {
+            return $formatted;
+        }
+
+        [$whole, $fraction] = explode(',', $formatted, 2);
+        $fraction = rtrim($fraction, '0');
+        $fraction = strlen($fraction) < 2 ? str_pad($fraction, 2, '0') : $fraction;
+
+        return "{$whole},{$fraction}";
+    }
+
+    public static function formatCurrencyPreviewState(mixed $amount, ?int $currencyId): string
+    {
+        if ($amount === null || $amount === '') {
+            return '';
+        }
+
+        return number_format(self::parseCurrencyState($amount), self::currencyPreviewDecimals($currencyId), ',', '.');
+    }
+
+    public static function calculateCurrencyPreview(float $quantity, float $unitPrice, float $discount, float $tax, ?string $taxType, ?int $currencyId): array
+    {
+        $normalizedTaxType = self::normalizeTaxTypeValue($taxType);
+        $base = $quantity * $unitPrice;
+        $afterDiscount = $base - ($base * ($discount / 100));
+        $taxNominal = round($afterDiscount * ($tax / 100), 2);
+
+        return [
+            'total' => $base,
+            'tax_nominal' => $normalizedTaxType === 'none' ? 0.0 : $taxNominal,
+            'subtotal' => $normalizedTaxType === 'inklusif' ? $afterDiscount : $afterDiscount + $taxNominal,
+        ];
     }
 
     protected static function formatSupplierLabel(?Supplier $supplier): string
@@ -345,7 +494,7 @@ class PurchaseOrderResource extends Resource
             ->mapWithKeys(function (Supplier $supplier) use ($linkedPrices, $showPrice) {
                 $label = "({$supplier->code}) {$supplier->perusahaan}";
                 if ($showPrice && isset($linkedPrices[$supplier->id]) && $linkedPrices[$supplier->id] > 0) {
-                    $label .= ' — Rp ' . number_format($linkedPrices[$supplier->id], 0, ',', '.');
+                    $label .= ' — Rp ' . number_format($linkedPrices[$supplier->id], 2, ',', '.');
                 }
 
                 return [$supplier->id => $label];
@@ -669,6 +818,12 @@ class PurchaseOrderResource extends Resource
                                 return Supplier::create($data)->id;
                             })
                             ->required(),
+                        TextInput::make('tempo_hutang')
+                            ->label('Tempo Hutang (hari)')
+                            ->numeric()
+                            ->default(0)
+                            ->reactive()
+                            ->dehydrated(),
                         TextInput::make('po_number')
                             ->required()
                             ->reactive()
@@ -701,6 +856,21 @@ class PurchaseOrderResource extends Resource
                             ->reactive(),
                         Repeater::make('purchaseOrderItem')
                             ->relationship()
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data): array {
+                                $currencyId = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
+                                $preview = self::calculateCurrencyPreview(
+                                    (float) ($data['quantity'] ?? 0),
+                                    (float) ($data['unit_price'] ?? 0),
+                                    (float) ($data['discount'] ?? 0),
+                                    (float) ($data['tax'] ?? 0),
+                                    self::normalizeTaxTypeValue($data['tipe_pajak'] ?? null),
+                                    $currencyId
+                                );
+
+                                $data['subtotal'] = self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
+
+                                return $data;
+                            })
                             ->columnSpanFull()
                             ->columns(4)
                             ->hint('Tambahkan item pembelian yang akan diinput')
@@ -760,7 +930,12 @@ class PurchaseOrderResource extends Resource
                                                     $newUnitPrice = (float) $supplierProduct->pivot->supplier_price;
                                                 }
                                             }
-                                            $set('unit_price', $newUnitPrice);
+                                            $itemCurrencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
+                                            $newUnitPrice = CurrencyConversionResolver::convertFromIdr($newUnitPrice, $itemCurrencyId, false);
+                                            $newUnitPrice = self::isIdrCurrency($itemCurrencyId)
+                                                ? round((float) $newUnitPrice, 2)
+                                                : (float) $newUnitPrice;
+                                            $set('unit_price', self::formatCurrencyInputState($newUnitPrice, $itemCurrencyId));
                                             $set('unit', $product->uom?->abbreviation ?? '-');
                                             $set('discount', 0);
                                             $set('tax', $newTax);
@@ -777,21 +952,14 @@ class PurchaseOrderResource extends Resource
                                             $set('refer_item_model_type', $referItem ? OrderRequestItem::class : null);
                                             $set('refer_item_model_id', $referItem?->id);
                                             // Use local variables (not $get) to avoid stale state after $set
-                                            $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
-                                                (float)$get('quantity'),
-                                                $newUnitPrice,
-                                                0,
-                                                $newTax,
-                                                $newTipePajak
-                                            )));
+                                            $preview = self::calculateCurrencyPreview((float)$get('quantity'), $newUnitPrice, 0, $newTax, $newTipePajak, $itemCurrencyId);
+                                            $set('total', self::formatCurrencyPreviewState($preview['total'], $itemCurrencyId));
+                                            $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $itemCurrencyId));
                                         } else {
-                                            $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
-                                                (float)$get('quantity'),
-                                                HelperController::parseIndonesianMoney($get('unit_price')),
-                                                (float)$get('discount'),
-                                                (float)$get('tax'),
-                                                self::normalizeTaxTypeValue($get('tipe_pajak') ?? null)
-                                            )));
+                                            $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
+                                            $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
+                                            $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                            $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                             $set('refer_item_model_type', null);
                                             $set('refer_item_model_id', null);
                                         }
@@ -818,7 +986,28 @@ class PurchaseOrderResource extends Resource
                                             return [$c->id => "{$c->name} ({$c->symbol})"];
                                         });
                                     })
-                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                    ->afterStateUpdated(function (Set $set, Get $get, $state, $old) {
+                                        $newCurrencyId = is_numeric($state) ? (int) $state : null;
+                                        $oldCurrencyId = is_numeric($old) ? (int) $old : null;
+
+                                        if ($newCurrencyId !== $oldCurrencyId) {
+                                            $currentUnitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
+                                            $convertedUnitPrice = CurrencyConversionResolver::convertBetweenCurrencies(
+                                                $currentUnitPrice,
+                                                $oldCurrencyId,
+                                                $newCurrencyId,
+                                                false
+                                            );
+                                            $convertedUnitPrice = self::isIdrCurrency($newCurrencyId)
+                                                ? round((float) $convertedUnitPrice, 2)
+                                                : (float) $convertedUnitPrice;
+
+                                            $preview = self::calculateCurrencyPreview((float) $get('quantity'), $convertedUnitPrice, (float) $get('discount'), (float) $get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $newCurrencyId);
+                                            $set('unit_price', self::formatCurrencyInputState($convertedUnitPrice, $newCurrencyId));
+                                            $set('total', self::formatCurrencyPreviewState($preview['total'], $newCurrencyId));
+                                            $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $newCurrencyId));
+                                        }
+
                                         // Ensure this currency is added to purchaseOrderCurrency if not already present
                                         $currencies = $get('../../purchaseOrderCurrency') ?? [];
 
@@ -869,38 +1058,42 @@ class PurchaseOrderResource extends Resource
                                         };
                                     }])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                         $qty = (float)$get('quantity');
-                                        $price = HelperController::parseIndonesianMoney($get('unit_price'));
-                                        $set('total', number_format($qty * $price, 0, ',', '.'));
-                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null))));
+                                        $price = self::parseCurrencyState($get('unit_price'));
+                                        $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
+                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     }),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->reactive()
                                     ->required()
                                     ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, ',', '.', 2)
+            $money($input, ',', '.', 10)
         JS))
-                                    ->formatStateUsing(function ($state) {
+                                    ->formatStateUsing(function ($state, Get $get) {
                                         if ($state === null || $state === '') {
                                             return '';
                                         }
-                                        return number_format(\App\Helpers\MoneyHelper::parse($state), 2, ',', '.');
+                                        return self::formatCurrencyInputState($state, is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
                                     })
                                     ->dehydrateStateUsing(function ($state) {
                                         if ($state === null || $state === '') {
                                             return null;
                                         }
-                                        return \App\Helpers\MoneyHelper::parse($state);
+                                        return self::parseCurrencyState($state);
                                     })
                                     ->validationMessages([
                                         'required' => 'Unit price tidak boleh kosong',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                         $qty = (float)$get('quantity');
-                                        $price = HelperController::parseIndonesianMoney($get('unit_price'));
-                                        $set('total', number_format($qty * $price, 0, ',', '.'));
-                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null))));
+                                        $price = self::parseCurrencyState($get('unit_price'));
+                                        $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
+                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->prefix(function ($get) {
                                         return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
@@ -913,11 +1106,18 @@ class PurchaseOrderResource extends Resource
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
-                                    ->indonesianMoney()
+                                    ->formatStateUsing(function ($state, Get $get) {
+                                        if ($state === null || $state === '') {
+                                            return '';
+                                        }
+
+                                        return self::formatCurrencyPreviewState($state, is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
+                                    })
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
+                                            $currencyId = $record->currency_id ?? null;
                                             $total = (float)$record->quantity * (float)$record->unit_price;
-                                            $component->state(number_format($total, 0, ',', '.'));
+                                            $component->state(self::formatCurrencyPreviewState($total, $currencyId));
                                         }
                                     }),
                                 TextInput::make('discount')
@@ -934,7 +1134,10 @@ class PurchaseOrderResource extends Resource
                                         'max' => 'Discount maksimal 100%.',
                                     ])
                                     ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal((float)$get('quantity'), HelperController::parseIndonesianMoney($get('unit_price')), (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null))));
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
+                                        $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
+                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->suffix('%')
                                     ->default(0),
@@ -958,13 +1161,10 @@ class PurchaseOrderResource extends Resource
                                     ->afterStateUpdated(function (Set $set, Get $get) {
                                         $tipePajak = self::normalizeTaxTypeValue($get('tipe_pajak') ?? null);
                                         $effectiveTax = $tipePajak === 'none' ? 0 : (float)$get('tax');
-                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
-                                            (float)$get('quantity'),
-                                            HelperController::parseIndonesianMoney($get('unit_price')),
-                                            (float)$get('discount'),
-                                            $effectiveTax,
-                                            $tipePajak
-                                        )));
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
+                                        $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), $effectiveTax, $tipePajak, $currencyId);
+                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->suffix('%')
                                     ->default(fn() => \App\Models\TaxSetting::activeRate('PPN')),
@@ -976,7 +1176,30 @@ class PurchaseOrderResource extends Resource
                                     })
                                     ->default(0)
                                     ->readOnly()
-                                    ->indonesianMoney()
+                                    ->formatStateUsing(function ($state, Get $get) {
+                                        if ($state === null || $state === '') {
+                                            return '';
+                                        }
+
+                                        return self::formatCurrencyPreviewState($state, is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
+                                    })
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if (! $record) {
+                                            return;
+                                        }
+
+                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                        $preview = self::calculateCurrencyPreview(
+                                            (float) ($record->quantity ?? 0),
+                                            (float) ($record->unit_price ?? 0),
+                                            (float) ($record->discount ?? 0),
+                                            (float) ($record->tax ?? 0),
+                                            self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
+                                            $currencyId
+                                        );
+
+                                        $component->state(self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                    })
                                     ->afterStateUpdated(function ($component, $state, $livewire) {
                                         $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         $items = $livewire->data['purchaseOrderItem'] ?? [];
@@ -984,7 +1207,7 @@ class PurchaseOrderResource extends Resource
                                         foreach ($items as $item) {
                                             $itemSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
-                                                \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                                self::parseCurrencyState($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
                                                 $item['tipe_pajak'] ?? null
@@ -1016,7 +1239,7 @@ class PurchaseOrderResource extends Resource
                                                     }
                                                 }
                                             }
-                                            $total += ($biaya['total'] ?? 0) * $nominal;
+                                            $total += self::parseCurrencyState($biaya['total'] ?? 0) * $nominal;
                                         }
 
                                         $livewire->data['total_amount'] = self::formatMoneyState($total);
@@ -1045,13 +1268,10 @@ class PurchaseOrderResource extends Resource
                                         }
                                         $effectiveTax = $normalizedState === 'none' ? 0 : (float)$get('tax');
                                         // Recalculate subtotal when tax type changes
-                                        $set('subtotal', self::formatMoneyState(HelperController::hitungSubtotal(
-                                            (float)$get('quantity'),
-                                            HelperController::parseIndonesianMoney($get('unit_price')),
-                                            (float)$get('discount'),
-                                            $effectiveTax,
-                                            $normalizedState
-                                        )));
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
+                                        $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), $effectiveTax, $normalizedState, $currencyId);
+                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->validationMessages([
                                         'required' => 'Tipe Pajak belum dipilih'
@@ -1061,10 +1281,11 @@ class PurchaseOrderResource extends Resource
                                     ->columnSpanFull()
                                     ->content(function (Get $get) {
                                         $qty       = (float)($get('quantity') ?? 0);
-                                        $unitPrice = HelperController::parseIndonesianMoney($get('unit_price'));
+                                        $unitPrice = self::parseCurrencyState($get('unit_price'));
                                         $discount  = (float)($get('discount') ?? 0);
                                         $taxRate   = (float)($get('tax') ?? 0);
                                         $tipePajak = self::normalizeTaxTypeValue($get('tipe_pajak') ?? null);
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
 
                                         if ($qty <= 0 || $unitPrice <= 0) {
                                             return new \Illuminate\Support\HtmlString(
@@ -1075,20 +1296,21 @@ class PurchaseOrderResource extends Resource
                                         $gross     = $qty * $unitPrice;
                                         $discAmt   = $gross * $discount / 100;
                                         $afterDisc = $gross - $discAmt;
-                                        $fmt       = fn(float $n) => MoneyHelper::rupiah($n);
+                                        $fmt       = fn(float $n) => CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($n, $currencyId);
 
-                                        // Use TaxService for consistent results (same as hitungSubtotal)
-                                        $taxResult     = \App\Services\TaxService::compute($afterDisc, $taxRate, $tipePajak);
+                                        $preview = self::calculateCurrencyPreview($qty, $unitPrice, $discount, $taxRate, $tipePajak, $currencyId);
                                         $normalizedType = \App\Services\TaxService::normalizeType($tipePajak);
-                                        $dpp   = $taxResult['dpp'];
-                                        $ppn   = $taxResult['ppn'];
-                                        $total = $taxResult['total'];
+                                        $ppn = (float) $preview['tax_nominal'];
+                                        $total = (float) $preview['subtotal'];
+                                        $dpp = $normalizedType === 'Inklusif'
+                                            ? max(0, $afterDisc - $ppn)
+                                            : $afterDisc;
 
                                         if ($normalizedType === 'Non Pajak' || $taxRate <= 0) {
                                             return new \Illuminate\Support\HtmlString(
                                                 '<div class="text-sm text-gray-600 py-1">' .
                                                     '<span class="font-semibold">&#9899; Non Pajak</span> &mdash; Tidak ada PPN. ' .
-                                                    'DPP: <strong>' . $fmt($dpp) . '</strong> &nbsp;|&nbsp; PPN: <strong>Rp 0</strong> &nbsp;|&nbsp; Total: <strong>' . $fmt($total) . '</strong>' .
+                                                    'DPP: <strong>' . $fmt($dpp) . '</strong> &nbsp;|&nbsp; PPN: <strong>' . $fmt(0) . '</strong> &nbsp;|&nbsp; Total: <strong>' . $fmt($total) . '</strong>' .
                                                     '</div>'
                                             );
                                         }
@@ -1196,6 +1418,22 @@ class PurchaseOrderResource extends Resource
                                             return [$c->id => "{$c->name} ({$c->symbol})"];
                                         });
                                     })
+                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                        if (! $state) {
+                                            return;
+                                        }
+
+                                        $currencies = $get('../../purchaseOrderCurrency') ?? [];
+                                        $currencyExists = collect($currencies)->contains(fn ($currency) => ($currency['currency_id'] ?? null) == $state);
+
+                                        if (! $currencyExists) {
+                                            $currencies[] = [
+                                                'currency_id' => $state,
+                                                'nominal' => CurrencyConversionResolver::resolveRate(is_numeric($state) ? (int) $state : null),
+                                            ];
+                                            $set('../../purchaseOrderCurrency', $currencies);
+                                        }
+                                    })
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih',
                                         'exists' => 'Mata uang tidak tersedia'
@@ -1234,6 +1472,7 @@ class PurchaseOrderResource extends Resource
                                     ])
                                     ->default(0)
                                     ->indonesianMoney()
+                                    ->dehydrateStateUsing(fn ($state) => self::parseCurrencyState($state ?? 0))
                                     ->afterStateUpdated(function ($component, $state, $livewire) {
                                         $currencies = $livewire->data['purchaseOrderCurrency'] ?? [];
                                         $items = $livewire->data['purchaseOrderItem'] ?? [];
@@ -1241,7 +1480,7 @@ class PurchaseOrderResource extends Resource
                                         foreach ($items as $item) {
                                             $itemSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
-                                                \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                                self::parseCurrencyState($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
                                                 $item['tipe_pajak'] ?? null
@@ -1272,7 +1511,7 @@ class PurchaseOrderResource extends Resource
                                                     }
                                                 }
                                             }
-                                            $biayaTotal = (float) HelperController::parseIndonesianMoney($biaya['total'] ?? 0);
+                                            $biayaTotal = (float) self::parseCurrencyState($biaya['total'] ?? 0);
                                             $total += $biayaTotal * $nominal;
                                         }
 
@@ -1294,6 +1533,8 @@ class PurchaseOrderResource extends Resource
                             ]),
                         Repeater::make('purchaseOrderCurrency')
                             ->label("Mata Uang")
+                            ->hidden()
+                            ->dehydrated(true)
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
                                 // Ensure 'nominal' is numeric so ->indonesianMoney() will render it
                                 if (isset($data['nominal']) && is_numeric($data['nominal'])) {
@@ -1317,10 +1558,6 @@ class PurchaseOrderResource extends Resource
                                     'nominal' => 0
                                 ]
                             ])
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Minimal satu mata uang harus dipilih'
-                            ])
                             ->schema([
                                 Select::make('currency_id')
                                     ->label('Mata uang')
@@ -1336,11 +1573,11 @@ class PurchaseOrderResource extends Resource
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         // Auto-fill nominal from Currency.to_rupiah master rate
                                         if ($state) {
-                                            $currency = Currency::find($state);
-                                            if ($currency && (float)$currency->to_rupiah > 0) {
+                                            $rate = CurrencyConversionResolver::resolveRate(is_numeric($state) ? (int) $state : null);
+                                            if ($rate > 0) {
                                                 // Cast to float to prevent indonesianMoney dehydrate from treating
                                                 // decimal strings like "1.00" as "100" (stripping the decimal dot)
-                                                $set('nominal', (float)$currency->to_rupiah);
+                                                $set('nominal', $rate);
                                             }
                                         }
                                     })
@@ -1369,7 +1606,7 @@ class PurchaseOrderResource extends Resource
                                         foreach ($items as $item) {
                                             $itemSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal(
                                                 $item['quantity'] ?? 0,
-                                                \App\Http\Controllers\HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                                                self::parseCurrencyState($item['unit_price'] ?? 0),
                                                 $item['discount'] ?? 0,
                                                 $item['tax'] ?? 0,
                                                 $item['tipe_pajak'] ?? null
@@ -1400,7 +1637,7 @@ class PurchaseOrderResource extends Resource
                                                     }
                                                 }
                                             }
-                                            $biayaTotal = (float) HelperController::parseIndonesianMoney($biaya['total'] ?? 0);
+                                            $biayaTotal = (float) self::parseCurrencyState($biaya['total'] ?? 0);
                                             $total += $biayaTotal * $nominal;
                                         }
 
@@ -1412,7 +1649,7 @@ class PurchaseOrderResource extends Resource
                             ->required()
                             ->reactive()
                             ->hidden()
-                            ->indonesianMoney()
+                            ->dehydrateStateUsing(fn ($state) => self::parseCurrencyState($state ?? 0))
                             ->helperText('Total dihitung dari item dan biaya; tampil untuk referensi saja')
                             ->afterStateHydrated(function ($component, $record) {
                                 if (! $record) {
@@ -1436,7 +1673,7 @@ class PurchaseOrderResource extends Resource
                                     $poCurrency = $poCurrencies->get($item->currency_id);
                                     $itemNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
                                         ? (float)$poCurrency->nominal
-                                        : ($item->currency->to_rupiah ?? 1);
+                                        : CurrencyConversionResolver::resolveRate((int) ($item->currency_id ?? null));
                                     $total += $itemSubtotal * $itemNominal;
                                 }
 
@@ -1444,7 +1681,7 @@ class PurchaseOrderResource extends Resource
                                     $poCurrency = $poCurrencies->get($biaya->currency_id);
                                     $biayaNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
                                         ? (float)$poCurrency->nominal
-                                        : ($biaya->currency->to_rupiah ?? 1);
+                                            : CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null));
                                     $total += (float) $biaya->total * $biayaNominal;
                                 }
                                 $component->state(self::formatMoneyState($total));
@@ -1576,7 +1813,9 @@ class PurchaseOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total Amount')
-                    ->rupiah()
+                    ->formatStateUsing(function ($state, $record) {
+                        return self::formatMoneyState($state, $record->currency_id ?? null);
+                    })
                     ->sortable(),
                 TextColumn::make('remaining_qty_status')
                     ->label('Status Penerimaan')
@@ -1972,7 +2211,7 @@ class PurchaseOrderResource extends Resource
                                     $otherFee = 0;
                                     foreach ($record->purchaseOrderBiaya as $biaya) {
                                         if ($biaya->masuk_invoice == 1) {
-                                            $otherFee += ($biaya->total * $biaya->currency->to_rupiah);
+                                                $otherFee += ($biaya->total * CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null)));
                                         }
                                     }
 

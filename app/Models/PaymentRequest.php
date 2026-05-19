@@ -242,7 +242,7 @@ class PaymentRequest extends Model
 
     public function getRemainingAmountAttribute(): float
     {
-        $total = MoneyHelper::parse($this->total_amount ?? 0);
+        $total = MoneyHelper::safeParse($this->total_amount ?? 0);
         return max(0, $total - $this->paid_amount);
     }
 }

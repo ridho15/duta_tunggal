@@ -146,7 +146,7 @@ class ViewQuotation extends ViewRecord
                                     ->content(fn($record) => $record->customer->name ?? '-'),
                                 Placeholder::make('total_amount')
                                     ->label('Total Amount')
-                                    ->content(fn($record) => 'Rp ' . number_format($record->total_amount, 0, ',', '.')),
+                                    ->content(fn($record) => \App\Helpers\MoneyHelper::rupiah($record->total_amount)),
                                 Placeholder::make('item_count')
                                     ->label('Jumlah Item')
                                     ->content(fn($record) => $record->quotationItem->count() . ' item(s)'),
@@ -226,7 +226,7 @@ class ViewQuotation extends ViewRecord
                                             ->reactive()
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $state ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $discount = $get('discount') ?? 0;
                                                 $tax = $get('tax') ?? 0;
                                                 $taxType = $get('tax_type') ?? 'None';
@@ -239,7 +239,7 @@ class ViewQuotation extends ViewRecord
                                             ->default(function ($get, $record) {
                                                 $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
                                                 return $quotationItem
-                                                    ? number_format((float) $quotationItem->unit_price, 0, ',', '.')
+                                                    ? number_format((float) $quotationItem->unit_price, 2, ',', '.')
                                                     : 0;
                                             })
                                             ->required()
@@ -251,7 +251,7 @@ class ViewQuotation extends ViewRecord
                                             ->reactive()
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $get('quantity') ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($state ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
                                                 $discount = $get('discount') ?? 0;
                                                 $tax = $get('tax') ?? 0;
                                                 $taxType = $get('tax_type') ?? 'None';
@@ -307,7 +307,7 @@ class ViewQuotation extends ViewRecord
                                             ->reactive()
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $get('quantity') ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $discount = $state ?? 0;
                                                 $tax = $get('tax') ?? 0;
                                                 $taxType = $get('tax_type') ?? 'None';
@@ -327,7 +327,7 @@ class ViewQuotation extends ViewRecord
                                             ->reactive()
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $get('quantity') ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $discount = $get('discount') ?? 0;
                                                 $tax = $state ?? 0;
                                                 $taxType = $get('tax_type') ?? 'None';
@@ -361,7 +361,7 @@ class ViewQuotation extends ViewRecord
                                                 $items[] = [
                                                     'product_id' => $quotationItem->product_id,
                                                     'quantity' => $quotationItem->quantity,
-                                                    'unit_price' => number_format((float) $quotationItem->unit_price, 0, ',', '.'),
+                                                    'unit_price' => number_format((float) $quotationItem->unit_price, 2, ',', '.'),
                                                     'discount' => $quotationItem->discount,
                                                     'tax' => $quotationItem->tax,
                                                     'tax_type' => $quotationItem->tax_type ?? 'None',
@@ -420,7 +420,7 @@ class ViewQuotation extends ViewRecord
                                 $saleOrder->saleOrderItem()->create([
                                     'product_id' => $item['product_id'],
                                     'quantity' => $item['quantity'],
-                                    'unit_price' => HelperController::parseIndonesianMoney($item['unit_price']),
+                                    'unit_price' => \App\Helpers\MoneyHelper::safeParse($item['unit_price']),
                                     'discount' => $item['discount'] ?? 0,
                                     'tax' => $item['tax'] ?? 0,
                                     'tipe_pajak' => $item['tax_type'] ?? 'None',

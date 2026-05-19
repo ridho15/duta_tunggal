@@ -103,9 +103,9 @@ class PurchaseReportServiceTest extends TestCase
 
         $this->assertNotNull($itemRow);
         $this->assertSame(3, $itemRow['Qty']);
-        $this->assertSame('Rp 200.000', $itemRow['Harga Satuan']);
-        $this->assertSame('Rp 600.000', $itemRow['Subtotal']);
+        $this->assertSame('Rp 200.000,00', $itemRow['Harga Satuan']);
+        $this->assertSame('Rp 600.000,00', $itemRow['Subtotal']);
         $this->assertNotNull($summaryRow);
-        $this->assertSame('Total: Rp 750.000', $summaryRow['Total PO']);
+        $this->assertSame('Total: Rp 750.000,00', $summaryRow['Total PO']);
     }
 }

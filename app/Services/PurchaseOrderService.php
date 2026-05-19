@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
+use App\Support\CurrencyConversionResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -26,16 +27,27 @@ class PurchaseOrderService
         self::$updatingTotalAmount = true;
 
         $total = 0;
+        $purchaseOrder->loadMissing(['purchaseOrderCurrency', 'purchaseOrderItem.currency', 'purchaseOrderBiaya.currency']);
+        $poCurrencies = $purchaseOrder->purchaseOrderCurrency->keyBy('currency_id');
 
         // Hitung total dari purchase order items
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            $total += HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak);
+            $subtotal = HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak);
+            $poCurrency = $poCurrencies->get($item->currency_id);
+            $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
+                ? (float) $poCurrency->nominal
+                : CurrencyConversionResolver::resolveRate(is_numeric($item->currency_id) ? (int) $item->currency_id : null);
+
+            $total += $subtotal * $rate;
         }
 
         // Hitung total dari biaya lain (purchase order biaya)
         foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
-            // Konversi ke Rupiah jika mata uang berbeda
-            $biayaAmount = $biaya->total * ($biaya->currency->to_rupiah ?? 1);
+            $poCurrency = $poCurrencies->get($biaya->currency_id);
+            $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
+                ? (float) $poCurrency->nominal
+                : CurrencyConversionResolver::resolveRate(is_numeric($biaya->currency_id) ? (int) $biaya->currency_id : null);
+            $biayaAmount = $biaya->total * $rate;
             $total += $biayaAmount;
         }
 

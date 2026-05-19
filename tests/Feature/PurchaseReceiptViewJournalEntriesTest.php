@@ -63,10 +63,8 @@ test('purchase receipt view shows related journal entries from receipt and recei
 
     $purchaseOrder = PurchaseOrder::factory()->create([
         'supplier_id' => $supplier->id,
-        'warehouse_id' => $warehouse->id,
         'status' => 'approved',
         'created_by' => $user->id,
-        'cabang_id' => $cabang->id,
     ]);
 
     $poItem = PurchaseOrderItem::factory()->create([
@@ -161,14 +159,12 @@ test('purchase receipt view falls back to purchase order item qc when receipt it
     $supplier = Supplier::factory()->create();
     $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
     $currency = Currency::factory()->create(['code' => 'IDR', 'to_rupiah' => 1]);
-    $product = Product::factory()->create(['cabang_id' => $cabang->id]);
+    $product = Product::factory()->forCabang($cabang)->create();
 
     $purchaseOrder = PurchaseOrder::factory()->create([
         'supplier_id' => $supplier->id,
-        'warehouse_id' => $warehouse->id,
         'status' => 'approved',
         'created_by' => $user->id,
-        'cabang_id' => $cabang->id,
     ]);
 
     $poItem = PurchaseOrderItem::factory()->create([

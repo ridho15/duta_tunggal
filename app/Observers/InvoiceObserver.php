@@ -7,6 +7,7 @@ use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
 use App\Services\LedgerPostingService;
+use App\Support\CurrencyConversionResolver;
 use App\Support\ProcurementFailureNotifier;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -345,7 +346,7 @@ class InvoiceObserver
             );
         }
 
-        $invoice->loadMissing('invoiceItem.product', 'fromModel.saleOrderItem.product');
+        $invoice->loadMissing('invoiceItem.product', 'fromModel.saleOrderItem.product', 'fromModel.saleOrderItem.currency');
 
         $invoiceItems = $invoice->invoiceItem;
         if ($invoiceItems->isEmpty() && $invoice->from_model_type === 'App\\Models\\SaleOrder') {
@@ -382,13 +383,17 @@ class InvoiceObserver
             // item->subtotal is already net of discount, so no separate discount entry is needed
             // (using net method: revenue is recorded after discount, keeping entries balanced)
             $lineTotal = (float) ($item->total ?? $item->subtotal ?? 0);
+            $lineSubtotal = (float) ($item->subtotal ?? $lineTotal);
             if ($lineTotal <= 0 && $invoice->from_model_type === 'App\\Models\\SaleOrder') {
                 $quantity = max(0, (float) ($item->quantity ?? 0));
                 $unitPrice = max(0, (float) ($item->unit_price ?? 0));
                 $discount = max(0.0, min(100.0, (float) ($item->discount ?? 0)));
+                $itemCurrencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null;
 
                 if ($quantity > 0 && $unitPrice > 0) {
-                    $lineTotal = round($quantity * $unitPrice * (1 - ($discount / 100)), 2);
+                    $lineOriginal = round($quantity * $unitPrice * (1 - ($discount / 100)), 4);
+                    $lineTotal = CurrencyConversionResolver::convertToIdr($lineOriginal, $itemCurrencyId);
+                    $lineSubtotal = $lineTotal;
                 }
             }
             if ($lineTotal > 0) {
@@ -399,13 +404,13 @@ class InvoiceObserver
                     'reference' => $invoice->invoice_number,
                     'description' => "Sales Invoice - Revenue: {$productName}",
                     'debit' => 0,
-                    'credit' => $item->subtotal ?? $lineTotal, // Revenue net of discount
+                    'credit' => round($lineSubtotal, 2), // Revenue net of discount, stored in IDR
                     'journal_type' => 'sales',
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                     'cabang_id' => $invoice->cabang_id,
                 ]);
-                $totalRevenue += $item->subtotal ?? $lineTotal;
+                $totalRevenue += round($lineSubtotal, 2);
             }
 
         }

@@ -54,6 +54,22 @@ class ProductFactory extends Factory
         ];
     }
 
+    public function forCabang(Cabang|int|null $cabang = null): static
+    {
+        return $this->state(function (array $attributes) use ($cabang) {
+            $cabangId = match (true) {
+                $cabang instanceof Cabang => $cabang->id,
+                is_int($cabang) && $cabang > 0 => $cabang,
+                default => Cabang::query()->inRandomOrder()->value('id')
+                    ?? Cabang::factory()->create()->id,
+            };
+
+            return [
+                'cabang_id' => $cabangId,
+            ];
+        });
+    }
+
     public function configure()
     {
         return $this->afterCreating(function (Product $product) {

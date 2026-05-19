@@ -98,7 +98,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                                     if ($this->cabang_id) {
                                         $query->where('cabang_id', $this->cabang_id);
                                     }
-                                    return 'Rp ' . number_format($query->sum('remaining'), 0, ',', '.');
+                                    return \App\Helpers\MoneyHelper::rupiah($query->sum('remaining'));
                                 }),
 
                             Placeholder::make('receivables_count')
@@ -123,7 +123,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                                             $q->where('cabang_id', $this->cabang_id);
                                         });
                                     }
-                                    return 'Rp ' . number_format($query->sum('remaining'), 0, ',', '.');
+                                    return \App\Helpers\MoneyHelper::rupiah($query->sum('remaining'));
                                 }),
 
                             Placeholder::make('payables_count')
@@ -180,14 +180,14 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                                 ->label('Expected Cash Inflow (Next 30 days)')
                                 ->content(function () {
                                     $amount = $this->calculateExpectedCashFlow('receivables', 30);
-                                    return 'Rp ' . number_format($amount, 0, ',', '.');
+                                    return \App\Helpers\MoneyHelper::rupiah($amount);
                                 }),
 
                             Placeholder::make('overdue_receivables')
                                 ->label('Overdue Receivables')
                                 ->content(function () {
                                     $amount = $this->ageingReportService()->calculateOverdue($this->ageingFilters())['receivables'];
-                                    return 'Rp ' . number_format($amount, 0, ',', '.');
+                                    return \App\Helpers\MoneyHelper::rupiah($amount);
                                 }),
                         ]),
 
@@ -198,14 +198,14 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                                 ->label('Expected Cash Outflow (Next 30 days)')
                                 ->content(function () {
                                     $amount = $this->calculateExpectedCashFlow('payables', 30);
-                                    return 'Rp ' . number_format($amount, 0, ',', '.');
+                                    return \App\Helpers\MoneyHelper::rupiah($amount);
                                 }),
 
                             Placeholder::make('overdue_payables')
                                 ->label('Overdue Payables')
                                 ->content(function () {
                                     $amount = $this->ageingReportService()->calculateOverdue($this->ageingFilters())['payables'];
-                                    return 'Rp ' . number_format($amount, 0, ',', '.');
+                                    return \App\Helpers\MoneyHelper::rupiah($amount);
                                 }),
                         ]),
                 ]),
@@ -282,7 +282,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
         $amount = $records->where('aging_bucket_computed', $bucket)->sum('remaining');
 
-        return 'Rp ' . number_format($amount, 0, ',', '.');
+        return \App\Helpers\MoneyHelper::rupiah($amount);
     }
 
     private function calculateExpectedCashFlow($type, $days)

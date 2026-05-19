@@ -2,6 +2,7 @@
 
 namespace App\Services\Reports;
 
+use App\Helpers\MoneyHelper;
 use App\Models\PurchaseOrder;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -91,7 +92,7 @@ class PurchaseReportService
                 'Qty' => '',
                 'Harga Satuan' => '',
                 'Subtotal' => '',
-                'Total PO' => 'Rp ' . number_format($order->total_amount ?? 0, 0, ',', '.'),
+                'Total PO' => MoneyHelper::rupiah($order->total_amount ?? 0),
                 'Status' => $order->status,
             ]);
 
@@ -106,8 +107,8 @@ class PurchaseReportService
                     'Email' => '',
                     'Produk' => $item->product->name ?? '-',
                     'Qty' => $item->quantity ?? 0,
-                    'Harga Satuan' => 'Rp ' . number_format($item->unit_price ?? 0, 0, ',', '.'),
-                    'Subtotal' => 'Rp ' . number_format(($item->quantity ?? 0) * ($item->unit_price ?? 0), 0, ',', '.'),
+                    'Harga Satuan' => MoneyHelper::rupiah($item->unit_price ?? 0),
+                    'Subtotal' => MoneyHelper::rupiah(($item->quantity ?? 0) * ($item->unit_price ?? 0)),
                     'Total PO' => '',
                     'Status' => '',
                 ]);
@@ -142,7 +143,7 @@ class PurchaseReportService
             'Qty' => '',
             'Harga Satuan' => '',
             'Subtotal' => '',
-            'Total PO' => 'Total: Rp ' . number_format($summary['total_amount'], 0, ',', '.'),
+            'Total PO' => 'Total: ' . MoneyHelper::rupiah($summary['total_amount']),
             'Status' => '',
         ]);
 
@@ -187,7 +188,7 @@ class PurchaseReportService
             'No. Telp' => '',
             'Email' => '',
             'Produk' => 'Total Qty: ' . $summary['total_quantity'],
-            'Qty' => 'Avg Transaction: Rp ' . number_format($summary['average_amount'], 0, ',', '.'),
+            'Qty' => 'Avg Transaction: ' . MoneyHelper::rupiah($summary['average_amount']),
             'Harga Satuan' => 'Unique Products: ' . $summary['unique_products'],
             'Subtotal' => '',
             'Total PO' => '',

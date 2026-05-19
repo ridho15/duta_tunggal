@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\BillOfMaterialResource\Pages;
 use App\Filament\Resources\BillOfMaterialResource\Pages\ViewBillOfMaterial;
+use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\BillOfMaterial;
 use App\Models\Cabang;
@@ -359,7 +360,7 @@ class BillOfMaterialResource extends Resource
                                             $quantity = (float) ($item['quantity'] ?? 0);
                                             $materialCost += ($unitPrice * $quantity);
                                         }
-                                        return 'Rp ' . number_format($materialCost, 0, ',', '.');
+                                        return MoneyHelper::rupiah($materialCost);
                                     }),
                                 Placeholder::make('total_cost_display')
                                     ->label('Total Biaya')
@@ -375,7 +376,7 @@ class BillOfMaterialResource extends Resource
                                         $laborCost = HelperController::parseIndonesianMoney($get('labor_cost'));
                                         $overheadCost = HelperController::parseIndonesianMoney($get('overhead_cost'));
                                         $totalCost = $materialCost + $laborCost + $overheadCost;
-                                        return 'Rp ' . number_format($totalCost, 0, ',', '.');
+                                        return MoneyHelper::rupiah($totalCost);
                                     }),
                                 Hidden::make('total_cost')
                                     ->dehydrated()
@@ -656,7 +657,7 @@ class BillOfMaterialResource extends Resource
 
     protected static function formatMoneyState(mixed $value): string
     {
-        return number_format((float) HelperController::parseIndonesianMoney($value), 0, ',', '.');
+        return number_format((float) HelperController::parseIndonesianMoney($value), 2, ',', '.');
     }
 
     protected static function findProductForForm(?int $productId): ?Product

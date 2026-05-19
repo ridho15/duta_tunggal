@@ -69,14 +69,14 @@ class AssetDisposalResource extends Resource
                                 'required' => 'Asset wajib dipilih.',
                             ])
                             ->getOptionLabelFromRecordUsing(function ($record) {
-                                return "{$record->name} (Book Value: Rp " . number_format($record->book_value, 0, ',', '.') . ")";
+                                return "{$record->name} (Book Value: " . \App\Helpers\MoneyHelper::rupiah($record->book_value) . ")";
                             })
                             ->options(function () {
                                 return \App\Models\Asset::where('status', 'active')
                                     ->with('cabang')
                                     ->get()
                                     ->mapWithKeys(function ($asset) {
-                                        return [$asset->id => "{$asset->name} - {$asset->cabang->nama} (Rp " . number_format($asset->book_value, 0, ',', '.') . ")"];
+                                        return [$asset->id => "{$asset->name} - {$asset->cabang->nama} (" . \App\Helpers\MoneyHelper::rupiah($asset->book_value) . ")"];
                                     });
                             }),
                     ]),

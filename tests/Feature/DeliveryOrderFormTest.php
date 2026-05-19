@@ -91,7 +91,8 @@ test('debug delivery order form data keys', function () {
     try {
         $result = $method->invoke($createPage, $formData);
         expect($result)->toBeArray();
-        expect($result['salesOrders'])->toBe([1]);
+        // Assert that the salesOrders returned include the sale order we created
+        expect($result['salesOrders'])->toBe([$saleOrder->id]);
         expect($result['deliveryOrderItem'])->toBeArray();
         expect(count($result['deliveryOrderItem']))->toBe(1);
     } catch (\Illuminate\Validation\ValidationException $e) {

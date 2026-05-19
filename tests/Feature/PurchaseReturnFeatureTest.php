@@ -1,18 +1,25 @@
 <?php
 
 use App\Models\User;
+use App\Models\Currency;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderCurrency;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptItem;
+use App\Models\PurchaseReturnItem;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\JournalEntry;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Filament\Resources\PurchaseReturnResource\Pages\ViewPurchaseReturn;
 use App\Http\Controllers\HelperController;
 use App\Services\PurchaseReturnService;
+use App\Services\BalanceSheetService;
 use App\Services\StockService;
 use App\Services\AccountingService;
 use Filament\Notifications\Notification;
@@ -193,6 +200,118 @@ test('can create purchase return with auto generated number', function () {
     expect($purchaseReturn->nota_retur)->toMatch('/^NR-\d{8}-\d{4}$/')
         ->and($purchaseReturn->purchase_receipt_id)->toBe($purchaseReceipt->id)
         ->and($purchaseReturn->status)->toBe('draft');
+});
+
+test('purchase return journal converts usd receipt item amount to idr and keeps balance sheet balanced', function () {
+    test()->seed(\Database\Seeders\CabangSeeder::class);
+    test()->seed(\Database\Seeders\SupplierSeeder::class);
+
+    $user = User::factory()->create(['cabang_id' => Cabang::first()->id, 'manage_type' => 'all']);
+    test()->actingAs($user);
+
+    $usd = Currency::updateOrCreate(
+        ['code' => 'USD'],
+        ['name' => 'US Dollar', 'symbol' => '$', 'to_rupiah' => 15000]
+    );
+
+    $inventoryCoa = ChartOfAccount::where('code', '1140.01')->first();
+    $product = Product::factory()->create([
+        'inventory_coa_id' => $inventoryCoa?->id,
+        'purchase_return_coa_id' => ChartOfAccount::where('code', '5120.10')->first()?->id,
+    ]);
+
+    $warehouse = Warehouse::first() ?? Warehouse::factory()->create();
+    $supplier = Supplier::first();
+    $cabang = Cabang::first();
+
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $supplier->id,
+        'po_number' => 'PO-USD-RET',
+        'order_date' => now()->toDateString(),
+        'status' => 'completed',
+        'received_by' => $user->id,
+        'expected_date' => now()->addDay()->toDateString(),
+        'total_amount' => 80000,
+        'cabang_id' => $cabang->id,
+        'currency_id' => $usd->id,
+        'created_by' => $user->id,
+        'warehouse_id' => $warehouse->id,
+        'tempo_hutang' => 30,
+        'ppn_option' => 'non_pajak',
+    ]);
+
+    PurchaseOrderCurrency::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'currency_id' => $usd->id,
+        'nominal' => 16000,
+    ]);
+
+    $poItem = PurchaseOrderItem::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $product->id,
+        'quantity' => 1,
+        'unit_price' => 5,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Non Pajak',
+        'currency_id' => $usd->id,
+    ]);
+
+    $purchaseReceipt = PurchaseReceipt::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'receipt_number' => 'RC-USD-RET',
+        'receipt_date' => now()->toDateString(),
+        'status' => 'completed',
+        'received_by' => $user->id,
+        'total_received' => 80000,
+        'cabang_id' => $cabang->id,
+        'currency_id' => $usd->id,
+        'created_by' => $user->id,
+        'warehouse_id' => $warehouse->id,
+    ]);
+
+    $receiptItem = PurchaseReceiptItem::create([
+        'purchase_receipt_id' => $purchaseReceipt->id,
+        'purchase_order_item_id' => $poItem->id,
+        'product_id' => $product->id,
+        'qty_received' => 1,
+        'qty_accepted' => 1,
+        'qty_rejected' => 0,
+        'warehouse_id' => $warehouse->id,
+        'status' => 'completed',
+    ]);
+
+    $purchaseReturn = PurchaseReturn::create([
+        'purchase_receipt_id' => $purchaseReceipt->id,
+        'return_date' => now()->toDateString(),
+        'nota_retur' => 'NR-USD-RET',
+        'created_by' => $user->id,
+        'status' => 'approved',
+        'cabang_id' => $cabang->id,
+    ]);
+
+    PurchaseReturnItem::create([
+        'purchase_return_id' => $purchaseReturn->id,
+        'purchase_receipt_item_id' => $receiptItem->id,
+        'product_id' => $product->id,
+        'qty_returned' => 1,
+        'unit_price' => 5,
+        'reason' => 'Rejected by supplier',
+    ]);
+
+    expect(app(PurchaseReturnService::class)->createJournalEntry($purchaseReturn))->toBeTrue();
+
+    $entries = JournalEntry::where('source_type', PurchaseReturn::class)
+        ->where('source_id', $purchaseReturn->id)
+        ->where('journal_type', 'purchase_return')
+        ->get();
+
+    expect((float) $entries->sum('debit'))->toBe(80000.0)
+        ->and((float) $entries->sum('credit'))->toBe(80000.0);
+
+    $balanceSheet = app(BalanceSheetService::class)->generate();
+    expect($balanceSheet['is_balanced'])->toBeTrue()
+        ->and(abs((float) $balanceSheet['difference']))->toBeLessThan(0.01);
 });
 
 test('can submit purchase return for approval', function () {

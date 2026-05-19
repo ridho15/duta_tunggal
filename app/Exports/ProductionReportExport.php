@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Helpers\MoneyHelper;
 use App\Models\ManufacturingOrder;
 use App\Models\Production;
 use App\Models\MaterialIssue;
@@ -57,7 +58,7 @@ class ProductionReportExport implements FromCollection, WithHeadings
                     'Tanggal Mulai' => $mo->start_date ? $mo->start_date->format('d/m/Y') : '-',
                     'Tanggal Selesai' => $mo->end_date ? $mo->end_date->format('d/m/Y') : '-',
                     'Total Produksi' => $totalProduced,
-                    'Total Biaya Material' => 'Rp ' . number_format($totalMaterialCost, 0, ',', '.'),
+                    'Total Biaya Material' => MoneyHelper::rupiah($totalMaterialCost),
                     'Durasi (Hari)' => $productionDays,
                     'Efisiensi (%)' => $productionDays > 0 ? round(($totalProduced / $productionDays) * 100, 2) : 0,
                 ];
@@ -88,8 +89,8 @@ class ProductionReportExport implements FromCollection, WithHeadings
                         'Nama Material' => $item->product->name ?? '-',
                         'Qty Diminta' => $item->quantity,
                         'Qty Dikeluarkan' => $item->issued_quantity ?? $item->quantity,
-                        'Harga Satuan' => 'Rp ' . number_format($item->unit_cost, 0, ',', '.'),
-                        'Total Biaya' => 'Rp ' . number_format($item->total_cost, 0, ',', '.'),
+                        'Harga Satuan' => MoneyHelper::rupiah($item->unit_cost),
+                        'Total Biaya' => MoneyHelper::rupiah($item->total_cost),
                         'Status' => $this->formatStatus($issue->status),
                     ];
                 });
@@ -123,8 +124,8 @@ class ProductionReportExport implements FromCollection, WithHeadings
                     'Qty Direncanakan' => $plannedQuantity,
                     'Qty Diproduksi' => $actualProduced,
                     'Pencapaian (%)' => round($efficiency, 2),
-                    'Total Biaya Material' => 'Rp ' . number_format($materialCost, 0, ',', '.'),
-                    'Biaya per Unit' => 'Rp ' . number_format($costPerUnit, 0, ',', '.'),
+                    'Total Biaya Material' => MoneyHelper::rupiah($materialCost),
+                    'Biaya per Unit' => MoneyHelper::rupiah($costPerUnit),
                     'Durasi (Hari)' => $plannedDays,
                     'Produktivitas (Unit/Hari)' => round($productivityRate, 2),
                     'Status Efisiensi' => $this->getEfficiencyStatus($efficiency),

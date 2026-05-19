@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Cabang;
 use App\Services\Reports\AgeingReportService;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -106,7 +107,7 @@ class SummarySheet implements FromCollection, WithHeadings, WithTitle, WithStyle
                 true
             );
             $data[] = ['Account Receivables Summary', '', '', 'Count', $receivablesData['current']['count'], $receivablesData['31-60']['count'], $receivablesData['61-90']['count'], $receivablesData['>90']['count'], $receivablesData['total']['count']];
-            $data[] = ['', '', '', 'Amount', 'Rp ' . number_format($receivablesData['current']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['31-60']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['61-90']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['>90']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['total']['amount'], 0, ',', '.')];
+            $data[] = ['', '', '', 'Amount', MoneyHelper::rupiah($receivablesData['current']['amount']), MoneyHelper::rupiah($receivablesData['31-60']['amount']), MoneyHelper::rupiah($receivablesData['61-90']['amount']), MoneyHelper::rupiah($receivablesData['>90']['amount']), MoneyHelper::rupiah($receivablesData['total']['amount'])];
         }
 
         $data[] = ['', '', '', '', '', '', '', '', ''];
@@ -121,7 +122,7 @@ class SummarySheet implements FromCollection, WithHeadings, WithTitle, WithStyle
                 true
             );
             $data[] = ['Account Payables Summary', '', '', 'Count', $payablesData['current']['count'], $payablesData['31-60']['count'], $payablesData['61-90']['count'], $payablesData['>90']['count'], $payablesData['total']['count']];
-            $data[] = ['', '', '', 'Amount', 'Rp ' . number_format($payablesData['current']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['31-60']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['61-90']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['>90']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['total']['amount'], 0, ',', '.')];
+            $data[] = ['', '', '', 'Amount', MoneyHelper::rupiah($payablesData['current']['amount']), MoneyHelper::rupiah($payablesData['31-60']['amount']), MoneyHelper::rupiah($payablesData['61-90']['amount']), MoneyHelper::rupiah($payablesData['>90']['amount']), MoneyHelper::rupiah($payablesData['total']['amount'])];
         }
 
         // Add cash flow projection
@@ -136,9 +137,9 @@ class SummarySheet implements FromCollection, WithHeadings, WithTitle, WithStyle
         $cashFlow60 = $service->projectCashFlow($baseFilters, 60);
         $cashFlow90 = $service->projectCashFlow($baseFilters, 90);
 
-        $data[] = ['Expected Collections (30 days)', 'Rp ' . number_format($cashFlow30['receivables'], 0, ',', '.'), '', 'Expected Payments (30 days)', 'Rp ' . number_format($cashFlow30['payables'], 0, ',', '.'), '', 'Net Cash Flow', 'Rp ' . number_format($cashFlow30['receivables'] - $cashFlow30['payables'], 0, ',', '.'), ''];
-        $data[] = ['Expected Collections (60 days)', 'Rp ' . number_format($cashFlow60['receivables'], 0, ',', '.'), '', 'Expected Payments (60 days)', 'Rp ' . number_format($cashFlow60['payables'], 0, ',', '.'), '', 'Net Cash Flow', 'Rp ' . number_format($cashFlow60['receivables'] - $cashFlow60['payables'], 0, ',', '.'), ''];
-        $data[] = ['Expected Collections (90 days)', 'Rp ' . number_format($cashFlow90['receivables'], 0, ',', '.'), '', 'Expected Payments (90 days)', 'Rp ' . number_format($cashFlow90['payables'], 0, ',', '.'), '', 'Net Cash Flow', 'Rp ' . number_format($cashFlow90['receivables'] - $cashFlow90['payables'], 0, ',', '.'), ''];
+        $data[] = ['Expected Collections (30 days)', MoneyHelper::rupiah($cashFlow30['receivables']), '', 'Expected Payments (30 days)', MoneyHelper::rupiah($cashFlow30['payables']), '', 'Net Cash Flow', MoneyHelper::rupiah($cashFlow30['receivables'] - $cashFlow30['payables']), ''];
+        $data[] = ['Expected Collections (60 days)', MoneyHelper::rupiah($cashFlow60['receivables']), '', 'Expected Payments (60 days)', MoneyHelper::rupiah($cashFlow60['payables']), '', 'Net Cash Flow', MoneyHelper::rupiah($cashFlow60['receivables'] - $cashFlow60['payables']), ''];
+        $data[] = ['Expected Collections (90 days)', MoneyHelper::rupiah($cashFlow90['receivables']), '', 'Expected Payments (90 days)', MoneyHelper::rupiah($cashFlow90['payables']), '', 'Net Cash Flow', MoneyHelper::rupiah($cashFlow90['receivables'] - $cashFlow90['payables']), ''];
 
         return collect($data);
     }
@@ -291,9 +292,9 @@ class ReceivablesAgeingSheet implements FromCollection, WithHeadings, WithTitle,
                 'Due Date' => $receivable->invoice->due_date ? Carbon::parse($receivable->invoice->due_date)->format('d/m/Y') : '-',
                 'Payment Terms' => $receivable->invoice->payment_terms ?? '-',
                 'Days Outstanding' => $receivable->days_outstanding_computed,
-                'Invoice Amount' => $receivable->total ? 'Rp ' . number_format($receivable->total, 0, ',', '.') : 'Rp 0',
-                'Paid Amount' => $receivable->paid ? 'Rp ' . number_format($receivable->paid, 0, ',', '.') : 'Rp 0',
-                'Remaining Amount' => $receivable->remaining ? 'Rp ' . number_format($receivable->remaining, 0, ',', '.') : 'Rp 0',
+                'Invoice Amount' => MoneyHelper::rupiah($receivable->total ?? 0),
+                'Paid Amount' => MoneyHelper::rupiah($receivable->paid ?? 0),
+                'Remaining Amount' => MoneyHelper::rupiah($receivable->remaining ?? 0),
                 'Aging Bucket' => $receivable->aging_bucket_computed,
                 'Status' => $receivable->status ?? 'Active',
                 'Branch' => $receivable->cabang->nama ?? '-',
@@ -443,9 +444,9 @@ class PayablesAgeingSheet implements FromCollection, WithHeadings, WithTitle, Wi
                 'Due Date' => $payable->invoice->due_date ? Carbon::parse($payable->invoice->due_date)->format('d/m/Y') : '-',
                 'Payment Terms' => $payable->invoice->payment_terms ?? '-',
                 'Days Outstanding' => $payable->days_outstanding_computed,
-                'Invoice Amount' => $payable->total ? 'Rp ' . number_format($payable->total, 0, ',', '.') : 'Rp 0',
-                'Paid Amount' => $payable->paid ? 'Rp ' . number_format($payable->paid, 0, ',', '.') : 'Rp 0',
-                'Remaining Amount' => $payable->remaining ? 'Rp ' . number_format($payable->remaining, 0, ',', '.') : 'Rp 0',
+                'Invoice Amount' => MoneyHelper::rupiah($payable->total ?? 0),
+                'Paid Amount' => MoneyHelper::rupiah($payable->paid ?? 0),
+                'Remaining Amount' => MoneyHelper::rupiah($payable->remaining ?? 0),
                 'Aging Bucket' => $payable->aging_bucket_computed,
                 'Status' => $payable->status ?? 'Active',
                 'Purchase Type' => $purchaseType,
