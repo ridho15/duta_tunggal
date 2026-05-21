@@ -9,6 +9,7 @@ use App\Models\InventoryStock;
 use App\Models\SaleOrder;
 use App\Models\StockReservation;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +30,7 @@ class SalesOrderService
                 $item->tax,
                 $taxType
             );
-            $total_amount += CurrencyConversionResolver::convertToIdr((float) $subtotal, is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null);
+            $total_amount += CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotal), is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null, false);
         }
 
         return $salesOrder->update([

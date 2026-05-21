@@ -11,6 +11,7 @@ use App\Models\SaleOrder;
 use App\Models\TaxSetting;
 use App\Services\InvoiceService;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -172,10 +173,10 @@ class InvoiceResource extends Resource
                                                     array_push($items, [
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->quantity,
-                                                        'price' => (float) CurrencyConversionResolver::convertToIdr((float) $price, $currencyId ?: null, false),
-                                                        'total' => (float) CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null, false)
+                                                        'price' => (float) CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($price), $currencyId ?: null, false),
+                                                            'total' => (float) CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotal), $currencyId ?: null, false)
                                                     ]);
-                                                    $total += (float) CurrencyConversionResolver::convertToIdr((float) $subtotal, $currencyId ?: null, false);
+                                                    $total += (float) CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotal), $currencyId ?: null, false);
                                                 }
                                             }
                                         }

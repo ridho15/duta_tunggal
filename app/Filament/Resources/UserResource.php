@@ -49,6 +49,23 @@ class UserResource extends Resource
             ->schema([
                 Fieldset::make('Form User')
                     ->schema([
+                        TextInput::make('first_name')
+                            ->label('Nama Depan')
+                            ->string()
+                            ->maxLength(50)
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Nama depan wajib diisi',
+                                'max' => 'Nama depan maksimal 50 karakter'
+                            ]),
+                        TextInput::make('last_name')
+                            ->label('Nama Belakang')
+                            ->maxLength(50)
+                            ->string()
+                            ->nullable()
+                            ->validationMessages([
+                                'max' => 'Nama belakang maksimal 50 karakter'
+                            ]),
                         TextInput::make('username')
                             ->label('Username')
                             ->required()
@@ -77,8 +94,7 @@ class UserResource extends Resource
                             ->required(fn(string $context): bool => $context === 'create'),
                         TextInput::make('konfirmasi_password')
                             ->password()
-                            ->dehydrateStateUsing(fn($state) => Hash::make($state))
-                            ->dehydrated(fn($state) => filled($state))
+                            ->dehydrated(false)
                             ->revealable()
                             ->same('password')
                             ->validationMessages([
@@ -131,9 +147,10 @@ class UserResource extends Resource
                             ->helperText("Untuk mengaktifkan cabang silahkan pilih cabang pada kelola")
                             ->reactive()
                             ->disabled(function ($set, $get) {
-                                if (in_array('all', $get('manage_type'))) {
+                                $manageType = (array) ($get('manage_type') ?? []);
+                                if (in_array('all', $manageType)) {
                                     return true;
-                                } elseif (in_array('cabang', $get('manage_type'))) {
+                                } elseif (in_array('cabang', $manageType)) {
                                     return false;
                                 }
 
@@ -151,7 +168,7 @@ class UserResource extends Resource
                             ->searchable()
                             ->reactive()
                             // S4: show warehouse field only when manage_type includes 'warehouse'
-                            ->visible(fn ($get) => in_array('warehouse', (array) ($get('manage_type') ?? [])))
+                            ->visible(fn($get) => in_array('warehouse', (array) ($get('manage_type') ?? [])))
                             ->relationship('warehouse', 'name', function (Builder $query, $get) {
                                 $query->where('cabang_id', $get('cabang_id'));
                             })
@@ -159,33 +176,6 @@ class UserResource extends Resource
                                 return "({$warehouse->kode}) {$warehouse->name}";
                             })
                             ->nullable(),
-                        TextInput::make('first_name')
-                            ->label('Nama Depan')
-                            ->string()
-                            ->maxLength(50)
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Nama depan wajib diisi',
-                                'max' => 'Nama depan maksimal 50 karakter'
-                            ]),
-                        TextInput::make('last_name')
-                            ->label('Nama Belakang')
-                            ->maxLength(50)
-                            ->string()
-                            ->nullable()
-                            ->validationMessages([
-                                'max' => 'Nama belakang maksimal 50 karakter'
-                            ]),
-                        TextInput::make('kode_user')
-                            ->label('Kode User')
-                            ->maxLength(50)
-                            ->required()
-                            ->unique(ignoreRecord: true)
-                            ->validationMessages([
-                                'required' => 'Kode user wajib diisi',
-                                'unique' => 'Kode user sudah digunakan',
-                                'max' => 'Kode user maksimal 50 karakter'
-                            ]),
                         TextInput::make('posisi')
                             ->label('Posisi')
                             ->string()
@@ -211,6 +201,23 @@ class UserResource extends Resource
             ]);
     }
 
+    protected static function formatManageTypeLabel(mixed $state): string
+    {
+        $values = is_array($state) ? $state : explode(',', (string) $state);
+
+        return collect($values)
+            ->filter()
+            ->map(function (string $value): string {
+                return match ($value) {
+                    'all' => 'Semua Cabang / Gudang',
+                    'cabang' => 'Cabang',
+                    'warehouse' => 'Gudang',
+                    default => Str::headline($value),
+                };
+            })
+            ->implode(', ');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -233,9 +240,7 @@ class UserResource extends Resource
                     ->sortable(),
                 TextColumn::make('manage_type')
                     ->badge()
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    })
+                    ->formatStateUsing(fn($state) => static::formatManageTypeLabel($state) ?: '-')
                     ->label('Kelola'),
                 ImageColumn::make('signature')
                     ->label('Tanda Tangan'),

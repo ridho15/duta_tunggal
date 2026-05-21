@@ -26,6 +26,7 @@ class PurchaseOrder extends Model
         'approved_by',
         'approval_signature',
         'approval_signed_at',
+        'top_type',
         'tempo_hutang', // hari
         'note',
         'close_requested_by',
@@ -49,6 +50,12 @@ class PurchaseOrder extends Model
             'date_approved' => 'date',
             'approval_signed_at' => 'datetime',
         ];
+    }
+
+    public function getTotalAmountAttribute($value)
+    {
+        if ($value === null) return null;
+        return number_format((float) $value, 2, '.', '');
     }
 
     public function purchaseOrderCurrency()

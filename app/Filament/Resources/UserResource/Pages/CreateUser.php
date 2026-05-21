@@ -28,8 +28,9 @@ class CreateUser extends CreateRecord
         if ($data['signature'] == null) {
             unset($data['signature']);
         }
-        if ($data['last_name'] != null || $data['last_name'] != '') {
-            $data['name'] = $data['first_name'] . ' ' . $data['last_name'];
+        $lastName = $data['last_name'] ?? '';
+        if (filled($lastName)) {
+            $data['name'] = $data['first_name'] . ' ' . $lastName;
         } else {
             $data['name'] = $data['first_name'];
         }

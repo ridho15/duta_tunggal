@@ -862,110 +862,28 @@ class HelperController extends Controller
 
     public static function parseIndonesianMoney($formattedValue)
     {
+        // Use centralized MoneyHelper parsing to ensure consistent behavior across the app.
+        // This avoids duplicated, error-prone parsing logic and keeps tests stable.
         if (!$formattedValue) {
-            return 0;
+            return 0.0;
         }
 
-        // Convert to string to ensure we're working with formatted input
-        $formattedValue = (string)$formattedValue;
-
-        // Check if it contains formatting characters (dots or commas)
-        if (!preg_match('/[.,]/', $formattedValue)) {
-            // No formatting characters, treat as regular number
-            return (float)$formattedValue;
+        // If it's already numeric, return as float
+        if (is_int($formattedValue) || is_float($formattedValue) || (is_string($formattedValue) && is_numeric($formattedValue))) {
+            return (float) $formattedValue;
         }
 
-        // Remove any non-numeric characters except dots and commas
-        $cleaned = preg_replace('/[^\d.,]/', '', $formattedValue);
-
-        // Determine the format by analyzing the separators
-        $hasComma = strpos($cleaned, ',') !== false;
-        $hasDot = strpos($cleaned, '.') !== false;
-
-        $integer = '';
-        $decimal = '0';
-
-        if ($hasComma && $hasDot) {
-            // Both separators present - need to determine which is decimal separator
-            $lastCommaPos = strrpos($cleaned, ',');
-            $lastDotPos = strrpos($cleaned, '.');
-
-            if ($lastDotPos > $lastCommaPos) {
-                // Dot comes after comma - likely Western format (commas as thousand sep, dot as decimal)
-                // Example: 125,000,000.50
-                $parts = explode('.', $cleaned);
-                if (count($parts) === 2) {
-                    $integer = str_replace(',', '', $parts[0]);
-                    $decimal = $parts[1];
-                } else {
-                    // Multiple dots - take last part as decimal
-                    $decimal = array_pop($parts);
-                    $integer = implode('', $parts);
-                    $integer = str_replace(',', '', $integer);
-                }
-                }
-            // Only commas - could be Western thousand separators or Indonesian decimal
-            $parts = explode(',', $cleaned);
-            if (count($parts) === 2 && preg_match('/^\d+$/', $parts[1])) {
-                // Indonesian decimal separator, including high precision
-                // values used for non-IDR currency input states.
-                $integer = str_replace(',', '', $parts[0]);
-                $decimal = $parts[1];
-            } else {
-                // Multiple commas - treat as thousand separators
-                $integer = str_replace(',', '', $cleaned);
-                $decimal = '0';
-            }
-        } elseif ($hasDot) {
-            // Only dots - could be Indonesian thousand separators or decimal
-            $dotCount = substr_count($cleaned, '.');
-            if ($dotCount === 1) {
-                $parts = explode('.', $cleaned);
-                $fraction = $parts[1] ?? '';
-                // If fraction has 3 or more digits, it's very likely a thousands separator
-                // e.g. '27.500' -> 27500. Treat as thousands.
-                if (strlen($fraction) > 2) {
-                    $integer = str_replace('.', '', $cleaned);
-                    $decimal = '0';
-                } elseif (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
-                    // Ends with .X or .XX  → decimal separator
-                    $decimal = $matches[1];
-                    $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
-                    $integer = str_replace('.', '', $integer);
-                } else {
-                    // Fallback: treat single dot as thousands separator
-                    $integer = str_replace('.', '', $cleaned);
-                    $decimal = '0';
-                }
-            } elseif (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
-                // Ends with .X or .XX  → decimal separator
-                $decimal = $matches[1];
-                $integer = preg_replace('/\.\d{1,2}$/', '', $cleaned);
-                $integer = str_replace('.', '', $integer); // clear any remaining thousand dots
-            } else {
-                // Multiple dots or other patterns → Indonesian thousands separator
-                $integer = str_replace('.', '', $cleaned);
-                $decimal = '0';
-            }
-        }
-
-        // Ensure decimal part is not empty
-        if (empty($decimal)) {
-            $decimal = '0';
-        }
-
-        // Combine back and return as float
-        $numeric = (float)($integer . '.' . $decimal);
-        return $numeric;
+        return \App\Helpers\MoneyHelper::safeParse($formattedValue);
+    
     }
 
     public static function hitungSubtotal($quantity, $unit_price, $discount, $tax, $taxType = null)
     {
         // Normalize only human-formatted money strings. Raw DB decimals like
         // "10000.0000000000" must stay numeric after high-precision migrations.
-        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price) && ! preg_match('/^\d+\.\d{3,}$/', trim($unit_price))) {
-            $parsed = self::parseIndonesianMoney($unit_price);
-            $unit_price = $parsed;
+        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
+            $parsed = \App\Helpers\MoneyHelper::parseHighPrecision($unit_price);
+            $unit_price = (float) $parsed;
         }
         // --- INPUT GUARDS ---
         $quantity  = max(0.0, (float) $quantity);
@@ -984,7 +902,7 @@ class HelperController extends Controller
 
         $normalizedTaxType = strtolower(trim((string) $taxType));
         $normalizedTaxType = match ($normalizedTaxType) {
-            'inklusif', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            'inklusif', 'inclusive', 'included', 'ppn included', 'ppn-included' => 'inklusif',
             'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
             default => 'eksklusif',
         };
@@ -998,8 +916,8 @@ class HelperController extends Controller
 
     public static function hitungTaxNominal($quantity, $unit_price, $discount, $tax, $taxType = null)
     {
-        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price) && ! preg_match('/^\d+\.\d{3,}$/', trim($unit_price))) {
-            $unit_price = self::parseIndonesianMoney($unit_price);
+        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
+            $unit_price = (float) \App\Helpers\MoneyHelper::parseHighPrecision($unit_price);
         }
 
         $quantity  = max(0.0, (float) $quantity);

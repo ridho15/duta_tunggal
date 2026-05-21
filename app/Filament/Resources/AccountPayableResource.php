@@ -13,7 +13,7 @@ use App\Support\OverdueStatusPresenter;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -131,18 +131,9 @@ class AccountPayableResource extends Resource
                             ->reactive()
                             ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
                             ->helperText('Sisa pembayaran akan terisi otomatis berdasarkan total invoice'),
-                        Radio::make('status')
-                            ->label('Status Pembayaran')
-                            ->options([
-                                PaymentStatus::UNPAID->value => 'Belum Lunas',
-                                PaymentStatus::PAID->value => 'Lunas',
-                            ])
+                        Hidden::make('status')
                             ->default(PaymentStatus::UNPAID->value)
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Status pembayaran harus dipilih'
-                            ])
-                            ->inline()
+                            ->dehydrated(fn (string $context): bool => $context === 'create')
                     ])
             ]);
     }

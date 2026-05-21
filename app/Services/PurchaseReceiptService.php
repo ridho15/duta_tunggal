@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Support\JournalCurrencyAmountResolver;
+use App\Helpers\MoneyHelper;
 
 class PurchaseReceiptService
 {
@@ -965,10 +966,10 @@ class PurchaseReceiptService
             if ((float) $receiptItem->qty_accepted > 0) {
                 $poItem = $receiptItem->purchaseOrderItem;
                 
-                // Normalize unit price to IDR using currency conversion
-                $rawUnitPrice = (float) ($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
-                $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
-                $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
+                    // Normalize unit price to IDR using currency conversion (high-precision)
+                    $rawUnitPrice = MoneyHelper::parseHighPrecision($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+                    $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+                    $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null, false);
                 
                 $total = round($unitPrice * $receiptItem->qty_accepted, 2);
 
@@ -1043,10 +1044,10 @@ class PurchaseReceiptService
 
             $poItem = $receiptItem->purchaseOrderItem;
             
-            // Normalize unit price to IDR using currency conversion
-            $rawUnitPrice = (float) ($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+            // Normalize unit price to IDR using currency conversion (high-precision)
+            $rawUnitPrice = MoneyHelper::parseHighPrecision($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
             $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
-            $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null);
+            $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null, false);
             
             $qty = $receiptItem->qty_accepted;
             $lineGross = round($unitPrice * $qty, 2);

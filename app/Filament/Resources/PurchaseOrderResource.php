@@ -24,6 +24,7 @@ use App\Services\QualityControlService;
 use App\Services\PurchaseReceiptService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -84,9 +85,32 @@ class PurchaseOrderResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    protected static function formatMoneyState(mixed $value, ?int $currencyId = null): string
+    public static function formatMoneyState(mixed $value, ?int $currencyId = null): string
     {
         return self::formatCurrencyPreviewState($value, $currencyId);
+    }
+
+    protected static function topTypeOptions(): array
+    {
+        return [
+            'cod' => 'COD',
+            'advance_before_delivery' => 'Advance Before Delivery',
+            'deposit_balance' => 'Deposit + Balance',
+            'credit_days' => 'Credit ... Days',
+        ];
+    }
+
+    protected static function normalizeTopTypeValue(?string $topType): string
+    {
+        $normalized = strtolower(trim((string) $topType));
+
+        return match ($normalized) {
+            'cod' => 'cod',
+            'advance before delivery', 'advance_before_delivery', 'advance-before-delivery', 'advance' => 'advance_before_delivery',
+            'deposit + balance', 'deposit_balance', 'deposit-balance', 'deposit balance' => 'deposit_balance',
+            'credit', 'credit_days', 'credit days', 'days' => 'credit_days',
+            default => 'credit_days',
+        };
     }
 
     public static function syncPurchaseOrderCurrencyData(array $data): array
@@ -601,6 +625,7 @@ class PurchaseOrderResource extends Resource
                                                         $autoSupplier = Supplier::find($autoSupplierId);
                                                         if ($autoSupplier) {
                                                             $set('tempo_hutang', $autoSupplier->tempo_hutang);
+                                                            $set('top_type', $autoSupplier->tempo_hutang > 0 ? 'credit_days' : 'cod');
                                                         }
                                                     } else {
                                                         $set('supplier_id', null);
@@ -766,6 +791,7 @@ class PurchaseOrderResource extends Resource
                                 $supplier = Supplier::find($state);
                                 if ($supplier) {
                                     $set('tempo_hutang', $supplier->tempo_hutang);
+                                    $set('top_type', $supplier->tempo_hutang > 0 ? 'credit_days' : 'cod');
                                 }
                                 // When referring to a multisupplier Order Request, rebuild items for the chosen supplier only
                                 if ($get('refer_model_type') === 'App\\Models\\OrderRequest' && $get('refer_model_id') && $state) {
@@ -818,10 +844,23 @@ class PurchaseOrderResource extends Resource
                                 return Supplier::create($data)->id;
                             })
                             ->required(),
+                        Select::make('top_type')
+                            ->label('TOP / Term of Payment')
+                            ->options(self::topTypeOptions())
+                            ->default('credit_days')
+                            ->reactive()
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                if (self::normalizeTopTypeValue($state) !== 'credit_days') {
+                                    $set('tempo_hutang', 0);
+                                }
+                            })
+                            ->dehydrated(),
                         TextInput::make('tempo_hutang')
-                            ->label('Tempo Hutang (hari)')
+                            ->label('Credit Days')
+                            ->helperText('Dipakai hanya jika TOP = Credit ... Days')
                             ->numeric()
                             ->default(0)
+                            ->visible(fn (Get $get) => self::normalizeTopTypeValue($get('top_type') ?? null) === 'credit_days')
                             ->reactive()
                             ->dehydrated(),
                         TextInput::make('po_number')
@@ -923,11 +962,11 @@ class PurchaseOrderResource extends Resource
                                             $newTax = \App\Support\TaxDefaultResolver::resolveForProductId((int) $product->id, $taxType);
                                             // Use supplier price from product_supplier pivot; Rp 0 if supplier not linked
                                             $supplierId = $get('../../supplier_id');
-                                            $newUnitPrice = 0.0;
+                                                $newUnitPrice = 0.0;
                                             if ($supplierId) {
                                                 $supplierProduct = $product->suppliers()->where('suppliers.id', $supplierId)->first();
                                                 if ($supplierProduct) {
-                                                    $newUnitPrice = (float) $supplierProduct->pivot->supplier_price;
+                                                    $newUnitPrice = MoneyHelper::parseHighPrecision($supplierProduct->pivot->supplier_price);
                                                 }
                                             }
                                             $itemCurrencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
@@ -991,7 +1030,7 @@ class PurchaseOrderResource extends Resource
                                         $oldCurrencyId = is_numeric($old) ? (int) $old : null;
 
                                         if ($newCurrencyId !== $oldCurrencyId) {
-                                            $currentUnitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
+                                            $currentUnitPrice = MoneyHelper::parseHighPrecision($get('unit_price') ?? 0);
                                             $convertedUnitPrice = CurrencyConversionResolver::convertBetweenCurrencies(
                                                 $currentUnitPrice,
                                                 $oldCurrencyId,

@@ -22,6 +22,7 @@ use App\Services\PurchaseOrderService;
 use App\Services\SalesOrderService;
 use App\Services\CreditValidationService;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use App\Support\WarehouseStockOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -326,7 +327,7 @@ class SaleOrderResource extends Resource
                 $currencyId
             );
 
-            $total += CurrencyConversionResolver::convertToIdr((float) $preview['subtotal'], $currencyId);
+            $total += CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($preview['subtotal']), $currencyId, false);
         }
 
         return $total;
@@ -745,8 +746,9 @@ class SaleOrderResource extends Resource
 
                                 $creditService = app(CreditValidationService::class);
                                 $totalForCredit = CurrencyConversionResolver::convertToIdr(
-                                    (float) static::parseCurrencyState($state),
-                                    static::resolveDefaultCurrencyId()
+                                    MoneyHelper::parseHighPrecision(static::parseCurrencyState($state)),
+                                    static::resolveDefaultCurrencyId(),
+                                    false
                                 );
                                 $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
 
@@ -803,7 +805,7 @@ class SaleOrderResource extends Resource
                                         if ($product) {
                                             $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                             $unitPrice = static::normalizeCurrencyDisplayValue(
-                                                CurrencyConversionResolver::convertFromIdr((float) $product->sell_price, $currencyId, false),
+                                                CurrencyConversionResolver::convertFromIdr(MoneyHelper::parseHighPrecision($product->sell_price), $currencyId, false),
                                                 $currencyId
                                             );
 
@@ -1159,7 +1161,7 @@ class SaleOrderResource extends Resource
                                                 static::normalizeTaxTypeValue($item['tipe_pajak'] ?? null),
                                                 $itemCurrencyId
                                             );
-                                            $total += CurrencyConversionResolver::convertToIdr((float) $preview['subtotal'], $itemCurrencyId);
+                                            $total += CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($preview['subtotal']), $itemCurrencyId, false);
                                         }
                                         $livewire->data['total_amount'] = static::formatCurrencyPreviewState($total, static::resolveDefaultCurrencyId());
 
@@ -1170,8 +1172,9 @@ class SaleOrderResource extends Resource
                                             if ($customer) {
                                                 $creditService = app(CreditValidationService::class);
                                                 $totalForCredit = CurrencyConversionResolver::convertToIdr(
-                                                    (float) $total,
-                                                    static::resolveDefaultCurrencyId()
+                                                    MoneyHelper::parseHighPrecision($total),
+                                                    static::resolveDefaultCurrencyId(),
+                                                    false
                                                 );
                                                 $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
 

@@ -169,6 +169,15 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_purchase_invoice_create_data_forces_draft_status()
+    {
+        $data = PurchaseInvoiceResource::mutateFormDataBeforeCreate([
+            'status' => 'paid',
+        ]);
+
+        $this->assertSame(Invoice::STATUS_DRAFT, $data['status']);
+    }
+
     public function test_mark_as_sent_action_shows_friendly_notification_when_update_fails()
     {
         $purchaseOrder = PurchaseOrder::factory()->create([
@@ -262,6 +271,62 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertStringContainsString('Rp 111.000', $html);
     }
 
+    public function test_import_purchase_invoice_pdf_shows_import_breakdown(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'is_import' => true,
+            'tempo_hutang' => 0,
+        ]);
+
+        $invoice = Invoice::withoutEvents(function () use ($purchaseOrder) {
+            return Invoice::factory()->create([
+                'invoice_number' => 'PINV-IMP-' . rand(1000, 9999),
+                'from_model_type' => PurchaseOrder::class,
+                'from_model_id' => $purchaseOrder->id,
+                'invoice_date' => now(),
+                'due_date' => now(),
+                'subtotal' => 100000,
+                'dpp' => 100000,
+                'ppn_rate' => 11,
+                'tax' => 11,
+                'pph22_amount' => 5000,
+                'bea_masuk_amount' => 7000,
+                'other_fee' => [
+                    ['name' => 'Biaya Handling', 'amount' => 3000],
+                ],
+                'total' => 126000,
+                'status' => 'draft',
+                'purchase_receipts' => [],
+                'cabang_id' => $this->cabang->id,
+            ]);
+        });
+
+        InvoiceItem::factory()->create([
+            'invoice_id' => $invoice->id,
+            'product_id' => $this->product->id,
+            'quantity' => 5,
+            'price' => 20000,
+            'subtotal' => 100000,
+            'tax_rate' => 11,
+            'tax_amount' => 11000,
+            'total' => 111000,
+        ]);
+
+        $html = view('pdf.purchase-order-invoice-2', [
+            'invoice' => $invoice->load('fromModel', 'invoiceItem.product', 'cabang'),
+        ])->render();
+
+        $this->assertStringContainsString('Breakdown Impor', $html);
+        $this->assertStringContainsString('PPh 22', $html);
+        $this->assertStringContainsString('BEA MASUK', $html);
+        $this->assertStringContainsString('TOTAL IMPOR', $html);
+    }
+
     public function test_purchase_invoice_form_has_required_fields()
     {
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
@@ -272,6 +337,8 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertFormFieldExists('selected_purchase_receipts')
             ->assertFormFieldExists('invoice_date')
             ->assertFormFieldExists('due_date')
+            ->assertFormFieldExists('pph22_amount')
+            ->assertFormFieldExists('bea_masuk_amount')
             ->assertFormFieldExists('tax')
             ->assertFormFieldExists('ppn_rate')
             ->assertFormFieldExists('other_fees');

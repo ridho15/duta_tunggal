@@ -53,6 +53,31 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         ];
     }
 
+    protected static function booted()
+    {
+        static::creating(function ($user) {
+            if (empty($user->kode_user)) {
+                $latestUser = static::where('kode_user', 'like', 'USR-%')
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                $number = 1;
+                if ($latestUser && preg_match('/^USR-(\d+)$/', $latestUser->kode_user, $matches)) {
+                    $number = intval($matches[1]) + 1;
+                } else {
+                    $count = static::where('kode_user', 'like', 'USR-%')->count();
+                    $number = $count + 1;
+                }
+
+                while (static::where('kode_user', 'USR-' . str_pad($number, 4, '0', STR_PAD_LEFT))->exists()) {
+                    $number++;
+                }
+
+                $user->kode_user = 'USR-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+            }
+        });
+    }
+
     public function getManageTypeAttribute($value)
     {
         if (is_array($value)) {

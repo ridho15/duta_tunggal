@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -33,27 +34,40 @@ class PurchaseOrderService
         // Hitung total dari purchase order items
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
             $subtotal = HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak);
-            $poCurrency = $poCurrencies->get($item->currency_id);
-            $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
-                ? (float) $poCurrency->nominal
-                : CurrencyConversionResolver::resolveRate(is_numeric($item->currency_id) ? (int) $item->currency_id : null);
-
-            $total += $subtotal * $rate;
+            $total += CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotal), is_numeric($item->currency_id) ? (int) $item->currency_id : null, false);
         }
 
         // Hitung total dari biaya lain (purchase order biaya)
         foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
-            $poCurrency = $poCurrencies->get($biaya->currency_id);
-            $rate = ($poCurrency && (float) $poCurrency->nominal > 0)
-                ? (float) $poCurrency->nominal
-                : CurrencyConversionResolver::resolveRate(is_numeric($biaya->currency_id) ? (int) $biaya->currency_id : null);
-            $biayaAmount = $biaya->total * $rate;
+            $biayaAmount = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($biaya->total ?? 0), is_numeric($biaya->currency_id) ? (int) $biaya->currency_id : null, false);
             $total += $biayaAmount;
         }
 
+        // Debug log for unit test investigation: capture computed total before persisting
+        try {
+            \Illuminate\Support\Facades\Log::debug('PurchaseOrderService::updateTotalAmount computed total', ['po_id' => $purchaseOrder->id, 'total_raw' => $total]);
+        } catch (\Throwable $e) {
+            // ignore logging failures in test environments
+        }
+        // Also write to a temp file for CI-less debugging
+        try {
+            $dump = json_encode(['po_id' => $purchaseOrder->id, 'total_raw' => $total]) . PHP_EOL;
+            @file_put_contents('/tmp/po_total_debug.txt', $dump, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         $purchaseOrder->update([
-            'total_amount' => $total
+            'total_amount' => number_format((float) $total, 2, '.', '')
         ]);
+
+        try {
+            $after = $purchaseOrder->fresh();
+            $dump2 = json_encode(['po_id' => $after->id, 'total_saved' => $after->total_amount]) . PHP_EOL;
+            @file_put_contents('/tmp/po_total_saved_debug.txt', $dump2, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            // ignore
+        }
 
         self::$updatingTotalAmount = false;
 

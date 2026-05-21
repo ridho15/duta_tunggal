@@ -657,7 +657,7 @@ class BillOfMaterialResource extends Resource
 
     protected static function formatMoneyState(mixed $value): string
     {
-        return number_format((float) HelperController::parseIndonesianMoney($value), 2, ',', '.');
+        return number_format((float) HelperController::parseIndonesianMoney($value), 0, ',', '.');
     }
 
     protected static function findProductForForm(?int $productId): ?Product

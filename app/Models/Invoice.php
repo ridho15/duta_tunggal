@@ -38,6 +38,8 @@ class Invoice extends Model
         'invoice_date',
         'subtotal',
         'tax',
+        'pph22_amount',
+        'bea_masuk_amount',
         'other_fee',
         'total',
         'due_date',
@@ -67,6 +69,8 @@ class Invoice extends Model
         'delivery_orders' => 'array',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
+        'pph22_amount' => 'float',
+        'bea_masuk_amount' => 'float',
     ];
 
     public function getStatusAttribute($value): ?string
@@ -177,6 +181,16 @@ class Invoice extends Model
     public function setTaxAttribute(mixed $value): void
     {
         $this->attributes['tax'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setPph22AmountAttribute(mixed $value): void
+    {
+        $this->attributes['pph22_amount'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setBeaMasukAmountAttribute(mixed $value): void
+    {
+        $this->attributes['bea_masuk_amount'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
     }
 
     public function setPpnRateAttribute(mixed $value): void
