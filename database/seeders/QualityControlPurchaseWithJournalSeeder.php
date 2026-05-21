@@ -17,6 +17,7 @@ use App\Models\Currency;
 use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class QualityControlPurchaseWithJournalSeeder extends Seeder
 {
@@ -29,13 +30,19 @@ class QualityControlPurchaseWithJournalSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
         try {
-            $this->createQualityControlPurchaseWithJournal();
+            $user = User::first() ?? User::factory()->create([
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'password' => bcrypt('password'),
+            ]);
+            Auth::login($user);
+            $this->createQualityControlPurchaseWithJournal($user);
         } finally {
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
         }
     }
 
-    private function createQualityControlPurchaseWithJournal()
+    private function createQualityControlPurchaseWithJournal($user)
     {
         // Get or create required data
         $cabang = Cabang::first() ?? Cabang::factory()->create([
@@ -82,10 +89,24 @@ class QualityControlPurchaseWithJournalSeeder extends Seeder
             'exchange_rate' => 1,
         ]);
 
-        $user = User::first() ?? User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => bcrypt('password'),
+        // Create Order Request (OR)
+        $orderRequest = \App\Models\OrderRequest::create([
+            'request_number' => 'OR-QC-' . now()->format('Ymd-His'),
+            'request_date' => now(),
+            'note' => 'Order Request for QC Testing',
+            'created_by' => $user->id,
+            'currency_id' => $currency->id,
+        ]);
+
+        // Create Order Request Item
+        \App\Models\OrderRequestItem::create([
+            'order_request_id' => $orderRequest->id,
+            'product_id' => $product->id,
+            'supplier_id' => $supplier->id,
+            'cabang_id' => $cabang->id,
+            'currency_id' => $currency->id,
+            'quantity' => 100,
+            'unit_price' => 10000,
         ]);
 
         // Create Purchase Order
@@ -102,6 +123,8 @@ class QualityControlPurchaseWithJournalSeeder extends Seeder
             'approved_by' => $user->id,
             'date_approved' => now(),
             'total_amount' => 1110000, // Will be updated after items
+            'refer_model_type' => 'App\\Models\\OrderRequest',
+            'refer_model_id' => $orderRequest->id,
         ]);
 
         // Create Purchase Order Item

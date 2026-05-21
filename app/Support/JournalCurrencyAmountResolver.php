@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Currency;
 use App\Models\PurchaseReceiptItem;
 
@@ -10,8 +11,9 @@ class JournalCurrencyAmountResolver
     /**
      * @return array{amount_original_currency: float, currency_id: ?int, currency_code: ?string, exchange_rate: float, amount_idr: float}
      */
-    public static function resolve(float $amount, ?int $currencyId = null, ?float $historicalRate = null): array
+    public static function resolve(mixed $amount, ?int $currencyId = null, ?float $historicalRate = null): array
     {
+        $amount = (float) MoneyHelper::parseHighPrecision($amount);
         $exchangeRate = (float) ($historicalRate ?? 0);
         if ($exchangeRate <= 0) {
             $exchangeRate = CurrencyConversionResolver::resolveRate($currencyId);

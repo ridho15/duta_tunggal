@@ -11,6 +11,7 @@ use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
@@ -61,8 +62,9 @@ class CreateSaleOrder extends CreateRecord
             if ($customer) {
                 $creditService = app(CreditValidationService::class);
                 $totalForCredit = CurrencyConversionResolver::convertToIdr(
-                    (float) SaleOrderResource::parseCurrencyState($data['total_amount'] ?? 0),
-                    is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null
+                    MoneyHelper::parseHighPrecision(SaleOrderResource::parseCurrencyState($data['total_amount'] ?? 0)),
+                    is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null,
+                    false
                 );
                 $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
                 

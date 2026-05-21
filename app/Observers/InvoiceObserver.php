@@ -6,6 +6,7 @@ use App\Enums\PaymentStatus;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
+use App\Helpers\MoneyHelper;
 use App\Services\LedgerPostingService;
 use App\Support\CurrencyConversionResolver;
 use App\Support\ProcurementFailureNotifier;
@@ -391,8 +392,8 @@ class InvoiceObserver
                 $itemCurrencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null;
 
                 if ($quantity > 0 && $unitPrice > 0) {
-                    $lineOriginal = round($quantity * $unitPrice * (1 - ($discount / 100)), 4);
-                    $lineTotal = CurrencyConversionResolver::convertToIdr($lineOriginal, $itemCurrencyId);
+                    $lineOriginal = MoneyHelper::parseHighPrecision($quantity * $unitPrice * (1 - ($discount / 100)));
+                    $lineTotal = CurrencyConversionResolver::convertToIdr($lineOriginal, $itemCurrencyId, false);
                     $lineSubtotal = $lineTotal;
                 }
             }

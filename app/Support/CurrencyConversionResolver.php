@@ -102,12 +102,29 @@ class CurrencyConversionResolver
         return (float) round((float) $quotient, 2);
     }
 
-    public static function formatAmount(?int $currencyId, float $amount, int $decimals = 2): string
+    public static function formatAmount(?int $currencyId, float $amount, ?int $decimals = null): string
     {
-        return static::resolveSymbol($currencyId) . ' ' . number_format($amount, $decimals, ',', '.');
+        $currency = static::resolveCurrency($currencyId);
+
+        if ($decimals === null) {
+            if ($currency) {
+                $code = strtoupper(trim($currency->code ?? ''));
+                $decimals = ($code === 'IDR' || (int) ($currency->to_rupiah ?? 0) === 1) ? 0 : 2;
+            } else {
+                $decimals = 2;
+            }
+        }
+
+        $formatted = number_format($amount, $decimals, ',', '.');
+
+        if ($decimals > 0 && $decimals === 2) {
+            $formatted = preg_replace('/,0{2}$/', '', $formatted) ?? $formatted;
+        }
+
+        return static::resolveSymbol($currencyId) . ' ' . $formatted;
     }
 
-    public static function formatAmountFromIdr(float $amount, ?int $currencyId, int $decimals = 2): string
+    public static function formatAmountFromIdr(float $amount, ?int $currencyId, ?int $decimals = null): string
     {
         return static::formatAmount($currencyId, static::convertFromIdr($amount, $currencyId), $decimals);
     }

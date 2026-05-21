@@ -7,6 +7,7 @@ use App\Services\SalesOrderService;
 use App\Services\CreditValidationService;
 use App\Models\Customer;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -45,8 +46,9 @@ class EditSaleOrder extends EditRecord
             if ($customer) {
                 $creditService = app(CreditValidationService::class);
                 $totalForCredit = CurrencyConversionResolver::convertToIdr(
-                    (float) SaleOrderResource::parseCurrencyState($data['total_amount'] ?? 0),
-                    is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null
+                    MoneyHelper::parseHighPrecision(SaleOrderResource::parseCurrencyState($data['total_amount'] ?? 0)),
+                    is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null,
+                    false
                 );
                 $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
 

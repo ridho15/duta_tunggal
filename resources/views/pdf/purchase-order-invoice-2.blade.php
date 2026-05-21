@@ -128,6 +128,34 @@
         $supplier = $invoice->supplier ?? $invoice->fromModel->supplier;
         $effectivePpnRate = (float) ($invoice->effective_ppn_rate ?? $invoice->ppn_rate ?? 0);
         $ppnAmount = (float) ($invoice->ppn_amount ?? (($invoice->dpp ?? $invoice->subtotal) * $effectivePpnRate / 100));
+        $isImport = (bool) ($invoice->fromModel->is_import ?? false);
+
+        $importFeeTotals = [
+            'pph' => (float) ($invoice->pph22_amount ?? 0),
+            'bea_masuk' => (float) ($invoice->bea_masuk_amount ?? 0),
+            'other' => 0.0,
+        ];
+
+        foreach ((array) ($invoice->other_fee ?? []) as $fee) {
+            $name = strtolower(trim((string) ($fee['name'] ?? '')));
+            $amount = (float) ($fee['amount'] ?? 0);
+
+            if ($amount <= 0) {
+                continue;
+            }
+
+            if (preg_match('/\bpph\b|pph\s*22/', $name) || preg_match('/bea masuk|customs|bm|import duty|cukai/', $name)) {
+                continue;
+            }
+
+            $importFeeTotals['other'] += $amount;
+        }
+
+        $importTotal = (float) ($invoice->dpp ?? $invoice->subtotal ?? 0)
+            + $ppnAmount
+            + $importFeeTotals['pph']
+            + $importFeeTotals['bea_masuk']
+            + $importFeeTotals['other'];
     @endphp
 
     <div class="header clearfix">
@@ -229,6 +257,40 @@
     </div>
     @endif
 
+    @if($isImport)
+    <div style="margin: 20px 0; clear: both;">
+        <h4 style="margin-bottom: 10px; color: #333;">Breakdown Impor</h4>
+        <table class="totals-table">
+            <tr>
+                <td>DPP:</td>
+                <td class="text-right rupiah">Rp {{ number_format($invoice->dpp ?? $invoice->subtotal, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td>PPN {{ number_format($effectivePpnRate, 2, ',', '.') }}%:</td>
+                <td class="text-right rupiah">Rp {{ number_format($ppnAmount, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td>PPh 22:</td>
+                <td class="text-right rupiah">Rp {{ number_format($importFeeTotals['pph'], 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td>BEA MASUK:</td>
+                <td class="text-right rupiah">Rp {{ number_format($importFeeTotals['bea_masuk'], 0, ',', '.') }}</td>
+            </tr>
+            @if($importFeeTotals['other'] > 0)
+            <tr>
+                <td>Biaya Impor Lainnya:</td>
+                <td class="text-right rupiah">Rp {{ number_format($importFeeTotals['other'], 0, ',', '.') }}</td>
+            </tr>
+            @endif
+            <tr class="total-row">
+                <td><strong>TOTAL IMPOR:</strong></td>
+                <td class="text-right rupiah"><strong>Rp {{ number_format($importTotal, 0, ',', '.') }}</strong></td>
+            </tr>
+        </table>
+    </div>
+    @endif
+
     <div class="totals-section">
         <table class="totals-table">
             <tr>
@@ -237,8 +299,14 @@
             </tr>
             
             {{-- Biaya lain dari invoice --}}
-            @if($invoice->other_fee && is_array($invoice->other_fee))
+            @if(!$isImport && $invoice->other_fee && is_array($invoice->other_fee))
                 @foreach($invoice->other_fee as $fee)
+                @php
+                    $feeName = strtolower(trim((string) ($fee['name'] ?? '')));
+                    if (preg_match('/\bpph\b|pph\s*22/', $feeName) || preg_match('/bea masuk|customs|bm|import duty|cukai/', $feeName)) {
+                        continue;
+                    }
+                @endphp
                 <tr>
                     <td>{{ $fee['name'] ?? 'Biaya Lain' }}:</td>
                     <td class="text-right rupiah">Rp {{ number_format($fee['amount'] ?? 0, 0, ',', '.') }}</td>
@@ -247,7 +315,7 @@
             @endif
             
             {{-- PPN --}}
-            @if($invoice->ppn_rate > 0)
+            @if(!$isImport && $invoice->ppn_rate > 0)
             <tr>
                 <td>DPP:</td>
                 <td class="text-right rupiah">Rp {{ number_format($invoice->dpp ?? $invoice->subtotal, 0, ',', '.') }}</td>
@@ -260,7 +328,7 @@
             
             <tr class="total-row">
                 <td><strong>TOTAL:</strong></td>
-                <td class="text-right rupiah"><strong>Rp {{ number_format($invoice->total, 0, ',', '.') }}</strong></td>
+                <td class="text-right rupiah"><strong>Rp {{ number_format($isImport ? $importTotal : $invoice->total, 0, ',', '.') }}</strong></td>
             </tr>
         </table>
     </div>

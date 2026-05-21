@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\StockMovement;
 use App\Models\ChartOfAccount;
 use App\Services\ReturnProductService;
+use App\Support\JournalCurrencyAmountResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,12 @@ use Illuminate\Support\Facades\Log;
 class QualityControlService
 {
     protected static $coaCache = [];
+
+    public function resolveQcJournalUnitPriceIdr(mixed $unitPrice, ?int $currencyId = null, ?float $historicalRate = null): array
+    {
+        return JournalCurrencyAmountResolver::resolve($unitPrice, $currencyId, $historicalRate);
+    }
+
     public function generateQcNumber()
     {
         $date = now()->format('Ymd');
@@ -340,11 +347,20 @@ class QualityControlService
         $product = $qualityControl->product;
         $passedQuantity = $qualityControl->passed_quantity;
 
-        // Get unit price based on model type
+        // Get unit price in IDR based on model type
         if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
-            $unitPrice = $fromModel?->unit_price ?? 0;
+            $purchaseOrderCurrency = $fromModel?->purchaseOrder?->purchaseOrderCurrency?->firstWhere('currency_id', $fromModel?->currency_id);
+            $resolved = $this->resolveQcJournalUnitPriceIdr(
+                $fromModel?->unit_price ?? 0,
+                is_numeric($fromModel?->currency_id ?? null) ? (int) $fromModel->currency_id : null,
+                is_numeric($purchaseOrderCurrency?->nominal ?? null)
+                    ? (float) $purchaseOrderCurrency->nominal
+                    : null
+            );
+            $unitPrice = $resolved['amount_idr'] ?? 0;
         } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
-            $unitPrice = $fromModel?->purchaseOrderItem?->unit_price ?? 0;
+            $resolved = JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($fromModel);
+            $unitPrice = $resolved['unit_price_idr'] ?? 0;
         } else {
             $unitPrice = 0;
         }

@@ -11,6 +11,7 @@ use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
 use App\Services\SalesInvoiceTaxResolver;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Illuminate\Support\Facades\Log;
 
 class SaleOrderObserver
@@ -103,7 +104,8 @@ class SaleOrderObserver
         $invoiceItems = [];
         $invoiceTaxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
         foreach ($saleOrder->saleOrderItem as $item) {
-            $itemCurrencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null;
+            // Prefer explicit item currency; fall back to the sale order currency when absent
+            $itemCurrencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : (is_numeric($saleOrder->currency_id ?? null) ? (int) $saleOrder->currency_id : null);
             $itemExchangeRate = CurrencyConversionResolver::resolveRate($itemCurrencyId);
 
             // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
@@ -133,9 +135,9 @@ class SaleOrderObserver
                 $subtotalBeforeTax = $baseAmount;
             }
 
-            $subtotalBeforeTaxIdr = CurrencyConversionResolver::convertToIdr((float) $subtotalBeforeTax, $itemCurrencyId);
-            $lineTaxIdr = CurrencyConversionResolver::convertToIdr((float) $lineTax, $itemCurrencyId);
-            $lineTotalIdr = CurrencyConversionResolver::convertToIdr((float) $lineSubtotal, $itemCurrencyId);
+            $subtotalBeforeTaxIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotalBeforeTax), $itemCurrencyId, false);
+            $lineTaxIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($lineTax), $itemCurrencyId, false);
+            $lineTotalIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($lineSubtotal), $itemCurrencyId, false);
             
             $subtotal += $subtotalBeforeTaxIdr;
             $tax += $lineTaxIdr;
@@ -156,7 +158,7 @@ class SaleOrderObserver
             $invoiceItems[] = [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
-                'price' => CurrencyConversionResolver::convertToIdr((float) $item->unit_price, $itemCurrencyId),
+                'price' => CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($item->unit_price), $itemCurrencyId, false),
                 'discount' => $item->discount,
                 'tax_rate' => $item->tax,
                 'tax_amount' => $lineTaxIdr,

@@ -13,6 +13,7 @@ use App\Models\Currency;
 use App\Models\Warehouse;
 use App\Services\OrderRequestService;
 use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use App\Support\ProcurementFailureNotifier;
 use App\Support\TaxDefaultResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -597,8 +598,8 @@ class OrderRequestResource extends Resource
                                             return;
                                         }
 
-                                        $currentOriginalPrice = self::parseCurrencyState($get('original_price') ?? 0);
-                                        $currentUnitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
+                                        $currentOriginalPrice = MoneyHelper::parseHighPrecision($get('original_price') ?? 0);
+                                        $currentUnitPrice = MoneyHelper::parseHighPrecision($get('unit_price') ?? 0);
 
                                         // Use CurrencyConversionResolver with bcmath precision for high-accuracy conversion
                                         $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertBetweenCurrencies(

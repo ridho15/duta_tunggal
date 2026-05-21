@@ -2,17 +2,39 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <title>Pembelian - {{ $purchaseOrder->po_number }}</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            font-size: 12px;
-            margin: 20px;
-        }
+    @php
+        $purchaseOrder->loadMissing(['purchaseOrderItem.currency', 'purchaseOrderCurrency.currency']);
 
-        .header,
-        .footer {
+        $headerCurrencyId = $purchaseOrder->purchaseOrderCurrency->first()?->currency_id
+            ?? $purchaseOrder->purchaseOrderItem->first()?->currency_id;
+        $isImport = (bool) ($purchaseOrder->is_import ?? false);
+
+        $formatMoney = function (float $amount, ?int $currencyId) {
+            $currency = $currencyId ? \App\Models\Currency::find($currencyId) : null;
+            $symbol = $currency?->symbol ?: \App\Support\CurrencyConversionResolver::resolveSymbol($currencyId);
+            $decimals = strtoupper((string) ($currency?->code ?? '')) === 'IDR' ? 0 : 2;
+
+            return $symbol . ' ' . number_format($amount, $decimals, $decimals === 0 ? ',' : '.', $decimals === 0 ? '.' : ',');
+        };
+
+        // TOP / credit term is the payment term; expected date remains the logistics date.
+        $topType = strtolower(trim((string) ($purchaseOrder->top_type ?? '')));
+        if ($topType === '') {
+            $topType = ((int) ($purchaseOrder->tempo_hutang ?? $purchaseOrder->supplier->tempo_hutang ?? 0)) > 0 ? 'credit_days' : 'cod';
+        }
+        $tempoHutang = (int) ($purchaseOrder->tempo_hutang ?? $purchaseOrder->supplier->tempo_hutang ?? 0);
+        $topLabel = match ($topType) {
+            'advance_before_delivery' => 'Advance Before Delivery',
+            'deposit_balance' => 'Deposit + Balance',
+            'credit_days' => 'Credit ' . ($tempoHutang > 0 ? $tempoHutang . ' hari' : '... Days'),
+            default => 'COD',
+        };
+        $jatuhTempoDate = $topType === 'credit_days' && $tempoHutang > 0
+            ? \Carbon\Carbon::parse($purchaseOrder->order_date)->addDays($tempoHutang)->format('d/m/Y')
+            : '-';
+    @endphp
+    <style>
+        .header {
             text-align: center;
         }
 
@@ -83,18 +105,13 @@
         </tr>
     </table>
 
-    @php
-        // Jatuh tempo: calculated from order_date + supplier.tempo_hutang (hari)
-        $tempoHutang = (int) ($purchaseOrder->supplier->tempo_hutang ?? 0);
-        $jatuhTempoDate = $tempoHutang > 0
-            ? \Carbon\Carbon::parse($purchaseOrder->order_date)->addDays($tempoHutang)->format('d/m/Y')
-            : ($purchaseOrder->expected_date
-                ? \Carbon\Carbon::parse($purchaseOrder->expected_date)->format('d/m/Y')
-                : '-');
-        $jatuhTempoLabel = $tempoHutang > 0 ? $jatuhTempoDate . ' (' . $tempoHutang . ' hari)' : $jatuhTempoDate;
-    @endphp
-
     <div class="title">PEMBELIAN</div>
+
+    @if($isImport)
+        <div style="margin-top: 10px; font-style: italic; color: #555;">
+            Transaksi impor diringkas pada PO. Breakdown fiskal lengkap ditampilkan pada Purchase Invoice.
+        </div>
+    @endif
 
     <table>
         <tr>
@@ -106,8 +123,14 @@
         <tr>
             <td><strong>Supplier:</strong></td>
             <td>{{ $purchaseOrder->supplier->perusahaan }}<br>{{ $purchaseOrder->supplier->address }}</td>
+            <td><strong>Tanggal Diharapkan:</strong></td>
+            <td>{{ $purchaseOrder->expected_date ? \Carbon\Carbon::parse($purchaseOrder->expected_date)->format('d/m/Y') : '-' }}</td>
+        </tr>
+        <tr>
+            <td><strong>TOP:</strong></td>
+            <td>{{ $topLabel }}</td>
             <td><strong>Jatuh Tempo:</strong></td>
-            <td>{{ $jatuhTempoLabel }}</td>
+            <td>{{ $jatuhTempoDate }}</td>
         </tr>
         <tr>
             <td><strong>Tipe:</strong></td>
@@ -127,10 +150,12 @@
                 <th>Harga Satuan</th>
                 <th>Diskon (%)</th>
                 <th>Diskon (Rp)</th>
-                <th>Tipe Pajak</th>
-                <th>Tax (%)</th>
-                <th>DPP</th>
-                <th>PPN</th>
+                @unless($isImport)
+                    <th>Tipe Pajak</th>
+                    <th>Tax (%)</th>
+                    <th>DPP</th>
+                    <th>PPN</th>
+                @endunless
                 <th>Total</th>
             </tr>
         </thead>
@@ -150,6 +175,7 @@
                 $discount       = (float) $item->discount;   // stored as %
                 $taxRate        = (float) $item->tax;        // stored as %
                 $taxType        = \App\Services\TaxService::normalizeType($item->tipe_pajak);
+                $lineCurrencyId = $item->currency_id ?? $headerCurrencyId;
 
                 $bruto          = $quantity * $unitPrice;
                 $discountAmount = $bruto * ($discount / 100.0);
@@ -159,6 +185,25 @@
                 $itemDPP    = $taxResult['dpp'];
                 $itemPPN    = $taxResult['ppn'];
                 $itemTotal  = $taxResult['total'];
+
+                $summaryBruto = $headerCurrencyId && $lineCurrencyId !== $headerCurrencyId
+                    ? (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($bruto, $lineCurrencyId, $headerCurrencyId)
+                    : $bruto;
+                $summaryDiskon = $headerCurrencyId && $lineCurrencyId !== $headerCurrencyId
+                    ? (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($discountAmount, $lineCurrencyId, $headerCurrencyId)
+                    : $discountAmount;
+                $summaryAfterDiskon = $headerCurrencyId && $lineCurrencyId !== $headerCurrencyId
+                    ? (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($afterDiscount, $lineCurrencyId, $headerCurrencyId)
+                    : $afterDiscount;
+                $summaryDpp = $headerCurrencyId && $lineCurrencyId !== $headerCurrencyId
+                    ? (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($itemDPP, $lineCurrencyId, $headerCurrencyId)
+                    : $itemDPP;
+                $summaryPpn = $headerCurrencyId && $lineCurrencyId !== $headerCurrencyId
+                    ? (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($itemPPN, $lineCurrencyId, $headerCurrencyId)
+                    : $itemPPN;
+                $summaryTotal = $headerCurrencyId && $lineCurrencyId !== $headerCurrencyId
+                    ? (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($itemTotal, $lineCurrencyId, $headerCurrencyId)
+                    : $itemTotal;
 
                 $totalBruto       += $bruto;
                 $totalDiskon      += $discountAmount;
@@ -172,41 +217,45 @@
                 <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
                 <td class="right">{{ number_format($quantity, 0, ',', '.') }}</td>
                 <td>{{ $item->product->uom->name ?? '-' }}</td>
-                <td class="right">Rp {{ number_format($unitPrice, 0, ',', '.') }}</td>
+                <td class="right">{{ $formatMoney($unitPrice, $lineCurrencyId) }}</td>
                 <td class="right">{{ number_format($discount, 2, ',', '.') }}%</td>
-                <td class="right">Rp {{ number_format($discountAmount, 0, ',', '.') }}</td>
-                <td>{{ $taxType }}</td>
-                <td class="right">{{ number_format($taxRate, 2, ',', '.') }}%</td>
-                <td class="right">Rp {{ number_format($itemDPP, 0, ',', '.') }}</td>
-                <td class="right">Rp {{ number_format($itemPPN, 0, ',', '.') }}</td>
-                <td class="right">Rp {{ number_format($itemTotal, 0, ',', '.') }}</td>
+                <td class="right">{{ $formatMoney($discountAmount, $lineCurrencyId) }}</td>
+                @unless($isImport)
+                    <td>{{ $taxType }}</td>
+                    <td class="right">{{ number_format($taxRate, 2, ',', '.') }}%</td>
+                    <td class="right">{{ $formatMoney($itemDPP, $lineCurrencyId) }}</td>
+                    <td class="right">{{ $formatMoney($itemPPN, $lineCurrencyId) }}</td>
+                @endunless
+                <td class="right">{{ $formatMoney($itemTotal, $lineCurrencyId) }}</td>
             </tr>
             @endforeach
 
             {{-- Summary Breakdown --}}
-            <tr>
-                <td colspan="11" class="right">Subtotal Bruto</td>
-                <td class="right">Rp {{ number_format($totalBruto, 0, ',', '.') }}</td>
+            <tr class="summary-row">
+                <td colspan="{{ $isImport ? 7 : 10 }}" class="right">Subtotal Bruto</td>
+                <td colspan="{{ $isImport ? 1 : 2 }}" class="right">{{ $formatMoney($totalBruto, $headerCurrencyId) }}</td>
             </tr>
-            <tr>
-                <td colspan="11" class="right">Total Diskon</td>
-                <td class="right">(Rp {{ number_format($totalDiskon, 0, ',', '.') }})</td>
+            <tr class="summary-row">
+                <td colspan="{{ $isImport ? 7 : 10 }}" class="right">Total Diskon</td>
+                <td colspan="{{ $isImport ? 1 : 2 }}" class="right">({{ $formatMoney($totalDiskon, $headerCurrencyId) }})</td>
             </tr>
-            <tr>
-                <td colspan="11" class="right">Sub Total (setelah diskon)</td>
-                <td class="right">Rp {{ number_format($totalAfterDiskon, 0, ',', '.') }}</td>
+            <tr class="summary-row">
+                <td colspan="{{ $isImport ? 7 : 10 }}" class="right">Sub Total (setelah diskon)</td>
+                <td colspan="{{ $isImport ? 1 : 2 }}" class="right">{{ $formatMoney($totalAfterDiskon, $headerCurrencyId) }}</td>
             </tr>
-            <tr>
-                <td colspan="11" class="right">DPP (Dasar Pengenaan Pajak)</td>
-                <td class="right">Rp {{ number_format($totalDPP, 0, ',', '.') }}</td>
-            </tr>
-            <tr>
-                <td colspan="11" class="right">PPN</td>
-                <td class="right">Rp {{ number_format($totalPPN, 0, ',', '.') }}</td>
-            </tr>
+            @unless($isImport)
+                <tr class="summary-row">
+                    <td colspan="10" class="right">DPP (Dasar Pengenaan Pajak)</td>
+                    <td colspan="2" class="right">{{ $formatMoney($totalDPP, $headerCurrencyId) }}</td>
+                </tr>
+                <tr class="summary-row">
+                    <td colspan="10" class="right">PPN</td>
+                    <td colspan="2" class="right">{{ $formatMoney($totalPPN, $headerCurrencyId) }}</td>
+                </tr>
+            @endunless
             <tr style="background-color: #f0f0f0;">
-                <td colspan="11" class="right"><strong>TOTAL</strong></td>
-                <td class="right"><strong>Rp {{ number_format($grandTotal, 0, ',', '.') }}</strong></td>
+                <td colspan="{{ $isImport ? 7 : 10 }}" class="right"><strong>TOTAL</strong></td>
+                <td colspan="{{ $isImport ? 1 : 2 }}" class="right"><strong>{{ $formatMoney($grandTotal, $headerCurrencyId) }}</strong></td>
             </tr>
         </tbody>
     </table>

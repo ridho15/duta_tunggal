@@ -170,6 +170,92 @@ class MoneyHelper
     }
 
     /**
+     * Parse a money string into a high-precision numeric string suitable for bcmath.
+     * Preserves all fractional digits and does NOT cast to float.
+     * Examples:
+     *  - "1.000.000,50" -> "1000000.50"
+     *  - "4.2510666666"  -> "4.2510666666"
+     *  - "-Rp 1.000"     -> "-1000"
+     */
+    public static function parseHighPrecision(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '0';
+        }
+
+        $str = (string) $value;
+
+        // Strip currency prefix and whitespace
+        $cleaned = preg_replace('/[Rp\s]/u', '', $str);
+        $cleaned = trim($cleaned);
+
+        if ($cleaned === '' || $cleaned === '-') {
+            return '0';
+        }
+
+        // No formatting chars — plain integer or float string from DB
+        if (!preg_match('/[.,]/', $cleaned)) {
+            return $cleaned;
+        }
+
+        $hasComma = strpos($cleaned, ',') !== false;
+        $hasDot   = strpos($cleaned, '.') !== false;
+
+        $integer = '';
+        $decimal = '';
+
+        if ($hasComma && $hasDot) {
+            $lastCommaPos = strrpos($cleaned, ',');
+            $lastDotPos   = strrpos($cleaned, '.');
+
+            if ($lastDotPos > $lastCommaPos) {
+                // Western format: 1,000,000.50  (dot = decimal)
+                $parts   = explode('.', $cleaned);
+                $decimal = array_pop($parts);
+                $integer = str_replace(',', '', implode('', $parts));
+            } else {
+                // Indonesian format: 1.000.000,50  (comma = decimal)
+                $parts   = explode(',', $cleaned);
+                $decimal = $parts[1] ?? '0';
+                $integer = str_replace('.', '', $parts[0]);
+            }
+        } elseif ($hasComma) {
+            $parts = explode(',', $cleaned);
+            $last  = end($parts);
+            if (count($parts) === 2 && preg_match('/^\d{1,2}$/', $last)) {
+                $decimal = $last;
+                $integer = str_replace('.', '', $parts[0]);
+            } else {
+                $integer = str_replace(',', '', $cleaned);
+                $decimal = '';
+            }
+        } else {
+            $dotCount = substr_count($cleaned, '.');
+            if ($dotCount === 1) {
+                $parts = explode('.', $cleaned);
+                $fraction = $parts[1] ?? '';
+                if (preg_match('/^\d{3}$/', $fraction)) {
+                    $integer = str_replace('.', '', $cleaned);
+                    $decimal = '';
+                } else {
+                    $integer = $parts[0];
+                    $decimal = $fraction;
+                }
+            } else {
+                $integer = str_replace('.', '', $cleaned);
+                $decimal = '';
+            }
+        }
+
+        $result = $integer;
+        if ($decimal !== '') {
+            $result .= '.' . $decimal;
+        }
+
+        return $result === '' ? '0' : $result;
+    }
+
+    /**
      * Safely parse a currency state coming from UI.
      * Native ints/floats and numeric strings without separators are returned as
      * numeric values, while formatted money strings are parsed with Indonesian

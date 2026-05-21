@@ -90,8 +90,18 @@ class JournalEntry extends Model
                         if (! $entry->currency_id) {
                             $currency = null;
 
+                            // Special-case: If the journal entry source is an Invoice created
+                            // from a SaleOrder, prefer IDR context for the sales journal flow.
+                            // This preserves the existing behavior where sales invoices are
+                            // represented in IDR in the general ledger even if the SO uses USD.
+                            if ($entry->source_type === \App\Models\Invoice::class && ($source->from_model_type ?? null) === \App\Models\SaleOrder::class) {
+                                $currency = \App\Models\Currency::where('code', 'IDR')
+                                    ->orWhere('to_rupiah', 1)
+                                    ->first();
+                            }
+
                             // 1. Source has currency_id directly (e.g. PurchaseReceipt)
-                            if (isset($source->currency_id) && $source->currency_id) {
+                            if (! $currency && isset($source->currency_id) && $source->currency_id) {
                                 $currency = \App\Models\Currency::find($source->currency_id);
                             }
 
