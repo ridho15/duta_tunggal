@@ -452,7 +452,9 @@ class HelperController extends Controller
                 'delete',
                 'restore',
                 'force-delete',
-                'approve'
+                'approve',
+                'reject',
+                'submit',
             ],
             'order request item' => [
                 'view any',

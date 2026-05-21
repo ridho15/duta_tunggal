@@ -344,7 +344,7 @@ Setiap transaksi memiliki nomor dokumen unik:
 
 - **Selalu gunakan `->withDefault()`** pada `belongsTo` relationships untuk menghindari null pointer.
 - **Hindari menambahkan global scope ganda** — cek AppServiceProvider dan model sebelum menambahkan observer/scope baru.
-- **Field money** disimpan sebagai `decimal(15,2)` untuk transaksi umum, dan beberapa field sensitif menggunakan `decimal(20,8)` untuk presisi tinggi.
+- **Field money wajib `decimal(15,2)`** untuk semua kolom nominal/harga termasuk IDR (lihat kebijakan lengkap di §9.5).
 - Accessor `getTotalAmountAttribute()` pada PurchaseOrder mengembalikan angka dengan 2 desimal sebagai string.
 
 ### 8.2 Service Layer
@@ -435,6 +435,80 @@ closed_at
 - Kolom status: selalu `status` dengan nilai string lowercase
 - Tabel pivot: `{model1}_{model2}` alphabetical (`product_supplier`, `delivery_sales_orders`)
 - Kolom Indonesia boleh dalam Bahasa Indonesia (`tipe_pajak`, `tempo_hutang`, `nama`, `perusahaan`)
+
+### 9.5 Kebijakan Presisi Decimal untuk Kolom Uang
+
+> **ATURAN WAJIB:** Semua kolom yang menyimpan nominal uang / harga, termasuk IDR dan valuta asing, **wajib menggunakan `decimal(15, 2)`** sebagai standar tunggal.
+
+#### Standar Utama
+
+| Tipe Kolom | Presisi | Keterangan |
+|---|---|---|
+| Semua nominal/harga (IDR & valuta asing) | **`decimal(15, 2)`** | Standar wajib |
+| Jurnal `debit` & `credit` | `decimal(20, 2)` | ⚠️ Pengecualian — menampung nilai ledger sangat besar |
+| Nilai aset tetap (`assets`, `asset_depreciations`) | `decimal(20, 2)` | ⚠️ Pengecualian — nilai aset kapital bisa sangat besar |
+| Kurs tukar (`exchange_rate`) | `decimal(18, 8)` | ⚠️ Pengecualian — presisi tinggi untuk konversi FX |
+| Nominal mata uang asal (`amount_original_currency`) | `decimal(20, 4)` | ⚠️ Pengecualian — presisi kalkulasi intermediate |
+
+#### Kolom yang TIDAK termasuk aturan decimal uang
+
+- Kolom **kuantitas/qty** (`decimal(10,2)` atau `decimal(15,2)`) — bukan uang
+- Kolom **persentase/rate** (`decimal(5,2)`) — bukan uang (contoh: `pajak`, `kenaikan_harga`)
+- Kolom **rasio/faktor** (`decimal(8,4)` atau `decimal(10,4)`) — bukan uang
+
+#### Hasil Audit (21 Mei 2026)
+
+Audit seluruh skema database dilakukan terhadap 107 kolom nominal uang. Ditemukan **2 kolom tidak konsisten** pada tabel `purchase_order_items`:
+
+| Tabel | Kolom | Sebelum | Sesudah | Status |
+|---|---|---|---|---|
+| `purchase_order_items` | `discount` | `decimal(10,2)` | `decimal(15,2)` | ✅ Diperbaiki |
+| `purchase_order_items` | `tax` | `decimal(10,2)` | `decimal(15,2)` | ✅ Diperbaiki |
+
+Perbaikan dilakukan via migration `2026_05_21_082847_fix_purchase_order_items_decimal_precision.php`.
+
+#### Kolom dengan Pengecualian Sah (tidak perlu diubah)
+
+| Tabel | Kolom | Tipe | Alasan Pengecualian |
+|---|---|---|---|
+| `journal_entries` | `debit`, `credit` | `decimal(20,2)` | Nilai ledger akumulatif bisa sangat besar |
+| `assets` | `purchase_cost`, `salvage_value`, `book_value` | `decimal(20,2)` | Nilai aset kapital |
+| `asset_depreciations` | `amount`, `accumulated_total`, `book_value` | `decimal(20,2)` | Akumulasi depresiasi aset |
+
+#### Cara Membuat Migration untuk Kolom Uang Baru
+
+```php
+// ✅ BENAR — selalu gunakan decimal(15, 2) untuk nominal uang
+$table->decimal('unit_price', 15, 2)->default(0);
+$table->decimal('discount', 15, 2)->default(0);
+$table->decimal('tax', 15, 2)->default(0);
+$table->decimal('subtotal', 15, 2)->default(0);
+$table->decimal('total_amount', 15, 2)->default(0);
+
+// ✅ BENAR — IDR Anchor Columns untuk mencegah precision drift pada konversi valas
+$table->decimal('unit_price_idr', 15, 2)->default(0)->comment('Anchor nilai IDR asli');
+$table->decimal('original_price_idr', 15, 2)->default(0)->comment('Anchor nilai IDR asli');
+
+// ❌ SALAH — jangan gunakan presisi berbeda untuk nominal uang biasa
+$table->decimal('discount', 10, 2);  // terlalu kecil
+$table->decimal('total', 18, 2);     // tidak konsisten dengan standar
+$table->decimal('amount', 20, 2);    // hanya untuk jurnal/aset
+
+// ✅ Pengecualian sah
+$table->decimal('exchange_rate', 18, 8)->default(1);      // kurs FX
+$table->decimal('debit', 20, 2)->default(0);              // jurnal ledger
+$table->decimal('purchase_cost', 20, 2)->default(0);     // nilai aset
+```
+
+#### Kebijakan Akurasi Konversi Mata Uang (IDR Anchor Strategy)
+
+> **ATURAN WAJIB KONVERSI VALUTA ASING:**
+> Guna menjamin akurasi 100% pada laporan keuangan dan mencegah selisih pembulatan (misalnya: Rp1.000.000,00 dikonversi ke USD menjadi $66,67 lalu dikonversi kembali menjadi Rp1.000.050,00):
+> 
+> 1. **Gunakan Kolom IDR Anchor:** Setiap item transaksi multi-mata uang wajib memiliki kolom internal `*_idr` (contoh: `unit_price_idr` dan `original_price_idr`) yang menyimpan nilai **selalu dalam mata uang dasar Rupiah (IDR)** dengan presisi asli.
+> 2. **Konversi Langsung dari Anchor:** Ketika ada pergantian mata uang/currency switching pada form UI, konversi **harus selalu diturunkan langsung dari nilai IDR anchor**, bukan dari nilai tampilan foreign currency yang sudah dibulatkan.
+> 3. **Operasi Aritmatika High Precision:** Gunakan method `CurrencyConversionResolver::convertToIdrHighPrecision()` dan `convertFromIdrHighPrecision()` yang memanfaatkan `bcmath` dengan scale desimal tinggi (minimal 10 desimal) untuk kalkulasi intermediate, lalu gunakan pembulatan matematis sejati (`number_format`) pada tahap output akhir.
+
 
 ### 9.4 Index Performa
 

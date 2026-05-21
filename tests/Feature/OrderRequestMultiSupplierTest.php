@@ -256,9 +256,10 @@ test('multi-supplier approve creates one PO per supplier and cabang combination'
 
         // All items in a PO come from the same supplier + cabang
         expect($poSupplierIds)->toHaveCount(1);
+        $firstOrItem = OrderRequestItem::find($po->purchaseOrderItem->first()->refer_item_model_id);
         $poKey = implode('|', [
             (string) $po->supplier_id,
-            (string) $po->cabang_id,
+            (string) ($firstOrItem?->cabang_id ?? ''),
         ]);
         expect($poSupplierIds->first())->toBe($poKey);
     }
@@ -289,7 +290,10 @@ test('createPurchaseOrder splits same supplier across different cabang into sepa
     }
 
     expect(PurchaseOrder::count())->toBe(2);
-    expect(PurchaseOrder::pluck('cabang_id')->unique())->toHaveCount(2);
+    $poCabangIds = PurchaseOrder::all()->map(function ($po) {
+        return $po->purchaseOrderItem->first()->referItemModel?->cabang_id;
+    })->unique();
+    expect($poCabangIds)->toHaveCount(2);
     expect(PurchaseOrder::pluck('supplier_id')->unique())->toHaveCount(1);
 });
 

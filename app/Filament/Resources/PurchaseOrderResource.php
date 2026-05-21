@@ -359,11 +359,35 @@ class PurchaseOrderResource extends Resource
         return null;
     }
 
+    /**
+     * Compute the quantity already locked in approved/active PO items for a given OrderRequestItem.
+     * This is needed because fulfilled_quantity is only updated when goods are received,
+     * not when a PO is approved. Without this, the system would think all qty is still
+     * available for new POs right after approving the first PO.
+     */
+    public static function getLockedQuantityForOrderRequestItem(int $orderRequestItemId): float
+    {
+        return (float) \App\Models\PurchaseOrderItem::query()
+            ->where('refer_item_model_type', OrderRequestItem::class)
+            ->where('refer_item_model_id', $orderRequestItemId)
+            ->whereHas('purchaseOrder', function ($q) {
+                // Count qty locked in POs that are approved or in-progress (not draft/closed/rejected)
+                $q->whereNotIn('status', ['draft', 'closed', 'cancelled', 'rejected']);
+            })
+            ->sum('quantity');
+    }
+
     public static function getAvailableOrderRequestItemGroups(OrderRequest $orderRequest): array
     {
         return $orderRequest->orderRequestItem
             ->map(function (OrderRequestItem $orderRequestItem) use ($orderRequest) {
-                $remainingQuantity = max(0, (float) $orderRequestItem->quantity - (float) ($orderRequestItem->fulfilled_quantity ?? 0));
+                // fulfilled_quantity reflects receipts; lockedQty reflects approved POs not yet received.
+                // Use the max of both to avoid double-counting when receipts already exceed locked qty.
+                $fulfilledQty  = (float) ($orderRequestItem->fulfilled_quantity ?? 0);
+                $lockedQty     = static::getLockedQuantityForOrderRequestItem((int) $orderRequestItem->id);
+                $accountedQty  = max($fulfilledQty, $lockedQty);
+                $remainingQuantity = max(0, (float) $orderRequestItem->quantity - $accountedQty);
+
                 if ($remainingQuantity <= 0) {
                     return null;
                 }
@@ -375,9 +399,9 @@ class PurchaseOrderResource extends Resource
                 }
 
                 return [
-                    'group_key'  => implode('|', [$supplierId, $cabangId]),
+                    'group_key'   => implode('|', [$supplierId, $cabangId]),
                     'supplier_id' => $supplierId,
-                    'cabang_id'  => $cabangId,
+                    'cabang_id'   => $cabangId,
                 ];
             })
             ->filter()
@@ -775,15 +799,15 @@ class PurchaseOrderResource extends Resource
                                 $currentSupplierId = (int) ($get('supplier_id') ?? 0);
 
                                 if ($currentSupplierId > 0 && $availableSupplierCount === 0) {
-                                    return 'Supplier ini sudah dipakai untuk PO lain, tetapi tetap ditampilkan karena merupakan supplier aktif pada PO ini.';
+                                    return 'Semua kuantitas item Order Request ini sudah tercakup oleh PO yang ada. Tidak ada sisa item yang perlu dibuatkan PO.';
                                 }
 
                                 if ($availableSupplierCount > 1) {
-                                    return "Order Request ini memiliki {$availableSupplierCount} supplier yang belum dibuat PO. Pilih satu supplier — item akan diisi otomatis sesuai supplier terpilih.";
+                                    return "Order Request ini memiliki {$availableSupplierCount} supplier dengan item yang belum sepenuhnya dibuatkan PO. Pilih satu supplier — item akan diisi otomatis sesuai supplier terpilih.";
                                 }
 
                                 if ($availableSupplierCount === 0) {
-                                    return 'Semua supplier pada Order Request ini sudah memiliki PO. Field supplier dinonaktifkan karena tidak ada pilihan yang masih tersedia.';
+                                    return 'Semua item Order Request ini sudah sepenuhnya tercakup oleh PO yang ada. Tidak ada sisa kuantitas yang perlu dibuatkan PO baru.';
                                 }
                                 return null;
                             })
@@ -2311,7 +2335,12 @@ class PurchaseOrderResource extends Resource
                 continue;
             }
 
-            $remainingQuantity = max(0, $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0));
+            // Use the greater of fulfilled_quantity (from receipts) and locked_quantity (from approved POs)
+            // to ensure we don't pre-fill items that are already covered by an existing approved PO.
+            $fulfilledQty  = (float) ($orderRequestItem->fulfilled_quantity ?? 0);
+            $lockedQty     = static::getLockedQuantityForOrderRequestItem((int) $orderRequestItem->id);
+            $accountedQty  = max($fulfilledQty, $lockedQty);
+            $remainingQuantity = max(0, (float) $orderRequestItem->quantity - $accountedQty);
             if ($remainingQuantity <= 0) {
                 continue;
             }
@@ -2355,33 +2384,23 @@ class PurchaseOrderResource extends Resource
     }
 
     /**
-     * Return Order Request supplier IDs that have not yet been used by an existing PO for the same OR.
+     * Return Order Request supplier IDs that still have items with remaining quantity
+     * (i.e., quantity not yet covered by approved POs or fulfilled receipts).
+     *
+     * NOTE: We no longer simply block a supplier because they already have a PO.
+     * A supplier remains "available" as long as any of their OR items still have
+     * qty > (locked in approved POs + already received). This allows partial POs
+     * to be followed by additional POs for the remaining qty.
      */
     public static function getAvailableOrderRequestSupplierIds(OrderRequest $orderRequest): array
     {
-        $orSupplierIds = collect(static::getAvailableOrderRequestItemGroups($orderRequest))
+        return collect(static::getAvailableOrderRequestItemGroups($orderRequest))
             ->pluck('supplier_id')
             ->filter()
             ->map(fn ($supplierId) => (int) $supplierId)
             ->unique()
             ->values()
             ->all();
-
-        if (empty($orSupplierIds)) {
-            return [];
-        }
-
-        $usedSupplierIds = PurchaseOrder::query()
-            ->where('refer_model_type', OrderRequest::class)
-            ->where('refer_model_id', $orderRequest->id)
-            ->pluck('supplier_id')
-            ->filter()
-            ->map(fn ($supplierId) => (int) $supplierId)
-            ->unique()
-            ->values()
-            ->all();
-
-        return array_values(array_diff($orSupplierIds, $usedSupplierIds));
     }
 
     public static function getRelations(): array

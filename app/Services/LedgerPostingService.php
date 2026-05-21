@@ -51,6 +51,10 @@ class LedgerPostingService
         }
 
         $date = $invoice->invoice_date ?? Carbon::now()->toDateString();
+        
+        $currencyContext = $this->resolveInvoiceCurrencyAndRate($invoice);
+        $currencyId = $currencyContext['currency_id'];
+        $exchangeRate = $currencyContext['exchange_rate'];
 
         // Determine COAs
         // Check if this is asset purchase
@@ -118,7 +122,7 @@ class LedgerPostingService
 
             // Debit for subtotal
             if ($subtotal > 0 && $debitCoa) {
-                $debitEntry = JournalEntry::create([
+                $debitEntry = $this->createJournalEntry([
                     'coa_id' => $debitCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
@@ -131,7 +135,7 @@ class LedgerPostingService
                     'project_id' => $projectId,
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
-                ]);
+                ], $currencyId, $exchangeRate);
                 $entries[] = $debitEntry;
             } else {
                 \Illuminate\Support\Facades\Log::info('DEBUG: Skipping debit entry for unbilled purchase', [
@@ -162,7 +166,7 @@ class LedgerPostingService
             // Import purchase invoices should not post PPN Masukan at invoice stage.
             // PPN impor is posted at payment stage (VendorPayment) when applicable.
             if (! $isImportPurchase && $ppnAmount > 0 && $ppnMasukanCoa) {
-                $entries[] = JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $ppnMasukanCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
@@ -175,7 +179,7 @@ class LedgerPostingService
                     'project_id' => $projectId,
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
-                ]);
+                ], $currencyId, $exchangeRate);
                 $actualPpnAmount = $ppnAmount;
             }
 
@@ -197,7 +201,7 @@ class LedgerPostingService
             // Create journal entry for other fees if any
             if ($totalOtherFees > 0) {
                 $expenseCoa = $invoice->expense_coa_id ? ChartOfAccount::find($invoice->expense_coa_id) : ChartOfAccount::where('code', config('coa.general_expense'))->first();
-                $entries[] = JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $expenseCoa ? $expenseCoa->id : 1, // fallback to first COA if not found
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
@@ -210,13 +214,13 @@ class LedgerPostingService
                     'project_id' => $projectId,
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
 
             // Credit Accounts Payable for total amount (subtotal + actual PPN + other fees)
             $totalAmount = $subtotal + $actualPpnAmount + $totalOtherFees;
             if ($totalAmount > 0 && $utangCoa) {
-                $creditEntry = JournalEntry::create([
+                $creditEntry = $this->createJournalEntry([
                     'coa_id' => $utangCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
@@ -229,7 +233,7 @@ class LedgerPostingService
                     'project_id' => $projectId,
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
-                ]);
+                ], $currencyId, $exchangeRate);
                 $entries[] = $creditEntry;
             } else {
                 \Illuminate\Support\Facades\Log::error('Missing accounts payable COA - cannot post invoice to ledger', [
@@ -280,6 +284,10 @@ class LedgerPostingService
         $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($deposit);
         $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($deposit);
 
+        $currencyContext = $this->resolveDepositCurrencyAndRate($deposit);
+        $currencyId = $currencyContext['currency_id'];
+        $exchangeRate = $currencyContext['exchange_rate'];
+
         $entries = [];
         $date = now()->toDateString();
 
@@ -287,7 +295,7 @@ class LedgerPostingService
         if ($deposit->from_model_type === 'App\\Models\\Supplier') {
             // Debit: Uang Muka (deposit account)
             if ($deposit->coa_id) {
-                $entries[] = \App\Models\JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $deposit->coa_id,
                     'date' => $date,
                     'reference' => 'DEP-' . $deposit->id,
@@ -300,13 +308,13 @@ class LedgerPostingService
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
                     'project_id' => $projectId,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
 
             // Credit: Kas/Bank (try to find default)
             $bankCoa = \App\Models\ChartOfAccount::where('code', 'LIKE', config('coa.cash_and_bank') . '%')->first();
             if ($bankCoa) {
-                $entries[] = \App\Models\JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $bankCoa->id,
                     'date' => $date,
                     'reference' => 'DEP-' . $deposit->id,
@@ -319,13 +327,13 @@ class LedgerPostingService
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
                     'project_id' => $projectId,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
         } elseif ($deposit->from_model_type === 'App\\Models\\Customer') {
             // Customer deposit (receipt from customer)
             // Debit: Kas/Bank (coa_id in deposit)
             if ($deposit->coa_id) {
-                $entries[] = \App\Models\JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $deposit->coa_id,
                     'date' => $date,
                     'reference' => 'DEP-' . $deposit->id,
@@ -338,13 +346,13 @@ class LedgerPostingService
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
                     'project_id' => $projectId,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
 
             // Credit: Customer deposit liability
             $liabilityCoa = \App\Models\ChartOfAccount::where('code', config('coa.customer_deposit'))->first();
             if ($liabilityCoa) {
-                $entries[] = \App\Models\JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $liabilityCoa->id,
                     'date' => $date,
                     'reference' => 'DEP-' . $deposit->id,
@@ -357,7 +365,7 @@ class LedgerPostingService
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
                     'project_id' => $projectId,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
         }
 
@@ -391,6 +399,10 @@ class LedgerPostingService
                 return ['status' => 'skipped', 'message' => 'VendorPayment has no amount to post'];
             }
 
+            $currencyContext = $this->resolveVendorPaymentCurrencyAndRate($payment);
+            $currencyId = $currencyContext['currency_id'];
+            $exchangeRate = $currencyContext['exchange_rate'];
+
             $utangCoa = ChartOfAccount::where('code', config('coa.accounts_payable'))->first();
             $defaultBankCoa = $payment->coa_id ? $payment->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
             $ppnMasukanCoa = ChartOfAccount::where('code', config('coa.ppn_masukan'))->first();
@@ -405,7 +417,7 @@ class LedgerPostingService
             $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($payment);
 
             if ($utangCoa) {
-                $entries[] = JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $utangCoa->id,
                     'date' => $date,
                     'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
@@ -418,7 +430,7 @@ class LedgerPostingService
                     'project_id' => $projectId,
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
 
             $depositDetailsAmount = $details->filter(function ($detail) {
@@ -445,7 +457,7 @@ class LedgerPostingService
                     throw new \RuntimeException('Akun deposit / uang muka supplier tidak ditemukan. Jurnal pembayaran tidak dapat dibuat tanpa COA deposit yang valid.');
                 }
 
-                $entries[] = JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $depositCoa->id,
                     'date' => $date,
                     'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
@@ -458,7 +470,7 @@ class LedgerPostingService
                     'project_id' => $projectId,
                     'source_type' => VendorPayment::class,
                     'source_id' => $payment->id,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
 
             $nonDepositDetails = $details->filter(function ($detail) {
@@ -492,7 +504,7 @@ class LedgerPostingService
                         throw new \Exception('Akun COA untuk metode pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal pembayaran tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
                     }
 
-                    $entries[] = JournalEntry::create([
+                    $entries[] = $this->createJournalEntry([
                         'coa_id' => $coa->id,
                         'date' => $date,
                         'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
@@ -505,13 +517,13 @@ class LedgerPostingService
                         'project_id' => $projectId,
                         'source_type' => VendorPayment::class,
                         'source_id' => $payment->id,
-                    ]);
+                    ], $currencyId, $exchangeRate);
                 }
             } elseif ($cashBankAmount > 0) {
                 // If no details or all details are deposit, use payment's coa_id or default bank coa
                 $coa = $defaultBankCoa ?: ($payment->coa_id ? ChartOfAccount::find($payment->coa_id) : null);
                 if ($coa) {
-                    $entries[] = JournalEntry::create([
+                    $entries[] = $this->createJournalEntry([
                         'coa_id' => $coa->id,
                         'date' => $date,
                         'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
@@ -524,7 +536,7 @@ class LedgerPostingService
                         'project_id' => $projectId,
                         'source_type' => VendorPayment::class,
                         'source_id' => $payment->id,
-                    ]);
+                    ], $currencyId, $exchangeRate);
                 } else {
                     Log::error('No COA available for payment credit entry', [
                         'payment_id' => $payment->id,
@@ -561,7 +573,7 @@ class LedgerPostingService
                         continue;
                     }
 
-                    $entries[] = JournalEntry::create([
+                    $entries[] = $this->createJournalEntry([
                         'coa_id' => $debitCoa->id,
                         'date' => $date,
                         'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
@@ -574,9 +586,9 @@ class LedgerPostingService
                         'project_id' => $projectId,
                         'source_type' => VendorPayment::class,
                         'source_id' => $payment->id,
-                    ]);
+                    ], $currencyId, $exchangeRate);
 
-                    $entries[] = JournalEntry::create([
+                    $entries[] = $this->createJournalEntry([
                         'coa_id' => $defaultBankCoa->id,
                         'date' => $date,
                         'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
@@ -589,7 +601,7 @@ class LedgerPostingService
                         'project_id' => $projectId,
                         'source_type' => VendorPayment::class,
                         'source_id' => $payment->id,
-                    ]);
+                    ], $currencyId, $exchangeRate);
                 }
             }
 
@@ -642,6 +654,10 @@ class LedgerPostingService
                 return ['status' => 'skipped', 'message' => 'CustomerReceipt has no amount to post'];
             }
 
+            $currencyContext = $this->resolveCustomerReceiptCurrencyAndRate($receipt);
+            $currencyId = $currencyContext['currency_id'];
+            $exchangeRate = $currencyContext['exchange_rate'];
+
             // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
             $piutangCoa = ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
             $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
@@ -649,7 +665,7 @@ class LedgerPostingService
             $entries = [];
 
             if ($piutangCoa) {
-                $entries[] = JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $piutangCoa->id,
                     'date' => $date,
                     'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
@@ -659,7 +675,7 @@ class LedgerPostingService
                     'journal_type' => 'receipt',
                     'source_type' => \App\Models\CustomerReceipt::class,
                     'source_id' => $receipt->id,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
 
             $depositDetailsAmount = $details->filter(function ($detail) {
@@ -686,7 +702,7 @@ class LedgerPostingService
                     throw new \RuntimeException('Akun deposit / uang muka pelanggan tidak ditemukan. Jurnal penerimaan tidak dapat dibuat tanpa COA deposit yang valid.');
                 }
 
-                $entries[] = JournalEntry::create([
+                $entries[] = $this->createJournalEntry([
                     'coa_id' => $depositCoa->id,
                     'date' => $date,
                     'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
@@ -696,7 +712,7 @@ class LedgerPostingService
                     'journal_type' => 'receipt',
                     'source_type' => \App\Models\CustomerReceipt::class,
                     'source_id' => $receipt->id,
-                ]);
+                ], $currencyId, $exchangeRate);
             }
 
             $nonDepositDetails = $details->filter(function ($detail) {
@@ -730,7 +746,7 @@ class LedgerPostingService
                         throw new \Exception('Akun COA untuk metode penerimaan pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal penerimaan tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
                     }
 
-                    $entries[] = JournalEntry::create([
+                    $entries[] = $this->createJournalEntry([
                         'coa_id' => $coa->id,
                         'date' => $date,
                         'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
@@ -740,13 +756,13 @@ class LedgerPostingService
                         'journal_type' => 'receipt',
                         'source_type' => \App\Models\CustomerReceipt::class,
                         'source_id' => $receipt->id,
-                    ]);
+                    ], $currencyId, $exchangeRate);
                 }
             } elseif ($cashBankAmount > 0) {
                 // If no details or all details are deposit, use receipt's coa_id or default bank coa
                 $coa = $defaultBankCoa ?: ($receipt->coa_id ? ChartOfAccount::find($receipt->coa_id) : null);
                 if ($coa) {
-                    $entries[] = JournalEntry::create([
+                    $entries[] = $this->createJournalEntry([
                         'coa_id' => $coa->id,
                         'date' => $date,
                         'reference' => 'REC-' . ($receipt->id ?? 'N/A'),
@@ -756,7 +772,7 @@ class LedgerPostingService
                         'journal_type' => 'receipt',
                         'source_type' => \App\Models\CustomerReceipt::class,
                         'source_id' => $receipt->id,
-                    ]);
+                    ], $currencyId, $exchangeRate);
                 } else {
                     Log::error('No COA available for receipt debit entry', [
                         'receipt_id' => $receipt->id,
@@ -921,5 +937,160 @@ class LedgerPostingService
 
             return $reversals;
         });
+    }
+
+    /**
+     * Helper to create a JournalEntry, automatically handling foreign currency conversion to IDR.
+     */
+    private function createJournalEntry(array $data, ?int $currencyId, float $exchangeRate): JournalEntry
+    {
+        $debitOrig = (float) ($data['debit'] ?? 0);
+        $creditOrig = (float) ($data['credit'] ?? 0);
+
+        // Convert amounts to IDR for the ledger
+        if ($currencyId && $exchangeRate > 1.0) {
+            $debitIdr = round($debitOrig * $exchangeRate, 2);
+            $creditIdr = round($creditOrig * $exchangeRate, 2);
+            $originalAmount = max($debitOrig, $creditOrig);
+        } else {
+            $debitIdr = $debitOrig;
+            $creditIdr = $creditOrig;
+            $originalAmount = max($debitOrig, $creditOrig);
+            $currencyId = $currencyId ?: \App\Support\CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
+            $exchangeRate = 1.0;
+        }
+
+        $entryData = array_merge($data, [
+            'debit' => $debitIdr,
+            'credit' => $creditIdr,
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate,
+            'amount_original_currency' => $originalAmount,
+        ]);
+
+        return JournalEntry::create($entryData);
+    }
+
+    /**
+     * Resolve the currency ID and exchange rate for a given Invoice.
+     */
+    private function resolveInvoiceCurrencyAndRate(Invoice $invoice): array
+    {
+        $currencyId = null;
+        $exchangeRate = 1.0;
+
+        if ($invoice->from_model_type === 'App\\Models\\PurchaseOrder' || $invoice->from_model_type === 'App\Models\PurchaseOrder') {
+            $po = $invoice->fromModel;
+            if ($po) {
+                $poCurrency = $po->purchaseOrderCurrency()->first();
+                if ($poCurrency) {
+                    $currencyId = $poCurrency->currency_id;
+                    $exchangeRate = (float) ($poCurrency->nominal ?? 1.0);
+                }
+            }
+        } elseif ($invoice->from_model_type === 'App\\Models\\PurchaseReceipt' || $invoice->from_model_type === 'App\Models\PurchaseReceipt') {
+            $receipt = $invoice->fromModel;
+            if ($receipt) {
+                $currencyId = $receipt->currency_id;
+                if ($receipt->purchaseOrder) {
+                    $poCurrency = $receipt->purchaseOrder->purchaseOrderCurrency()->firstWhere('currency_id', $currencyId);
+                    if ($poCurrency) {
+                        $exchangeRate = (float) ($poCurrency->nominal ?? 1.0);
+                    }
+                }
+            }
+        } elseif ($invoice->from_model_type === 'App\\Models\\SaleOrder' || $invoice->from_model_type === 'App\Models\SaleOrder') {
+            $so = $invoice->fromModel;
+            if ($so) {
+                $currencyId = $so->currency_id;
+                $exchangeRate = (float) ($so->exchange_rate ?? 1.0);
+            }
+        }
+
+        // Fallback to default rate if not resolved
+        if ($currencyId && $exchangeRate <= 1.0) {
+            $exchangeRate = \App\Support\CurrencyConversionResolver::resolveRate($currencyId);
+        }
+
+        return [
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate > 0 ? $exchangeRate : 1.0,
+        ];
+    }
+
+    /**
+     * Resolve the currency ID and exchange rate for a given VendorPayment.
+     */
+    private function resolveVendorPaymentCurrencyAndRate(VendorPayment $payment): array
+    {
+        $currencyId = null;
+        $exchangeRate = 1.0;
+
+        $invoiceIds = collect($payment->selected_invoices ?? [])
+            ->map(fn ($item) => is_array($item) ? ($item['invoice_id'] ?? null) : $item)
+            ->filter()->values();
+
+        if ($invoiceIds->isNotEmpty()) {
+            $invoice = \App\Models\Invoice::find($invoiceIds->first());
+            if ($invoice) {
+                return $this->resolveInvoiceCurrencyAndRate($invoice);
+            }
+        }
+
+        return [
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate,
+        ];
+    }
+
+    /**
+     * Resolve the currency ID and exchange rate for a given CustomerReceipt.
+     */
+    private function resolveCustomerReceiptCurrencyAndRate(\App\Models\CustomerReceipt $receipt): array
+    {
+        $currencyId = null;
+        $exchangeRate = 1.0;
+
+        $invoiceIds = collect($receipt->selected_invoices ?? [])
+            ->map(fn ($item) => is_array($item) ? ($item['invoice_id'] ?? null) : $item)
+            ->filter()->values();
+
+        if ($invoiceIds->isNotEmpty()) {
+            $invoice = \App\Models\Invoice::find($invoiceIds->first());
+            if ($invoice) {
+                return $this->resolveInvoiceCurrencyAndRate($invoice);
+            }
+        }
+
+        if ($receipt->invoice_id) {
+            $invoice = \App\Models\Invoice::find($receipt->invoice_id);
+            if ($invoice) {
+                return $this->resolveInvoiceCurrencyAndRate($invoice);
+            }
+        }
+
+        return [
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate,
+        ];
+    }
+
+    /**
+     * Resolve the currency ID and exchange rate for a given Deposit.
+     */
+    private function resolveDepositCurrencyAndRate(\App\Models\Deposit $deposit): array
+    {
+        $currencyId = null;
+        $exchangeRate = 1.0;
+
+        if (isset($deposit->currency_id) && $deposit->currency_id) {
+            $currencyId = $deposit->currency_id;
+            $exchangeRate = \App\Support\CurrencyConversionResolver::resolveRate($currencyId);
+        }
+
+        return [
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate,
+        ];
     }
 }

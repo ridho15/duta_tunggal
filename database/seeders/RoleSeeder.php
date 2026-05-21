@@ -179,53 +179,85 @@ class RoleSeeder extends Seeder
         // Role -> resource mapping: each role gets ALL permissions for the listed resources
         $roleResourceMap = [
             'Admin' => [
-                'user', 'role', 'permission', 'currency', 'chart of account', 'tax setting', 'cabang', 'asset', 'journal entry', 'delivery schedule'
+                'user', 'role', 'permission', 'currency', 'chart of account',
+                'tax setting', 'cabang', 'asset', 'journal entry', 'delivery schedule',
+                'supplier', 'product', 'warehouse', 'unit of measure',
             ],
             'Finance Manager' => [
-                'account payable', 'account receivable', 'vendor payment', 'vendor payment detail', 'customer receipt', 'customer receipt item', 'invoice', 'invoice item', 'deposit', 'deposit log', 'ageing schedule', 'voucher request', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
+                'account payable', 'account receivable', 'vendor payment', 'vendor payment detail',
+                'customer receipt', 'customer receipt item', 'invoice', 'invoice item',
+                'deposit', 'deposit log', 'ageing schedule', 'voucher request',
+                'asset', 'asset depreciation', 'asset disposal', 'asset transfer',
+                'cash bank account', 'cash bank transaction detail', 'journal entry',
+                'purchase return', 'customer return',
             ],
             'Admin Keuangan' => [
-                'account payable', 'vendor payment', 'deposit', 'invoice', 'invoice item', 'voucher request', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
+                'account payable', 'vendor payment', 'deposit', 'invoice', 'invoice item',
+                'voucher request', 'asset', 'asset depreciation', 'asset disposal',
+                'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry',
             ],
             'Accounting' => [
-                'chart of account', 'account payable', 'account receivable', 'deposit', 'invoice', 'invoice item', 'ageing schedule', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
+                'chart of account', 'account payable', 'account receivable', 'deposit',
+                'invoice', 'invoice item', 'ageing schedule', 'asset', 'asset depreciation',
+                'asset disposal', 'asset transfer', 'cash bank account',
+                'cash bank transaction detail', 'journal entry',
             ],
             'Purchasing' => [
-                'purchase order', 'purchase order item', 'purchase receipt', 'purchase receipt item', 'purchase order biaya', 'purchase order currency', 'purchase return'
+                'order request', 'order request item',
+                'purchase order', 'purchase order item', 'purchase receipt', 'purchase receipt item',
+                'purchase order biaya', 'purchase order currency', 'purchase return',
+                'supplier', 'product',
             ],
             'Purchasing Manager' => [
-                'purchase order', 'purchase order item', 'purchase receipt', 'vendor payment', 'purchase return', 'purchase order biaya', 'asset'
+                'order request', 'order request item',
+                'purchase order', 'purchase order item', 'purchase receipt',
+                'vendor payment', 'purchase return', 'purchase return item',
+                'purchase order biaya', 'purchase order currency',
+                'supplier', 'product', 'asset',
             ],
             'Inventory Manager' => [
-                'warehouse', 'warehouse confirmation', 'inventory stock', 'stock movement', 'stock transfer', 'stock transfer item', 'product', 'product category', 'rak', 'unit of measure', 'product unit conversion', 'quality control', 'asset transfer'
+                'warehouse', 'warehouse confirmation', 'inventory stock', 'stock movement',
+                'stock transfer', 'stock transfer item', 'product', 'product category',
+                'rak', 'unit of measure', 'product unit conversion', 'quality control',
+                'asset transfer', 'bill of material', 'bill of material item',
+                'production', 'production plan', 'material issue',
+                'order request', 'order request item',
             ],
             'Admin Inventory' => [
-                'warehouse', 'inventory stock', 'stock movement', 'product'
+                'warehouse', 'inventory stock', 'stock movement', 'product',
+                'product category', 'rak', 'unit of measure', 'product unit conversion',
             ],
             'Warehouse Staff' => [
-                'warehouse', 'warehouse confirmation', 'stock transfer', 'stock transfer item', 'inventory stock'
+                'warehouse', 'warehouse confirmation', 'stock transfer', 'stock transfer item',
+                'inventory stock', 'rak', 'quality control',
             ],
             'Checker' => [
-                'warehouse confirmation', 'quality control', 'inventory stock'
+                'warehouse confirmation', 'quality control', 'inventory stock',
+                'purchase receipt item',
             ],
             'Sales Manager' => [
-                'sales order', 'sales order item', 'quotation', 'quotation item', 'invoice', 'customer', 'customer receipt'
+                'sales order', 'sales order item', 'quotation', 'quotation item',
+                'invoice', 'customer', 'customer receipt', 'customer return',
+                'return product', 'return product item', 'delivery order', 'surat jalan',
+                'delivery schedule',
             ],
             'Sales' => [
-                'sales order', 'sales order item', 'quotation', 'customer'
+                'sales order', 'sales order item', 'quotation', 'customer',
             ],
             'Kasir' => [
-                'customer receipt', 'customer receipt item', 'invoice'
+                'customer receipt', 'customer receipt item', 'invoice', 'deposit',
+                'cash bank account',
             ],
             'Customer Service' => [
-                'customer', 'quotation', 'sales order', 'delivery order', 'surat jalan', 'delivery schedule'
+                'customer', 'quotation', 'sales order', 'delivery order',
+                'surat jalan', 'delivery schedule', 'customer return',
             ],
             'Delivery Driver' => [
-                'delivery order', 'delivery order item', 'vehicle', 'surat jalan', 'delivery schedule'
+                'delivery order', 'delivery order item', 'vehicle', 'surat jalan', 'delivery schedule',
             ],
             'Auditor' => [], // Auditor receives only 'view any' for every resource (via special block below)
             'IT Support' => [
-                'user', 'role', 'permission', 'tax setting', 'currency'
+                'user', 'role', 'permission', 'tax setting', 'currency',
             ],
         ];
 
@@ -255,9 +287,11 @@ class RoleSeeder extends Seeder
                         $allowedDestructiveRoles = [
                         'Owner',
                         'Super Admin',
+                        'Admin',
                         'Purchasing Manager',
                         'Inventory Manager',
                         'Finance Manager',
+                        'Sales Manager',
                     ];
 
                         foreach ($allDefined[$res] as $action) {

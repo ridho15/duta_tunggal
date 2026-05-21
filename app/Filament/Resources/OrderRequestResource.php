@@ -481,6 +481,12 @@ class OrderRequestResource extends Resource
                                                 // Store the master price as original_price; user can override unit_price
                                                 $set('original_price', self::formatMoneyInputState($unitPrice));
                                                 $set('unit_price', self::formatMoneyInputState($unitPrice));
+
+                                                // Persist IDR anchor so currency round-trips stay lossless
+                                                // Always convert the raw IDR cost_price (not the rounded foreign display value)
+                                                $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product->cost_price ?? 0);
+                                                $set('unit_price_idr', $rawIdrPrice);
+                                                $set('original_price_idr', $rawIdrPrice);
                                                 $set('unit', $product->uom?->abbreviation ?? '-');
                                                 // Autofill cabang item from product if available, but keep editable
                                                 $set('cabang_id', $product->cabang_id ?? Supplier::find($itemSupplierId)?->cabang_id ?? auth()->user()?->cabang_id);
@@ -566,6 +572,11 @@ class OrderRequestResource extends Resource
 
                                                     $set('original_price', self::formatMoneyInputState($unitPrice));
                                                     $set('unit_price', self::formatMoneyInputState($unitPrice));
+
+                                                    // Persist IDR anchor
+                                                    $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product->cost_price ?? 0);
+                                                    $set('unit_price_idr', $rawIdrPrice);
+                                                    $set('original_price_idr', $rawIdrPrice);
                                                     // Recalculate subtotal
                                                     $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
                                                     $taxType  = self::taxServiceTypeFromItemTaxType($itemTaxType);
@@ -598,25 +609,54 @@ class OrderRequestResource extends Resource
                                             return;
                                         }
 
-                                        $currentOriginalPrice = MoneyHelper::parseHighPrecision($get('original_price') ?? 0);
-                                        $currentUnitPrice = MoneyHelper::parseHighPrecision($get('unit_price') ?? 0);
+                                        // ── IDR Anchor Strategy ─────────────────────────────────────────────────
+                                        // PROBLEM: reading the current display value (already rounded to 2 dp) and
+                                        // re-converting it loses precision:
+                                        //   1.000.000 ÷ 15.000 = 66.6666 → rounded to 66.67
+                                        //   66.67 × 15.000 = 1.000.050 (wrong!)
+                                        //
+                                        // FIX: always convert from the stored IDR anchor value so the source
+                                        // precision is never truncated by the intermediate display rounding.
+                                        // ────────────────────────────────────────────────────────────────────────
 
-                                        // Use CurrencyConversionResolver with bcmath precision for high-accuracy conversion
-                                        $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertBetweenCurrencies(
-                                            $currentOriginalPrice,
-                                            $oldCurrencyId,
-                                            $newCurrencyId,
-                                            false
+                                        // Read IDR anchor (hidden field populated when product/supplier is set)
+                                        $unitPriceIdrRaw      = MoneyHelper::parseHighPrecision($get('unit_price_idr') ?? 0);
+                                        $originalPriceIdrRaw  = MoneyHelper::parseHighPrecision($get('original_price_idr') ?? 0);
+
+                                        // If anchor is zero/missing, fall back to converting the current display value
+                                        // through the old currency as a best-effort (handles pre-migration rows)
+                                        if ((float) $unitPriceIdrRaw <= 0) {
+                                            $currentUnitPrice = MoneyHelper::parseHighPrecision($get('unit_price') ?? 0);
+                                            $unitPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
+                                                $currentUnitPrice, $oldCurrencyId
+                                            );
+                                        }
+                                        if ((float) $originalPriceIdrRaw <= 0) {
+                                            $currentOriginalPrice = MoneyHelper::parseHighPrecision($get('original_price') ?? 0);
+                                            $originalPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
+                                                $currentOriginalPrice, $oldCurrencyId
+                                            );
+                                        }
+
+                                        // Convert directly from IDR anchor to new currency (no intermediate rounding)
+                                        $convertedUnitPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
+                                            $unitPriceIdrRaw, $newCurrencyId
                                         );
-                                        $convertedUnitPrice = \App\Support\CurrencyConversionResolver::convertBetweenCurrencies(
-                                            $currentUnitPrice,
-                                            $oldCurrencyId,
-                                            $newCurrencyId,
-                                            false
+                                        $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
+                                            $originalPriceIdrRaw, $newCurrencyId
                                         );
 
-                                        $convertedOriginalPrice = self::normalizeCurrencyDisplayValue($convertedOriginalPrice, $newCurrencyId);
-                                        $convertedUnitPrice = self::normalizeCurrencyDisplayValue($convertedUnitPrice, $newCurrencyId);
+                                        // For IDR display: round to whole number (no cents in Rupiah)
+                                        // For foreign currency: keep 2 decimal places
+                                        $newCode = \App\Models\Currency::find($newCurrencyId)?->code;
+                                        if (strtoupper((string) $newCode) === 'IDR') {
+                                            $convertedUnitPrice     = bcadd($unitPriceIdrRaw, '0', 2);
+                                            $convertedOriginalPrice = bcadd($originalPriceIdrRaw, '0', 2);
+                                        }
+
+                                        // Update hidden IDR anchor fields with the now-resolved IDR values
+                                        $set('unit_price_idr', $unitPriceIdrRaw);
+                                        $set('original_price_idr', $originalPriceIdrRaw);
 
                                         $set('original_price', self::formatMoneyInputState($convertedOriginalPrice));
                                         $set('unit_price', self::formatMoneyInputState($convertedUnitPrice));
@@ -626,7 +666,7 @@ class OrderRequestResource extends Resource
                                         $quantity = (float) ($get('quantity') ?? 0);
                                         $discPct = (float) ($get('discount') ?? 0);
                                         $taxPct = (float) ($get('tax') ?? 0);
-                                        $preview = self::calculateApprovalItemPreview($quantity, $convertedUnitPrice, $discPct, $taxPct, $taxType);
+                                        $preview = self::calculateApprovalItemPreview($quantity, (float) $convertedUnitPrice, $discPct, $taxPct, $taxType);
 
                                         $set('total', number_format((float)$preview['total_cost'], 2, ',', '.'));
                                         $set('total_cost', number_format((float)$preview['total_cost'], 2, ',', '.'));
@@ -744,6 +784,15 @@ class OrderRequestResource extends Resource
                                         'numeric' => 'Quantity harus berupa angka.',
                                         'min' => 'Quantity minimal 0.01.',
                                     ]),
+                                // IDR anchor hidden fields — store the authoritative IDR value for
+                                // lossless currency round-trips (IDR→USD→IDR = same IDR value).
+                                // Populated when product/supplier is selected; updated on currency change.
+                                Hidden::make('unit_price_idr')
+                                    ->default(0)
+                                    ->dehydrated(true),
+                                Hidden::make('original_price_idr')
+                                    ->default(0)
+                                    ->dehydrated(true),
                                 TextInput::make('original_price')
                                     ->label('Harga Asli (Master)')
                                     ->prefix(fn(Get $get) => self::resolveCurrencySymbol(

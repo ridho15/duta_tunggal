@@ -56,7 +56,7 @@ class CompleteProcurementAccountingFlowTest extends TestCase
         $this->user = User::factory()->create();
         $this->supplier = Supplier::factory()->create(['tempo_hutang' => 30]);
         $this->warehouse = Warehouse::factory()->create(['status' => 1]);
-        $this->currency = Currency::factory()->create(['code' => 'IDR', 'name' => 'Rupiah', 'symbol' => 'Rp']);
+        $this->currency = Currency::factory()->create(['code' => 'IDR', 'name' => 'Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
 
         // Create unit of measure
         \App\Models\UnitOfMeasure::factory()->create();
@@ -139,6 +139,8 @@ class CompleteProcurementAccountingFlowTest extends TestCase
             'order_request_id' => $orderRequest->id,
             'product_id' => $this->product->id,
             'quantity' => 10,
+            'unit_price' => 10000,
+            'currency_id' => $this->currency->id,
             'note' => 'Complete procurement flow test',
         ]);
 
