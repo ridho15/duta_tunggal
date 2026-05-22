@@ -8,6 +8,7 @@ use App\Filament\Resources\OrderRequestResource;
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\Currency;
@@ -423,11 +424,11 @@ it('preserves granular plastic supplier price when switching IDR to USD and back
         ->assertSet('data.orderRequestItem.0.tax_nominal', '51,63')
         ->assertSet('data.orderRequestItem.0.subtotal', '520,96')
         ->set('data.orderRequestItem.0.currency_id', $this->defaultCurrency->id)
-        ->assertSet('data.orderRequestItem.0.original_price', '703.950,00')
-        ->assertSet('data.orderRequestItem.0.unit_price', '703.950,00')
-        ->assertSet('data.orderRequestItem.0.total', '7.039.500,00')
-        ->assertSet('data.orderRequestItem.0.tax_nominal', '774.345,00')
-        ->assertSet('data.orderRequestItem.0.subtotal', '7.813.845,00');
+        ->assertSet('data.orderRequestItem.0.original_price', '704.000,00')
+        ->assertSet('data.orderRequestItem.0.unit_price', '704.000,00')
+        ->assertSet('data.orderRequestItem.0.total', '7.040.000,00')
+        ->assertSet('data.orderRequestItem.0.tax_nominal', '774.400,00')
+        ->assertSet('data.orderRequestItem.0.subtotal', '7.814.400,00');
 });
 
 it('persists and shows granular plastic USD values without rounding to whole dollars', function () {
@@ -719,6 +720,161 @@ it('views order request details on the Filament view page', function () {
         ->assertSee($expectedSubtotal)
         ->assertSee('Qty Diterima (Penerimaan Barang)')
         ->assertSee('Sisa Qty Belum Diterima');
+});
+
+it('approves an order request from the view page action and updates status', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->callAction('approve', data: [
+            'create_purchase_order' => false,
+        ]);
+
+    expect($or->fresh()->status)->toBe('approved');
+    expect($or->fresh()->purchaseOrders()->count())->toBe(0);
+});
+
+it('approves an order request from the list table action without creating purchase order', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 2,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ListOrderRequests::class)
+        ->callTableAction('approve', $or, data: [
+            'create_purchase_order' => false,
+        ])
+        ->assertHasNoTableActionErrors();
+
+    expect($or->fresh()->status)->toBe('approved');
+    expect($or->fresh()->purchaseOrders()->count())->toBe(0);
+});
+
+it('approves an order request from the list table action and creates a single purchase order', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ListOrderRequests::class)
+        ->callTableAction('approve', $or, data: [
+            'create_purchase_order' => true,
+            'multi_supplier' => false,
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-LIST-APPROVE-001',
+            'order_date' => now()->toDateString(),
+            'selected_items' => [[
+                'item_id' => $item->id,
+                'item_supplier_id' => $this->supplier->id,
+                'item_cabang_id' => $this->cabang->id,
+                'currency_id' => $this->defaultCurrency->id,
+                'quantity' => 3,
+                'unit_price' => 1000,
+                'include' => true,
+            ]],
+        ])
+        ->assertHasNoTableActionErrors();
+
+    expect($or->fresh()->status)->toBe('approved');
+    expect($or->fresh()->purchaseOrders)->toHaveCount(1);
+    expect($or->fresh()->purchaseOrders->first()->po_number)->toBe('PO-LIST-APPROVE-001');
+});
+
+it('approves an order request from the list table action and creates grouped purchase orders', function () {
+    $supplierB = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
+    $cabangB = \App\Models\Cabang::factory()->create();
+    $productB = Product::factory()->forCabang($cabangB)->create(['supplier_id' => $supplierB->id]);
+
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $itemA = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 2,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $itemB = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $productB->id,
+        'supplier_id' => $supplierB->id,
+        'cabang_id' => $cabangB->id,
+        'quantity' => 4,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 2000,
+        'original_price' => 2000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ListOrderRequests::class)
+        ->callTableAction('approve', $or, data: [
+            'create_purchase_order' => true,
+            'multi_supplier' => true,
+            'order_date' => now()->toDateString(),
+            'selected_items' => [
+                [
+                    'item_id' => $itemA->id,
+                    'item_supplier_id' => $this->supplier->id,
+                    'item_cabang_id' => $this->cabang->id,
+                    'currency_id' => $this->defaultCurrency->id,
+                    'quantity' => 2,
+                    'unit_price' => 1000,
+                    'include' => true,
+                ],
+                [
+                    'item_id' => $itemB->id,
+                    'item_supplier_id' => $supplierB->id,
+                    'item_cabang_id' => $cabangB->id,
+                    'currency_id' => $this->defaultCurrency->id,
+                    'quantity' => 4,
+                    'unit_price' => 2000,
+                    'include' => true,
+                ],
+            ],
+        ])
+        ->assertHasNoTableActionErrors();
+
+    expect($or->fresh()->status)->toBe('approved');
+    expect(PurchaseOrder::where('refer_model_type', OrderRequest::class)->where('refer_model_id', $or->id)->count())->toBe(2);
 });
 
 it('shows decimal unit price on the Filament view page', function () {

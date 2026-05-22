@@ -12,6 +12,7 @@ use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
+use App\Support\OrderRequestQuantityLock;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
@@ -96,7 +97,8 @@ class QualityControlPurchaseResource extends Resource
                                                 // Saat create: hanya tampilkan jika masih ada sisa qty yang perlu diinspeksi
                                                 if ($context === 'create') {
                                                     $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                    return ($item->quantity - $inspected) > 0;
+                                                    $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                    return min(max(0, ($item->quantity - $inspected)), $limit['remaining_received']) > 0;
                                                 }
                                                 return true;
                                             })
@@ -109,7 +111,8 @@ class QualityControlPurchaseResource extends Resource
                                                 $productName  = $product->name ?? 'N/A';
                                                 $ordered      = $item->quantity ?? 0;
                                                 $inspected    = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                $remaining    = max(0, $ordered - $inspected);
+                                                $limit        = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                $remaining    = min(max(0, $ordered - $inspected), $limit['remaining_received']);
 
                                                 $label = "PO: {$poNumber} - {$supplierName} - {$productName}"
                                                        . " (Ordered: {$ordered} | Inspected: {$inspected} | Sisa: {$remaining})";
@@ -146,7 +149,8 @@ class QualityControlPurchaseResource extends Resource
                                                 $alreadyInspected = $item->qualityControls->sum(
                                                     fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
                                                 );
-                                                $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
+                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
 
                                                 // Show remaining as "quantity to inspect this time"
                                                 $set('quantity_received', $remainingQty);
@@ -286,7 +290,8 @@ class QualityControlPurchaseResource extends Resource
                                                         $alreadyInspected = $item->qualityControls->sum(
                                                             fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
                                                         );
-                                                        $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
+                                                        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                        $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_accepted']);
 
                                                         if ((float) $value > $remainingQty) {
                                                             $fail("Passed quantity ({$value}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
@@ -307,11 +312,12 @@ class QualityControlPurchaseResource extends Resource
                                         $purchaseOrderItemId = $get('from_model_id');
                                         if ($purchaseOrderItemId) {
                                             $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
-                                            if ($item) {
-                                                $alreadyInspected = $item->qualityControls->sum(
-                                                    fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
-                                                );
-                                                $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
+                                                    if ($item) {
+                                                        $alreadyInspected = $item->qualityControls->sum(
+                                                            fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                                                        );
+                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
 
                                                 if ($remainingQty > 0 && ($passed + $rejected) > $remainingQty) {
                                                     $set('passed_quantity', max(0, $remainingQty - $rejected));
@@ -340,7 +346,8 @@ class QualityControlPurchaseResource extends Resource
                                                         $alreadyInspected = $item->qualityControls->sum(
                                                             fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
                                                         );
-                                                        $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
+                                                        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                        $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
 
                                                         if (($passed + $rejected) > $remainingQty) {
                                                             $fail("Total inspected ({$passed} + {$rejected}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
@@ -365,7 +372,8 @@ class QualityControlPurchaseResource extends Resource
                                                 $alreadyInspected = $item->qualityControls->sum(
                                                     fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
                                                 );
-                                                $remainingQty = max(0, ($item->quantity ?? 0) - $alreadyInspected);
+                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
 
                                                 if ($remainingQty > 0 && ($passed + $rejected) > $remainingQty) {
                                                     $set('rejected_quantity', max(0, $remainingQty - $passed));
@@ -547,13 +555,15 @@ class QualityControlPurchaseResource extends Resource
                                             ->filter(function ($item) {
                                                 if (!$item->product) return false;
                                                 $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                return ($item->quantity - $inspected) > 0;
+                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                return min(max(0, $item->quantity - $inspected), $limit['remaining_received']) > 0;
                                             })
                                             ->mapWithKeys(function ($item) {
                                                 $product   = $item->product->name ?? 'N/A';
                                                 $sku       = $item->product->sku ?? '';
                                                 $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                $remaining = max(0, $item->quantity - $inspected);
+                                                $limit     = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                                                $remaining = min(max(0, $item->quantity - $inspected), $limit['remaining_received']);
                                                 $label     = "{$product}" . ($sku ? " ({$sku})" : '') . " — Dipesan: {$item->quantity} | Sisa QC: {$remaining}";
                                                 return [$item->id => $label];
                                             });
@@ -608,7 +618,8 @@ class QualityControlPurchaseResource extends Resource
                             $alreadyInspected = $poItem->qualityControls->sum(
                                 fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
                             );
-                            $remainingQty = max(0, $poItem->quantity - $alreadyInspected);
+                            $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItem->id);
+                            $remainingQty = min(max(0, $poItem->quantity - $alreadyInspected), $limit['remaining_received']);
                             if ($remainingQty <= 0) continue; // no more qty to inspect
 
                             $qcNumber = HelperController::generateUniqueCode(

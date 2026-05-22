@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\Currency;
 use App\Models\Product;
+use App\Support\OrderRequestQuantityLock;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
@@ -117,6 +118,32 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->label('Quantity')
                             ->default(0)
                             ->reactive()
+                            ->helperText(function (Get $get) {
+                                $orItemId = $get('refer_item_model_id');
+                                if (! $orItemId) {
+                                    return null;
+                                }
+
+                                $max = OrderRequestQuantityLock::orderRequestItemLimit((int) $orItemId)['remaining_for_po'];
+                                return "Maks: {$max} (sisa OR)";
+                            })
+                            ->rules([function (Get $get, $record) {
+                                return function ($attribute, $value, $fail) use ($get, $record) {
+                                    $orItemId = $get('refer_item_model_id');
+                                    if (! $orItemId) {
+                                        return;
+                                    }
+
+                                    $max = OrderRequestQuantityLock::orderRequestItemLimit(
+                                        (int) $orItemId,
+                                        $record?->id ? (int) $record->id : null
+                                    )['remaining_for_po'];
+
+                                    if ((float) $value > $max) {
+                                        $fail("Qty tidak boleh melebihi sisa Order Request ({$max}).");
+                                    }
+                                };
+                            }])
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -294,7 +321,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             $alreadyInspected = $record->qualityControls->sum(
                                 fn ($qc) => $qc->passed_quantity + $qc->rejected_quantity
                             );
-                            $remaining = max(0, ($record->quantity ?? 0) - $alreadyInspected);
+                            $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $record->id);
+                            $remaining = min(max(0, ($record->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
 
                             // Resolve default warehouse (Order Request > PO)
                             $defaultWarehouseId = $po->warehouse_id;

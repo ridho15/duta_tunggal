@@ -8,6 +8,7 @@ use App\Models\Supplier;
 use App\Services\PurchaseOrderService;
 use App\Services\ProductSupplierSyncService;
 use App\Support\CurrencyConversionResolver;
+use App\Support\OrderRequestQuantityLock;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -90,7 +91,7 @@ class OrderRequestService
         // No selection provided — use all items with remaining quantity
         return $orderRequest->orderRequestItem
             ->map(function ($orderRequestItem) use ($supplier) {
-            $remainingQty = max(0, (float) $orderRequestItem->quantity - (float) ($orderRequestItem->fulfilled_quantity ?? 0));
+            $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $orderRequestItem->id)['remaining_for_po'];
             if ($remainingQty <= 0) {
                 return null;
             }

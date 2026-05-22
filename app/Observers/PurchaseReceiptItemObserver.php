@@ -8,6 +8,7 @@ use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Services\PurchaseReturnService;
+use App\Support\OrderRequestQuantityLock;
 use App\Support\ProcurementFailureNotifier;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -38,6 +39,11 @@ class PurchaseReceiptItemObserver
         } else {
             Log::info("PurchaseReceiptItemObserver: qty_rejected <= 0 condition NOT met, skipping PurchaseReturn creation");
         }
+    }
+
+    public function saving(PurchaseReceiptItem $receiptItem): void
+    {
+        OrderRequestQuantityLock::validatePurchaseReceiptItem($receiptItem);
     }
 
     protected function createPurchaseReturnForRejectedItem(PurchaseReceiptItem $receiptItem)

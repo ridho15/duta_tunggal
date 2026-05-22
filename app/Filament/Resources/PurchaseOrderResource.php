@@ -24,7 +24,9 @@ use App\Services\QualityControlService;
 use App\Services\PurchaseReceiptService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Support\CurrencyConversionResolver;
+use App\Support\OrderRequestQuantityLock;
 use App\Helpers\MoneyHelper;
+use App\Support\TaxTypeHelper;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -64,6 +66,7 @@ use Illuminate\Support\Str;
 use Filament\Notifications\Notification;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Saade\FilamentAutograph\Forms\Components\SignaturePad as ComponentsSignaturePad;
 
 class PurchaseOrderResource extends Resource
@@ -246,7 +249,7 @@ class PurchaseOrderResource extends Resource
             return '';
         }
 
-        return number_format(self::parseCurrencyState($amount), self::currencyPreviewDecimals($currencyId), ',', '.');
+        return self::formatCurrencyInputState($amount, $currencyId);
     }
 
     public static function calculateCurrencyPreview(float $quantity, float $unitPrice, float $discount, float $tax, ?string $taxType, ?int $currencyId): array
@@ -314,14 +317,7 @@ class PurchaseOrderResource extends Resource
 
     public static function normalizeTaxTypeValue(?string $value): string
     {
-        $normalized = strtolower(trim((string) $value));
-
-        return match ($normalized) {
-            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
-            'inklusif', 'ppn included', 'included', 'ppn-included' => 'inklusif',
-            'eklusif', 'eksklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
-            default => 'eklusif',
-        };
+        return TaxTypeHelper::normalize($value);
     }
 
     public static function resolveOrderRequestItemReference(
@@ -336,8 +332,7 @@ class PurchaseOrderResource extends Resource
 
         $query = OrderRequestItem::query()
             ->where('order_request_id', $orderRequestId)
-            ->where('product_id', $productId)
-            ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)');
+            ->where('product_id', $productId);
 
         if ($supplierId) {
             $query->orderByRaw('CASE WHEN supplier_id = ? THEN 0 WHEN supplier_id IS NULL THEN 1 ELSE 2 END', [$supplierId]);
@@ -347,7 +342,9 @@ class PurchaseOrderResource extends Resource
             $query->orderByRaw('CASE WHEN cabang_id = ? THEN 0 WHEN cabang_id IS NULL THEN 1 ELSE 2 END', [$cabangId]);
         }
 
-        return $query->orderBy('id')->first();
+        return $query->orderBy('id')
+            ->get()
+            ->first(fn (OrderRequestItem $item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0);
     }
 
     public static function resolveOrderRequestItemCabangId(OrderRequestItem $orderRequestItem, ?OrderRequest $orderRequest = null): ?int
@@ -367,14 +364,7 @@ class PurchaseOrderResource extends Resource
      */
     public static function getLockedQuantityForOrderRequestItem(int $orderRequestItemId): float
     {
-        return (float) \App\Models\PurchaseOrderItem::query()
-            ->where('refer_item_model_type', OrderRequestItem::class)
-            ->where('refer_item_model_id', $orderRequestItemId)
-            ->whereHas('purchaseOrder', function ($q) {
-                // Count qty locked in POs that are approved or in-progress (not draft/closed/rejected)
-                $q->whereNotIn('status', ['draft', 'closed', 'cancelled', 'rejected']);
-            })
-            ->sum('quantity');
+        return OrderRequestQuantityLock::activePurchaseOrderItemQuantity($orderRequestItemId);
     }
 
     public static function getAvailableOrderRequestItemGroups(OrderRequest $orderRequest): array
@@ -931,6 +921,7 @@ class PurchaseOrderResource extends Resource
                                 );
 
                                 $data['subtotal'] = self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
+                                $data['tax_nominal'] = self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId);
 
                                 return $data;
                             })
@@ -970,6 +961,16 @@ class PurchaseOrderResource extends Resource
                                             ->mapWithKeys(function ($product) {
                                                 return [$product->id => "({$product->sku}) {$product->name}"];
                                             });
+                                    })
+                                    ->getOptionLabelUsing(function ($value) {
+                                        if (!$value) {
+                                            return null;
+                                        }
+                                        $product = \App\Models\Product::withoutGlobalScope('product_cabang')->find($value);
+                                        if ($product) {
+                                            return "({$product->sku}) {$product->name}";
+                                        }
+                                        return (string) $value;
                                     })
                                     ->helperText('Menampilkan semua produk. Harga otomatis terisi dari harga supplier jika terhubung, atau Rp 0 jika tidak terhubung.')
                                     ->reactive()
@@ -1017,11 +1018,13 @@ class PurchaseOrderResource extends Resource
                                             // Use local variables (not $get) to avoid stale state after $set
                                             $preview = self::calculateCurrencyPreview((float)$get('quantity'), $newUnitPrice, 0, $newTax, $newTipePajak, $itemCurrencyId);
                                             $set('total', self::formatCurrencyPreviewState($preview['total'], $itemCurrencyId));
+                                            $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $itemCurrencyId));
                                             $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $itemCurrencyId));
                                         } else {
                                             $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                             $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                             $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                            $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                             $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                             $set('refer_item_model_type', null);
                                             $set('refer_item_model_id', null);
@@ -1068,6 +1071,7 @@ class PurchaseOrderResource extends Resource
                                             $preview = self::calculateCurrencyPreview((float) $get('quantity'), $convertedUnitPrice, (float) $get('discount'), (float) $get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $newCurrencyId);
                                             $set('unit_price', self::formatCurrencyInputState($convertedUnitPrice, $newCurrencyId));
                                             $set('total', self::formatCurrencyPreviewState($preview['total'], $newCurrencyId));
+                                            $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $newCurrencyId));
                                             $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $newCurrencyId));
                                         }
 
@@ -1102,19 +1106,17 @@ class PurchaseOrderResource extends Resource
                                     ->helperText(function (Get $get) {
                                         $orItemId = $get('refer_item_model_id');
                                         if (!$orItemId) return null;
-                                        $orItem = \App\Models\OrderRequestItem::find($orItemId);
-                                        if (!$orItem) return null;
-                                        $max = max(0, $orItem->quantity - ($orItem->fulfilled_quantity ?? 0));
+                                        $max = OrderRequestQuantityLock::orderRequestItemLimit((int) $orItemId)['remaining_for_po'];
                                         return "Maks: {$max} (sisa OR)";
                                     })
                                     ->rules([function (Get $get, $record) {
                                         return function ($attribute, $value, $fail) use ($get, $record) {
                                             $orItemId = $get('refer_item_model_id');
                                             if (!$orItemId) return;
-                                            $orItem = \App\Models\OrderRequestItem::find($orItemId);
-                                            if (!$orItem) return;
-                                            $existing = $record?->quantity ?? 0; // qty already on this PO item
-                                            $max = max(0, $orItem->quantity - ($orItem->fulfilled_quantity ?? 0) + (float) $existing);
+                                            $max = OrderRequestQuantityLock::orderRequestItemLimit(
+                                                (int) $orItemId,
+                                                $record?->id ? (int) $record->id : null
+                                            )['remaining_for_po'];
                                             if ((float) $value > $max) {
                                                 $fail("Qty tidak boleh melebihi sisa Order Request ({$max}).");
                                             }
@@ -1126,6 +1128,7 @@ class PurchaseOrderResource extends Resource
                                         $price = self::parseCurrencyState($get('unit_price'));
                                         $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     }),
                                 TextInput::make('unit_price')
@@ -1156,6 +1159,7 @@ class PurchaseOrderResource extends Resource
                                         $price = self::parseCurrencyState($get('unit_price'));
                                         $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->prefix(function ($get) {
@@ -1200,6 +1204,7 @@ class PurchaseOrderResource extends Resource
                                         $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                         $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->suffix('%')
@@ -1227,10 +1232,44 @@ class PurchaseOrderResource extends Resource
                                         $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                         $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), $effectiveTax, $tipePajak, $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->suffix('%')
                                     ->default(fn() => \App\Models\TaxSetting::activeRate('PPN')),
+                                TextInput::make('tax_nominal')
+                                    ->label('Nominal Pajak')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->prefix(function ($get) {
+                                        return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
+                                    })
+                                    ->formatStateUsing(function ($state, Get $get) {
+                                        if ($state === null || $state === '') {
+                                            return '';
+                                        }
+
+                                        return self::formatCurrencyPreviewState($state, is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
+                                    })
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if (! $record) {
+                                            return;
+                                        }
+
+                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                        $preview = self::calculateCurrencyPreview(
+                                            (float) ($record->quantity ?? 0),
+                                            (float) ($record->unit_price ?? 0),
+                                            (float) ($record->discount ?? 0),
+                                            (float) ($record->tax ?? 0),
+                                            self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
+                                            $currencyId
+                                        );
+
+                                        $component->state(self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
+                                    })
+                                    ->helperText('Nominal PPN dihitung otomatis dari quantity, harga, diskon, dan tipe pajak.'),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total (termasuk pajak)')
                                     ->reactive()
@@ -1315,11 +1354,7 @@ class PurchaseOrderResource extends Resource
                                     ->default('inklusif')
                                     ->dehydrated(true)
                                     ->disabled(fn(Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn')
-                                    ->options([
-                                        'none' => 'Non Pajak',
-                                        'inklusif'  => 'Inklusif (PPN termasuk)',
-                                        'eklusif' => 'Eksklusif (PPN ditambahkan)',
-                                    ])
+                                    ->options(TaxTypeHelper::options())
                                     ->afterStateUpdated(function ($state, Get $get, Set $set) {
                                         $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
                                         $normalizedState = self::normalizeTaxTypeValue($state);
@@ -1772,18 +1807,25 @@ class PurchaseOrderResource extends Resource
                     })->formatStateUsing(function ($state) {
                         return "({$state->code}) {$state->perusahaan}";
                     }),
-                TextColumn::make('cabang')
-                    ->label('Cabang')
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->kode}) {$state->nama}";
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('cabang', function ($query) use ($search) {
-                            return $query->where('kode', 'LIKE', '%' . $search . '%')
-                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
-                        });
-                    }),
+                // Only include cabang column/search when the DB still has the column.
+                (Schema::hasColumn('purchase_orders', 'cabang_id')
+                    ? TextColumn::make('cabang')
+                        ->label('Cabang')
+                        ->formatStateUsing(function ($state) {
+                            return "({$state->kode}) {$state->nama}";
+                        })
+                        ->toggleable(isToggledHiddenByDefault: true)
+                        ->searchable(query: function (Builder $query, $search) {
+                            return $query->whereHas('cabang', function ($query) use ($search) {
+                                return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                    ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                            });
+                        })
+                    : TextColumn::make('cabang')
+                        ->label('Cabang')
+                        ->formatStateUsing(fn() => '-')
+                        ->toggleable(isToggledHiddenByDefault: true)
+                ),
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->searchable(),
@@ -1819,17 +1861,22 @@ class PurchaseOrderResource extends Resource
                         default    => 'success',
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('warehouse')
-                    ->label('Gudang')
-                    ->searchable(query: function (Builder $query, $search) {
-                        $query->whereHas('warehouse', function (Builder $query) use ($search) {
-                            $query->where('kode', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%');
-                        });
-                    })
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->kode}) {$state->name}";
-                    }),
+                (Schema::hasColumn('purchase_orders', 'warehouse_id')
+                    ? TextColumn::make('warehouse')
+                        ->label('Gudang')
+                        ->searchable(query: function (Builder $query, $search) {
+                            $query->whereHas('warehouse', function (Builder $query) use ($search) {
+                                $query->where('kode', 'LIKE', '%' . $search . '%')
+                                    ->orWhere('name', 'LIKE', '%' . $search . '%');
+                            });
+                        })
+                        ->formatStateUsing(function ($state) {
+                            return "({$state->kode}) {$state->name}";
+                        })
+                    : TextColumn::make('warehouse')
+                        ->label('Gudang')
+                        ->formatStateUsing(fn() => '-')
+                ),
                 TextColumn::make('order_date')
                     ->date()
                     ->sortable(),

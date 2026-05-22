@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Controllers\HelperController;
 use App\Models\PurchaseOrder;
 use App\Support\CurrencyConversionResolver;
+use App\Support\OrderRequestQuantityLock;
 use App\Helpers\MoneyHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -100,6 +101,8 @@ class PurchaseOrderService
      */
     public function approvePo(PurchaseOrder $purchaseOrder, ?int $userId = null): PurchaseOrder
     {
+        OrderRequestQuantityLock::validatePurchaseOrderApproval($purchaseOrder);
+
         $purchaseOrder->update([
             'status'        => 'approved',
             'date_approved' => Carbon::now(),

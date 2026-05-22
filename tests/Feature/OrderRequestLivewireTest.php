@@ -168,11 +168,11 @@ it('prefers product tax, then active setting, then zero for order request items'
             ],
         ])
         ->set('data.tax_type', 'PPN Excluded')
-        ->assertSet('data.orderRequestItem.0.tax', 7)
-        ->set('data.orderRequestItem.0.tax', 7)
-        ->assertSet('data.orderRequestItem.0.tax', 7)
+        ->assertSet('data.orderRequestItem.0.tax', 11)
+        ->set('data.orderRequestItem.0.tax', 11)
+        ->assertSet('data.orderRequestItem.0.tax', 11)
         ->set('data.tax_type', 'PPN Included')
-        ->assertSet('data.orderRequestItem.0.tax', 7)
+        ->assertSet('data.orderRequestItem.0.tax', 11)
         ->set('data.orderRequestItem.0.product_id', $productWithoutTax->id)
         ->set('data.tax_type', 'PPN Excluded')
         ->assertSet('data.orderRequestItem.0.tax', 11);

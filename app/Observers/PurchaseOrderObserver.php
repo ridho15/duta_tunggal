@@ -6,6 +6,7 @@ use App\Models\PurchaseOrder;
 use App\Models\JournalEntry;
 use App\Models\ChartOfAccount;
 use App\Services\PurchaseOrderService;
+use App\Support\OrderRequestQuantityLock;
 
 class PurchaseOrderObserver
 {
@@ -40,6 +41,13 @@ class PurchaseOrderObserver
     {
         // Update total amount when purchase order is first created
         $this->purchaseOrderService->updateTotalAmount($purchaseOrder);
+    }
+
+    public function updating(PurchaseOrder $purchaseOrder): void
+    {
+        if ($purchaseOrder->isDirty('status') && $purchaseOrder->status === 'approved') {
+            OrderRequestQuantityLock::validatePurchaseOrderApproval($purchaseOrder);
+        }
     }
 
     /**
