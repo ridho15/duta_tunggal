@@ -28,6 +28,7 @@ beforeEach(function () {
         'code' => 'IDR',
         'name' => 'Rupiah',
         'symbol' => 'Rp',
+        'to_rupiah' => 1,
     ]);
 
     UnitOfMeasure::factory()->create();
