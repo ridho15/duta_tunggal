@@ -24,7 +24,9 @@ use App\Services\QualityControlService;
 use App\Services\PurchaseReceiptService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Support\CurrencyConversionResolver;
+use App\Support\OrderRequestQuantityLock;
 use App\Helpers\MoneyHelper;
+use App\Support\TaxTypeHelper;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -64,6 +66,7 @@ use Illuminate\Support\Str;
 use Filament\Notifications\Notification;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Saade\FilamentAutograph\Forms\Components\SignaturePad as ComponentsSignaturePad;
 
 class PurchaseOrderResource extends Resource
@@ -246,7 +249,7 @@ class PurchaseOrderResource extends Resource
             return '';
         }
 
-        return number_format(self::parseCurrencyState($amount), self::currencyPreviewDecimals($currencyId), ',', '.');
+        return self::formatCurrencyInputState($amount, $currencyId);
     }
 
     public static function calculateCurrencyPreview(float $quantity, float $unitPrice, float $discount, float $tax, ?string $taxType, ?int $currencyId): array
@@ -314,14 +317,7 @@ class PurchaseOrderResource extends Resource
 
     public static function normalizeTaxTypeValue(?string $value): string
     {
-        $normalized = strtolower(trim((string) $value));
-
-        return match ($normalized) {
-            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
-            'inklusif', 'ppn included', 'included', 'ppn-included' => 'inklusif',
-            'eklusif', 'eksklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
-            default => 'eklusif',
-        };
+        return TaxTypeHelper::normalize($value);
     }
 
     public static function resolveOrderRequestItemReference(
@@ -336,8 +332,7 @@ class PurchaseOrderResource extends Resource
 
         $query = OrderRequestItem::query()
             ->where('order_request_id', $orderRequestId)
-            ->where('product_id', $productId)
-            ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)');
+            ->where('product_id', $productId);
 
         if ($supplierId) {
             $query->orderByRaw('CASE WHEN supplier_id = ? THEN 0 WHEN supplier_id IS NULL THEN 1 ELSE 2 END', [$supplierId]);
@@ -347,7 +342,9 @@ class PurchaseOrderResource extends Resource
             $query->orderByRaw('CASE WHEN cabang_id = ? THEN 0 WHEN cabang_id IS NULL THEN 1 ELSE 2 END', [$cabangId]);
         }
 
-        return $query->orderBy('id')->first();
+        return $query->orderBy('id')
+            ->get()
+            ->first(fn (OrderRequestItem $item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0);
     }
 
     public static function resolveOrderRequestItemCabangId(OrderRequestItem $orderRequestItem, ?OrderRequest $orderRequest = null): ?int
@@ -359,11 +356,28 @@ class PurchaseOrderResource extends Resource
         return null;
     }
 
+    /**
+     * Compute the quantity already locked in approved/active PO items for a given OrderRequestItem.
+     * This is needed because fulfilled_quantity is only updated when goods are received,
+     * not when a PO is approved. Without this, the system would think all qty is still
+     * available for new POs right after approving the first PO.
+     */
+    public static function getLockedQuantityForOrderRequestItem(int $orderRequestItemId): float
+    {
+        return OrderRequestQuantityLock::activePurchaseOrderItemQuantity($orderRequestItemId);
+    }
+
     public static function getAvailableOrderRequestItemGroups(OrderRequest $orderRequest): array
     {
         return $orderRequest->orderRequestItem
             ->map(function (OrderRequestItem $orderRequestItem) use ($orderRequest) {
-                $remainingQuantity = max(0, (float) $orderRequestItem->quantity - (float) ($orderRequestItem->fulfilled_quantity ?? 0));
+                // fulfilled_quantity reflects receipts; lockedQty reflects approved POs not yet received.
+                // Use the max of both to avoid double-counting when receipts already exceed locked qty.
+                $fulfilledQty  = (float) ($orderRequestItem->fulfilled_quantity ?? 0);
+                $lockedQty     = static::getLockedQuantityForOrderRequestItem((int) $orderRequestItem->id);
+                $accountedQty  = max($fulfilledQty, $lockedQty);
+                $remainingQuantity = max(0, (float) $orderRequestItem->quantity - $accountedQty);
+
                 if ($remainingQuantity <= 0) {
                     return null;
                 }
@@ -375,9 +389,9 @@ class PurchaseOrderResource extends Resource
                 }
 
                 return [
-                    'group_key'  => implode('|', [$supplierId, $cabangId]),
+                    'group_key'   => implode('|', [$supplierId, $cabangId]),
                     'supplier_id' => $supplierId,
-                    'cabang_id'  => $cabangId,
+                    'cabang_id'   => $cabangId,
                 ];
             })
             ->filter()
@@ -775,15 +789,15 @@ class PurchaseOrderResource extends Resource
                                 $currentSupplierId = (int) ($get('supplier_id') ?? 0);
 
                                 if ($currentSupplierId > 0 && $availableSupplierCount === 0) {
-                                    return 'Supplier ini sudah dipakai untuk PO lain, tetapi tetap ditampilkan karena merupakan supplier aktif pada PO ini.';
+                                    return 'Semua kuantitas item Order Request ini sudah tercakup oleh PO yang ada. Tidak ada sisa item yang perlu dibuatkan PO.';
                                 }
 
                                 if ($availableSupplierCount > 1) {
-                                    return "Order Request ini memiliki {$availableSupplierCount} supplier yang belum dibuat PO. Pilih satu supplier — item akan diisi otomatis sesuai supplier terpilih.";
+                                    return "Order Request ini memiliki {$availableSupplierCount} supplier dengan item yang belum sepenuhnya dibuatkan PO. Pilih satu supplier — item akan diisi otomatis sesuai supplier terpilih.";
                                 }
 
                                 if ($availableSupplierCount === 0) {
-                                    return 'Semua supplier pada Order Request ini sudah memiliki PO. Field supplier dinonaktifkan karena tidak ada pilihan yang masih tersedia.';
+                                    return 'Semua item Order Request ini sudah sepenuhnya tercakup oleh PO yang ada. Tidak ada sisa kuantitas yang perlu dibuatkan PO baru.';
                                 }
                                 return null;
                             })
@@ -907,6 +921,7 @@ class PurchaseOrderResource extends Resource
                                 );
 
                                 $data['subtotal'] = self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
+                                $data['tax_nominal'] = self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId);
 
                                 return $data;
                             })
@@ -946,6 +961,16 @@ class PurchaseOrderResource extends Resource
                                             ->mapWithKeys(function ($product) {
                                                 return [$product->id => "({$product->sku}) {$product->name}"];
                                             });
+                                    })
+                                    ->getOptionLabelUsing(function ($value) {
+                                        if (!$value) {
+                                            return null;
+                                        }
+                                        $product = \App\Models\Product::withoutGlobalScope('product_cabang')->find($value);
+                                        if ($product) {
+                                            return "({$product->sku}) {$product->name}";
+                                        }
+                                        return (string) $value;
                                     })
                                     ->helperText('Menampilkan semua produk. Harga otomatis terisi dari harga supplier jika terhubung, atau Rp 0 jika tidak terhubung.')
                                     ->reactive()
@@ -993,11 +1018,13 @@ class PurchaseOrderResource extends Resource
                                             // Use local variables (not $get) to avoid stale state after $set
                                             $preview = self::calculateCurrencyPreview((float)$get('quantity'), $newUnitPrice, 0, $newTax, $newTipePajak, $itemCurrencyId);
                                             $set('total', self::formatCurrencyPreviewState($preview['total'], $itemCurrencyId));
+                                            $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $itemCurrencyId));
                                             $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $itemCurrencyId));
                                         } else {
                                             $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                             $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                             $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                            $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                             $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                             $set('refer_item_model_type', null);
                                             $set('refer_item_model_id', null);
@@ -1044,6 +1071,7 @@ class PurchaseOrderResource extends Resource
                                             $preview = self::calculateCurrencyPreview((float) $get('quantity'), $convertedUnitPrice, (float) $get('discount'), (float) $get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $newCurrencyId);
                                             $set('unit_price', self::formatCurrencyInputState($convertedUnitPrice, $newCurrencyId));
                                             $set('total', self::formatCurrencyPreviewState($preview['total'], $newCurrencyId));
+                                            $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $newCurrencyId));
                                             $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $newCurrencyId));
                                         }
 
@@ -1078,19 +1106,27 @@ class PurchaseOrderResource extends Resource
                                     ->helperText(function (Get $get) {
                                         $orItemId = $get('refer_item_model_id');
                                         if (!$orItemId) return null;
-                                        $orItem = \App\Models\OrderRequestItem::find($orItemId);
-                                        if (!$orItem) return null;
-                                        $max = max(0, $orItem->quantity - ($orItem->fulfilled_quantity ?? 0));
+                                        $max = OrderRequestQuantityLock::orderRequestItemLimit((int) $orItemId)['remaining_for_po'];
                                         return "Maks: {$max} (sisa OR)";
                                     })
-                                    ->rules([function (Get $get, $record) {
-                                        return function ($attribute, $value, $fail) use ($get, $record) {
+                                    ->rules([function (Get $get) {
+                                        return function ($attribute, $value, $fail) use ($get) {
                                             $orItemId = $get('refer_item_model_id');
                                             if (!$orItemId) return;
-                                            $orItem = \App\Models\OrderRequestItem::find($orItemId);
-                                            if (!$orItem) return;
-                                            $existing = $record?->quantity ?? 0; // qty already on this PO item
-                                            $max = max(0, $orItem->quantity - ($orItem->fulfilled_quantity ?? 0) + (float) $existing);
+                                            
+                                            // Mengurai index repeater dari path atribut (misal: 'purchaseOrderItem.0.quantity')
+                                            $segments = explode('.', $attribute);
+                                            $index = $segments[1] ?? null;
+                                            $itemId = null;
+                                            if ($index !== null) {
+                                                $items = $get('../../purchaseOrderItem') ?? [];
+                                                $itemId = $items[$index]['id'] ?? null;
+                                            }
+
+                                            $max = OrderRequestQuantityLock::orderRequestItemLimit(
+                                                (int) $orItemId,
+                                                $itemId ? (int) $itemId : null
+                                            )['remaining_for_po'];
                                             if ((float) $value > $max) {
                                                 $fail("Qty tidak boleh melebihi sisa Order Request ({$max}).");
                                             }
@@ -1102,6 +1138,7 @@ class PurchaseOrderResource extends Resource
                                         $price = self::parseCurrencyState($get('unit_price'));
                                         $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     }),
                                 TextInput::make('unit_price')
@@ -1132,6 +1169,7 @@ class PurchaseOrderResource extends Resource
                                         $price = self::parseCurrencyState($get('unit_price'));
                                         $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->prefix(function ($get) {
@@ -1176,6 +1214,7 @@ class PurchaseOrderResource extends Resource
                                         $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                         $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->suffix('%')
@@ -1203,10 +1242,44 @@ class PurchaseOrderResource extends Resource
                                         $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
                                         $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), $effectiveTax, $tipePajak, $currencyId);
                                         $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->suffix('%')
                                     ->default(fn() => \App\Models\TaxSetting::activeRate('PPN')),
+                                TextInput::make('tax_nominal')
+                                    ->label('Nominal Pajak')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->prefix(function ($get) {
+                                        return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
+                                    })
+                                    ->formatStateUsing(function ($state, Get $get) {
+                                        if ($state === null || $state === '') {
+                                            return '';
+                                        }
+
+                                        return self::formatCurrencyPreviewState($state, is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
+                                    })
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if (! $record) {
+                                            return;
+                                        }
+
+                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                        $preview = self::calculateCurrencyPreview(
+                                            (float) ($record->quantity ?? 0),
+                                            (float) ($record->unit_price ?? 0),
+                                            (float) ($record->discount ?? 0),
+                                            (float) ($record->tax ?? 0),
+                                            self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
+                                            $currencyId
+                                        );
+
+                                        $component->state(self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
+                                    })
+                                    ->helperText('Nominal PPN dihitung otomatis dari quantity, harga, diskon, dan tipe pajak.'),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total (termasuk pajak)')
                                     ->reactive()
@@ -1291,11 +1364,7 @@ class PurchaseOrderResource extends Resource
                                     ->default('inklusif')
                                     ->dehydrated(true)
                                     ->disabled(fn(Get $get) => ($get('../../ppn_option') ?? 'standard') === 'non_ppn')
-                                    ->options([
-                                        'none' => 'Non Pajak',
-                                        'inklusif'  => 'Inklusif (PPN termasuk)',
-                                        'eklusif' => 'Eksklusif (PPN ditambahkan)',
-                                    ])
+                                    ->options(TaxTypeHelper::options())
                                     ->afterStateUpdated(function ($state, Get $get, Set $set) {
                                         $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
                                         $normalizedState = self::normalizeTaxTypeValue($state);
@@ -1748,18 +1817,25 @@ class PurchaseOrderResource extends Resource
                     })->formatStateUsing(function ($state) {
                         return "({$state->code}) {$state->perusahaan}";
                     }),
-                TextColumn::make('cabang')
-                    ->label('Cabang')
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->kode}) {$state->nama}";
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('cabang', function ($query) use ($search) {
-                            return $query->where('kode', 'LIKE', '%' . $search . '%')
-                                ->orWhere('nama', 'LIKE', '%' . $search . '%');
-                        });
-                    }),
+                // Only include cabang column/search when the DB still has the column.
+                (Schema::hasColumn('purchase_orders', 'cabang_id')
+                    ? TextColumn::make('cabang')
+                        ->label('Cabang')
+                        ->formatStateUsing(function ($state) {
+                            return "({$state->kode}) {$state->nama}";
+                        })
+                        ->toggleable(isToggledHiddenByDefault: true)
+                        ->searchable(query: function (Builder $query, $search) {
+                            return $query->whereHas('cabang', function ($query) use ($search) {
+                                return $query->where('kode', 'LIKE', '%' . $search . '%')
+                                    ->orWhere('nama', 'LIKE', '%' . $search . '%');
+                            });
+                        })
+                    : TextColumn::make('cabang')
+                        ->label('Cabang')
+                        ->formatStateUsing(fn() => '-')
+                        ->toggleable(isToggledHiddenByDefault: true)
+                ),
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->searchable(),
@@ -1795,17 +1871,22 @@ class PurchaseOrderResource extends Resource
                         default    => 'success',
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('warehouse')
-                    ->label('Gudang')
-                    ->searchable(query: function (Builder $query, $search) {
-                        $query->whereHas('warehouse', function (Builder $query) use ($search) {
-                            $query->where('kode', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%');
-                        });
-                    })
-                    ->formatStateUsing(function ($state) {
-                        return "({$state->kode}) {$state->name}";
-                    }),
+                (Schema::hasColumn('purchase_orders', 'warehouse_id')
+                    ? TextColumn::make('warehouse')
+                        ->label('Gudang')
+                        ->searchable(query: function (Builder $query, $search) {
+                            $query->whereHas('warehouse', function (Builder $query) use ($search) {
+                                $query->where('kode', 'LIKE', '%' . $search . '%')
+                                    ->orWhere('name', 'LIKE', '%' . $search . '%');
+                            });
+                        })
+                        ->formatStateUsing(function ($state) {
+                            return "({$state->kode}) {$state->name}";
+                        })
+                    : TextColumn::make('warehouse')
+                        ->label('Gudang')
+                        ->formatStateUsing(fn() => '-')
+                ),
                 TextColumn::make('order_date')
                     ->date()
                     ->sortable(),
@@ -2311,7 +2392,12 @@ class PurchaseOrderResource extends Resource
                 continue;
             }
 
-            $remainingQuantity = max(0, $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0));
+            // Use the greater of fulfilled_quantity (from receipts) and locked_quantity (from approved POs)
+            // to ensure we don't pre-fill items that are already covered by an existing approved PO.
+            $fulfilledQty  = (float) ($orderRequestItem->fulfilled_quantity ?? 0);
+            $lockedQty     = static::getLockedQuantityForOrderRequestItem((int) $orderRequestItem->id);
+            $accountedQty  = max($fulfilledQty, $lockedQty);
+            $remainingQuantity = max(0, (float) $orderRequestItem->quantity - $accountedQty);
             if ($remainingQuantity <= 0) {
                 continue;
             }
@@ -2355,33 +2441,23 @@ class PurchaseOrderResource extends Resource
     }
 
     /**
-     * Return Order Request supplier IDs that have not yet been used by an existing PO for the same OR.
+     * Return Order Request supplier IDs that still have items with remaining quantity
+     * (i.e., quantity not yet covered by approved POs or fulfilled receipts).
+     *
+     * NOTE: We no longer simply block a supplier because they already have a PO.
+     * A supplier remains "available" as long as any of their OR items still have
+     * qty > (locked in approved POs + already received). This allows partial POs
+     * to be followed by additional POs for the remaining qty.
      */
     public static function getAvailableOrderRequestSupplierIds(OrderRequest $orderRequest): array
     {
-        $orSupplierIds = collect(static::getAvailableOrderRequestItemGroups($orderRequest))
+        return collect(static::getAvailableOrderRequestItemGroups($orderRequest))
             ->pluck('supplier_id')
             ->filter()
             ->map(fn ($supplierId) => (int) $supplierId)
             ->unique()
             ->values()
             ->all();
-
-        if (empty($orSupplierIds)) {
-            return [];
-        }
-
-        $usedSupplierIds = PurchaseOrder::query()
-            ->where('refer_model_type', OrderRequest::class)
-            ->where('refer_model_id', $orderRequest->id)
-            ->pluck('supplier_id')
-            ->filter()
-            ->map(fn ($supplierId) => (int) $supplierId)
-            ->unique()
-            ->values()
-            ->all();
-
-        return array_values(array_diff($orSupplierIds, $usedSupplierIds));
     }
 
     public static function getRelations(): array

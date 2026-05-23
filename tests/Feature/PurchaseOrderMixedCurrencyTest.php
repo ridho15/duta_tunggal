@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Product;
@@ -54,6 +55,13 @@ class PurchaseOrderMixedCurrencyTest extends TestCase
         $this->assertEquals(500.00, (float) $item2->unit_price);
         $this->assertEquals('$', $item1->currency->symbol);
         $this->assertEquals('€', $item2->currency->symbol);
+    }
+
+    public function test_preview_formatter_matches_currency_aware_input_formatting(): void
+    {
+        $this->assertSame('1.234,50', PurchaseOrderResource::formatCurrencyPreviewState(1234.5, $this->usd->id));
+        $this->assertSame('1.234,50', PurchaseOrderResource::formatCurrencyPreviewState('1.234,5', $this->usd->id));
+        $this->assertSame('1.234,50', PurchaseOrderResource::formatCurrencyPreviewState(1234.5, null));
     }
 
     public function test_purchase_order_pdf_separates_expected_date_from_top_due_date_and_respects_item_currency()

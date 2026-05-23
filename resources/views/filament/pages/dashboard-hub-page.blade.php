@@ -6,10 +6,25 @@
     $heroFrom    = '#eff6ff';
     $heroTo      = '#dbeafe';
     $items = [
-        ['label' => 'Finance Dashboard',   'url' => \App\Filament\Pages\MyDashboard::getUrl(),          'icon' => 'chart-bar',           'desc' => 'Dashboard widget keuangan dan operasional utama'],
-        ['label' => 'Laporan Penjualan',   'url' => \App\Filament\Pages\SalesReportPage::getUrl(),     'icon' => 'chart-bar-square',    'desc' => 'Rekap transaksi & performa penjualan'],
-        ['label' => 'Laporan Pembelian',   'url' => \App\Filament\Pages\PurchaseReportPage::getUrl(),  'icon' => 'shopping-cart',       'desc' => 'Rekap transaksi & aktivitas pembelian'],
+        ['label' => 'Finance Dashboard',   'url' => \App\Filament\Pages\MyDashboard::getUrl(),          'icon' => 'chart-bar',           'desc' => 'Dashboard widget keuangan dan operasional utama', 'class' => \App\Filament\Pages\MyDashboard::class],
+        ['label' => 'Laporan Penjualan',   'url' => \App\Filament\Pages\SalesReportPage::getUrl(),     'icon' => 'chart-bar-square',    'desc' => 'Rekap transaksi & performa penjualan', 'class' => \App\Filament\Pages\SalesReportPage::class],
+        ['label' => 'Laporan Pembelian',   'url' => \App\Filament\Pages\PurchaseReportPage::getUrl(),  'icon' => 'shopping-cart',       'desc' => 'Rekap transaksi & aktivitas pembelian', 'class' => \App\Filament\Pages\PurchaseReportPage::class],
     ];
+
+    $filteredItems = [];
+    foreach ($items as $item) {
+        $class = $item['class'] ?? null;
+        if ($class) {
+            if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                continue;
+            }
+            if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                continue;
+            }
+        }
+        $filteredItems[] = $item;
+    }
+    $items = $filteredItems;
 @endphp
 
 @include('filament.pages.partials.hub-styles')

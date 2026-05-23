@@ -10,6 +10,7 @@ use App\Models\StockMovement;
 use App\Models\ChartOfAccount;
 use App\Services\ReturnProductService;
 use App\Support\JournalCurrencyAmountResolver;
+use App\Support\OrderRequestQuantityLock;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -89,15 +90,33 @@ class QualityControlService
     {
         // Validate passed_quantity doesn't exceed ordered quantity
         $passedQuantity = $data['passed_quantity'] ?? $purchaseOrderItem->quantity;
+        $rejectedQuantity = $data['rejected_quantity'] ?? 0;
         if ($passedQuantity > $purchaseOrderItem->quantity) {
             throw new \Exception("QC passed quantity ({$passedQuantity}) cannot exceed ordered quantity ({$purchaseOrderItem->quantity}) in purchase order.");
+        }
+
+        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+        $inspectedQuantity = (float) $passedQuantity + (float) $rejectedQuantity;
+        $quantityReceived = $data['quantity_received'] ?? $inspectedQuantity;
+        if ((float) $passedQuantity > (float) $quantityReceived) {
+            throw new \Exception("QC passed quantity ({$passedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+        }
+
+        if ($inspectedQuantity > (float) $quantityReceived) {
+            throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+        }
+        if ($inspectedQuantity > $limit['remaining_received']) {
+            throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+        }
+        if ((float) $passedQuantity > $limit['remaining_accepted']) {
+            throw new \Exception("QC passed quantity ({$passedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
         }
 
         $qualityControl = QualityControl::create([
             'qc_number'         => $this->generateQcNumber(),
             'passed_quantity'   => $passedQuantity,
-            'rejected_quantity' => $data['rejected_quantity'] ?? 0,
-            'quantity_received' => $data['quantity_received'] ?? $passedQuantity,
+            'rejected_quantity' => $rejectedQuantity,
+            'quantity_received' => $quantityReceived,
             'notes'             => $data['notes'] ?? null,
             'status'            => 0,
             'inspected_by'      => $data['inspected_by'] ?? null,
@@ -153,7 +172,7 @@ class QualityControlService
         }
 
         $updatedAttributes = [];
-        foreach (['passed_quantity', 'rejected_quantity', 'warehouse_id', 'rak_id', 'reason_reject', 'inspected_by'] as $field) {
+        foreach (['passed_quantity', 'rejected_quantity', 'quantity_received', 'warehouse_id', 'rak_id', 'reason_reject', 'inspected_by'] as $field) {
             if (array_key_exists($field, $data)) {
                 $updatedAttributes[$field] = $data[$field];
             }
@@ -178,6 +197,31 @@ class QualityControlService
             }
         }
 
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $purchaseOrderItem = $qualityControl->fromModel;
+            if ($purchaseOrderItem) {
+                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+                $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
+
+                if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $quantityReceived) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $limit['remaining_received']) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+                }
+
+                if ((float) $qualityControl->passed_quantity > $limit['remaining_accepted']) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+                }
+            }
+        }
+
         if ($qualityControl->isDirty()) {
             $qualityControl->save();
         }
@@ -187,6 +231,31 @@ class QualityControlService
             $purchaseReceiptItem = $qualityControl->fromModel;
             if ($purchaseReceiptItem && $qualityControl->passed_quantity > $purchaseReceiptItem->qty_received) {
                 throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed received quantity ({$purchaseReceiptItem->qty_received}) in purchase receipt.");
+            }
+        }
+
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $purchaseOrderItem = $qualityControl->fromModel;
+            if ($purchaseOrderItem) {
+                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+                $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
+
+                if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $quantityReceived) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $limit['remaining_received']) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+                }
+
+                if ((float) $qualityControl->passed_quantity > $limit['remaining_accepted']) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+                }
             }
         }
 
@@ -928,6 +997,18 @@ class QualityControlService
             return;
         }
 
+        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+        $qtyReceived = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+        $qtyAccepted = (float) $qualityControl->passed_quantity;
+
+        if ($qtyReceived > $limit['remaining_received']) {
+            throw new \Exception("Quantity Received dari QC tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+        }
+
+        if ($qtyAccepted > $limit['remaining_accepted']) {
+            throw new \Exception("Quantity Accepted dari QC tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+        }
+
         // Generate receipt number
         $receiptNumber = $this->generateReceiptNumber();
 
@@ -948,8 +1029,8 @@ class QualityControlService
             'purchase_receipt_id'    => $purchaseReceipt->id,
             'purchase_order_item_id' => $purchaseOrderItem->id,
             'product_id'             => $qualityControl->product_id,
-            'qty_received'           => $qualityControl->passed_quantity + $qualityControl->rejected_quantity,
-            'qty_accepted'           => $qualityControl->passed_quantity,
+            'qty_received'           => $qtyReceived,
+            'qty_accepted'           => $qtyAccepted,
             'qty_rejected'           => $qualityControl->rejected_quantity,
             'reason_rejected'        => $qualityControl->rejected_quantity > 0 ? 'Failed QC inspection' : null,
             'warehouse_id'           => $qualityControl->warehouse_id,

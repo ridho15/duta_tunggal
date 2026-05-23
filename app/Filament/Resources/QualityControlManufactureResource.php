@@ -59,6 +59,11 @@ class QualityControlManufactureResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
+    public static function canChooseInspector(): bool
+    {
+        return Auth::user()?->hasRole(['Super Admin', 'Owner']) === true;
+    }
+
     public static function getProductionQuery(?QualityControl $record = null): Builder
     {
         $currentProductionId = $record?->from_model_type === Production::class
@@ -408,6 +413,11 @@ class QualityControlManufactureResource extends Resource
                                 Select::make('inspected_by')
                                     ->label('Inspected By')
                                     ->options(\App\Models\User::pluck('name', 'id'))
+                                    ->default(fn (?QualityControl $record) => $record?->inspected_by ?? Auth::id())
+                                    ->disabled(fn () => ! static::canChooseInspector())
+                                    ->dehydrated(true)
+                                    ->searchable(fn () => static::canChooseInspector())
+                                    ->preload(fn () => static::canChooseInspector())
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Inspected by wajib dipilih'

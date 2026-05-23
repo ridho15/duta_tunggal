@@ -7,6 +7,8 @@ use App\Models\OrderRequestItem;
 use App\Models\Supplier;
 use App\Services\PurchaseOrderService;
 use App\Services\ProductSupplierSyncService;
+use App\Support\CurrencyConversionResolver;
+use App\Support\OrderRequestQuantityLock;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -41,8 +43,15 @@ class OrderRequestService
 
                     $qty = (float) ($row['quantity'] ?? $orderRequestItem->quantity);
 
-                    // Validate quantity does not exceed remaining unfulfilled quantity
-                    $maxQty = max(0, $orderRequestItem->quantity - ($orderRequestItem->fulfilled_quantity ?? 0));
+                    // Validate quantity does not exceed remaining unfulfilled AND un-locked quantity.
+                    // fulfilled_quantity = received via PurchaseReceipt; locked = in approved (non-draft) POs.
+                    $fulfilledQty = (float) ($orderRequestItem->fulfilled_quantity ?? 0);
+                    $lockedQty    = (float) \App\Models\PurchaseOrderItem::query()
+                        ->where('refer_item_model_type', \App\Models\OrderRequestItem::class)
+                        ->where('refer_item_model_id', $orderRequestItem->id)
+                        ->whereHas('purchaseOrder', fn ($q) => $q->whereNotIn('status', ['draft', 'closed', 'cancelled', 'rejected']))
+                        ->sum('quantity');
+                    $maxQty = max(0, $orderRequestItem->quantity - max($fulfilledQty, $lockedQty));
                     if ($qty > $maxQty) {
                         Log::warning('OrderRequest qty clamped to remaining quantity.', [
                             'order_request_id' => $orderRequest->id,
@@ -82,7 +91,7 @@ class OrderRequestService
         // No selection provided — use all items with remaining quantity
         return $orderRequest->orderRequestItem
             ->map(function ($orderRequestItem) use ($supplier) {
-            $remainingQty = max(0, (float) $orderRequestItem->quantity - (float) ($orderRequestItem->fulfilled_quantity ?? 0));
+            $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $orderRequestItem->id)['remaining_for_po'];
             if ($remainingQty <= 0) {
                 return null;
             }
@@ -151,10 +160,13 @@ class OrderRequestService
                     'currency_id'       => $itemCurrencyId,
                 ]);
 
+                $rate = CurrencyConversionResolver::resolveRate((int)$itemCurrencyId);
+                $idrPrice = $row['unit_price'] * $rate;
+
                 $itemsForPivotSync[] = [
                     'product_id' => (int) $orderRequestItem->product_id,
                     'supplier_id' => (int) ($orderRequestItem->supplier_id ?: $supplier->id),
-                    'unit_price' => $row['unit_price'],
+                    'unit_price' => $idrPrice,
                 ];
                 // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
             }
@@ -188,10 +200,14 @@ class OrderRequestService
                 $supplierId = $item->supplier_id;
 
                 if ($productId && $supplierId) {
+                    $itemCurrencyId = $item->currency_id;
+                    $rate = CurrencyConversionResolver::resolveRate($itemCurrencyId ? (int)$itemCurrencyId : null);
+                    $idrPrice = $item->unit_price * $rate;
+
                     $this->productSupplierSyncService->syncSupplierProductPrice(
                         $productId,
                         $supplierId,
-                        $item->unit_price
+                        $idrPrice
                     );
                 }
             }

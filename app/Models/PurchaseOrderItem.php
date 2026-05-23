@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Support\OrderRequestQuantityLock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -58,9 +59,9 @@ class PurchaseOrderItem extends Model
                             ->orWhereNull('supplier_id');
                     });
                 })
-                ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)')
                 ->orderBy('id')
-                ->first();
+                ->get()
+                ->first(fn (OrderRequestItem $item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0);
 
             if (! $matchedItem) {
                 return;

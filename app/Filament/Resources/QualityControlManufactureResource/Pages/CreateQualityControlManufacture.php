@@ -6,6 +6,7 @@ use App\Filament\Resources\QualityControlManufactureResource;
 use App\Models\Production;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Auth;
 
 class CreateQualityControlManufacture extends CreateRecord
 {
@@ -14,6 +15,10 @@ class CreateQualityControlManufacture extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['from_model_type'] = Production::class;
+
+        if (! QualityControlManufactureResource::canChooseInspector()) {
+            $data['inspected_by'] = Auth::id();
+        }
 
         $production = Production::query()
             ->with('manufacturingOrder.productionPlan.product')

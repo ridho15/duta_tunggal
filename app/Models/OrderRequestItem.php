@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Helpers\MoneyHelper;
+use App\Support\CurrencyConversionResolver;
 use App\Support\TaxDefaultResolver;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,13 +22,15 @@ class OrderRequestItem extends Model
         'quantity',
         'fulfilled_quantity',
         'unit_price',
+        'unit_price_idr',       // IDR anchor — always stored in IDR for lossless re-conversion
         'original_price',
+        'original_price_idr',   // IDR anchor — always stored in IDR for lossless re-conversion
         'discount',
         'tax',
         'tipe_pajak',
         'subtotal',
         'note',
-        'currency_id'  // ← ADD THIS
+        'currency_id',
     ];
 
     public function orderRequest()
@@ -65,24 +68,41 @@ class OrderRequestItem extends Model
         static::saving(function (OrderRequestItem $item) {
             $item->loadMissing('orderRequest');
 
-            $quantity = (float) ($item->quantity ?? 0);
-            $unitPrice = MoneyHelper::safeParse($item->unit_price ?? 0);
-            $discount = (float) ($item->discount ?? 0);
+            $quantity    = (float) ($item->quantity ?? 0);
+            $unitPrice   = MoneyHelper::safeParse($item->unit_price ?? 0);
+            $discount    = (float) ($item->discount ?? 0);
             $itemTaxType = static::normalizeItemTaxType($item->tipe_pajak ?? null);
-            $taxType = static::taxServiceTypeFromItemTaxType($itemTaxType);
+            $taxType     = static::taxServiceTypeFromItemTaxType($itemTaxType);
             $item->tipe_pajak = $itemTaxType;
             $tax = $taxType === 'None'
                 ? 0.0
                 : TaxDefaultResolver::resolveForProductId((int) ($item->product_id ?? 0), $taxType);
             $item->tax = $tax;
 
-            $base = $quantity * $unitPrice;
+            // ── IDR Anchor ─────────────────────────────────────────────────────────
+            // Always persist unit_price and original_price converted to IDR so that
+            // subsequent currency switches can round-trip without precision drift.
+            // Example drift without anchor: 1.000.000 → $66.67 → 1.000.050 (wrong)
+            $currencyId = $item->currency_id ?? null;
+
+            $item->unit_price_idr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
+                MoneyHelper::parseHighPrecision($item->unit_price ?? 0),
+                $currencyId ? (int) $currencyId : null
+            );
+
+            $item->original_price_idr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
+                MoneyHelper::parseHighPrecision($item->original_price ?? 0),
+                $currencyId ? (int) $currencyId : null
+            );
+            // ───────────────────────────────────────────────────────────────────────
+
+            $base      = $quantity * $unitPrice;
             $afterDisc = $base - ($base * ($discount / 100));
 
             $taxNominal = round($afterDisc * ($tax / 100), 2);
             $item->subtotal = match ($itemTaxType) {
                 'none', 'inklusif' => round($afterDisc, 2),
-                default => round($afterDisc + $taxNominal, 2),
+                default            => round($afterDisc + $taxNominal, 2),
             };
         });
 

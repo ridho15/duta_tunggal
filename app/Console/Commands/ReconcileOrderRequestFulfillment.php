@@ -45,10 +45,14 @@ class ReconcileOrderRequestFulfillment extends Command
         $alreadyGood = 0;
 
         foreach ($items as $item) {
-            $purchaseOrderItem = $item->purchaseOrderItem;
-            $computedFulfilled = $purchaseOrderItem
+            $poItemIds = \App\Models\PurchaseOrderItem::query()
+                ->where('refer_item_model_type', OrderRequestItem::class)
+                ->where('refer_item_model_id', $item->id)
+                ->pluck('id');
+
+            $computedFulfilled = $poItemIds->isNotEmpty()
                 ? (float) PurchaseReceiptItem::query()
-                    ->where('purchase_order_item_id', $purchaseOrderItem->id)
+                    ->whereIn('purchase_order_item_id', $poItemIds)
                     ->sum('qty_accepted')
                 : 0.0;
 

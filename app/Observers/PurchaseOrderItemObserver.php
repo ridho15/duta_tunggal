@@ -6,12 +6,14 @@ use App\Models\OrderRequest;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseOrder;
 use App\Models\OrderRequestItem;
+use App\Support\OrderRequestQuantityLock;
 
 class PurchaseOrderItemObserver
 {
     public function creating(PurchaseOrderItem $purchaseOrderItem): void
     {
         if (! empty($purchaseOrderItem->refer_item_model_type) && ! empty($purchaseOrderItem->refer_item_model_id)) {
+            OrderRequestQuantityLock::validatePurchaseOrderItem($purchaseOrderItem);
             return;
         }
 
@@ -39,16 +41,23 @@ class PurchaseOrderItemObserver
                         ->orWhereNull('cabang_id');
                 });
             })
-            ->whereRaw('quantity > COALESCE(fulfilled_quantity, 0)')
             ->orderBy('id')
-            ->first();
+            ->get()
+            ->first(fn (OrderRequestItem $item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0);
 
         if (! $matchedItem) {
-            return;
+            throw new \InvalidArgumentException('Item Purchase Order tidak memiliki sisa quantity Order Request yang tersedia.');
         }
 
         $purchaseOrderItem->refer_item_model_type = OrderRequestItem::class;
         $purchaseOrderItem->refer_item_model_id = $matchedItem->id;
+
+        OrderRequestQuantityLock::validatePurchaseOrderItem($purchaseOrderItem);
+    }
+
+    public function saving(PurchaseOrderItem $purchaseOrderItem): void
+    {
+        OrderRequestQuantityLock::validatePurchaseOrderItem($purchaseOrderItem);
     }
 
     /**

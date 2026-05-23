@@ -6,10 +6,25 @@
     $heroFrom    = '#eff6ff';
     $heroTo      = '#bfdbfe';
     $items = [
-        ['label' => 'Piutang Usaha',      'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',     'desc' => 'Kelola hak tagih dari pelanggan'],
-        ['label' => 'Invoice Penjualan',  'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text', 'desc' => 'Tagihan penjualan kepada pelanggan'],
-        ['label' => 'Penjualan Lainnya',  'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',  'desc' => 'Transaksi penjualan non-standar'],
+        ['label' => 'Piutang Usaha',      'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',     'desc' => 'Kelola hak tagih dari pelanggan', 'class' => \App\Filament\Resources\AccountReceivableResource::class],
+        ['label' => 'Invoice Penjualan',  'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text', 'desc' => 'Tagihan penjualan kepada pelanggan', 'class' => \App\Filament\Resources\SalesInvoiceResource::class],
+        ['label' => 'Penjualan Lainnya',  'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',  'desc' => 'Transaksi penjualan non-standar', 'class' => \App\Filament\Resources\OtherSaleResource::class],
     ];
+
+    $filteredItems = [];
+    foreach ($items as $item) {
+        $class = $item['class'] ?? null;
+        if ($class) {
+            if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                continue;
+            }
+            if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                continue;
+            }
+        }
+        $filteredItems[] = $item;
+    }
+    $items = $filteredItems;
 @endphp
 
 @include('filament.pages.partials.hub-styles')

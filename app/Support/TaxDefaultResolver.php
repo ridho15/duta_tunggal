@@ -19,7 +19,10 @@ class TaxDefaultResolver
         }
 
         if ($productId) {
-            return static::resolveProductRate(Product::find($productId));
+            $productRate = static::resolveProductRate(Product::find($productId));
+            if ($productRate > 0) {
+                return $productRate;
+            }
         }
 
         return 0.0;
@@ -32,7 +35,12 @@ class TaxDefaultResolver
             return $settingRate;
         }
 
-        return static::resolveProductRate($product);
+        $productRate = static::resolveProductRate($product);
+        if ($productRate > 0) {
+            return $productRate;
+        }
+
+        return 0.0;
     }
 
     public static function resolveFallbackRate(): float

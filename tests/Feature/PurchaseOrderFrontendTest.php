@@ -135,6 +135,12 @@ test('purchase order index page loads successfully and displays purchase orders'
         ->assertSee('PO-FRONT-001');
 });
 
+test('purchase order index search does not error when cabang_id column is absent', function () {
+    $response = $this->get(PurchaseOrderResource::getUrl('index', ['tableSearch' => 'asdfsdf']));
+
+    $response->assertOk();
+});
+
 test('purchase order create page is accessible with the correct heading', function () {
     $response = $this->get(PurchaseOrderResource::getUrl('create'));
 

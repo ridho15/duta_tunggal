@@ -9,32 +9,54 @@
         [
             'title' => 'Produk & Persediaan',
             'items' => [
-                ['label' => 'Produk',          'url' => \App\Filament\Resources\ProductResource::getUrl(),          'icon' => 'cube',            'desc' => 'Kelola master produk dan SKU'],
-                ['label' => 'Kategori Produk', 'url' => \App\Filament\Resources\ProductCategoryResource::getUrl(), 'icon' => 'tag',             'desc' => 'Atur klasifikasi produk'],
-                ['label' => 'Satuan',          'url' => \App\Filament\Resources\UnitOfMeasureResource::getUrl(),    'icon' => 'square-2-stack',  'desc' => 'Kelola satuan barang'],
-                ['label' => 'Rak',             'url' => \App\Filament\Resources\RakResource::getUrl(),              'icon' => 'squares-2x2',     'desc' => 'Atur lokasi rak gudang'],
+                ['label' => 'Produk',          'url' => \App\Filament\Resources\ProductResource::getUrl(),          'icon' => 'cube',            'desc' => 'Kelola master produk dan SKU', 'class' => \App\Filament\Resources\ProductResource::class],
+                ['label' => 'Kategori Produk', 'url' => \App\Filament\Resources\ProductCategoryResource::getUrl(), 'icon' => 'tag',             'desc' => 'Atur klasifikasi produk', 'class' => \App\Filament\Resources\ProductCategoryResource::class],
+                ['label' => 'Satuan',          'url' => \App\Filament\Resources\UnitOfMeasureResource::getUrl(),    'icon' => 'square-2-stack',  'desc' => 'Kelola satuan barang', 'class' => \App\Filament\Resources\UnitOfMeasureResource::class],
+                ['label' => 'Rak',             'url' => \App\Filament\Resources\RakResource::getUrl(),              'icon' => 'squares-2x2',     'desc' => 'Atur lokasi rak gudang', 'class' => \App\Filament\Resources\RakResource::class],
             ],
         ],
         [
             'title' => 'Organisasi & Lokasi',
             'items' => [
-                ['label' => 'Gudang',   'url' => \App\Filament\Resources\WarehouseResource::getUrl(), 'icon' => 'archive-box',     'desc' => 'Data gudang dan status aktif'],
-                ['label' => 'Cabang',   'url' => \App\Filament\Resources\CabangResource::getUrl(),    'icon' => 'building-office', 'desc' => 'Kelola cabang perusahaan'],
-                ['label' => 'Customer', 'url' => \App\Filament\Resources\CustomerResource::getUrl(),   'icon' => 'user-group',      'desc' => 'Master data pelanggan'],
-                ['label' => 'Supplier', 'url' => \App\Filament\Resources\SupplierResource::getUrl(),   'icon' => 'truck',           'desc' => 'Master data pemasok'],
+                ['label' => 'Gudang',   'url' => \App\Filament\Resources\WarehouseResource::getUrl(), 'icon' => 'archive-box',     'desc' => 'Data gudang dan status aktif', 'class' => \App\Filament\Resources\WarehouseResource::class],
+                ['label' => 'Cabang',   'url' => \App\Filament\Resources\CabangResource::getUrl(),    'icon' => 'building-office', 'desc' => 'Kelola cabang perusahaan', 'class' => \App\Filament\Resources\CabangResource::class],
+                ['label' => 'Customer', 'url' => \App\Filament\Resources\CustomerResource::getUrl(),   'icon' => 'user-group',      'desc' => 'Master data pelanggan', 'class' => \App\Filament\Resources\CustomerResource::class],
+                ['label' => 'Supplier', 'url' => \App\Filament\Resources\SupplierResource::getUrl(),   'icon' => 'truck',           'desc' => 'Master data pemasok', 'class' => \App\Filament\Resources\SupplierResource::class],
             ],
         ],
         [
             'title' => 'Keuangan & Pendukung',
             'items' => [
-                ['label' => 'Chart of Account', 'url' => \App\Filament\Resources\ChartOfAccountResource::getUrl(), 'icon' => 'banknotes',       'desc' => 'Struktur akun akuntansi'],
-                ['label' => 'Mata Uang',        'url' => \App\Filament\Resources\CurrencyResource::getUrl(),        'icon' => 'currency-dollar', 'desc' => 'Daftar mata uang dan kurs'],
-                ['label' => 'Setting Pajak',    'url' => \App\Filament\Resources\TaxSettingResource::getUrl(),      'icon' => 'document-text',   'desc' => 'Konfigurasi tarif pajak'],
-                ['label' => 'Kendaraan',        'url' => \App\Filament\Resources\VehicleResource::getUrl(),         'icon' => 'truck',           'desc' => 'Master kendaraan operasional'],
-                ['label' => 'Driver',           'url' => \App\Filament\Resources\DriverResource::getUrl(),          'icon' => 'identification',  'desc' => 'Master pengemudi'],
+                ['label' => 'Chart of Account', 'url' => \App\Filament\Resources\ChartOfAccountResource::getUrl(), 'icon' => 'banknotes',       'desc' => 'Struktur akun akuntansi', 'class' => \App\Filament\Resources\ChartOfAccountResource::class],
+                ['label' => 'Mata Uang',        'url' => \App\Filament\Resources\CurrencyResource::getUrl(),        'icon' => 'currency-dollar', 'desc' => 'Daftar mata uang dan kurs', 'class' => \App\Filament\Resources\CurrencyResource::class],
+                ['label' => 'Setting Pajak',    'url' => \App\Filament\Resources\TaxSettingResource::getUrl(),      'icon' => 'document-text',   'desc' => 'Konfigurasi tarif pajak', 'class' => \App\Filament\Resources\TaxSettingResource::class],
+                ['label' => 'Kendaraan',        'url' => \App\Filament\Resources\VehicleResource::getUrl(),         'icon' => 'truck',           'desc' => 'Master kendaraan operasional', 'class' => \App\Filament\Resources\VehicleResource::class],
+                ['label' => 'Driver',           'url' => \App\Filament\Resources\DriverResource::getUrl(),          'icon' => 'identification',  'desc' => 'Master pengemudi', 'class' => \App\Filament\Resources\DriverResource::class],
             ],
         ],
     ];
+
+    $filteredSections = [];
+    foreach ($sections as $section) {
+        $filteredItems = [];
+        foreach ($section['items'] as $item) {
+            $class = $item['class'] ?? null;
+            if ($class) {
+                if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                    continue;
+                }
+                if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+        if (!empty($filteredItems)) {
+            $section['items'] = $filteredItems;
+            $filteredSections[] = $section;
+        }
+    }
+    $sections = $filteredSections;
     $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 
