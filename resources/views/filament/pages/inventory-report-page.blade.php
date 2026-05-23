@@ -43,8 +43,8 @@
                 <label class="filament-forms-field-wrapper-label">Gudang</label>
                 <select wire:model.live="warehouse_id" class="filament-forms-select">
                     <option value="">Semua Gudang</option>
-                    @foreach(\App\Models\Warehouse::all() as $warehouse)
-                        <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                    @foreach($this->warehouseOptions() as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -52,8 +52,8 @@
                 <label class="filament-forms-field-wrapper-label">Produk</label>
                 <select wire:model.live="product_id" class="filament-forms-select">
                     <option value="">Semua Produk</option>
-                    @foreach(\App\Models\Product::all() as $product)
-                        <option value="{{ $product->id }}">{{ $product->name }}</option>
+                    @foreach($this->productOptions() as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
                     @endforeach
                 </select>
             </div>

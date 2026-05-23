@@ -20,6 +20,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class InventoryReportPage extends Page implements HasTable
 {
@@ -93,16 +94,20 @@ class InventoryReportPage extends Page implements HasTable
 
     private function getStockByWarehouseTable(Table $table): Table
     {
+        try {
+            $query = InventoryStock::query()
+                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+                ->with(['product', 'warehouse', 'rak'])
+                ->orderBy('warehouse_id')
+                ->orderBy('product_id');
+        } catch (Throwable) {
+            $query = InventoryStock::query()->whereRaw('1 = 0');
+        }
+
         return $table
             ->defaultSort('created_at', 'desc')
-            ->query(
-                InventoryStock::query()
-                    ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
-                    ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
-                    ->with(['product', 'warehouse', 'rak'])
-                    ->orderBy('warehouse_id')
-                    ->orderBy('product_id')
-            )
+            ->query($query)
             ->columns([
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
                 TextColumn::make('product.name')->label('Produk')->sortable(),
@@ -129,7 +134,7 @@ class InventoryReportPage extends Page implements HasTable
                 Action::make('view_movements')
                     ->label('Lihat Movement')
                     ->icon('heroicon-o-eye')
-                    ->url(fn ($record) => route('filament.admin.resources.inventory-stocks.view', $record)),
+                    ->url(fn ($record) => \App\Filament\Resources\InventoryStockResource::getUrl('view', ['record' => $record])),
             ])
             ->headerActions([
                 Action::make('export_excel')
@@ -145,17 +150,21 @@ class InventoryReportPage extends Page implements HasTable
 
     private function getMovementHistoryTable(Table $table): Table
     {
+        try {
+            $query = StockMovement::query()
+                ->when($this->start_date, fn ($query) => $query->whereDate('date', '>=', $this->start_date))
+                ->when($this->end_date, fn ($query) => $query->whereDate('date', '<=', $this->end_date))
+                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+                ->with(['product', 'warehouse', 'rak'])
+                ->orderBy('date', 'desc')
+                ->orderBy('created_at', 'desc');
+        } catch (Throwable) {
+            $query = StockMovement::query()->whereRaw('1 = 0');
+        }
+
         return $table
-            ->query(
-                StockMovement::query()
-                    ->when($this->start_date, fn ($query) => $query->whereDate('date', '>=', $this->start_date))
-                    ->when($this->end_date, fn ($query) => $query->whereDate('date', '<=', $this->end_date))
-                    ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
-                    ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
-                    ->with(['product', 'warehouse', 'rak'])
-                    ->orderBy('date', 'desc')
-                    ->orderBy('created_at', 'desc')
-            )
+            ->query($query)
             ->columns([
                 TextColumn::make('date')->label('Tanggal')->date()->sortable(),
                 TextColumn::make('product.name')->label('Produk')->sortable(),
@@ -191,15 +200,19 @@ class InventoryReportPage extends Page implements HasTable
 
     private function getAgingStockTable(Table $table): Table
     {
+        try {
+            $query = InventoryStock::query()
+                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+                ->with(['product', 'warehouse', 'rak'])
+                ->orderBy('warehouse_id')
+                ->orderBy('product_id');
+        } catch (Throwable) {
+            $query = InventoryStock::query()->whereRaw('1 = 0');
+        }
+
         return $table
-            ->query(
-                InventoryStock::query()
-                    ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
-                    ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
-                    ->with(['product', 'warehouse', 'rak'])
-                    ->orderBy('warehouse_id')
-                    ->orderBy('product_id')
-            )
+            ->query($query)
             ->columns([
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
                 TextColumn::make('product.name')->label('Produk')->sortable(),
@@ -291,5 +304,23 @@ class InventoryReportPage extends Page implements HasTable
     private function inventoryReportService(): InventoryReportService
     {
         return app(InventoryReportService::class);
+    }
+
+    public function warehouseOptions()
+    {
+        try {
+            return Warehouse::query()->orderBy('name')->pluck('name', 'id');
+        } catch (Throwable) {
+            return collect();
+        }
+    }
+
+    public function productOptions()
+    {
+        try {
+            return Product::query()->orderBy('name')->pluck('name', 'id');
+        } catch (Throwable) {
+            return collect();
+        }
     }
 }
