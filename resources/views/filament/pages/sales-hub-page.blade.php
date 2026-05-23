@@ -9,21 +9,43 @@
         [
             'title' => 'Transaksi Penjualan',
             'items' => [
-                ['label' => 'Quotations',      'url' => \App\Filament\Resources\QuotationResource::getUrl(),        'icon' => 'document-text',        'desc' => 'Kelola penawaran harga untuk pelanggan'],
-                ['label' => 'Sale Orders',     'url' => \App\Filament\Resources\SaleOrderResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Buat dan pantau pesanan penjualan'],
-                ['label' => 'Retur Pelanggan', 'url' => \App\Filament\Resources\CustomerReturnResource::getUrl(),   'icon' => 'arrow-uturn-left',     'desc' => 'Tangani retur barang dari pelanggan'],
+                ['label' => 'Quotations',      'url' => \App\Filament\Resources\QuotationResource::getUrl(),        'icon' => 'document-text',        'desc' => 'Kelola penawaran harga untuk pelanggan', 'class' => \App\Filament\Resources\QuotationResource::class],
+                ['label' => 'Sale Orders',     'url' => \App\Filament\Resources\SaleOrderResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Buat dan pantau pesanan penjualan', 'class' => \App\Filament\Resources\SaleOrderResource::class],
+                ['label' => 'Retur Pelanggan', 'url' => \App\Filament\Resources\CustomerReturnResource::getUrl(),   'icon' => 'arrow-uturn-left',     'desc' => 'Tangani retur barang dari pelanggan', 'class' => \App\Filament\Resources\CustomerReturnResource::class],
             ],
         ],
         [
             'title' => 'Keuangan Penjualan',
             'items' => [
-                ['label' => 'Piutang Usaha',     'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',            'desc' => 'Kelola hak tagih dari pelanggan'],
-                ['label' => 'Invoice Penjualan', 'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text',        'desc' => 'Tagihan penjualan kepada pelanggan'],
-                ['label' => 'Penjualan Lainnya', 'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Transaksi penjualan non-standar'],
-                ['label' => 'Sales Report',      'url' => \App\Filament\Pages\SalesReportPage::getUrl(),            'icon' => 'chart-bar-square',     'desc' => 'Pantau ringkasan dan performa penjualan'],
+                ['label' => 'Piutang Usaha',     'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',            'desc' => 'Kelola hak tagih dari pelanggan', 'class' => \App\Filament\Resources\AccountReceivableResource::class],
+                ['label' => 'Invoice Penjualan', 'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text',        'desc' => 'Tagihan penjualan kepada pelanggan', 'class' => \App\Filament\Resources\SalesInvoiceResource::class],
+                ['label' => 'Penjualan Lainnya', 'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Transaksi penjualan non-standar', 'class' => \App\Filament\Resources\OtherSaleResource::class],
+                ['label' => 'Sales Report',      'url' => \App\Filament\Pages\SalesReportPage::getUrl(),            'icon' => 'chart-bar-square',     'desc' => 'Pantau ringkasan dan performa penjualan', 'class' => \App\Filament\Pages\SalesReportPage::class],
             ],
         ],
     ];
+
+    $filteredSections = [];
+    foreach ($sections as $section) {
+        $filteredItems = [];
+        foreach ($section['items'] as $item) {
+            $class = $item['class'] ?? null;
+            if ($class) {
+                if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                    continue;
+                }
+                if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+        if (!empty($filteredItems)) {
+            $section['items'] = $filteredItems;
+            $filteredSections[] = $section;
+        }
+    }
+    $sections = $filteredSections;
     $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 

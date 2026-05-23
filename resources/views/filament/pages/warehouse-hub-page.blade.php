@@ -9,21 +9,43 @@
         [
             'title' => 'Transaksi Gudang',
             'items' => [
-                ['label' => 'Stock Transfer',    'url' => \App\Filament\Resources\StockTransferResource::getUrl(),         'icon' => 'arrows-right-left',        'desc' => 'Pindahkan stok antar gudang/lokasi'],
-                ['label' => 'Stock Adjustment',  'url' => \App\Filament\Resources\StockAdjustmentResource::getUrl(),       'icon' => 'adjustments-horizontal',   'desc' => 'Koreksi selisih stok secara manual'],
-                ['label' => 'Stock Opname',      'url' => \App\Filament\Resources\StockOpnameResource::getUrl(),           'icon' => 'clipboard-document-check', 'desc' => 'Hitung fisik persediaan gudang'],
-                ['label' => 'Return Product',    'url' => \App\Filament\Resources\ReturnProductResource::getUrl(),         'icon' => 'arrow-uturn-left',          'desc' => 'Proses pengembalian produk dari pelanggan'],
+                ['label' => 'Stock Transfer',    'url' => \App\Filament\Resources\StockTransferResource::getUrl(),         'icon' => 'arrows-right-left',        'desc' => 'Pindahkan stok antar gudang/lokasi', 'class' => \App\Filament\Resources\StockTransferResource::class],
+                ['label' => 'Stock Adjustment',  'url' => \App\Filament\Resources\StockAdjustmentResource::getUrl(),       'icon' => 'adjustments-horizontal',   'desc' => 'Koreksi selisih stok secara manual', 'class' => \App\Filament\Resources\StockAdjustmentResource::class],
+                ['label' => 'Stock Opname',      'url' => \App\Filament\Resources\StockOpnameResource::getUrl(),           'icon' => 'clipboard-document-check', 'desc' => 'Hitung fisik persediaan gudang', 'class' => \App\Filament\Resources\StockOpnameResource::class],
+                ['label' => 'Return Product',    'url' => \App\Filament\Resources\ReturnProductResource::getUrl(),         'icon' => 'arrow-uturn-left',          'desc' => 'Proses pengembalian produk dari pelanggan', 'class' => \App\Filament\Resources\ReturnProductResource::class],
             ],
         ],
         [
             'title' => 'Monitoring & Konfirmasi',
             'items' => [
-                ['label' => 'Inventory Stock',   'url' => \App\Filament\Resources\InventoryStockResource::getUrl(),        'icon' => 'archive-box',              'desc' => 'Monitor posisi stok real-time'],
-                ['label' => 'Stock Movement',    'url' => \App\Filament\Resources\StockMovementResource::getUrl(),         'icon' => 'arrow-trending-up',        'desc' => 'Riwayat mutasi masuk/keluar stok'],
-                ['label' => 'Konfirmasi Gudang', 'url' => \App\Filament\Resources\WarehouseConfirmationResource::getUrl(), 'icon' => 'check-badge',              'desc' => 'Persetujuan penerimaan/pengeluaran gudang'],
+                ['label' => 'Inventory Stock',   'url' => \App\Filament\Resources\InventoryStockResource::getUrl(),        'icon' => 'archive-box',              'desc' => 'Monitor posisi stok real-time', 'class' => \App\Filament\Resources\InventoryStockResource::class],
+                ['label' => 'Stock Movement',    'url' => \App\Filament\Resources\StockMovementResource::getUrl(),         'icon' => 'arrow-trending-up',        'desc' => 'Riwayat mutasi masuk/keluar stok', 'class' => \App\Filament\Resources\StockMovementResource::class],
+                ['label' => 'Konfirmasi Gudang', 'url' => \App\Filament\Resources\WarehouseConfirmationResource::getUrl(), 'icon' => 'check-badge',              'desc' => 'Persetujuan penerimaan/pengeluaran gudang', 'class' => \App\Filament\Resources\WarehouseConfirmationResource::class],
             ],
         ],
     ];
+
+    $filteredSections = [];
+    foreach ($sections as $section) {
+        $filteredItems = [];
+        foreach ($section['items'] as $item) {
+            $class = $item['class'] ?? null;
+            if ($class) {
+                if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                    continue;
+                }
+                if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+        if (!empty($filteredItems)) {
+            $section['items'] = $filteredItems;
+            $filteredSections[] = $section;
+        }
+    }
+    $sections = $filteredSections;
     $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 

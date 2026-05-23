@@ -9,12 +9,34 @@
         [
             'title' => 'Akses & Otorisasi',
             'items' => [
-                ['label' => 'User',       'url' => \App\Filament\Resources\UserResource::getUrl(),        'icon' => 'user-circle', 'desc' => 'Kelola akun pengguna'],
-                ['label' => 'Role',       'url' => \App\Filament\Resources\RoleResource::getUrl(),        'icon' => 'finger-print', 'desc' => 'Kelola role dan tugas akses'],
-                ['label' => 'Permission', 'url' => \App\Filament\Resources\PermissionResource::getUrl(),  'icon' => 'key',          'desc' => 'Kelola hak akses sistem'],
+                ['label' => 'User',       'url' => \App\Filament\Resources\UserResource::getUrl(),        'icon' => 'user-circle', 'desc' => 'Kelola akun pengguna', 'class' => \App\Filament\Resources\UserResource::class],
+                ['label' => 'Role',       'url' => \App\Filament\Resources\RoleResource::getUrl(),        'icon' => 'finger-print', 'desc' => 'Kelola role dan tugas akses', 'class' => \App\Filament\Resources\RoleResource::class],
+                ['label' => 'Permission', 'url' => \App\Filament\Resources\PermissionResource::getUrl(),  'icon' => 'key',          'desc' => 'Kelola hak akses sistem', 'class' => \App\Filament\Resources\PermissionResource::class],
             ],
         ],
     ];
+
+    $filteredSections = [];
+    foreach ($sections as $section) {
+        $filteredItems = [];
+        foreach ($section['items'] as $item) {
+            $class = $item['class'] ?? null;
+            if ($class) {
+                if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                    continue;
+                }
+                if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+        if (!empty($filteredItems)) {
+            $section['items'] = $filteredItems;
+            $filteredSections[] = $section;
+        }
+    }
+    $sections = $filteredSections;
     $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 
