@@ -6,9 +6,24 @@
     $heroFrom    = '#fffbeb';
     $heroTo      = '#fde68a';
     $items = [
-        ['label' => 'Utang Usaha',        'url' => \App\Filament\Resources\AccountPayableResource::getUrl(),  'icon' => 'credit-card',   'desc' => 'Kelola kewajiban pembayaran ke supplier'],
-        ['label' => 'Invoice Pembelian',  'url' => \App\Filament\Resources\PurchaseInvoiceResource::getUrl(), 'icon' => 'document-text', 'desc' => 'Tagihan pembelian dari vendor/supplier'],
+        ['label' => 'Utang Usaha',        'url' => \App\Filament\Resources\AccountPayableResource::getUrl(),  'icon' => 'credit-card',   'desc' => 'Kelola kewajiban pembayaran ke supplier', 'class' => \App\Filament\Resources\AccountPayableResource::class],
+        ['label' => 'Invoice Pembelian',  'url' => \App\Filament\Resources\PurchaseInvoiceResource::getUrl(), 'icon' => 'document-text', 'desc' => 'Tagihan pembelian dari vendor/supplier', 'class' => \App\Filament\Resources\PurchaseInvoiceResource::class],
     ];
+
+    $filteredItems = [];
+    foreach ($items as $item) {
+        $class = $item['class'] ?? null;
+        if ($class) {
+            if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                continue;
+            }
+            if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                continue;
+            }
+        }
+        $filteredItems[] = $item;
+    }
+    $items = $filteredItems;
 @endphp
 
 @include('filament.pages.partials.hub-styles')

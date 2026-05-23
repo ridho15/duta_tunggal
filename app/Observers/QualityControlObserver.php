@@ -57,6 +57,19 @@ class QualityControlObserver
                     (float) $limit['remaining_received']
                 );
                 $maxAccepted = min($maxInspectable, (float) $limit['remaining_accepted']);
+                $quantityReceived = $qualityControl->quantity_received;
+                if ($quantityReceived !== null) {
+                    $quantityReceived = (float) $quantityReceived;
+
+                    if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                        throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed Qty Received ({$quantityReceived}).");
+                    }
+
+                    $totalAgainstReceived = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                    if ($totalAgainstReceived > $quantityReceived) {
+                        throw new \Exception("QC total inspected quantity ({$totalAgainstReceived}) cannot exceed Qty Received ({$quantityReceived}).");
+                    }
+                }
 
                 // Validate passed_quantity individually
                 if ($qualityControl->passed_quantity > $maxAccepted) {

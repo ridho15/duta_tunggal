@@ -1109,13 +1109,23 @@ class PurchaseOrderResource extends Resource
                                         $max = OrderRequestQuantityLock::orderRequestItemLimit((int) $orItemId)['remaining_for_po'];
                                         return "Maks: {$max} (sisa OR)";
                                     })
-                                    ->rules([function (Get $get, $record) {
-                                        return function ($attribute, $value, $fail) use ($get, $record) {
+                                    ->rules([function (Get $get) {
+                                        return function ($attribute, $value, $fail) use ($get) {
                                             $orItemId = $get('refer_item_model_id');
                                             if (!$orItemId) return;
+                                            
+                                            // Mengurai index repeater dari path atribut (misal: 'purchaseOrderItem.0.quantity')
+                                            $segments = explode('.', $attribute);
+                                            $index = $segments[1] ?? null;
+                                            $itemId = null;
+                                            if ($index !== null) {
+                                                $items = $get('../../purchaseOrderItem') ?? [];
+                                                $itemId = $items[$index]['id'] ?? null;
+                                            }
+
                                             $max = OrderRequestQuantityLock::orderRequestItemLimit(
                                                 (int) $orItemId,
-                                                $record?->id ? (int) $record->id : null
+                                                $itemId ? (int) $itemId : null
                                             )['remaining_for_po'];
                                             if ((float) $value > $max) {
                                                 $fail("Qty tidak boleh melebihi sisa Order Request ({$max}).");

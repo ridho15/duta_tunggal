@@ -97,6 +97,14 @@ class QualityControlService
 
         $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
         $inspectedQuantity = (float) $passedQuantity + (float) $rejectedQuantity;
+        $quantityReceived = $data['quantity_received'] ?? $inspectedQuantity;
+        if ((float) $passedQuantity > (float) $quantityReceived) {
+            throw new \Exception("QC passed quantity ({$passedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+        }
+
+        if ($inspectedQuantity > (float) $quantityReceived) {
+            throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+        }
         if ($inspectedQuantity > $limit['remaining_received']) {
             throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
         }
@@ -108,7 +116,7 @@ class QualityControlService
             'qc_number'         => $this->generateQcNumber(),
             'passed_quantity'   => $passedQuantity,
             'rejected_quantity' => $rejectedQuantity,
-            'quantity_received' => $data['quantity_received'] ?? $passedQuantity,
+            'quantity_received' => $quantityReceived,
             'notes'             => $data['notes'] ?? null,
             'status'            => 0,
             'inspected_by'      => $data['inspected_by'] ?? null,
@@ -164,7 +172,7 @@ class QualityControlService
         }
 
         $updatedAttributes = [];
-        foreach (['passed_quantity', 'rejected_quantity', 'warehouse_id', 'rak_id', 'reason_reject', 'inspected_by'] as $field) {
+        foreach (['passed_quantity', 'rejected_quantity', 'quantity_received', 'warehouse_id', 'rak_id', 'reason_reject', 'inspected_by'] as $field) {
             if (array_key_exists($field, $data)) {
                 $updatedAttributes[$field] = $data[$field];
             }
@@ -189,6 +197,31 @@ class QualityControlService
             }
         }
 
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $purchaseOrderItem = $qualityControl->fromModel;
+            if ($purchaseOrderItem) {
+                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+                $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
+
+                if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $quantityReceived) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $limit['remaining_received']) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+                }
+
+                if ((float) $qualityControl->passed_quantity > $limit['remaining_accepted']) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+                }
+            }
+        }
+
         if ($qualityControl->isDirty()) {
             $qualityControl->save();
         }
@@ -206,6 +239,15 @@ class QualityControlService
             if ($purchaseOrderItem) {
                 $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
                 $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
+
+                if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $quantityReceived) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
 
                 if ($inspectedQuantity > $limit['remaining_received']) {
                     throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");

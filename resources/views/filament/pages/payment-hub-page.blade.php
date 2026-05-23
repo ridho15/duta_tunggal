@@ -6,13 +6,28 @@
     $heroFrom    = '#eef2ff';
     $heroTo      = '#c7d2fe';
     $items = [
-        ['label' => 'Permintaan Pembayaran', 'url' => \App\Filament\Resources\PaymentRequestResource::getUrl(),     'icon' => 'document-text',    'desc' => 'Ajukan permintaan dana ke keuangan'],
-        ['label' => 'Penerimaan Pelanggan',  'url' => \App\Filament\Resources\CustomerReceiptResource::getUrl(),    'icon' => 'inbox-arrow-down', 'desc' => 'Catat pembayaran masuk dari pelanggan'],
-        ['label' => 'Pembayaran Vendor',     'url' => \App\Filament\Resources\VendorPaymentResource::getUrl(),      'icon' => 'arrow-up-circle',  'desc' => 'Proses pelunasan ke vendor/supplier'],
-        ['label' => 'Transaksi Kas & Bank',  'url' => \App\Filament\Resources\CashBankTransactionResource::getUrl(),'icon' => 'banknotes',        'desc' => 'Catat penerimaan & pengeluaran kas/bank'],
-        ['label' => 'Deposit',               'url' => \App\Filament\Resources\DepositResource::getUrl(),            'icon' => 'circle-stack',     'desc' => 'Kelola deposit & uang muka'],
-        ['label' => 'Transfer Kas & Bank',   'url' => \App\Filament\Resources\CashBankTransferResource::getUrl(),  'icon' => 'arrows-right-left','desc' => 'Transfer antar akun kas & bank'],
+        ['label' => 'Permintaan Pembayaran', 'url' => \App\Filament\Resources\PaymentRequestResource::getUrl(),     'icon' => 'document-text',    'desc' => 'Ajukan permintaan dana ke keuangan', 'class' => \App\Filament\Resources\PaymentRequestResource::class],
+        ['label' => 'Penerimaan Pelanggan',  'url' => \App\Filament\Resources\CustomerReceiptResource::getUrl(),    'icon' => 'inbox-arrow-down', 'desc' => 'Catat pembayaran masuk dari pelanggan', 'class' => \App\Filament\Resources\CustomerReceiptResource::class],
+        ['label' => 'Pembayaran Vendor',     'url' => \App\Filament\Resources\VendorPaymentResource::getUrl(),      'icon' => 'arrow-up-circle',  'desc' => 'Proses pelunasan ke vendor/supplier', 'class' => \App\Filament\Resources\VendorPaymentResource::class],
+        ['label' => 'Transaksi Kas & Bank',  'url' => \App\Filament\Resources\CashBankTransactionResource::getUrl(),'icon' => 'banknotes',        'desc' => 'Catat penerimaan & pengeluaran kas/bank', 'class' => \App\Filament\Resources\CashBankTransactionResource::class],
+        ['label' => 'Deposit',               'url' => \App\Filament\Resources\DepositResource::getUrl(),            'icon' => 'circle-stack',     'desc' => 'Kelola deposit & uang muka', 'class' => \App\Filament\Resources\DepositResource::class],
+        ['label' => 'Transfer Kas & Bank',   'url' => \App\Filament\Resources\CashBankTransferResource::getUrl(),  'icon' => 'arrows-right-left','desc' => 'Transfer antar akun kas & bank', 'class' => \App\Filament\Resources\CashBankTransferResource::class],
     ];
+
+    $filteredItems = [];
+    foreach ($items as $item) {
+        $class = $item['class'] ?? null;
+        if ($class) {
+            if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                continue;
+            }
+            if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                continue;
+            }
+        }
+        $filteredItems[] = $item;
+    }
+    $items = $filteredItems;
 @endphp
 
 @include('filament.pages.partials.hub-styles')

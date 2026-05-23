@@ -1358,6 +1358,9 @@ class OrderRequestResource extends Resource
                         ->fillForm(function ($record) {
                             $items = $record->orderRequestItem->map(function ($item) use ($record) {
                                 $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'];
+                                if ($remainingQty <= 0) {
+                                    return null;
+                                }
                                 // Use item-level supplier only
                                 $supplierId = $item->supplier_id;
                                 $cabangId = $item->cabang_id;
@@ -1406,15 +1409,17 @@ class OrderRequestResource extends Resource
                                     'cabang_name'      => $cabangName,
                                     'uom'              => $uom,
                                     'quantity'         => max(0, $remainingQty),
+                                    'original_price'   => self::formatMoneyPreviewState($item->original_price ?? $supplierPrice),
                                     'unit_price'       => $supplierPrice,
                                     'tax'              => $taxPct,
                                     'tax_nominal'      => $taxNom,
+                                    'total_cost'       => self::formatMoneyPreviewState($base),
                                     'subtotal'         => $subtotal,
                                     'max_quantity'     => max(0, $remainingQty),
                                     'include'          => $remainingQty > 0,
                                     'tipe_pajak'       => self::normalizeItemTaxType($item->tipe_pajak ?? null),
                                 ];
-                            })->values()->toArray();
+                            })->filter()->values()->toArray();
 
                             $groups = collect($items)
                                 ->map(fn($item) => implode('|', [
@@ -1529,7 +1534,7 @@ class OrderRequestResource extends Resource
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
-                            if (!$user || !$user->hasPermissionTo('approve order request') || $record->status !== 'approved') {
+                            if (!$user || !$user->hasPermissionTo('approve order request') || !in_array($record->status, ['approved', 'partial'], true)) {
                                 return false;
                             }
                             // Allow creating a new PO as long as some items still have unfulfilled quantity
@@ -1611,6 +1616,9 @@ class OrderRequestResource extends Resource
                         ->fillForm(function ($record) {
                             $items = $record->orderRequestItem->map(function ($item) use ($record) {
                                 $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'];
+                                if ($remainingQty <= 0) {
+                                    return null;
+                                }
                                 // Use item-level supplier only (no OR-level fallback)
                                 $supplierId = $item->supplier_id;
                                 $cabangId = $item->cabang_id;
@@ -1669,7 +1677,7 @@ class OrderRequestResource extends Resource
                                     'include'          => $remainingQty > 0,
                                     'tipe_pajak'       => self::normalizeItemTaxType($item->tipe_pajak ?? null),
                                 ];
-                            })->values()->toArray();
+                            })->filter()->values()->toArray();
 
                             $groups = collect($items)
                                 ->map(fn($item) => implode('|', [

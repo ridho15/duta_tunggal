@@ -106,6 +106,9 @@ class ViewOrderRequest extends ViewRecord
                 ->fillForm(function ($record) {
                     $items = $record->orderRequestItem->map(function ($item) use ($record) {
                         $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'];
+                        if ($remainingQty <= 0) {
+                            return null;
+                        }
                         $unitPrice = MoneyHelper::safeParse($item->unit_price ?? 0);
                         $originalPrice = MoneyHelper::safeParse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
@@ -153,7 +156,7 @@ class ViewOrderRequest extends ViewRecord
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null),
                         ];
-                    })->values()->toArray();
+                    })->filter()->values()->toArray();
 
                     $groups = collect($items)
                         ->map(fn($item) => implode('|', [
@@ -336,6 +339,9 @@ class ViewOrderRequest extends ViewRecord
                 ->fillForm(function ($record) {
                     $items = $record->orderRequestItem->map(function ($item) use($record) {
                         $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'];
+                        if ($remainingQty <= 0) {
+                            return null;
+                        }
                         $unitPrice = MoneyHelper::safeParse($item->unit_price ?? 0);
                         $originalPrice = MoneyHelper::safeParse($item->original_price ?? $item->unit_price ?? 0);
                         $totalCost = max(0, $remainingQty) * $unitPrice;
@@ -378,11 +384,12 @@ class ViewOrderRequest extends ViewRecord
                             'tax'              => $taxPct,
                             'tax_nominal'      => OrderRequestResource::formatMoneyPreviewState($preview['tax_nominal']),
                             'total_cost'       => OrderRequestResource::formatMoneyPreviewState($preview['total_cost']),
+                            'subtotal'         => OrderRequestResource::formatMoneyPreviewState($preview['subtotal']),
                             'max_quantity'     => max(0, $remainingQty),
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => $tipePajak,
                         ];
-                    })->values()->toArray();
+                    })->filter()->values()->toArray();
 
                     $groups = collect($items)
                         ->map(fn($item) => implode('|', [
@@ -398,6 +405,7 @@ class ViewOrderRequest extends ViewRecord
 
                     return [
                         'supplier_id'    => $isMultiSupplier ? null : $firstSupplierId,
+                        'cabang_id'      => $isMultiSupplier ? null : ($items[0]['item_cabang_id'] ?? null),
                         'multi_supplier' => $isMultiSupplier,
                         'selected_items' => $items,
                     ];
@@ -474,7 +482,7 @@ class ViewOrderRequest extends ViewRecord
                         ]),
                 ])
                 ->visible(function ($record) {
-                    if (!Auth::user()->hasPermissionTo('approve order request') || $record->status !== 'approved') {
+                    if (!Auth::user()->hasPermissionTo('approve order request') || !in_array($record->status, ['approved', 'partial'], true)) {
                         return false;
                     }
                     // Show button as long as some items still have unfulfilled quantity
@@ -512,6 +520,7 @@ class ViewOrderRequest extends ViewRecord
 
                             $poData = array_merge($data, [
                                 'supplier_id'    => $supplierId,
+                                'cabang_id'      => $cabangId,
                                 'po_number'      => $poNumber,
                                 'selected_items' => $groupItems->values()->toArray(),
                                 'multi_supplier' => false,

@@ -9,20 +9,42 @@
         [
             'title' => 'Perencanaan Produksi',
             'items' => [
-                ['label' => 'Bill of Material',    'url' => \App\Filament\Resources\BillOfMaterialResource::getUrl(),     'icon' => 'document-text',           'desc' => 'Struktur material dan komponen produksi'],
-                ['label' => 'Production Plan',     'url' => \App\Filament\Resources\ProductionPlanResource::getUrl(),      'icon' => 'calendar-days',           'desc' => 'Rencana produksi terjadwal'],
-                ['label' => 'Manufacturing Order', 'url' => \App\Filament\Resources\ManufacturingOrderResource::getUrl(),  'icon' => 'clipboard-document-list', 'desc' => 'Instruksi produksi per order'],
+                ['label' => 'Bill of Material',    'url' => \App\Filament\Resources\BillOfMaterialResource::getUrl(),     'icon' => 'document-text',           'desc' => 'Struktur material dan komponen produksi', 'class' => \App\Filament\Resources\BillOfMaterialResource::class],
+                ['label' => 'Production Plan',     'url' => \App\Filament\Resources\ProductionPlanResource::getUrl(),      'icon' => 'calendar-days',           'desc' => 'Rencana produksi terjadwal', 'class' => \App\Filament\Resources\ProductionPlanResource::class],
+                ['label' => 'Manufacturing Order', 'url' => \App\Filament\Resources\ManufacturingOrderResource::getUrl(),  'icon' => 'clipboard-document-list', 'desc' => 'Instruksi produksi per order', 'class' => \App\Filament\Resources\ManufacturingOrderResource::class],
             ],
         ],
         [
             'title' => 'Eksekusi Produksi',
             'items' => [
-                ['label' => 'Material Issue',       'url' => \App\Filament\Resources\MaterialIssueResource::getUrl(),           'icon' => 'archive-box-arrow-down', 'desc' => 'Pengeluaran material ke produksi'],
-                ['label' => 'Production',           'url' => \App\Filament\Resources\ProductionResource::getUrl(),               'icon' => 'play-circle',           'desc' => 'Eksekusi dan progres produksi'],
-                ['label' => 'QC Manufacture',       'url' => \App\Filament\Resources\QualityControlManufactureResource::getUrl(), 'icon' => 'check-badge',            'desc' => 'Kontrol kualitas hasil produksi'],
+                ['label' => 'Material Issue',       'url' => \App\Filament\Resources\MaterialIssueResource::getUrl(),           'icon' => 'archive-box-arrow-down', 'desc' => 'Pengeluaran material ke produksi', 'class' => \App\Filament\Resources\MaterialIssueResource::class],
+                ['label' => 'Production',           'url' => \App\Filament\Resources\ProductionResource::getUrl(),               'icon' => 'play-circle',           'desc' => 'Eksekusi dan progres produksi', 'class' => \App\Filament\Resources\ProductionResource::class],
+                ['label' => 'QC Manufacture',       'url' => \App\Filament\Resources\QualityControlManufactureResource::getUrl(), 'icon' => 'check-badge',            'desc' => 'Kontrol kualitas hasil produksi', 'class' => \App\Filament\Resources\QualityControlManufactureResource::class],
             ],
         ],
     ];
+
+    $filteredSections = [];
+    foreach ($sections as $section) {
+        $filteredItems = [];
+        foreach ($section['items'] as $item) {
+            $class = $item['class'] ?? null;
+            if ($class) {
+                if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                    continue;
+                }
+                if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+        if (!empty($filteredItems)) {
+            $section['items'] = $filteredItems;
+            $filteredSections[] = $section;
+        }
+    }
+    $sections = $filteredSections;
     $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 

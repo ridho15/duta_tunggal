@@ -9,12 +9,34 @@
         [
             'title' => 'Aset Tetap',
             'items' => [
-                ['label' => 'Aset Tetap',    'url' => \App\Filament\Resources\AssetResource::getUrl(),         'icon' => 'building-office-2',  'desc' => 'Master aset dan nilai buku'],
-                ['label' => 'Transfer Aset', 'url' => \App\Filament\Resources\AssetTransferResource::getUrl(),  'icon' => 'arrow-right-circle', 'desc' => 'Perpindahan aset antar cabang'],
-                ['label' => 'Disposal Aset', 'url' => \App\Filament\Resources\AssetDisposalResource::getUrl(),  'icon' => 'archive-box-x-mark', 'desc' => 'Penghapusan aset tetap'],
+                ['label' => 'Aset Tetap',    'url' => \App\Filament\Resources\AssetResource::getUrl(),         'icon' => 'building-office-2',  'desc' => 'Master aset dan nilai buku', 'class' => \App\Filament\Resources\AssetResource::class],
+                ['label' => 'Transfer Aset', 'url' => \App\Filament\Resources\AssetTransferResource::getUrl(),  'icon' => 'arrow-right-circle', 'desc' => 'Perpindahan aset antar cabang', 'class' => \App\Filament\Resources\AssetTransferResource::class],
+                ['label' => 'Disposal Aset', 'url' => \App\Filament\Resources\AssetDisposalResource::getUrl(),  'icon' => 'archive-box-x-mark', 'desc' => 'Penghapusan aset tetap', 'class' => \App\Filament\Resources\AssetDisposalResource::class],
             ],
         ],
     ];
+
+    $filteredSections = [];
+    foreach ($sections as $section) {
+        $filteredItems = [];
+        foreach ($section['items'] as $item) {
+            $class = $item['class'] ?? null;
+            if ($class) {
+                if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                    continue;
+                }
+                if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+        if (!empty($filteredItems)) {
+            $section['items'] = $filteredItems;
+            $filteredSections[] = $section;
+        }
+    }
+    $sections = $filteredSections;
     $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 

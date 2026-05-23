@@ -27,6 +27,10 @@ class EditQualityControlPurchase extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        if (! QualityControlPurchaseResource::canChooseInspector()) {
+            $data['inspected_by'] = $this->record->inspected_by;
+        }
+
         return $data;
     }
 

@@ -64,6 +64,43 @@ class QualityControlPurchaseResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    public static function canChooseInspector(): bool
+    {
+        return Auth::user()?->hasRole(['Super Admin', 'Owner']) === true;
+    }
+
+    public static function syncQcQuantityAgainstReceived(callable $set, callable $get, ?string $changedField = null): void
+    {
+        $received = max(0, (float) ($get('quantity_received') ?? 0));
+        $passed = max(0, (float) ($get('passed_quantity') ?? 0));
+
+        // ensure passed quantity does not exceed received quantity
+        if ($passed > $received) {
+            $passed = $received;
+        }
+
+        $rejected = max(0, $received - $passed);
+
+        $set('passed_quantity', $passed);
+        $set('rejected_quantity', $rejected);
+        $set('total_inspected', $received);
+    }
+
+    public static function validateQcQuantityAgainstReceived(callable $get, \Closure $fail, mixed $passedValue = null, mixed $rejectedValue = null): void
+    {
+        $received = (float) ($get('quantity_received') ?? 0);
+        $passed = (float) ($passedValue ?? $get('passed_quantity') ?? 0);
+        $rejected = (float) ($rejectedValue ?? $get('rejected_quantity') ?? 0);
+
+        if ($passed > $received) {
+            $fail("Passed quantity ({$passed}) tidak boleh melebihi Qty Received ({$received}).");
+        }
+
+        if (($passed + $rejected) > $received) {
+            $fail("Total passed dan rejected ({$passed} + {$rejected}) tidak boleh melebihi Qty Received ({$received}).");
+        }
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -225,6 +262,9 @@ class QualityControlPurchaseResource extends Resource
                                     ->numeric()
                                     ->required()
                                     ->reactive()
+                                    ->afterStateUpdated(function (callable $set, callable $get) {
+                                        static::syncQcQuantityAgainstReceived($set, $get, 'quantity_received');
+                                    })
                                     ->helperText('Jumlah barang yang datang/diterima dari supplier')
                                     ->validationMessages([
                                         'required' => 'Quantity Received wajib diisi',
@@ -298,6 +338,8 @@ class QualityControlPurchaseResource extends Resource
                                                         }
                                                     }
                                                 }
+
+                                                static::validateQcQuantityAgainstReceived($get, $fail, $value);
                                             };
                                         }
                                     ])
@@ -306,84 +348,13 @@ class QualityControlPurchaseResource extends Resource
                                         'numeric' => 'Passed Quantity harus berupa angka'
                                     ])
                                     ->afterStateUpdated(function ($set, $get) {
-                                        $passed   = (float) $get('passed_quantity');
-                                        $rejected = (float) $get('rejected_quantity');
-
-                                        $purchaseOrderItemId = $get('from_model_id');
-                                        if ($purchaseOrderItemId) {
-                                            $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
-                                                    if ($item) {
-                                                        $alreadyInspected = $item->qualityControls->sum(
-                                                            fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
-                                                        );
-                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
-
-                                                if ($remainingQty > 0 && ($passed + $rejected) > $remainingQty) {
-                                                    $set('passed_quantity', max(0, $remainingQty - $rejected));
-                                                    $passed = max(0, $remainingQty - $rejected);
-                                                }
-                                            }
-                                        }
-
-                                        $set('total_inspected', $passed + $rejected);
+                                        static::syncQcQuantityAgainstReceived($set, $get, 'passed_quantity');
                                     }),
                                 TextInput::make('rejected_quantity')
                                     ->label('Rejected Quantity')
                                     ->numeric()
-                                    ->required()
-                                    ->reactive()
-                                    ->rules([
-                                        function ($get) {
-                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                                $passed   = (float) $get('passed_quantity');
-                                                $rejected = (float) $value;
-
-                                                $purchaseOrderItemId = $get('from_model_id');
-                                                if ($purchaseOrderItemId) {
-                                                    $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
-                                                    if ($item) {
-                                                        $alreadyInspected = $item->qualityControls->sum(
-                                                            fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
-                                                        );
-                                                        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                        $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
-
-                                                        if (($passed + $rejected) > $remainingQty) {
-                                                            $fail("Total inspected ({$passed} + {$rejected}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
-                                                        }
-                                                    }
-                                                }
-                                            };
-                                        }
-                                    ])
-                                    ->validationMessages([
-                                        'required' => 'Rejected Quantity wajib diisi',
-                                        'numeric' => 'Rejected Quantity harus berupa angka'
-                                    ])
-                                    ->afterStateUpdated(function ($set, $get) {
-                                        $passed   = (float) $get('passed_quantity');
-                                        $rejected = (float) $get('rejected_quantity');
-
-                                        $purchaseOrderItemId = $get('from_model_id');
-                                        if ($purchaseOrderItemId) {
-                                            $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
-                                            if ($item) {
-                                                $alreadyInspected = $item->qualityControls->sum(
-                                                    fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
-                                                );
-                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
-
-                                                if ($remainingQty > 0 && ($passed + $rejected) > $remainingQty) {
-                                                    $set('rejected_quantity', max(0, $remainingQty - $passed));
-                                                    $rejected = max(0, $remainingQty - $passed);
-                                                }
-                                            }
-                                        }
-
-                                        $set('total_inspected', $passed + $rejected);
-                                    }),
+                                    ->disabled()
+                                    ->dehydrated(true),
                                 TextInput::make('total_inspected')
                                     ->label('Total Inspected')
                                     ->disabled()
@@ -396,6 +367,11 @@ class QualityControlPurchaseResource extends Resource
                                 Select::make('inspected_by')
                                     ->label('Inspected By')
                                     ->options(\App\Models\User::pluck('name', 'id'))
+                                    ->default(fn (?QualityControl $record) => $record?->inspected_by ?? Auth::id())
+                                    ->disabled(fn () => ! static::canChooseInspector())
+                                    ->dehydrated(true)
+                                    ->searchable(fn () => static::canChooseInspector())
+                                    ->preload(fn () => static::canChooseInspector())
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Inspected By harus dipilih'
@@ -596,6 +572,16 @@ class QualityControlPurchaseResource extends Resource
                                         return [];
                                     })
                                     ->searchable(),
+                                Select::make('inspected_by')
+                                    ->label('Inspected By')
+                                    ->options(\App\Models\User::pluck('name', 'id'))
+                                    ->default(Auth::id())
+                                    ->disabled(fn () => ! static::canChooseInspector())
+                                    ->dehydrated(true)
+                                    ->searchable(fn () => static::canChooseInspector())
+                                    ->preload(fn () => static::canChooseInspector())
+                                    ->required()
+                                    ->validationMessages(['required' => 'Inspected By harus dipilih']),
                                 \Filament\Forms\Components\DatePicker::make('inspection_date')
                                     ->label('Tanggal Inspeksi')
                                     ->default(now())
@@ -607,10 +593,11 @@ class QualityControlPurchaseResource extends Resource
                             ]),
                     ])
                     ->action(function (array $data) {
-                        $created = 0;
-                        $selectedItemIds = $data['selected_po_item_ids'] ?? [];
+                            $created = 0;
+                            $selectedItemIds = $data['selected_po_item_ids'] ?? [];
+                            $inspectedBy = static::canChooseInspector() ? ($data['inspected_by'] ?? Auth::id()) : Auth::id();
 
-                        foreach ($selectedItemIds as $poItemId) {
+                            foreach ($selectedItemIds as $poItemId) {
                             $poItem = PurchaseOrderItem::with(['product', 'qualityControls', 'purchaseOrder'])->find($poItemId);
                             if (!$poItem) continue;
 
@@ -638,6 +625,7 @@ class QualityControlPurchaseResource extends Resource
                                 'rejected_quantity' => 0,
                                 'quantity_received' => $remainingQty,
                                 'status'            => 0,
+                                'inspected_by'      => $inspectedBy,
                                 'notes'             => $data['notes'] ?? null,
                                 'date_send_stock'   => $data['inspection_date'] ?? now(),
                                 'cabang_id'         => $poItem->purchaseOrder->cabang_id ?? Auth::user()?->cabang_id,
@@ -750,76 +738,13 @@ class QualityControlPurchaseResource extends Resource
                             // Sembunyikan action jika passed_quantity = 0 atau sudah diproses
                             return !$record->status && $record->passed_quantity > 0;
                         })
-                        // Show a resolution form only when there are rejected items
-                        ->form(function ($record) {
-                            if (!$record || $record->rejected_quantity <= 0) {
-                                return [];
-                            }
-
-                            return [
-                                \Filament\Forms\Components\Placeholder::make('qc_summary')
-                                    ->label('Ringkasan QC')
-                                    ->content(function () use ($record) {
-                                        return "Qty Diterima: {$record->passed_quantity} | Qty Ditolak: {$record->rejected_quantity}";
-                                    }),
-                                \Filament\Forms\Components\Radio::make('failed_qc_action')
-                                    ->label('Tindakan untuk item yang ditolak')
-                                    ->required()
-                                    ->options(PurchaseReturn::qcActionOptions())
-                                    ->descriptions([
-                                        PurchaseReturn::QC_ACTION_REDUCE_STOCK
-                                            => 'Qty pada PO item akan dikurangi sebesar qty yang ditolak. Barang dianggap tidak datang.',
-                                        PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY
-                                            => 'PO tetap terbuka; supplier diharapkan mengirim ulang item yang ditolak.',
-                                        PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER
-                                            => 'Qty yang ditolak digabung ke PO berikutnya dengan harga asli.',
-                                    ])
-                                    ->reactive(),
-                                \Filament\Forms\Components\Select::make('merge_target_po_id')
-                                    ->label('Target PO (untuk penggabungan)')
-                                    ->searchable()
-                                    ->preload()
-                                    ->options(function () use ($record) {
-                                        return PurchaseOrder::whereIn('status', ['draft', 'pending_approval', 'approved'])
-                                            ->whereHas('purchaseOrderItem', function ($q) use ($record) {
-                                                $q->where('product_id', $record->product_id);
-                                            })
-                                            ->orWhere(function ($q) {
-                                                $q->whereIn('status', ['draft', 'pending_approval', 'approved']);
-                                            })
-                                            ->limit(50)
-                                            ->get()
-                                            ->mapWithKeys(fn ($po) => [$po->id => "{$po->po_number} ({$po->supplier?->perusahaan})"])
-                                            ->toArray();
-                                    })
-                                    ->visible(fn ($get) => $get('failed_qc_action') === PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER)
-                                    ->required(fn ($get) => $get('failed_qc_action') === PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER),
-                            ];
-                        })
-                        ->requiresConfirmation(function ($record) {
-                            // Only show plain confirmation when there are NO rejected items
-                            return $record && $record->rejected_quantity <= 0;
-                        })
-                        ->modalHeading(fn ($record) => $record && $record->rejected_quantity > 0
-                            ? 'Proses QC – Pilih Tindakan untuk Item yang Ditolak'
-                            : 'Konfirmasi Process QC'
-                        )
-                        ->modalDescription(fn ($record) => $record && $record->rejected_quantity <= 0
-                            ? "Passed: {$record->passed_quantity}, Rejected: {$record->rejected_quantity}. Apakah Anda yakin ingin memproses QC ini?"
-                            : null
-                        )
+                        ->requiresConfirmation()
+                        ->modalHeading('Konfirmasi Process QC')
+                        ->modalDescription(fn ($record) => "Passed: {$record->passed_quantity}, Rejected: {$record->rejected_quantity}. Apakah Anda yakin ingin memproses QC ini?")
                         ->modalSubmitActionLabel('Proses QC')
                         ->action(function ($record, array $data) {
                             try {
                                 $qcService     = new QualityControlService();
-                                $returnService = app(PurchaseReturnService::class);
-
-                                if ($record->rejected_quantity > 0) {
-                                    $action     = $data['failed_qc_action'] ?? PurchaseReturn::QC_ACTION_REDUCE_STOCK;
-                                    $mergePoId  = $data['merge_target_po_id'] ?? null;
-
-                                    $returnService->createFromQualityControl($record, $action, $mergePoId ?: null);
-                                }
 
                                 $qcService->completeQualityControl($record, []);
                                 HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed. Proses selanjutnya: Tim Gudang perlu memperbarui stok penerimaan barang dan memastikan Purchase Order ditandai sebagai selesai.");

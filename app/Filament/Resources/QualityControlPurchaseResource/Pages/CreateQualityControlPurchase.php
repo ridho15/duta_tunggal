@@ -7,6 +7,7 @@ use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -14,6 +15,15 @@ use Throwable;
 class CreateQualityControlPurchase extends CreateRecord
 {
     protected static string $resource = QualityControlPurchaseResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        if (! QualityControlPurchaseResource::canChooseInspector()) {
+            $data['inspected_by'] = Auth::id();
+        }
+
+        return $data;
+    }
 
     protected function handleRecordCreation(array $data): Model
     {

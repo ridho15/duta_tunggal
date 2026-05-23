@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 
+use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\Currency;
 use App\Models\Product;
@@ -367,6 +368,10 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                             ->label('Diperiksa Oleh')
                                             ->options(\App\Models\User::pluck('name', 'id'))
                                             ->default(Auth::id())
+                                            ->disabled(fn () => ! Auth::user()?->hasRole(['Super Admin', 'Owner']))
+                                            ->dehydrated(true)
+                                            ->searchable(fn () => Auth::user()?->hasRole(['Super Admin', 'Owner']) === true)
+                                            ->preload(fn () => Auth::user()?->hasRole(['Super Admin', 'Owner']) === true)
                                             ->required()
                                             ->validationMessages(['required' => 'Pemeriksa wajib dipilih']),
                                         \Filament\Forms\Components\TextInput::make('quantity_received')
@@ -378,8 +383,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                             ->reactive()
                                             ->afterStateUpdated(function ($set, $get, $state) {
                                                 $received = (float) $state;
-                                                $set('passed_quantity', $received);
-                                                $set('rejected_quantity', 0);
+                                                $set('passed_quantity', min((float) ($get('passed_quantity') ?? $received), $received));
+                                                QualityControlPurchaseResource::syncQcQuantityAgainstReceived($set, $get, 'quantity_received');
                                             })
                                             ->validationMessages([
                                                 'required' => 'Qty diterima wajib diisi',
@@ -392,14 +397,21 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                             ->required()
                                             ->minValue(0)
                                             ->reactive()
+                                            ->rules([
+                                                fn ($get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                    QualityControlPurchaseResource::validateQcQuantityAgainstReceived($get, $fail, $value);
+                                                },
+                                            ])
+                                            ->afterStateUpdated(function ($set, $get) {
+                                                QualityControlPurchaseResource::syncQcQuantityAgainstReceived($set, $get, 'passed_quantity');
+                                            })
                                             ->validationMessages(['required' => 'Qty lulus wajib diisi']),
                                         \Filament\Forms\Components\TextInput::make('rejected_quantity')
                                             ->label('Qty Ditolak')
                                             ->numeric()
                                             ->default(0)
-                                            ->required()
-                                            ->minValue(0)
-                                            ->validationMessages(['required' => 'Qty ditolak wajib diisi']),
+                                            ->disabled()
+                                            ->dehydrated(true),
                                         \Filament\Forms\Components\Select::make('condition')
                                             ->label('Kondisi')
                                             ->options([
@@ -418,9 +430,10 @@ class PurchaseOrderItemRelationManager extends RelationManager
                         })
                         ->action(function ($record, array $data) {
                             $qualityControlService = app(QualityControlService::class);
+                            $canChooseInspector = Auth::user()?->hasRole(['Super Admin', 'Owner']) === true;
 
                             $qc = $qualityControlService->createQCFromPurchaseOrderItem($record, [
-                                'inspected_by'     => $data['inspected_by'],
+                                'inspected_by'     => $canChooseInspector ? ($data['inspected_by'] ?? Auth::id()) : Auth::id(),
                                 'passed_quantity'  => (float) ($data['passed_quantity'] ?? 0),
                                 'rejected_quantity' => (float) ($data['rejected_quantity'] ?? 0),
                                 'quantity_received' => (float) ($data['quantity_received'] ?? 0),

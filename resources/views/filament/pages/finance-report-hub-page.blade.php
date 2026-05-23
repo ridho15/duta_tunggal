@@ -9,27 +9,49 @@
         [
             'title' => 'Laporan Utama',
             'items' => [
-                ['label' => 'Neraca (Balance Sheet)',       'url' => \App\Filament\Resources\Reports\BalanceSheetResource::getUrl(),  'icon' => 'chart-bar',             'desc' => 'Posisi aset, liabilitas & ekuitas'],
-                ['label' => 'Laporan Laba Rugi (P&L)',      'url' => \App\Filament\Resources\Reports\ProfitAndLossResource::getUrl(), 'icon' => 'arrow-trending-up',     'desc' => 'Kinerja pendapatan & beban operasional'],
-                ['label' => 'Neraca Saldo (Trial Balance)', 'url' => \App\Filament\Pages\TrialBalancePage::getUrl(),                  'icon' => 'table-cells',           'desc' => 'Saldo debet/kredit per akun'],
-                ['label' => 'Buku Besar',                  'url' => \App\Filament\Pages\BukuBesarPage::getUrl(),                     'icon' => 'book-open',             'desc' => 'Rincian mutasi per akun COA'],
-                ['label' => 'Laporan Arus Kas',             'url' => \App\Filament\Resources\Reports\CashFlowResource::getUrl(),     'icon' => 'banknotes',             'desc' => 'Aliran dana masuk & keluar perusahaan'],
+                ['label' => 'Neraca (Balance Sheet)',       'url' => \App\Filament\Resources\Reports\BalanceSheetResource::getUrl(),  'icon' => 'chart-bar',             'desc' => 'Posisi aset, liabilitas & ekuitas', 'class' => \App\Filament\Resources\Reports\BalanceSheetResource::class],
+                ['label' => 'Laporan Laba Rugi (P&L)',      'url' => \App\Filament\Resources\Reports\ProfitAndLossResource::getUrl(), 'icon' => 'arrow-trending-up',     'desc' => 'Kinerja pendapatan & beban operasional', 'class' => \App\Filament\Resources\Reports\ProfitAndLossResource::class],
+                ['label' => 'Neraca Saldo (Trial Balance)', 'url' => \App\Filament\Pages\TrialBalancePage::getUrl(),                  'icon' => 'table-cells',           'desc' => 'Saldo debet/kredit per akun', 'class' => \App\Filament\Pages\TrialBalancePage::class],
+                ['label' => 'Buku Besar',                  'url' => \App\Filament\Pages\BukuBesarPage::getUrl(),                     'icon' => 'book-open',             'desc' => 'Rincian mutasi per akun COA', 'class' => \App\Filament\Pages\BukuBesarPage::class],
+                ['label' => 'Laporan Arus Kas',             'url' => \App\Filament\Resources\Reports\CashFlowResource::getUrl(),     'icon' => 'banknotes',             'desc' => 'Aliran dana masuk & keluar perusahaan', 'class' => \App\Filament\Resources\Reports\CashFlowResource::class],
             ],
         ],
         [
             'title' => 'Analisis & Pendukung',
             'items' => [
-                ['label' => 'HPP / Cost of Goods Sold',      'url' => \App\Filament\Resources\Reports\HppResource::getUrl(),                 'icon' => 'calculator',              'desc' => 'Hitung biaya pokok penjualan'],
-                ['label' => 'Cost of Goods Manufacturing',   'url' => \App\Filament\Pages\CostOfGoodsManufacturingPage::getUrl(),            'icon' => 'cog-6-tooth',             'desc' => 'Biaya produksi barang selesai'],
-                ['label' => 'Aging Report (AR/AP)',           'url' => \App\Filament\Resources\Reports\AgeingReportResource::getUrl(),        'icon' => 'clock',                   'desc' => 'Analisis umur piutang & hutang'],
-                ['label' => 'Profit per Divisi',              'url' => \App\Filament\Pages\ProfitLossMultiDivisionPage::getUrl(),             'icon' => 'chart-pie',               'desc' => 'Laba rugi per unit bisnis/divisi'],
-                ['label' => 'Drill Down Financial Report',   'url' => \App\Filament\Pages\DrillDownFinancialReportPage::getUrl(),            'icon' => 'magnifying-glass-circle', 'desc' => 'Analisis mendalam per pos keuangan'],
-                ['label' => 'Financial Statement',           'url' => \App\Filament\Pages\FinancialStatementPage::getUrl(),                  'icon' => 'document-chart-bar',      'desc' => 'Laporan keuangan gabungan lengkap'],
-                ['label' => 'ALK Grafik',                    'url' => \App\Filament\Pages\AlkGraficPage::getUrl(),                          'icon' => 'presentation-chart-line', 'desc' => 'Visualisasi analisis laporan keuangan'],
-                ['label' => 'Journal Consolidation',         'url' => \App\Filament\Pages\JournalConsolidationPage::getUrl(),               'icon' => 'server-stack',            'desc' => 'Konsolidasi jurnal lintas divisi'],
+                ['label' => 'HPP / Cost of Goods Sold',      'url' => \App\Filament\Resources\Reports\HppResource::getUrl(),                 'icon' => 'calculator',              'desc' => 'Hitung biaya pokok penjualan', 'class' => \App\Filament\Resources\Reports\HppResource::class],
+                ['label' => 'Cost of Goods Manufacturing',   'url' => \App\Filament\Pages\CostOfGoodsManufacturingPage::getUrl(),            'icon' => 'cog-6-tooth',             'desc' => 'Biaya produksi barang selesai', 'class' => \App\Filament\Pages\CostOfGoodsManufacturingPage::class],
+                ['label' => 'Aging Report (AR/AP)',           'url' => \App\Filament\Resources\Reports\AgeingReportResource::getUrl(),        'icon' => 'clock',                   'desc' => 'Analisis umur piutang & hutang', 'class' => \App\Filament\Resources\Reports\AgeingReportResource::class],
+                ['label' => 'Profit per Divisi',              'url' => \App\Filament\Pages\ProfitLossMultiDivisionPage::getUrl(),             'icon' => 'chart-pie',               'desc' => 'Laba rugi per unit bisnis/divisi', 'class' => \App\Filament\Pages\ProfitLossMultiDivisionPage::class],
+                ['label' => 'Drill Down Financial Report',   'url' => \App\Filament\Pages\DrillDownFinancialReportPage::getUrl(),            'icon' => 'magnifying-glass-circle', 'desc' => 'Analisis mendalam per pos keuangan', 'class' => \App\Filament\Pages\DrillDownFinancialReportPage::class],
+                ['label' => 'Financial Statement',           'url' => \App\Filament\Pages\FinancialStatementPage::getUrl(),                  'icon' => 'document-chart-bar',      'desc' => 'Laporan keuangan gabungan lengkap', 'class' => \App\Filament\Pages\FinancialStatementPage::class],
+                ['label' => 'ALK Grafik',                    'url' => \App\Filament\Pages\AlkGraficPage::getUrl(),                          'icon' => 'presentation-chart-line', 'desc' => 'Visualisasi analisis laporan keuangan', 'class' => \App\Filament\Pages\AlkGraficPage::class],
+                ['label' => 'Journal Consolidation',         'url' => \App\Filament\Pages\JournalConsolidationPage::getUrl(),               'icon' => 'server-stack',            'desc' => 'Konsolidasi jurnal lintas divisi', 'class' => \App\Filament\Pages\JournalConsolidationPage::class],
             ],
         ],
     ];
+
+    $filteredSections = [];
+    foreach ($sections as $section) {
+        $filteredItems = [];
+        foreach ($section['items'] as $item) {
+            $class = $item['class'] ?? null;
+            if ($class) {
+                if (is_subclass_of($class, \Filament\Resources\Resource::class) && !$class::canViewAny()) {
+                    continue;
+                }
+                if (is_subclass_of($class, \Filament\Pages\Page::class) && !$class::canAccess()) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+        if (!empty($filteredItems)) {
+            $section['items'] = $filteredItems;
+            $filteredSections[] = $section;
+        }
+    }
+    $sections = $filteredSections;
     $totalItems = collect($sections)->sum(fn($s) => count($s['items']));
 @endphp
 

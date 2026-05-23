@@ -260,7 +260,7 @@
             <td>: <strong>{{ $purchaseOrder->supplier->perusahaan }}</strong><br>
                 <span style="padding-left: 8px;">{{ $purchaseOrder->supplier->address }}</span>
             </td>
-            <td class="label">Tgl Diharapkan</td>
+            <td class="label">Tanggal Diharapkan</td>
             <td>: {{ $purchaseOrder->expected_date ? \Carbon\Carbon::parse($purchaseOrder->expected_date)->format('d/m/Y') : '-' }}</td>
         </tr>
         <tr>

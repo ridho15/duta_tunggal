@@ -23,6 +23,10 @@ class EditQualityControlManufacture extends EditRecord
     {
         $data['from_model_type'] = Production::class;
 
+        if (! QualityControlManufactureResource::canChooseInspector()) {
+            $data['inspected_by'] = $this->record->inspected_by;
+        }
+
         $production = Production::query()
             ->with('manufacturingOrder.productionPlan.product')
             ->find($data['from_model_id'] ?? $this->record->from_model_id);

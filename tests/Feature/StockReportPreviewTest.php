@@ -23,6 +23,8 @@ class StockReportPreviewTest extends TestCase
     #[Test]
     public function it_uses_stock_movements_for_preview_rows_and_outbound_totals(): void
     {
+        $this->seed(\Database\Seeders\PermissionSeeder::class);
+
         $user = User::factory()->create();
         $user->givePermissionTo('view any inventory stock');
         $this->actingAs($user);
@@ -100,6 +102,8 @@ class StockReportPreviewTest extends TestCase
     #[Test]
     public function it_prefers_inventory_snapshot_for_qty_on_hand_and_computes_status_and_value(): void
     {
+        $this->seed(\Database\Seeders\PermissionSeeder::class);
+
         $user = User::factory()->create();
         $user->givePermissionTo('view any inventory stock');
         $this->actingAs($user);
@@ -187,4 +191,20 @@ class StockReportPreviewTest extends TestCase
         $response->assertSee('Produk Preview Snapshot');
         $response->assertSee('32.500');
     }
+
+    #[Test]
+    public function it_can_render_the_filament_stock_report_page(): void
+    {
+        $this->seed(\Database\Seeders\PermissionSeeder::class);
+
+        $user = User::factory()->create();
+        // Give necessary permissions to access stock report and inventory stocks
+        $user->givePermissionTo('view any inventory stock');
+        $this->actingAs($user);
+
+        $response = $this->get(\App\Filament\Resources\Reports\StockReportResource::getUrl('index'));
+
+        $response->assertOk();
+    }
 }
+

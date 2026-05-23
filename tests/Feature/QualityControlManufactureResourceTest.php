@@ -18,6 +18,7 @@ use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -217,4 +218,70 @@ test('quality control manufacture create page lists finished productions without
     expect(array_values($options))
         ->toContain($eligibleLabel)
         ->not->toContain($existingLinkedLabel);
+});
+
+test('quality control manufacture create defaults inspector to current user for regular user', function () {
+    $context = createQualityControlManufactureContext();
+    $otherUser = User::factory()->create(['cabang_id' => $context['user']->cabang_id]);
+
+    Livewire::actingAs($context['user'])
+        ->test(CreateQualityControlManufacture::class)
+        ->assertFormSet([
+            'inspected_by' => $context['user']->id,
+        ])
+        ->fillForm([
+            'from_model_id' => $context['eligibleProduction']->id,
+            'qc_number' => 'QC-M-INSPECTOR-001',
+            'warehouse_id' => $context['warehouse']->id,
+            'rak_id' => $context['rak']->id,
+            'passed_quantity' => 5,
+            'rejected_quantity' => 0,
+            'inspected_by' => $otherUser->id,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(QualityControl::where('qc_number', 'QC-M-INSPECTOR-001')->value('inspected_by'))
+        ->toBe($context['user']->id);
+});
+
+test('quality control manufacture create allows super admin to choose inspector', function () {
+    $context = createQualityControlManufactureContext();
+    $otherUser = User::factory()->create(['cabang_id' => $context['user']->cabang_id]);
+    $role = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $context['user']->assignRole($role);
+
+    Livewire::actingAs($context['user'])
+        ->test(CreateQualityControlManufacture::class)
+        ->fillForm([
+            'from_model_id' => $context['eligibleProduction']->id,
+            'qc_number' => 'QC-M-SUPER-INSPECTOR-001',
+            'warehouse_id' => $context['warehouse']->id,
+            'rak_id' => $context['rak']->id,
+            'passed_quantity' => 5,
+            'rejected_quantity' => 0,
+            'inspected_by' => $otherUser->id,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(QualityControl::where('qc_number', 'QC-M-SUPER-INSPECTOR-001')->value('inspected_by'))
+        ->toBe($otherUser->id);
+});
+
+test('quality control manufacture edit keeps existing inspector for regular user', function () {
+    $context = createQualityControlManufactureContext();
+    $otherUser = User::factory()->create(['cabang_id' => $context['user']->cabang_id]);
+
+    Livewire::actingAs($context['user'])
+        ->test(EditQualityControlManufacture::class, ['record' => $context['qualityControl']->getKey()])
+        ->fillForm([
+            'inspected_by' => $otherUser->id,
+            'notes' => 'Updated notes',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($context['qualityControl']->fresh()->inspected_by)
+        ->toBe($context['user']->id);
 });
